@@ -1,0 +1,149 @@
+.imagewidget-container {
+    font-family: sans-serif;
+    padding: 1.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .imagewidget-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 6px;
+  }
+  
+  .imagewidget-navigation {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 6px;
+  }
+  
+  .imagewidget-navigation {
+    justify-content: space-between;
+  }
+  
+  .imagewidget-toolbar button, .imagewidget-navigation button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+  
+  .imagewidget-tools button {
+      width: 32px;
+  }
+  
+  .imagewidget-toolbar button:hover, .imagewidget-navigation button:hover {
+    background-color: #f0f0f0;
+    border-color: #bbb;
+  }
+  
+  .imagewidget-toolbar button:active, .imagewidget-navigation button:active {
+    background-color: #e0e0e0;
+  }
+  
+  .imagewidget-toolbar button:disabled, .imagewidget-navigation button:disabled {
+    background-color: #f5f5f5;
+    border-color: #ddd;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  
+  .imagewidget-drawing-area {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px; /* Adjust as needed */
+  }
+  
+  .imagewidget-classes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    width: 100%;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .imagewidget-tools {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    width: 100%;
+  }
+  
+  .imagewidget-classes button {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  
+  .imagewidget-classes button.selected {
+    background-color: #4a90e2;
+    color: white;
+    border-color: #4a90e2;
+  }
+  
+  .imagewidget-classes button.selected {
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    transform: translateY(1px);
+  }
+  
+  .imagewidget-progress-details {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  
+  .imagewidget-filename {
+    font-size: 0.75rem;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  .imagewidget-progress-container {
+    width: 100%;
+    height: 6px;
+    background-color: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  
+  .imagewidget-progress-bar {
+    height: 100%;
+    background-color: #4caf50;
+    border-radius: 3px;
+    transition: width 0.3s ease-in-out;
+  }
+  
+  .imagewidget-progress-text {
+    font-size: 0.75rem;
+    color: #666;
+  }
