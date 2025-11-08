@@ -5,22 +5,22 @@ This notebook demonstrates how to use the TextLabel widget for binary classifica
 
 import marimo
 
-__generated_with = "0.9.0"
+__generated_with = "0.17.7"
 app = marimo.App()
 
 
 @app.cell
-def __():
+def _():
     import marimo as mo
     import sys
     sys.path.insert(0, '..')
     from llabel import TextLabel
     from datasets import load_dataset
-    return TextLabel, load_dataset, mo, sys
+    return TextLabel, load_dataset, mo
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     # Text Labeling Demo
 
@@ -30,7 +30,7 @@ def __(mo):
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     ## Sentiment Analysis with IMDB Dataset
 
@@ -40,25 +40,27 @@ def __(mo):
 
 
 @app.cell
-def __(load_dataset, mo):
+def _(load_dataset, mo):
     # Load IMDB dataset from HuggingFace
     dataset = load_dataset("imdb", split="test")
 
     # Take a small sample for labeling (50 reviews)
     sample_indices = range(0, 50)
-    texts = [dataset[i]["text"] for i in sample_indices]
+    # Convert data to list of dicts (dict is the required format for the TextLabel widget)
+    examples = [{"text": dataset[i]["text"]} for i in sample_indices]
 
-    mo.md(f"Loaded {len(texts)} movie reviews from IMDB dataset")
-    return dataset, sample_indices, texts
+    mo.md(f"Loaded {len(examples)} movie reviews from IMDB dataset")
+    return (examples,)
 
 
 @app.cell
-def __(TextLabel, mo, texts):
+def _(TextLabel, examples, mo):
     # Create widget for sentiment labeling
     # Users will label as positive (Yes) or negative (No)
     widget = mo.ui.anywidget(
         TextLabel(
-            examples=texts,
+            examples=examples,
+            render=lambda ex: ex["text"],  # Extract text field from dict
             notes=True
         )
     )
@@ -68,7 +70,7 @@ def __(TextLabel, mo, texts):
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     ### Instructions
 
@@ -82,7 +84,77 @@ def __(mo):
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
+    mo.md("""
+    ## Export Annotations
+
+    After labeling, export your annotations for further processing.
+    """)
+    return
+
+
+@app.cell
+def _(widget):
+    # Explore annotations as you label
+    widget.get_annotations()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Check Progress
+
+    Monitor your labeling progress.
+    """)
+    return
+
+
+@app.cell
+def _(mo, widget):
+    progress = widget.progress()
+    mo.md(f"""
+    **Progress:** {progress['labeled']}/{progress['total']} ({progress['percent']}%)
+    **Remaining:** {progress['remaining']}
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Save to File
+
+    Save your annotations for later use.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    import json
+
+    # Test with run_button instead (works better in marimo)
+    save_button = mo.ui.run_button(label="Save Annotations")
+    save_button
+    return json, save_button
+
+
+@app.cell
+def _(json, mo, save_button, widget):
+    mo.stop(not save_button.value)
+
+    export_anns = widget.export_annotations(include_examples=True)
+
+    with open('text_annotations.json', 'w') as f:
+        json.dump(export_anns, f, indent=2)
+
+    mo.md(f"✓ Saved {len(export_anns)} annotations to text_annotations.json")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
     mo.md("""
     ## Custom Render Function
 
@@ -92,9 +164,9 @@ def __(mo):
 
 
 @app.cell
-def __(TextLabel, mo):
+def _(TextLabel, mo):
     # Sample data with metadata
-    examples = [
+    tweet_examples = [
         {"text": "Machine learning is fascinating", "author": "Alice", "date": "2024-01-15"},
         {"text": "AI will change everything", "author": "Bob", "date": "2024-01-16"},
         {"text": "Deep learning requires lots of data", "author": "Charlie", "date": "2024-01-17"},
@@ -113,7 +185,7 @@ def __(TextLabel, mo):
         """
 
     _widget2 = TextLabel(
-        examples=examples,
+        examples=tweet_examples,
         render=render_tweet,
         notes=True
     )
@@ -122,86 +194,11 @@ def __(TextLabel, mo):
     widget2 = mo.ui.anywidget(_widget2)
 
     widget2
-    return examples, render_tweet, widget2
-
-
-@app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ## Export Annotations
-
-    After labeling, export your annotations for further processing.
-    """)
     return
 
 
-@app.cell
-def __(mo, widget):
-    # Get all annotations from the widget
-    all_annotations = widget.get_annotations()
-    labeled = widget.get_labeled_annotations()
-    export = widget.export_annotations(include_examples=True)
-
-    mo.vstack([
-        mo.md(f"**Total examples:** {len(all_annotations)}"),
-        mo.md(f"**Labeled:** {len(labeled)}"),
-        mo.md("**First annotation:**"),
-        mo.json(export[0] if export else {})
-    ])
-    return all_annotations, export, labeled
-
-
 @app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ## Check Progress
-
-    Monitor your labeling progress.
-    """)
-    return
-
-
-@app.cell
-def __(mo, widget):
-    progress = widget.progress()
-    mo.md(f"""
-    **Progress:** {progress['labeled']}/{progress['total']} ({progress['percent']}%)
-    **Remaining:** {progress['remaining']}
-    """)
-    return (progress,)
-
-
-@app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ## Save to File
-
-    Save your annotations for later use.
-    """)
-    return
-
-
-@app.cell
-def __(mo, widget):
-    import json
-
-    # Button to save annotations
-    save_button = mo.ui.button(label="Save Annotations")
-
-    if save_button.value:
-        annotations_data = widget.export_annotations(include_examples=True)
-        with open('text_annotations.json', 'w') as f:
-            json.dump(annotations_data, f, indent=2)
-        result = mo.md(f"✓ Saved {len(annotations_data)} annotations to text_annotations.json")
-    else:
-        result = mo.md("")
-
-    mo.vstack([save_button, result])
-    return annotations_data, json, result, save_button
-
-
-@app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     ## Custom Keyboard Shortcuts
 
@@ -211,7 +208,7 @@ def __(mo):
 
 
 @app.cell
-def __(TextLabel, mo):
+def _(TextLabel, mo):
     # Custom shortcuts
     custom_shortcuts = {
         "y": "yes",
@@ -222,7 +219,8 @@ def __(TextLabel, mo):
     }
 
     _widget3 = TextLabel(
-        examples=["Example 1", "Example 2", "Example 3"],
+        examples=[{"text": "Example 1"}, {"text": "Example 2"}, {"text": "Example 3"}],
+        render=lambda ex: ex["text"],
         shortcuts=custom_shortcuts,
         notes=True
     )
@@ -232,7 +230,7 @@ def __(TextLabel, mo):
 
     # Note: This will use single-key shortcuts instead of Alt+ combinations
     widget3
-    return custom_shortcuts, widget3
+    return
 
 
 if __name__ == "__main__":

@@ -174,3 +174,7 @@ Desktop.ini
 uv.lock
 *.pth
 package-lock.json
+
+# Marimo
+__marimo__/
+**/__marimo__/

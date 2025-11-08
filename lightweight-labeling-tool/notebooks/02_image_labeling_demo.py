@@ -5,23 +5,23 @@ This notebook demonstrates how to use the ImageLabel widget for image annotation
 
 import marimo
 
-__generated_with = "0.9.0"
+__generated_with = "0.17.7"
 app = marimo.App()
 
 
 @app.cell
-def __():
+def _():
     import marimo as mo
     import sys
     sys.path.insert(0, '..')
     from llabel import ImageLabel
     import numpy as np
     from PIL import Image
-    return Image, ImageLabel, mo, np, sys
+    return ImageLabel, mo
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     # Image Labeling Demo
 
@@ -31,182 +31,69 @@ def __(mo):
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
-    ## Bounding Box Annotation
+    ## Image Annotation Widget
 
-    Annotate images with bounding boxes for object detection.
+    Annotate images with bounding boxes, points, or polygons.
     """)
     return
 
 
 @app.cell
-def __(ImageLabel, mo, np):
-    # Create sample images with NumPy
-    sample_images = [
-        np.random.randint(0, 255, (400, 600, 3), dtype=np.uint8),
-        np.random.randint(0, 255, (400, 600, 3), dtype=np.uint8),
-        np.random.randint(0, 255, (400, 600, 3), dtype=np.uint8),
-    ]
+def _(ImageLabel, mo):
+    from pathlib import Path
+
+    # Load images from pexels_mixed directory
+    # Use absolute path from project root
+    project_root = Path.cwd()
+    if project_root.name == "notebooks":
+        project_root = project_root.parent
+    image_dir = project_root / "data" / "image" / "pexels_mixed"
+    image_paths = sorted(str(p) for p in image_dir.glob("*.jpg"))
 
     # Define object classes
     classes = ["person", "car", "bicycle", "dog"]
 
-    # Create widget
+    # Create widget (no mode parameter - handles all annotation types flexibly)
     _widget = ImageLabel(
-        images=sample_images,
-        classes=classes,
-        mode="bbox"
+        paths=image_paths,
+        classes=classes
     )
 
     # Wrap with Marimo's anywidget wrapper
     widget = mo.ui.anywidget(_widget)
 
     widget
-    return classes, sample_images, widget
+    return classes, image_paths, widget
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
-    ### Instructions for Bounding Box Mode
+    ### How to Use
 
+    **Annotation Modes:**
+    - **Bounding Box**: Click and drag to draw a rectangle
+    - **Point**: Click to place a point
+    - **Polygon**: Click to place vertices, close by clicking near the first point
+
+    **Keyboard Shortcuts:**
+    - Use **Previous/Next** buttons or **Arrow keys** to navigate images
+    - Press **Esc** to cancel current drawing
+    - Click **Clear Annotations** to remove all annotations from current image
+
+    **Getting Started:**
     1. Select a class from the dropdown
-    2. Click and drag on the image to draw a bounding box
-    3. Release to create the annotation
-    4. Use **Previous/Next** buttons or **Arrow keys** to navigate
-    5. Click **Clear Annotations** to remove all boxes from current image
-    6. Press **Esc** to cancel current drawing
+    2. Choose your annotation mode (bbox/point/polygon)
+    3. Annotate the image
+    4. Navigate to the next image
     """)
     return
 
 
 @app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ## Point Annotation
-
-    Annotate specific points of interest (e.g., keypoints, landmarks).
-    """)
-    return
-
-
-@app.cell
-def __(ImageLabel, mo, np):
-    # Create sample images
-    point_images = [
-        np.random.randint(0, 255, (500, 500, 3), dtype=np.uint8),
-        np.random.randint(0, 255, (500, 500, 3), dtype=np.uint8),
-    ]
-
-    # Define keypoint classes
-    keypoint_classes = ["nose", "left_eye", "right_eye", "left_ear", "right_ear"]
-
-    _widget_points = ImageLabel(
-        images=point_images,
-        classes=keypoint_classes,
-        mode="point"
-    )
-
-    # Wrap with Marimo's anywidget wrapper
-    widget_points = mo.ui.anywidget(_widget_points)
-
-    widget_points
-    return keypoint_classes, point_images, widget_points
-
-
-@app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ### Instructions for Point Mode
-
-    1. Select a keypoint class
-    2. Click on the image to place a point
-    3. Points are immediately saved
-    4. Clear all points with **Clear Annotations**
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ## Polygon Annotation
-
-    Draw polygons for segmentation tasks.
-    """)
-    return
-
-
-@app.cell
-def __(ImageLabel, mo, np):
-    # Create sample images
-    poly_images = [
-        np.random.randint(0, 255, (400, 600, 3), dtype=np.uint8),
-    ]
-
-    # Define segmentation classes
-    seg_classes = ["background", "foreground", "object"]
-
-    _widget_poly = ImageLabel(
-        images=poly_images,
-        classes=seg_classes,
-        mode="polygon"
-    )
-
-    # Wrap with Marimo's anywidget wrapper
-    widget_poly = mo.ui.anywidget(_widget_poly)
-
-    widget_poly
-    return poly_images, seg_classes, widget_poly
-
-
-@app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ### Instructions for Polygon Mode
-
-    1. Select a class
-    2. Click to place polygon vertices
-    3. Click near the first point to close the polygon
-    4. Press **Esc** to cancel current polygon
-    5. Polygon is saved when closed
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def __(mo):
-    mo.md("""
-    ## Working with PIL Images
-    """)
-    return
-
-
-@app.cell
-def __(Image, ImageLabel, mo):
-    # Create PIL images
-    pil_images = [
-        Image.new('RGB', (400, 300), color=(255, 0, 0)),
-        Image.new('RGB', (400, 300), color=(0, 255, 0)),
-        Image.new('RGB', (400, 300), color=(0, 0, 255)),
-    ]
-
-    _widget_pil = ImageLabel(
-        images=pil_images,
-        classes=["red", "green", "blue"],
-        mode="bbox"
-    )
-
-    # Wrap with Marimo's anywidget wrapper
-    widget_pil = mo.ui.anywidget(_widget_pil)
-
-    widget_pil
-    return pil_images, widget_pil
-
-
-@app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     ## Export Annotations
 
@@ -216,13 +103,12 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
+def _(mo, widget):
     # Get raw annotations (relative coordinates)
-    annotations = widget.get_annotations()
+    annotations = widget.annotations
 
     # Get normalized annotations (absolute pixel coordinates)
-    # Image dimensions: 600x400 (width x height)
-    normalized = widget.get_normalized_annotations(image_width=600, image_height=400)
+    normalized = widget.get_normalized_annotations()
 
     mo.vstack([
         mo.md("**Raw annotations (relative coordinates 0-1):**"),
@@ -230,11 +116,11 @@ def __(mo, widget):
         mo.md("**Normalized annotations (absolute pixels):**"),
         mo.json(normalized[0] if normalized else {})
     ])
-    return annotations, normalized
+    return
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     ## Export to COCO Format
 
@@ -244,8 +130,8 @@ def __(mo):
 
 
 @app.cell
-def __(widget):
-    def export_to_coco(widget_instance, image_width=600, image_height=400):
+def _(widget):
+    def export_to_coco(widget_instance):
         """Export annotations to COCO format."""
         coco_format = {
             "images": [],
@@ -262,34 +148,49 @@ def __(widget):
             })
 
         # Get normalized annotations
-        annotations_list = widget_instance.get_normalized_annotations(
-            image_width=image_width,
-            image_height=image_height
-        )
+        annotations_list = widget_instance.get_normalized_annotations()
 
         ann_id = 0
         for img_idx, img_ann in enumerate(annotations_list):
+            # Get image dimensions from first element if available
+            if img_ann.get("elements"):
+                img_dims = img_ann["elements"][0].get("imageDimensions", {"width": 600, "height": 400})
+                width = img_dims["width"]
+                height = img_dims["height"]
+            else:
+                width, height = 600, 400
+
+             # Extract image filename
+            filename = (
+                widget_instance.filenames[img_idx]
+                if widget_instance.filenames and img_idx < len(widget_instance.filenames)
+                # or fallback 
+                else f"image_{img_idx}.jpg"
+            )
             # Add image info
             coco_format["images"].append({
                 "id": img_idx,
-                "width": image_width,
-                "height": image_height,
-                "file_name": f"image_{img_idx}.jpg"
+                "width": width,
+                "height": height,
+                "file_name": filename
             })
 
-            # Add annotations
-            for elem in img_ann["elements"]:
-                if elem["type"] == "bbox":
-                    x1, y1, x2, y2 = elem["coords"]
-                    width = x2 - x1
-                    height = y2 - y1
+            # Add annotations (convert points to bbox if we have 2 points)
+            for elem in img_ann.get("elements", []):
+                points = elem.get("points", [])
+                if len(points) >= 2:
+                    # Assume first two points define bbox corners
+                    x1, y1 = points[0]["x"], points[0]["y"]
+                    x2, y2 = points[1]["x"], points[1]["y"]
+                    bbox_width = abs(x2 - x1)
+                    bbox_height = abs(y2 - y1)
 
                     coco_format["annotations"].append({
                         "id": ann_id,
                         "image_id": img_idx,
-                        "category_id": elem["class_idx"],
-                        "bbox": [x1, y1, width, height],
-                        "area": width * height,
+                        "category_id": elem.get("label", 0),
+                        "bbox": [min(x1, x2), min(y1, y2), bbox_width, bbox_height],
+                        "area": bbox_width * bbox_height,
                         "iscrowd": 0
                     })
                     ann_id += 1
@@ -298,11 +199,11 @@ def __(widget):
 
     # Export
     coco_data = export_to_coco(widget)
-    return coco_data, export_to_coco
+    return (coco_data,)
 
 
 @app.cell
-def __(coco_data, mo):
+def _(coco_data, mo):
     mo.vstack([
         mo.md(f"**Exported {len(coco_data['annotations'])} annotations**"),
         mo.md(f"**Categories:** {[c['name'] for c in coco_data['categories']]}"),
@@ -312,7 +213,7 @@ def __(coco_data, mo):
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     ## Save Annotations
     """)
@@ -320,25 +221,28 @@ def __(mo):
 
 
 @app.cell
-def __(coco_data, mo):
+def _(mo):
     import json
 
     # Button to save COCO annotations
-    save_coco_button = mo.ui.button(label="Save COCO Annotations")
+    save_coco_button = mo.ui.run_button(label="Save COCO Annotations")
+    save_coco_button
+    return json, save_coco_button
 
-    if save_coco_button.value:
-        with open('coco_annotations.json', 'w') as f:
-            json.dump(coco_data, f, indent=2)
-        save_result = mo.md("✓ Saved annotations to coco_annotations.json")
-    else:
-        save_result = mo.md("")
 
-    mo.vstack([save_coco_button, save_result])
-    return json, save_coco_button, save_result
+@app.cell
+def _(coco_data, json, mo, save_coco_button):
+    mo.stop(not save_coco_button.value)
+
+    with open('coco_annotations.json', 'w') as f:
+        json.dump(coco_data, f, indent=2)
+
+    mo.md("✓ Saved annotations to coco_annotations.json")
+    return
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md("""
     ## Custom Colors
 
@@ -348,7 +252,7 @@ def __(mo):
 
 
 @app.cell
-def __(ImageLabel, mo, sample_images, classes):
+def _(ImageLabel, classes, image_paths, mo):
     # Custom colors (CSS color strings)
     custom_colors = [
         "#FF0000",  # Red
@@ -358,17 +262,16 @@ def __(ImageLabel, mo, sample_images, classes):
     ]
 
     _widget_custom = ImageLabel(
-        images=sample_images[:1],
+        paths=image_paths[:1],
         classes=classes,
-        colors=custom_colors,
-        mode="bbox"
+        colors=custom_colors
     )
 
     # Wrap with Marimo's anywidget wrapper
     widget_custom = mo.ui.anywidget(_widget_custom)
 
     widget_custom
-    return custom_colors, widget_custom
+    return
 
 
 if __name__ == "__main__":
