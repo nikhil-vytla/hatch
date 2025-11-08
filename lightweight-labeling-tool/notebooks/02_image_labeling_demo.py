@@ -221,7 +221,8 @@ def __(_widget, mo):
     annotations = _widget.get_annotations()
 
     # Get normalized annotations (absolute pixel coordinates)
-    normalized = _widget.get_normalized_annotations()
+    # Image dimensions: 600x400 (width x height)
+    normalized = _widget.get_normalized_annotations(image_width=600, image_height=400)
 
     mo.vstack([
         mo.md("**Raw annotations (relative coordinates 0-1):**"),
