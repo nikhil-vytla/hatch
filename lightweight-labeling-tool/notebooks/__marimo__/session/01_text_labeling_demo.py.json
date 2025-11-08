@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.17.7"
+  },
+  "cells": [
+    {
+      "id": "MJUe",
+      "code_hash": "78c145fef57e9537d47730f38854d2f7",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"text-labeling-demo\">Text Labeling Demo</h1>\n<span class=\"paragraph\">This notebook demonstrates how to use the <code>TextLabel</code> widget for binary classification tasks.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "095661aa70a0ca7836936b67a5fa42cb",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"basic-text-classification\">Basic Text Classification</h2>\n<span class=\"paragraph\">Let's create a simple sentiment analysis labeling task.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "747dd0b76aac7d37b29cff135a25209f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"instructions\">Instructions</h3>\n<ul>\n<li>Click <strong>Yes</strong> for positive sentiment</li>\n<li>Click <strong>No</strong> for negative sentiment</li>\n<li>Click <strong>Skip</strong> if unsure</li>\n<li>Use <strong>Alt+2</strong>, <strong>Alt+3</strong>, <strong>Alt+4</strong> for keyboard shortcuts</li>\n<li>Add notes for context or edge cases</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "fa7eb878ae02283201d446e0b46b014e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"custom-render-function\">Custom Render Function</h2>\n<span class=\"paragraph\">You can provide a custom render function to display examples in any format.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "dabef5396b3c2fb88554690a64090068",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"export-annotations\">Export Annotations</h2>\n<span class=\"paragraph\">After labeling, export your annotations for further processing.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "4b494f00ea6f6ce5c02fcc21d9119e0e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"check-progress\">Check Progress</h2>\n<span class=\"paragraph\">Monitor your labeling progress.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "6d1e609c9ea5ef56eebb8b0301e14e32",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"save-to-file\">Save to File</h2>\n<span class=\"paragraph\">Save your annotations for later use.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "b90b0e79bb9bf34e1e9957b9ea66f728",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"custom-keyboard-shortcuts\">Custom Keyboard Shortcuts</h2>\n<span class=\"paragraph\">You can customize keyboard shortcuts to match your workflow.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hbol",
+      "code_hash": "d2f4bf087af46a9b4fdfb1eb27cd38fa",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "33171ffe9257d9b7ae13e37f9ce74676",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='bkHC-0' random-id='7e4ef9a2-5ff6-17cd-9388-915c9c367c55'><marimo-anywidget data-initial-value='{&quot;annotations&quot;:[{&quot;index&quot;:0,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:1,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:2,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:3,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:4,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:5,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:6,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:7,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null}],&quot;current_index&quot;:0,&quot;current_rendered&quot;:&quot;I absolutely love this product! It exceeded all my expectations.&quot;,&quot;enable_notes&quot;:true,&quot;keyboard_shortcuts&quot;:{&quot;alt+1&quot;:&quot;prev&quot;,&quot;alt+2&quot;:&quot;yes&quot;,&quot;alt+3&quot;:&quot;no&quot;,&quot;alt+4&quot;:&quot;skip&quot;,&quot;alt+5&quot;:&quot;focus_notes&quot;,&quot;alt+6&quot;:&quot;speech_notes&quot;},&quot;total&quot;:8}' data-label='null' data-js-url='&quot;./@file/5349-187151-s8dEmOSH.js&quot;' data-js-hash='&quot;802296451af1b3d2be3b678439d1a9d8&quot;' data-css='&quot;/* Adapted from koaning/molabel */&#92;n&#92;n.text-label-container {&#92;n  font-family: -apple-system, BlinkMacSystemFont, &#92;&quot;Segoe UI&#92;&quot;, Roboto, &#92;&quot;Helvetica Neue&#92;&quot;, Arial, sans-serif;&#92;n  max-width: 900px;&#92;n  margin: 20px auto;&#92;n  padding: 20px;&#92;n  background: #ffffff;&#92;n  border-radius: 8px;&#92;n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);&#92;n}&#92;n&#92;n.text-label-header {&#92;n  margin-bottom: 20px;&#92;n}&#92;n&#92;n.progress-info {&#92;n  font-size: 14px;&#92;n  color: #666;&#92;n  margin-bottom: 8px;&#92;n  font-weight: 500;&#92;n}&#92;n&#92;n.progress-bar {&#92;n  width: 100%;&#92;n  height: 6px;&#92;n  background: #e0e0e0;&#92;n  border-radius: 3px;&#92;n  overflow: hidden;&#92;n}&#92;n&#92;n.progress-fill {&#92;n  height: 100%;&#92;n  background: linear-gradient(90deg, #4CAF50, #45a049);&#92;n  transition: width 0.3s ease;&#92;n}&#92;n&#92;n.text-label-content {&#92;n  min-height: 200px;&#92;n  padding: 24px;&#92;n  margin: 20px 0;&#92;n  background: #f9f9f9;&#92;n  border-radius: 6px;&#92;n  border: 1px solid #e0e0e0;&#92;n  font-size: 16px;&#92;n  line-height: 1.6;&#92;n}&#92;n&#92;n.text-label-buttons {&#92;n  display: flex;&#92;n  gap: 10px;&#92;n  justify-content: center;&#92;n  flex-wrap: wrap;&#92;n  margin: 20px 0;&#92;n}&#92;n&#92;n.btn {&#92;n  padding: 10px 20px;&#92;n  font-size: 14px;&#92;n  font-weight: 500;&#92;n  border: none;&#92;n  border-radius: 6px;&#92;n  cursor: pointer;&#92;n  transition: all 0.2s ease;&#92;n  outline: none;&#92;n}&#92;n&#92;n.btn:hover:not(:disabled) {&#92;n  transform: translateY(-1px);&#92;n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);&#92;n}&#92;n&#92;n.btn:active:not(:disabled) {&#92;n  transform: translateY(0);&#92;n}&#92;n&#92;n.btn:disabled {&#92;n  opacity: 0.4;&#92;n  cursor: not-allowed;&#92;n}&#92;n&#92;n.btn-secondary {&#92;n  background: #6c757d;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-secondary:hover:not(:disabled) {&#92;n  background: #5a6268;&#92;n}&#92;n&#92;n.btn-yes {&#92;n  background: #4CAF50;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-yes:hover:not(:disabled) {&#92;n  background: #45a049;&#92;n}&#92;n&#92;n.btn-yes.active {&#92;n  background: #2e7d32;&#92;n  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);&#92;n}&#92;n&#92;n.btn-no {&#92;n  background: #f44336;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-no:hover:not(:disabled) {&#92;n  background: #da190b;&#92;n}&#92;n&#92;n.btn-no.active {&#92;n  background: #c62828;&#92;n  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);&#92;n}&#92;n&#92;n.btn-skip {&#92;n  background: #ff9800;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-skip:hover:not(:disabled) {&#92;n  background: #fb8c00;&#92;n}&#92;n&#92;n.btn-skip.active {&#92;n  background: #ef6c00;&#92;n  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);&#92;n}&#92;n&#92;n.text-label-notes {&#92;n  margin-top: 20px;&#92;n}&#92;n&#92;n.text-label-notes label {&#92;n  display: block;&#92;n  font-size: 14px;&#92;n  font-weight: 500;&#92;n  color: #333;&#92;n  margin-bottom: 8px;&#92;n}&#92;n&#92;n.notes-input {&#92;n  width: 100%;&#92;n  padding: 10px;&#92;n  font-size: 14px;&#92;n  font-family: inherit;&#92;n  border: 1px solid #ddd;&#92;n  border-radius: 4px;&#92;n  resize: vertical;&#92;n  outline: none;&#92;n  transition: border-color 0.2s ease;&#92;n}&#92;n&#92;n.notes-input:focus {&#92;n  border-color: #4CAF50;&#92;n  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);&#92;n}&#92;n&quot;' data-buffer-paths='[]'></marimo-anywidget></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "1c21e71300101d8c57d67010d899f84b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='Xref-0' random-id='3b990bad-be4c-3855-cb84-3664541674f0'><marimo-anywidget data-initial-value='{&quot;annotations&quot;:[{&quot;index&quot;:0,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:1,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:2,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null},{&quot;index&quot;:3,&quot;label&quot;:null,&quot;notes&quot;:&quot;&quot;,&quot;timestamp&quot;:null}],&quot;current_index&quot;:0,&quot;current_rendered&quot;:&quot;&#92;n    &lt;div style=&#92;&quot;border-left: 4px solid #1DA1F2; padding-left: 16px; margin: 8px 0;&#92;&quot;&gt;&#92;n        &lt;p style=&#92;&quot;font-size: 18px; margin: 8px 0;&#92;&quot;&gt;Machine learning is fascinating&lt;/p&gt;&#92;n        &lt;p style=&#92;&quot;color: #657786; font-size: 14px; margin: 8px 0;&#92;&quot;&gt;&#92;n            &lt;strong&gt;@Alice&lt;/strong&gt; \u00b7 2024-01-15&#92;n        &lt;/p&gt;&#92;n    &lt;/div&gt;&#92;n    &quot;,&quot;enable_notes&quot;:true,&quot;keyboard_shortcuts&quot;:{&quot;alt+1&quot;:&quot;prev&quot;,&quot;alt+2&quot;:&quot;yes&quot;,&quot;alt+3&quot;:&quot;no&quot;,&quot;alt+4&quot;:&quot;skip&quot;,&quot;alt+5&quot;:&quot;focus_notes&quot;,&quot;alt+6&quot;:&quot;speech_notes&quot;},&quot;total&quot;:4}' data-label='null' data-js-url='&quot;./@file/5349-187151-THl4Sjeb.js&quot;' data-js-hash='&quot;802296451af1b3d2be3b678439d1a9d8&quot;' data-css='&quot;/* Adapted from koaning/molabel */&#92;n&#92;n.text-label-container {&#92;n  font-family: -apple-system, BlinkMacSystemFont, &#92;&quot;Segoe UI&#92;&quot;, Roboto, &#92;&quot;Helvetica Neue&#92;&quot;, Arial, sans-serif;&#92;n  max-width: 900px;&#92;n  margin: 20px auto;&#92;n  padding: 20px;&#92;n  background: #ffffff;&#92;n  border-radius: 8px;&#92;n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);&#92;n}&#92;n&#92;n.text-label-header {&#92;n  margin-bottom: 20px;&#92;n}&#92;n&#92;n.progress-info {&#92;n  font-size: 14px;&#92;n  color: #666;&#92;n  margin-bottom: 8px;&#92;n  font-weight: 500;&#92;n}&#92;n&#92;n.progress-bar {&#92;n  width: 100%;&#92;n  height: 6px;&#92;n  background: #e0e0e0;&#92;n  border-radius: 3px;&#92;n  overflow: hidden;&#92;n}&#92;n&#92;n.progress-fill {&#92;n  height: 100%;&#92;n  background: linear-gradient(90deg, #4CAF50, #45a049);&#92;n  transition: width 0.3s ease;&#92;n}&#92;n&#92;n.text-label-content {&#92;n  min-height: 200px;&#92;n  padding: 24px;&#92;n  margin: 20px 0;&#92;n  background: #f9f9f9;&#92;n  border-radius: 6px;&#92;n  border: 1px solid #e0e0e0;&#92;n  font-size: 16px;&#92;n  line-height: 1.6;&#92;n}&#92;n&#92;n.text-label-buttons {&#92;n  display: flex;&#92;n  gap: 10px;&#92;n  justify-content: center;&#92;n  flex-wrap: wrap;&#92;n  margin: 20px 0;&#92;n}&#92;n&#92;n.btn {&#92;n  padding: 10px 20px;&#92;n  font-size: 14px;&#92;n  font-weight: 500;&#92;n  border: none;&#92;n  border-radius: 6px;&#92;n  cursor: pointer;&#92;n  transition: all 0.2s ease;&#92;n  outline: none;&#92;n}&#92;n&#92;n.btn:hover:not(:disabled) {&#92;n  transform: translateY(-1px);&#92;n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);&#92;n}&#92;n&#92;n.btn:active:not(:disabled) {&#92;n  transform: translateY(0);&#92;n}&#92;n&#92;n.btn:disabled {&#92;n  opacity: 0.4;&#92;n  cursor: not-allowed;&#92;n}&#92;n&#92;n.btn-secondary {&#92;n  background: #6c757d;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-secondary:hover:not(:disabled) {&#92;n  background: #5a6268;&#92;n}&#92;n&#92;n.btn-yes {&#92;n  background: #4CAF50;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-yes:hover:not(:disabled) {&#92;n  background: #45a049;&#92;n}&#92;n&#92;n.btn-yes.active {&#92;n  background: #2e7d32;&#92;n  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);&#92;n}&#92;n&#92;n.btn-no {&#92;n  background: #f44336;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-no:hover:not(:disabled) {&#92;n  background: #da190b;&#92;n}&#92;n&#92;n.btn-no.active {&#92;n  background: #c62828;&#92;n  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);&#92;n}&#92;n&#92;n.btn-skip {&#92;n  background: #ff9800;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-skip:hover:not(:disabled) {&#92;n  background: #fb8c00;&#92;n}&#92;n&#92;n.btn-skip.active {&#92;n  background: #ef6c00;&#92;n  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);&#92;n}&#92;n&#92;n.text-label-notes {&#92;n  margin-top: 20px;&#92;n}&#92;n&#92;n.text-label-notes label {&#92;n  display: block;&#92;n  font-size: 14px;&#92;n  font-weight: 500;&#92;n  color: #333;&#92;n  margin-bottom: 8px;&#92;n}&#92;n&#92;n.notes-input {&#92;n  width: 100%;&#92;n  padding: 10px;&#92;n  font-size: 14px;&#92;n  font-family: inherit;&#92;n  border: 1px solid #ddd;&#92;n  border-radius: 4px;&#92;n  resize: vertical;&#92;n  outline: none;&#92;n  transition: border-color 0.2s ease;&#92;n}&#92;n&#92;n.notes-input:focus {&#92;n  border-color: #4CAF50;&#92;n  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);&#92;n}&#92;n&quot;' data-buffer-paths='[]'></marimo-anywidget></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "5895fca77683f7c7308036160aa181e6",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "'dict' object has no attribute 'get_annotations'",
+          "traceback": []
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "<span class=\"codehilite\"><div class=\"highlight\"><pre><span></span><span class=\"gt\">Traceback (most recent call last):</span>\n  File <span class=\"nb\">&quot;/var/folders/wq/_3t6b0rd04v7csfvxfvyp2yr0000gn/T/marimo_18685/__marimo__cell_BYtC_.py&quot;</span>, line <span class=\"m\">2</span>, in <span class=\"n\">&lt;module&gt;</span>\n<span class=\"w\">    </span><span class=\"n\">all_annotations</span> <span class=\"o\">=</span> <span class=\"n\">widget</span><span class=\"o\">.</span><span class=\"n\">value</span><span class=\"o\">.</span><span class=\"n\">get_annotations</span><span class=\"p\">()</span>\n<span class=\"w\">                      </span><span class=\"pm\">^^^^^^^^^^^^^^^^^^^^^^^^^^^^</span>\n<span class=\"gr\">AttributeError</span>: <span class=\"n\">&#39;dict&#39; object has no attribute &#39;get_annotations&#39;</span>\n</pre></div>\n</span>",
+          "mimetype": "application/vnd.marimo+traceback"
+        }
+      ]
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "05845fbc82bfaeef8951d21f93955eb7",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "655b7b7eed5174b49c38c819e0fc324f",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "5180b9e37a75d47d86b87323d426dc26",
+      "outputs": [],
+      "console": []
+    }
+  ]
+}
