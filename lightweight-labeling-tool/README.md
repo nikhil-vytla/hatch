@@ -42,16 +42,18 @@ uv pip install -e ".[dev]"         # Development tools
 ```python
 from llabel import TextLabel
 
-# Simple text classification
-texts = [
-    "I love this product!",
-    "Terrible experience.",
-    "It's okay, nothing special."
+# TextLabel requires examples as a list of dicts
+# and a render function to display them
+examples = [
+    {"text": "I love this product!"},
+    {"text": "Terrible experience."},
+    {"text": "It's okay, nothing special."}
 ]
 
 widget = TextLabel(
-    examples=texts,
-    notes=True  # Enable notes field
+    examples=examples,
+    render=lambda ex: ex["text"],  # Extract text field from dict
+    notes=True  # Enable notes field (default: True)
 )
 
 widget
@@ -69,27 +71,38 @@ widget
 ```python
 from llabel import ImageLabel
 import numpy as np
+from PIL import Image
 
-# Create or load images
+# ImageLabel accepts multiple input formats:
+# - NumPy arrays
+# - PIL/Pillow Image objects
+# - File paths (strings)
+# - URLs (http:// or https://)
+# - Base64 encoded strings
+# - File-like objects (BytesIO, etc.)
+
 images = [
     np.random.randint(0, 255, (400, 600, 3), dtype=np.uint8),
+    Image.open("path/to/image.jpg"),
+    "https://example.com/image.png",
     # ... more images
 ]
 
+# The widget handles all annotation types flexibly (no mode parameter)
 widget = ImageLabel(
-    images=images,
+    images=images,  # or use paths=[] for backward compatibility
     classes=["person", "car", "bicycle"],
-    mode="bbox"  # or "point", "polygon"
+    colors=["red", "blue", "green"]  # Optional: list or dict
 )
 
 widget
 ```
 
 **Features:**
-- Three annotation modes: bounding boxes, points, polygons
+- Multiple annotation types: bounding boxes, points, polygons (all supported simultaneously)
 - Multi-class support with color coding
-- Multiple input formats (NumPy, PIL, file paths, URLs)
-- Coordinate normalization
+- Multiple input formats (NumPy arrays, PIL Images, file paths, URLs, base64, file-like objects)
+- Coordinate normalization (relative 0-1 and absolute pixel coordinates)
 - COCO format export
 
 ### Using with Marimo
@@ -101,7 +114,11 @@ import marimo as mo
 from llabel import TextLabel
 
 # Create and wrap widget
-widget = mo.ui.anywidget(TextLabel(examples=texts, notes=True))
+# Note: examples must be a list of dicts, and render function is required
+examples = [{"text": "Example 1"}, {"text": "Example 2"}]
+widget = mo.ui.anywidget(
+    TextLabel(examples=examples, render=lambda ex: ex["text"], notes=True)
+)
 widget  # Display the widget
 
 # Access widget methods directly on the wrapped widget
@@ -145,28 +162,26 @@ progress = widget.progress()
 print(f"Progress: {progress['percent']}%")
 ```
 
-### Image Annotation Modes
+### Image Annotation Types
+
+The `ImageLabel` widget supports all annotation types simultaneously (no mode parameter needed):
 
 **Bounding Boxes:**
-```python
-widget = ImageLabel(images=images, classes=["cat", "dog"], mode="bbox")
-```
 - Click and drag to draw boxes
 - Auto-saves on release
+- Represented by 2 points (top-left and bottom-right corners)
 
 **Points:**
-```python
-widget = ImageLabel(images=images, classes=["nose", "eye"], mode="point")
-```
 - Click to place points
 - Ideal for keypoint annotation
+- Represented by 1 point
 
 **Polygons:**
-```python
-widget = ImageLabel(images=images, classes=["object"], mode="polygon")
-```
 - Click to place vertices
 - Close polygon by clicking near first point
+- Represented by 3+ points
+
+All annotation types can be used together in the same widget. The widget automatically distinguishes between them based on the number of points in each annotation.
 
 ### Export to COCO Format
 
@@ -200,11 +215,7 @@ def to_coco(widget, image_size):
 - `Alt+3`: No
 - `Alt+4`: Skip
 - `Alt+5`: Focus notes
-
-### Image Widget
-- `←/→`: Navigate images
-- `Esc`: Cancel current drawing
-- `1-9`: Quick class selection (if < 10 classes)
+- `Alt+6`: Speech notes
 
 ## Demo Notebooks
 
@@ -217,15 +228,16 @@ Sentiment analysis with real IMDB movie reviews from HuggingFace datasets.
 # Install demo dependencies
 uv pip install -e ".[demos]"
 
-# Run the notebook
-marimo edit notebooks/01_text_labeling_demo.py
+# Run the notebook (use marimo edit for editable mode)
+marimo run notebooks/01_text_labeling_demo.py
 ```
 
 ### 02_image_labeling_demo.py
 Image annotation with bbox, point, and polygon modes. Demonstrates COCO format export.
 
 ```bash
-marimo edit notebooks/02_image_labeling_demo.py
+# Run the notebook (use marimo edit for editable mode)
+marimo run notebooks/02_image_labeling_demo.py
 ```
 
 ### 03_sam_integration_demo.py
@@ -235,8 +247,8 @@ marimo edit notebooks/02_image_labeling_demo.py
 # Install SAM dependencies (includes PyTorch, ~2.4GB model)
 uv pip install -e ".[sam]"
 
-# Run the notebook
-marimo edit notebooks/03_sam_integration_demo.py
+# Run the notebook (use marimo edit for editable mode)
+marimo run notebooks/03_sam_integration_demo.py
 ```
 
 This notebook demonstrates:
@@ -245,34 +257,6 @@ This notebook demonstrates:
 - Using box prompts for segmentation
 - Visualizing segmentation masks
 - Saving masked images
-
-## Architecture
-
-### Design Principles
-
-1. **Minimal dependencies**: anywidget + traitlets (+ optional Pillow/NumPy)
-2. **Extensible base class**: Easy to add new widget types
-3. **Flexible rendering**: Custom functions for any data format
-4. **State synchronization**: Traitlets handle Python ↔ JavaScript communication
-5. **Modern frontend**: ES modules + CSS, no build step required
-
-### Package Structure
-
-```
-llabel/
-├── __init__.py       # Package exports
-├── base.py           # Base widget class
-├── text.py           # Text labeling widget
-├── image.py          # Image labeling widget
-├── video.py          # Video widget design (future)
-├── pdf.py            # PDF widget design (future)
-├── utils.py          # Shared utilities
-└── static/
-    ├── text-widget.js
-    ├── text-widget.css
-    ├── image-widget.js
-    └── image-widget.css
-```
 
 ## Extending llabel
 
@@ -320,7 +304,7 @@ def render_with_markdown(example):
 - Activity labeling (time ranges)
 
 **Key integrations:**
-- Compatible with SAM for segmentation
+- Compatibility with SAM2 for segmentation
 - Optical flow for tracking
 - Export to video segmentation formats
 
@@ -335,21 +319,6 @@ def render_with_markdown(example):
 - LayoutLM compatibility
 - OCR integration for scanned documents
 - Document layout analysis
-
-## Comparison with molabel
-
-| Feature | llabel | molabel |
-|---------|--------|---------|
-| Text labeling | ✅ | ✅ |
-| Image labeling | ✅ | ✅ |
-| Custom render | ✅ | ✅ |
-| Keyboard shortcuts | ✅ | ✅ |
-| Gamepad support | ❌ | ✅ |
-| Speech-to-text | ❌ | ✅ |
-| Multiple annotation modes | ✅ (bbox/point/polygon) | ⚠️ (basic) |
-| Video support | 🚧 (designed) | ❌ |
-| PDF support | 🚧 (designed) | ❌ |
-| Base class architecture | ✅ | ❌ |
 
 ## Development
 
@@ -399,9 +368,6 @@ This project is inspired by and adapted from [koaning/molabel](https://github.co
 
 Built on [anywidget](https://anywidget.dev) by Trevor Manz.
 
-## License
-
-MIT License
 
 ## Contributing
 
@@ -409,8 +375,6 @@ Contributions welcome! Areas of interest:
 
 - [ ] Implementing video labeling widget
 - [ ] Implementing PDF labeling widget
-- [ ] Adding gamepad support
-- [ ] Adding speech-to-text integration
 - [ ] Improving mobile responsiveness
 - [ ] Additional export formats
 - [ ] More annotation modes
