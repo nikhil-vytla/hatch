@@ -56,15 +56,14 @@ def __(load_dataset, mo):
 def __(TextLabel, mo, texts):
     # Create widget for sentiment labeling
     # Users will label as positive (Yes) or negative (No)
-    widget = mo.ui.anywidget(
-        TextLabel(
-            examples=texts,
-            notes=True
-        )
+    _text_widget = TextLabel(
+        examples=texts,
+        notes=True
     )
+    widget = mo.ui.anywidget(_text_widget)
 
     widget
-    return (widget,)
+    return _text_widget, widget
 
 
 @app.cell(hide_code=True)
@@ -136,11 +135,11 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
+def __(_text_widget, mo):
     # Get all annotations from the widget
-    all_annotations = widget.get_annotations()
-    labeled = widget.get_labeled_annotations()
-    export = widget.export_annotations(include_examples=True)
+    all_annotations = _text_widget.get_annotations()
+    labeled = _text_widget.get_labeled_annotations()
+    export = _text_widget.export_annotations(include_examples=True)
 
     mo.vstack([
         mo.md(f"**Total examples:** {len(all_annotations)}"),
@@ -162,8 +161,8 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
-    progress = widget.progress()
+def __(_text_widget, mo):
+    progress = _text_widget.progress()
     mo.md(f"""
     **Progress:** {progress['labeled']}/{progress['total']} ({progress['percent']}%)
     **Remaining:** {progress['remaining']}
@@ -182,14 +181,14 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
+def __(_text_widget, mo):
     import json
 
     # Button to save annotations
     save_button = mo.ui.button(label="Save Annotations")
 
     if save_button.value:
-        annotations_data = widget.export_annotations(include_examples=True)
+        annotations_data = _text_widget.export_annotations(include_examples=True)
         with open('text_annotations.json', 'w') as f:
             json.dump(annotations_data, f, indent=2)
         result = mo.md(f"✓ Saved {len(annotations_data)} annotations to text_annotations.json")
