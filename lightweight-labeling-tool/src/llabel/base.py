@@ -143,7 +143,7 @@ class BaseLabelWidget(anywidget.AnyWidget):
             List of annotation dictionaries
         """
         exported = []
-        for i, annotation in enumerate(self.get_labeled_annotations()):
+        for annotation in self.get_labeled_annotations():
             item = {
                 "index": annotation["index"],
                 "label": annotation["label"],
@@ -152,7 +152,7 @@ class BaseLabelWidget(anywidget.AnyWidget):
             }
 
             if include_examples:
-                item["example"] = self.examples[i]
+                item["example"] = self.examples[annotation["index"]]
 
             exported.append(item)
 
