@@ -1,6 +1,6 @@
 # llabel - Lightweight Labeling Widgets
 
-A lightweight, extensible data labeling toolkit for Jupyter notebooks, inspired by [koaning/molabel](https://github.com/koaning/molabel) and built on [anywidget](https://anywidget.dev).
+A lightweight, extensible data labeling toolkit for interactive notebooks (Jupyter, Marimo), inspired by [koaning/molabel](https://github.com/koaning/molabel) and built on [anywidget](https://anywidget.dev).
 
 ## Features
 
@@ -298,6 +298,9 @@ def render_with_markdown(example):
 # Install development dependencies
 pip install -e ".[dev]"
 
+# Run marimo notebooks
+marimo edit notebooks/01_text_labeling_demo.py
+
 # Run tests
 pytest
 
@@ -311,10 +314,25 @@ export ANYWIDGET_HMR=1
 
 ## Examples & Notebooks
 
-See the `notebooks/` directory for complete examples:
+See the `notebooks/` directory for complete examples (using [Marimo](https://marimo.io)):
 
-- `01_text_labeling_demo.ipynb`: Text classification with custom rendering
-- `02_image_labeling_demo.ipynb`: Image annotation (bbox, point, polygon)
+- `01_text_labeling_demo.py`: Text classification with custom rendering
+- `02_image_labeling_demo.py`: Image annotation (bbox, point, polygon)
+
+**Running the examples:**
+
+```bash
+# Install marimo
+pip install marimo
+
+# Run as interactive notebook
+marimo edit notebooks/01_text_labeling_demo.py
+
+# Or run as app
+marimo run notebooks/01_text_labeling_demo.py
+```
+
+The notebooks also work in Jupyter and other anywidget-compatible environments.
 
 ## Credits
 

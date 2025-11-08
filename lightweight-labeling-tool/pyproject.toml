@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 [project]
 name = "llabel"
 version = "0.1.0"
-description = "Lightweight labeling widgets for Jupyter notebooks"
+description = "Lightweight labeling widgets for interactive notebooks (Jupyter, Marimo)"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
@@ -19,7 +19,7 @@ dependencies = [
 image = ["pillow", "numpy"]
 video = ["opencv-python", "numpy"]
 pdf = ["pypdf", "pillow"]
-dev = ["pytest", "black", "ruff", "jupyter", "notebook"]
+dev = ["pytest", "black", "ruff", "marimo", "jupyter", "notebook"]
 all = ["pillow", "numpy", "opencv-python", "pypdf"]
 
 [tool.hatch.build.targets.wheel]
