@@ -39,7 +39,7 @@ def __(mo):
 
 
 @app.cell
-def __(TextLabel):
+def __(TextLabel, mo):
     # Sample text data
     texts = [
         "I absolutely love this product! It exceeded all my expectations.",
@@ -53,10 +53,13 @@ def __(TextLabel):
     ]
 
     # Create widget with simple string render
-    widget = TextLabel(
+    _widget = TextLabel(
         examples=texts,
         notes=True
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget = mo.ui.anywidget(_widget)
 
     widget
     return texts, widget
@@ -87,7 +90,7 @@ def __(mo):
 
 
 @app.cell
-def __(TextLabel):
+def __(TextLabel, mo):
     # Sample data with metadata
     examples = [
         {"text": "Machine learning is fascinating", "author": "Alice", "date": "2024-01-15"},
@@ -107,11 +110,14 @@ def __(TextLabel):
         </div>
         """
 
-    widget2 = TextLabel(
+    _widget2 = TextLabel(
         examples=examples,
         render=render_tweet,
         notes=True
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget2 = mo.ui.anywidget(_widget2)
 
     widget2
     return examples, render_tweet, widget2
@@ -129,10 +135,10 @@ def __(mo):
 
 @app.cell
 def __(mo, widget):
-    # Get all annotations
-    all_annotations = widget.get_annotations()
-    labeled = widget.get_labeled_annotations()
-    export = widget.export_annotations(include_examples=True)
+    # Get all annotations from the wrapped widget
+    all_annotations = widget.value.get_annotations()
+    labeled = widget.value.get_labeled_annotations()
+    export = widget.value.export_annotations(include_examples=True)
 
     mo.vstack([
         mo.md(f"**Total examples:** {len(all_annotations)}"),
@@ -155,7 +161,7 @@ def __(mo):
 
 @app.cell
 def __(mo, widget):
-    progress = widget.progress()
+    progress = widget.value.progress()
     mo.md(f"""
     **Progress:** {progress['labeled']}/{progress['total']} ({progress['percent']}%)
     **Remaining:** {progress['remaining']}
@@ -181,7 +187,7 @@ def __(mo, widget):
     save_button = mo.ui.button(label="Save Annotations")
 
     if save_button.value:
-        annotations_data = widget.export_annotations(include_examples=True)
+        annotations_data = widget.value.export_annotations(include_examples=True)
         with open('text_annotations.json', 'w') as f:
             json.dump(annotations_data, f, indent=2)
         result = mo.md(f"✓ Saved {len(annotations_data)} annotations to text_annotations.json")
@@ -203,7 +209,7 @@ def __(mo):
 
 
 @app.cell
-def __(TextLabel):
+def __(TextLabel, mo):
     # Custom shortcuts
     custom_shortcuts = {
         "y": "yes",
@@ -213,11 +219,14 @@ def __(TextLabel):
         "t": "focus_notes"
     }
 
-    widget3 = TextLabel(
+    _widget3 = TextLabel(
         examples=["Example 1", "Example 2", "Example 3"],
         shortcuts=custom_shortcuts,
         notes=True
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget3 = mo.ui.anywidget(_widget3)
 
     # Note: This will use single-key shortcuts instead of Alt+ combinations
     widget3

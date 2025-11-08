@@ -41,7 +41,7 @@ def __(mo):
 
 
 @app.cell
-def __(ImageLabel, np):
+def __(ImageLabel, mo, np):
     # Create sample images with NumPy
     sample_images = [
         np.random.randint(0, 255, (400, 600, 3), dtype=np.uint8),
@@ -53,11 +53,14 @@ def __(ImageLabel, np):
     classes = ["person", "car", "bicycle", "dog"]
 
     # Create widget
-    widget = ImageLabel(
+    _widget = ImageLabel(
         images=sample_images,
         classes=classes,
         mode="bbox"
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget = mo.ui.anywidget(_widget)
 
     widget
     return classes, sample_images, widget
@@ -89,7 +92,7 @@ def __(mo):
 
 
 @app.cell
-def __(ImageLabel, np):
+def __(ImageLabel, mo, np):
     # Create sample images
     point_images = [
         np.random.randint(0, 255, (500, 500, 3), dtype=np.uint8),
@@ -99,11 +102,14 @@ def __(ImageLabel, np):
     # Define keypoint classes
     keypoint_classes = ["nose", "left_eye", "right_eye", "left_ear", "right_ear"]
 
-    widget_points = ImageLabel(
+    _widget_points = ImageLabel(
         images=point_images,
         classes=keypoint_classes,
         mode="point"
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget_points = mo.ui.anywidget(_widget_points)
 
     widget_points
     return keypoint_classes, point_images, widget_points
@@ -133,7 +139,7 @@ def __(mo):
 
 
 @app.cell
-def __(ImageLabel, np):
+def __(ImageLabel, mo, np):
     # Create sample images
     poly_images = [
         np.random.randint(0, 255, (400, 600, 3), dtype=np.uint8),
@@ -142,11 +148,14 @@ def __(ImageLabel, np):
     # Define segmentation classes
     seg_classes = ["background", "foreground", "object"]
 
-    widget_poly = ImageLabel(
+    _widget_poly = ImageLabel(
         images=poly_images,
         classes=seg_classes,
         mode="polygon"
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget_poly = mo.ui.anywidget(_widget_poly)
 
     widget_poly
     return poly_images, seg_classes, widget_poly
@@ -175,7 +184,7 @@ def __(mo):
 
 
 @app.cell
-def __(Image, ImageLabel):
+def __(Image, ImageLabel, mo):
     # Create PIL images
     pil_images = [
         Image.new('RGB', (400, 300), color=(255, 0, 0)),
@@ -183,11 +192,14 @@ def __(Image, ImageLabel):
         Image.new('RGB', (400, 300), color=(0, 0, 255)),
     ]
 
-    widget_pil = ImageLabel(
+    _widget_pil = ImageLabel(
         images=pil_images,
         classes=["red", "green", "blue"],
         mode="bbox"
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget_pil = mo.ui.anywidget(_widget_pil)
 
     widget_pil
     return pil_images, widget_pil
@@ -206,10 +218,10 @@ def __(mo):
 @app.cell
 def __(mo, widget):
     # Get raw annotations (relative coordinates)
-    annotations = widget.get_annotations()
+    annotations = widget.value.get_annotations()
 
     # Get normalized annotations (absolute pixel coordinates)
-    normalized = widget.get_normalized_annotations()
+    normalized = widget.value.get_normalized_annotations()
 
     mo.vstack([
         mo.md("**Raw annotations (relative coordinates 0-1):**"),
@@ -241,7 +253,7 @@ def __(widget):
         }
 
         # Add categories
-        classes_list = widget_instance.classes
+        classes_list = widget_instance.value.classes
         for idx, cls in enumerate(classes_list):
             coco_format["categories"].append({
                 "id": idx,
@@ -249,7 +261,7 @@ def __(widget):
             })
 
         # Get normalized annotations
-        annotations_list = widget_instance.get_normalized_annotations(
+        annotations_list = widget_instance.value.get_normalized_annotations(
             image_width=image_width,
             image_height=image_height
         )
@@ -335,7 +347,7 @@ def __(mo):
 
 
 @app.cell
-def __(ImageLabel, sample_images, classes):
+def __(ImageLabel, mo, sample_images, classes):
     # Custom colors (CSS color strings)
     custom_colors = [
         "#FF0000",  # Red
@@ -344,12 +356,15 @@ def __(ImageLabel, sample_images, classes):
         "#FFFF00",  # Yellow
     ]
 
-    widget_custom = ImageLabel(
+    _widget_custom = ImageLabel(
         images=sample_images[:1],
         classes=classes,
         colors=custom_colors,
         mode="bbox"
     )
+
+    # Wrap with Marimo's anywidget wrapper
+    widget_custom = mo.ui.anywidget(_widget_custom)
 
     widget_custom
     return custom_colors, widget_custom
