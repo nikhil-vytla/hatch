@@ -21,6 +21,7 @@ class TextLabel(BaseLabelWidget):
 
     # Additional traitlets specific to text widget
     current_rendered = traitlets.Unicode("").tag(sync=True)
+    examples_data = traitlets.List([]).tag(sync=True)
 
     # JavaScript and CSS
     _esm = Path(__file__).parent / "static" / "text-widget.js"
@@ -28,8 +29,8 @@ class TextLabel(BaseLabelWidget):
 
     def __init__(
         self,
-        examples: List[Any],
-        render: Optional[Callable[[Any], Any]] = None,
+        examples: List[Dict[str, Any]],
+        render: Callable[[Dict[str, Any]], Any],
         shortcuts: Optional[Dict[str, str]] = None,
         notes: bool = True,
     ):
@@ -37,16 +38,21 @@ class TextLabel(BaseLabelWidget):
         Initialize the text labeling widget.
 
         Args:
-            examples: List of examples to label (any type)
-            render: Function to convert example to displayable format
-                   If None, uses str() conversion
+            examples: List of example dicts to label
+            render: Function that takes an example dict and returns displayable format
             shortcuts: Custom keyboard shortcut mapping
             notes: Enable notes field
         """
-        super().__init__(examples=examples, shortcuts=shortcuts, notes=notes)
+        # Render all examples and store with _html key (molabel approach)
+        rendered_examples = [
+            {**ex, "_html": autocast_render(render(ex.copy()))}
+            for ex in examples
+        ]
 
-        # Store render function
-        self.render_fn = render if render else str
+        super().__init__(examples=rendered_examples, shortcuts=shortcuts, notes=notes)
+
+        # Sync examples to frontend
+        self.examples_data = rendered_examples
 
         # Render initial example
         self._update_rendered()
@@ -58,9 +64,7 @@ class TextLabel(BaseLabelWidget):
     def _update_rendered(self):
         """Update the rendered content for current example."""
         if 0 <= self.current_index < len(self.examples):
-            example = self.examples[self.current_index]
-            rendered = self.render_fn(example)
-            self.current_rendered = autocast_render(rendered)
+            self.current_rendered = self.examples[self.current_index].get("_html", "")
 
     def _on_index_change(self, change):
         """Handle index changes."""

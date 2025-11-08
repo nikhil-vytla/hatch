@@ -59,16 +59,8 @@ class BaseLabelWidget(anywidget.AnyWidget):
         self.total = len(examples)
         self.enable_notes = notes
 
-        # Initialize annotations
-        self.annotations = [
-            {
-                "index": i,
-                "label": None,
-                "notes": "",
-                "timestamp": None,
-            }
-            for i in range(len(examples))
-        ]
+        # Initialize annotations as empty list (molabel approach)
+        self.annotations = []
 
         # Set up keyboard shortcuts
         default_shortcuts = {
@@ -130,7 +122,7 @@ class BaseLabelWidget(anywidget.AnyWidget):
         Returns:
             List of labeled annotation dictionaries
         """
-        return [a for a in self.annotations if a["label"] is not None]
+        return [a for a in self.annotations if a.get("_label") is not None]
 
     def export_annotations(self, include_examples: bool = False) -> List[Dict[str, Any]]:
         """
@@ -146,13 +138,14 @@ class BaseLabelWidget(anywidget.AnyWidget):
         for annotation in self.get_labeled_annotations():
             item = {
                 "index": annotation["index"],
-                "label": annotation["label"],
-                "notes": annotation["notes"],
-                "timestamp": annotation["timestamp"],
+                "label": annotation.get("_label"),
+                "notes": annotation.get("_notes", ""),
+                "timestamp": annotation.get("_timestamp"),
             }
 
             if include_examples:
-                item["example"] = self.examples[annotation["index"]]
+                # Use the example from annotation if available, otherwise lookup
+                item["example"] = annotation.get("example", self.examples[annotation["index"]])
 
             exported.append(item)
 
@@ -161,15 +154,7 @@ class BaseLabelWidget(anywidget.AnyWidget):
     def reset(self):
         """Reset all annotations and return to first example."""
         self.current_index = 0
-        self.annotations = [
-            {
-                "index": i,
-                "label": None,
-                "notes": "",
-                "timestamp": None,
-            }
-            for i in range(len(self.examples))
-        ]
+        self.annotations = []
 
     def progress(self) -> Dict[str, int]:
         """
