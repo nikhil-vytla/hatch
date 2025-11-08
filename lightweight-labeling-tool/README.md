@@ -90,6 +90,30 @@ widget
 - Coordinate normalization
 - COCO format export
 
+### Using with Marimo
+
+When using in Marimo notebooks, wrap widgets with `mo.ui.anywidget()`:
+
+```python
+import marimo as mo
+from llabel import TextLabel
+
+# Create widget
+_widget = TextLabel(examples=texts, notes=True)
+
+# Wrap for Marimo compatibility
+widget = mo.ui.anywidget(_widget)
+
+# Display
+widget
+
+# Access widget methods via .value
+annotations = widget.value.get_annotations()
+progress = widget.value.progress()
+```
+
+This is the recommended approach for Marimo and handles all compatibility concerns.
+
 ## Usage Examples
 
 ### Custom Render Function
