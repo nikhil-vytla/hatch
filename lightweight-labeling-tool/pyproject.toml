@@ -16,16 +16,25 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-image = ["pillow", "numpy"]
-video = ["opencv-python", "numpy"]
-pdf = ["pypdf", "pillow"]
+image = ["Pillow>=9.0.0", "numpy>=1.20.0"]
+video = ["opencv-python>=4.5.0", "numpy>=1.20.0"]
+pdf = ["pypdf>=3.0.0", "Pillow>=9.0.0"]
 sam = ["segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib"]
 demos = ["datasets", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib"]
-dev = ["pytest", "black", "ruff", "marimo", "jupyter", "notebook", "datasets"]
-all = ["pillow", "numpy", "opencv-python", "pypdf", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib", "datasets"]
+dev = ["pytest>=7.0", "black>=22.0", "ruff>=0.0.270", "marimo", "jupyter", "notebook", "datasets"]
+all = ["Pillow>=9.0.0", "numpy>=1.20.0", "opencv-python>=4.5.0", "pypdf>=3.0.0", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib", "datasets"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/llabel"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.hatch.build]
+include = [
+    "src/llabel/**/*.py",
+    "src/llabel/static/**/*",
+]
 
 [tool.black]
 line-length = 88
