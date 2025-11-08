@@ -29,8 +29,8 @@ class BaseLabelWidget(anywidget.AnyWidget):
     """
 
     # Override ipywidgets traits to prevent conflicts with Marimo (Marimo compatibility)
-    layout = traitlets.Instance('ipywidgets.widgets.Layout', allow_none=True, default_value=None)
-    comm = traitlets.Instance('ipywidgets.widgets.widget.Comm', allow_none=True, default_value=None)
+    layout = traitlets.Any(default_value=None, allow_none=True)
+    comm = traitlets.Any(default_value=None, allow_none=True)
 
     # Traitlets for state synchronization
     current_index = traitlets.Int(0).tag(sync=True)
