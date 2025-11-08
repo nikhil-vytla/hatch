@@ -98,19 +98,14 @@ When using in Marimo notebooks, wrap widgets with `mo.ui.anywidget()`:
 import marimo as mo
 from llabel import TextLabel
 
-# Create widget
-_widget = TextLabel(examples=texts, notes=True)
-
-# Wrap for Marimo compatibility and display
-widget = mo.ui.anywidget(_widget)
+# Create and wrap widget
+widget = mo.ui.anywidget(TextLabel(examples=texts, notes=True))
 widget  # Display the widget
 
-# Access widget methods via the original _widget reference
-annotations = _widget.get_annotations()
-progress = _widget.progress()
+# Access widget methods directly on the wrapped widget
+annotations = widget.get_annotations()
+progress = widget.progress()
 ```
-
-**Important**: Keep the `_widget` reference to call methods. The wrapped `widget` is for display only - its `.value` property returns state as a dictionary, not the widget instance.
 
 ## Usage Examples
 

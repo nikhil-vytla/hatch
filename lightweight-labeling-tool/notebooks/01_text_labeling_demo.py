@@ -62,7 +62,7 @@ def __(TextLabel, mo):
     widget = mo.ui.anywidget(_widget)
 
     widget
-    return _widget, texts, widget
+    return texts, widget
 
 
 @app.cell(hide_code=True)
@@ -120,7 +120,7 @@ def __(TextLabel, mo):
     widget2 = mo.ui.anywidget(_widget2)
 
     widget2
-    return _widget2, examples, render_tweet, widget2
+    return examples, render_tweet, widget2
 
 
 @app.cell(hide_code=True)
@@ -134,11 +134,11 @@ def __(mo):
 
 
 @app.cell
-def __(_widget, mo):
-    # Get all annotations from the original widget
-    all_annotations = _widget.get_annotations()
-    labeled = _widget.get_labeled_annotations()
-    export = _widget.export_annotations(include_examples=True)
+def __(mo, widget):
+    # Get all annotations from the widget
+    all_annotations = widget.get_annotations()
+    labeled = widget.get_labeled_annotations()
+    export = widget.export_annotations(include_examples=True)
 
     mo.vstack([
         mo.md(f"**Total examples:** {len(all_annotations)}"),
@@ -160,8 +160,8 @@ def __(mo):
 
 
 @app.cell
-def __(_widget, mo):
-    progress = _widget.progress()
+def __(mo, widget):
+    progress = widget.progress()
     mo.md(f"""
     **Progress:** {progress['labeled']}/{progress['total']} ({progress['percent']}%)
     **Remaining:** {progress['remaining']}
@@ -180,14 +180,14 @@ def __(mo):
 
 
 @app.cell
-def __(_widget, mo):
+def __(mo, widget):
     import json
 
     # Button to save annotations
     save_button = mo.ui.button(label="Save Annotations")
 
     if save_button.value:
-        annotations_data = _widget.export_annotations(include_examples=True)
+        annotations_data = widget.export_annotations(include_examples=True)
         with open('text_annotations.json', 'w') as f:
             json.dump(annotations_data, f, indent=2)
         result = mo.md(f"✓ Saved {len(annotations_data)} annotations to text_annotations.json")
@@ -230,7 +230,7 @@ def __(TextLabel, mo):
 
     # Note: This will use single-key shortcuts instead of Alt+ combinations
     widget3
-    return _widget3, custom_shortcuts, widget3
+    return custom_shortcuts, widget3
 
 
 if __name__ == "__main__":
