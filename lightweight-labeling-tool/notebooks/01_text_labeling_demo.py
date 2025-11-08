@@ -15,7 +15,8 @@ def __():
     import sys
     sys.path.insert(0, '..')
     from llabel import TextLabel
-    return mo, sys, TextLabel
+    from datasets import load_dataset
+    return TextLabel, load_dataset, mo, sys
 
 
 @app.cell(hide_code=True)
@@ -31,38 +32,39 @@ def __(mo):
 @app.cell(hide_code=True)
 def __(mo):
     mo.md("""
-    ## Basic Text Classification
+    ## Sentiment Analysis with IMDB Dataset
 
-    Let's create a simple sentiment analysis labeling task.
+    Let's label movie reviews from the IMDB dataset for sentiment analysis.
     """)
     return
 
 
 @app.cell
-def __(TextLabel, mo):
-    # Sample text data
-    texts = [
-        "I absolutely love this product! It exceeded all my expectations.",
-        "Terrible experience. Would not recommend to anyone.",
-        "It's okay, nothing special but does the job.",
-        "Best purchase I've made this year! Highly recommended.",
-        "Complete waste of money. Very disappointed.",
-        "Pretty good overall, with a few minor issues.",
-        "Outstanding quality and great customer service!",
-        "Not what I expected. Returning it tomorrow."
-    ]
+def __(load_dataset, mo):
+    # Load IMDB dataset from HuggingFace
+    dataset = load_dataset("imdb", split="test")
 
-    # Create widget with simple string render
-    _widget = TextLabel(
-        examples=texts,
-        notes=True
+    # Take a small sample for labeling (50 reviews)
+    sample_indices = range(0, 50)
+    texts = [dataset[i]["text"] for i in sample_indices]
+
+    mo.md(f"Loaded {len(texts)} movie reviews from IMDB dataset")
+    return dataset, sample_indices, texts
+
+
+@app.cell
+def __(TextLabel, mo, texts):
+    # Create widget for sentiment labeling
+    # Users will label as positive (Yes) or negative (No)
+    widget = mo.ui.anywidget(
+        TextLabel(
+            examples=texts,
+            notes=True
+        )
     )
 
-    # Wrap with Marimo's anywidget wrapper
-    widget = mo.ui.anywidget(_widget)
-
     widget
-    return texts, widget
+    return (widget,)
 
 
 @app.cell(hide_code=True)
