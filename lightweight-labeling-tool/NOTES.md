@@ -228,7 +228,8 @@ Encountered and resolved several compatibility issues with Marimo:
    - **Solution**: Call `super().__init__()` with no arguments, following koaning/molabel's pattern.
 
 3. **Wrapper Requirement**: Use `mo.ui.anywidget()` wrapper for proper Marimo integration and reactivity.
-   - Access widget methods via `.value` property: `widget.value.get_annotations()`
+   - Keep the original `_widget` reference to call methods: `_widget.get_annotations()`
+   - The wrapped `widget` is for display only - its `.value` returns state as a dict, not the widget instance
 
 4. **Comm Trait Issue**: Similar to layout, the `comm` trait from ipywidgets.Widget was causing type validation errors with MarimoComm.
    - **Initial attempt**: Used `traitlets.Instance('ipywidgets.widgets.widget.Comm', allow_none=True)` but this still validates type
