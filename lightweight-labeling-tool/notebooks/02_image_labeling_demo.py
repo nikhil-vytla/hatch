@@ -63,7 +63,7 @@ def __(ImageLabel, mo, np):
     widget = mo.ui.anywidget(_widget)
 
     widget
-    return classes, sample_images, widget
+    return _widget, classes, sample_images, widget
 
 
 @app.cell(hide_code=True)

@@ -62,7 +62,7 @@ def __(TextLabel, mo):
     widget = mo.ui.anywidget(_widget)
 
     widget
-    return texts, widget
+    return _widget, texts, widget
 
 
 @app.cell(hide_code=True)
@@ -120,7 +120,7 @@ def __(TextLabel, mo):
     widget2 = mo.ui.anywidget(_widget2)
 
     widget2
-    return examples, render_tweet, widget2
+    return _widget2, examples, render_tweet, widget2
 
 
 @app.cell(hide_code=True)
@@ -230,7 +230,7 @@ def __(TextLabel, mo):
 
     # Note: This will use single-key shortcuts instead of Alt+ combinations
     widget3
-    return custom_shortcuts, widget3
+    return _widget3, custom_shortcuts, widget3
 
 
 if __name__ == "__main__":
