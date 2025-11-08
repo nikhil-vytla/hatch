@@ -40,7 +40,6 @@ class BaseLabelWidget(anywidget.AnyWidget):
         examples: List[Any],
         shortcuts: Optional[Dict[str, str]] = None,
         notes: bool = False,
-        **kwargs,
     ):
         """
         Initialize the base labeling widget.
@@ -49,9 +48,8 @@ class BaseLabelWidget(anywidget.AnyWidget):
             examples: List of examples to label
             shortcuts: Custom keyboard shortcut mapping (key -> action)
             notes: Enable notes field
-            **kwargs: Additional arguments passed to parent
         """
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.examples = examples
         self.total = len(examples)
