@@ -63,7 +63,7 @@ def __(ImageLabel, mo, np):
     widget = mo.ui.anywidget(_widget)
 
     widget
-    return _widget, classes, sample_images, widget
+    return classes, sample_images, widget
 
 
 @app.cell(hide_code=True)
@@ -216,13 +216,13 @@ def __(mo):
 
 
 @app.cell
-def __(_widget, mo):
+def __(mo, widget):
     # Get raw annotations (relative coordinates)
-    annotations = _widget.get_annotations()
+    annotations = widget.get_annotations()
 
     # Get normalized annotations (absolute pixel coordinates)
     # Image dimensions: 600x400 (width x height)
-    normalized = _widget.get_normalized_annotations(image_width=600, image_height=400)
+    normalized = widget.get_normalized_annotations(image_width=600, image_height=400)
 
     mo.vstack([
         mo.md("**Raw annotations (relative coordinates 0-1):**"),
@@ -244,7 +244,7 @@ def __(mo):
 
 
 @app.cell
-def __(_widget):
+def __(widget):
     def export_to_coco(widget_instance, image_width=600, image_height=400):
         """Export annotations to COCO format."""
         coco_format = {
@@ -297,7 +297,7 @@ def __(_widget):
         return coco_format
 
     # Export
-    coco_data = export_to_coco(_widget)
+    coco_data = export_to_coco(widget)
     return coco_data, export_to_coco
 
 
