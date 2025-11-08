@@ -28,6 +28,9 @@ class BaseLabelWidget(anywidget.AnyWidget):
     recording annotations, and managing keyboard shortcuts.
     """
 
+    # Override layout trait to prevent ipywidgets Layout creation (Marimo compatibility)
+    layout = traitlets.Instance('ipywidgets.widgets.Layout', allow_none=True, default_value=None)
+
     # Traitlets for state synchronization
     current_index = traitlets.Int(0).tag(sync=True)
     annotations = traitlets.List([]).tag(sync=True)
