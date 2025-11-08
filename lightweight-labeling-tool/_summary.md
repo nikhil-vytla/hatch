@@ -4,5 +4,6 @@ Key deliverables:
 - Production-ready TextLabel and ImageLabel widgets with full Python/JS implementations
 - Extensible base class architecture enabling easy addition of new widget types
 - Detailed design specifications for video and PDF annotation (video.py, pdf.py)
-- Two interactive Jupyter notebooks demonstrating common labeling workflows
+- Two interactive Marimo notebooks demonstrating common labeling workflows
 - Complete project setup with pyproject.toml, comprehensive README, and development notes
+- Marimo compatibility fix using traitlets.Any() for layout/comm traits
