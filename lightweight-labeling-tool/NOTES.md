@@ -230,6 +230,10 @@ Encountered and resolved several compatibility issues with Marimo:
 3. **Wrapper Requirement**: Use `mo.ui.anywidget()` wrapper for proper Marimo integration and reactivity.
    - Access widget methods via `.value` property: `widget.value.get_annotations()`
 
+4. **Comm Trait Issue**: Similar to layout, the `comm` trait from ipywidgets.Widget was causing type validation errors with MarimoComm.
+   - **Initial attempt**: Used `traitlets.Instance('ipywidgets.widgets.widget.Comm', allow_none=True)` but this still validates type
+   - **Final solution**: Changed both `layout` and `comm` to use `traitlets.Any(default_value=None, allow_none=True)` which accepts any value without type validation, including MarimoComm
+
 ## Final Reflections
 
 ### What Worked Well
