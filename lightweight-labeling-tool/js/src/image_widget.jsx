@@ -722,9 +722,11 @@ const Toolbar = ({ tool, setTool, onClear, classes, currentClass, setCurrentClas
   );
 };
 
-const Navigation = ({ currentIndex, setCurrentIndex, srcs, annotations }) => {
+const Navigation = ({ currentIndex, setCurrentIndex, srcs, filenames, annotations }) => {
   const currentSrc = srcs[currentIndex];
-  const imageName = currentSrc.split("/").pop();
+  const imageName = filenames && filenames[currentIndex]
+    ? filenames[currentIndex]
+    : currentSrc.split("/").pop();
   const annotatedImagesCount = annotations.filter(a => a.elements && a.elements.length > 0).length;
 
   return (
@@ -760,6 +762,7 @@ const Navigation = ({ currentIndex, setCurrentIndex, srcs, annotations }) => {
 
 function ImageAnnotationWidget() {
   const [srcs] = useModelState("srcs");
+  const [filenames] = useModelState("filenames");
   const [annotations, setAnnotations] = useModelState("annotations");
   const [classes] = useModelState("classes");
   const [colors] = useModelState("colors");
@@ -865,6 +868,7 @@ function ImageAnnotationWidget() {
         currentIndex={currentIndex}
         setCurrentIndex={setCurrentIndex}
         srcs={srcs}
+        filenames={filenames}
         annotations={annotations}
       />
     </div>

@@ -1,215 +1,178 @@
 # Adapted from koaning/molabel
 """Image labeling widget for annotation tasks."""
 
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+import base64
+from io import BytesIO
 
+import anywidget
 import traitlets
 
-from .base import BaseLabelWidget
-from .utils import to_data_uri
 
+def to_src(input_data: Union[str, Any]) -> str:
+    """Converts various input types to a data URI string for display in the widget.
 
-class ImageLabel(BaseLabelWidget):
+    Supports:
+    - URLs (http/https)
+    - Local file paths
+    - Base64 strings
+    - PIL/Pillow Image objects
+    - NumPy arrays
+    - File-like objects (BytesIO, etc.)
     """
-    Widget for labeling images with bounding boxes, points, or polygons.
+    # Handle string inputs (URLs, paths, or base64)
+    if isinstance(input_data, str):
+        # Check if it's a URL
+        if input_data.startswith(("http://", "https://")):
+            return input_data
 
-    Supports multiple image formats: URLs, file paths, PIL Images, NumPy arrays.
+        # Check if it's already a data URI
+        if input_data.startswith("data:image/"):
+            return input_data
+
+        # Check if it's a base64 string (not a file path)
+        if not Path(input_data).exists():
+            # Try to decode it to verify it's valid base64
+            try:
+                base64.b64decode(input_data)
+                return f"data:image/png;base64,{input_data}"
+            except Exception:
+                pass
+
+        # Handle local file path
+        path_obj = Path(input_data)
+        with open(path_obj, "rb") as f:
+            return f"data:image/{path_obj.suffix[1:]};base64," + base64.b64encode(f.read()).decode("utf-8")
+
+    # Handle PIL/Pillow Image objects
+    try:
+        from PIL import Image
+        if isinstance(input_data, Image.Image):
+            buffered = BytesIO()
+            format = input_data.format if input_data.format else "PNG"
+            input_data.save(buffered, format=format)
+            img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            return f"data:image/{format.lower()};base64,{img_str}"
+    except ImportError:
+        pass
+
+    # Handle numpy arrays
+    try:
+        import numpy as np
+        if isinstance(input_data, np.ndarray):
+            from PIL import Image
+            img = Image.fromarray(input_data.astype('uint8'))
+            buffered = BytesIO()
+            img.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            return f"data:image/png;base64,{img_str}"
+    except ImportError:
+        pass
+
+    # Handle file-like objects (BytesIO, etc.)
+    if hasattr(input_data, 'read') and hasattr(input_data, 'seek'):
+        input_data.seek(0)
+        img_bytes = input_data.read()
+        img_str = base64.b64encode(img_bytes).decode("utf-8")
+        # Try to determine format from bytes
+        format = "png"
+        if img_bytes.startswith(b'\xff\xd8\xff'):
+            format = "jpeg"
+        elif img_bytes.startswith(b'\x89PNG'):
+            format = "png"
+        elif img_bytes.startswith(b'GIF89a') or img_bytes.startswith(b'GIF87a'):
+            format = "gif"
+        return f"data:image/{format};base64,{img_str}"
+
+    raise TypeError(f"Unsupported input type: {type(input_data)}")
+
+
+class ImageLabel(anywidget.AnyWidget):
     """
+    An annotation tool for images.
 
-    # Additional traitlets specific to image widget
+    Args:
+        images (list): A list of images to annotate. Each item can be:
+            - URL string (http:// or https://)
+            - Local file path string
+            - Base64 encoded string
+            - PIL/Pillow Image object
+            - NumPy array
+            - File-like object (BytesIO, etc.)
+        classes (list, optional): A list of classes to use for annotation
+        colors (dict or list, optional): Colors for each class. Can be dict mapping
+            class names to colors, or list of colors in same order as classes
+    """
+    # JavaScript and CSS (read as text like molabel)
+    _esm = (Path(__file__).parent / "static" / "image-widget.js").read_text()
+    _css = (Path(__file__).parent / "static" / "image-widget.css").read_text()
+
+    # Override ipywidgets traits to prevent conflicts with Marimo (Marimo compatibility)
+    layout = traitlets.Any(default_value=None, allow_none=True)
+    comm = traitlets.Any(default_value=None, allow_none=True)
+
+    # Traitlets (molabel's simpler approach)
     srcs = traitlets.List([]).tag(sync=True)
+    filenames = traitlets.List([]).tag(sync=True)
+    annotations = traitlets.List([]).tag(sync=True)
     classes = traitlets.List([]).tag(sync=True)
-    colors = traitlets.List([]).tag(sync=True)
-    current_src = traitlets.Unicode("").tag(sync=True)
-    annotation_mode = traitlets.Unicode("bbox").tag(sync=True)  # bbox, point, polygon
+    colors = traitlets.Dict({}).tag(sync=True)
 
-    # JavaScript and CSS
-    _esm = Path(__file__).parent / "static" / "image-widget.js"
-    _css = Path(__file__).parent / "static" / "image-widget.css"
+    def __init__(self, images=None, paths=None, classes=None, colors=None, **kwargs):
+        super().__init__(**kwargs)
 
-    def __init__(
-        self,
-        images: Optional[List[Any]] = None,
-        paths: Optional[List[str]] = None,
-        classes: Optional[List[str]] = None,
-        colors: Optional[List[str]] = None,
-        mode: str = "bbox",
-        shortcuts: Optional[Dict[str, str]] = None,
-    ):
-        """
-        Initialize the image labeling widget.
+        # Support both 'images' (new) and 'paths' (backward compatibility)
+        input_items = images if images is not None else paths
 
-        Args:
-            images: List of images (PIL, numpy, URLs, etc.)
-            paths: Alternative to images - list of file paths
-            classes: List of class names for classification
-            colors: List of colors for each class (CSS color strings)
-            mode: Annotation mode - 'bbox', 'point', or 'polygon'
-            shortcuts: Custom keyboard shortcut mapping
-        """
-        # Process image sources
-        if images is not None:
-            sources = images
-        elif paths is not None:
-            sources = paths
-        else:
-            raise ValueError("Either 'images' or 'paths' must be provided")
-
-        # Convert all sources to data URIs
-        self._original_sources = sources
-        self.srcs = [to_data_uri(src, "image/png") for src in sources]
-
-        # Initialize parent with dummy examples (we use srcs instead)
-        super().__init__(examples=sources, shortcuts=shortcuts, notes=False)
-
-        # Set classes and colors
-        self.classes = classes or []
+        if input_items:
+            self.srcs = [to_src(item) for item in input_items]
+            self.filenames = [self._extract_filename(item) for item in input_items]
+            self.annotations = [{"src": src, "elements": []} for src in self.srcs]
+        if classes:
+            self.classes = classes
         if colors:
-            self.colors = colors
-        elif len(self.classes) > 0:
-            # Generate default colors
-            self.colors = self._generate_colors(len(self.classes))
-        else:
-            self.colors = []
+            if isinstance(colors, list):
+                if len(colors) != len(self.classes):
+                    raise ValueError("The length of `colors` must match the length of `classes`.")
+                self.colors = dict(zip(self.classes, colors))
+            else:
+                self.colors = colors
 
-        # Set annotation mode
-        if mode not in ["bbox", "point", "polygon"]:
-            raise ValueError("mode must be 'bbox', 'point', or 'polygon'")
-        self.annotation_mode = mode
+    def _extract_filename(self, item):
+        """Extract a display filename from the input item."""
+        if isinstance(item, str):
+            # If it's a file path, extract filename
+            if not item.startswith(("http://", "https://", "data:")):
+                return Path(item).name
+            # If it's a URL, extract the last segment
+            if item.startswith(("http://", "https://")):
+                return item.split("/")[-1].split("?")[0] or "image"
+        # For other types (PIL, numpy, etc), use index-based name
+        return f"image_{id(item) % 10000}"
 
-        # Initialize annotations with proper structure
-        self.annotations = [
-            {
-                "index": i,
-                "elements": [],  # List of {type, coords, class_idx}
-                "timestamp": None,
-            }
-            for i in range(len(self.srcs))
-        ]
+    def _normalize_points(self, annotation: dict) -> dict:
+        if "elements" not in annotation:
+            return annotation
 
-        # Set current image
-        if len(self.srcs) > 0:
-            self.current_src = self.srcs[0]
+        elements = []
+        for element in annotation["elements"]:
+            points = []
+            for point in element["points"]:
+                points.append({
+                    "x": int(point["x"] * element["imageDimensions"]["width"]),
+                    "y": int(point["y"] * element["imageDimensions"]["height"])
+                })
+            new_element = {**element}
+            new_element["points"] = points
+            elements.append(new_element)
+        return {
+            **annotation,
+            "elements": elements
+        }
 
-        # Set up observers
-        self.observe(self._on_index_change, names=["current_index"])
-
-    def _generate_colors(self, n: int) -> List[str]:
-        """Generate n distinct colors."""
-        colors = [
-            "#FF6B6B",  # Red
-            "#4ECDC4",  # Teal
-            "#45B7D1",  # Blue
-            "#FFA07A",  # Light Salmon
-            "#98D8C8",  # Mint
-            "#F7DC6F",  # Yellow
-            "#BB8FCE",  # Purple
-            "#85C1E2",  # Sky Blue
-        ]
-
-        # Repeat if we need more colors
-        while len(colors) < n:
-            colors.extend(colors)
-
-        return colors[:n]
-
-    def _on_index_change(self, change):
-        """Handle index changes."""
-        if 0 <= self.current_index < len(self.srcs):
-            self.current_src = self.srcs[self.current_index]
-
-    def get_normalized_annotations(
-        self, image_width: int = None, image_height: int = None
-    ) -> List[Dict[str, Any]]:
+    def get_normalized_annotations(self):
         """
-        Convert relative coordinates to absolute pixel coordinates.
-
-        Args:
-            image_width: Image width in pixels (required if not using PIL)
-            image_height: Image height in pixels (required if not using PIL)
-
-        Returns:
-            List of annotations with absolute coordinates
+        Get the coordinates of the annotations for a given image.
         """
-        normalized = []
-
-        for i, annotation in enumerate(self.annotations):
-            if annotation["elements"]:
-                # Try to get image dimensions
-                width, height = None, None
-
-                try:
-                    from PIL import Image
-
-                    # Try to open original source
-                    source = self._original_sources[i]
-                    if isinstance(source, str) and not source.startswith("http"):
-                        img = Image.open(source)
-                        width, height = img.size
-                    elif hasattr(source, "size"):
-                        width, height = source.size
-                except:
-                    pass
-
-                # Use provided dimensions if image dimensions not available
-                if width is None:
-                    width = image_width
-                if height is None:
-                    height = image_height
-
-                if width is None or height is None:
-                    raise ValueError(
-                        "Cannot normalize coordinates without image dimensions"
-                    )
-
-                # Normalize elements
-                norm_elements = []
-                for elem in annotation["elements"]:
-                    norm_elem = {
-                        "type": elem["type"],
-                        "class_idx": elem.get("class_idx"),
-                        "coords": [],
-                    }
-
-                    # Convert relative (0-1) to absolute coordinates
-                    coords = elem["coords"]
-                    if elem["type"] == "bbox":
-                        # [x1, y1, x2, y2] relative to absolute
-                        norm_elem["coords"] = [
-                            coords[0] * width,
-                            coords[1] * height,
-                            coords[2] * width,
-                            coords[3] * height,
-                        ]
-                    elif elem["type"] == "point":
-                        # [x, y] relative to absolute
-                        norm_elem["coords"] = [coords[0] * width, coords[1] * height]
-                    elif elem["type"] == "polygon":
-                        # List of [x, y] pairs
-                        norm_elem["coords"] = [
-                            [x * width, y * height] for x, y in coords
-                        ]
-
-                    norm_elements.append(norm_elem)
-
-                normalized.append(
-                    {
-                        "index": i,
-                        "elements": norm_elements,
-                        "timestamp": annotation["timestamp"],
-                    }
-                )
-
-        return normalized
-
-    def next(self):
-        """Move to next image."""
-        if self.current_index < len(self.srcs) - 1:
-            self.current_index += 1
-
-    def prev(self):
-        """Move to previous image."""
-        if self.current_index > 0:
-            self.current_index -= 1
+        return [self._normalize_points(annotation) for annotation in self.annotations]
