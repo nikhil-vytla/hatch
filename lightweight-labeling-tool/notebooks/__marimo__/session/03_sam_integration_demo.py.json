@@ -1,0 +1,262 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.17.7"
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "c6ee5a2998db6d017e41980a7d349496",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"sam-integration-demo\">SAM Integration Demo</h2>\n<h3 id=\"troubleshooting\">Troubleshooting</h3>\n<span class=\"paragraph\">If you get a torchvision import error, reinstall compatible versions:</span>\n<div class=\"language-bash codehilite\"><pre><span></span><code><span class=\"c1\"># Uninstall existing versions</span>\npip<span class=\"w\"> </span>uninstall<span class=\"w\"> </span>torch<span class=\"w\"> </span>torchvision<span class=\"w\"> </span>segment-anything<span class=\"w\"> </span>-y\n\n<span class=\"c1\"># Reinstall with compatible versions</span>\nuv<span class=\"w\"> </span>pip<span class=\"w\"> </span>install<span class=\"w\"> </span>torch<span class=\"w\"> </span>torchvision\nuv<span class=\"w\"> </span>pip<span class=\"w\"> </span>install<span class=\"w\"> </span>segment-anything\n</code></pre></div>\n<span class=\"paragraph\">Or use the demos extra which includes compatible versions:\n<div class=\"language-bash codehilite\"><pre><span></span><code>uv<span class=\"w\"> </span>pip<span class=\"w\"> </span>install<span class=\"w\"> </span>-e<span class=\"w\"> </span><span class=\"s2\">&quot;.[demos]&quot;</span>\n</code></pre></div></span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "b7f6dd57d8b99363923b5edaab716454",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "a459fcd1dc016a79a29e13c8e182bd24",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Test image created. Click points or draw boxes on the widget below.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "031c34f113f5c0abd4abfa77e4295943",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "e665b15aef1d2ed4e4b1db38c18435fb",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Using device: cpu\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "PKri",
+      "code_hash": "e2ce31b24d8fd739bdab76a06a85fcac",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "a7a437a228607ccc0970d96f52030f6b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "00ea030615a3c120daca01ee5f5c1ea1",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"annotation-widget\">Annotation Widget</h2>\n<span class=\"paragraph\"><strong>Instructions:</strong></span>\n<ul>\n<li>Use <strong>point mode</strong> to click points for SAM prompts</li>\n<li>Use <strong>bbox mode</strong> to draw bounding boxes for SAM prompts</li>\n<li>SAM will segment based on your annotations</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "31acc3d5a127e4829b12369058201980",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='BYtC-0' random-id='eccdb42d-0e20-58b4-650e-b866fd54835d'><marimo-anywidget data-initial-value='{&quot;annotation_mode&quot;:&quot;point&quot;,&quot;annotations&quot;:[{&quot;index&quot;:0,&quot;elements&quot;:[],&quot;timestamp&quot;:null}],&quot;classes&quot;:[&quot;foreground&quot;,&quot;background&quot;],&quot;colors&quot;:[&quot;orange&quot;,&quot;blue&quot;],&quot;current_index&quot;:0,&quot;current_src&quot;:&quot;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAlgAAAGQCAIAAAD9V4nPAAAIdElEQVR4nO3cS27bShBA0eQhe7L2P1J29QYBAiN2YvHbTd5z5rapaqAvihD8/fl8fgOAqv9GPwAAjCSEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpP0Y/wJW8PR6jH4F7+vl8jn4E6LIRApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApAmhACkCSEAaUIIQJoQApD2Y/QDABzo8Xhb+iPP588jnoRpCSFwHyuy98ovkcZ7E0LgwnYp39K/oos3I4TA9ZzTvy//uiLegxAClzG2fx8p4j0IITC72fr3kSJemhAC85o/gX/49cByeC1CCMzocgl8Tw6vRQiBuVw6ge/J4VUIITCL2yTwPTmcnxAC490yge/J4cz8r1FgsNtX8LfOJ70WGyEwTDAMVsMJ2QiBMYIV/K382SdkIwTOJgPfrIYzsRECp1LB90xjBkIInMe9/5GZDOfVKHAG1/0/eE06lo0QOJwKvsKURhFC4Fju99eZ1RBCCBzIzb6UiZ1PCIGjuNPXMbeTCSFwCLf5FqZ3JiEE9uce384MTyOEwM7c4HsxyXMIIbAnd/e+zPMEQgjsxq19BFM9mhAC+3BfH8dsDyWEAKQJIbADK8vRTPg4Qghs5Y4+hzkfRAiBTdzOZzLtIwghAGlCCKxnQTmfme9OCIGV3MijmPy+hBCANCEE1rCUjGX+OxJCYDG38Aycwl6EEIA0IQSWsYjMw1nsQggBSBNCYAEryGycyHZCCECaEAKvsnzMyblsJIQApAkh8BJrx8yczhZCCECaEAJfs3DMzxmtJoQApAkhAGlCCHzBO7ercFLrCCEAaUIIQJoQAv/ibdu1OK8VhBCANCEEIE0Igb/ynu2KnNpSQghAmhACkCaEAKQJIQBpQgh8zncursvZLSKEAKQJIQBpQghAmhACkCaEAKQJIfAJXzu8Oif4OiEEIE0IAUgTQgDShBCANCEEIE0IAUgTQgDShBCANCEEIE0IAUgTQgDShBCANCEEIE0IAUgTQgDShBCANCEEPvF8/hz9CGziBF8nhACkCSEAaUIIQJoQApAmhACkCSHwOV87vC5nt4gQApAmhACkCSEAaUIIQJoQAn/lOxdX5NSWEkIA0oQQgDQhBP7Fe7ZrcV4rCCEAaUIIQNr35/M5+hmA2T0eb6Mfga95L7qOjRCANCEEIE0Iga955zY/Z7SaEAKQJoTASywcM3M6WwghAGlCCLzK2jEn57KREAKQJoTAApaP2TiR7YQQgDQhBJaxgszDWexCCAFIE0JgMYvIDJzCXoQQWMMtPJb570gIAUgTQmAlS8koJr8vIQTWcyOfz8x3J4QApAkhsIkF5UymfQQhBLZyO5/DnA8ihMAO3NFHM+HjCCEAaUII7MPKchyzPZQQArtxXx/BVI8mhMCe3Nr7Ms8TCCGwM3f3XkzyHEII7M8Nvp0ZnkYIgUO4x7cwvTMJIXAUt/k65nYyIQQO5E5fysTOJ4TAsdzsrzOrIYQQOJz7/RWmNMqP0Q8AJPy65R+Pt9EPMiMJHMtGCJzHjf+RmQwnhMCp3PvvmcYMvBoFzuY16TcJnImNEBijXILyZ5+QjRAYJrgaSuCEbITAYJ02dD7ptdgIgfFuvxpK4MyEEJjFLXMogfMTQmAut8mhBF6FEAIzunQOJfBahBCY1+VyKIFXJITA7H7XZdoi6t+lCSFwGbMVUf/uQQiB6xlbRP27GSEELuyPJh3UReW7NyEE7uNjsVakUfZqhBC4M1XjS/7XKABpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghAmhACkCaEAKQJIQBpQghA2v97vT2/9EJyDAAAAABJRU5ErkJggg==&quot;,&quot;enable_notes&quot;:false,&quot;keyboard_shortcuts&quot;:{&quot;alt+1&quot;:&quot;prev&quot;,&quot;alt+2&quot;:&quot;yes&quot;,&quot;alt+3&quot;:&quot;no&quot;,&quot;alt+4&quot;:&quot;skip&quot;,&quot;alt+5&quot;:&quot;focus_notes&quot;,&quot;alt+6&quot;:&quot;speech_notes&quot;},&quot;srcs&quot;:[&quot;data:image/png;base64,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&quot;],&quot;total&quot;:1}' data-label='null' data-js-url='&quot;./@file/10298-414643-GNNp6sdc.js&quot;' data-js-hash='&quot;fdc8daf2e271e291069ca9a42fa66d0d&quot;' data-css='&quot;/* Adapted from koaning/molabel */&#92;n&#92;n.image-label-container {&#92;n  font-family: -apple-system, BlinkMacSystemFont, &#92;&quot;Segoe UI&#92;&quot;, Roboto, &#92;&quot;Helvetica Neue&#92;&quot;, Arial, sans-serif;&#92;n  max-width: 1200px;&#92;n  margin: 20px auto;&#92;n  padding: 20px;&#92;n  background: #ffffff;&#92;n  border-radius: 8px;&#92;n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);&#92;n}&#92;n&#92;n.image-label-header {&#92;n  margin-bottom: 20px;&#92;n}&#92;n&#92;n.progress-info {&#92;n  font-size: 14px;&#92;n  color: #666;&#92;n  margin-bottom: 8px;&#92;n  font-weight: 500;&#92;n  display: flex;&#92;n  justify-content: space-between;&#92;n  align-items: center;&#92;n}&#92;n&#92;n.mode-info {&#92;n  font-size: 12px;&#92;n  background: #e3f2fd;&#92;n  color: #1976d2;&#92;n  padding: 4px 8px;&#92;n  border-radius: 4px;&#92;n  text-transform: uppercase;&#92;n  font-weight: 600;&#92;n}&#92;n&#92;n.progress-bar {&#92;n  width: 100%;&#92;n  height: 6px;&#92;n  background: #e0e0e0;&#92;n  border-radius: 3px;&#92;n  overflow: hidden;&#92;n}&#92;n&#92;n.progress-fill {&#92;n  height: 100%;&#92;n  background: linear-gradient(90deg, #2196F3, #1976D2);&#92;n  transition: width 0.3s ease;&#92;n}&#92;n&#92;n.image-label-canvas-container {&#92;n  margin: 20px 0;&#92;n  border: 2px solid #e0e0e0;&#92;n  border-radius: 6px;&#92;n  overflow: hidden;&#92;n  background: #f5f5f5;&#92;n  display: flex;&#92;n  justify-content: center;&#92;n  align-items: center;&#92;n  min-height: 400px;&#92;n}&#92;n&#92;n.image-label-canvas {&#92;n  max-width: 100%;&#92;n  max-height: 600px;&#92;n  cursor: crosshair;&#92;n  display: block;&#92;n}&#92;n&#92;n.image-label-controls {&#92;n  display: flex;&#92;n  flex-direction: column;&#92;n  gap: 15px;&#92;n  margin-top: 20px;&#92;n}&#92;n&#92;n.nav-buttons {&#92;n  display: flex;&#92;n  gap: 10px;&#92;n  justify-content: center;&#92;n}&#92;n&#92;n.class-selection {&#92;n  display: flex;&#92;n  align-items: center;&#92;n  justify-content: center;&#92;n  gap: 10px;&#92;n}&#92;n&#92;n.class-selection label {&#92;n  font-size: 14px;&#92;n  font-weight: 500;&#92;n  color: #333;&#92;n}&#92;n&#92;n.class-select {&#92;n  padding: 8px 12px;&#92;n  font-size: 14px;&#92;n  border: 1px solid #ddd;&#92;n  border-radius: 4px;&#92;n  background: white;&#92;n  cursor: pointer;&#92;n  outline: none;&#92;n  transition: border-color 0.2s ease;&#92;n}&#92;n&#92;n.class-select:focus {&#92;n  border-color: #2196F3;&#92;n  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);&#92;n}&#92;n&#92;n.btn {&#92;n  padding: 10px 20px;&#92;n  font-size: 14px;&#92;n  font-weight: 500;&#92;n  border: none;&#92;n  border-radius: 6px;&#92;n  cursor: pointer;&#92;n  transition: all 0.2s ease;&#92;n  outline: none;&#92;n}&#92;n&#92;n.btn:hover:not(:disabled) {&#92;n  transform: translateY(-1px);&#92;n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);&#92;n}&#92;n&#92;n.btn:active:not(:disabled) {&#92;n  transform: translateY(0);&#92;n}&#92;n&#92;n.btn:disabled {&#92;n  opacity: 0.4;&#92;n  cursor: not-allowed;&#92;n}&#92;n&#92;n.btn-secondary {&#92;n  background: #6c757d;&#92;n  color: white;&#92;n}&#92;n&#92;n.btn-secondary:hover:not(:disabled) {&#92;n  background: #5a6268;&#92;n}&#92;n&#92;n.btn-clear {&#92;n  background: #f44336;&#92;n  color: white;&#92;n  align-self: center;&#92;n}&#92;n&#92;n.btn-clear:hover:not(:disabled) {&#92;n  background: #da190b;&#92;n}&#92;n&quot;' data-buffer-paths='[]'></marimo-anywidget></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "07d83f4ef8f6021fe07bc125ec62969c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "3a574e8302a3393c60337d29eff1ca13",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "4018fc0e8bf4da4d5ba1087446110f40",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"sam-segmentation-results\">SAM Segmentation Results</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "7af5c123a5890592216d91e92ee61293",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "436e6fb7c5dc814ef0e9833ca995bdc4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "7419f9fc8de95df0fdfad643076b6acd",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "ancestor-stopped",
+          "evalue": "This cell wasn't run because an ancestor was stopped with `mo.stop`: ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "2eeb241eab723175cfcf835053e425b0",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "ancestor-stopped",
+          "evalue": "This cell wasn't run because an ancestor was stopped with `mo.stop`: ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "efb64c0c93c10f82ef653ada439c1a7e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"save-masked-image\">Save Masked Image</h2>\n<span class=\"paragraph\">The masked image above can be saved for further use.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "02af4a69d74163675cbe4f74e9cbf2ff",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='qnkX-0' random-id='93c3fff7-a61b-942e-e899-4a741b8af81a'><marimo-button data-initial-value='0' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Save Masked Image&lt;/span&gt;&lt;/span&gt;&quot;' data-kind='&quot;neutral&quot;' data-disabled='false' data-full-width='false'></marimo-button></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "c9f81470739382d8d6c8ce1ad06cf8d2",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "ancestor-stopped",
+          "evalue": "This cell wasn't run because an ancestor was stopped with `mo.stop`: ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    }
+  ]
+}

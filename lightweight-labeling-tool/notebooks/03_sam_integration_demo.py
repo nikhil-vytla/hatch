@@ -5,13 +5,14 @@ This notebook demonstrates how to integrate Segment Anything Model (SAM) with th
 
 import marimo
 
-__generated_with = "0.9.0"
+__generated_with = "0.17.7"
 app = marimo.App(width="columns")
 
 
 @app.cell(column=0, hide_code=True)
 def _(mo):
-    mo.md(r"""## SAM Integration Demo
+    mo.md(r"""
+    ## SAM Integration Demo
 
     ### Troubleshooting
 
@@ -42,7 +43,7 @@ def _():
     from llabel import ImageLabel
     import numpy as np
     from PIL import Image
-    return Image, ImageLabel, mo, np, sys
+    return Image, ImageLabel, mo, np
 
 
 @app.cell
@@ -62,7 +63,7 @@ def _(Image, mo):
     test_image.save("test_image.png")
 
     mo.md("Test image created. Click points or draw boxes on the widget below.")
-    return ImageDraw, draw, test_image
+    return (test_image,)
 
 
 @app.cell(hide_code=True)
@@ -78,7 +79,7 @@ def _():
             "sam_vit_h_4b8939.pth",
         )
         print("Download complete!")
-    return Path, urllib
+    return
 
 
 @app.cell(hide_code=True)
@@ -95,8 +96,7 @@ def _():
         num_gpus = torch.cuda.device_count()
         for gpu_id in range(num_gpus):
             print(f"GPU {gpu_id}: {torch.cuda.get_device_name(gpu_id)}")
-
-    return cuda_available, device, torch
+    return (device,)
 
 
 @app.cell
@@ -107,7 +107,7 @@ def _(device):
     sam.to(device=device)
 
     predictor = SamPredictor(sam)
-    return SamPredictor, predictor, sam, sam_model_registry
+    return (predictor,)
 
 
 @app.cell
@@ -119,7 +119,8 @@ def _(np, predictor, test_image):
 
 @app.cell(column=1, hide_code=True)
 def _(mo):
-    mo.md(r"""## Annotation Widget
+    mo.md(r"""
+    ## Annotation Widget
 
     **Instructions:**
     - Use **point mode** to click points for SAM prompts
@@ -156,8 +157,7 @@ def _(label_widget):
     else:
         points = []
         boxes = []
-
-    return annots, boxes, elements, points
+    return boxes, points
 
 
 @app.cell
@@ -181,13 +181,14 @@ def _(boxes, label_widget, points):
         labels = [l + 1 for l in _labels]  # SAM uses 1 for foreground
     else:
         labels = []
-
-    return LabelEncoder, box_coords, labels, point_coords
+    return box_coords, labels, point_coords
 
 
 @app.cell(column=2, hide_code=True)
 def _(mo):
-    mo.md(r"""## SAM Segmentation Results""")
+    mo.md(r"""
+    ## SAM Segmentation Results
+    """)
     return
 
 
@@ -201,12 +202,11 @@ def _(labels, mo, np, point_coords, predictor):
         point_labels=np.array(labels),
         multimask_output=False,
     )
-
-    return logits, masks, scores
+    return (masks,)
 
 
 @app.cell
-def _(box_coords, mo, point_coords, test_image):
+def _(box_coords, point_coords, test_image):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -227,13 +227,11 @@ def _(box_coords, mo, point_coords, test_image):
     ax.axis('off')
 
     gca = plt.gca()
-    return ax, fig, gca, plt
+    return (plt,)
 
 
 @app.cell
-def _(box_coords, masks, mo, point_coords, test_image):
-    import matplotlib.pyplot as plt
-
+def _(box_coords, masks, mo, plt, point_coords, test_image):
     mo.stop(len(point_coords + box_coords) == 0)
 
     fig2, ax2 = plt.subplots(figsize=(8, 6))
@@ -244,14 +242,14 @@ def _(box_coords, masks, mo, point_coords, test_image):
 
     # Plot points
     if len(point_coords) > 0:
-        points_array = list(zip(*point_coords))
-        ax2.scatter(*points_array, c='red', s=100, marker='*', edgecolors='white', linewidths=2)
+        points_array2 = list(zip(*point_coords))
+        ax2.scatter(*points_array2, c='red', s=100, marker='*', edgecolors='white', linewidths=2)
 
     ax2.set_title("SAM Segmentation Result")
     ax2.axis('off')
 
     gca2 = plt.gca()
-    return ax2, fig2, gca2
+    return
 
 
 @app.cell
@@ -263,7 +261,7 @@ def _(Image, masks, mo, np, point_coords, test_image):
     masked_image = Image.fromarray(rgba_image.astype(np.uint8), mode="RGBA")
 
     masked_image
-    return masked_image, rgba_image
+    return (masked_image,)
 
 
 @app.cell
@@ -277,7 +275,7 @@ def _(mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     save_button = mo.ui.button(label="Save Masked Image")
     save_button
     return (save_button,)
