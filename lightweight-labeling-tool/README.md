@@ -101,18 +101,16 @@ from llabel import TextLabel
 # Create widget
 _widget = TextLabel(examples=texts, notes=True)
 
-# Wrap for Marimo compatibility
+# Wrap for Marimo compatibility and display
 widget = mo.ui.anywidget(_widget)
+widget  # Display the widget
 
-# Display
-widget
-
-# Access widget methods via .value
-annotations = widget.value.get_annotations()
-progress = widget.value.progress()
+# Access widget methods via the original _widget reference
+annotations = _widget.get_annotations()
+progress = _widget.progress()
 ```
 
-This is the recommended approach for Marimo and handles all compatibility concerns.
+**Important**: Keep the `_widget` reference to call methods. The wrapped `widget` is for display only - its `.value` property returns state as a dictionary, not the widget instance.
 
 ## Usage Examples
 

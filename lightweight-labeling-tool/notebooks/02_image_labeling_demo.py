@@ -216,12 +216,12 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
+def __(_widget, mo):
     # Get raw annotations (relative coordinates)
-    annotations = widget.value.get_annotations()
+    annotations = _widget.get_annotations()
 
     # Get normalized annotations (absolute pixel coordinates)
-    normalized = widget.value.get_normalized_annotations()
+    normalized = _widget.get_normalized_annotations()
 
     mo.vstack([
         mo.md("**Raw annotations (relative coordinates 0-1):**"),
@@ -243,7 +243,7 @@ def __(mo):
 
 
 @app.cell
-def __(widget):
+def __(_widget):
     def export_to_coco(widget_instance, image_width=600, image_height=400):
         """Export annotations to COCO format."""
         coco_format = {
@@ -253,7 +253,7 @@ def __(widget):
         }
 
         # Add categories
-        classes_list = widget_instance.value.classes
+        classes_list = widget_instance.classes
         for idx, cls in enumerate(classes_list):
             coco_format["categories"].append({
                 "id": idx,
@@ -261,7 +261,7 @@ def __(widget):
             })
 
         # Get normalized annotations
-        annotations_list = widget_instance.value.get_normalized_annotations(
+        annotations_list = widget_instance.get_normalized_annotations(
             image_width=image_width,
             image_height=image_height
         )
@@ -296,7 +296,7 @@ def __(widget):
         return coco_format
 
     # Export
-    coco_data = export_to_coco(widget)
+    coco_data = export_to_coco(_widget)
     return coco_data, export_to_coco
 
 

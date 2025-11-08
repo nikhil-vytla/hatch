@@ -134,11 +134,11 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
-    # Get all annotations from the wrapped widget
-    all_annotations = widget.value.get_annotations()
-    labeled = widget.value.get_labeled_annotations()
-    export = widget.value.export_annotations(include_examples=True)
+def __(_widget, mo):
+    # Get all annotations from the original widget
+    all_annotations = _widget.get_annotations()
+    labeled = _widget.get_labeled_annotations()
+    export = _widget.export_annotations(include_examples=True)
 
     mo.vstack([
         mo.md(f"**Total examples:** {len(all_annotations)}"),
@@ -160,8 +160,8 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
-    progress = widget.value.progress()
+def __(_widget, mo):
+    progress = _widget.progress()
     mo.md(f"""
     **Progress:** {progress['labeled']}/{progress['total']} ({progress['percent']}%)
     **Remaining:** {progress['remaining']}
@@ -180,14 +180,14 @@ def __(mo):
 
 
 @app.cell
-def __(mo, widget):
+def __(_widget, mo):
     import json
 
     # Button to save annotations
     save_button = mo.ui.button(label="Save Annotations")
 
     if save_button.value:
-        annotations_data = widget.value.export_annotations(include_examples=True)
+        annotations_data = _widget.export_annotations(include_examples=True)
         with open('text_annotations.json', 'w') as f:
             json.dump(annotations_data, f, indent=2)
         result = mo.md(f"✓ Saved {len(annotations_data)} annotations to text_annotations.json")
