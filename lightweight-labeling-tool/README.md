@@ -29,6 +29,8 @@ uv pip install -e .
 
 # With optional dependencies
 uv pip install -e ".[image]"      # Image support (Pillow, NumPy)
+uv pip install -e ".[sam]"         # SAM integration (Segment Anything)
+uv pip install -e ".[demos]"       # Run demo notebooks (HuggingFace datasets, SAM)
 uv pip install -e ".[all]"         # All features
 uv pip install -e ".[dev]"         # Development tools
 ```
@@ -203,6 +205,46 @@ def to_coco(widget, image_size):
 - `←/→`: Navigate images
 - `Esc`: Cancel current drawing
 - `1-9`: Quick class selection (if < 10 classes)
+
+## Demo Notebooks
+
+Interactive Marimo notebooks are available in the `notebooks/` directory:
+
+### 01_text_labeling_demo.py
+Sentiment analysis with real IMDB movie reviews from HuggingFace datasets.
+
+```bash
+# Install demo dependencies
+uv pip install -e ".[demos]"
+
+# Run the notebook
+marimo edit notebooks/01_text_labeling_demo.py
+```
+
+### 02_image_labeling_demo.py
+Image annotation with bbox, point, and polygon modes. Demonstrates COCO format export.
+
+```bash
+marimo edit notebooks/02_image_labeling_demo.py
+```
+
+### 03_sam_integration_demo.py
+**Segment Anything Model (SAM) integration!** Click points or draw boxes, and SAM automatically segments the objects.
+
+```bash
+# Install SAM dependencies (includes PyTorch, ~2.4GB model)
+uv pip install -e ".[sam]"
+
+# Run the notebook
+marimo edit notebooks/03_sam_integration_demo.py
+```
+
+This notebook demonstrates:
+- Loading and running SAM on CPU or GPU
+- Using point prompts for segmentation
+- Using box prompts for segmentation
+- Visualizing segmentation masks
+- Saving masked images
 
 ## Architecture
 
