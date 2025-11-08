@@ -1,0 +1,33 @@
+# Adapted from koaning/molabel
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llabel"
+version = "0.1.0"
+description = "Lightweight labeling widgets for Jupyter notebooks"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = [
+    "anywidget>=0.9.0",
+    "traitlets>=5.0.0",
+]
+
+[project.optional-dependencies]
+image = ["pillow", "numpy"]
+video = ["opencv-python", "numpy"]
+pdf = ["pypdf", "pillow"]
+dev = ["pytest", "black", "ruff", "jupyter", "notebook"]
+all = ["pillow", "numpy", "opencv-python", "pypdf"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["llabel"]
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I"]
