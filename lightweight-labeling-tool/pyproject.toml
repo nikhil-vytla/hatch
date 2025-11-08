@@ -25,7 +25,7 @@ dev = ["pytest", "black", "ruff", "marimo", "jupyter", "notebook", "datasets"]
 all = ["pillow", "numpy", "opencv-python", "pypdf", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib", "datasets"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["llabel"]
+packages = ["src/llabel"]
 
 [tool.black]
 line-length = 88
