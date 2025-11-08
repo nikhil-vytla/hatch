@@ -25,12 +25,12 @@ A lightweight, extensible data labeling toolkit for interactive notebooks (Jupyt
 ## Installation
 
 ```bash
-pip install -e .
+uv pip install -e .
 
 # With optional dependencies
-pip install -e ".[image]"      # Image support (Pillow, NumPy)
-pip install -e ".[all]"         # All features
-pip install -e ".[dev]"         # Development tools
+uv pip install -e ".[image]"      # Image support (Pillow, NumPy)
+uv pip install -e ".[all]"         # All features
+uv pip install -e ".[dev]"         # Development tools
 ```
 
 ## Quick Start
@@ -296,7 +296,7 @@ def render_with_markdown(example):
 
 ```bash
 # Install development dependencies
-pip install -e ".[dev]"
+uv pip install -e ".[dev]"
 
 # Run marimo notebooks
 marimo edit notebooks/01_text_labeling_demo.py
@@ -323,7 +323,7 @@ See the `notebooks/` directory for complete examples (using [Marimo](https://mar
 
 ```bash
 # Install marimo
-pip install marimo
+uv pip install marimo
 
 # Run as interactive notebook
 marimo edit notebooks/01_text_labeling_demo.py
