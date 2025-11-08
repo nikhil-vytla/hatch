@@ -42,3 +42,6 @@ line-length = 88
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "I"]
+
+[tool.marimo.runtime]
+output_max_bytes = 10_000_000_000
