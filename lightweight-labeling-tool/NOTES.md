@@ -190,22 +190,33 @@ llabel/
 - Export to multiple formats (COCO, SpaCy, highlighted PDF)
 - Layout analysis integration (LayoutLM compatibility)
 
-## Notebooks Created
+## Notebooks Created (Marimo)
 
-1. **01_text_labeling_demo.ipynb**
+Using Marimo instead of Jupyter for better version control and reactivity.
+
+1. **01_text_labeling_demo.py**
    - Basic text classification
    - Custom render functions
    - Export annotations
    - Progress tracking
    - Custom keyboard shortcuts
+   - Interactive save button
 
-2. **02_image_labeling_demo.ipynb**
+2. **02_image_labeling_demo.py**
    - Bounding box annotation
    - Point/keypoint annotation
    - Polygon segmentation
    - Multiple input formats (NumPy, PIL, paths)
    - COCO format export
    - Custom colors
+   - Interactive save button
+
+### Why Marimo?
+- **Pure Python files**: Better for version control (no JSON)
+- **Reactive**: Cells automatically update when dependencies change
+- **Runnable as scripts or apps**: Can run `marimo edit` or `marimo run`
+- **Modern**: Clean UI, better developer experience
+- **Compatible**: Works alongside Jupyter via anywidget
 
 ## Final Reflections
 
@@ -239,6 +250,6 @@ For video and PDF widgets:
 - JavaScript: 2 (text-widget.js, image-widget.js)
 - CSS: 2 (text-widget.css, image-widget.css)
 - Config: 1 (pyproject.toml)
-- Documentation: 2 (README.md, NOTES.md)
-- Notebooks: 2 (text demo, image demo)
-- Total: 16 core files
+- Documentation: 3 (README.md, NOTES.md, _summary.md)
+- Marimo notebooks: 2 (text demo, image demo)
+- Total: 17 core files
