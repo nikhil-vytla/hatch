@@ -19,10 +19,10 @@ dependencies = [
 image = ["pillow", "numpy"]
 video = ["opencv-python", "numpy"]
 pdf = ["pypdf", "pillow"]
-sam = ["segment-anything", "torch", "scikit-learn", "matplotlib"]
-demos = ["datasets", "segment-anything", "torch", "scikit-learn", "matplotlib"]
+sam = ["segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib"]
+demos = ["datasets", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib"]
 dev = ["pytest", "black", "ruff", "marimo", "jupyter", "notebook", "datasets"]
-all = ["pillow", "numpy", "opencv-python", "pypdf", "segment-anything", "torch", "scikit-learn", "matplotlib", "datasets"]
+all = ["pillow", "numpy", "opencv-python", "pypdf", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib", "datasets"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["llabel"]

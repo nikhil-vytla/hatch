@@ -11,7 +11,26 @@ app = marimo.App(width="columns")
 
 @app.cell(column=0, hide_code=True)
 def _(mo):
-    mo.md(r"""## Load Image for Segmentation""")
+    mo.md(r"""## SAM Integration Demo
+
+    ### Troubleshooting
+
+    If you get a torchvision import error, reinstall compatible versions:
+
+    ```bash
+    # Uninstall existing versions
+    pip uninstall torch torchvision segment-anything -y
+
+    # Reinstall with compatible versions
+    uv pip install torch torchvision
+    uv pip install segment-anything
+    ```
+
+    Or use the demos extra which includes compatible versions:
+    ```bash
+    uv pip install -e ".[demos]"
+    ```
+    """)
     return
 
 
