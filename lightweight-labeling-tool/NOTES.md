@@ -218,6 +218,18 @@ Using Marimo instead of Jupyter for better version control and reactivity.
 - **Modern**: Clean UI, better developer experience
 - **Compatible**: Works alongside Jupyter via anywidget
 
+### Marimo Compatibility Fixes
+Encountered and resolved several compatibility issues with Marimo:
+
+1. **Layout Trait Issue**: ipywidgets.Widget (inherited by anywidget.AnyWidget) has a `layout` trait that defaults to creating a Layout widget. Marimo's comm system tried to set MarimoComm on Layout's comm trait, causing TraitError.
+   - **Solution**: Override `layout` trait in BaseLabelWidget with `default_value=None` to prevent Layout widget creation.
+
+2. **Kwargs Pattern**: Passing `**kwargs` to `super().__init__()` can include problematic parameters.
+   - **Solution**: Call `super().__init__()` with no arguments, following koaning/molabel's pattern.
+
+3. **Wrapper Requirement**: Use `mo.ui.anywidget()` wrapper for proper Marimo integration and reactivity.
+   - Access widget methods via `.value` property: `widget.value.get_annotations()`
+
 ## Final Reflections
 
 ### What Worked Well
