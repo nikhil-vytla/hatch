@@ -31,6 +31,9 @@ def _(mo):
     ```bash
     uv pip install -e ".[demos]"
     ```
+
+    Currently, this notebook supports point and box annotations, not polygon annotations. 
+    I plan to add polygon support in the future.
     """)
     return
 
@@ -132,13 +135,12 @@ def _(mo):
 
 @app.cell
 def _(ImageLabel, mo):
-    # Create annotation widget
+    # Create annotation widget (no mode parameter - handles all annotation types flexibly)
     label_widget = mo.ui.anywidget(
         ImageLabel(
             paths=["test_image.png"],
-            classes=["foreground", "background"],
-            colors=["orange", "blue"],
-            mode="point"  # Start with point mode, user can switch to bbox
+            classes=["rectangle", "circle", "background"],
+            colors=["orange", "blue", "black"]
         )
     )
     label_widget
@@ -148,12 +150,14 @@ def _(ImageLabel, mo):
 @app.cell
 def _(label_widget):
     # Get annotations from widget
-    annots = label_widget.get_normalized_annotations(image_width=600, image_height=400)
+    annots = label_widget.get_normalized_annotations()
 
-    if annots:
-        elements = annots[0]["elements"]
-        points = [e for e in elements if e["type"] == "point"]
-        boxes = [e for e in elements if e["type"] == "bbox"]
+    if annots and len(annots) > 0:
+        elements = annots[0].get("elements", [])
+        # In the new structure, all annotations use points
+        # Single points have 1 point, bboxes have 2+ points
+        points = [e for e in elements if len(e.get("points", [])) == 1]
+        boxes = [e for e in elements if len(e.get("points", [])) >= 2]
     else:
         points = []
         boxes = []
@@ -162,26 +166,39 @@ def _(label_widget):
 
 @app.cell
 def _(boxes, label_widget, points):
-    # Extract point coordinates for SAM
+    # Extract point coordinates for SAM (from normalized points)
     point_coords = [
-        [p["coords"][0], p["coords"][1]]
+        [p["points"][0]["x"], p["points"][0]["y"]]
         for p in points
     ]
 
     # Extract box coordinates for SAM (x1, y1, x2, y2 format)
     box_coords = [
-        [b["coords"][0], b["coords"][1], b["coords"][2], b["coords"][3]]
+        [b["points"][0]["x"], b["points"][0]["y"], b["points"][1]["x"], b["points"][1]["y"]]
         for b in boxes
     ]
 
-    # Get labels (class indices)
-    from sklearn.preprocessing import LabelEncoder
-    if label_widget.annotations and label_widget.annotations[0]["elements"]:
-        _labels = [e.get("class_idx", 0) for e in label_widget.annotations[0]["elements"]]
-        labels = [l + 1 for l in _labels]  # SAM uses 1 for foreground
+    # Get labels for points (can be either positive or negative)
+    # Note: Boxes don't need labels - they're always treated as positive prompts by SAM
+    # SAM uses: 1 = foreground (positive), 0 = background (negative)
+    annots_raw = label_widget.annotations
+    if annots_raw and len(annots_raw) > 0 and annots_raw[0].get("elements"):
+        point_labels = []
+        classes = label_widget.classes
+        for elem in annots_raw[0]["elements"]:
+            if len(elem.get("points", [])) == 1:  # Only for point annotations
+                class_name = elem.get("label", "")
+                # Validate that the class name exists in the classes list
+                if class_name and class_name in classes:
+                    # Map: background class -> 0 (negative prompt), everything else -> 1 (positive prompt)
+                    sam_label = 0 if class_name == "background" else 1
+                    point_labels.append(sam_label)
+                else:
+                    # Default to positive prompt if class name is invalid or missing
+                    point_labels.append(1)
     else:
-        labels = []
-    return box_coords, labels, point_coords
+        point_labels = [1] * len(point_coords)
+    return box_coords, point_coords, point_labels
 
 
 @app.cell(column=2, hide_code=True)
@@ -193,21 +210,31 @@ def _(mo):
 
 
 @app.cell
-def _(labels, mo, np, point_coords, predictor):
+def _(box_coords, mo, np, point_coords, point_labels, predictor):
     # Run SAM prediction if we have annotations
-    mo.stop(len(point_coords) == 0)
+    mo.stop(len(point_coords) == 0 and len(box_coords) == 0)
 
-    masks, scores, logits = predictor.predict(
-        point_coords=np.array(point_coords),
-        point_labels=np.array(labels),
-        multimask_output=False,
-    )
+    # Prepare arguments for SAM
+    sam_kwargs = {"multimask_output": False}
+
+    if len(point_coords) > 0:
+        sam_kwargs["point_coords"] = np.array(point_coords)
+        sam_kwargs["point_labels"] = np.array(point_labels)
+
+    if len(box_coords) > 0:
+        # SAM expects box in format [x1, y1, x2, y2]
+        # Use the first box if multiple are drawn
+        sam_kwargs["box"] = np.array(box_coords[0])
+
+    masks, scores, logits = predictor.predict(**sam_kwargs)
     return (masks,)
 
 
 @app.cell
-def _(box_coords, point_coords, test_image):
+def _(box_coords, mo, point_coords, test_image):
     import matplotlib.pyplot as plt
+
+    mo.stop(len(point_coords) == 0 and len(box_coords) == 0)
 
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.imshow(test_image)
@@ -226,13 +253,13 @@ def _(box_coords, point_coords, test_image):
     ax.set_title("Annotations")
     ax.axis('off')
 
-    gca = plt.gca()
+    plt.gca()
     return (plt,)
 
 
 @app.cell
 def _(box_coords, masks, mo, plt, point_coords, test_image):
-    mo.stop(len(point_coords + box_coords) == 0)
+    mo.stop(len(point_coords) == 0 and len(box_coords) == 0)
 
     fig2, ax2 = plt.subplots(figsize=(8, 6))
     ax2.imshow(test_image)
@@ -248,14 +275,14 @@ def _(box_coords, masks, mo, plt, point_coords, test_image):
     ax2.set_title("SAM Segmentation Result")
     ax2.axis('off')
 
-    gca2 = plt.gca()
+    plt.gca()
     return
 
 
 @app.cell
-def _(Image, masks, mo, np, point_coords, test_image):
+def _(Image, box_coords, masks, mo, np, point_coords, test_image):
     # Create masked image with alpha channel
-    mo.stop(len(point_coords) == 0)
+    mo.stop(len(point_coords) == 0 and len(box_coords) == 0)
 
     rgba_image = np.dstack([np.array(test_image), masks[0].astype(np.uint8) * 255])
     masked_image = Image.fromarray(rgba_image.astype(np.uint8), mode="RGBA")
@@ -276,7 +303,7 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    save_button = mo.ui.button(label="Save Masked Image")
+    save_button = mo.ui.run_button(label="Save Masked Image")
     save_button
     return (save_button,)
 
@@ -284,12 +311,10 @@ def _(mo):
 @app.cell
 def _(masked_image, mo, point_coords, save_button):
     mo.stop(len(point_coords) == 0)
+    mo.stop(not save_button.value)
 
-    if save_button.value:
-        masked_image.save("sam_output.png")
-        mo.md("✓ Saved masked image to `sam_output.png`")
-    else:
-        mo.md("Click button above to save the masked image")
+    masked_image.save("sam_output.png")
+    mo.md("✓ Saved masked image to `sam_output.png`")
     return
 
 
