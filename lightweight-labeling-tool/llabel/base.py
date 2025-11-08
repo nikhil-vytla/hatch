@@ -51,6 +51,8 @@ class BaseLabelWidget(anywidget.AnyWidget):
             notes: Enable notes field
             **kwargs: Additional arguments passed to parent
         """
+        # Set layout to None to avoid Marimo compatibility issues
+        kwargs.setdefault('layout', None)
         super().__init__(**kwargs)
 
         self.examples = examples
