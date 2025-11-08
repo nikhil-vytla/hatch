@@ -32,7 +32,6 @@ class TextLabel(BaseLabelWidget):
         render: Optional[Callable[[Any], Any]] = None,
         shortcuts: Optional[Dict[str, str]] = None,
         notes: bool = True,
-        **kwargs,
     ):
         """
         Initialize the text labeling widget.
@@ -43,9 +42,8 @@ class TextLabel(BaseLabelWidget):
                    If None, uses str() conversion
             shortcuts: Custom keyboard shortcut mapping
             notes: Enable notes field
-            **kwargs: Additional arguments passed to parent
         """
-        super().__init__(examples=examples, shortcuts=shortcuts, notes=notes, **kwargs)
+        super().__init__(examples=examples, shortcuts=shortcuts, notes=notes)
 
         # Store render function
         self.render_fn = render if render else str

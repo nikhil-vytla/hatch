@@ -37,7 +37,6 @@ class ImageLabel(BaseLabelWidget):
         colors: Optional[List[str]] = None,
         mode: str = "bbox",
         shortcuts: Optional[Dict[str, str]] = None,
-        **kwargs,
     ):
         """
         Initialize the image labeling widget.
@@ -49,7 +48,6 @@ class ImageLabel(BaseLabelWidget):
             colors: List of colors for each class (CSS color strings)
             mode: Annotation mode - 'bbox', 'point', or 'polygon'
             shortcuts: Custom keyboard shortcut mapping
-            **kwargs: Additional arguments passed to parent
         """
         # Process image sources
         if images is not None:
@@ -64,7 +62,7 @@ class ImageLabel(BaseLabelWidget):
         self.srcs = [to_data_uri(src, "image/png") for src in sources]
 
         # Initialize parent with dummy examples (we use srcs instead)
-        super().__init__(examples=sources, shortcuts=shortcuts, notes=False, **kwargs)
+        super().__init__(examples=sources, shortcuts=shortcuts, notes=False)
 
         # Set classes and colors
         self.classes = classes or []
