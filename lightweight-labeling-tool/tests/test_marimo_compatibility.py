@@ -1,6 +1,9 @@
 """Quick test to verify Marimo compatibility."""
 import sys
-sys.path.insert(0, '.')
+import os
+
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Test basic import
 try:
@@ -12,8 +15,12 @@ except Exception as e:
 
 # Test widget creation
 try:
-    texts = ["Example 1", "Example 2", "Example 3"]
-    widget = TextLabel(examples=texts, notes=True)
+    texts = [{"text": "Example 1"}, {"text": "Example 2"}, {"text": "Example 3"}]
+    widget = TextLabel(
+        examples=texts,
+        render=lambda x: x["text"],
+        notes=True
+    )
     print("✓ TextLabel widget created successfully")
 except Exception as e:
     print(f"✗ TextLabel creation failed: {e}")
