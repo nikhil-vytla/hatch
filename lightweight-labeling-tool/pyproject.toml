@@ -16,12 +16,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-image = ["Pillow>=9.0.0", "numpy>=1.20.0"]
-video = ["opencv-python>=4.5.0", "numpy>=1.20.0"]
-pdf = ["pypdf>=3.0.0", "Pillow>=9.0.0"]
+# Media handling (images, videos, PDFs)
+media = ["Pillow>=9.0.0", "numpy>=1.20.0", "opencv-python>=4.5.0", "pypdf>=3.0.0"]
+# SAM (Segment Anything Model) integration - heavy ML dependencies
 sam = ["segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib"]
-demos = ["datasets", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib"]
+# Development and testing
 dev = ["pytest>=7.0", "black>=22.0", "ruff>=0.0.270", "marimo", "jupyter", "notebook", "datasets"]
+# Everything
 all = ["Pillow>=9.0.0", "numpy>=1.20.0", "opencv-python>=4.5.0", "pypdf>=3.0.0", "segment-anything", "torch>=1.7.0", "torchvision>=0.8.0", "scikit-learn", "matplotlib", "datasets"]
 
 [tool.hatch.build.targets.wheel]
@@ -42,6 +43,12 @@ line-length = 88
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
 
 [tool.marimo.runtime]
 output_max_bytes = 10_000_000_000
