@@ -28,11 +28,10 @@ A lightweight, extensible data labeling toolkit for interactive notebooks (Jupyt
 uv pip install -e .
 
 # With optional dependencies
-uv pip install -e ".[image]"      # Image support (Pillow, NumPy)
+uv pip install -e ".[media]"       # Media support (images, videos, PDFs)
 uv pip install -e ".[sam]"         # SAM integration (Segment Anything)
-uv pip install -e ".[demos]"       # Run demo notebooks (HuggingFace datasets, SAM)
+uv pip install -e ".[dev]"         # Development tools (includes datasets for demos)
 uv pip install -e ".[all]"         # All features
-uv pip install -e ".[dev]"         # Development tools
 ```
 
 ## Quick Start
@@ -198,10 +197,7 @@ def to_coco(widget, image_size):
         coco["categories"].append({"id": idx, "name": cls})
 
     # Add annotations
-    annotations = widget.get_normalized_annotations(
-        image_width=image_size[0],
-        image_height=image_size[1]
-    )
+    annotations = widget.get_normalized_annotations()
 
     # ... process annotations
     return coco
@@ -226,7 +222,7 @@ Sentiment analysis with real IMDB movie reviews from HuggingFace datasets.
 
 ```bash
 # Install demo dependencies
-uv pip install -e ".[demos]"
+uv pip install -e ".[dev]"
 
 # Run the notebook (use marimo edit for editable mode)
 marimo run notebooks/01_text_labeling_demo.py
@@ -330,11 +326,11 @@ uv pip install -e ".[dev]"
 marimo edit notebooks/01_text_labeling_demo.py
 
 # Run tests
-pytest
+uv run --with pytest pytest
 
 # Format code
-black llabel/
-ruff llabel/
+black src/llabel/
+ruff src/llabel/
 
 # Enable HMR for development
 export ANYWIDGET_HMR=1
