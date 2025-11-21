@@ -74,12 +74,12 @@ graph TB
 
 ### Taxonomy Structure
 
-This diagram demonstrates how a real-world evaluation (Pinterest customer support) maps through the taxonomy structure, showing the connection from specific risks to comprehensive test coverage.
+This diagram demonstrates how a real-world evaluation (DesignCo customer support) maps through the taxonomy structure, showing the connection from specific risks to comprehensive test coverage.
 
 ```mermaid
 graph TD
     subgraph "Example: Customer Support"
-        INC[Pinterest Evaluation<br/>Chatbot Testing]
+        INC[DesignCo Evaluation<br/>Chatbot Testing]
         INC --> H1[Financial Risk]
         INC --> H2[Brand Risk]
         INC --> FM[Hallucination Risk]
@@ -111,7 +111,7 @@ graph TD
     end
     
     subgraph "Eval Coverage"
-        TA1 --> E1[1,455+ Evals<br/>Pinterest Dataset]
+        TA1 --> E1[1,455+ Evals<br/>DesignCo Dataset]
         TB1 --> E2[Policy Evals]
         TC1 --> E3[Test Cases]
         M1 --> E4[Methodology Tests]
@@ -187,7 +187,7 @@ graph LR
         METH -->|Filters| EVALS2[Evals:<br/>Semantic Drift]
         CTX -->|Filters| EVALS3[Evals:<br/>Customer Support]
         
-        EVALS1 -->|Intersection| FINAL[Relevant Evals<br/>Pinterest Dataset<br/>Policy & Hallucination Tests]
+        EVALS1 -->|Intersection| FINAL[Relevant Evals<br/>DesignCo Dataset<br/>Policy & Hallucination Tests]
         EVALS2 -->|Intersection| FINAL
         EVALS3 -->|Intersection| FINAL
     end
@@ -210,8 +210,8 @@ The physical layout of the dashboard interface, showing how different components
 graph TB
     subgraph "Header Section"
         HEADER[Comprehensive AI Agent Testing]
-        BADGE1[MAES-1 Framework Badge]
-        BADGE2[Pinterest Evaluation Badge]
+        BADGE1[MAES Framework Badge]
+        BADGE2[DesignCo Evaluation Badge]
         HEADER -.-> BADGE1
         HEADER -.-> BADGE2
     end
@@ -219,7 +219,7 @@ graph TB
     subgraph "Narrative Flow Cards"
         CARD1[Card 1: The Risks<br/>Hallucination, Jailbreaks<br/>Data Leakage]
         CARD2[Card 2: The Safeguards<br/>A001-A004 Controls<br/>Testing & Filters]
-        CARD3[Card 3: The Tests<br/>1,455+ Evals<br/>Pinterest Dataset]
+        CARD3[Card 3: The Tests<br/>1,455+ Evals<br/>DesignCo Dataset]
         CARD4[Card 4: The Results<br/>98.5% Pass Rate<br/>P0: 0, P1: 2]
         CARD1 --> CARD2
         CARD2 --> CARD3
@@ -296,8 +296,8 @@ The system is grounded in documented AI failures:
 
 **Real-World Evaluation Example:**
 
-The Pinterest customer support evaluation serves as a concrete demonstration of comprehensive testing:
-- **Context**: Evaluation of Ada chatbot for Pinterest customer support
+The DesignCo customer support evaluation serves as a concrete demonstration of comprehensive testing:
+- **Context**: Evaluation of AcmeCo chatbot for DesignCo customer support
 - **Coverage**: 1,455+ evals covering hallucination, jailbreaks, policy violations, and additional failure modes
 - **Relevance**: Demonstrates comprehensive testing on a production customer support deployment
 - **Methodology**: Multi-turn and single-turn conversations tested across multiple risk categories and attack methodologies
@@ -310,7 +310,7 @@ Incident {
   failure_mode: "Hallucination"
   use_case: "Customer support"
   context: ["Retail", "Enterprise"]
-  eval_coverage: "1,455+ evals from Pinterest dataset"
+  eval_coverage: "1,455+ evals from DesignCo dataset"
   frequency: "High"
 }
 ```
@@ -366,7 +366,7 @@ The evaluation suite provides extensive coverage across all dimensions:
   - All known methodologies (Semantic Drift, Context Flooding, Role Play, Emotional Manipulation, Encoding Attacks)
   - Multiple use cases (Customer Support, Sales, etc.)
   - Various contexts (Retail, Enterprise, Healthcare, etc.)
-- **Source**: Combination of real-world production evaluations (e.g., Pinterest dataset) and synthetic test cases designed to cover edge cases
+- **Source**: Combination of real-world production evaluations (e.g., DesignCo dataset) and synthetic test cases designed to cover edge cases
 
 **Coverage Metrics:**
 - Evaluations per failure mode
@@ -374,7 +374,7 @@ The evaluation suite provides extensive coverage across all dimensions:
 - Evaluations per use case
 - Coverage gaps identified and tracked
 
-**Evaluation Structure (Pinterest dataset example):**
+**Evaluation Structure (DesignCo dataset example):**
 ```
 Eval {
   id: "EVAL-12345"
@@ -386,7 +386,7 @@ Eval {
   prompt: "User: What's your return policy for..."
   expected_behavior: "Agent should check actual policy"
   severity_if_fails: "P2"
-  source: "Pinterest evaluation dataset"
+  source: "DesignCo evaluation dataset"
 }
 ```
 
@@ -412,7 +412,7 @@ Eval {
    - A004: Incident response plan (procedures for addressing failures)
 
 3. **The Tests** (Visual card)
-   - 1,455+ evals from production customer support deployment (Pinterest)
+   - 1,455+ evals from production customer support deployment (DesignCo)
    - Comprehensive coverage across all failure modes
    - Multiple methodologies tested (Semantic Drift, Context Flooding, Role Play, etc.)
    - Links to actual test prompts from evaluation dataset
@@ -483,7 +483,7 @@ The following sections detail the customer journey through the dashboard, from i
 
 **Initial Understanding (30 seconds - 2 minutes):**
 - Customer reads through narrative flow cards, understanding the testing approach
-- Recognizes relevance: Pinterest example matches their use case (customer support)
+- Recognizes relevance: DesignCo example matches their use case (customer support)
 - Sees comprehensiveness: Multiple risk categories and methodologies covered
 - Notices transparency: Actual test prompts visible, not just summary statistics
 
@@ -493,7 +493,7 @@ The following sections detail the customer journey through the dashboard, from i
 1. Customer clicks "Hallucination" category in taxonomy explorer
 2. Views detailed breakdown:
    - Evaluation count: 247 evals specifically for hallucination
-   - Example prompts: Real test cases from Pinterest dataset
+   - Example prompts: Real test cases from DesignCo dataset
    - Pass rate: 98.5% with detailed breakdown by subcategory
    - Failure analysis: 4 failures at P2-P3 severity, all documented with remediation plans
 
@@ -532,7 +532,7 @@ The following sections detail the customer journey through the dashboard, from i
 
 **Use Case Filtering:**
 2. Customer filters by their specific use case (Customer Support):
-   - Sees 1,455+ evals from Pinterest customer support deployment
+   - Sees 1,455+ evals from DesignCo customer support deployment
    - Reviews performance metrics specific to customer support scenarios
    - Compares to other use cases to understand relative risk
 
@@ -557,7 +557,7 @@ The dashboard design follows seven core principles that ensure effective communi
 
 2. **Clear Traceability**: Demonstrate the complete chain: incident → taxonomy → evals → confidence. Customers can follow the path from their concern to specific test coverage.
 
-3. **Specific Examples**: Show actual test prompts, not just counts. Real examples from the Pinterest dataset make the testing tangible and verifiable.
+3. **Specific Examples**: Show actual test prompts, not just counts. Real examples from the DesignCo dataset make the testing tangible and verifiable.
 
 4. **Comprehensive Coverage**: Display coverage across all categories, not just successes. Show the full scope of testing to demonstrate thoroughness.
 
