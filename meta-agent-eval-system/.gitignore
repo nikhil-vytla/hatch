@@ -1,0 +1,19 @@
+# Envs and virtual envs
+.env
+.venv
+
+# Pycache
+__pycache__/
+**/__pycache__/
+
+# MacOS
+.DS_Store
+
+# Raw docs
+raw_docs/
+
+# Agent configs
+AGENTS.md
+
+# Raw data
+data/
