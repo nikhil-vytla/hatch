@@ -6,7 +6,7 @@ import pytest
 
 from orrery import engine
 from orrery.plugins import build_registry
-from orrery.spec import WorldSpec
+from orrery.spec import TimelineEntry, WorldSpec
 from orrery.trace import Trace
 
 
@@ -89,6 +89,24 @@ async def test_toml_world_runs() -> None:
     spec = WorldSpec.from_toml(spec_path)
     result = await engine.run(spec, seed=7)
     assert result.passed
+
+
+async def test_timeline_can_spawn_entities_mid_run() -> None:
+    """Dynamic worlds: the timeline injects a new entity while the run is live."""
+    spec = support_spec(0, chaos=False)
+    spec.timeline.append(
+        TimelineEntry(
+            at=1.0,
+            intent="spawn_entity",
+            payload={"entity": {"id": "ticket-2", "kind": "ticket", "attrs": {"status": "open"}}},
+        )
+    )
+    result = await engine.run(spec, seed=0)
+    assert result.store.maybe("ticket-2") is not None
+    assert any(e.kind == "entity.spawned" for e in result.trace.events)
+    # And the growth replays like any other change.
+    replayed = await engine.replay(spec, result.trace)
+    assert replayed.store.maybe("ticket-2") is not None
 
 
 async def test_chaos_events_hidden_from_agent_but_in_trace() -> None:

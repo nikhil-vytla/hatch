@@ -73,6 +73,8 @@ replayable bit-for-bit.
 | `verify.py` | `Verifier`, `Verdict` (+evidence), boolean/temporal combinators |
 | `spec.py` | `WorldSpec` Pydantic models; TOML load; spec hash; contract |
 | `generate.py` | `Generator` protocol; `ProceduralGenerator` (seeded sampling) |
+| `models.py` | Provider integration: `ModelClient` protocol, `ModelPolicy`, Anthropic/playbook clients (ADR-0007) |
+| `adapters.py` | Benchmark ingestion: `(rows, brief) -> [WorldSpec]`; `bfcl_style` reference adapter (ADR-0008) |
 | `engine.py` | Run loop: activate → decide → submit → reduce → trace; replay |
 | `plugins.py` | Entry-point discovery for policies/mechanics/verifiers/surfaces |
 | `logging.py` | Structured (JSON) logging setup |

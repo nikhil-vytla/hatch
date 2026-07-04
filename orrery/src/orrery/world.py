@@ -15,7 +15,7 @@ import random
 from collections.abc import Callable
 from typing import Any
 
-from orrery.entities import EntityStore
+from orrery.entities import Entity, EntityStore
 from orrery.events import Event, Intent
 from orrery.ids import SeqCounter
 from orrery.rng import RngRegistry
@@ -138,8 +138,7 @@ def mech_call_tool(world: World, actor_id: str, intent: Intent) -> list[Event]:
         visibility="direct",
     )
     tool_entity = world.store.maybe(f"tool:{tool_name}")
-    tool_fn = world.tools.get(tool_name)
-    if tool_fn is None or tool_entity is None:
+    if tool_entity is None:
         failed = world.new_event(
             "tool.failed",
             actor_id,
@@ -155,16 +154,31 @@ def mech_call_tool(world: World, actor_id: str, intent: Intent) -> list[Event]:
             visibility="direct",
         )
         return [called, failed]
-    try:
-        result = tool_fn(world.store, args, world.rng.stream(f"tool:{tool_name}"))
-    except ToolError as exc:
-        failed = world.new_event(
-            "tool.failed",
-            actor_id,
-            {"tool": tool_name, "reason": str(exc), "to": actor_id},
-            visibility="direct",
-        )
-        return [called, failed]
+    tool_fn = world.tools.get(tool_name)
+    if tool_fn is None:
+        # Tools-as-data: an entity with a canned `response` attr is a fully
+        # declarative simulated tool — adapted benchmarks need no Python.
+        canned = tool_entity.attrs.get("response")
+        if canned is None:
+            failed = world.new_event(
+                "tool.failed",
+                actor_id,
+                {"tool": tool_name, "reason": "no implementation or response", "to": actor_id},
+                visibility="direct",
+            )
+            return [called, failed]
+        result = canned
+    else:
+        try:
+            result = tool_fn(world.store, args, world.rng.stream(f"tool:{tool_name}"))
+        except ToolError as exc:
+            failed = world.new_event(
+                "tool.failed",
+                actor_id,
+                {"tool": tool_name, "reason": str(exc), "to": actor_id},
+                visibility="direct",
+            )
+            return [called, failed]
     ok = world.new_event(
         "tool.result",
         actor_id,
@@ -172,6 +186,39 @@ def mech_call_tool(world: World, actor_id: str, intent: Intent) -> list[Event]:
         visibility="direct",
     )
     return [called, ok]
+
+
+def mech_spawn_entity(world: World, actor_id: str, intent: Intent) -> list[Event]:
+    """Dynamic worlds: entities may appear mid-run (emergent tasks, new NPCs' props).
+
+    The spawn is an ordinary event, so replay and verifiers see world growth
+    like any other change.
+    """
+    data = intent.payload["entity"]
+    if world.store.maybe(data["id"]) is not None:
+        return [
+            world.new_event(
+                "intent.rejected",
+                actor_id,
+                {"intent": "spawn_entity", "reason": f"entity {data['id']} exists"},
+                visibility="direct",
+            )
+        ]
+    return [world.new_event("entity.spawned", actor_id, {"entity": data})]
+
+
+def mech_despawn_entity(world: World, actor_id: str, intent: Intent) -> list[Event]:
+    entity_id = intent.payload["entity_id"]
+    if world.store.maybe(entity_id) is None:
+        return [
+            world.new_event(
+                "intent.rejected",
+                actor_id,
+                {"intent": "despawn_entity", "reason": f"no such entity {entity_id}"},
+                visibility="direct",
+            )
+        ]
+    return [world.new_event("entity.despawned", actor_id, {"entity_id": entity_id})]
 
 
 # ---------------------------------------------------------------------------
@@ -184,9 +231,21 @@ def reduce_fact_set(store: EntityStore, event: Event) -> None:
     entity.attrs[event.payload["attr"]] = event.payload["value"]
 
 
+def reduce_entity_spawned(store: EntityStore, event: Event) -> None:
+    store.add(Entity.model_validate(event.payload["entity"]))
+
+
+def reduce_entity_despawned(store: EntityStore, event: Event) -> None:
+    store.remove(event.payload["entity_id"])
+
+
 def register_builtin(registry: Any) -> None:
     """Populate a plugins.Registry with the built-in world rules."""
     registry.mechanics["send_message"] = mech_send_message
     registry.mechanics["set_fact"] = mech_set_fact
     registry.mechanics["call_tool"] = mech_call_tool
+    registry.mechanics["spawn_entity"] = mech_spawn_entity
+    registry.mechanics["despawn_entity"] = mech_despawn_entity
     registry.reducers["fact.set"] = reduce_fact_set
+    registry.reducers["entity.spawned"] = reduce_entity_spawned
+    registry.reducers["entity.despawned"] = reduce_entity_despawned

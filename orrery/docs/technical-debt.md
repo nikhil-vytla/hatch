@@ -31,3 +31,15 @@ to block the next milestones; all were accepted deliberately (KISS).
    ignores it.
 9. **`uses` executes arbitrary module imports.** Acceptable for a local research
    tool; a hosted service would need an allowlist/sandbox around domain packs.
+10. **ModelPolicy history is flattened text.** Tool calls/results are
+    serialized into plain turns — provider-portable and replay-safe, but it
+    discards native tool-use message structure, which degrades strong
+    tool-calling models. Fix: store structured turns, render per-client
+    (`ModelClient` interface unchanged). Do this before any serious live-model
+    evaluation (M3).
+11. **`AnthropicClient` is untested against the live API.** Playbook covers
+    ModelPolicy logic and replay never needs a provider, but the ~40 lines of
+    request/response conversion have no integration test (requires a key).
+    Add an opt-in `ANTHROPIC_API_KEY`-gated smoke test.
+12. **Adapter arg-matching is exact.** `payload_contains` equality vs. BFCL's
+    accepted-answer ranges; needs a `matches_any`/predicate param at M4.
