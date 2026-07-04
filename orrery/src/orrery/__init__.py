@@ -8,6 +8,7 @@ from orrery.actors import Actor, Decision, DecisionContext, Policy, ScheduledInt
 from orrery.engine import ReplayDivergence, RunResult, replay, run
 from orrery.entities import Entity, EntityStore
 from orrery.events import Event, Intent
+from orrery.models import ModelClient, ModelPolicy, ModelResponse, PlaybookClient, ToolCall
 from orrery.observe import ObservationScope, WorldView
 from orrery.plugins import Registry, build_registry
 from orrery.rng import RngRegistry
@@ -41,8 +42,12 @@ __all__ = [
     "EntityStore",
     "Event",
     "Intent",
+    "ModelClient",
+    "ModelPolicy",
+    "ModelResponse",
     "Observation",
     "ObservationScope",
+    "PlaybookClient",
     "Policy",
     "PolicySpec",
     "ReactionRule",
@@ -53,6 +58,7 @@ __all__ = [
     "ScheduledIntentDraft",
     "Surface",
     "TextSurface",
+    "ToolCall",
     "Trace",
     "Verdict",
     "Verifier",

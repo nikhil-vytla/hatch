@@ -1,0 +1,243 @@
+{
+  "name": "bfcl-calendar-003",
+  "description": "Adapted function-calling task: Book a meeting with Dana tomorrow at 10am for 30 minutes, then check my schedule",
+  "uses": [],
+  "horizon": 10.0,
+  "max_activations": 1000,
+  "entities": [
+    {
+      "id": "tool:create_event",
+      "kind": "tool",
+      "attrs": {
+        "status": "up",
+        "description": "Create a calendar event.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "time": {
+              "type": "string"
+            },
+            "duration_minutes": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "title",
+            "time"
+          ]
+        },
+        "response": {
+          "event_id": "evt-42",
+          "status": "confirmed"
+        }
+      },
+      "visible_to": [],
+      "secret_attrs": []
+    },
+    {
+      "id": "tool:list_events",
+      "kind": "tool",
+      "attrs": {
+        "status": "up",
+        "description": "List calendar events for a day.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "day": {
+              "type": "string"
+            }
+          }
+        },
+        "response": {
+          "events": [
+            {
+              "id": "evt-42",
+              "title": "Meeting with Dana"
+            }
+          ]
+        }
+      },
+      "visible_to": [],
+      "secret_attrs": []
+    }
+  ],
+  "actors": [
+    {
+      "id": "user-1",
+      "role": "population",
+      "policy": {
+        "type": "scripted",
+        "params": {
+          "steps": [
+            [
+              {
+                "kind": "send_message",
+                "payload": {
+                  "to": "agent-1",
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Book a meeting with Dana tomorrow at 10am for 30 minutes, then check my schedule."
+                    }
+                  ]
+                }
+              }
+            ]
+          ]
+        }
+      },
+      "scope": {
+        "entity_kinds": null,
+        "omniscient": false
+      },
+      "priority": 0,
+      "activate_at": [
+        0.0
+      ]
+    },
+    {
+      "id": "agent-1",
+      "role": "system_under_test",
+      "policy": {
+        "type": "scripted",
+        "params": {
+          "steps": [
+            [
+              {
+                "kind": "call_tool",
+                "payload": {
+                  "tool": "create_event",
+                  "args": {
+                    "title": "Meeting with Dana",
+                    "time": "tomorrow 10:00",
+                    "duration_minutes": 30
+                  }
+                }
+              }
+            ],
+            [
+              {
+                "kind": "call_tool",
+                "payload": {
+                  "tool": "list_events",
+                  "args": {
+                    "day": "tomorrow"
+                  }
+                }
+              }
+            ],
+            [
+              {
+                "kind": "send_message",
+                "payload": {
+                  "to": "user-1",
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Done \u2014 task completed."
+                    }
+                  ]
+                }
+              }
+            ]
+          ]
+        }
+      },
+      "scope": {
+        "entity_kinds": null,
+        "omniscient": false
+      },
+      "priority": 0,
+      "activate_at": []
+    }
+  ],
+  "timeline": [],
+  "reactions": [
+    {
+      "on_kind": "message.sent",
+      "activate": "agent-1",
+      "delay": 0.1,
+      "only_if_addressed": true,
+      "priority": 0
+    },
+    {
+      "on_kind": "message.sent",
+      "activate": "user-1",
+      "delay": 0.1,
+      "only_if_addressed": true,
+      "priority": 0
+    },
+    {
+      "on_kind": "tool.result",
+      "activate": "agent-1",
+      "delay": 0.05,
+      "only_if_addressed": true,
+      "priority": 0
+    },
+    {
+      "on_kind": "tool.failed",
+      "activate": "agent-1",
+      "delay": 0.05,
+      "only_if_addressed": true,
+      "priority": 0
+    }
+  ],
+  "contract": [
+    {
+      "name": "calls_create_event_0",
+      "kind": "objective",
+      "verifier": "eventually_event",
+      "params": {
+        "kind": "tool.called",
+        "actor_id": "agent-1",
+        "payload_contains": {
+          "tool": "create_event",
+          "args": {
+            "title": "Meeting with Dana",
+            "time": "tomorrow 10:00",
+            "duration_minutes": 30
+          }
+        }
+      }
+    },
+    {
+      "name": "calls_list_events_1",
+      "kind": "objective",
+      "verifier": "eventually_event",
+      "params": {
+        "kind": "tool.called",
+        "actor_id": "agent-1",
+        "payload_contains": {
+          "tool": "list_events",
+          "args": {
+            "day": "tomorrow"
+          }
+        }
+      }
+    },
+    {
+      "name": "responded_to_user",
+      "kind": "objective",
+      "verifier": "eventually_event",
+      "params": {
+        "kind": "message.sent",
+        "payload_contains": {
+          "from": "agent-1",
+          "to": "user-1"
+        }
+      }
+    },
+    {
+      "name": "call_budget",
+      "kind": "invariant",
+      "verifier": "budget_max",
+      "params": {
+        "kind": "tool.called",
+        "limit": 5
+      }
+    }
+  ]
+}

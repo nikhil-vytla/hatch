@@ -18,6 +18,8 @@ from typing import Any
 PolicyFactory = Callable[[dict[str, Any]], Any]
 VerifierFactory = Callable[[str, dict[str, Any]], Any]
 GeneratorFn = Callable[[dict[str, Any], int], Any]  # (brief, seed) -> WorldSpec
+AdapterFn = Callable[[list[dict[str, Any]], dict[str, Any]], Any]  # (rows, brief) -> [WorldSpec]
+ClientFactory = Callable[[dict[str, Any]], Any]  # params -> ModelClient
 
 ENTRY_POINT_GROUPS = ("orrery.policies", "orrery.verifiers", "orrery.domains")
 
@@ -30,6 +32,8 @@ class Registry:
     tools: dict[str, Any] = field(default_factory=dict)
     verifiers: dict[str, VerifierFactory] = field(default_factory=dict)
     generators: dict[str, GeneratorFn] = field(default_factory=dict)
+    adapters: dict[str, AdapterFn] = field(default_factory=dict)
+    model_clients: dict[str, ClientFactory] = field(default_factory=dict)
 
     def use_module(self, module_path: str) -> None:
         """Import a domain module and let it register itself."""
@@ -41,13 +45,15 @@ class Registry:
 
 
 def build_registry(uses: list[str] | None = None, discover: bool = False) -> Registry:
-    from orrery import actors, perturb, verify, world
+    from orrery import actors, adapters, models, perturb, verify, world
 
     registry = Registry()
     world.register_builtin(registry)
     actors.register_builtin_policies(registry)
     verify.register_builtin_verifiers(registry)
     perturb.register(registry)
+    models.register(registry)
+    adapters.register(registry)
 
     if discover:  # third-party packages, via entry points
         for group in ENTRY_POINT_GROUPS:

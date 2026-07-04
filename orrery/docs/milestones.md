@@ -44,17 +44,48 @@ parallel policy evaluation, U6 streaming surfaces, U7 T2 interception proxy).
 
 **Technical debt.** Logged in `technical-debt.md`.
 
+## M2 — Provider integration + benchmark adaptation (done, 2026-07-04)
+
+Prompted by a direct ambition check: "how easy is it to bring in different
+agents/models/providers, and can we adapt existing benchmarks?" Both were
+architecture claims without proof; this milestone made them capabilities.
+
+**What was built.**
+- `models.py` (ADR-0007): `ModelClient` protocol (one async `complete()`
+  method = a provider), `ModelPolicy` (any chat+tool-calling model as an
+  actor; tool calls → intents; the kernel's event loop is the agentic loop),
+  `AnthropicClient` (lazy optional dep) and `PlaybookClient` (deterministic
+  test double / reference adapter).
+- `adapters.py` (ADR-0008): adapter protocol `(rows, brief) -> [WorldSpec]`
+  with a `bfcl_style` function-calling adapter; **tools-as-data** (canned
+  `response` on tool entities → adapted specs are pure data, `uses=[]`);
+  **oracle self-validation** (default agent performs the task's expected
+  actions, proving each conversion is solvable); `orrery adapt … --run` CLI.
+- Dynamic worlds: `spawn_entity`/`despawn_entity` mechanics — timelines and
+  actors can grow the world mid-run, with growth in the event log so replay
+  and verifiers see it.
+
+**Key verified behaviors** (now 32 tests):
+- a model-driven agent passes the support-desk contract; the SUT swap is a
+  policy-spec change, no world changes
+- replaying a model-driven trace against a client that raises on contact
+  succeeds — replay provably never touches a provider
+- every adapted benchmark task is validated by its oracle; the same task runs
+  against a model policy; a wrong-args call fails exactly its expected-call
+  objective while `responded_to_user` still passes
+- a timeline-spawned entity exists in final state and replays bit-for-bit
+
+**Deferred within M2 scope:** the LLM *judge* verifier (ground-truth-aware
+grading) — moved to M3, since the verifier slot and omniscient store access
+already exist.
+
 ## Next milestones (proposed order)
 
-- **M2 — LLM-backed actors + judge verifier.** An `LLMPolicy` (Claude API)
-  behind the same Policy protocol, proving decision-recording keeps replay
-  intact with a nondeterministic live actor; an LLM judge Verifier that grades
-  with ground-truth world access. Highest leverage: it converts the framework
-  from "simulator" to "evaluation product".
-- **M3 — Dataset export + QA gate.** Trace → (observation, decision) SFT/RL
-  examples filtered by contract; `orrery qa` exit-code gate for CI.
-- **M4 — Benchmark adapter.** One converter (e.g. τ-bench-style support tasks)
-  from a public benchmark format into WorldSpecs, validating ADR-0006's
-  adaptation claim.
+- **M3 — LLM judge verifier + dataset export + QA gate.** Judge grades with
+  ground-truth world access; trace → (observation, decision) SFT/RL examples
+  filtered by contract; invariant-vs-objective rollup in reporting.
+- **M4 — Stateful benchmark adapter (τ-bench-style).** Reactive scripted
+  users + DB-entity initialization; `matches_any` arg-matching for BFCL
+  answer ranges.
 - **M5 — T2 interception proxy.** Provider-dialect localhost endpoint so
   unmodified agent binaries run inside Orrery worlds.

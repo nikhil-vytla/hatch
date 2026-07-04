@@ -38,6 +38,9 @@ class EntityStore(BaseModel):
     def maybe(self, entity_id: str) -> Entity | None:
         return self.entities.get(entity_id)
 
+    def remove(self, entity_id: str) -> None:
+        del self.entities[entity_id]
+
     def by_kind(self, kind: str) -> list[Entity]:
         return [e for e in self.entities.values() if e.kind == kind]
 

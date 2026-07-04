@@ -101,3 +101,43 @@ policies/ingestion tiers; WorldSpec IR + generators).
   verifier algebra laws; e2e determinism/replay/chaos/safety tests).
 - Demo artifacts in examples/ (spec-seed1.json + support_desk-1.jsonl),
   replay-verified after regeneration.
+
+## 2026-07-04 — M2: ambition check → provider + benchmark integration
+
+User pushed on three questions: can we adapt diverse/dynamic worlds AND
+existing benchmarks? how easy is bringing in different agents/models/
+providers? is that accounted for? Honest audit: the *seams* were right
+(Policy protocol, generator/adapter split in ADR-0006, entry points) but two
+claims had no proof in the tree — no model-backed actor, no adapter. Built
+both instead of arguing:
+
+- models.py: ModelClient protocol (a provider = one async complete()),
+  ModelPolicy (tool calls → intents; deliberately NO inner agentic loop —
+  the kernel's event loop is the agentic loop, so budgets/chaos/multi-agent
+  interleaving see every model tool call), PlaybookClient (deterministic
+  double), AnthropicClient (lazy optional dep, pyright-ignored import).
+- adapters.py: (rows, brief) -> [WorldSpec]; bfcl_style function-calling
+  adapter + 3 sample rows in examples/benchmarks/. Two ideas emerged that
+  feel genuinely load-bearing for the platform story:
+  1. **tools-as-data**: canned `response` attr on a tool entity = complete
+     simulated tool; adapted specs are pure data (uses=[]), hash-citable,
+     no Python package rides along.
+  2. **oracle self-validation**: default adapted agent performs the task's
+     expected actions; oracle passes ⇒ conversion is faithful. Turns
+     "did we port the benchmark right?" into a test.
+- SUT-as-parameter confirmed end-to-end: same adapted task ran against the
+  oracle and a playbook model policy; swapping the support-desk rule agent
+  for a model agent was a policy-spec edit only.
+- Replay isolation proof: replayed a model-driven trace against a client
+  whose complete() raises — fingerprint matched, provider never contacted.
+  This is the ADR-0001 payoff made concrete.
+- Dynamic worlds: spawn_entity/despawn_entity mechanics; timeline spawns a
+  ticket mid-run; growth replays bit-for-bit.
+- Gate: 32/32 tests, ruff clean, pyright 0. New ADR-0007/0008 +
+  docs/extending.md (researcher-facing extension guide).
+- Watch-item honestly logged: ModelPolicy keeps history as flattened text
+  turns (provider-portable, replay-safe, but loses native tool-use blocks —
+  will hurt strong tool-callers; fix is structured turns rendered per-client,
+  interface unchanged). Also `orrery run` of a model-spec against a live
+  provider is still unexercised (needs a key); playbook path is identical
+  code except the client.

@@ -107,7 +107,7 @@ $ uv run orrery replay examples/spec-seed1.json examples/support_desk-1.jsonl
 replay ok: fingerprint 80975fc25d36d430… reproduced bit-for-bit
 ```
 
-Every claimed property is a test, not documentation: 23 tests (hypothesis
+Every claimed property is a test, not documentation: 32 tests (hypothesis
 property tests for RNG stream independence, scheduler total order, and the
 verifier algebra laws; end-to-end tests for bit-identical determinism, replay
 tamper detection, chaos-forced retries, hidden-state enforcement, and
@@ -133,12 +133,40 @@ uv run orrery run --generate support_desk --seeds 20 --out runs/   # population 
   rate with replayable repro cases for every failure — the CLI already exits
   nonzero on contract violations.
 
-### What's deliberately not in v0
+### Providers and benchmarks (v0.2)
 
-LLM-backed policies/judges (the Policy/Verifier protocols are their slots),
-the T2 interception proxy for unmodified agent binaries, streaming
-verification, dataset export, and browser/audio surfaces. Each is designed
-for (see [docs/assumptions.md](docs/assumptions.md) and
+Two capabilities added after an ambition check on platform openness:
+
+- **Any model, any provider** ([models.py](src/orrery/models.py), ADR-0007):
+  a provider is one async `ModelClient.complete()` method — Anthropic ships,
+  OpenAI-compatible/local adapters are symmetric ~40-line classes, and a
+  deterministic `PlaybookClient` doubles as test double and reference.
+  `ModelPolicy` turns any such model into an actor whose tool calls become
+  world intents; there is no inner agentic loop, so budgets, chaos, and
+  multi-agent interleaving apply to every model turn. Swapping the reference
+  world's rule-based agent for a model-driven one is a policy-spec edit.
+  Replaying a model-driven trace provably never contacts a provider (tested
+  against a client that raises on contact).
+- **Benchmark ingestion** ([adapters.py](src/orrery/adapters.py), ADR-0008):
+  `(rows, brief) -> [WorldSpec]`, with a `bfcl_style` function-calling
+  adapter. Adapted worlds are *pure data* (simulated tools are canned
+  responses on tool entities — no Python pack rides along), the
+  system-under-test is a parameter rather than part of the task, and every
+  conversion is **oracle-self-validated**: `orrery adapt tasks.jsonl --run`
+  proves each world solvable before a model sees it. Dynamic worlds are
+  supported via `spawn_entity`/`despawn_entity` — timelines and actors can
+  grow the world mid-run, and growth replays bit-for-bit.
+
+Researcher/user extension points (policies, providers, mechanics, verifiers,
+generators, adapters, surfaces) are documented in
+[docs/extending.md](docs/extending.md).
+
+### What's deliberately not built yet
+
+The LLM *judge* verifier (slot exists; M3), the T2 interception proxy for
+unmodified agent binaries, streaming verification, dataset export, and
+browser/audio surfaces. Each is designed for (see
+[docs/assumptions.md](docs/assumptions.md) and
 [docs/roadmap.md](docs/roadmap.md)) and none requires kernel changes — that
 was the point of spending the design budget where it went.
 

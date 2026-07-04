@@ -87,6 +87,30 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_adapt(args: argparse.Namespace) -> int:
+    registry = build_registry(uses=args.uses)
+    adapter = registry.adapters.get(args.adapter)
+    if adapter is None:
+        print(f"no adapter {args.adapter!r}; known: {', '.join(sorted(registry.adapters))}")
+        return 1
+    brief = json.loads(args.brief) if args.brief else {}
+    rows = [json.loads(line) for line in Path(args.file).read_text().splitlines() if line.strip()]
+    specs = adapter(rows, brief)
+    print(f"adapted {len(specs)} task(s) from {args.file}")
+    failures = 0
+    for spec in specs:
+        if args.out:
+            out_path = Path(args.out) / f"{spec.name.replace(':', '-')}.json"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(json.dumps(spec.model_dump(mode="json"), indent=2))
+            print(f"  {spec.name} -> {out_path} (hash {spec.spec_hash()[:12]}…)")
+        if args.run:
+            result = asyncio.run(engine.run(spec, 0))
+            _print_verdicts(result, 0)
+            failures += not result.passed
+    return 1 if failures else 0
+
+
 def cmd_generate(args: argparse.Namespace) -> int:
     registry = build_registry(uses=args.uses)
     brief = json.loads(args.brief) if args.brief else {}
@@ -123,6 +147,15 @@ def main(argv: list[str] | None = None) -> int:
     p_verify.add_argument("spec")
     p_verify.add_argument("trace")
     p_verify.set_defaults(fn=cmd_verify)
+
+    p_adapt = sub.add_parser("adapt", help="convert benchmark rows (JSONL) into WorldSpecs")
+    p_adapt.add_argument("adapter", help="adapter name, e.g. bfcl_style")
+    p_adapt.add_argument("file", help="benchmark rows, one JSON object per line")
+    p_adapt.add_argument("--brief", help="JSON brief (e.g. agent policy override)")
+    p_adapt.add_argument("--uses", action="append", default=[])
+    p_adapt.add_argument("--out", help="directory for adapted spec files")
+    p_adapt.add_argument("--run", action="store_true", help="also run each adapted world")
+    p_adapt.set_defaults(fn=cmd_adapt)
 
     p_gen = sub.add_parser("generate", help="emit a WorldSpec from a generator template")
     p_gen.add_argument("template")
