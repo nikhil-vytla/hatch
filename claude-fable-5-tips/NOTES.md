@@ -104,3 +104,23 @@ it blindly:
   content farming the Fable 5 launch) — official Anthropic docs are the
   trustworthy source and secondary posts added no new substance in the
   snippets I checked.
+
+## Added: sources/ folder (user request, third session)
+
+User asked to "copy the sources in" alongside the existing citations.
+Deliberately did *not* paste full verbatim copies of the Willison post or
+the tweet thread into the repo — that would both violate copyright
+practice (reproducing full third-party articles) and this file's own
+"don't copy full fetched material" spirit. Instead added
+`sources/` with one file per source: confirmed URL, verification status,
+an original-wording summary, and (only where exact wording was directly
+confirmed, not reconstructed from search snippets) a single short quote
+under 15 words with attribution. Anthropic's own prompting doc is the one
+exception treated more generously — its "copy-pasteable" snippets are
+functional templates explicitly meant for reuse, and those already live
+in full in `templates/AGENTS.fable5.md`.
+
+Also used this pass to double check the 1M-token-context claim already
+in NOTES/README (confirmed via OpenRouter + Anthropic's context-windows
+docs) and to trim a 20-word quote in README.md down to under 15 words for
+the same reason.
