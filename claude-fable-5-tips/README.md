@@ -1,15 +1,22 @@
 # Working with Claude Fable 5: distilled tips
 
 A small investigation into how to prompt and build harnesses for Claude
-Fable 5, starting from a [tweet by Thariq (Anthropic)](https://x.com/trq212/status/2073100352921215386)
+Fable 5, starting from [Thariq Shihipar's (Anthropic) "A Field Guide to
+Fable: Finding Your Unknowns"](https://x.com/trq212/status/2073100352921215386)
 and [Simon Willison's "Fable's judgement"](https://simonwillison.net/2026/Jul/3/judgement/),
 then corroborated against Anthropic's official prompting docs.
 
 ## TL;DR
 
-Fable 5 is capable enough that older, prescriptive prompting habits
-(enumerated rules, micromanaged checkpoints, treating it like autocomplete)
-actively hold it back. The consistent advice across every source: **give
+Two separate but complementary ideas came out of this. First (Thariq):
+Fable's output quality is now bottlenecked less by the model and more by
+how well the user surfaces their own **unknowns** — gaps between the
+"map" (your prompt/context) and the "territory" (the actual codebase) —
+before, during, and after implementation, using techniques like blind
+spot passes, interviews, and reference implementations. Second
+(Willison, Anthropic's official docs): Fable is capable enough that
+older, prescriptive prompting habits (enumerated rules, micromanaged
+checkpoints, treating it like autocomplete) actively hold it back — **give
 it judgement and intent, not rules; delegate mechanical work to cheaper
 subagents; and ground its self-reported progress in evidence.**
 
@@ -19,12 +26,17 @@ Full reference notes (author, verification status, and a substantial
 summary in my own words per source, not full copies of the originals)
 live in [sources/](sources/):
 
-- [Thariq (@trq212) on X](sources/thariq-trq212-tweets.md) —
-  direct fetch was blocked (HTTP 402 on x.com), reconstructed via search
-  snippets of this and adjacent posts in the same thread. Consistent
-  theme: use judgement to pick a lower-power model for coding subtasks
-  and run it in a subagent — stop using Fable like autocomplete, use it
-  for judgement (architecture, migration planning, debugging, review).
+- [Thariq Shihipar (@trq212) — "A Field Guide to Fable: Finding Your Unknowns"](sources/thariq-trq212-tweets.md) —
+  direct fetch was blocked (HTTP 402 on x.com); full text was provided
+  directly by the user, so this summary is drawn from the real article,
+  not reconstructed from search snippets (an earlier version of this
+  file mischaracterized its theme — see the correction note in the
+  source file). Theme: quality is bottlenecked by how well you surface
+  your own "unknowns" (map vs. territory) — a taxonomy of four unknown
+  types, plus a phase-by-phase technique catalog (blind spot passes,
+  brainstorm/prototype, interviews, reference implementations,
+  implementation notes, quizzes) for discovering them before they get
+  expensive to fix.
 - [Simon Willison — "Fable's judgement"](sources/simon-willison-fables-judgement.md) —
   same delegation idea from the user side: tell Fable to use its own
   judgement (e.g. on when to write tests) instead of prescriptive rules,
@@ -86,6 +98,17 @@ Fable at low effort can still beat prior models at max effort.
    - Don't surface a live remaining-context countdown — it can trigger
      premature "should we start a new session?" suggestions.
 
+**10. Output quality is bottlenecked by your unknowns, not the model.**
+Per Thariq's framing: the gap between your prompt/context (the map) and
+the actual codebase (the territory) is where Fable has to guess. Splitting
+your gaps into known knowns, known unknowns, unknown knowns, and unknown
+unknowns, and running phase-appropriate techniques to surface each
+(blind spot passes and brainstorms before implementation, a running
+implementation-notes file during, a quiz to check your own understanding
+after) closes that gap faster than either over-specifying (Claude follows
+orders past the point a pivot would help) or under-specifying (Claude
+falls back to generic best practices that may not fit).
+
 ## Connection back to this repo
 
 The top-level [CLAUDE.md](../CLAUDE.md) (via Claude Code's own system
@@ -108,3 +131,11 @@ since they don't inherit Claude Code's system prompt.
 - [templates/verifier-subagent-skill.md](templates/verifier-subagent-skill.md) —
   a skill definition implementing Anthropic's recommended
   fresh-context-verifier pattern for long-running self-verification.
+- [templates/unknowns-discovery-skill.md](templates/unknowns-discovery-skill.md) —
+  a skill definition implementing Thariq's technique catalog (blind spot
+  pass, brainstorm/prototype, interview, reference, implementation plan,
+  implementation notes, quiz) for surfacing unknowns pre/during/post
+  implementation.
+- [sources/](sources/) — per-source reference notes (verification status,
+  original-wording summaries, and short attributed quotes where wording
+  was directly confirmed) for everything cited above.

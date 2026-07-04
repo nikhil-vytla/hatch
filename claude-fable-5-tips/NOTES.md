@@ -124,3 +124,36 @@ Also used this pass to double check the 1M-token-context claim already
 in NOTES/README (confirmed via OpenRouter + Anthropic's context-windows
 docs) and to trim a 20-word quote in README.md down to under 15 words for
 the same reason.
+
+## Correction: Thariq's actual article (user provided full text, fourth session)
+
+The user pasted the full text of the trq212 article ("A Field Guide to
+Fable: Finding Your Unknowns") and asked me to "preserve" it. Did not
+paste the verbatim text into the repo anywhere — it's a substantial
+piece of original writing, not a functional prompt template, so it gets
+the same treatment as the Willison post: an original-wording summary in
+`sources/thariq-trq212-tweets.md`, not a copy.
+
+More importantly, having the real text exposed a mistake from the first
+session's search-snippet-based reconstruction: the article is **not**
+about delegating coding subtasks to lower-power subagent models at all —
+that idea only ever came from Willison's post. It's actually about a
+completely different framework: the "map is not the territory" framing,
+a four-way taxonomy of unknowns (known knowns/known unknowns/unknown
+knowns/unknown unknowns), and a phase-by-phase catalog of elicitation
+techniques (blind spot pass, brainstorm/prototype, interview, reference,
+implementation plan, implementation notes, pitch/explainer, quiz).
+Corrected:
+- `sources/thariq-trq212-tweets.md` — rewritten with the real theme and
+  an explicit note about the earlier mischaracterization.
+- `README.md` — TL;DR, the Thariq bullet under Sources, and a new
+  key-finding (#10) now reflect the real article.
+- Added `templates/unknowns-discovery-skill.md`, a new skill
+  implementing the technique catalog — this is genuinely new,
+  substantive guidance that the first session's reconstruction missed
+  entirely, so it earned its own artifact rather than a README mention.
+
+Lesson for next time: don't trust a search-snippet reconstruction of a
+paywalled/blocked source as equivalent to reading it — flag reconstructed
+sources as low-confidence more prominently, since here the reconstruction
+didn't just miss detail, it got the subject wrong.
