@@ -15,24 +15,27 @@ subagents; and ground its self-reported progress in evidence.**
 
 ## Sources
 
-- [Thariq (@trq212) on X](https://x.com/trq212/status/2073100352921215386) —
+Full reference notes (author, verification status, and a substantial
+summary in my own words per source, not full copies of the originals)
+live in [sources/](sources/):
+
+- [Thariq (@trq212) on X](sources/thariq-trq212-tweets.md) —
   direct fetch was blocked (HTTP 402 on x.com), reconstructed via search
   snippets of this and adjacent posts in the same thread. Consistent
-  theme: "use your judgement to decide an appropriate lower power model
-  and run that in a subagent" for coding tasks — stop using Fable like
-  autocomplete, use it for judgement (architecture, migration planning,
-  debugging, review).
-- [Simon Willison — "Fable's judgement"](https://simonwillison.net/2026/Jul/3/judgement/) —
+  theme: use judgement to pick a lower-power model for coding subtasks
+  and run it in a subagent — stop using Fable like autocomplete, use it
+  for judgement (architecture, migration planning, debugging, review).
+- [Simon Willison — "Fable's judgement"](sources/simon-willison-fables-judgement.md) —
   same delegation idea from the user side: tell Fable to use its own
   judgement (e.g. on when to write tests) instead of prescriptive rules,
   and to delegate implementation to cheaper models to conserve Fable
   tokens. Reports faster output with slower token burn.
-- [Anthropic — Prompting Claude Fable 5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5) —
+- [Anthropic — Prompting Claude Fable 5](sources/anthropic-prompting-claude-fable-5.md) —
   the primary source; official, detailed, with copy-pasteable prompt
   snippets. Everything below traces back to this doc unless noted.
-- [Anthropic — Introducing Claude Fable 5 and Claude Mythos 5](https://www.anthropic.com/news/claude-fable-5-mythos-5) —
-  capability/pricing context: 1M token context window, $10/$50 per Mtok,
-  safety-classifier fallback to Opus 4.8 in <5% of sessions.
+- [Anthropic — Introducing Claude Fable 5 and Claude Mythos 5](sources/anthropic-fable-5-mythos-5-launch.md) —
+  capability/pricing context: $10/$50 per Mtok pricing, safety-classifier
+  fallback to Opus 4.8 for offensive-cyber/bio/reasoning-extraction cases.
 
 ## Key findings
 
