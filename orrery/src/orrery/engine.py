@@ -9,6 +9,7 @@ windows, NPC behavior — derives from the spec and the seed.
 from __future__ import annotations
 
 import importlib.metadata
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from orrery.actors import Actor, Decision, DecisionContext
@@ -21,11 +22,17 @@ from orrery.observe import render_view
 from orrery.plugins import Registry, build_registry
 from orrery.rng import RngRegistry
 from orrery.spec import WorldSpec
+from orrery.surfaces import Observation
 from orrery.trace import DecisionRecord, Trace, TraceMeta
 from orrery.verify import Verdict, Verifier
 from orrery.world import World
 
 log = get_logger("orrery.engine")
+
+# Called after each activation with (actor_id, activation_index, observation,
+# decision). Fires identically in live and replay runs — the seam for dataset
+# export (replay-reconstructed observations) and streaming verification.
+DecisionObserver = Callable[[str, int, Observation, Decision], None]
 
 
 def _version() -> str:
@@ -85,6 +92,7 @@ async def run(
     seed: int,
     registry: Registry | None = None,
     replay_from: Trace | None = None,
+    observer: DecisionObserver | None = None,
 ) -> RunResult:
     registry = registry or build_registry(uses=spec.uses)
     seq = SeqCounter()
@@ -171,6 +179,8 @@ async def run(
                 actor_id=actor.id, activation=activation_index, time=now, decision=decision
             )
         )
+        if observer is not None:
+            observer(actor.id, activation_index, observation, decision)
         for draft in decision.scheduled:
             scheduled = ScheduledIntent(
                 at_time=draft.at_time, intent=draft.intent, actor_id=actor.id
@@ -205,7 +215,12 @@ async def run(
     return RunResult(trace=trace, store=store, verdicts=verdicts)
 
 
-async def replay(spec: WorldSpec, trace: Trace, registry: Registry | None = None) -> RunResult:
+async def replay(
+    spec: WorldSpec,
+    trace: Trace,
+    registry: Registry | None = None,
+    observer: DecisionObserver | None = None,
+) -> RunResult:
     """Re-derive the world from the recorded decision stream.
 
     Raises ReplayDivergence if the replayed event log does not fingerprint-
@@ -216,7 +231,9 @@ async def replay(spec: WorldSpec, trace: Trace, registry: Registry | None = None
             f"spec hash mismatch: trace has {trace.meta.spec_hash[:12]}, "
             f"spec is {spec.spec_hash()[:12]}"
         )
-    result = await run(spec, trace.meta.seed, registry=registry, replay_from=trace)
+    result = await run(
+        spec, trace.meta.seed, registry=registry, replay_from=trace, observer=observer
+    )
     original = trace.event_fingerprint
     replayed = result.trace.event_fingerprint
     if original != replayed:

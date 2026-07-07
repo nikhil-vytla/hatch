@@ -111,6 +111,20 @@ def cmd_adapt(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def cmd_export(args: argparse.Namespace) -> int:
+    from orrery import export
+
+    spec = load_spec(Path(args.spec))
+    trace = Trace.read(Path(args.trace))
+    rows = asyncio.run(export.export_sft(spec, trace, require_pass=not args.include_failing))
+    if not rows:
+        print("no records exported (run failed its contract; use --include-failing to keep it)")
+        return 1
+    export.write_jsonl(rows, Path(args.out))
+    print(f"{len(rows)} records -> {args.out} (reward={rows[0]['reward']:.3f})")
+    return 0
+
+
 def cmd_generate(args: argparse.Namespace) -> int:
     registry = build_registry(uses=args.uses)
     brief = json.loads(args.brief) if args.brief else {}
@@ -156,6 +170,13 @@ def main(argv: list[str] | None = None) -> int:
     p_adapt.add_argument("--out", help="directory for adapted spec files")
     p_adapt.add_argument("--run", action="store_true", help="also run each adapted world")
     p_adapt.set_defaults(fn=cmd_adapt)
+
+    p_export = sub.add_parser("export", help="export a trace as contract-labeled training data")
+    p_export.add_argument("spec")
+    p_export.add_argument("trace")
+    p_export.add_argument("--out", required=True, help="output JSONL path")
+    p_export.add_argument("--include-failing", action="store_true")
+    p_export.set_defaults(fn=cmd_export)
 
     p_gen = sub.add_parser("generate", help="emit a WorldSpec from a generator template")
     p_gen.add_argument("template")
