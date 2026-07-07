@@ -1,0 +1,191 @@
+{
+  "name": "bfcl-weather-001",
+  "description": "Adapted function-calling task: What's the weather in San Francisco right now, in celsius?",
+  "uses": [],
+  "horizon": 10.0,
+  "max_activations": 1000,
+  "entities": [
+    {
+      "id": "tool:get_weather",
+      "kind": "tool",
+      "attrs": {
+        "status": "up",
+        "description": "Get current weather for a city.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string",
+              "enum": [
+                "celsius",
+                "fahrenheit"
+              ]
+            }
+          },
+          "required": [
+            "city",
+            "unit"
+          ]
+        },
+        "response": {
+          "temp": 17,
+          "unit": "celsius",
+          "conditions": "fog"
+        }
+      },
+      "visible_to": [],
+      "secret_attrs": []
+    }
+  ],
+  "actors": [
+    {
+      "id": "user-1",
+      "role": "population",
+      "policy": {
+        "type": "scripted",
+        "params": {
+          "steps": [
+            [
+              {
+                "kind": "send_message",
+                "payload": {
+                  "to": "agent-1",
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "What's the weather in San Francisco right now, in celsius?"
+                    }
+                  ]
+                }
+              }
+            ]
+          ]
+        }
+      },
+      "scope": {
+        "entity_kinds": null,
+        "omniscient": false
+      },
+      "priority": 0,
+      "activate_at": [
+        0.0
+      ]
+    },
+    {
+      "id": "agent-1",
+      "role": "system_under_test",
+      "policy": {
+        "type": "scripted",
+        "params": {
+          "steps": [
+            [
+              {
+                "kind": "call_tool",
+                "payload": {
+                  "tool": "get_weather",
+                  "args": {
+                    "city": "San Francisco",
+                    "unit": "celsius"
+                  }
+                }
+              }
+            ],
+            [
+              {
+                "kind": "send_message",
+                "payload": {
+                  "to": "user-1",
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Done \u2014 task completed."
+                    }
+                  ]
+                }
+              }
+            ]
+          ]
+        }
+      },
+      "scope": {
+        "entity_kinds": null,
+        "omniscient": false
+      },
+      "priority": 0,
+      "activate_at": []
+    }
+  ],
+  "timeline": [],
+  "reactions": [
+    {
+      "on_kind": "message.sent",
+      "activate": "agent-1",
+      "delay": 0.1,
+      "only_if_addressed": true,
+      "priority": 0
+    },
+    {
+      "on_kind": "message.sent",
+      "activate": "user-1",
+      "delay": 0.1,
+      "only_if_addressed": true,
+      "priority": 0
+    },
+    {
+      "on_kind": "tool.result",
+      "activate": "agent-1",
+      "delay": 0.05,
+      "only_if_addressed": true,
+      "priority": 0
+    },
+    {
+      "on_kind": "tool.failed",
+      "activate": "agent-1",
+      "delay": 0.05,
+      "only_if_addressed": true,
+      "priority": 0
+    }
+  ],
+  "contract": [
+    {
+      "name": "calls_get_weather_0",
+      "kind": "objective",
+      "verifier": "eventually_event",
+      "params": {
+        "kind": "tool.called",
+        "actor_id": "agent-1",
+        "payload_contains": {
+          "tool": "get_weather",
+          "args": {
+            "city": "San Francisco",
+            "unit": "celsius"
+          }
+        }
+      }
+    },
+    {
+      "name": "responded_to_user",
+      "kind": "objective",
+      "verifier": "eventually_event",
+      "params": {
+        "kind": "message.sent",
+        "payload_contains": {
+          "from": "agent-1",
+          "to": "user-1"
+        }
+      }
+    },
+    {
+      "name": "call_budget",
+      "kind": "invariant",
+      "verifier": "budget_max",
+      "params": {
+        "kind": "tool.called",
+        "limit": 4
+      }
+    }
+  ]
+}
