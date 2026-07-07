@@ -141,3 +141,29 @@ both instead of arguing:
   interface unchanged). Also `orrery run` of a model-spec against a live
   provider is still unexercised (needs a key); playbook path is identical
   code except the client.
+
+## 2026-07-04 — Pillars check: RL / sandboxing / tracing / observability
+
+User asked whether these four are planned. Wrote docs/platform-pillars.md
+(status + staged design + what forces each stage) and closed the weakest
+gap in code: the RL story claimed "traces export to training data" with no
+exporter in the tree.
+
+- Added `DecisionObserver` hook to the engine (fires identically live and
+  in replay) — one seam serving dataset export now, streaming verification
+  and live dashboards later.
+- export.py: traces → (observation, decision) records. The design insight
+  that made this clean: DON'T store observations in traces — reconstruct
+  them by replaying and re-rendering views. ADR-0001 determinism makes the
+  reconstruction bit-faithful; the trace stays lean. Export is itself
+  deterministic (tested: two exports identical).
+- Reward = the contract: mean objective score gated by invariants. The
+  leaky-agent run exports with objective_reward 1.0 but reward 0.0 —
+  "unsafe success is not training signal" falls out of ADR-0004 for free.
+- `orrery export spec trace --out data.jsonl` + require_pass filtering.
+- Sandboxing deliberately stays deferred — documented the honest position:
+  everything is simulated in-process today (no fs/network/subprocess in any
+  world), so the container tax would buy nothing yet; staged plan tied to
+  the features that force each stage (code-execution tools → subprocess
+  runtime; untrusted binaries + T2 proxy → containers).
+- Gate: 35/35 tests, ruff clean, pyright clean.

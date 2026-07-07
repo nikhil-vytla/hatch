@@ -75,7 +75,8 @@ replayable bit-for-bit.
 | `generate.py` | `Generator` protocol; `ProceduralGenerator` (seeded sampling) |
 | `models.py` | Provider integration: `ModelClient` protocol, `ModelPolicy`, Anthropic/playbook clients (ADR-0007) |
 | `adapters.py` | Benchmark ingestion: `(rows, brief) -> [WorldSpec]`; `bfcl_style` reference adapter (ADR-0008) |
-| `engine.py` | Run loop: activate → decide → submit → reduce → trace; replay |
+| `engine.py` | Run loop: activate → decide → submit → reduce → trace; replay; `DecisionObserver` hook |
+| `export.py` | Traces → contract-labeled training data via replay reconstruction (pillars doc) |
 | `plugins.py` | Entry-point discovery for policies/mechanics/verifiers/surfaces |
 | `logging.py` | Structured (JSON) logging setup |
 | `cli.py` | `orrery run · replay · verify` |
