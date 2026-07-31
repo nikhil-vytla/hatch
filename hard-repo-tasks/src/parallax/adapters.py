@@ -28,6 +28,7 @@ def export_hud(
                     "revision": manifest.source.revision,
                     "prompt": manifest.prompt,
                     "starter_patch_b64": base64.b64encode(patch).decode(),
+                    "recipe_name": manifest.recipe_name,
                 },
                 "slug": manifest.task_id,
                 "columns": {
