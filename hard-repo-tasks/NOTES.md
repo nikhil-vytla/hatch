@@ -80,3 +80,67 @@ Intellect Verifiers.
   upstream answer from satisfying the task.
 - First `uv sync` failed because `pyproject.toml` referenced `README.md` before
   the report existed. Added the report skeleton and will retry.
+- Implemented a standard-library compiler with exact pinned text edits, separate
+  public/sealed capsules, deterministic hashes, executable admission, gated
+  grading, and HUD/Verifiers exports.
+- All 12 Click tasks passed the admission matrix twice: deterministic output,
+  gold=1, no-op=0, upstream restoration=0, and unrelated-path tampering=0.
+- First HUD no-op lifecycle returned a structured zero with regression=1,
+  counterfactual=0, adversarial=1. This confirmed that the contract gate works.
+- Live rollout attempt 1:
+  - Scheduled six DeepSeek-V4-Flash and six Claude Sonnet 4.6 runs across three
+    omission depths.
+  - HUD's local macOS workspace warned that bubblewrap was unavailable. Agents
+    ran broad `find /` and host-directory commands; several hung.
+  - Stopped only the runaway commands. Five initial DeepSeek runs completed with
+    rewards `[0, 0, 1, 0, 0]`; the remaining runs were not clean enough for a
+    model comparison.
+  - One successful DeepSeek trace used a minimal inline dispatch condition and
+    recovered from importing Click out of a stale editable checkout.
+- Built and deployed the HUD image successfully:
+  - Build `a5bc3aac-7a34-49bc-b4a5-68b3e47f9840`
+  - Image digest
+    `sha256:fb6252115437f5d2754a268b850cb20efb9eaaff957ce9e76988af420c1f6567`
+  - v6 introspection found one task template and two capabilities.
+- Remote execution remained unavailable:
+  - `--runtime hud` returned HTTP 404 from the runtime-session endpoint for all
+    12 attempted runs.
+  - Fully hosted submission returned "No registry found" for two smoke runs,
+    even though the image deployment succeeded.
+- Tightened local prompt/workspace guidance and ran serial calibration:
+  - GPT-5.6 Sol passed the semantic contract in 4/4 audited completed runs.
+    Three scored 1. The fourth scored 0 only because it added focused tests.
+  - Three representative DeepSeek traces passed all nine semantic component
+    checks but scored 0 under the old integrity policy.
+  - Claude Sonnet 4.6 hit a 300-second provider idle timeout and was excluded.
+- Reward-policy correction:
+  - The original `allowed_paths` excluded `tests/test_testing.py`. This punished
+    agents for adding legitimate regression tests even when hidden behavioral
+    checks all passed.
+  - Setting `HOME` to the workspace caused normal pip cache files to appear as
+    modifications and trip the same gate.
+  - Revised recipes allow the focused test file. Grading now filters only
+    narrowly defined pytest, bytecode, coverage, and pip cache artifacts.
+  - This is an example of reward design changing the behavior selected by RL:
+    the old rule preferred minimal patches over evidence-producing engineering.
+- Containment breach:
+  - The unisolated model modified `/tmp/parallax-click`, a separate source clone
+    outside its task workspace.
+  - Saved the diff as `results/escaped-workspace-click.diff`, deleted the
+    disposable clone, and recreated the exact pinned revision.
+  - Local macOS HUD results are unacceptable for production until they run
+    inside a container or another hard filesystem boundary.
+- Difficulty conclusion:
+  - The counterfactual successfully resists memorized upstream restoration.
+  - It is not hard: the complete feature reduces to validation plus dispatch,
+    and both the strong and inspected weak rollouts solved it.
+  - Counterfactuality and hardness are independent axes. The family is rejected
+    by the calibration controller and must be hardened with cross-module state,
+    temporal sequences, and adversarial semantic mutants.
+- Verifiers integration:
+  - PyPI `verifiers==0.2.1` lacks the documented `verifiers.v1` namespace.
+  - Current main at
+    `b4612b53ae911c2295c56ab31c9fb1d9f9dde061` reports
+    `0.2.2.dev58` and exposes v1 under `import verifiers.v1 as vf`.
+  - Corrected the adapter for typed `TaskData`, behavioral `Task`, and lazy
+    `Taskset`. It loads all 12 generated rows against that pinned API.
