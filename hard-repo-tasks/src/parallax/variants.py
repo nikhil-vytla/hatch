@@ -327,7 +327,10 @@ def admit_variant(source: TaskSpec, variant: TaskVariant) -> VariantAdmission:
     }
     if variant.verifier_policy == VerifierPolicy.REUSE and behavior_changes & set(actual):
         violations.append("the original verifier cannot be reused after a behavioral change")
-    if variant.state_mode == StateMode.PERSISTENT and variant.verifier_policy == VerifierPolicy.REUSE:
+    if (
+        variant.state_mode == StateMode.PERSISTENT
+        and variant.verifier_policy == VerifierPolicy.REUSE
+    ):
         violations.append("persistent state requires an episode-aware verifier")
     if variant.relation == IntentRelation.PRESERVE and (
         source.goals != variant.spec.goals or source.constraints != variant.spec.constraints
