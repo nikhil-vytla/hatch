@@ -3,10 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 class IntentCondition(StrEnum):
@@ -254,7 +255,7 @@ def extract_integer(response: str) -> int | None:
     boxed = re.findall(r"\\boxed\{(-?[\d,]+)\}", response)
     if boxed:
         return int(boxed[-1].replace(",", ""))
-    numbers = re.findall(r"(?<![\w.])-?\d[\d,]*(?![\w.])", response)
+    numbers = re.findall(r"(?<!\w)-?\d[\d,]*(?!\w)", response)
     if not numbers:
         return None
     return int(numbers[-1].replace(",", ""))
@@ -297,7 +298,12 @@ def summarize_records(records: Iterable[RunRecord]) -> dict[str, Any]:
         valid = [
             row
             for row in condition_rows
-            if row.status in {RunStatus.SUCCESS, RunStatus.MODEL_FAILURE, RunStatus.INVALID_RESPONSE}
+            if row.status
+            in {
+                RunStatus.SUCCESS,
+                RunStatus.MODEL_FAILURE,
+                RunStatus.INVALID_RESPONSE,
+            }
         ]
         rewards = [row.reward for row in valid if row.reward is not None]
         conditions[condition] = {

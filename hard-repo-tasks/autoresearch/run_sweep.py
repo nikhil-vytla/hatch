@@ -5,10 +5,10 @@ import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
+from chat_env import intent_chat
 from hud import Chat
 from hud.agents import create_agent
 
-from chat_env import intent_chat
 from parallax.autoresearch import (
     CampaignManifest,
     IntentCondition,
@@ -70,7 +70,7 @@ async def _run_one(
         else:
             status = RunStatus.MODEL_FAILURE
         error = None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         response = replies[-1] if replies else ""
         parsed = None
         reward = None
