@@ -378,7 +378,11 @@ def summarize_records(records: Iterable[RunRecord]) -> dict[str, Any]:
 
     paired: dict[str, dict[str, Any]] = {}
     for condition, condition_rows in by_condition.items():
-        if condition == IntentCondition.STATIC or condition.startswith("repeat") or "+" in condition:
+        if (
+            condition == IntentCondition.STATIC
+            or condition.startswith("repeat")
+            or "+" in condition
+        ):
             continue
         control = "repeat-deep" if condition.endswith("-deep") else "repeat"
         repeat = {
