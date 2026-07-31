@@ -1,0 +1,39 @@
+{
+  "campaign_id": "intent-cycle-4-haiku-easy",
+  "conditions": [
+    "static",
+    "repeat-deep",
+    "combined-deep"
+  ],
+  "max_calls_non_static": 7,
+  "model": "claude-haiku-4-5",
+  "protocol_version": "parallax-autoresearch-v1",
+  "repetitions": 2,
+  "seed": 0,
+  "tasks": [
+    {
+      "generator_version": "intent-arithmetic-v1",
+      "penalty": 7,
+      "points_per_unit": 3,
+      "task_id": "workshop-easy-alpha",
+      "teams": 4,
+      "units_per_team": 5
+    },
+    {
+      "generator_version": "intent-arithmetic-v1",
+      "penalty": 11,
+      "points_per_unit": 5,
+      "task_id": "workshop-easy-beta",
+      "teams": 6,
+      "units_per_team": 4
+    },
+    {
+      "generator_version": "intent-arithmetic-v1",
+      "penalty": 13,
+      "points_per_unit": 4,
+      "task_id": "workshop-easy-gamma",
+      "teams": 5,
+      "units_per_team": 7
+    }
+  ]
+}

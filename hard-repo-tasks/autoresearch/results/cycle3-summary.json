@@ -1,0 +1,45 @@
+{
+  "conditions": {
+    "combined-deep": {
+      "accuracy": null,
+      "harness_errors": 6,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 0,
+      "valid_runs": 0
+    },
+    "repeat-deep": {
+      "accuracy": null,
+      "harness_errors": 6,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 0,
+      "valid_runs": 0
+    },
+    "static": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 6,
+      "valid_runs": 6
+    }
+  },
+  "next_intervention": {
+    "condition": null,
+    "intervention": null,
+    "reason": "no valid evolving condition available"
+  },
+  "paired_against_repeat": {
+    "combined-deep": {
+      "degraded_pairs": 0,
+      "improved_pairs": 0,
+      "mean_delta_vs_repeat": null,
+      "pairs": 0
+    }
+  },
+  "runs": 18
+}
