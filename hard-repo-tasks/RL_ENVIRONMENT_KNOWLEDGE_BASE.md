@@ -6,6 +6,10 @@ This document records the definitions, evidence, and design rules used by
 Parallax. It distinguishes claims supported by sources from working judgments
 that still need experiments.
 
+This is a narrative snapshot. New evidence enters the typed
+[research knowledge system](knowledge/index.md) first so source claims,
+concepts, contradictions, and syntheses remain independently searchable.
+
 ## Core distinction
 
 The most useful engineering distinction is:

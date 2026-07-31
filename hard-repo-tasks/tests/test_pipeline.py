@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -191,3 +192,15 @@ def test_curriculum_rejects_semantically_saturated_family() -> None:
     assert decision.action == "harden"
     assert decision.strong_semantic_rate == 1.0
     assert "add cross-module state propagation" in decision.next_transforms
+
+
+def test_knowledge_base_metadata_and_links() -> None:
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "scripts/check_knowledge.py"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

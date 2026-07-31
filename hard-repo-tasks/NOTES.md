@@ -162,3 +162,16 @@ Intellect Verifiers.
     browser or computer-use integration, so this run cannot inherit the user's
     authenticated browser session. Used accessible primary papers, blogs, and
     cross-posts and recorded the X source gap instead of inferring post content.
+- Research knowledge system:
+  - The single narrative knowledge-base document did not provide atomic source
+    provenance, typed semantic links, contradiction tracking, or reliable
+    machine validation.
+  - Added `knowledge/` with TOML-front-matter source, concept, and synthesis
+    notes. Stable IDs decouple semantic links from file locations.
+  - Seeded five primary-source notes, five concept notes, one cross-source
+    synthesis, a curated research map, and copyable templates.
+  - Added `scripts/check_knowledge.py` to reject missing metadata, duplicate
+    IDs, malformed relation lists, self-links, and unknown relation targets.
+  - Added a user-level `academic-knowledge-curator` subagent that applies the
+    schema after literature reviews and records inaccessible evidence instead
+    of silently dropping it.
