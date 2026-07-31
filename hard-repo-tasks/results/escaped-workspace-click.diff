@@ -1,0 +1,167 @@
+diff --git a/src/click/testing.py b/src/click/testing.py
+index cc123d4..f657f3a 100644
+--- a/src/click/testing.py
++++ b/src/click/testing.py
+@@ -23,9 +23,9 @@ if t.TYPE_CHECKING:
+     from .core import Command
+ 
+ if sys.platform == "win32":
+-    CaptureMode: t.TypeAlias = t.Literal["sys"]  # pyright: ignore[reportRedeclaration]
++    CaptureMode: t.TypeAlias = t.Literal["sys", "adaptive"]  # pyright: ignore[reportRedeclaration]
+ else:
+-    CaptureMode: t.TypeAlias = t.Literal["sys", "fd"]  # pyright: ignore[reportRedeclaration]
++    CaptureMode: t.TypeAlias = t.Literal["sys", "fd", "adaptive"]  # pyright: ignore[reportRedeclaration]
+ ExceptionInfo: t.TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
+ 
+ 
+@@ -335,7 +335,8 @@ class CliRunner:
+         clobber the host runner's stdout. ``fd`` redirects file descriptors
+         ``1`` and ``2`` via :func:`os.dup2` to a temporary file, also catching
+         output from stale stream references, C extensions, and subprocesses.
+-        ``fd`` is not supported on Windows.
++        ``fd`` is not supported on Windows. ``adaptive`` uses ``fd`` on POSIX
++        and falls back to ``sys`` on Windows.
+ 
+     .. versionchanged:: 8.4.0
+         Added the ``capture`` parameter. The default ``sys`` mode no longer
+@@ -365,14 +366,16 @@ class CliRunner:
+         catch_exceptions: bool = True,
+         capture: CaptureMode = "sys",
+     ) -> None:
+-        if capture not in {"sys", "fd"}:
++        if capture not in {"sys", "fd", "adaptive"}:
+             raise ValueError(
+-                f"capture={capture!r} is not valid. Choose from 'sys' or 'fd'."
++                f"capture={capture!r} is not valid. Choose from 'sys', 'fd', or 'adaptive'."
+             )
+         if capture == "fd" and sys.platform == "win32":
+             raise ValueError(
+-                f"capture={capture!r} is not supported on Windows. Use 'sys'."
++                f"capture={capture!r} is not supported on Windows. Use 'sys' or 'adaptive'."
+             )
++        if capture == "adaptive":
++            capture = "fd" if sys.platform != "win32" else "sys"
+         self.charset = charset
+         self.env = env or {}
+         self.echo_stdin = echo_stdin
+diff --git a/tests/test_testing.py b/tests/test_testing.py
+index 870d95c..40ada7b 100644
+--- a/tests/test_testing.py
++++ b/tests/test_testing.py
+@@ -838,3 +838,116 @@ def test_capture_pytest_matrix(
+     # Click output is not leaking into Pytest.
+     assert "inside-stdout" not in captured.out
+     assert "inside-stderr" not in captured.err
++
++
++
++def test_capture_adaptive_invalid():
++    """'adaptive' is accepted as a valid mode."""
++    # Should not raise
++    runner = CliRunner(capture="adaptive")
++    assert runner.capture in ("sys", "fd")
++
++
++def test_capture_invalid_rejected():
++    """Unknown values are still rejected."""
++    with pytest.raises(ValueError, match="capture"):
++        CliRunner(capture="invalid")  # type: ignore[arg-type]
++    with pytest.raises(ValueError, match="capture"):
++        CliRunner(capture="unknown")  # type: ignore[arg-type]
++
++
++@needs_fd_capture
++def test_capture_adaptive_os_write():
++    """On POSIX, 'adaptive' captures fd-level writes like 'fd'."""
++
++    @click.command()
++    def cli():
++        click.echo("python stdout")
++        os.write(1, b"fd stdout\n")
++        os.write(2, b"fd stderr\n")
++
++    runner = CliRunner(capture="adaptive")
++    result = runner.invoke(cli)
++    assert "python stdout" in result.stdout
++    assert "fd stdout" in result.stdout
++    assert "fd stderr" in result.stderr
++
++
++@needs_fd_capture
++def test_capture_adaptive_stale_reference():
++    """On POSIX, 'adaptive' captures stale fd writes like 'fd'."""
++    stale_stdout = open(1, "w", closefd=False)
++
++    @click.command()
++    def cli():
++        stale_stdout.write("stale write\n")
++        stale_stdout.flush()
++        click.echo("normal write")
++
++    runner = CliRunner(capture="adaptive")
++    result = runner.invoke(cli)
++    assert "normal write" in result.stdout
++    assert "stale write" in result.stdout
++
++
++@needs_fd_capture
++def test_capture_adaptive_stderr_separation():
++    """On POSIX, 'adaptive' preserves stdout/stderr separation."""
++
++    @click.command()
++    def cli():
++        click.echo("py-out")
++        click.echo("py-err", err=True)
++        os.write(1, b"fd-out\n")
++        os.write(2, b"fd-err\n")
++
++    runner = CliRunner(capture="adaptive")
++    result = runner.invoke(cli)
++    assert "py-out" in result.stdout
++    assert "fd-out" in result.stdout
++    assert "py-err" in result.stderr
++    assert "fd-err" in result.stderr
++    assert "py-out" in result.output
++    assert "py-err" in result.output
++    assert "fd-out" in result.output
++    assert "fd-err" in result.output
++
++
++@needs_fd_capture
++def test_capture_adaptive_nesting():
++    """Nested CliRunner.invoke() with adaptive capture works."""
++
++    @click.command("inner")
++    def inner_cli():
++        click.echo("inner")
++
++    @click.command("outer")
++    def outer_cli():
++        click.echo("outer")
++        os.write(1, b"outer fd\n")
++        inner_runner = CliRunner(capture="adaptive")
++        inner_result = inner_runner.invoke(inner_cli)
++        click.echo(f"inner captured: {inner_result.stdout.strip()}")
++
++    runner = CliRunner(capture="adaptive")
++    result = runner.invoke(outer_cli)
++    assert "outer" in result.stdout
++    assert "outer fd" in result.stdout
++    assert "inner captured: inner" in result.stdout
++
++
++@needs_fd_capture
++def test_capture_adaptive_fileno():
++    """On POSIX, 'adaptive' exposes fileno() like 'fd'."""
++
++    @click.command()
++    def cli():
++        click.echo("ok")
++        # fileno() should work (like fd mode), not raise UnsupportedOperation
++        fd = sys.stdout.fileno()
++        assert fd >= 0
++
++    runner = CliRunner(capture="adaptive")
++    result = runner.invoke(cli)
++    assert result.exit_code == 0
++    assert "ok" in result.stdout

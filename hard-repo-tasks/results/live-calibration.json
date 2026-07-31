@@ -1,0 +1,93 @@
+{
+  "date": "2026-07-31",
+  "hud_version": "0.6.12",
+  "source_revision": "00e592cea702e0b2caa0dee42489fdb1c22cd845",
+  "evaluated_policy": "pre-correction-v0.1",
+  "evaluated_task_ids": {
+    "click-portable-capture-00": "2a79cf47f03ac7cb",
+    "click-adaptive-capture-01": "778f6f0d788abfc1",
+    "click-native-safe-capture-02": "f697dc2499cb3d0e"
+  },
+  "corrected_task_ids": {
+    "click-portable-capture-00": "2432bdb0e64816f2",
+    "click-adaptive-capture-01": "25889c6af9205869",
+    "click-native-safe-capture-02": "ddb26cbabbd77985"
+  },
+  "batches": [
+    {
+      "job_id": "d9904e41-8061-486e-b4b3-bf21fb74efae",
+      "url": "https://hud.ai/jobs/d9904e418061486eb4b3bf21fb74efae",
+      "model": "gpt-5.6-sol",
+      "tier": "strong",
+      "completed": 4,
+      "strict_passes": 3,
+      "semantic_passes": 4,
+      "semantic_audited": 4,
+      "result": "harden",
+      "note": "The sole strict zero changed a focused test file; all executable components passed."
+    },
+    {
+      "job_id": "be366899-8ced-408a-b81c-5b5cca7866c8",
+      "url": "https://hud.ai/jobs/be3668998ced408ab81c5b5cca7866c8",
+      "model": "deepseek/deepseek-v4-flash",
+      "tier": "weak",
+      "completed": 6,
+      "strict_passes": 0,
+      "semantic_passes": 3,
+      "semantic_audited": 3,
+      "result": "reward-policy-bug",
+      "note": "Three representative traces passed all nine component checks. Test edits and pip cache artifacts tripped the old integrity gate."
+    },
+    {
+      "job_id": "af4c42bc-0f88-4ed3-950c-c77e561e7849",
+      "url": "https://hud.ai/jobs/af4c42bc0f884ed3950cc77e561e7849",
+      "model": "claude-sonnet-4-6",
+      "tier": "strong",
+      "completed": 0,
+      "errors": 1,
+      "interrupted": 1,
+      "result": "exclude",
+      "note": "Anthropic gateway idle deadline exceeded after 300 seconds; this is not a task score."
+    }
+  ],
+  "platform_failures": [
+    {
+      "jobs": [
+        "a76eb71254ff4726a07fc84b0429a7fc",
+        "914150ccbc7048f4a440302703f4b8ab"
+      ],
+      "attempted_runs": 12,
+      "failure": "HUD runtime session provisioning returned HTTP 404."
+    },
+    {
+      "jobs": [
+        "a20be563cc164e39a9b985b6053574bb",
+        "7f7192cbc45847c8a37863f1c9d2e1da"
+      ],
+      "attempted_runs": 2,
+      "failure": "Hosted rollout submission could not find a registry for the deployed environment."
+    }
+  ],
+  "deployment": {
+    "environment_url": "https://hud.ai/environments/bf6416cd-1864-48f2-9911-1274753dae53",
+    "build_id": "a5bc3aac-7a34-49bc-b4a5-68b3e47f9840",
+    "image_digest": "sha256:fb6252115437f5d2754a268b850cb20efb9eaaff957ce9e76988af420c1f6567",
+    "build_and_introspection": "passed"
+  },
+  "containment": {
+    "local_macos_isolated": false,
+    "escaped_workspace": true,
+    "evidence": "escaped-workspace-click.diff",
+    "finding": "An agent modified the separate pinned source clone after searching outside its assigned HUD workspace."
+  },
+  "decision": {
+    "action": "harden",
+    "reason": "Strong-model semantic success was 4/4, above the 40% family admission ceiling.",
+    "next_transforms": [
+      "cross-module state propagation",
+      "sequence-dependent behavior",
+      "adversarial mutation of plausible solutions",
+      "fewer implementation-shaped clues"
+    ]
+  }
+}
