@@ -177,3 +177,41 @@ Intellect Verifiers.
     of silently dropping it.
   - Validation passed for 12 connected notes: five concepts, five sources, and
     two syntheses. The full suite now has six passing tests, and Ruff passes.
+- Task variation review:
+  - Installed the official HUD `hud-environment-builder` skill inside this
+    experiment with `npx skills add https://docs.hud.ai`. The copied skill and
+    `skills-lock.json` are versioned with the experiment.
+  - Corrected the shorthand description of Parallax. It synthesizes behavior
+    absent upstream and withholds selected gold implementation sites. It is not
+    direct upstream restoration, but surviving gold structure can still reduce
+    the task to constrained completion.
+  - Separated exact answer leakage, gold-shadow leakage, public-substrate
+    familiarity, legitimate reusable knowledge, and task-family overfitting.
+  - Reviewed DeepSWE at
+    `e016041a6ccf8da29906afc9a3f5a8df940a1f78`. Its instruction, commit,
+    image, test patch, test IDs, runner, and verifier form one validated tuple.
+    Ten paraphrases are correlated robustness conditions, not ten independent
+    benchmark tasks.
+  - Reviewed Microsoft Evolving Intent at
+    `993d6be9597ac03854b46362ccd647eb1bfd267a`. Its useful trick is backward
+    construction: reveal, revision, and switch events end at the exact source
+    intent, allowing the original terminal verifier to remain unchanged.
+  - The trick is incomplete for stateful software work. Returning to the same
+    intent does not undo non-commutative edits, migrations, messages, network
+    calls, or other irreversible effects. Read-only precursors or staged
+    read-only-to-transactional execution are the safe default.
+  - Mapped limitations across every task component
+    \(T=(I,s_0,G,C,V,B,M)\). No reviewed provider makes the full semantics,
+    reset distribution, policies, budget accounting, and provenance mandatory
+    and portable.
+  - Cost evidence points to expert assurance as the bottleneck. TheAgentCompany
+    reports about 3,000 person-hours for 175 tasks; SPICE estimates about 2,265
+    engineer-hours and more than $170,000 for the SWE-bench Verified labeling
+    campaign. Cheap candidate generation shifts work into rejection,
+    behavioral verification, adversarial audits, calibration, and governance.
+  - Added `parallax.variants`, a typed model for task components, intent
+    relations, state modes, verifier policies, anchored intent trajectories,
+    ten causal variant families, and deterministic admission checks.
+  - Added source and concept notes plus four syntheses covering counterfactual
+    contamination, provider limitations, construction economics, and
+    controlled task variation.
