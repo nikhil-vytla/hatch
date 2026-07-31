@@ -25,16 +25,32 @@ def main() -> None:
         if row["accuracy"] is not None
         and row["provider_errors"] + row["harness_errors"] == 0
     }
-    hardest = min(valid, key=lambda name: valid[name]["accuracy"]) if valid else None
-    summary["next_intervention"] = {
-        "condition": hardest,
-        "intervention": "canonical-active-intent-ledger-v1" if hardest else None,
-        "reason": (
-            "lowest valid evolving-condition accuracy"
-            if hardest
-            else "no valid evolving condition available"
-        ),
+    repeat_accuracy = summary["conditions"].get("repeat", {}).get("accuracy")
+    degraded = {
+        name: row
+        for name, row in valid.items()
+        if repeat_accuracy is not None and row["accuracy"] < repeat_accuracy
     }
+    hardest = min(degraded, key=lambda name: degraded[name]["accuracy"]) if degraded else None
+    if hardest:
+        next_intervention = {
+            "condition": hardest,
+            "intervention": "canonical-active-intent-ledger-v1",
+            "reason": "lowest evolving-condition accuracy below matched control",
+        }
+    elif valid:
+        next_intervention = {
+            "condition": None,
+            "intervention": "increase-transition-depth",
+            "reason": "all valid evolving conditions are saturated at the matched control",
+        }
+    else:
+        next_intervention = {
+            "condition": None,
+            "intervention": None,
+            "reason": "no valid evolving condition available",
+        }
+    summary["next_intervention"] = next_intervention
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
