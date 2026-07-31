@@ -149,3 +149,16 @@ Intellect Verifiers.
   - `uv run ruff check .`: all checks passed.
   - The admission matrix rerun passed all five checks for all 12 tasks.
   - The generated taskset loaded all 12 rows against Verifiers v1.
+- Environment and task research:
+  - Added `RL_ENVIRONMENT_KNOWLEDGE_BASE.md` so conceptual research does not
+    remain trapped in chat transcripts.
+  - Recorded formal and operational definitions, environment and task quality
+    criteria, an admission checklist, working hypotheses, primary sources, and
+    confidence limits.
+  - Kept environment, task, harness, rollout, reward, and metrics separate.
+    Current platforms draw these package boundaries differently, but the
+    distinction prevents runtime behavior from being mistaken for task design.
+  - Direct X search returned HTTP 403. The available tool catalog exposes no
+    browser or computer-use integration, so this run cannot inherit the user's
+    authenticated browser session. Used accessible primary papers, blogs, and
+    cross-posts and recorded the X source gap instead of inferring post content.
