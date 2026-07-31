@@ -217,3 +217,14 @@ Intellect Verifiers.
     controlled task variation.
   - Final validation: 11 tests passed, Ruff passed, and the knowledge validator
     accepted 25 linked notes: eight concepts, 11 sources, and six syntheses.
+  - Added an end-to-end contract-planning test that serializes a source task,
+    invokes `scripts/plan_variants.py`, reloads ten contracts, and confirms they
+    remain one source-task cluster.
+  - Added an Evolving Intent integration test that compiles reveal, revision,
+    and function-switch events back to the exact source goal and constraints,
+    then admits the staged variant with the original verifier.
+  - This validates the current modeling layer, not a full generated-agent
+    rollout. Natural-language generation, repository-state transformation,
+    verifier transformation, runtime execution, and grading are still missing.
+  - Final validation after these additions: 13 tests passed, Ruff passed, and
+    all 25 knowledge notes remained valid.
