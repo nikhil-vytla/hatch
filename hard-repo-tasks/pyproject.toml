@@ -9,6 +9,11 @@ dependencies = []
 [project.scripts]
 parallax = "parallax.cli:main"
 
+[project.optional-dependencies]
+verifiers = [
+    "verifiers>=0.2.1",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

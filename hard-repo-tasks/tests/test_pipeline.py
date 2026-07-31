@@ -190,4 +190,4 @@ def test_curriculum_rejects_semantically_saturated_family() -> None:
     decision = decide_curriculum(observations)
     assert decision.action == "harden"
     assert decision.strong_semantic_rate == 1.0
-    assert "cross-module state propagation" in decision.next_transforms
+    assert "add cross-module state propagation" in decision.next_transforms
