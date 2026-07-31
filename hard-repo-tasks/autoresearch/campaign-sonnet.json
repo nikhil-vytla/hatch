@@ -1,0 +1,42 @@
+{
+  "campaign_id": "intent-cycle-1-sonnet",
+  "conditions": [
+    "static",
+    "repeat",
+    "reveal",
+    "revision",
+    "switch",
+    "combined"
+  ],
+  "max_calls_non_static": 4,
+  "model": "claude-sonnet-4-5",
+  "protocol_version": "parallax-autoresearch-v1",
+  "repetitions": 2,
+  "seed": 0,
+  "tasks": [
+    {
+      "generator_version": "intent-arithmetic-v1",
+      "penalty": 37,
+      "points_per_unit": 8,
+      "task_id": "workshop-alpha",
+      "teams": 7,
+      "units_per_team": 13
+    },
+    {
+      "generator_version": "intent-arithmetic-v1",
+      "penalty": 29,
+      "points_per_unit": 6,
+      "task_id": "workshop-beta",
+      "teams": 9,
+      "units_per_team": 11
+    },
+    {
+      "generator_version": "intent-arithmetic-v1",
+      "penalty": 45,
+      "points_per_unit": 7,
+      "task_id": "workshop-gamma",
+      "teams": 8,
+      "units_per_team": 14
+    }
+  ]
+}
