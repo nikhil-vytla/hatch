@@ -13,6 +13,7 @@ from parallax.autoresearch import (
     append_record,
     default_tasks,
     extract_integer,
+    generate_lookup_tasks,
     load_records,
     render_conversation,
     summarize_records,
@@ -171,3 +172,12 @@ def test_lookup_task_is_static_solvable_and_anchor_preserving() -> None:
     assert len(combined.turns) == len(ledger.turns) == 7
     assert "Current intent ledger" in ledger.turns[-1]
     assert verify_response("The routing code is RAVEN.", "RAVEN") == ("RAVEN", 1.0)
+
+
+def test_lookup_task_generator_is_deterministic_and_dense() -> None:
+    first = generate_lookup_tasks(count=4, rows_per_task=18, seed=42)
+    second = generate_lookup_tasks(count=4, rows_per_task=18, seed=42)
+    assert first == second
+    assert len({task.digest() for task in first}) == 4
+    assert all(len(task.records) == 18 for task in first)
+    assert all(task.expected.startswith("CODE") for task in first)
