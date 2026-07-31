@@ -284,6 +284,7 @@ by the Verifiers package.
 uv sync
 uv run pytest
 uv run ruff check .
+uv run python scripts/check_knowledge.py
 
 python recipes/build_click_portable.py
 uv run parallax compile \
@@ -294,6 +295,11 @@ uv run parallax compile \
 uv run python scripts/admit.py \
   recipes/click /path/to/pinned/click \
   --out results/admission.json
+
+# Emit ten causal variant contracts for a typed source task.
+uv run python scripts/plan_variants.py \
+  /path/to/task-spec.json \
+  --out runs/variant-contracts.json
 
 # Optional integrations.
 uv sync --extra verifiers
