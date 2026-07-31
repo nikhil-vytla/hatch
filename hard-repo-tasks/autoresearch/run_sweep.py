@@ -8,6 +8,7 @@ from pathlib import Path
 from chat_env import env, intent_chat
 from hud import Chat, LocalRuntime
 from hud.agents import create_agent
+from hud.telemetry.exporter import flush
 
 from parallax.autoresearch import (
     CampaignManifest,
@@ -164,3 +165,4 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+    flush()
