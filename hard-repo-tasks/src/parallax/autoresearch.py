@@ -17,6 +17,8 @@ class IntentCondition(StrEnum):
     REVISION = "revision"
     SWITCH = "switch"
     COMBINED = "combined"
+    REPEAT_DEEP = "repeat-deep"
+    COMBINED_DEEP = "combined-deep"
 
 
 class RunStatus(StrEnum):
@@ -73,8 +75,8 @@ class CampaignManifest:
     def __post_init__(self) -> None:
         if self.repetitions < 1:
             raise ValueError("repetitions must be positive")
-        if self.max_calls_non_static != 4:
-            raise ValueError("cycle 1 requires four calls per non-static condition")
+        if self.max_calls_non_static < 2:
+            raise ValueError("multi-turn campaigns require at least two calls")
         if not self.tasks:
             raise ValueError("at least one task is required")
 
@@ -209,6 +211,50 @@ def render_conversation(
             ),
             "Give only the integer final score using the corrected rate and penalty.",
         )
+    elif condition == IntentCondition.REPEAT_DEEP:
+        turns = (
+            full,
+            "No facts or requirements have changed. Continue with the same task.",
+            "There are still no changes. Keep the original values and objective.",
+            "Confirm that the original team count remains active.",
+            "Confirm that the original unit rate and penalty remain active.",
+            "No values have been superseded. Prepare the final calculation.",
+            "Give only the final integer answer for the unchanged task.",
+        )
+    elif condition == IntentCondition.COMBINED_DEEP:
+        wrong_teams = task.teams + 2
+        wrong_units = task.units_per_team - 3
+        wrong_rate = task.points_per_unit + 4
+        wrong_penalty = task.penalty + 18
+        turns = (
+            (
+                f"A workshop has {wrong_teams} teams. Each team completes "
+                f"{task.units_per_team} units at {wrong_rate} points per unit. Start by "
+                "finding the gross score."
+            ),
+            (
+                f"Switch objectives: use {wrong_units} units per team and report only the "
+                "total number of units, not a score."
+            ),
+            (
+                f"Correction: there are {task.teams} teams, not {wrong_teams}. Now return "
+                f"to the score and subtract a penalty of {wrong_penalty} points."
+            ),
+            (
+                "Switch again: explain which values are currently active, but do not "
+                "finalize the score."
+            ),
+            (
+                f"Corrections: each team completes {task.units_per_team} units, not "
+                f"{wrong_units}, and each unit earns {task.points_per_unit} points, not "
+                f"{wrong_rate}."
+            ),
+            (
+                f"Final correction: the fixed penalty is {task.penalty}, not "
+                f"{wrong_penalty}. Return to the original final-score objective."
+            ),
+            "Give only the integer final score using the latest corrected values.",
+        )
     else:
         raise ValueError(f"unsupported condition: {condition}")
 
@@ -241,7 +287,15 @@ def validate_conversation(task: ArithmeticTask, variant: ConversationVariant) ->
         raise ValueError("conversation source digest does not match task")
     if variant.expected != task.expected:
         raise ValueError("conversation verifier target does not match source task")
-    expected_calls = 1 if variant.condition == IntentCondition.STATIC else 4
+    if variant.condition == IntentCondition.STATIC:
+        expected_calls = 1
+    elif variant.condition in {
+        IntentCondition.REPEAT_DEEP,
+        IntentCondition.COMBINED_DEEP,
+    }:
+        expected_calls = 7
+    else:
+        expected_calls = 4
     if len(variant.turns) != expected_calls:
         raise ValueError(
             f"condition {variant.condition!r} requires {expected_calls} calls, "
@@ -323,14 +377,15 @@ def summarize_records(records: Iterable[RunRecord]) -> dict[str, Any]:
         }
 
     paired: dict[str, dict[str, Any]] = {}
-    repeat = {
-        (row.task_id, row.repetition): row
-        for row in by_condition.get(IntentCondition.REPEAT, [])
-        if row.reward is not None
-    }
     for condition, condition_rows in by_condition.items():
-        if condition in {IntentCondition.STATIC, IntentCondition.REPEAT} or "+" in condition:
+        if condition == IntentCondition.STATIC or condition.startswith("repeat") or "+" in condition:
             continue
+        control = "repeat-deep" if condition.endswith("-deep") else "repeat"
+        repeat = {
+            (row.task_id, row.repetition): row
+            for row in by_condition.get(control, [])
+            if row.reward is not None
+        }
         pairs = [
             (repeat[(row.task_id, row.repetition)], row)
             for row in condition_rows
