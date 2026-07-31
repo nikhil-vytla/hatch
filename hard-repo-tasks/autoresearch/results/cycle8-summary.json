@@ -1,0 +1,45 @@
+{
+  "conditions": {
+    "combined-buried": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 12,
+      "successes": 12,
+      "valid_runs": 12
+    },
+    "repeat-buried": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 12,
+      "successes": 12,
+      "valid_runs": 12
+    },
+    "static": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 12,
+      "successes": 12,
+      "valid_runs": 12
+    }
+  },
+  "next_intervention": {
+    "condition": null,
+    "intervention": "increase-transition-depth",
+    "reason": "all valid evolving conditions are saturated at the matched control"
+  },
+  "paired_against_repeat": {
+    "combined-buried": {
+      "degraded_pairs": 0,
+      "improved_pairs": 0,
+      "mean_delta_vs_repeat": 0.0,
+      "pairs": 12
+    }
+  },
+  "runs": 36
+}
