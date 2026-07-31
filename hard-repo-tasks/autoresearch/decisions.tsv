@@ -1,0 +1,5 @@
+ts	phase	decision	why	evidence	result
+2026-07-31T19:01:54Z	frame	scoped cycle 1 to three arithmetic tasks and six conversation conditions	the execution loop must work before repository and verifier transformations earn complexity	autoresearch/PLAYBOOK.md	definition of done frozen
+2026-07-31T19:01:54Z	frame	made repeat the primary control for evolving conditions	static and evolving conversations otherwise differ in both intent changes and model-call count	autoresearch/PLAYBOOK.md	budget confound addressed in protocol
+2026-07-31T19:01:54Z	architecture	deferred repository mutation and transformed verifiers from cycle 1	four independent reviewers agreed the current symbolic variant layer is disconnected from execution	autoresearch/PLAYBOOK.md	smallest executable vertical slice selected
+2026-07-31T19:01:54Z	architecture	chose HUD Chat as the multi-turn execution boundary	HUD v6 documents persistent message history and one fresh model run per user turn	https://docs.hud.ai/v6/advanced/extending	open until smoke run
