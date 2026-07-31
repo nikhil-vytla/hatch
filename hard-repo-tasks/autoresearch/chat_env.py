@@ -9,7 +9,7 @@ env = Environment(name="parallax-intent-chat")
 
 
 @env.template()
-async def intent_chat(messages: list[PromptMessage], expected: int):
+async def intent_chat(messages: list[PromptMessage], expected: int | str):
     answer = yield messages
     _parsed, reward = verify_response(str(answer or ""), expected)
     yield reward

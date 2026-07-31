@@ -6,6 +6,8 @@ from pathlib import Path
 from parallax.autoresearch import (
     CampaignManifest,
     IntentCondition,
+    LookupRecord,
+    LookupTask,
     RunRecord,
     RunStatus,
     append_record,
@@ -142,3 +144,30 @@ def test_campaign_digest_changes_with_protocol() -> None:
     )
     changed = replace(campaign, model="other-model")
     assert campaign.digest() != changed.digest()
+
+
+def test_lookup_task_is_static_solvable_and_anchor_preserving() -> None:
+    task = LookupTask(
+        task_id="routing",
+        records=(
+            LookupRecord("north", "standard", "email", "AMBER"),
+            LookupRecord("south", "priority", "chat", "BIRCH"),
+            LookupRecord("east", "priority", "chat", "RAVEN"),
+        ),
+        anchor_region="east",
+        anchor_tier="priority",
+        anchor_channel="chat",
+    )
+    static = render_conversation(task, IntentCondition.STATIC)
+    combined = render_conversation(task, IntentCondition.COMBINED_DEEP)
+    ledger = render_conversation(
+        task,
+        IntentCondition.COMBINED_DEEP,
+        intent_ledger=True,
+    )
+    assert task.expected == "RAVEN"
+    assert static.expected == combined.expected == ledger.expected
+    assert len(static.turns) == 1
+    assert len(combined.turns) == len(ledger.turns) == 7
+    assert "Current intent ledger" in ledger.turns[-1]
+    assert verify_response("The routing code is RAVEN.", "RAVEN") == ("RAVEN", 1.0)

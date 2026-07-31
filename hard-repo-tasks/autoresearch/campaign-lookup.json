@@ -1,0 +1,63 @@
+{
+  "campaign_id": "intent-cycle-6-lookup",
+  "conditions": [
+    "static",
+    "repeat-deep",
+    "combined-deep"
+  ],
+  "max_calls_non_static": 7,
+  "model": "claude-haiku-4-5",
+  "protocol_version": "parallax-autoresearch-v1",
+  "repetitions": 2,
+  "seed": 0,
+  "tasks": [
+    {
+      "anchor_channel": "chat",
+      "anchor_region": "east",
+      "anchor_tier": "priority",
+      "generator_version": "intent-lookup-v1",
+      "kind": "lookup",
+      "records": [
+        {"channel": "email", "code": "AMBER", "region": "north", "tier": "standard"},
+        {"channel": "chat", "code": "BIRCH", "region": "south", "tier": "priority"},
+        {"channel": "email", "code": "CEDAR", "region": "east", "tier": "standard"},
+        {"channel": "chat", "code": "RAVEN", "region": "east", "tier": "priority"},
+        {"channel": "chat", "code": "TOPAZ", "region": "north", "tier": "priority"},
+        {"channel": "email", "code": "WILLOW", "region": "south", "tier": "standard"}
+      ],
+      "task_id": "routing-alpha"
+    },
+    {
+      "anchor_channel": "email",
+      "anchor_region": "north",
+      "anchor_tier": "standard",
+      "generator_version": "intent-lookup-v1",
+      "kind": "lookup",
+      "records": [
+        {"channel": "chat", "code": "FALCON", "region": "east", "tier": "priority"},
+        {"channel": "email", "code": "JASPER", "region": "south", "tier": "priority"},
+        {"channel": "email", "code": "COBALT", "region": "north", "tier": "standard"},
+        {"channel": "chat", "code": "LINDEN", "region": "north", "tier": "priority"},
+        {"channel": "email", "code": "ORCHID", "region": "east", "tier": "standard"},
+        {"channel": "chat", "code": "SABLE", "region": "south", "tier": "standard"}
+      ],
+      "task_id": "routing-beta"
+    },
+    {
+      "anchor_channel": "email",
+      "anchor_region": "south",
+      "anchor_tier": "priority",
+      "generator_version": "intent-lookup-v1",
+      "kind": "lookup",
+      "records": [
+        {"channel": "chat", "code": "BRONZE", "region": "north", "tier": "standard"},
+        {"channel": "email", "code": "EMBER", "region": "east", "tier": "priority"},
+        {"channel": "email", "code": "MAPLE", "region": "south", "tier": "priority"},
+        {"channel": "chat", "code": "ONYX", "region": "east", "tier": "standard"},
+        {"channel": "email", "code": "PEARL", "region": "north", "tier": "priority"},
+        {"channel": "chat", "code": "SUMAC", "region": "south", "tier": "standard"}
+      ],
+      "task_id": "routing-gamma"
+    }
+  ]
+}
