@@ -23,6 +23,8 @@ class IntentCondition(StrEnum):
     COMBINED_DEEP = "combined-deep"
     REPEAT_BURIED = "repeat-buried"
     COMBINED_BURIED = "combined-buried"
+    REPEAT_TABLELAST = "repeat-tablelast"
+    COMBINED_TABLELAST = "combined-tablelast"
 
 
 class RunStatus(StrEnum):
@@ -396,6 +398,8 @@ def validate_conversation(task: SourceTask, variant: ConversationVariant) -> Non
     elif base_condition in {
         IntentCondition.REPEAT_BURIED,
         IntentCondition.COMBINED_BURIED,
+        IntentCondition.REPEAT_TABLELAST,
+        IntentCondition.COMBINED_TABLELAST,
     }:
         expected_calls = 12
     else:
@@ -498,6 +502,8 @@ def summarize_records(records: Iterable[RunRecord]) -> dict[str, Any]:
             control = "repeat-deep"
         elif condition.endswith("-buried"):
             control = "repeat-buried"
+        elif condition.endswith("-tablelast"):
+            control = "repeat-tablelast"
         else:
             control = "repeat"
         repeat = {
@@ -585,6 +591,11 @@ def _render_lookup_conversation(
         IntentCondition.COMBINED_BURIED,
     }:
         turns = _buried_lookup_turns(task, condition)
+    elif condition in {
+        IntentCondition.REPEAT_TABLELAST,
+        IntentCondition.COMBINED_TABLELAST,
+    }:
+        turns = _tablelast_lookup_turns(task, condition)
     else:
         raise ValueError(f"lookup tasks do not support condition {condition!r}")
 
@@ -620,6 +631,24 @@ def _render_lookup_conversation(
     return variant
 
 
+def _disjoint_records(task: LookupTask, need: int) -> list[LookupRecord]:
+    """Return records sharing no field value with the anchor request."""
+    disjoint = [
+        record
+        for record in task.records
+        if record.code != task.expected
+        and record.region != task.anchor_region
+        and record.tier != task.anchor_tier
+        and record.channel != task.anchor_channel
+    ]
+    if len(disjoint) < need:
+        raise ValueError(
+            f"this lookup conversation requires {need} records sharing no "
+            "field with the anchor"
+        )
+    return disjoint
+
+
 def _buried_lookup_turns(
     task: LookupTask, condition: IntentCondition
 ) -> tuple[str, ...]:
@@ -630,19 +659,7 @@ def _buried_lookup_turns(
     alone: the last statement of each anchor field sits at least seven turns
     before the final question, behind side lookups that plant competing codes.
     """
-    disjoint = [
-        record
-        for record in task.records
-        if record.code != task.expected
-        and record.region != task.anchor_region
-        and record.tier != task.anchor_tier
-        and record.channel != task.anchor_channel
-    ]
-    if len(disjoint) < 6:
-        raise ValueError(
-            "buried lookup conversations require six records sharing no field "
-            "with the anchor"
-        )
+    disjoint = _disjoint_records(task, 6)
     first, second = disjoint[0], disjoint[1]
     side = disjoint[2:6]
 
@@ -715,6 +732,95 @@ def _buried_lookup_turns(
         ),
         side_lookup(side[3]),
         "Return to the active request. Give only its routing code.",
+    )
+
+
+def _tablelast_lookup_turns(
+    task: LookupTask, condition: IntentCondition
+) -> tuple[str, ...]:
+    """Render 12-turn conversations that withhold the table until the end.
+
+    Because no reply can contain any routing code before the final turn, the
+    model cannot resolve the answer early and copy it from its own replies.
+    It must carry the active request itself across the interference window.
+    """
+    disjoint = _disjoint_records(task, 6)
+    first, second = disjoint[0], disjoint[1]
+    side = disjoint[2:6]
+
+    def side_note(record: LookupRecord) -> str:
+        return (
+            "Side note that does not change the active request: a separate "
+            f"ticket mentioned region={record.region}, tier={record.tier}, "
+            f"channel={record.channel}. Acknowledge it but do not adopt it."
+        )
+
+    final = (
+        f"{_lookup_table(task)}\n\nGive only the routing code for the active "
+        "request."
+    )
+    if condition == IntentCondition.REPEAT_TABLELAST:
+        return (
+            (
+                "You will receive the routing table only at the end of this "
+                f"conversation. Current request: region={task.anchor_region}, "
+                f"tier={task.anchor_tier}, channel={task.anchor_channel}. "
+                "Remember it and do not answer until the table arrives."
+            ),
+            "No routing fields have changed. Keep the original request active.",
+            side_note(side[0]),
+            "Still no changes to the active request. Do not adopt any "
+            "side-note request.",
+            side_note(side[1]),
+            "Confirm the active request is still the original one, without "
+            "naming its fields.",
+            side_note(side[2]),
+            "For history only: no request has been superseded because none "
+            "changed.",
+            side_note(side[3]),
+            "No value has been superseded. Keep the active request in mind.",
+            "The routing table arrives next. Prepare to look up the active "
+            "request.",
+            final,
+        )
+    return (
+        (
+            "You will receive the routing table only at the end of this "
+            f"conversation. Start with this request: region={first.region}, "
+            f"tier={first.tier}, channel={first.channel}. Remember it and do "
+            "not answer until the table arrives."
+        ),
+        (
+            f"Switch requests: now use region={second.region}, "
+            f"tier={second.tier}, channel={second.channel}. Do not answer yet."
+        ),
+        (
+            f"Correction: the active region is {task.anchor_region}, not "
+            f"{second.region}. Keep the other current fields for now."
+        ),
+        (
+            f"Correction: the active tier is {task.anchor_tier}, not "
+            f"{second.tier}. Keep tracking the current request."
+        ),
+        (
+            f"Final correction: the active channel is {task.anchor_channel}, "
+            f"not {second.channel}. The active request is now fixed. Continue "
+            "to wait for the table."
+        ),
+        side_note(side[0]),
+        side_note(side[1]),
+        (
+            "For history only: earlier turns mentioned "
+            f"region={first.region}, region={second.region}, "
+            f"tier={second.tier}, and channel={second.channel}. All of those "
+            "are superseded. Confirm the active request is unchanged, without "
+            "naming its fields."
+        ),
+        side_note(side[2]),
+        "Do not change anything. Keep the active request in mind while "
+        "handling side notes.",
+        side_note(side[3]),
+        final,
     )
 
 

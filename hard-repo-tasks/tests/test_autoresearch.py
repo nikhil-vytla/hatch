@@ -55,7 +55,12 @@ def _record(
 
 def test_all_conditions_preserve_the_source_verifier_target() -> None:
     task = default_tasks()[0]
-    buried = {IntentCondition.REPEAT_BURIED, IntentCondition.COMBINED_BURIED}
+    buried = {
+        IntentCondition.REPEAT_BURIED,
+        IntentCondition.COMBINED_BURIED,
+        IntentCondition.REPEAT_TABLELAST,
+        IntentCondition.COMBINED_TABLELAST,
+    }
     for condition in IntentCondition:
         if condition in buried:
             with pytest.raises(ValueError, match="unsupported condition"):
@@ -222,6 +227,33 @@ def test_buried_lookup_side_questions_share_no_field_with_the_anchor() -> None:
         assert record.tier != task.anchor_tier
         assert record.channel != task.anchor_channel
         assert record.code != task.expected
+
+
+def test_tablelast_lookup_conditions_withhold_every_code_until_the_end() -> None:
+    tasks = generate_lookup_tasks(count=12, rows_per_task=24, seed=42)
+    for task in tasks:
+        anchor_values = (task.anchor_region, task.anchor_tier, task.anchor_channel)
+        repeat = render_conversation(task, IntentCondition.REPEAT_TABLELAST)
+        combined = render_conversation(task, IntentCondition.COMBINED_TABLELAST)
+        assert repeat.expected == combined.expected == task.expected
+        assert len(repeat.turns) == len(combined.turns) == 12
+        for variant in (repeat, combined):
+            # No routing code exists anywhere before the final turn, so the
+            # model cannot resolve the answer early and copy it forward.
+            for turn in variant.turns[:-1]:
+                assert "CODE" not in turn
+                assert "Routing table" not in turn
+            assert "Routing table" in variant.turns[-1]
+            assert task.expected in variant.turns[-1]
+        # The evolving arm fixes the anchor by turn five and never restates
+        # it until the table arrives.
+        for value in anchor_values:
+            assert any(value in turn for turn in combined.turns[:5])
+        for turn in combined.turns[5:-1]:
+            assert not any(value in turn for value in anchor_values)
+        # The matched control names the anchor only in its opening turn.
+        for turn in repeat.turns[1:-1]:
+            assert not any(value in turn for value in anchor_values)
 
 
 def test_lookup_task_generator_is_deterministic_and_dense() -> None:
