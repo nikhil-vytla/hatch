@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -149,3 +153,98 @@ def test_behavior_change_requires_a_transformed_verifier() -> None:
     admission = admit_variant(source, variant)
     assert not admission.admitted
     assert "original verifier cannot be reused" in " ".join(admission.violations)
+
+
+def test_plan_variants_cli_emits_one_cluster_with_ten_contracts(tmp_path: Path) -> None:
+    source = _source()
+    source_path = tmp_path / "source.json"
+    output_path = tmp_path / "contracts.json"
+    source_path.write_text(json.dumps(source.to_dict()))
+    root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/plan_variants.py",
+            str(source_path),
+            "--out",
+            str(output_path),
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(output_path.read_text())
+    assert payload["source"]["task_id"] == source.task_id
+    assert payload["analysis_unit"] == "source_task_cluster"
+    assert len(payload["variant_contracts"]) == 10
+    assert {row["family"] for row in payload["variant_contracts"]} == {
+        blueprint.family for blueprint in default_variant_blueprints()
+    }
+    assert not any(
+        row["independent_benchmark_task"] for row in payload["variant_contracts"]
+    )
+
+
+def test_evolving_intent_maps_to_an_admitted_staged_variant() -> None:
+    source = _source()
+    candidate = replace(
+        source,
+        task_id="duration-parser.evolving",
+        instruction="Intent arrives through a four-turn conversation.",
+        budget=replace(source.budget, max_turns=4),
+    )
+    trajectory = AnchorTrajectory(
+        initial_goal="Map the parser architecture.",
+        initial_values=(("constraint:0", "Rename the public API."),),
+        initially_revealed=("constraint:0",),
+        events=(
+            IntentEvent(
+                turn=2,
+                kind=IntentEventKind.REVEAL,
+                target="constraint:1",
+                before=None,
+                after="Add no dependencies.",
+                message="Do not add dependencies.",
+            ),
+            IntentEvent(
+                turn=3,
+                kind=IntentEventKind.REVISE,
+                target="constraint:0",
+                before="Rename the public API.",
+                after="Keep the public API stable.",
+                message="Correction: keep the public API stable.",
+            ),
+            IntentEvent(
+                turn=4,
+                kind=IntentEventKind.SWITCH,
+                target="goal",
+                before="Map the parser architecture.",
+                after="Parse decimal hour durations.",
+                message="Now implement decimal-hour parsing.",
+            ),
+        ),
+    )
+    variant = TaskVariant(
+        source_task_id=source.task_id,
+        variant_id=candidate.task_id,
+        source_digest=source.digest(),
+        spec=candidate,
+        declared_components=(TaskComponent.INSTRUCTION, TaskComponent.BUDGET),
+        relation=IntentRelation.PRESERVE,
+        state_mode=StateMode.STAGED,
+        verifier_policy=VerifierPolicy.REUSE,
+        generator_version="test",
+        trajectory=trajectory,
+    )
+
+    admission = admit_variant(source, variant)
+    assert admission.admitted
+    assert admission.changed_components == (
+        TaskComponent.INSTRUCTION,
+        TaskComponent.BUDGET,
+    )
+    assert admission.clustered_with_source

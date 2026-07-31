@@ -319,6 +319,9 @@ repository source.
 
 - The implemented transform is recipe-driven and Python-specific. General
   semantic discovery across languages is future work.
+- `parallax.variants` currently plans and validates causal variant contracts.
+  It does not yet generate natural-language turns, transform repository state
+  or verifiers, execute an agent, or grade a generated variant end to end.
 - Only one repository and one task family received live calibration.
 - Three DeepSeek traces and four GPT traces received detailed semantic review;
   aggregate zero rewards under the old scope gate must not be read as zero
