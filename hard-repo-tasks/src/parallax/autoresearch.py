@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
+import random
 import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
@@ -189,6 +191,47 @@ def default_tasks() -> tuple[ArithmeticTask, ...]:
         ArithmeticTask("workshop-beta", teams=9, units_per_team=11, points_per_unit=6, penalty=29),
         ArithmeticTask("workshop-gamma", teams=8, units_per_team=14, points_per_unit=7, penalty=45),
     )
+
+
+def generate_lookup_tasks(
+    count: int,
+    rows_per_task: int,
+    seed: int,
+) -> tuple[LookupTask, ...]:
+    if count < 1:
+        raise ValueError("count must be positive")
+    regions = tuple(f"region-{index}" for index in range(8))
+    tiers = ("standard", "priority", "critical")
+    channels = ("email", "chat", "phone")
+    combinations = list(itertools.product(regions, tiers, channels))
+    if rows_per_task < 3 or rows_per_task > len(combinations):
+        raise ValueError("rows_per_task must be between 3 and 72")
+
+    rng = random.Random(seed)
+    tasks: list[LookupTask] = []
+    for task_index in range(count):
+        selected = rng.sample(combinations, rows_per_task)
+        records = tuple(
+            LookupRecord(
+                region=region,
+                tier=tier,
+                channel=channel,
+                code=f"CODE{task_index:02d}{row_index:02d}",
+            )
+            for row_index, (region, tier, channel) in enumerate(selected)
+        )
+        anchor = records[-1]
+        tasks.append(
+            LookupTask(
+                task_id=f"routing-grid-{task_index:02d}",
+                records=records,
+                anchor_region=anchor.region,
+                anchor_tier=anchor.tier,
+                anchor_channel=anchor.channel,
+                generator_version=f"intent-lookup-grid-v1-seed-{seed}",
+            )
+        )
+    return tuple(tasks)
 
 
 def render_conversation(
