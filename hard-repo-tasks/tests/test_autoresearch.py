@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from parallax.autoresearch import (
     CampaignManifest,
     IntentCondition,
@@ -53,7 +55,12 @@ def _record(
 
 def test_all_conditions_preserve_the_source_verifier_target() -> None:
     task = default_tasks()[0]
+    buried = {IntentCondition.REPEAT_BURIED, IntentCondition.COMBINED_BURIED}
     for condition in IntentCondition:
+        if condition in buried:
+            with pytest.raises(ValueError, match="unsupported condition"):
+                render_conversation(task, condition)
+            continue
         variant = render_conversation(task, condition)
         assert variant.expected == task.expected
         if condition == IntentCondition.STATIC:
@@ -172,6 +179,49 @@ def test_lookup_task_is_static_solvable_and_anchor_preserving() -> None:
     assert len(combined.turns) == len(ledger.turns) == 7
     assert "Current intent ledger" in ledger.turns[-1]
     assert verify_response("The routing code is RAVEN.", "RAVEN") == ("RAVEN", 1.0)
+
+
+def test_buried_lookup_conditions_hide_the_anchor_after_the_burial_point() -> None:
+    tasks = generate_lookup_tasks(count=12, rows_per_task=24, seed=42)
+    for task in tasks:
+        anchor_values = (task.anchor_region, task.anchor_tier, task.anchor_channel)
+        repeat = render_conversation(task, IntentCondition.REPEAT_BURIED)
+        combined = render_conversation(task, IntentCondition.COMBINED_BURIED)
+        assert repeat.expected == combined.expected == task.expected
+        assert len(repeat.turns) == len(combined.turns) == 12
+        # The matched control names the anchor only in its opening prompt.
+        for turn in repeat.turns[1:]:
+            assert not any(value in turn for value in anchor_values)
+        # The evolving arm finishes every correction by turn five; nothing
+        # after the burial point restates an anchor field or the answer.
+        for value in anchor_values:
+            assert any(value in turn for turn in combined.turns[:5])
+        for turn in combined.turns[5:]:
+            assert not any(value in turn for value in anchor_values)
+            assert task.expected not in turn
+
+
+def test_buried_lookup_side_questions_share_no_field_with_the_anchor() -> None:
+    task = generate_lookup_tasks(count=12, rows_per_task=24, seed=42)[0]
+    by_triple = {
+        (record.region, record.tier, record.channel): record
+        for record in task.records
+    }
+    combined = render_conversation(task, IntentCondition.COMBINED_BURIED)
+    side_turns = [turn for turn in combined.turns if turn.startswith("Side question")]
+    assert len(side_turns) == 4
+    for turn in side_turns:
+        matches = [
+            record
+            for triple, record in by_triple.items()
+            if all(part in turn for part in triple)
+        ]
+        assert len(matches) == 1
+        record = matches[0]
+        assert record.region != task.anchor_region
+        assert record.tier != task.anchor_tier
+        assert record.channel != task.anchor_channel
+        assert record.code != task.expected
 
 
 def test_lookup_task_generator_is_deterministic_and_dense() -> None:
