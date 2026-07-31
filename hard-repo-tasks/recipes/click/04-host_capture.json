@@ -1,0 +1,90 @@
+{
+  "allowed_paths": [
+    "src/click/testing.py"
+  ],
+  "behavior_tags": [
+    "repository-grounding",
+    "scope-control",
+    "focused-verification",
+    "fresh-verification"
+  ],
+  "checks": [
+    {
+      "argv": [
+        "python",
+        "-c",
+        "import click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    click.echo(\"out\")\n    click.echo(\"err\", err=True)\n\nfor mode in (\"sys\", \"fd\"):\n    result = CliRunner(capture=mode).invoke(command)\n    assert result.exit_code == 0\n    assert result.stdout == \"out\\n\"\n    assert result.stderr == \"err\\n\"\n"
+      ],
+      "category": "regression",
+      "env": {
+        "PYTHONPATH": "src"
+      },
+      "name": "existing-capture-regression",
+      "weight": 0.2
+    },
+    {
+      "argv": [
+        "python",
+        "-c",
+        "import os\nimport click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    os.write(1, b\"native-stdout\\\\n\")\n    os.write(2, b\"native-stderr\\\\n\")\n    click.echo(\"python-stdout\")\n    click.echo(\"python-stderr\", err=True)\n\nrunner = CliRunner(capture=\"host_capture\")\nresult = runner.invoke(command)\nassert result.exit_code == 0, result.exception\nassert result.stdout == \"native-stdout\\\\npython-stdout\\\\n\", repr(result.stdout)\nassert result.stderr == \"native-stderr\\\\npython-stderr\\\\n\", repr(result.stderr)\nassert result.output == (\n    \"native-stdout\\\\nnative-stderr\\\\npython-stdout\\\\npython-stderr\\\\n\"\n), repr(result.output)\n"
+      ],
+      "category": "counterfactual",
+      "env": {
+        "PYTHONPATH": "src"
+      },
+      "name": "counterfactual-native-capture",
+      "weight": 0.6
+    },
+    {
+      "argv": [
+        "python",
+        "-c",
+        "from click.testing import CliRunner\n\ntry:\n    CliRunner(capture=\"host_capture-almost\")\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError(\"near-match mode must not be accepted\")\n"
+      ],
+      "category": "adversarial",
+      "env": {
+        "PYTHONPATH": "src"
+      },
+      "name": "near-match-rejected",
+      "weight": 0.2
+    }
+  ],
+  "implementation_edits": [
+    {
+      "after": "if sys.platform == \"win32\":\n    CaptureMode: t.TypeAlias = t.Literal[\"sys\", \"host_capture\"]  # pyright: ignore[reportRedeclaration]\nelse:\n    CaptureMode: t.TypeAlias = t.Literal[\"sys\", \"fd\", \"host_capture\"]  # pyright: ignore[reportRedeclaration]\n",
+      "before": "if sys.platform == \"win32\":\n    CaptureMode: t.TypeAlias = t.Literal[\"sys\"]  # pyright: ignore[reportRedeclaration]\nelse:\n    CaptureMode: t.TypeAlias = t.Literal[\"sys\", \"fd\"]  # pyright: ignore[reportRedeclaration]\n",
+      "id": "declare-mode",
+      "path": "src/click/testing.py"
+    },
+    {
+      "after": "        if capture not in {\"sys\", \"fd\", \"host_capture\"}:\n            raise ValueError(\n                f\"capture={capture!r} is not valid. \"\n                \"Choose from 'sys', 'fd', or 'host_capture'.\"\n            )\n",
+      "before": "        if capture not in {\"sys\", \"fd\"}:\n            raise ValueError(\n                f\"capture={capture!r} is not valid. Choose from 'sys' or 'fd'.\"\n            )\n",
+      "id": "accept-mode",
+      "path": "src/click/testing.py"
+    },
+    {
+      "after": "        self.catch_exceptions = catch_exceptions\n        self.capture = capture\n\n    def _effective_capture(self) -> t.Literal[\"sys\", \"fd\"]:\n        if self.capture == \"host_capture\":\n            return \"sys\" if sys.platform == \"win32\" else \"fd\"\n        return self.capture\n\n    def get_default_prog_name(self, cli: Command) -> str:\n",
+      "before": "        self.catch_exceptions = catch_exceptions\n        self.capture = capture\n\n    def get_default_prog_name(self, cli: Command) -> str:\n",
+      "id": "resolve-mode",
+      "path": "src/click/testing.py"
+    },
+    {
+      "after": "        if self._effective_capture() == \"fd\":\n            cap_out = _FDCapture(1)\n",
+      "before": "        if self.capture == \"fd\":\n            cap_out = _FDCapture(1)\n",
+      "id": "use-mode",
+      "path": "src/click/testing.py"
+    }
+  ],
+  "name": "click-host-capture-capture-04",
+  "probe_edits": [],
+  "prompt": "Complete Click's new `capture=\"host_capture\"` policy for `CliRunner`. It must use file-descriptor capture on POSIX so subprocess and native writes are collected, fall back to `sys` capture on Windows, preserve the ordering and separation of stdout/stderr, keep explicit `sys` and `fd` behavior unchanged, and reject unknown values. The type alias has already been started. Make the smallest coherent implementation and run focused tests.",
+  "source": {
+    "license": "BSD-3-Clause",
+    "locator": "https://github.com/pallets/click.git",
+    "revision": "00e592cea702e0b2caa0dee42489fdb1c22cd845"
+  },
+  "starter_omissions": [
+    "resolve-mode",
+    "use-mode"
+  ]
+}
