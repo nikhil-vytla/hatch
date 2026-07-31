@@ -9,7 +9,7 @@ tags = ["index", "research-method"]
 
 [relations]
 broader = []
-related = ["synthesis.environment-task-quality", "concept.rl-environment", "concept.rl-task", "concept.agent-harness", "concept.task-validity", "concept.reward-integrity"]
+related = ["synthesis.environment-task-quality", "synthesis.public-counterfactual-tasks", "synthesis.provider-task-limitations", "synthesis.task-construction-costs", "synthesis.controlled-task-variation", "concept.rl-environment", "concept.rl-task", "concept.agent-harness", "concept.task-validity", "concept.reward-integrity", "concept.task-specification", "concept.anchored-intent-trajectory", "concept.causal-task-variant"]
 supported_by = []
 challenges = []
 +++
@@ -24,6 +24,16 @@ challenges = []
 - [Agent harness](concepts/agent-harness.md)
 - [Task validity](concepts/task-validity.md)
 - [Reward integrity](concepts/reward-integrity.md)
+- [Executable task specification](concepts/task-specification.md)
+- [Anchored intent trajectory](concepts/anchored-intent-trajectory.md)
+- [Causal task variant](concepts/causal-task-variant.md)
+
+## Current syntheses
+
+- [Counterfactual tasks reduce answer leakage but do not prove synthesis](syntheses/public-counterfactual-tasks.md)
+- [Current provider task contracts leave semantic gaps](syntheses/provider-task-limitations.md)
+- [Expert assurance dominates task and benchmark cost](syntheses/task-construction-costs.md)
+- [Controlled task variation should be a causal study](syntheses/controlled-task-variation.md)
 
 ## Evidence map
 
@@ -40,6 +50,18 @@ challenges = []
 ### Harnesses and generalization
 
 - [Zhang and Khattab on compositional harnesses](sources/zhang-khattab-harnesses.md)
+
+### Task variation and benchmarks
+
+- [Microsoft Evolving Intent](sources/microsoft-evolving-intent.md)
+- [DeepSWE](sources/deepswe.md)
+- [HUD task-design guidance](sources/hud-task-design.md)
+
+### Theory and construction cost
+
+- [POMDP formalization](sources/kaelbling-pomdp.md)
+- [TheAgentCompany](sources/the-agent-company.md)
+- [SPICE](sources/spice.md)
 
 ## Current Parallax questions
 

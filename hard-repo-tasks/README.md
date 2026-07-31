@@ -128,6 +128,65 @@ Headline rates are not directly comparable: harness, budget, pass@k, repository
 mix, model snapshot, and invalid-task filtering differ. They support design
 choices, not a universal difficulty threshold.
 
+## Correction: counterfactual completion is not clean-room synthesis
+
+The first pipeline does not delete upstream context and ask the agent to
+recover it. It creates behavior absent upstream, implements a complete gold
+world, then removes selected implementation sites. Exact recovery from public
+history should therefore fail if gold artifacts remain private.
+
+That still leaves a gold shadow. Surviving declarations, call sites, types,
+imports, comments, and control flow may reveal most design decisions. A model
+can also know the public repository's architecture from pretraining. Those are
+different risks:
+
+- Exact answer retrieval invalidates the evaluation.
+- Gold-shaped scaffolding can reduce synthesis to constrained completion.
+- Repository familiarity is a generalization confound.
+- Language and framework knowledge is legitimate prior capability.
+
+Parallax will now classify partial-gold completion separately from
+pristine-baseline synthesis. Paired incompatible counterfactuals,
+information-removal ladders, and generator/repository holdouts are required
+before making a synthesis claim. See the
+[counterfactual-task synthesis](knowledge/syntheses/public-counterfactual-tasks.md).
+
+## Controlled task variants
+
+[Evolving Intent](https://arxiv.org/abs/2607.20734) supplies a useful control:
+construct reveal, revision, and function-switch events backward so the terminal
+latent intent exactly matches the source task, then reuse its native verifier.
+This preserves final answer verifiability. It does not verify intermediate
+behavior or erase persistent side effects.
+
+The new `parallax.variants` module models a task as
+\(T=(I,s_0,G,C,V,B,M)\), classifies every changed component, and records intent
+relation, state mode, verifier policy, provenance, and source digest. It
+defines ten variant contracts:
+
+1. instruction paraphrase;
+2. delayed reveal;
+3. argument revision;
+4. function switch;
+5. combined intent evolution;
+6. budget shift;
+7. constraint refinement;
+8. equivalent-state transform;
+9. goal extension;
+10. persistent episode.
+
+Only unchanged semantics or budgets can safely reuse the original verifier.
+State transforms require verifier transport, refined constraints require
+augmentation, goal extensions require composition, and persistent episodes
+require replacement. The first six remain correlated conditions under one
+source-task cluster, not six independent benchmark samples.
+
+`scripts/plan_variants.py` emits the ten causal contracts for a source task.
+Generated candidates still need anchor replay, clean state, gold/no-op/mutant
+checks, leakage scans, verifier validation, and grouped model calibration.
+The full rationale is in the
+[controlled-variation synthesis](knowledge/syntheses/controlled-task-variation.md).
+
 ## Experiment: Click counterfactual capture
 
 The first family targets the heavily used
