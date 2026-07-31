@@ -215,3 +215,5 @@ Intellect Verifiers.
   - Added source and concept notes plus four syntheses covering counterfactual
     contamination, provider limitations, construction economics, and
     controlled task variation.
+  - Final validation: 11 tests passed, Ruff passed, and the knowledge validator
+    accepted 25 linked notes: eight concepts, 11 sources, and six syntheses.
