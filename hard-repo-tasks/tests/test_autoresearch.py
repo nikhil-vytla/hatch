@@ -53,7 +53,15 @@ def test_all_conditions_preserve_the_source_verifier_target() -> None:
     for condition in IntentCondition:
         variant = render_conversation(task, condition)
         assert variant.expected == task.expected
-        expected_calls = 1 if condition == IntentCondition.STATIC else 4
+        if condition == IntentCondition.STATIC:
+            expected_calls = 1
+        elif condition in {
+            IntentCondition.REPEAT_DEEP,
+            IntentCondition.COMBINED_DEEP,
+        }:
+            expected_calls = 7
+        else:
+            expected_calls = 4
         assert len(variant.turns) == expected_calls
 
 
@@ -77,6 +85,16 @@ def test_intent_ledger_is_one_declared_intervention() -> None:
     assert ledger.turns[:-1] == base.turns[:-1]
     assert "Current intent ledger" in ledger.turns[-1]
     assert ledger.expected == base.expected
+
+
+def test_deep_combined_restores_every_superseded_value() -> None:
+    task = default_tasks()[0]
+    variant = render_conversation(task, IntentCondition.COMBINED_DEEP)
+    transcript = "\n".join(variant.turns)
+    assert f"not {task.teams + 2}" in transcript
+    assert f"not {task.units_per_team - 3}" in transcript
+    assert f"not {task.points_per_unit + 4}" in transcript
+    assert f"not {task.penalty + 18}" in transcript
 
 
 def test_integer_verifier_accepts_common_formats() -> None:

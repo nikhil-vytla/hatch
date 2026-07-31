@@ -17,7 +17,7 @@ def main() -> None:
     evolving = {
         name: row
         for name, row in summary["conditions"].items()
-        if name not in {"static", "repeat"} and "+" not in name
+        if name != "static" and not name.startswith("repeat") and "+" not in name
     }
     valid = {
         name: row
@@ -25,11 +25,12 @@ def main() -> None:
         if row["accuracy"] is not None
         and row["provider_errors"] + row["harness_errors"] == 0
     }
-    repeat_accuracy = summary["conditions"].get("repeat", {}).get("accuracy")
+    paired = summary["paired_against_repeat"]
     degraded = {
         name: row
         for name, row in valid.items()
-        if repeat_accuracy is not None and row["accuracy"] < repeat_accuracy
+        if paired.get(name, {}).get("mean_delta_vs_repeat") is not None
+        and paired[name]["mean_delta_vs_repeat"] < 0
     }
     hardest = min(degraded, key=lambda name: degraded[name]["accuracy"]) if degraded else None
     if hardest:

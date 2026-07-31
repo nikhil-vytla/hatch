@@ -1,0 +1,90 @@
+{
+  "conditions": {
+    "combined": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 6,
+      "valid_runs": 6
+    },
+    "repeat": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 6,
+      "valid_runs": 6
+    },
+    "reveal": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 6,
+      "valid_runs": 6
+    },
+    "revision": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 6,
+      "valid_runs": 6
+    },
+    "static": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 6,
+      "valid_runs": 6
+    },
+    "switch": {
+      "accuracy": 1.0,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 6,
+      "successes": 6,
+      "valid_runs": 6
+    }
+  },
+  "next_intervention": {
+    "condition": null,
+    "intervention": "increase-transition-depth",
+    "reason": "all valid evolving conditions are saturated at the matched control"
+  },
+  "paired_against_repeat": {
+    "combined": {
+      "degraded_pairs": 0,
+      "improved_pairs": 0,
+      "mean_delta_vs_repeat": 0.0,
+      "pairs": 6
+    },
+    "reveal": {
+      "degraded_pairs": 0,
+      "improved_pairs": 0,
+      "mean_delta_vs_repeat": 0.0,
+      "pairs": 6
+    },
+    "revision": {
+      "degraded_pairs": 0,
+      "improved_pairs": 0,
+      "mean_delta_vs_repeat": 0.0,
+      "pairs": 6
+    },
+    "switch": {
+      "degraded_pairs": 0,
+      "improved_pairs": 0,
+      "mean_delta_vs_repeat": 0.0,
+      "pairs": 6
+    }
+  },
+  "runs": 36
+}
