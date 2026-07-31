@@ -47,12 +47,51 @@ class ArithmeticTask:
 
 
 @dataclass(frozen=True)
+class LookupRecord:
+    region: str
+    tier: str
+    channel: str
+    code: str
+
+
+@dataclass(frozen=True)
+class LookupTask:
+    task_id: str
+    records: tuple[LookupRecord, ...]
+    anchor_region: str
+    anchor_tier: str
+    anchor_channel: str
+    generator_version: str = "intent-lookup-v1"
+
+    @property
+    def expected(self) -> str:
+        matches = [
+            record.code
+            for record in self.records
+            if (
+                record.region == self.anchor_region
+                and record.tier == self.anchor_tier
+                and record.channel == self.anchor_channel
+            )
+        ]
+        if len(matches) != 1:
+            raise ValueError("lookup anchor must match exactly one record")
+        return matches[0]
+
+    def digest(self) -> str:
+        return _digest(asdict(self))
+
+
+SourceTask = ArithmeticTask | LookupTask
+
+
+@dataclass(frozen=True)
 class ConversationVariant:
     task_id: str
     source_digest: str
     condition: str
     turns: tuple[str, ...]
-    expected: int
+    expected: int | str
     renderer_version: str = "evolving-intent-v1"
     parent_condition: str | None = None
     intervention: str | None = None
@@ -66,7 +105,7 @@ class CampaignManifest:
     campaign_id: str
     model: str
     repetitions: int
-    tasks: tuple[ArithmeticTask, ...]
+    tasks: tuple[SourceTask, ...]
     conditions: tuple[IntentCondition, ...]
     max_calls_non_static: int = 4
     seed: int = 0
@@ -85,11 +124,22 @@ class CampaignManifest:
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> CampaignManifest:
+        tasks: list[SourceTask] = []
+        for raw_task in value["tasks"]:
+            task = dict(raw_task)
+            kind = task.pop("kind", "arithmetic")
+            if kind == "arithmetic":
+                tasks.append(ArithmeticTask(**task))
+            elif kind == "lookup":
+                task["records"] = tuple(LookupRecord(**row) for row in task["records"])
+                tasks.append(LookupTask(**task))
+            else:
+                raise ValueError(f"unknown task kind: {kind!r}")
         return cls(
             campaign_id=value["campaign_id"],
             model=value["model"],
             repetitions=int(value["repetitions"]),
-            tasks=tuple(ArithmeticTask(**task) for task in value["tasks"]),
+            tasks=tuple(tasks),
             conditions=tuple(IntentCondition(item) for item in value["conditions"]),
             max_calls_non_static=int(value.get("max_calls_non_static", 4)),
             seed=int(value.get("seed", 0)),
@@ -112,8 +162,8 @@ class RunRecord:
     model: str
     repetition: int
     calls: int
-    expected: int
-    parsed_answer: int | None
+    expected: int | str
+    parsed_answer: int | str | None
     reward: float | None
     status: RunStatus
     final_response: str
@@ -142,11 +192,14 @@ def default_tasks() -> tuple[ArithmeticTask, ...]:
 
 
 def render_conversation(
-    task: ArithmeticTask,
+    task: SourceTask,
     condition: IntentCondition,
     *,
     intent_ledger: bool = False,
 ) -> ConversationVariant:
+    if isinstance(task, LookupTask):
+        return _render_lookup_conversation(task, condition, intent_ledger=intent_ledger)
+
     full = _full_prompt(task)
     if condition == IntentCondition.STATIC:
         turns = (full,)
@@ -282,14 +335,15 @@ def render_conversation(
     return variant
 
 
-def validate_conversation(task: ArithmeticTask, variant: ConversationVariant) -> None:
+def validate_conversation(task: SourceTask, variant: ConversationVariant) -> None:
     if variant.source_digest != task.digest():
         raise ValueError("conversation source digest does not match task")
     if variant.expected != task.expected:
         raise ValueError("conversation verifier target does not match source task")
-    if variant.condition == IntentCondition.STATIC:
+    base_condition = variant.parent_condition or variant.condition
+    if base_condition == IntentCondition.STATIC:
         expected_calls = 1
-    elif variant.condition in {
+    elif base_condition in {
         IntentCondition.REPEAT_DEEP,
         IntentCondition.COMBINED_DEEP,
     }:
@@ -315,8 +369,14 @@ def extract_integer(response: str) -> int | None:
     return int(numbers[-1].replace(",", ""))
 
 
-def verify_response(response: str, expected: int) -> tuple[int | None, float]:
-    parsed = extract_integer(response)
+def verify_response(
+    response: str, expected: int | str
+) -> tuple[int | str | None, float]:
+    if isinstance(expected, int):
+        parsed: int | str | None = extract_integer(response)
+    else:
+        labels = re.findall(r"\b[A-Z][A-Z0-9_-]{2,15}\b", response)
+        parsed = labels[-1] if labels else response.strip().upper() or None
     return parsed, float(parsed == expected)
 
 
@@ -408,6 +468,112 @@ def summarize_records(records: Iterable[RunRecord]) -> dict[str, Any]:
         "conditions": conditions,
         "paired_against_repeat": paired,
     }
+
+
+def _render_lookup_conversation(
+    task: LookupTask,
+    condition: IntentCondition,
+    *,
+    intent_ledger: bool,
+) -> ConversationVariant:
+    full = _lookup_full_prompt(task)
+    if condition == IntentCondition.STATIC:
+        turns = (full,)
+    elif condition == IntentCondition.REPEAT_DEEP:
+        turns = (
+            full,
+            "No routing fields have changed. Keep the original request active.",
+            "There are still no updates. Do not substitute another table row.",
+            "Confirm that region, tier, and channel all remain unchanged.",
+            "Continue using only the routing table and the original active request.",
+            "No value has been superseded. Prepare the final lookup.",
+            "Give only the routing code for the unchanged request.",
+        )
+    elif condition == IntentCondition.COMBINED_DEEP:
+        alternatives = [
+            record
+            for record in task.records
+            if record.code != task.expected
+        ]
+        if len(alternatives) < 2:
+            raise ValueError("deep lookup conversations require two alternative records")
+        first, second = alternatives[:2]
+        turns = (
+            (
+                f"{_lookup_table(task)}\n\nStart with this request: region={first.region}, "
+                f"tier={task.anchor_tier}, channel={first.channel}. Find its routing code."
+            ),
+            (
+                f"Switch requests: now use region={second.region}, tier={second.tier}, "
+                f"channel={second.channel}. Do not finalize yet."
+            ),
+            (
+                f"Correction: the active region is {task.anchor_region}, not "
+                f"{second.region}. Keep the other current fields for now."
+            ),
+            (
+                "Switch objectives briefly: state which three routing fields are active, "
+                "but do not output a code."
+            ),
+            (
+                f"Correction: the active tier is {task.anchor_tier}, not {second.tier}. "
+                "Keep tracking the current request."
+            ),
+            (
+                f"Final correction: the active channel is {task.anchor_channel}, not "
+                f"{second.channel}. Return to the routing-code objective."
+            ),
+            "Using the latest region, tier, and channel, give only the routing code.",
+        )
+    else:
+        raise ValueError(f"lookup tasks do not support condition {condition!r}")
+
+    parent: str | None = None
+    intervention: str | None = None
+    name = str(condition)
+    if intent_ledger:
+        if condition == IntentCondition.STATIC:
+            raise ValueError("the intent ledger is only defined for multi-turn conditions")
+        ledger = (
+            "Current intent ledger:\n"
+            f"- Goal: return the routing code.\n"
+            f"- Active region: {task.anchor_region}.\n"
+            f"- Active tier: {task.anchor_tier}.\n"
+            f"- Active channel: {task.anchor_channel}.\n"
+            "- Ignore superseded requests and values."
+        )
+        turns = (*turns[:-1], f"{turns[-1]}\n\n{ledger}")
+        parent = name
+        name = f"{name}+intent-ledger"
+        intervention = "canonical-active-intent-ledger-v1"
+
+    variant = ConversationVariant(
+        task_id=task.task_id,
+        source_digest=task.digest(),
+        condition=name,
+        turns=turns,
+        expected=task.expected,
+        parent_condition=parent,
+        intervention=intervention,
+    )
+    validate_conversation(task, variant)
+    return variant
+
+
+def _lookup_table(task: LookupTask) -> str:
+    rows = "\n".join(
+        f"- region={row.region}, tier={row.tier}, channel={row.channel} -> {row.code}"
+        for row in task.records
+    )
+    return f"Routing table:\n{rows}"
+
+
+def _lookup_full_prompt(task: LookupTask) -> str:
+    return (
+        f"{_lookup_table(task)}\n\n"
+        f"Current request: region={task.anchor_region}, tier={task.anchor_tier}, "
+        f"channel={task.anchor_channel}. Give only the matching routing code."
+    )
 
 
 def _full_prompt(task: ArithmeticTask, *, points_per_unit: int | None = None) -> str:
