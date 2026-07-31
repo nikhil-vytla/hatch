@@ -101,6 +101,10 @@ not an unvalidated bonus that can reward performative tool use.
 
 The design draws on primary results rather than leaderboard folklore:
 
+- [RL environment and task knowledge base](RL_ENVIRONMENT_KNOWLEDGE_BASE.md)
+  records the working definitions, quality criteria, admission checklist,
+  hypotheses, source confidence, and unresolved research questions used by this
+  experiment.
 - [SWE-Smith](https://arxiv.org/abs/2504.21798) generated 50,137 tasks from 128
   repositories. Claude 3.7 solved 36% overall, but the median task changed only
   five lines; PR-mirror trajectories transferred best.
