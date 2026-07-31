@@ -104,5 +104,13 @@ def _changed_paths(root: Path) -> tuple[str, ...]:
         path = entry[3:]
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
-        paths.append(path)
+        if not _is_ephemeral(path):
+            paths.append(path)
     return tuple(sorted(set(paths)))
+
+
+def _is_ephemeral(path: str) -> bool:
+    parts = Path(path).parts
+    if any(part in {".pytest_cache", "__pycache__"} for part in parts):
+        return True
+    return path.startswith("Library/Caches/pip/") or path in {".coverage"}

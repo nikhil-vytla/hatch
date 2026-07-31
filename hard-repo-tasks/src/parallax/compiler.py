@@ -6,7 +6,6 @@ import os
 import shutil
 import subprocess
 import tempfile
-from dataclasses import asdict
 from pathlib import Path
 
 from parallax.models import Check, Recipe, TaskManifest
@@ -43,8 +42,10 @@ def compile_recipe(recipe: Recipe, source_root: Path, output_root: Path) -> Task
         gold_results = [_run_check(gold, check) for check in recipe.checks]
         starter_results = [_run_check(starter, check) for check in recipe.checks]
         if not all(result["passed"] for result in gold_results):
-            failures = [result["name"] for result in gold_results if not result["passed"]]
-            raise CompilationError(f"gold world failed checks: {failures}")
+            failures = [result for result in gold_results if not result["passed"]]
+            raise CompilationError(
+                "gold world failed checks:\n" + json.dumps(failures, indent=2, sort_keys=True)
+            )
         if all(result["passed"] for result in starter_results):
             raise CompilationError("starter world passes every check; task has no observable gap")
         regression_failures = [

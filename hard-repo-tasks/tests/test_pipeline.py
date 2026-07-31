@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from parallax.adapters import export_hud, export_verifiers, render_verifiers_taskset
+from parallax.calibration import RolloutObservation, decide_curriculum
 from parallax.compiler import compile_recipe
 from parallax.grading import grade_candidate
 from parallax.models import Check, Recipe, SourceSpec, TextEdit
@@ -127,6 +128,12 @@ def test_grading_gates_contract_and_forbidden_paths(tmp_path: Path) -> None:
     no_op = _candidate(source, recipe, tmp_path / "no-op", complete=True)
     assert grade_candidate(recipe, no_op).reward == 1.0
 
+    cache_only = _candidate(source, recipe, tmp_path / "cache-only", complete=True)
+    cache_path = cache_only / "Library" / "Caches" / "pip" / "http-v2" / "artifact"
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_text("ephemeral")
+    assert grade_candidate(recipe, cache_only).reward == 1.0
+
     tampered = _candidate(source, recipe, tmp_path / "tampered", complete=True)
     (tampered / "unrelated.txt").write_text("reward hack")
     grade = grade_candidate(recipe, tampered)
@@ -172,3 +179,15 @@ def test_edit_requires_exact_pinned_context(tmp_path: Path) -> None:
             tmp_path,
             (TextEdit("ambiguous", "file.py", "same", "different"),),
         )
+
+
+def test_curriculum_rejects_semantically_saturated_family() -> None:
+    observations = [
+        RolloutObservation("a", "gpt", "strong", "completed", 1.0, 1.0),
+        RolloutObservation("a", "gpt", "strong", "completed", 1.0, 1.0),
+        RolloutObservation("a", "weak", "weak", "completed", 0.0, 1.0),
+    ]
+    decision = decide_curriculum(observations)
+    assert decision.action == "harden"
+    assert decision.strong_semantic_rate == 1.0
+    assert "cross-module state propagation" in decision.next_transforms

@@ -1,6 +1,7 @@
 {
   "allowed_paths": [
-    "src/click/testing.py"
+    "src/click/testing.py",
+    "tests/test_testing.py"
   ],
   "behavior_tags": [
     "repository-grounding",
@@ -26,7 +27,7 @@
       "argv": [
         "python",
         "-c",
-        "import os\nimport click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    os.write(1, b\"native-stdout\\\\n\")\n    os.write(2, b\"native-stderr\\\\n\")\n    click.echo(\"python-stdout\")\n    click.echo(\"python-stderr\", err=True)\n\nrunner = CliRunner(capture=\"portable\")\nresult = runner.invoke(command)\nassert result.exit_code == 0, result.exception\nassert result.stdout == \"native-stdout\\\\npython-stdout\\\\n\", repr(result.stdout)\nassert result.stderr == \"native-stderr\\\\npython-stderr\\\\n\", repr(result.stderr)\nassert result.output == (\n    \"native-stdout\\\\nnative-stderr\\\\npython-stdout\\\\npython-stderr\\\\n\"\n), repr(result.output)\n"
+        "import os\nimport click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    os.write(1, b\"native-stdout\\n\")\n    os.write(2, b\"native-stderr\\n\")\n    click.echo(\"python-stdout\")\n    click.echo(\"python-stderr\", err=True)\n\nrunner = CliRunner(capture=\"portable\")\nresult = runner.invoke(command)\nassert result.exit_code == 0, result.exception\nassert result.stdout == \"python-stdout\\nnative-stdout\\n\", repr(result.stdout)\nassert result.stderr == \"python-stderr\\nnative-stderr\\n\", repr(result.stderr)\nassert result.output == (\n    \"python-stdout\\npython-stderr\\nnative-stdout\\nnative-stderr\\n\"\n), repr(result.output)\n"
       ],
       "category": "counterfactual",
       "env": {

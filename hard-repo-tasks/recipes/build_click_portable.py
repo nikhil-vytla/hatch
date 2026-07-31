@@ -52,10 +52,14 @@ INVOKE_BEFORE = '''        if self.capture == "fd":
 
 def build(mode: str, index: int) -> dict[str, object]:
     display = mode.replace("_", "-")
+    posix_alias = (
+        f'    CaptureMode: t.TypeAlias = t.Literal["sys", "fd", "{mode}"]'
+        "  # pyright: ignore[reportRedeclaration]"
+    )
     alias_after = f'''if sys.platform == "win32":
     CaptureMode: t.TypeAlias = t.Literal["sys", "{mode}"]  # pyright: ignore[reportRedeclaration]
 else:
-    CaptureMode: t.TypeAlias = t.Literal["sys", "fd", "{mode}"]  # pyright: ignore[reportRedeclaration]
+{posix_alias}
 '''
     validation_after = f'''        if capture not in {{"sys", "fd", "{mode}"}}:
             raise ValueError(
@@ -82,18 +86,18 @@ from click.testing import CliRunner
 
 @click.command()
 def command():
-    os.write(1, b"native-stdout\\\\n")
-    os.write(2, b"native-stderr\\\\n")
+    os.write(1, b"native-stdout\\n")
+    os.write(2, b"native-stderr\\n")
     click.echo("python-stdout")
     click.echo("python-stderr", err=True)
 
 runner = CliRunner(capture="{mode}")
 result = runner.invoke(command)
 assert result.exit_code == 0, result.exception
-assert result.stdout == "native-stdout\\\\npython-stdout\\\\n", repr(result.stdout)
-assert result.stderr == "native-stderr\\\\npython-stderr\\\\n", repr(result.stderr)
+assert result.stdout == "python-stdout\\nnative-stdout\\n", repr(result.stdout)
+assert result.stderr == "python-stderr\\nnative-stderr\\n", repr(result.stderr)
 assert result.output == (
-    "native-stdout\\\\nnative-stderr\\\\npython-stdout\\\\npython-stderr\\\\n"
+    "python-stdout\\npython-stderr\\nnative-stdout\\nnative-stderr\\n"
 ), repr(result.output)
 '''
     regression = '''import click
@@ -191,7 +195,7 @@ else:
                 "env": {"PYTHONPATH": "src"},
             },
         ],
-        "allowed_paths": ["src/click/testing.py"],
+        "allowed_paths": ["src/click/testing.py", "tests/test_testing.py"],
         "behavior_tags": [
             "repository-grounding",
             "scope-control",
