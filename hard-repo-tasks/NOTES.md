@@ -144,3 +144,8 @@ Intellect Verifiers.
     `0.2.2.dev58` and exposes v1 under `import verifiers.v1 as vf`.
   - Corrected the adapter for typed `TaskData`, behavioral `Task`, and lazy
     `Taskset`. It loads all 12 generated rows against that pinned API.
+- Final verification:
+  - `uv run pytest -q`: 5 passed.
+  - `uv run ruff check .`: all checks passed.
+  - The admission matrix rerun passed all five checks for all 12 tasks.
+  - The generated taskset loaded all 12 rows against Verifiers v1.
