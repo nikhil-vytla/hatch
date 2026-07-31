@@ -19,3 +19,4 @@ ts	phase	decision	why	evidence	result
 2026-07-31T19:33:29Z	architecture	pivoted the source-task domain from arithmetic to exact lookup	intent tracking should be measured without arithmetic skill dominating the result	autoresearch/decisions.tsv	build typed lookup tasks next
 2026-07-31T19:41:01Z	sweep	rejected the six-row lookup campaign as saturated	static, repeat-deep, and combined-deep each scored 6 of 6	autoresearch/results/cycle6-summary.json	exact lookup is valid but too sparse
 2026-07-31T19:41:01Z	architecture	built a deterministic dense lookup campaign generator	a rerunnable generator can sweep table density without hand-authoring tasks	autoresearch/make_lookup_campaign.py	open until dense baseline calibration
+2026-07-31T20:18:08Z	sweep	rejected the dense 18-row lookup campaign as saturated	static, repeat-deep, and combined-deep each scored 12 of 12 under Haiku	autoresearch/results/cycle7-summary.json	no effect, corrections sit next to the final question
