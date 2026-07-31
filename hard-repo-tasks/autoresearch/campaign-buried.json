@@ -1,0 +1,1863 @@
+{
+  "campaign_id": "intent-cycle-8-buried",
+  "conditions": [
+    "static",
+    "repeat-buried",
+    "combined-buried"
+  ],
+  "max_calls_non_static": 12,
+  "model": "claude-haiku-4-5",
+  "protocol_version": "parallax-autoresearch-v1",
+  "repetitions": 1,
+  "seed": 42,
+  "tasks": [
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-2",
+      "anchor_tier": "critical",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "phone",
+          "code": "CODE0000",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0001",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0002",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0003",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0004",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0005",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0006",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0007",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0008",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0009",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0010",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0011",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0012",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0013",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0014",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0015",
+          "region": "region-4",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0016",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0017",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0018",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0019",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0020",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0021",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0022",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0023",
+          "region": "region-2",
+          "tier": "critical"
+        }
+      ],
+      "task_id": "routing-grid-00"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-3",
+      "anchor_tier": "standard",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "chat",
+          "code": "CODE0100",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0101",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0102",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0103",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0104",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0105",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0106",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0107",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0108",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0109",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0110",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0111",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0112",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0113",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0114",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0115",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0116",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0117",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0118",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0119",
+          "region": "region-4",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0120",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0121",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0122",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0123",
+          "region": "region-3",
+          "tier": "standard"
+        }
+      ],
+      "task_id": "routing-grid-01"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-7",
+      "anchor_tier": "critical",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "phone",
+          "code": "CODE0200",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0201",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0202",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0203",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0204",
+          "region": "region-4",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0205",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0206",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0207",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0208",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0209",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0210",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0211",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0212",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0213",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0214",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0215",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0216",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0217",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0218",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0219",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0220",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0221",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0222",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0223",
+          "region": "region-7",
+          "tier": "critical"
+        }
+      ],
+      "task_id": "routing-grid-02"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-0",
+      "anchor_tier": "standard",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "phone",
+          "code": "CODE0300",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0301",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0302",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0303",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0304",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0305",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0306",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0307",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0308",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0309",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0310",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0311",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0312",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0313",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0314",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0315",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0316",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0317",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0318",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0319",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0320",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0321",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0322",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0323",
+          "region": "region-0",
+          "tier": "standard"
+        }
+      ],
+      "task_id": "routing-grid-03"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-7",
+      "anchor_tier": "standard",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "chat",
+          "code": "CODE0400",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0401",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0402",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0403",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0404",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0405",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0406",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0407",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0408",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0409",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0410",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0411",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0412",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0413",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0414",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0415",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0416",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0417",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0418",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0419",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0420",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0421",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0422",
+          "region": "region-4",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0423",
+          "region": "region-7",
+          "tier": "standard"
+        }
+      ],
+      "task_id": "routing-grid-04"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-3",
+      "anchor_tier": "critical",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "email",
+          "code": "CODE0500",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0501",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0502",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0503",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0504",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0505",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0506",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0507",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0508",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0509",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0510",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0511",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0512",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0513",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0514",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0515",
+          "region": "region-4",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0516",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0517",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0518",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0519",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0520",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0521",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0522",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0523",
+          "region": "region-3",
+          "tier": "critical"
+        }
+      ],
+      "task_id": "routing-grid-05"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-5",
+      "anchor_tier": "critical",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "chat",
+          "code": "CODE0600",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0601",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0602",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0603",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0604",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0605",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0606",
+          "region": "region-4",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0607",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0608",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0609",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0610",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0611",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0612",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0613",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0614",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0615",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0616",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0617",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0618",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0619",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0620",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0621",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0622",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0623",
+          "region": "region-5",
+          "tier": "critical"
+        }
+      ],
+      "task_id": "routing-grid-06"
+    },
+    {
+      "anchor_channel": "chat",
+      "anchor_region": "region-3",
+      "anchor_tier": "priority",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "chat",
+          "code": "CODE0700",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0701",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0702",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0703",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0704",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0705",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0706",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0707",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0708",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0709",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0710",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0711",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0712",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0713",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0714",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0715",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0716",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0717",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0718",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0719",
+          "region": "region-4",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0720",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0721",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0722",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0723",
+          "region": "region-3",
+          "tier": "priority"
+        }
+      ],
+      "task_id": "routing-grid-07"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-5",
+      "anchor_tier": "priority",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "phone",
+          "code": "CODE0800",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0801",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0802",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0803",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0804",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0805",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0806",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0807",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0808",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0809",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0810",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0811",
+          "region": "region-5",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0812",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0813",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0814",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0815",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0816",
+          "region": "region-2",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0817",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0818",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0819",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0820",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0821",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0822",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0823",
+          "region": "region-5",
+          "tier": "priority"
+        }
+      ],
+      "task_id": "routing-grid-08"
+    },
+    {
+      "anchor_channel": "chat",
+      "anchor_region": "region-7",
+      "anchor_tier": "critical",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "email",
+          "code": "CODE0900",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0901",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0902",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0903",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0904",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0905",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0906",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0907",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0908",
+          "region": "region-0",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0909",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0910",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0911",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0912",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0913",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0914",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0915",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0916",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0917",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0918",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0919",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0920",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE0921",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE0922",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE0923",
+          "region": "region-7",
+          "tier": "critical"
+        }
+      ],
+      "task_id": "routing-grid-09"
+    },
+    {
+      "anchor_channel": "phone",
+      "anchor_region": "region-5",
+      "anchor_tier": "critical",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "email",
+          "code": "CODE1000",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1001",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1002",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1003",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1004",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1005",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1006",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1007",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1008",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1009",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1010",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1011",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1012",
+          "region": "region-2",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1013",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1014",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1015",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1016",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1017",
+          "region": "region-5",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1018",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1019",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1020",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1021",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1022",
+          "region": "region-6",
+          "tier": "critical"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1023",
+          "region": "region-5",
+          "tier": "critical"
+        }
+      ],
+      "task_id": "routing-grid-10"
+    },
+    {
+      "anchor_channel": "email",
+      "anchor_region": "region-0",
+      "anchor_tier": "standard",
+      "generator_version": "intent-lookup-grid-v1-seed-42",
+      "kind": "lookup",
+      "records": [
+        {
+          "channel": "email",
+          "code": "CODE1100",
+          "region": "region-5",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1101",
+          "region": "region-4",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1102",
+          "region": "region-1",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1103",
+          "region": "region-3",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1104",
+          "region": "region-2",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1105",
+          "region": "region-7",
+          "tier": "priority"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1106",
+          "region": "region-6",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1107",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1108",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1109",
+          "region": "region-1",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1110",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1111",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1112",
+          "region": "region-1",
+          "tier": "critical"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1113",
+          "region": "region-6",
+          "tier": "standard"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1114",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1115",
+          "region": "region-3",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1116",
+          "region": "region-7",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1117",
+          "region": "region-7",
+          "tier": "standard"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1118",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1119",
+          "region": "region-0",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1120",
+          "region": "region-0",
+          "tier": "priority"
+        },
+        {
+          "channel": "phone",
+          "code": "CODE1121",
+          "region": "region-4",
+          "tier": "priority"
+        },
+        {
+          "channel": "chat",
+          "code": "CODE1122",
+          "region": "region-3",
+          "tier": "critical"
+        },
+        {
+          "channel": "email",
+          "code": "CODE1123",
+          "region": "region-0",
+          "tier": "standard"
+        }
+      ],
+      "task_id": "routing-grid-11"
+    }
+  ]
+}
