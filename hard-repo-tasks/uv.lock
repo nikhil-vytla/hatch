@@ -1599,7 +1599,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "verifiers", marker = "extra == 'verifiers'", specifier = ">=0.2.1" }]
+requires-dist = [{ name = "verifiers", marker = "extra == 'verifiers'", git = "https://github.com/PrimeIntellect-ai/verifiers.git" }]
 provides-extras = ["verifiers"]
 
 [package.metadata.requires-dev]
@@ -2351,7 +2351,7 @@ wheels = [
 
 [[package]]
 name = "renderers"
-version = "0.1.8"
+version = "0.1.9.dev10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
@@ -2363,9 +2363,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/82/e493c5f6752283b18f43b8bb3e6f3b2068310a0a42b0650de1b841713fa3/renderers-0.1.8.tar.gz", hash = "sha256:7a50b59cc64593da504c054bf3e2f0f147af5c1770bad7107de7b18887377280", size = 343291, upload-time = "2026-07-15T14:10:22.918Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/20/9e916532c3f5133514fc6909ff1efd686c6c4bf0e99eab2dc5a10ea87eda/renderers-0.1.9.dev10.tar.gz", hash = "sha256:35c2dac8704661a0b1127cec34a6577b795579d4e8f060ce6563076c24fac18a", size = 349159, upload-time = "2026-07-30T19:49:07.731Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/2b/6defb0cc5ca19d66798a6c656d30aab86d7c9d4cec14c2b24248b5421c86/renderers-0.1.8-py3-none-any.whl", hash = "sha256:40e6b2c766e23feb12f73b1fbdfef4dea51921479454756ac796612e3bef8397", size = 189915, upload-time = "2026-07-15T14:10:21.371Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/67/b4ea55e275aae6cb01ef0ed343c9874511de0d8e0173366a0ad7d7f7039f/renderers-0.1.9.dev10-py3-none-any.whl", hash = "sha256:36c4ee952239a71c41fbb3059ee7b1f48e153627937a59d8cb01f6f21695e7ee", size = 192989, upload-time = "2026-07-30T19:49:06.013Z" },
 ]
 
 [[package]]
@@ -2996,8 +2996,8 @@ wheels = [
 
 [[package]]
 name = "verifiers"
-version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
+version = "0.2.2.dev58"
+source = { git = "https://github.com/PrimeIntellect-ai/verifiers.git#b4612b53ae911c2295c56ab31c9fb1d9f9dde061" }
 dependencies = [
     { name = "aiohttp" },
     { name = "aiolimiter" },
@@ -3026,10 +3026,6 @@ dependencies = [
     { name = "tomli-w" },
     { name = "typing-extensions" },
     { name = "uvloop", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/50/66d6571470240006caec392361d9f20e863acf39361bda325e53e235dbed/verifiers-0.2.1.tar.gz", hash = "sha256:e68c2b22a7fdbc2590a7cb8f59db685295be7999b9a75b12fffc00b2ac7c5aa1", size = 739478, upload-time = "2026-07-20T20:15:52.117Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/ce/1d17f06a311fb904a4032f417dc00ee0b855baa773efdfb694cfba3b7792/verifiers-0.2.1-py3-none-any.whl", hash = "sha256:6b31b20a0d2b42ec7dbcd6824124d085535aaaed2be36fe6b4fdf59ebf65a42f", size = 759473, upload-time = "2026-07-20T20:15:50.364Z" },
 ]
 
 [[package]]
