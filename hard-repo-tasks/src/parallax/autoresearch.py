@@ -21,6 +21,8 @@ class IntentCondition(StrEnum):
     COMBINED = "combined"
     REPEAT_DEEP = "repeat-deep"
     COMBINED_DEEP = "combined-deep"
+    REPEAT_BURIED = "repeat-buried"
+    COMBINED_BURIED = "combined-buried"
 
 
 class RunStatus(StrEnum):
@@ -391,6 +393,11 @@ def validate_conversation(task: SourceTask, variant: ConversationVariant) -> Non
         IntentCondition.COMBINED_DEEP,
     }:
         expected_calls = 7
+    elif base_condition in {
+        IntentCondition.REPEAT_BURIED,
+        IntentCondition.COMBINED_BURIED,
+    }:
+        expected_calls = 12
     else:
         expected_calls = 4
     if len(variant.turns) != expected_calls:
@@ -487,7 +494,12 @@ def summarize_records(records: Iterable[RunRecord]) -> dict[str, Any]:
             or "+" in condition
         ):
             continue
-        control = "repeat-deep" if condition.endswith("-deep") else "repeat"
+        if condition.endswith("-deep"):
+            control = "repeat-deep"
+        elif condition.endswith("-buried"):
+            control = "repeat-buried"
+        else:
+            control = "repeat"
         repeat = {
             (row.task_id, row.repetition): row
             for row in by_condition.get(control, [])
@@ -568,6 +580,11 @@ def _render_lookup_conversation(
             ),
             "Using the latest region, tier, and channel, give only the routing code.",
         )
+    elif condition in {
+        IntentCondition.REPEAT_BURIED,
+        IntentCondition.COMBINED_BURIED,
+    }:
+        turns = _buried_lookup_turns(task, condition)
     else:
         raise ValueError(f"lookup tasks do not support condition {condition!r}")
 
@@ -601,6 +618,104 @@ def _render_lookup_conversation(
     )
     validate_conversation(task, variant)
     return variant
+
+
+def _buried_lookup_turns(
+    task: LookupTask, condition: IntentCondition
+) -> tuple[str, ...]:
+    """Render 12-turn conversations whose anchor intent is buried mid-history.
+
+    Every record referenced after the burial point shares no field value with
+    the anchor, so the final active intent cannot be recovered from recency
+    alone: the last statement of each anchor field sits at least seven turns
+    before the final question, behind side lookups that plant competing codes.
+    """
+    disjoint = [
+        record
+        for record in task.records
+        if record.code != task.expected
+        and record.region != task.anchor_region
+        and record.tier != task.anchor_tier
+        and record.channel != task.anchor_channel
+    ]
+    if len(disjoint) < 6:
+        raise ValueError(
+            "buried lookup conversations require six records sharing no field "
+            "with the anchor"
+        )
+    first, second = disjoint[0], disjoint[1]
+    side = disjoint[2:6]
+
+    def side_lookup(record: LookupRecord) -> str:
+        return (
+            "Side question that does not change the active request: what is the "
+            f"routing code for region={record.region}, tier={record.tier}, "
+            f"channel={record.channel}? Answer it, then keep the active request "
+            "unchanged."
+        )
+
+    if condition == IntentCondition.REPEAT_BURIED:
+        return (
+            _lookup_full_prompt(task),
+            "No routing fields have changed. Keep the original request active.",
+            side_lookup(side[0]),
+            "Still no changes to the active request. Do not substitute another "
+            "table row.",
+            side_lookup(side[1]),
+            "Confirm that the active region, tier, and channel all remain "
+            "unchanged, without naming their values.",
+            side_lookup(side[2]),
+            "For history only: no request has been superseded because none "
+            "changed. Confirm the active request is still the original one, "
+            "without giving a code.",
+            side_lookup(side[3]),
+            "No value has been superseded. Keep the active request in mind.",
+            "Prepare the final lookup for the active request, but do not output "
+            "the code yet.",
+            "Give only the routing code for the active request.",
+        )
+    return (
+        (
+            f"{_lookup_table(task)}\n\nStart with this request: "
+            f"region={first.region}, tier={first.tier}, "
+            f"channel={first.channel}. Find its routing code but do not "
+            "finalize."
+        ),
+        (
+            f"Switch requests: now use region={second.region}, "
+            f"tier={second.tier}, channel={second.channel}. Do not finalize "
+            "yet."
+        ),
+        (
+            f"Correction: the active region is {task.anchor_region}, not "
+            f"{second.region}. Keep the other current fields for now."
+        ),
+        (
+            f"Correction: the active tier is {task.anchor_tier}, not "
+            f"{second.tier}. Keep tracking the current request."
+        ),
+        (
+            f"Final correction: the active channel is {task.anchor_channel}, "
+            f"not {second.channel}. The active request is now fixed. Do not "
+            "output its code yet."
+        ),
+        side_lookup(side[0]),
+        side_lookup(side[1]),
+        (
+            "For history only: earlier turns mentioned "
+            f"region={first.region}, region={second.region}, "
+            f"tier={second.tier}, and channel={second.channel}. All of those "
+            "are superseded. Confirm the active request is unchanged, without "
+            "naming its fields or giving a code."
+        ),
+        side_lookup(side[2]),
+        (
+            "Do not change anything. Keep the active request in mind while "
+            "handling side questions."
+        ),
+        side_lookup(side[3]),
+        "Return to the active request. Give only its routing code.",
+    )
 
 
 def _lookup_table(task: LookupTask) -> str:

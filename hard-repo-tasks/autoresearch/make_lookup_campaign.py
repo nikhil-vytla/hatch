@@ -17,6 +17,8 @@ def main() -> None:
     parser.add_argument("--rows", type=int, default=18)
     parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--conditions", default="static,repeat-deep,combined-deep")
+    parser.add_argument("--max-calls", type=int, default=7)
     args = parser.parse_args()
 
     tasks = []
@@ -26,8 +28,8 @@ def main() -> None:
         tasks.append(value)
     payload = {
         "campaign_id": args.campaign_id,
-        "conditions": ["static", "repeat-deep", "combined-deep"],
-        "max_calls_non_static": 7,
+        "conditions": args.conditions.split(","),
+        "max_calls_non_static": args.max_calls,
         "model": args.model,
         "protocol_version": "parallax-autoresearch-v1",
         "repetitions": args.repetitions,
