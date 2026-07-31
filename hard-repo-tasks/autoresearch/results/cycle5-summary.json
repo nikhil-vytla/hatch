@@ -1,0 +1,20 @@
+{
+  "conditions": {
+    "static": {
+      "accuracy": 0.25,
+      "harness_errors": 0,
+      "invalid_responses": 0,
+      "provider_errors": 0,
+      "runs": 4,
+      "successes": 1,
+      "valid_runs": 4
+    }
+  },
+  "next_intervention": {
+    "condition": null,
+    "intervention": null,
+    "reason": "no valid evolving condition available"
+  },
+  "paired_against_repeat": {},
+  "runs": 4
+}
