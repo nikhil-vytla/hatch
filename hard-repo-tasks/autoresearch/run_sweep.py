@@ -5,8 +5,8 @@ import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
-from chat_env import intent_chat
-from hud import Chat
+from chat_env import env, intent_chat
+from hud import Chat, LocalRuntime
 from hud.agents import create_agent
 
 from parallax.autoresearch import (
@@ -56,7 +56,11 @@ async def _run_one(
     trace_ids: list[str] = []
     try:
         agent = create_agent(manifest.model)
-        chat = Chat(intent_chat(messages=[], expected=variant.expected), agent)
+        chat = Chat(
+            intent_chat(messages=[], expected=variant.expected),
+            agent,
+            runtime=LocalRuntime(env),
+        )
         for turn in variant.turns:
             trace = await chat.send(turn)
             replies.append(str(trace.content or ""))
@@ -123,7 +127,15 @@ async def main() -> None:
     if args.intent_ledger and len(conditions) != 1:
         raise ValueError("--intent-ledger requires exactly one condition")
 
-    existing = {record.key for record in load_records(args.out)}
+    existing = {
+        record.key
+        for record in load_records(args.out)
+        if record.status
+        not in {
+            RunStatus.PROVIDER_ERROR,
+            RunStatus.HARNESS_ERROR,
+        }
+    }
     total = 0
     for task_index, task in enumerate(tasks):
         for condition in conditions:
