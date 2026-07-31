@@ -175,3 +175,5 @@ Intellect Verifiers.
   - Added a user-level `academic-knowledge-curator` subagent that applies the
     schema after literature reviews and records inaccessible evidence instead
     of silently dropping it.
+  - Validation passed for 12 connected notes: five concepts, five sources, and
+    two syntheses. The full suite now has six passing tests, and Ruff passes.
