@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import subprocess
@@ -66,18 +67,46 @@ class CharacterizationTests(unittest.TestCase):
             ],
         )
 
-    def test_swe_overlay_contract(self) -> None:
+    def test_bird_sql_is_classified_as_nondeterministic(self) -> None:
+        contract = self.receipt["bird_sql_reproducibility"]
         self.assertEqual(
-            self.receipt["scheduler_probe"]["swe_overlay"],
-            {
-                "ceil_front_7_into_3": [3, 2, 2],
-                "stripped_source_argument_ids": [1],
-                "target_symptom_ids": [2],
-                "predecessor_symptom_ids": {
-                    "PREDECESSOR_FUNCTION.": [101]
-                },
-                "normalized_source_function": "SOURCE_FUNCTION.",
-            },
+            contract["classification"],
+            "nondeterministic_unless_mechanically_constrained",
+        )
+        self.assertIn(
+            "seed alone does not fix output order",
+            contract["observations"],
+        )
+        self.assertIn(
+            "canonical output ordering before identity or byte comparison",
+            contract["required_constraints"],
+        )
+
+    def test_swe_overlay_contract(self) -> None:
+        overlay = self.receipt["scheduler_probe"]["swe_overlay"]
+        self.assertEqual(
+            overlay["before_argument_ids"],
+            [[1, 101, 102], [], [103, 3, 2]],
+        )
+        self.assertEqual(
+            overlay["after_argument_ids"],
+            [[102, 101, 190], [103, 191], [1, 2, 3, 90]],
+        )
+        self.assertEqual(
+            overlay["phase_owned_ids"],
+            {"predecessor": [101, 102, 103], "source": [1, 2, 3]},
+        )
+        self.assertEqual(overlay["symptom_positions"], [[2], [1], [3]])
+        self.assertEqual(
+            overlay["rendered_turns"],
+            [
+                "PREDECESSOR. PG_LOCATION PG_APPROACH PG_SYMPTOM_A",
+                "[REVEAL] LEAKED_PG_CONSTRAINT PG_SYMPTOM_B",
+                (
+                    "[FUNCTION] SOURCE. [AFTER_FUNCTION] SOURCE_TRIGGER "
+                    "SOURCE_LOCATION SOURCE_CONSTRAINT SOURCE_SYMPTOM"
+                ),
+            ],
         )
 
     def test_every_provider_generated_asset_is_explicitly_unavailable(self) -> None:
@@ -120,16 +149,58 @@ class CharacterizationTests(unittest.TestCase):
             },
         )
 
-    def test_tampered_hash_is_rejected(self) -> None:
+    def test_any_committed_field_tampering_is_rejected(self) -> None:
+        mutations = {
+            "source hash": lambda receipt: receipt["sources"][
+                "situated_simulation/turn_scheduler.py"
+            ].__setitem__("sha256", "0" * 64),
+            "contract prose": lambda receipt: receipt["contracts"][0][
+                "observable_contract"
+            ].__setitem__(0, "tampered"),
+            "source range": lambda receipt: receipt["contracts"][0]["symbols"][
+                0
+            ].__setitem__("line_start", 0),
+            "middle trajectory": lambda receipt: receipt["scheduler_probe"][
+                "active_values"
+            ].__setitem__(2, {"1": "tampered"}),
+            "index path": lambda receipt: receipt["published_eval_indices"][
+                "gsm8k"
+            ].__setitem__("eval_ids_path", "tampered.json"),
+            "source file claim": lambda receipt: receipt[
+                "published_eval_indices"
+            ]["gsm8k"].__setitem__("source_file_claim", "tampered.json"),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                tampered = copy.deepcopy(self.receipt)
+                mutate(tampered)
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "receipt.json"
+                    path.write_text(json.dumps(tampered), encoding="utf-8")
+                    with self.assertRaisesRegex(
+                        characterize.CharacterizationError,
+                        "canonical receipt digest mismatch",
+                    ):
+                        characterize.verify_receipt(path)
+
+    def test_canonical_digest_is_pinned(self) -> None:
+        self.assertEqual(
+            self.receipt["canonical_sha256"],
+            characterize.PINNED_RECEIPT_SHA256,
+        )
+
+    def test_resealed_tampered_receipt_is_rejected(self) -> None:
         tampered = copy.deepcopy(self.receipt)
-        target = "situated_simulation/turn_scheduler.py"
-        tampered["sources"][target]["sha256"] = "0" * 64
+        tampered["contracts"][0]["observable_contract"][0] = "tampered"
+        tampered["canonical_sha256"] = hashlib.sha256(
+            characterize._canonical_receipt_bytes(tampered)
+        ).hexdigest()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "receipt.json"
             path.write_text(json.dumps(tampered), encoding="utf-8")
             with self.assertRaisesRegex(
                 characterize.CharacterizationError,
-                "receipt hash drifted",
+                "pinned canonical digest",
             ):
                 characterize.verify_receipt(path)
 

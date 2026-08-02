@@ -44,13 +44,15 @@ counterfactuals:
 6. The final `UserIntent` restores the source function, source argument
    values, all source argument IDs as revealed, and the source label.
 7. The SWE wrapper removes `category == "symptom"` arguments before the
-   generic scheduler and restores them through `post_fill_hook` at the front
-   of their owning function phase.
+   generic scheduler. Its `post_fill_hook` repairs ownership, redistributes
+   within each phase, reinserts symptoms, and then sorts arguments. At this
+   pin, stripped symptom IDs lack category entries during the final sort and
+   render after recognized categories.
 
-The receipt mechanically exercises items 1, 2, 3, 5, 6, and the deterministic
-parts of item 7. Exact source hashes and static symbol checks cover the provider
-backed stages and item 4. Provider outputs are not available, so this ADR does
-not claim that any published conversation was recreated.
+The receipt mechanically exercises items 1, 2, 3, 5, 6, and all behavior
+described in item 7. Exact source hashes and static symbol checks cover the
+provider-backed stages and item 4. Provider outputs are not available, so this
+ADR does not claim that any published conversation was recreated.
 
 ## Frozen construction boundary
 

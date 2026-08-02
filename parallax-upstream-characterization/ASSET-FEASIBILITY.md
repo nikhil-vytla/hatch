@@ -54,9 +54,13 @@ do not exist in the tree. The receipt checks that absence.
   and the default reported verdict are different contracts.
 - Reproducible now: strict evaluation is feasible after downloading the exact
   BIRD database release and matching gold SQL. SQL counterfactual generation is
-  deterministic once Stage 1 output and the database are fixed. Exact Stage 1,
-  SQL predecessor output, default LLM-judge decisions, and paper scores cannot
-  be recreated from this pin.
+  nondeterministic by default. It uses global `random.shuffle`, defaults to
+  four worker threads, and appends results in completion order. A fixed seed
+  alone is insufficient. Identity or byte-level comparisons also require fixed
+  Stage 1 and database bytes, worker count, runtime behavior, later provider
+  behavior, and canonical output ordering. Exact Stage 1, SQL predecessor
+  output, default LLM-judge decisions, and paper scores cannot be recreated
+  from this pin.
 - Access and license: the databases are a large external download. CC BY-SA
   attribution and share-alike duties apply to redistributed dataset material.
   This PR commits no BIRD rows, SQL, evidence, or database bytes.

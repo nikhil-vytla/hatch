@@ -1,4 +1,45 @@
 {
+  "bird_sql_reproducibility": {
+    "classification": "nondeterministic_unless_mechanically_constrained",
+    "observations": [
+      "global random.shuffle selects candidate order",
+      "the CLI seeds the global RNG once",
+      "the CLI defaults to four worker threads",
+      "parallel results append in future completion order",
+      "seed alone does not fix output order"
+    ],
+    "required_constraints": [
+      "fixed input and database bytes",
+      "fixed seed",
+      "fixed worker count and runtime behavior",
+      "fixed provider behavior for later stages",
+      "canonical output ordering before identity or byte comparison"
+    ],
+    "source": "intent_construction/retrospective_expansion/counterfactual/generate_counterfactuals_sql.py",
+    "symbols": [
+      {
+        "line_end": 423,
+        "line_start": 345,
+        "symbol": "SQLCounterfactualGenerator.generate_counterfactual"
+      },
+      {
+        "line_end": 469,
+        "line_start": 425,
+        "symbol": "SQLCounterfactualGenerator.generate_having_counterfactuals"
+      },
+      {
+        "line_end": 508,
+        "line_start": 471,
+        "symbol": "SQLCounterfactualGenerator.generate_limit_counterfactuals"
+      },
+      {
+        "line_end": 825,
+        "line_start": 604,
+        "symbol": "main"
+      }
+    ]
+  },
+  "canonical_sha256": "4f2a34f999f872ed57c4a269fe08ac8537fc068d68f37d6ae7820522e8e42662",
   "claim_limits": [
     "The scheduler probe is synthetic and characterizes code contracts only.",
     "No provider-generated extraction, counterfactual, predecessor, or final dataset is present.",
@@ -115,7 +156,9 @@
       "observable_contract": [
         "strip category=symptom before generic scheduling",
         "install a post_fill_hook",
-        "inject symptoms before other arguments in their function phase"
+        "repair cross-phase ownership and redistribute within phases",
+        "insert symptoms at index zero before the final canonical sort",
+        "sort recognized categories before stripped symptom IDs"
       ],
       "source": "situated_simulation/turn_scheduler_swe.py",
       "stage": "swe_overlay",
@@ -124,6 +167,11 @@
           "line_end": 131,
           "line_start": 82,
           "symbol": "_strip_symptoms"
+        },
+        {
+          "line_end": 623,
+          "line_start": 484,
+          "symbol": "_make_inject_hook"
         },
         {
           "line_end": 691,
@@ -258,22 +306,83 @@
     ],
     "scenario": "combined",
     "swe_overlay": {
-      "ceil_front_7_into_3": [
-        3,
-        2,
-        2
+      "after_argument_ids": [
+        [
+          102,
+          101,
+          190
+        ],
+        [
+          103,
+          191
+        ],
+        [
+          1,
+          2,
+          3,
+          90
+        ]
       ],
-      "normalized_source_function": "SOURCE_FUNCTION.",
-      "predecessor_symptom_ids": {
-        "PREDECESSOR_FUNCTION.": [
-          101
+      "after_argument_texts": [
+        [
+          "PG_LOCATION",
+          "PG_APPROACH",
+          "PG_SYMPTOM_A"
+        ],
+        [
+          "LEAKED_PG_CONSTRAINT",
+          "PG_SYMPTOM_B"
+        ],
+        [
+          "SOURCE_TRIGGER",
+          "SOURCE_LOCATION",
+          "SOURCE_CONSTRAINT",
+          "SOURCE_SYMPTOM"
+        ]
+      ],
+      "before_argument_ids": [
+        [
+          1,
+          101,
+          102
+        ],
+        [],
+        [
+          103,
+          3,
+          2
+        ]
+      ],
+      "observed_order_note": "The hook inserts symptoms at index zero, then its canonical sort uses the stripped raw record. Stripped symptom IDs have no category entry and therefore sort after recognized categories.",
+      "phase_owned_ids": {
+        "predecessor": [
+          101,
+          102,
+          103
+        ],
+        "source": [
+          1,
+          2,
+          3
         ]
       },
-      "stripped_source_argument_ids": [
-        1
+      "probe_kind": "synthetic_slot_probe",
+      "provider_output": false,
+      "rendered_turns": [
+        "PREDECESSOR. PG_LOCATION PG_APPROACH PG_SYMPTOM_A",
+        "[REVEAL] LEAKED_PG_CONSTRAINT PG_SYMPTOM_B",
+        "[FUNCTION] SOURCE. [AFTER_FUNCTION] SOURCE_TRIGGER SOURCE_LOCATION SOURCE_CONSTRAINT SOURCE_SYMPTOM"
       ],
-      "target_symptom_ids": [
-        2
+      "symptom_positions": [
+        [
+          2
+        ],
+        [
+          1
+        ],
+        [
+          3
+        ]
       ]
     },
     "transition_types": [
