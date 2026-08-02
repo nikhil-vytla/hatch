@@ -1,0 +1,62 @@
+"""Content-addressed Parallax domain and native-verifier core."""
+
+from .artifacts import (
+    ArtifactError,
+    PublicationReceipt,
+    ReplayLock,
+    TreePolicy,
+    TreeSnapshot,
+    make_replay_lock,
+    publish_public_task,
+    replay_locked,
+    snapshot_tree,
+)
+from .canonical import CanonicalValueError, canonical_bytes, content_id, sha256_digest
+from .gsm8k import admit_task, build_task, grade_gsm8k, parse_final_answer, source_asset_manifest
+from .records import (
+    AdmissionError,
+    AssetEntry,
+    AssetManifest,
+    DomainSourceIdentity,
+    GradeResult,
+    NativeTask,
+    Provenance,
+    PublicTaskIdentity,
+    RuntimePolicy,
+    SealedTaskIdentity,
+    Verdict,
+    VerifierCommitment,
+)
+
+__all__ = [
+    "AdmissionError",
+    "ArtifactError",
+    "AssetEntry",
+    "AssetManifest",
+    "CanonicalValueError",
+    "DomainSourceIdentity",
+    "GradeResult",
+    "NativeTask",
+    "Provenance",
+    "PublicationReceipt",
+    "PublicTaskIdentity",
+    "ReplayLock",
+    "RuntimePolicy",
+    "SealedTaskIdentity",
+    "TreePolicy",
+    "TreeSnapshot",
+    "Verdict",
+    "VerifierCommitment",
+    "admit_task",
+    "build_task",
+    "canonical_bytes",
+    "content_id",
+    "grade_gsm8k",
+    "make_replay_lock",
+    "parse_final_answer",
+    "publish_public_task",
+    "replay_locked",
+    "sha256_digest",
+    "snapshot_tree",
+    "source_asset_manifest",
+]

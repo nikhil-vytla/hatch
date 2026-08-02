@@ -21,3 +21,19 @@
 - The executable SWE probe exposed a narrower result than the earlier prose claimed. Symptoms are inserted at index zero, but the final category sort receives the stripped record, so symptom IDs lack category entries and sort after recognized categories. The report now records this exact behavior and drops the symptom-first rendering claim.
 - Added a canonical SHA-256 over every receipt field and pinned it in the characterizer. Offline verification checks this seal and semantic invariants; the optional pinned-checkout test remains stronger because it regenerates the receipt by executing the pinned source.
 - Final verification passed: offline receipt verification, 12 offline tests with the optional checkout test skipped, all 12 tests against the pinned checkout, `py_compile`, and `git diff --check`. The credential/private-path scan found only the intentional `/tmp/receipt.json` example, negative assertions for `/Users/` and `/tmp/`, and labeled synthetic or negative-evidence tokens. No credential, private trace ID, benchmark plaintext, hidden answer, or newly redistributed licensed asset was found.
+
+## PR2 domain and verifier core
+
+- Moved the PR1 subtree into `parallax/characterization/`. Product notes and the summary now have one durable home at `parallax/`.
+- Added canonical UTF-8 JSON that rejects floats, non-NFC text, native paths, bytes, non-string keys, and integers outside the signed 64-bit range.
+- Added typed immutable source, asset, verifier, public task, sealed task, grade, publication, tree snapshot, and replay-lock records.
+- Bound native evaluator and parser source bytes, parser and evaluation policies, answer authority, assets, runtime policy, dependencies, and schemas into sealed identity.
+- Implemented only the native GSM8K final-answer contract. The parser accepts one final canonical integer marker; malformed or ambiguous output is invalid.
+- Added pre-execution admission checks for the exact asset set and bytes, local evaluator and parser implementation, answer authority, runtime policy, and sealed identity.
+- Added same-filesystem staged publication, manifest verification, atomic rename, deterministic tree snapshots, and locked byte replay.
+- Replay rejects changed or missing files, unexpected files, symlinks, non-regular entries, path escapes, changed verifier code, and changed assets.
+- Core tests use only labeled synthetic prompts and answers. No benchmark plaintext or hidden answer is stored.
+- Focused verification initially passed 13 core tests and 12 characterization tests with one optional pinned-checkout test skipped.
+- Hardened tree replay to reject unexpected directories and a symlink used as the snapshot root; the core suite now has 14 tests.
+- Final checks passed: 14 core tests, 12 characterization tests with one optional pinned-checkout refresh skipped, strict `mypy`, Ruff, `py_compile`, wheel build plus installed-wheel import, and `git diff --check`.
+- The final content scan found no credential, private path, private key, trace ID, or benchmark answer. Numeric grading fixtures are explicitly labeled synthetic.

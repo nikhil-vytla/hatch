@@ -125,7 +125,7 @@ changed published ID count, or changed scheduler receipt.
 
 ## Adapter feasibility
 
-[`ASSET-FEASIBILITY.md`](ASSET-FEASIBILITY.md) records public inputs, generated
+[`../docs/asset-feasibility.md`](../docs/asset-feasibility.md) records public inputs, generated
 and intermediate assets, native evaluator requirements, licenses, access
 restrictions, and current reproducibility for GSM8K, BIRD-SQL, BrowseComp+, and
 SWE-bench Verified.
@@ -162,8 +162,8 @@ upstream rendering, `ChangePlan`, or the SWE overlay. Its exact-byte locked
 replay remains evidence of deterministic artifact handling for invalid frozen
 inputs. It is not evidence of Evolving Intent.
 
-[`ADR.md`](ADR.md) keeps the accepted invariant and claim boundary.
-[`MIGRATION.md`](MIGRATION.md) classifies old artifacts as accepted,
+[`../docs/source-characterization.md`](../docs/source-characterization.md) keeps the accepted invariant and claim boundary.
+[`../docs/migration.md`](../docs/migration.md) classifies old artifacts as accepted,
 superseded, negative evidence, deferred hypotheses, or rejected
 implementation.
 
@@ -172,8 +172,8 @@ implementation.
 - `characterize.py`: refresh, offline verification, and unavailable-asset CLI
 - `fixtures/receipt.json`: immutable source, contract, scheduler, and ID receipt
 - `tests/test_characterize.py`: offline and optional pinned-checkout gates
-- `ADR.md`: concise source invariant and implementation boundary
-- `MIGRATION.md`: evidence-branch migration ledger
-- `ASSET-FEASIBILITY.md`: four-adapter asset review
-- `NOTES.md`: investigation log
-- `_summary.md`: short project index entry
+- `../docs/source-characterization.md`: source invariant and implementation boundary
+- `../docs/migration.md`: evidence-branch migration ledger
+- `../docs/asset-feasibility.md`: four-adapter asset review
+- `../NOTES.md`: product investigation log
+- `../_summary.md`: short project index entry
