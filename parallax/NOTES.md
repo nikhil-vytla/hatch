@@ -2,24 +2,24 @@
 
 ## 2026-08-02
 
-- Started from `origin/main` commit `8746e20` on the PR1 branch.
-- Scope is PR1 only: characterize the pinned Microsoft Evolving Intent implementation and published adapter asset feasibility. No production synthesis or experiment code belongs here.
-- Treat the original evidence worktree as read-only. Verify every source revision and hash independently before recording it.
-- Independently cloned `https://github.com/microsoft/evolving-intent`, detached at `993d6be9597ac03854b46362ccd647eb1bfd267a`, and verified tree `7ba418a8c6bddf5e650dc1808f7316a018d76168`.
-- Recomputed Git blob SHA-1 and file SHA-256 values for the extraction, counterfactual, predecessor, trajectory, scheduler, renderer, SWE overlay, evaluator, license, and published evaluation-index files. The two old SWE scheduler hashes matched; the remaining hashes were derived fresh.
-- Confirmed the observable upstream sequence: `BaseExtractor.extract`; `CounterfactualGenerator.generate_counterfactuals`; `PredecessorGenerator._generate_chain` with immediate-successor conditioning and fallback-model escalation; `create_sample`; `build_change_plan`; and `create_sample_swe`.
-- Ran the pinned scheduler with a clearly labeled synthetic contract probe and deterministic prefix callables. The requested `(t=7, g=2, p=2)` probe retained six non-empty turns, followed farthest-to-nearest-to-source function order, and restored all source argument values and the final label.
-- Confirmed the SWE overlay normalizes function punctuation, strips symptom arguments before generic scheduling, and installs a post-fill hook that redistributes and reinjects them by function phase.
-- Confirmed all four committed evaluation ID manifests exist with counts GSM8K 200, BIRD-SQL 100, BrowseComp+ 100, and SWE-bench Verified 50. Every named generated source file under `final_dataset/` is absent.
-- Confirmed `.gitignore` excludes Stage 1 output, counterfactual output, predecessor output, final datasets, external dataset directories, experiment outputs, workspaces, and logs.
-- Asset review: GSM8K is MIT and light enough for a later native verifier slice. BIRD data is CC BY-SA 4.0 and needs large database packages. BrowseComp+ is MIT but obfuscated and needs external corpus/index assets plus an LLM judge after exact-match failure. SWE-bench is MIT at the harness level but needs Docker, instance images, source repositories, and target-repository licenses.
-- The pinned dependency file is not an environment lock: it uses lower bounds and leaves `mini-swe-agent` unversioned.
-- The old `parallax.frozen-proposal.v1` path is negative evidence. Its fixture has repeated-character digest placeholders and a `school_supply_sales` context unrelated to the Natalia source question. Its compiler appends the source question and checks a sentinel goal; it does not execute any upstream construction or scheduler stage.
-- The characterization receipt contains no provider output or benchmark plaintext. Its contract probe uses symbolic tokens and is explicitly marked synthetic so it cannot be mistaken for generated benchmark data.
-- Independent review found that the BIRD-SQL generator is not deterministic by default. The pin seeds one global RNG, but each sample shuffles candidate lists, the CLI defaults to four worker threads, and successful results append in future-completion order. Reproducibility therefore needs fixed inputs, database bytes, seed, worker count, runtime and later provider behavior, plus canonical output ordering.
-- Replaced the shallow SWE check with an executable call to the pinned `_make_inject_hook`, followed by pinned `fill_texts` and `render_turns`. A synthetic slot layout deliberately leaks source and predecessor arguments across phases and leaves a phase-internal hole. The observed hook repairs ownership, refills the hole from the same phase, inserts all symptoms, sorts, and produces three locked rendered turns.
-- The executable SWE probe exposed a narrower result than the earlier prose claimed. Symptoms are inserted at index zero, but the final category sort receives the stripped record, so symptom IDs lack category entries and sort after recognized categories. The report now records this exact behavior and drops the symptom-first rendering claim.
-- Added a canonical SHA-256 over every receipt field and pinned it in the characterizer. Offline verification checks this seal and semantic invariants; the optional pinned-checkout test remains stronger because it regenerates the receipt by executing the pinned source.
-- Final verification passed: offline receipt verification, 12 offline tests with the optional checkout test skipped, all 12 tests against the pinned checkout, `py_compile`, and `git diff --check`. The credential/private-path scan found only the intentional `/tmp/receipt.json` example, negative assertions for `/Users/` and `/tmp/`, and labeled synthetic or negative-evidence tokens. No credential, private trace ID, benchmark plaintext, hidden answer, or newly redistributed licensed asset was found.
-- Moved PR1 into the durable `parallax/` product root from a separate clean worktree at the latest remote PR1 tip. The product-level `README.md`, `NOTES.md`, and `_summary.md` are the only AGENTS trio; characterization code, fixture, tests, and local ignores now live under `characterization/`, while the ADR and evidence documents live under `docs/`.
-- Relocation verification passed from `parallax/`: 12 offline tests passed with the optional pinned-checkout test skipped, all 12 pinned-checkout tests passed, `py_compile` passed, and a fresh receipt recomputation matched the committed fixture byte for byte. The root-level PR template was unchanged, and scans found no obsolete directory reference, credential, private trace ID, or local absolute path in committed evidence.
+- Established `parallax/` as the durable product root for the clean sequence.
+- Reviewed the Evolving Intent paper and the canonical Microsoft repository at
+  its immutable reference commit.
+- Separated the general Parallax research model from Evolving Intent, which is
+  one synthesis strategy over a task and environment specification.
+- Defined the minimum vocabulary needed by later code: task and environment
+  specifications, trajectories, interventions, admission invariants,
+  controlled arms, run evidence, and estimands.
+- Kept verifier authority and sealed information explicit so experiments do
+  not mistake evaluator drift or answer leakage for an agent effect.
+- Recorded the Evolving Intent stages and semantic contracts that PR3 must
+  validate with Parallax-owned tests.
+- Confirmed that upstream generated pools and provider transcripts are not
+  published, so this work cannot support byte-identical or paper-score
+  reproduction claims.
+- Removed the earlier executable evidence scaffolding and split-out research
+  notes after review. PR3 will own behavioral validation.
+- Kept this PR to the required product trio and two focused method documents.
+- Final checks covered internal and external links, balanced display math,
+  required classification labels and symbols, summary shape, private paths and
+  credential patterns, the untouched PR template, and `git diff --check`.
