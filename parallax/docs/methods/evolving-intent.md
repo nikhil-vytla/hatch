@@ -99,9 +99,9 @@ matched presentation of the same verifiable task does not. The effect is an
 empirical estimand under the controlled-arm rules in `MODEL.md`, not a property
 assumed by construction.
 
-## PR3 behavioral contracts
+## Required behavioral coverage
 
-PR3 must add Parallax-owned tests for:
+The independent implementation requires Parallax-owned regression coverage for:
 
 - extraction of source function and arguments;
 - argument counterfactual acceptance and selection;
@@ -118,13 +118,25 @@ PR3 must add Parallax-owned tests for:
 These are semantic contracts. They do not require provider-text or byte parity
 with the consulted repository.
 
+> [!NOTE]
+> No executable Evolving Intent implementation or behavioral regression suite
+> exists in the repository yet.
+
+> **TODO:** Add behavioral tests for extraction and argument expansion;
+> predecessor and fallback behavior; trajectory construction; partial-order
+> scheduling; rendering; terminal source restoration; matched budgets and
+> verifier authority; overlays; and every documented implementation deviation.
+
 ## Interpretation and limits
 
 Where the paper leaves behavior open, a Parallax adapter must document its
-interpretation. Any intentional difference from the consulted implementation
-must be explicit and covered by a PR3 behavioral test.
+interpretation.
 
-Two details may affect future adapters. BIRD-SQL construction uses global
+> [!IMPORTANT]
+> Every intentional difference from the consulted implementation requires an
+> explicit rationale and behavioral regression coverage.
+
+Two details may affect adapters. BIRD-SQL construction uses global
 shuffling, multiple workers, and completion-order collection, so a seed alone
 does not define output order. The consulted SWE overlay strips symptom
 arguments before scheduling and reinserts them later; its final category sort
@@ -132,5 +144,9 @@ can place symptoms after recognized categories.
 
 The upstream generated pools and provider transcripts are not published in the
 repository. Parallax therefore makes no claim of byte-identical dataset
-reproduction, provider replay, or paper-score reproduction. This PR introduces
-no runtime implementation or test suite.
+reproduction, provider replay, or paper-score reproduction.
+
+> [!WARNING]
+> Generated pools and provider transcripts are unavailable. Reported results
+> cannot be treated as reproductions of the paper without independently
+> retained construction and evaluation evidence.
