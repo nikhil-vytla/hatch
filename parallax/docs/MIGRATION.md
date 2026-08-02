@@ -23,14 +23,15 @@ branch part of this PR.
 ## Superseded
 
 - `architecture/evolving-intent-pipeline/FORMAL-MODEL.md` and `ADR-001.md` are
-  superseded for the clean stack by the smaller invariant in `ADR.md`. The old
-  documents mixed this source characterization with later research protocol,
-  checkpoint evolution, and experiment design.
+  superseded for the clean stack by the smaller invariant in
+  `adr/0001-upstream-characterization.md`. The old documents mixed this source
+  characterization with later research protocol, checkpoint evolution, and
+  experiment design.
 - The old Unit 0 family-build receipt is superseded as an Evolving Intent gate
-  by `fixtures/receipt.json`. Its valid locked-build result remains historical
-  evidence for artifact determinism.
+  by `../characterization/fixtures/receipt.json`. Its valid locked-build result
+  remains historical evidence for artifact determinism.
 - The prose-only SWE correction is superseded by the executable source and
-  overlay checks in `characterize.py`.
+  overlay checks in `../characterization/characterize.py`.
 
 ## Negative evidence
 

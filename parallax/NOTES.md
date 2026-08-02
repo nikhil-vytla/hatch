@@ -2,7 +2,7 @@
 
 ## 2026-08-02
 
-- Started from `origin/main` commit `8746e20` on `cursor/parallax-upstream-characterization`.
+- Started from `origin/main` commit `8746e20` on the PR1 branch.
 - Scope is PR1 only: characterize the pinned Microsoft Evolving Intent implementation and published adapter asset feasibility. No production synthesis or experiment code belongs here.
 - Treat the original evidence worktree as read-only. Verify every source revision and hash independently before recording it.
 - Independently cloned `https://github.com/microsoft/evolving-intent`, detached at `993d6be9597ac03854b46362ccd647eb1bfd267a`, and verified tree `7ba418a8c6bddf5e650dc1808f7316a018d76168`.
@@ -21,3 +21,5 @@
 - The executable SWE probe exposed a narrower result than the earlier prose claimed. Symptoms are inserted at index zero, but the final category sort receives the stripped record, so symptom IDs lack category entries and sort after recognized categories. The report now records this exact behavior and drops the symptom-first rendering claim.
 - Added a canonical SHA-256 over every receipt field and pinned it in the characterizer. Offline verification checks this seal and semantic invariants; the optional pinned-checkout test remains stronger because it regenerates the receipt by executing the pinned source.
 - Final verification passed: offline receipt verification, 12 offline tests with the optional checkout test skipped, all 12 tests against the pinned checkout, `py_compile`, and `git diff --check`. The credential/private-path scan found only the intentional `/tmp/receipt.json` example, negative assertions for `/Users/` and `/tmp/`, and labeled synthetic or negative-evidence tokens. No credential, private trace ID, benchmark plaintext, hidden answer, or newly redistributed licensed asset was found.
+- Moved PR1 into the durable `parallax/` product root from a separate clean worktree at the latest remote PR1 tip. The product-level `README.md`, `NOTES.md`, and `_summary.md` are the only AGENTS trio; characterization code, fixture, tests, and local ignores now live under `characterization/`, while the ADR and evidence documents live under `docs/`.
+- Relocation verification passed from `parallax/`: 12 offline tests passed with the optional pinned-checkout test skipped, all 12 pinned-checkout tests passed, `py_compile` passed, and a fresh receipt recomputation matched the committed fixture byte for byte. The root-level PR template was unchanged, and scans found no obsolete directory reference, credential, private trace ID, or local absolute path in committed evidence.
