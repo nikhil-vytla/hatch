@@ -1,7 +1,7 @@
 # Parallax research model
 
 Parallax studies how agents respond when a task, its environment, or the
-interaction schedule changes. The model below fixes the vocabulary for later
+interaction schedule changes. The model below fixes the vocabulary for
 implementations and experiments. It is a specification, not a theorem.
 
 ## Task and environment
@@ -52,6 +52,10 @@ studies leakage.
 **Invariant (authority separation).** Public task information may guide the
 policy. Sealed information and verifier internals may determine evaluation but
 must not enter agent-visible observations in an admitted non-leakage study.
+
+> [!IMPORTANT]
+> Verifier authority and sealed evaluator information are part of experimental
+> validity. An arm that leaks or silently changes them is not comparable.
 
 ## Synthesis and admission
 
@@ -110,7 +114,14 @@ matched or randomized according to the design.
 to audit an outcome: arm assignment, source identity, admitted specifications,
 agent and environment versions, observations, actions, tool results, resource
 usage, verifier verdict, reward, and relevant randomness. This is a conceptual
-requirement; this PR defines no serialization format.
+requirement.
+
+> [!NOTE]
+> No code representation or serialization format for task specifications,
+> environment specifications, admission results, or run evidence exists yet.
+
+> **TODO:** Define content-addressed representations for admitted task and
+> environment specifications, verifier identity, and retained run evidence.
 
 **Estimand.** For outcome \(Y\), a basic matched-arm effect is
 
@@ -136,5 +147,9 @@ invariant.
 schedule while restoring the source task for final evaluation. Other
 strategies may transform different task or environment axes.
 
-Checkpoint evolution will be specified later as a separate strategy and state
-machine. It is not an Evolving Intent stage and is not defined by this PR.
+> [!NOTE]
+> Checkpoint evolution is a separate strategy and state machine. It is not an
+> Evolving Intent stage and is not specified here.
+
+> **TODO:** Specify checkpoint-evolution states, transition guards, admission
+> invariants, and controlled-arm semantics before implementing that strategy.
