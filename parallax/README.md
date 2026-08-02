@@ -1,59 +1,237 @@
 # Parallax
 
-Parallax starts with a small content-addressed domain and native-verifier core. This PR admits only GSM8K. It adds no Evolving Intent synthesis, experiment runner, provider adapter, campaign API, HUD integration, or Click recipe.
+Parallax is a research harness for finding modern-agent failure modes, turning
+them into questions about agent training and RL environments, synthesizing
+harder but verifiable tasks from existing benchmarks and codebases, and running
+controlled experiments with trustworthy evidence.
 
-## What is committed
+This folder is the durable product root. PR1 records what the pinned Microsoft
+Evolving Intent implementation does, what public adapter assets exist, and what
+is missing. It does not add synthesis, a production API, an experiment runner,
+a HUD adapter, or a CLI recipe.
 
-Every durable identifier uses canonical UTF-8 JSON and a preimage with an explicit `parallax-content-id`, version, namespace, and SHA-256 algorithm separator. Canonical values reject floats, non-string map keys, non-NFC text, unbounded integers, paths, bytes, and other platform-dependent objects.
+The old research branch is not being merged wholesale. It mixes useful
+historical evidence with prototypes, hand-authored pseudo-Evolving-Intent
+behavior, and incomplete verifier identity. The clean sequence is:
 
-A public task commits the source identity, prompt, and public asset manifest. It does not contain the answer authority, verifier commitment, sealed evaluator data, or sealed task ID. The sealed identity binds the public ID, native verifier commitment, and evaluator-data digest.
+1. pinned upstream characterization
+2. content-addressed domain and native-verifier core
+3. real GSM8K Evolving Intent construction
+4. controlled experiment runner
 
-The verifier commitment binds:
+Later units consume this PR's exact source pins, executable scheduler and SWE
+contracts, canonical receipt, and explicit unavailable-asset behavior.
 
-- evaluator implementation bytes and exact-comparison policy
-- parser implementation bytes and the final-line grammar
-- answer authority digest
-- individually digested assets and their provenance
-- runtime and dependency policy
-- record schemas and versions
+## Domain and verifier core
 
-Admission verifies these commitments before parsing or evaluation. Grading always returns one of `pass`, `task_failure`, `invalid_submission`, `harness_failure`, or `verifier_failure`. Expected model mistakes do not become verifier exceptions.
+PR2 adds the minimal content-addressed core for GSM8K task identity, native
+grading, atomic public artifact publication, and locked replay. It does not add
+Evolving Intent construction or experiment execution.
 
-## GSM8K contract
+Canonical UTF-8 JSON and domain-separated SHA-256 IDs bind source records and
+individual asset provenance. Public task identity contains the source, prompt,
+and public asset manifest only. Sealed identity binds evaluator and parser
+source bytes and policies, answer authority, assets, runtime and dependency
+policy, and schemas.
 
-The only accepted response form ends with exactly one line matching:
+Admission verifies those commitments before evaluation. Native GSM8K grading
+returns `pass`, `task_failure`, `invalid_submission`, `harness_failure`, or
+`verifier_failure`. Public artifacts are exposed with one atomic rename.
+Locked replay rejects changed, missing, or unexpected paths, symlinks, and
+changed verifier or asset bytes.
 
-```text
-FINAL_ANSWER: -?(0|[1-9][0-9]*)
+See [`docs/architecture.md`](docs/architecture.md) for the PR2 record flow and
+invariants. [`docs/MIGRATION.md`](docs/MIGRATION.md) records which
+evidence-branch concepts the clean stack accepts or rejects.
+
+## Result
+
+The characterizer independently verifies Microsoft Evolving Intent commit
+[`993d6be9597ac03854b46362ccd647eb1bfd267a`](https://github.com/microsoft/evolving-intent/tree/993d6be9597ac03854b46362ccd647eb1bfd267a)
+and tree `7ba418a8c6bddf5e650dc1808f7316a018d76168`. The receipt pins Git blob
+SHA-1 and file SHA-256 values for the implementation stages, scheduler,
+renderers, SWE overlay, evaluators, license, and all four published evaluation
+ID pairs.
+
+The source implements these observable stages and contracts:
+
+1. `BaseExtractor.extract` decomposes a source item, converts it to
+   conversational function and arguments, checks coverage, optionally checks
+   solvability, and builds output.
+2. `CounterfactualGenerator.generate_counterfactuals` calls a provider for
+   each eligible argument, validates replacement shape, and stores accepted
+   variants in `counterfactual_arguments`. BIRD-SQL uses a separate
+   database-backed generator, but its output is nondeterministic by default.
+   It uses global `random.shuffle`, defaults to four worker threads, and
+   appends results in future-completion order. A seed alone does not fix order.
+3. `PredecessorGenerator._generate_chain` recursively conditions each new
+   predecessor on the immediate successor and its full arguments.
+   `_generate_single_predecessor` switches to `fallback_model` after half of
+   `max_attempts`.
+4. The plan-first scheduler selects predecessors farthest-first, selects
+   evaluation revisions round-robin, schedules events, fills reveals, fills
+   text, renders turns, and builds `ChangePlan`.
+5. Rendering orders function, correction, then reveals within a turn.
+6. `build_change_plan` emits one `UserIntent` per retained turn and an
+   `IntentTransition` between turns. The final state restores the source
+   function, source argument values, complete revealed set, and source label.
+7. The SWE-bench Verified wrapper removes symptom arguments before generic
+   scheduling, then uses `post_fill_hook` to repair phase ownership,
+   redistribute within each phase, reinsert symptoms, and sort arguments. The
+   executable probe catches a source argument and a predecessor argument
+   deliberately placed in the wrong phases, checks their repaired locations,
+   checks same-phase redistribution, and renders the resulting turns.
+
+The pinned hook does not preserve symptom-first rendering when a slot also has
+recognized non-symptom categories. It inserts each symptom at index zero, then
+sorts using the stripped record. Because stripping removed symptom category
+entries, the final sort treats those IDs as unknown and places them after
+recognized categories. The receipt locks that observed order rather than the
+stronger symptom-first claim.
+
+The deterministic contract probe requests `(t=7, g=2, p=2)`. Upstream trims
+one empty slot, so the observed result has six user turns. It moves from the
+farthest predecessor to the nearer predecessor and then the source function.
+The final correction restores the remaining counterfactual argument. Injected
+prefix functions make the six rendered strings stable and suitable for later
+implementation parity tests.
+
+## Evidence boundaries
+
+`characterization/fixtures/receipt.json` is generated by running the exact
+pinned source. Its symbolic scheduler and SWE slot probes are not
+provider-generated benchmark records. They expose control flow, ownership
+repair, argument order, and rendering without a model call.
+
+Offline verification recomputes a canonical SHA-256 over every receipt field
+and compares it with the digest pinned in
+`characterization/characterize.py`. This catches changes to contract text,
+source ranges, trajectory values, index paths, source-file claims, hashes, and
+probe results. It does not inspect an upstream checkout. The optional
+pinned-checkout test is stronger because it reruns source, hash, AST, index,
+scheduler, hook, and renderer characterization and compares the complete
+regenerated receipt.
+
+The upstream repository does not commit Stage 1 extraction output, Stage 2
+counterfactual output, Stage 3 predecessor output, final generated datasets,
+provider transcripts, rejected attempts, or paper result bundles. Its
+`.gitignore` excludes those paths. The characterizer returns a distinct
+nonzero status for every requested generated asset:
+
+```shell
+python characterization/characterize.py asset \
+  --receipt characterization/fixtures/receipt.json \
+  --adapter gsm8k \
+  --asset final_dataset
 ```
 
-Reasoning may precede that line. Extra markers, leading zeros, suffix text, missing markers, and oversized integers are invalid submissions. The evaluator compares the parsed canonical integer string with sealed answer authority.
+The command prints `status: unavailable` as JSON and exits 3. No hand-authored
+record is promoted to replace the missing asset.
 
-Tests use labeled synthetic prompts and answers. No benchmark row or hidden answer is committed.
+This project does not claim byte-identical reproduction. The source revision
+and deterministic scheduler probe are exact, but generated data depends on
+unpublished provider exchanges, mutable model services, and unlocked
+dependencies.
 
-## Publication and replay
-
-Public artifacts are built in a same-filesystem staging directory, verified against their canonical artifact manifest, and exposed with one atomic rename. The public tree policy allows only `task.json` and `publication-manifest.json`; it ignores nothing. Replay checks an immutable tree snapshot, rejects missing or unexpected files and all symlinks, re-runs admission, and verifies the locked verifier, assets, public identity, and artifact manifest before returning bytes.
-
-See [`docs/architecture.md`](docs/architecture.md) for the record flow and invariants. [`docs/migration.md`](docs/migration.md) states what the clean stack retained or rejected from the evidence branch. The pinned upstream characterization and machine receipt live under [`characterization/`](characterization/).
-
-## Run checks
+## Run offline checks
 
 From `parallax/`:
 
 ```shell
 PYTHONPATH=src python -m unittest discover -s tests -v
+python characterization/characterize.py verify \
+  --receipt characterization/fixtures/receipt.json
 python -m unittest discover -s characterization/tests -v
-python -m py_compile src/parallax/*.py tests/test_core.py   characterization/characterize.py characterization/tests/test_characterize.py
+uvx mypy src
+python -m ruff check src tests characterization
+python -m py_compile src/parallax/*.py tests/test_core.py \
+  characterization/characterize.py \
+  characterization/tests/test_characterize.py
 ```
 
-Package and import checks:
+Build and import the package:
 
 ```shell
-python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/parallax-wheel .
+python -m pip wheel --no-deps --no-build-isolation \
+  --wheel-dir /tmp/parallax-wheel .
 PYTHONPATH=src python -c 'import parallax'
 ```
 
-## Current limits
+These checks need no network, credentials, model call, benchmark plaintext,
+database, corpus, index, Docker image, or hidden answer.
 
-PR2 does not fetch GSM8K, synthesize trajectories, run experiments, claim Microsoft Evolving Intent parity, or support BIRD-SQL, BrowseComp+, or SWE-bench. The runtime policy commits CPython `>=3.11,<4` with no third-party runtime dependencies; it does not claim cross-interpreter equivalence. PR3 and PR4 must build on these identities without weakening admission or exposing sealed data.
+## Refresh from upstream
+
+Clone the repository separately and detach at the pinned revision. Then run:
+
+```shell
+python characterization/characterize.py refresh \
+  --upstream /path/to/evolving-intent \
+  --output /tmp/receipt.json
+
+EVOLVING_INTENT_UPSTREAM=/path/to/evolving-intent \
+  python -m unittest discover -s characterization/tests -v
+```
+
+Refresh rejects a different revision, tree, dirty checkout, missing file, blob
+change, content change, missing source symbol, changed control-flow fragment,
+changed published ID count, or changed scheduler receipt.
+
+## Adapter feasibility
+
+[`docs/ASSET-FEASIBILITY.md`](docs/ASSET-FEASIBILITY.md) records public inputs,
+generated and intermediate assets, native evaluator requirements, licenses,
+access restrictions, and current reproducibility for GSM8K, BIRD-SQL,
+BrowseComp+, and SWE-bench Verified.
+
+The short result is:
+
+- GSM8K has public MIT inputs and a light final-answer verifier, but no
+  generated Evolving Intent pool.
+- BIRD-SQL strict execution can run after acquiring the CC BY-SA 4.0 database
+  package and matching gold SQL. Default post-grading may also call an LLM
+  judge. Counterfactual generation remains nondeterministic unless input and
+  database bytes, seed, worker count, runtime and later provider behavior, and
+  canonical output ordering are all constrained.
+- BrowseComp+ is public and MIT-labeled but deliberately obfuscated. Full
+  evaluation needs decrypted inputs, a large corpus, FAISS indexes, an
+  embedding model, and an LLM judge after exact-match failure.
+- SWE-bench Verified is public and uses the MIT SWE-bench harness. Evaluation
+  needs Docker, source repositories, test assets, and per-instance images. The
+  pinned Microsoft requirements leave `mini-swe-agent` unversioned and use a
+  lower bound for `swebench`.
+
+## Why the old compile path does not qualify
+
+The evidence branch's `parallax.frozen-proposal.v1` fixture is hand-authored.
+It contains repeated-character digest placeholders and a
+`school_supply_sales` context that does not match the Natalia clips source
+task. `compile_plans` copies authored event messages and appends the full source
+question as the terminal turn. `replay_plan` checks a literal
+`answer_source_task` goal and the copied anchor.
+
+That path never runs extraction, argument counterfactual generation, function
+predecessor generation, plan-first scheduling, argument filling, text filling,
+upstream rendering, `ChangePlan`, or the SWE overlay. Its exact-byte locked
+replay remains evidence of deterministic artifact handling for invalid frozen
+inputs. It is not evidence of Evolving Intent.
+
+[`docs/adr/0001-upstream-characterization.md`](docs/adr/0001-upstream-characterization.md)
+keeps the accepted invariant and claim boundary.
+[`docs/MIGRATION.md`](docs/MIGRATION.md) classifies old artifacts as accepted,
+superseded, negative evidence, deferred hypotheses, or rejected implementation.
+
+## Files
+
+- `characterization/characterize.py`: refresh, offline verification, and
+  unavailable-asset CLI
+- `characterization/fixtures/receipt.json`: immutable source, contract,
+  scheduler, and ID receipt
+- `characterization/tests/test_characterize.py`: offline and optional
+  pinned-checkout gates
+- `docs/adr/0001-upstream-characterization.md`: concise source invariant and
+  implementation boundary
+- `docs/MIGRATION.md`: evidence-branch migration ledger
+- `docs/ASSET-FEASIBILITY.md`: four-adapter asset review
+- `NOTES.md`: investigation log
+- `_summary.md`: short project index entry
