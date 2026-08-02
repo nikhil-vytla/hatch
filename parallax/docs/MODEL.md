@@ -117,11 +117,14 @@ usage, verifier verdict, reward, and relevant randomness. This is a conceptual
 requirement.
 
 > [!NOTE]
-> No code representation or serialization format for task specifications,
-> environment specifications, admission results, or run evidence exists yet.
+> The implementation now provides canonical, content-addressed records for
+> domain sources, individual asset provenance, public and sealed task identity,
+> verifier authority, grade evidence, publication receipts, deterministic tree
+> snapshots, and replay locks. GSM8K is the only admitted domain.
 
-> **TODO:** Define content-addressed representations for admitted task and
-> environment specifications, verifier identity, and retained run evidence.
+> **TODO:** Define executable `EnvironmentSpec` records, synthesis admission
+> results, trajectories, controlled-arm assignments, resource usage, and
+> retained run evidence before experiment execution is implemented.
 
 **Estimand.** For outcome \(Y\), a basic matched-arm effect is
 

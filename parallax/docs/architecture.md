@@ -1,6 +1,6 @@
 # Architecture and invariants
 
-Status: accepted for the PR2 domain and native-verifier core.
+Status: implemented for the GSM8K domain and native-verifier core.
 
 ## Record flow
 
@@ -44,3 +44,21 @@ Replay succeeds only when the current snapshot equals the locked snapshot, publi
 ## Trust boundary
 
 This core authenticates supplied bytes and verifier logic. It does not establish that a mutable dataset URL still serves those bytes, perform provider-backed construction, or prove Evolving Intent compatibility. Callers must obtain public source assets and an answer authority through a separately audited ingestion path before building production tasks.
+
+## Evidence-branch disposition
+
+The implementation retains deterministic canonical bytes, domain-separated
+content IDs, source pins, individual asset provenance, public and sealed
+identity, native verifier authority, closed grading outcomes, atomic
+publication, and locked replay. These concepts were rewritten as the small
+standard-library package under `src/parallax/`.
+
+It rejects the evidence branch's fake Evolving Intent records, universal
+variant catalog, hand-authored proposal fixtures, campaign runner, checkpoint
+placeholders, HUD adapters, Click recipes, and experiment execution. None of
+those types or compatibility paths are part of this package.
+
+> [!WARNING]
+> A valid content commitment proves which bytes were admitted. It does not
+> prove that caller-supplied source or answer bytes came from the claimed
+> dataset revision; audited ingestion remains a separate requirement.
