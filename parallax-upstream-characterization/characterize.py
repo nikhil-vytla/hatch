@@ -15,6 +15,9 @@ from typing import Any
 
 PINNED_REVISION = "993d6be9597ac03854b46362ccd647eb1bfd267a"
 PINNED_TREE = "7ba418a8c6bddf5e650dc1808f7316a018d76168"
+PINNED_RECEIPT_SHA256 = (
+    "4f2a34f999f872ed57c4a269fe08ac8537fc068d68f37d6ae7820522e8e42662"
+)
 
 # Git blob SHA-1 and SHA-256 of the checked-out bytes at PINNED_REVISION.
 PINNED_FILES: dict[str, tuple[str, str]] = {
@@ -147,6 +150,25 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _canonical_receipt_bytes(receipt: dict[str, Any]) -> bytes:
+    payload = dict(receipt)
+    payload.pop("canonical_sha256", None)
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+
+def _seal_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
+    sealed = dict(receipt)
+    sealed["canonical_sha256"] = hashlib.sha256(
+        _canonical_receipt_bytes(sealed)
+    ).hexdigest()
+    return sealed
 
 
 def _find_symbol(
@@ -294,11 +316,22 @@ def _source_contracts(upstream: Path) -> list[dict[str, Any]]:
 
     swe_path = upstream / "situated_simulation/turn_scheduler_swe.py"
     strip_node, strip_source = _find_symbol(swe_path, "_strip_symptoms")
+    hook_node, hook_source = _find_symbol(swe_path, "_make_inject_hook")
     swe_node, swe_source = _find_symbol(swe_path, "create_sample_swe")
     _assert_fragments(
         "_strip_symptoms",
         strip_source,
         ['c.get("category") == "symptom"', 'c.get("category") != "symptom"'],
+    )
+    _assert_fragments(
+        "_make_inject_hook",
+        hook_source,
+        [
+            "_repair_phase_leaks(",
+            "_redistribute_within_phase(",
+            "target_slot.arguments.insert(",
+            "slot.arguments.sort(key=_sort_key)",
+        ],
     )
     _assert_fragments(
         "create_sample_swe",
@@ -389,15 +422,66 @@ def _source_contracts(upstream: Path) -> list[dict[str, Any]]:
             "source": str(swe_path.relative_to(upstream)),
             "symbols": [
                 _symbol_receipt(strip_node, "_strip_symptoms"),
+                _symbol_receipt(hook_node, "_make_inject_hook"),
                 _symbol_receipt(swe_node, "create_sample_swe"),
             ],
             "observable_contract": [
                 "strip category=symptom before generic scheduling",
                 "install a post_fill_hook",
-                "inject symptoms before other arguments in their function phase",
+                "repair cross-phase ownership and redistribute within phases",
+                "insert symptoms at index zero before the final canonical sort",
+                "sort recognized categories before stripped symptom IDs",
             ],
         },
     ]
+
+
+def _bird_sql_reproducibility(upstream: Path) -> dict[str, Any]:
+    path = upstream / (
+        "intent_construction/retrospective_expansion/counterfactual/"
+        "generate_counterfactuals_sql.py"
+    )
+    symbols: list[dict[str, Any]] = []
+    for symbol, method in [
+        ("SQLCounterfactualGenerator", "generate_counterfactual"),
+        ("SQLCounterfactualGenerator", "generate_having_counterfactuals"),
+        ("SQLCounterfactualGenerator", "generate_limit_counterfactuals"),
+    ]:
+        node, source = _find_symbol(path, symbol, method)
+        _assert_fragments(f"{symbol}.{method}", source, ["random.shuffle("])
+        symbols.append(_symbol_receipt(node, f"{symbol}.{method}"))
+
+    main_node, main_source = _find_symbol(path, "main")
+    _assert_fragments(
+        "generate_counterfactuals_sql.main",
+        main_source,
+        [
+            '"--num_workers", type=int, default=4',
+            "random.seed(args.seed)",
+            "as_completed(futures)",
+            "results.append(result)",
+        ],
+    )
+    symbols.append(_symbol_receipt(main_node, "main"))
+    return {
+        "classification": "nondeterministic_unless_mechanically_constrained",
+        "source": str(path.relative_to(upstream)),
+        "symbols": symbols,
+        "observations": [
+            "global random.shuffle selects candidate order",
+            "the CLI seeds the global RNG once",
+            "the CLI defaults to four worker threads",
+            "parallel results append in future completion order",
+            "seed alone does not fix output order",
+        ],
+        "required_constraints": [
+            "fixed input and database bytes",
+            "fixed seed",
+            "fixed worker count and runtime behavior",
+            "fixed provider behavior for later stages",
+            "canonical output ordering before identity or byte comparison",
+        ],
+    }
 
 
 def _contract_probe() -> dict[str, Any]:
@@ -463,6 +547,159 @@ def _contract_probe() -> dict[str, Any]:
     }
 
 
+def _swe_overlay_probe(
+    scheduler: Any,
+    swe: Any,
+    *,
+    function_prefix: Any,
+    correction_prefix: Any,
+    reveal_prefix: Any,
+    reveal_after_function: Any,
+    correction_after_reveal: Any,
+    new_info_prefix: Any,
+    join: Any,
+) -> dict[str, Any]:
+    """Execute the pinned hook and renderer on deliberately misplaced arguments."""
+    raw = {
+        "function": "SOURCE.",
+        "arguments": [
+            {"argument_id": 1, "argument": "SOURCE_TRIGGER", "category": "trigger"},
+            {"argument_id": 2, "argument": "SOURCE_LOCATION", "category": "location"},
+            {
+                "argument_id": 3,
+                "argument": "SOURCE_CONSTRAINT",
+                "category": "constraint",
+            },
+            {"argument_id": 90, "argument": "SOURCE_SYMPTOM", "category": "symptom"},
+        ],
+        "predecessor_functions": [
+            {
+                "predecessor_function": "PREDECESSOR.",
+                "is_predecessor": True,
+                "counterfactual_arguments": [
+                    {
+                        "argument_id": 101,
+                        "argument": "PG_APPROACH",
+                        "category": "approach",
+                    },
+                    {
+                        "argument_id": 102,
+                        "argument": "PG_LOCATION",
+                        "category": "location",
+                    },
+                    {
+                        "argument_id": 103,
+                        "argument": "PG_CONSTRAINT",
+                        "category": "constraint",
+                    },
+                    {
+                        "argument_id": 190,
+                        "argument": "PG_SYMPTOM_A",
+                        "category": "symptom",
+                    },
+                    {
+                        "argument_id": 191,
+                        "argument": "PG_SYMPTOM_B",
+                        "category": "symptom",
+                    },
+                ],
+            }
+        ],
+    }
+    stripped, target_symptoms, predecessor_symptoms = swe._strip_symptoms(raw)
+    selected_functions = stripped["predecessor_functions"]
+    source_arguments = stripped["arguments"]
+    slots = [
+        scheduler.TurnSlot(
+            0,
+            events=[scheduler.TurnEvent(type="function_init", function_idx=0)],
+            arguments=[
+                scheduler.ArgumentItem(1, "LEAKED_SOURCE_TRIGGER", True),
+                scheduler.ArgumentItem(101, "PG_APPROACH"),
+                scheduler.ArgumentItem(102, "PG_LOCATION"),
+            ],
+        ),
+        scheduler.TurnSlot(1),
+        scheduler.TurnSlot(
+            2,
+            events=[scheduler.TurnEvent(type="function_change", function_idx=-1)],
+            arguments=[
+                scheduler.ArgumentItem(103, "LEAKED_PG_CONSTRAINT"),
+                scheduler.ArgumentItem(3, "SOURCE_CONSTRAINT"),
+                scheduler.ArgumentItem(2, "SOURCE_LOCATION"),
+            ],
+        ),
+    ]
+    before_argument_ids = [
+        [item.cond_id for item in slot.arguments] for slot in slots
+    ]
+    hook = swe._make_inject_hook(
+        target_symptoms,
+        predecessor_symptoms,
+        stripped["function"],
+    )
+    hook(
+        slots,
+        stripped,
+        selected_functions,
+        source_arguments,
+        set(),
+        {},
+        {item["argument_id"]: item for item in source_arguments},
+    )
+    after_argument_ids = [
+        [item.cond_id for item in slot.arguments] for slot in slots
+    ]
+    after_argument_texts = [
+        [item.text for item in slot.arguments] for slot in slots
+    ]
+    scheduler.fill_texts(
+        slots,
+        selected_functions,
+        stripped["function"],
+        {},
+        {item["argument_id"]: item for item in source_arguments},
+    )
+    rendered_turns, _ = scheduler.render_turns(
+        slots,
+        selected_functions,
+        True,
+        get_function_change_prefix=function_prefix,
+        get_correction_prefix=correction_prefix,
+        get_reveal_prefix=reveal_prefix,
+        get_reveal_after_function_prefix=reveal_after_function,
+        get_corr_after_reveal_prefix=correction_after_reveal,
+        get_new_info_prefix=new_info_prefix,
+        join_prefix_content=join,
+    )
+    return {
+        "probe_kind": "synthetic_slot_probe",
+        "provider_output": False,
+        "before_argument_ids": before_argument_ids,
+        "after_argument_ids": after_argument_ids,
+        "after_argument_texts": after_argument_texts,
+        "rendered_turns": rendered_turns,
+        "phase_owned_ids": {
+            "predecessor": sorted(
+                item
+                for slot in after_argument_ids[:2]
+                for item in slot
+                if item < 190
+            ),
+            "source": [item for item in after_argument_ids[2] if item < 90],
+        },
+        "symptom_positions": [
+            [index for index, item in enumerate(slot) if item in {90, 190, 191}]
+            for slot in after_argument_ids
+        ],
+        "observed_order_note": (
+            "The hook inserts symptoms at index zero, then its canonical sort "
+            "uses the stripped raw record. Stripped symptom IDs have no category "
+            "entry and therefore sort after recognized categories."
+        ),
+    }
+
+
 def _scheduler_probe(upstream: Path) -> dict[str, Any]:
     sys.path.insert(0, str(upstream))
     try:
@@ -509,32 +746,6 @@ def _scheduler_probe(upstream: Path) -> dict[str, Any]:
             raise CharacterizationError("pinned scheduler rejected its contract probe")
         change_plan = sample.metadata["change_plan"]
 
-        swe_raw = {
-            "function": "SOURCE_FUNCTION",
-            "arguments": [
-                {"argument_id": 1, "argument": "SOURCE_TRIGGER", "category": "trigger"},
-                {"argument_id": 2, "argument": "SOURCE_SYMPTOM", "category": "symptom"},
-            ],
-            "predecessor_functions": [
-                {
-                    "predecessor_function": "PREDECESSOR_FUNCTION",
-                    "counterfactual_arguments": [
-                        {
-                            "argument_id": 101,
-                            "argument": "PREDECESSOR_SYMPTOM",
-                            "category": "symptom",
-                        },
-                        {
-                            "argument_id": 1,
-                            "argument": "SOURCE_TRIGGER",
-                            "category": "trigger",
-                        },
-                    ],
-                }
-            ],
-        }
-        stripped, target_symptoms, predecessor_symptoms = swe._strip_symptoms(swe_raw)
-
         return {
             "probe_kind": "synthetic_contract_probe",
             "provider_output": False,
@@ -555,20 +766,17 @@ def _scheduler_probe(upstream: Path) -> dict[str, Any]:
                 transition["type"] for transition in change_plan["transitions"]
             ],
             "final_label": change_plan["final_label"],
-            "swe_overlay": {
-                "ceil_front_7_into_3": swe.distribute_ceil_front(7, 3),
-                "stripped_source_argument_ids": [
-                    item["argument_id"] for item in stripped["arguments"]
-                ],
-                "target_symptom_ids": [
-                    item["argument_id"] for item in target_symptoms
-                ],
-                "predecessor_symptom_ids": {
-                    key: [item["argument_id"] for item in value]
-                    for key, value in predecessor_symptoms.items()
-                },
-                "normalized_source_function": stripped["function"],
-            },
+            "swe_overlay": _swe_overlay_probe(
+                scheduler,
+                swe,
+                function_prefix=function_prefix,
+                correction_prefix=correction_prefix,
+                reveal_prefix=reveal_prefix,
+                reveal_after_function=reveal_after_function,
+                correction_after_reveal=correction_after_reveal,
+                new_info_prefix=new_info_prefix,
+                join=join,
+            ),
         }
     finally:
         sys.path.pop(0)
@@ -629,7 +837,7 @@ def collect(upstream: Path) -> dict[str, Any]:
             "sha256": sha256,
         }
 
-    return {
+    return _seal_receipt({
         "schema": "parallax.microsoft-evolving-intent-characterization.v1",
         "repository": "https://github.com/microsoft/evolving-intent",
         "revision": revision,
@@ -637,6 +845,7 @@ def collect(upstream: Path) -> dict[str, Any]:
         "license": "MIT",
         "sources": sources,
         "contracts": _source_contracts(upstream),
+        "bird_sql_reproducibility": _bird_sql_reproducibility(upstream),
         "scheduler_probe": _scheduler_probe(upstream),
         "published_eval_indices": _index_receipts(upstream),
         "generated_assets": GENERATED_ASSET_STATUS,
@@ -645,7 +854,7 @@ def collect(upstream: Path) -> dict[str, Any]:
             "No provider-generated extraction, counterfactual, predecessor, or final dataset is present.",
             "No paper result, model response, or byte-identical dataset reproduction is claimed.",
         ],
-    }
+    })
 
 
 def _validate_probe(probe: dict[str, Any]) -> None:
@@ -682,17 +891,50 @@ def _validate_probe(probe: dict[str, Any]) -> None:
     if probe["turns"] != expected_turns:
         raise CharacterizationError("deterministic-prefix render receipt drifted")
     if probe["swe_overlay"] != {
-        "ceil_front_7_into_3": [3, 2, 2],
-        "stripped_source_argument_ids": [1],
-        "target_symptom_ids": [2],
-        "predecessor_symptom_ids": {"PREDECESSOR_FUNCTION.": [101]},
-        "normalized_source_function": "SOURCE_FUNCTION.",
+        "probe_kind": "synthetic_slot_probe",
+        "provider_output": False,
+        "before_argument_ids": [[1, 101, 102], [], [103, 3, 2]],
+        "after_argument_ids": [[102, 101, 190], [103, 191], [1, 2, 3, 90]],
+        "after_argument_texts": [
+            ["PG_LOCATION", "PG_APPROACH", "PG_SYMPTOM_A"],
+            ["LEAKED_PG_CONSTRAINT", "PG_SYMPTOM_B"],
+            [
+                "SOURCE_TRIGGER",
+                "SOURCE_LOCATION",
+                "SOURCE_CONSTRAINT",
+                "SOURCE_SYMPTOM",
+            ],
+        ],
+        "rendered_turns": [
+            "PREDECESSOR. PG_LOCATION PG_APPROACH PG_SYMPTOM_A",
+            "[REVEAL] LEAKED_PG_CONSTRAINT PG_SYMPTOM_B",
+            (
+                "[FUNCTION] SOURCE. [AFTER_FUNCTION] SOURCE_TRIGGER "
+                "SOURCE_LOCATION SOURCE_CONSTRAINT SOURCE_SYMPTOM"
+            ),
+        ],
+        "phase_owned_ids": {
+            "predecessor": [101, 102, 103],
+            "source": [1, 2, 3],
+        },
+        "symptom_positions": [[2], [1], [3]],
+        "observed_order_note": (
+            "The hook inserts symptoms at index zero, then its canonical sort "
+            "uses the stripped raw record. Stripped symptom IDs have no category "
+            "entry and therefore sort after recognized categories."
+        ),
     }:
         raise CharacterizationError("SWE overlay receipt drifted")
 
 
 def verify_receipt(receipt_path: Path) -> dict[str, Any]:
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    embedded_digest = receipt.get("canonical_sha256")
+    computed_digest = hashlib.sha256(_canonical_receipt_bytes(receipt)).hexdigest()
+    if embedded_digest != computed_digest:
+        raise CharacterizationError("canonical receipt digest mismatch")
+    if embedded_digest != PINNED_RECEIPT_SHA256:
+        raise CharacterizationError("receipt does not match the pinned canonical digest")
     if receipt.get("revision") != PINNED_REVISION:
         raise CharacterizationError("receipt revision is not pinned")
     if receipt.get("tree") != PINNED_TREE:
