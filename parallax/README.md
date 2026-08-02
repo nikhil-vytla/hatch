@@ -13,15 +13,25 @@ Evolving Intent as one strategy in that model and records the published method,
 source links, interpretation policy, and evidence limits.
 
 > [!NOTE]
-> The repository currently defines the research model and Evolving Intent
-> method contract. It does not contain executable synthesis, experiment
-> execution, generated benchmark pools, provider transcripts, or paper-score
-> reproduction.
+> The repository implements content-addressed GSM8K source, asset, task, and
+> verifier identity; native final-answer grading; atomic public artifact
+> publication; and locked replay. The Evolving Intent method remains a contract,
+> not an executable synthesis implementation.
 
-> **TODO:** Implement the content-addressed domain and native-verifier core.
+[`docs/architecture.md`](docs/architecture.md) maps the research model to the
+implemented records and states their identity, admission, publication, and
+replay invariants.
 
 > **TODO:** Implement GSM8K Evolving Intent synthesis with behavioral
 > regression coverage for the documented contracts.
 
 > **TODO:** Implement controlled experiment execution with matched arms,
 > retained run evidence, and declared estimands.
+
+Run the implemented core checks from `parallax/`:
+
+```shell
+PYTHONPATH=src python -m unittest discover -s tests -v
+uvx mypy src
+python -m ruff check src tests
+```

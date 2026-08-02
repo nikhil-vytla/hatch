@@ -44,7 +44,7 @@ class DomainSourceIdentity:
 
     def __post_init__(self) -> None:
         if self.domain != "gsm8k":
-            raise ValueError("PR2 admits only the gsm8k domain")
+            raise ValueError("this package currently admits only the gsm8k domain")
         for name in ("source_uri", "source_revision", "split", "record_id"):
             _nonempty(getattr(self, name), name)
 

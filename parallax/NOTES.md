@@ -26,6 +26,23 @@
   credential patterns, and Markdown formatting.
 
 > [!NOTE]
-> Current capability is documentation-only: the model and Evolving Intent
-> contract exist, while synthesis, native verification, regression tests, and
-> experiment execution do not.
+> Current capability includes the formal model, Evolving Intent method contract,
+> and a content-addressed GSM8K native-verifier core. Synthesis and experiment
+> execution remain unimplemented.
+
+## Domain and verifier core
+
+- Added canonical UTF-8 JSON with explicit version, namespace, and SHA-256
+  separators. Ambiguous and platform-dependent values fail validation.
+- Added immutable source, asset, verifier, public task, sealed task, grade,
+  publication, tree snapshot, and replay-lock records.
+- Bound evaluator and parser source bytes and policies, answer authority,
+  assets, runtime policy, dependencies, and schemas into sealed identity.
+- Implemented only GSM8K native final-answer parsing and exact grading.
+- Added admission checks before evaluator execution and closed verdicts for
+  pass, task failure, invalid submission, harness failure, and verifier failure.
+- Added manifest-verified atomic publication and byte-locked replay that rejects
+  mutation, unexpected paths, symlinks, changed verifier code, and changed
+  assets.
+- Used labeled synthetic test values; no benchmark rows or hidden answers are
+  versioned.
