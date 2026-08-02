@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
+import secrets
 import stat
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -18,12 +17,35 @@ class ArtifactError(ValueError):
     """Published bytes do not satisfy their committed artifact contract."""
 
 
+class PublicationStateError(ArtifactError):
+    """Publication renamed a destination but could not confirm a valid final state."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.destination_visible = True
+        self.durability_indeterminate = True
+
+
+class PublicationDurabilityError(ArtifactError):
+    """A complete destination is visible but parent-directory durability is unknown."""
+
+    def __init__(self, receipt: PublicationReceipt, snapshot: TreeSnapshot) -> None:
+        super().__init__(
+            "publication is visible and complete, but parent-directory fsync failed; "
+            "durability after a crash is indeterminate"
+        )
+        self.destination_visible = True
+        self.durability_indeterminate = True
+        self.receipt = receipt
+        self.snapshot = snapshot
+
+
 @dataclass(frozen=True)
 class TreePolicy:
     allowed_paths: tuple[str, ...]
     ignored_paths: tuple[str, ...] = ()
     reject_unexpected: bool = True
-    schema: str = "parallax.tree-policy.v1"
+    schema: str = "parallax.tree-policy.v2"
 
     def __post_init__(self) -> None:
         for path in self.allowed_paths + self.ignored_paths:
@@ -95,64 +117,174 @@ class ReplayLock:
     tree_snapshot: TreeSnapshot
     verifier_commitment_id: str
     asset_manifest_id: str
-    schema: str = "parallax.replay-lock.v1"
+    schema: str = "parallax.replay-lock.v2"
 
     def __post_init__(self) -> None:
         validate_content_id(self.verifier_commitment_id, "verifier-commitment")
         validate_content_id(self.asset_manifest_id, "asset-manifest")
         if self.publication_receipt.tree_snapshot_id != self.tree_snapshot.id:
             raise ValueError("replay lock receipt and snapshot disagree")
+        if self.publication_receipt.tree_policy_id != self.tree_snapshot.policy_id:
+            raise ValueError("replay lock receipt and snapshot policies disagree")
 
     @property
     def id(self) -> str:
         return content_id("replay-lock", self)
 
 
+@dataclass(frozen=True)
+class _TreeCapture:
+    snapshot: TreeSnapshot
+    files: tuple[tuple[str, bytes], ...]
+
+    def as_dict(self) -> dict[str, bytes]:
+        return dict(self.files)
+
+
 PUBLIC_TREE_POLICY = TreePolicy(("publication-manifest.json", "task.json"))
+
+
+def _descriptor_flags(*, directory: bool = False) -> int:
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise ArtifactError("artifact operations require POSIX no-follow directory descriptors")
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    if directory:
+        flags |= os.O_DIRECTORY
+    return flags
+
+
+def _open_directory_path(path: Path) -> int:
+    lexical = path if path.is_absolute() else Path.cwd() / path
+    if any(part in (".", "..") for part in lexical.parts):
+        raise ArtifactError("directory path must not contain dot or parent components")
+    if path.is_symlink():
+        raise ArtifactError("directory root must not be a symlink")
+    absolute = path.resolve(strict=True)
+    descriptor = os.open(os.path.sep, _descriptor_flags(directory=True))
+    try:
+        for part in absolute.parts[1:]:
+            next_descriptor = os.open(
+                part,
+                _descriptor_flags(directory=True),
+                dir_fd=descriptor,
+            )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
 
 
 def _is_ignored(relative: str, policy: TreePolicy) -> bool:
     return any(relative == ignored or relative.startswith(ignored + "/") for ignored in policy.ignored_paths)
 
 
-def snapshot_tree(root: Path, policy: TreePolicy) -> TreeSnapshot:
-    if root.is_symlink():
-        raise ArtifactError("snapshot root cannot be a symlink")
-    root = root.resolve(strict=True)
-    if not root.is_dir():
-        raise ArtifactError("snapshot root must be a directory")
-    discovered: dict[str, TreeEntry] = {}
+def _directory_changed(before: os.stat_result, after: os.stat_result) -> bool:
+    return (
+        before.st_dev,
+        before.st_ino,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
 
-    def visit(directory: Path, prefix: str = "") -> None:
-        for item in sorted(os.scandir(directory), key=lambda entry: entry.name):
+
+def _read_once(directory_fd: int, name: str, relative: str) -> bytes:
+    file_fd = os.open(name, _descriptor_flags(), dir_fd=directory_fd)
+    try:
+        before = os.fstat(file_fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ArtifactError(f"non-regular tree entry: {relative}")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(file_fd, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(file_fd)
+        data = b"".join(chunks)
+        stable = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) == (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+        if not stable or len(data) != after.st_size:
+            raise ArtifactError(f"file changed during capture: {relative}")
+        return data
+    finally:
+        os.close(file_fd)
+
+
+def _capture_tree_fd(root_fd: int, policy: TreePolicy) -> _TreeCapture:
+    discovered: dict[str, bytes] = {}
+
+    def visit(directory_fd: int, prefix: str = "") -> None:
+        before_directory = os.fstat(directory_fd)
+        with os.scandir(directory_fd) as iterator:
+            entries = sorted(iterator, key=lambda entry: entry.name)
+        for item in entries:
             relative = f"{prefix}/{item.name}" if prefix else item.name
             validate_relative_path(relative)
-            mode = item.stat(follow_symlinks=False).st_mode
-            if stat.S_ISLNK(mode):
+            item_stat = item.stat(follow_symlinks=False)
+            if stat.S_ISLNK(item_stat.st_mode):
                 raise ArtifactError(f"symlink is forbidden: {relative}")
             if _is_ignored(relative, policy):
                 continue
-            if stat.S_ISDIR(mode):
+            if stat.S_ISDIR(item_stat.st_mode):
                 contains_allowed = any(
-                    allowed.startswith(relative + "/")
-                    for allowed in policy.allowed_paths
+                    allowed.startswith(relative + "/") for allowed in policy.allowed_paths
                 )
                 if policy.reject_unexpected and not contains_allowed:
                     raise ArtifactError(f"unexpected directory: {relative}")
-                visit(Path(item.path), relative)
-            elif stat.S_ISREG(mode):
+                child_fd = os.open(item.name, _descriptor_flags(directory=True), dir_fd=directory_fd)
+                try:
+                    visit(child_fd, relative)
+                finally:
+                    os.close(child_fd)
+            elif stat.S_ISREG(item_stat.st_mode):
                 if policy.reject_unexpected and relative not in policy.allowed_paths:
                     raise ArtifactError(f"unexpected file: {relative}")
-                data = Path(item.path).read_bytes()
-                discovered[relative] = TreeEntry(relative, len(data), sha256_digest(data))
+                discovered[relative] = _read_once(directory_fd, item.name, relative)
             else:
                 raise ArtifactError(f"non-regular tree entry: {relative}")
+        if _directory_changed(before_directory, os.fstat(directory_fd)):
+            raise ArtifactError(f"directory changed during capture: {prefix or '.'}")
 
-    visit(root)
+    visit(root_fd)
     missing = set(policy.allowed_paths) - set(discovered)
     if missing:
         raise ArtifactError(f"missing allowed files: {', '.join(sorted(missing))}")
-    return TreeSnapshot(policy.id, tuple(discovered[path] for path in sorted(discovered)))
+    files = tuple((path, discovered[path]) for path in sorted(discovered))
+    entries = tuple(TreeEntry(path, len(data), sha256_digest(data)) for path, data in files)
+    return _TreeCapture(TreeSnapshot(policy.id, entries), files)
+
+
+def _capture_tree(root: Path, policy: TreePolicy) -> _TreeCapture:
+    try:
+        root_fd = _open_directory_path(root)
+    except OSError as error:
+        raise ArtifactError("snapshot root must be a non-symlink directory") from error
+    try:
+        return _capture_tree_fd(root_fd, policy)
+    finally:
+        os.close(root_fd)
+
+
+def snapshot_tree(root: Path, policy: TreePolicy) -> TreeSnapshot:
+    return _capture_tree(root, policy).snapshot
 
 
 def _artifact_manifest(task_bytes: bytes) -> dict[str, object]:
@@ -161,20 +293,15 @@ def _artifact_manifest(task_bytes: bytes) -> dict[str, object]:
     return {**body, "id": content_id("artifact-manifest", body)}
 
 
-def _write_durable(path: Path, data: bytes) -> None:
-    with path.open("xb") as handle:
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
-
-
-def verify_publication(root: Path, task: NativeTask) -> str:
-    snapshot_tree(root, PUBLIC_TREE_POLICY)
-    task_bytes = (root / "task.json").read_bytes()
+def _verify_public_capture(capture: _TreeCapture, task: NativeTask) -> str:
+    files = capture.as_dict()
+    task_bytes = files.get("task.json")
+    manifest_bytes = files.get("publication-manifest.json")
+    if task_bytes is None or manifest_bytes is None:
+        raise ArtifactError("public artifact files are missing")
     expected_task = canonical_bytes(task.public.as_record())
     if task_bytes != expected_task:
         raise ArtifactError("public task bytes do not match the committed public identity")
-    manifest_bytes = (root / "publication-manifest.json").read_bytes()
     try:
         manifest = json.loads(manifest_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -187,33 +314,130 @@ def verify_publication(root: Path, task: NativeTask) -> str:
     return str(expected_manifest["id"])
 
 
+def verify_publication(root: Path, task: NativeTask) -> str:
+    capture = _capture_tree(root, PUBLIC_TREE_POLICY)
+    return _verify_public_capture(capture, task)
+
+
+def _write_durable(directory_fd: int, name: str, data: bytes) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    file_fd = os.open(name, flags, 0o600, dir_fd=directory_fd)
+    try:
+        view = memoryview(data)
+        while view:
+            written = os.write(file_fd, view)
+            if written <= 0:
+                raise OSError("artifact write made no progress")
+            view = view[written:]
+        os.fsync(file_fd)
+    finally:
+        os.close(file_fd)
+
+
+def _make_staging(parent_fd: int) -> tuple[str, int]:
+    for _ in range(100):
+        name = f".parallax-staging-{secrets.token_hex(12)}"
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+        except FileExistsError:
+            continue
+        return name, os.open(name, _descriptor_flags(directory=True), dir_fd=parent_fd)
+    raise ArtifactError("could not allocate a unique staging directory")
+
+
+def _cleanup_staging(parent_fd: int, staging_name: str, staging_fd: int) -> None:
+    for name in PUBLIC_TREE_POLICY.allowed_paths:
+        try:
+            os.unlink(name, dir_fd=staging_fd)
+        except FileNotFoundError:
+            pass
+    os.close(staging_fd)
+    try:
+        os.rmdir(staging_name, dir_fd=parent_fd)
+    except OSError:
+        pass
+
+
 def publish_public_task(destination: Path, task: NativeTask) -> tuple[PublicationReceipt, TreeSnapshot]:
     destination = destination.absolute()
-    if destination.exists() or destination.is_symlink():
-        raise ArtifactError("publication destination already exists")
+    validate_relative_path(destination.name)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".parallax-staging-", dir=destination.parent))
     try:
+        parent_fd = _open_directory_path(destination.parent)
+    except OSError as error:
+        raise ArtifactError("publication parent must be a non-symlink directory") from error
+    staging_name = ""
+    staging_fd = -1
+    renamed = False
+    try:
+        try:
+            os.stat(destination.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ArtifactError("publication destination already exists")
+        staging_name, staging_fd = _make_staging(parent_fd)
         task_bytes = canonical_bytes(task.public.as_record())
         manifest_bytes = canonical_bytes(_artifact_manifest(task_bytes))
-        _write_durable(staging / "task.json", task_bytes)
-        _write_durable(staging / "publication-manifest.json", manifest_bytes)
-        manifest_id = verify_publication(staging, task)
-        snapshot = snapshot_tree(staging, PUBLIC_TREE_POLICY)
-        os.replace(staging, destination)
-        directory_fd = os.open(destination.parent, os.O_RDONLY)
+        _write_durable(staging_fd, "task.json", task_bytes)
+        _write_durable(staging_fd, "publication-manifest.json", manifest_bytes)
+        _verify_public_capture(_capture_tree_fd(staging_fd, PUBLIC_TREE_POLICY), task)
+        os.replace(
+            staging_name,
+            destination.name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        renamed = True
+        os.close(staging_fd)
+        staging_fd = -1
+        destination_fd = os.open(
+            destination.name,
+            _descriptor_flags(directory=True),
+            dir_fd=parent_fd,
+        )
         try:
-            os.fsync(directory_fd)
+            final_capture = _capture_tree_fd(destination_fd, PUBLIC_TREE_POLICY)
         finally:
-            os.close(directory_fd)
-        receipt = PublicationReceipt(task.public.id, manifest_id, snapshot.id, PUBLIC_TREE_POLICY.id)
+            os.close(destination_fd)
+        manifest_id = _verify_public_capture(final_capture, task)
+        snapshot = final_capture.snapshot
+        receipt = PublicationReceipt(
+            task.public.id,
+            manifest_id,
+            snapshot.id,
+            PUBLIC_TREE_POLICY.id,
+        )
+        try:
+            os.fsync(parent_fd)
+        except OSError as error:
+            raise PublicationDurabilityError(receipt, snapshot) from error
         return receipt, snapshot
-    except Exception:
-        shutil.rmtree(staging, ignore_errors=True)
+    except PublicationDurabilityError:
         raise
+    except Exception as error:
+        if renamed:
+            raise PublicationStateError(
+                f"publication destination is visible but final validation failed: {type(error).__name__}"
+            ) from error
+        if staging_fd >= 0:
+            _cleanup_staging(parent_fd, staging_name, staging_fd)
+            staging_fd = -1
+        raise
+    finally:
+        if staging_fd >= 0:
+            _cleanup_staging(parent_fd, staging_name, staging_fd)
+        os.close(parent_fd)
 
 
-def make_replay_lock(receipt: PublicationReceipt, snapshot: TreeSnapshot, task: NativeTask) -> ReplayLock:
+def make_replay_lock(
+    receipt: PublicationReceipt,
+    snapshot: TreeSnapshot,
+    task: NativeTask,
+    policy: TreePolicy,
+) -> ReplayLock:
+    if receipt.tree_policy_id != policy.id or snapshot.policy_id != policy.id:
+        raise ValueError("receipt, snapshot, and replay policy must match")
     return ReplayLock(receipt, snapshot, task.verifier.id, task.assets.id)
 
 
@@ -222,6 +446,7 @@ def replay_locked(
     lock: ReplayLock,
     task: NativeTask,
     available_assets: Mapping[str, bytes],
+    policy: TreePolicy,
 ) -> dict[str, bytes]:
     try:
         admit_task(task, available_assets)
@@ -233,10 +458,15 @@ def replay_locked(
         raise AdmissionError("replay verifier or asset commitment changed")
     if task.public.id != lock.publication_receipt.public_task_id:
         raise AdmissionError("replay public identity changed")
-    snapshot = snapshot_tree(root, PUBLIC_TREE_POLICY)
-    if snapshot != lock.tree_snapshot:
+    if (
+        lock.publication_receipt.tree_policy_id != lock.tree_snapshot.policy_id
+        or lock.tree_snapshot.policy_id != policy.id
+    ):
+        raise ArtifactError("receipt, snapshot, and actual replay policies disagree")
+    capture = _capture_tree(root, policy)
+    if capture.snapshot != lock.tree_snapshot:
         raise ArtifactError("published tree differs from replay lock")
-    manifest_id = verify_publication(root, task)
+    manifest_id = _verify_public_capture(capture, task)
     if manifest_id != lock.publication_receipt.artifact_manifest_id:
         raise ArtifactError("artifact manifest differs from publication receipt")
-    return {path: (root / path).read_bytes() for path in PUBLIC_TREE_POLICY.allowed_paths}
+    return capture.as_dict()

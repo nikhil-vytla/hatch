@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePosixPath
@@ -16,8 +18,23 @@ def _nonempty(value: str, field: str) -> str:
 
 def validate_relative_path(value: str) -> str:
     _nonempty(value, "path")
+    if unicodedata.normalize("NFC", value) != value:
+        raise ValueError("path must be NFC-normalized")
+    if "\\" in value or re.match(r"^[A-Za-z]:", value):
+        raise ValueError("Windows path forms are forbidden")
+    if value.startswith("/") or "//" in value or "/./" in value or "/../" in value:
+        raise ValueError("path must be a normalized relative POSIX path")
     path = PurePosixPath(value)
-    if path.is_absolute() or value != path.as_posix() or any(part in ("", ".", "..") for part in path.parts):
+    reserved = re.compile(r"^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", re.IGNORECASE)
+    for part in path.parts:
+        if (
+            part in ("", ".", "..")
+            or part.endswith((".", " "))
+            or reserved.match(part)
+            or any(character in part for character in '<>:"|?*')
+        ):
+            raise ValueError("path contains a non-portable component")
+    if path.is_absolute() or value != path.as_posix():
         raise ValueError("path must be a normalized relative POSIX path")
     return value
 
@@ -112,14 +129,15 @@ class ImplementationCommitment:
 @dataclass(frozen=True)
 class RuntimePolicy:
     implementation: str
-    python_requirement: str
+    version: str
+    cache_tag: str
     dependencies: tuple[str, ...]
-    network_allowed: bool = False
-    schema: str = "parallax.runtime-policy.v1"
+    schema: str = "parallax.runtime-policy.v2"
 
     def __post_init__(self) -> None:
         _nonempty(self.implementation, "implementation")
-        _nonempty(self.python_requirement, "python_requirement")
+        _nonempty(self.version, "version")
+        _nonempty(self.cache_tag, "cache_tag")
         if self.dependencies != tuple(sorted(set(self.dependencies))):
             raise ValueError("dependencies must be unique and sorted")
 
@@ -135,7 +153,7 @@ class VerifierCommitment:
     answer_authority_digest: str
     asset_manifest_id: str
     runtime_policy: RuntimePolicy
-    schema: str = "parallax.verifier-commitment.v1"
+    schema: str = "parallax.verifier-commitment.v2"
 
     def __post_init__(self) -> None:
         validate_digest(self.answer_authority_digest)

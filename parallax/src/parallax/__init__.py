@@ -2,7 +2,10 @@
 
 from .artifacts import (
     ArtifactError,
+    PUBLIC_TREE_POLICY,
+    PublicationDurabilityError,
     PublicationReceipt,
+    PublicationStateError,
     ReplayLock,
     TreePolicy,
     TreeSnapshot,
@@ -38,7 +41,10 @@ __all__ = [
     "GradeResult",
     "NativeTask",
     "Provenance",
+    "PUBLIC_TREE_POLICY",
+    "PublicationDurabilityError",
     "PublicationReceipt",
+    "PublicationStateError",
     "PublicTaskIdentity",
     "ReplayLock",
     "RuntimePolicy",
