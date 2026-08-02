@@ -19,7 +19,7 @@ do not exist in the tree. The receipt checks that absence.
   `load_dataset("gsm8k", "main")` without a dataset revision.
 - Published upstream asset: 200 evaluation IDs and 200 runner task IDs are
   committed. Their exact blob and content hashes are in
-  `fixtures/receipt.json`.
+  `../characterization/fixtures/receipt.json`.
 - Generated assets: extraction, argument counterfactuals, function
   predecessors, `final_dataset/gsm8k_final.json`, provider responses, rejected
   attempts, and paper result files are absent. Generic extraction and both
