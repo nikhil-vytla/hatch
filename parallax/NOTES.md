@@ -36,13 +36,20 @@
   separators. Ambiguous and platform-dependent values fail validation.
 - Added immutable source, asset, verifier, public task, sealed task, grade,
   publication, tree snapshot, and replay-lock records.
-- Bound evaluator and parser source bytes and policies, answer authority,
-  assets, runtime policy, dependencies, and schemas into sealed identity.
+- Bound loaded evaluator, parser, and shared answer-validator code objects,
+  policies, answer authority, assets, exact CPython runtime identity,
+  dependencies, and schemas into sealed identity.
 - Implemented only GSM8K native final-answer parsing and exact grading.
 - Added admission checks before evaluator execution and closed verdicts for
   pass, task failure, invalid submission, harness failure, and verifier failure.
-- Added manifest-verified atomic publication and byte-locked replay that rejects
-  mutation, unexpected paths, symlinks, changed verifier code, and changed
-  assets.
+- Removed evaluator injection from grading and made ordinary module-global and
+  post-import source-file changes irrelevant to the closed-over engine.
+- Added manifest-verified atomic publication and single-capture replay with
+  no-follow descriptors, portable path checks, explicit post-rename durability
+  states, and consistent receipt, snapshot, and replay policies.
 - Used labeled synthetic test values; no benchmark rows or hidden answers are
   versioned.
+- The focused suite now has 22 tests, including evaluator injection,
+  post-import file changes, loaded-code and module-global mutation, answer
+  boundaries, pre-rename tampering, post-verification mutation, parent fsync
+  failure, portable paths, symlinks, and replay-policy mismatch.

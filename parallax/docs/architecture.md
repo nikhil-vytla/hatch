@@ -7,7 +7,7 @@ Status: implemented for the GSM8K domain and native-verifier core.
 1. `DomainSourceIdentity` identifies a GSM8K source URI, immutable revision, split, and row ID.
 2. `AssetManifest` commits every admitted asset by relative name, byte count, SHA-256, origin, revision, and license.
 3. `PublicTaskIdentity` binds source, prompt, and public asset manifest. It is safe to publish.
-4. `VerifierCommitment` binds executable evaluator and parser source bytes, both policies, answer authority, assets, runtime policy, dependencies, and schemas.
+4. `VerifierCommitment` binds the loaded evaluator, parser, and shared answer-validator code objects, their policies, answer authority, assets, exact Python runtime identity, dependencies, and schemas.
 5. `SealedTaskIdentity` binds the public task and all reward-affecting verifier data.
 6. Admission recomputes the local verifier commitment and exact asset set before evaluation.
 7. `GradeResult` returns a closed verdict and content-addressed evidence ID.
@@ -29,36 +29,69 @@ Public identity must remain unchanged when only answer authority changes. Sealed
 
 ## Admission and grading invariants
 
-The local implementation recomputes the evaluator and parser source-byte digest. An evaluator label alone never authorizes execution. Admission requires exact equality for the verifier commitment, sealed identity, asset manifest, public asset reference, and available asset names and bytes.
+The grading entry point closes over its parser, evaluator, answer validator,
+runtime probe, and identity helpers. It accepts no evaluator argument and does
+not look them up through replaceable module globals. Commitments fingerprint
+the loaded CPython code objects and transitive answer validator, not the source
+file on disk. Admission recomputes those fingerprints and the exact
+implementation name, patch version, and cache tag immediately before parsing.
+It also requires exact equality for sealed identity, asset manifest, public
+asset reference, and available asset names and bytes.
 
-The parser accepts one final non-empty `FINAL_ANSWER` line with a canonical decimal integer. The evaluator performs canonical string equality. A wrong integer is `task_failure`; malformed or ambiguous model output is `invalid_submission`; admission and asset faults are `harness_failure`; unexpected parser or evaluator faults are `verifier_failure`. The grading boundary converts these failures to `GradeResult` and does not report them as model task failures.
+One canonical answer validator governs authority construction, commitment,
+admission, parser output, and grading. It accepts `0` or an optional minus
+followed by a nonzero ASCII digit and up to 99 further digits. It rejects
+padding, a plus sign, leading zeros, negative zero, non-ASCII digits, and more
+than 100 digits. A wrong integer is `task_failure`; malformed or ambiguous
+model output is `invalid_submission`; admission and asset faults are
+`harness_failure`; unexpected parser or evaluator faults are
+`verifier_failure`.
 
 ## Publication and replay invariants
 
-Publication writes complete files to a same-filesystem staging directory, fsyncs each file, checks canonical bytes and the committed manifest, snapshots the tree, and atomically renames the directory into place. A failed rename leaves no destination.
+Publication accepts identity records, derives immutable public bytes, and
+writes its own same-filesystem staging directory. It opens directories and
+files relative to no-follow descriptors, fsyncs each file, captures and checks
+the staging tree, atomically renames it, then captures the visible destination
+again before issuing a receipt. A failed rename leaves no destination. A
+post-rename validation failure raises `PublicationStateError`, which explicitly
+reports that a destination is visible and durability is indeterminate.
 
-The public tree policy explicitly allows `publication-manifest.json` and `task.json`, ignores no paths, and rejects every unexpected file or directory. Snapshot traversal rejects symlinks and non-regular entries. Snapshots commit relative paths, byte counts, and content digests; file modes, owners, and timestamps are intentionally outside identity. Relative path validation rejects absolute paths, `..`, empty segments, and non-normal POSIX forms.
+If parent-directory fsync fails after rename, the API raises
+`PublicationDurabilityError` with the verified receipt and snapshot. The
+destination is complete and visible, but crash durability is indeterminate.
 
-Replay succeeds only when the current snapshot equals the locked snapshot, publication bytes remain canonical, and task admission succeeds with the locked verifier and assets. It returns the exact published bytes and never regenerates identity-bearing content.
+The public tree policy explicitly allows `publication-manifest.json` and
+`task.json`, ignores no paths, and rejects every unexpected file or directory.
+Traversal rejects symlinks and non-regular entries. Each file is opened with
+no-follow semantics and read once; descriptor metadata must remain stable
+during capture. Replay derives the snapshot, verifies the manifest, and returns
+bytes from that same capture. Receipt, snapshot, and actual replay policy IDs
+must match.
+
+Paths use canonical forward slashes. Validation rejects absolute and parent
+paths, empty and dot components, backslashes, Windows drives and reserved
+device names, trailing dots or spaces, alternate data-stream colons, wildcard
+characters, NUL, and non-NFC text.
 
 ## Trust boundary
 
-This core authenticates supplied bytes and verifier logic. It does not establish that a mutable dataset URL still serves those bytes, perform provider-backed construction, or prove Evolving Intent compatibility. Callers must obtain public source assets and an answer authority through a separately audited ingestion path before building production tasks.
-
-## Evidence-branch disposition
-
-The implementation retains deterministic canonical bytes, domain-separated
-content IDs, source pins, individual asset provenance, public and sealed
-identity, native verifier authority, closed grading outcomes, atomic
-publication, and locked replay. These concepts were rewritten as the small
-standard-library package under `src/parallax/`.
-
-It rejects the evidence branch's fake Evolving Intent records, universal
-variant catalog, hand-authored proposal fixtures, campaign runner, checkpoint
-placeholders, HUD adapters, Click recipes, and experiment execution. None of
-those types or compatibility paths are part of this package.
+This core authenticates supplied bytes and loaded verifier semantics. It does
+not establish that a mutable dataset URL still serves those bytes, perform
+provider-backed construction, prove Evolving Intent compatibility, or provide
+a hostile-process sandbox.
 
 > [!WARNING]
 > A valid content commitment proves which bytes were admitted. It does not
 > prove that caller-supplied source or answer bytes came from the claimed
 > dataset revision; audited ingestion remains a separate requirement.
+
+> [!IMPORTANT]
+> The loaded-semantics checks resist evaluator arguments, source-file changes
+> after import, and ordinary module-global monkeypatching. They cannot protect a
+> process that deliberately replaces the public grading callable, mutates
+> closure cells or code objects through introspection or native memory access,
+> or writes published files after a verified capture. Process isolation and
+> post-publication access control remain caller responsibilities.
+
+> **TODO:** Add audited dataset ingestion before producing non-synthetic tasks.

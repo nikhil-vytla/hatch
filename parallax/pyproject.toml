@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,7 @@ name = "parallax-verifier-core"
 version = "0.1.0"
 description = "Content-addressed Parallax domain and native-verifier core"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
