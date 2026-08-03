@@ -308,6 +308,7 @@ def fetch_swebench_verified(
         "https://datasets-server.huggingface.co/filter?"
         f"dataset={urllib.parse.quote(SWE_BENCH_DATASET, safe='')}"
         f"&config=default&split=test&where={where}"
+        f"&revision={dataset_revision}"
     )
     try:
         response = _FilterResponse.model_validate_json(fetch(rows_url))

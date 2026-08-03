@@ -54,14 +54,18 @@ The second slice adds an offline-ready SWE-bench Verified path:
    records the pinned SWE symptom-overlay transformation.
 3. `swebench_env.py` renders deterministic `instance.json`, `env.py`, and
    `Dockerfile.hud` files. Generated images use digest-pinned official
-   `swebench/sweb.eval` bases and one total agent-step budget per episode.
+   `swebench/sweb.eval` bases and one total agent-step budget per episode. This
+   renderer is an offline scaffold, not an admitted evaluation environment:
+   its single container exposes verifier data to the agent and its grader does
+   not implement official named-test semantics.
 4. `screening.py` preregisters boundary-model screening units and canonical
-   outcomes. It refuses unapproved execution and stops any plan whose upper
-   estimate exceeds $20.
+   outcomes before execution, persists each unit for safe resume, and defaults
+   to a $5 upper cap.
 
 These components have scripted offline coverage only. No provider request,
-official image pull, HUD deployment, or paid screening episode has run from
-this slice.
+official image pull, HUD deployment, or paid screening episode has run.
+Screening remains blocked on evaluator-side verifier isolation, official
+SWE-bench grading, and execution-identity binding.
 
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the

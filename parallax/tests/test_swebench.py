@@ -143,6 +143,7 @@ def test_fetch_checks_revision_before_and_after_rows() -> None:
         calls += 1
         if "datasets-server" not in url:
             return json.dumps({"sha": SWE_BENCH_REVISION}).encode()
+        assert f"revision={SWE_BENCH_REVISION}" in url
         return json.dumps(
             {
                 "features": [

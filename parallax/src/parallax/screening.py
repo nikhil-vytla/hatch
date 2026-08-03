@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -10,7 +11,7 @@ from pydantic import Field, TypeAdapter, ValidationError, model_validator
 
 from .evolving_intent import Arm
 from .gsm8k import Verdict, Verification
-from .runner import Outcome, RunFailure, atomic_write, canonical_digest
+from .runner import FailureKind, Outcome, RunFailure, atomic_write, canonical_digest
 from .swebench import SweBenchProblem
 from .types import (
     DesignDigest,
@@ -23,11 +24,17 @@ from .types import (
 )
 
 Usd = Annotated[float, Field(ge=0, allow_inf_nan=False)]
-SCREENING_SPEND_CAP_USD = 20.0
+SCREENING_SPEND_CAP_USD = 5.0
 
 
 class SpendApprovalRequired(RuntimeError):
     pass
+
+
+class ScreeningExecutionError(RuntimeError):
+    def __init__(self, failure_kind: FailureKind, message: str) -> None:
+        super().__init__(message)
+        self.failure_kind = failure_kind
 
 
 class ScreeningCost(StrictModel):
@@ -100,13 +107,23 @@ class ScreeningRun(StrictModel):
     model_config_digest: ModelConfigDigest
     unit: ScreeningUnit
     outcome: Outcome
+    prompt_tokens: Annotated[int, Field(ge=0)]
+    completion_tokens: Annotated[int, Field(ge=0)]
+    estimated_cost_usd: Usd
+
+
+class ScreeningExecution(StrictModel):
+    outcome: Outcome
+    prompt_tokens: Annotated[int, Field(ge=0)]
+    completion_tokens: Annotated[int, Field(ge=0)]
+    estimated_cost_usd: Usd
 
 
 ScreeningRecord: TypeAlias = Annotated[
     ScreeningPlan | ScreeningRun,
     Field(discriminator="kind"),
 ]
-ScreeningExecutor: TypeAlias = Callable[[ScreeningUnit], Outcome]
+ScreeningExecutor: TypeAlias = Callable[[ScreeningUnit], ScreeningExecution]
 _SCREENING_RECORD = TypeAdapter(ScreeningRecord)
 
 
@@ -222,12 +239,14 @@ def run_screening(
     *,
     output_path: Path,
     approve_spend: bool = False,
+    spend_cap_usd: float = SCREENING_SPEND_CAP_USD,
 ) -> tuple[ScreeningRun, ...]:
+    if not math.isfinite(spend_cap_usd) or spend_cap_usd <= 0:
+        raise ValueError("screening spend cap must be finite and positive")
     upper = plan.estimated_cost_upper_usd
-    if upper > SCREENING_SPEND_CAP_USD:
+    if upper > spend_cap_usd:
         raise SpendApprovalRequired(
-            f"screening upper estimate ${upper:.2f} exceeds "
-            f"${SCREENING_SPEND_CAP_USD:.2f} cap"
+            f"screening upper estimate ${upper:.2f} exceeds ${spend_cap_usd:.2f} cap"
         )
     if not approve_spend:
         raise SpendApprovalRequired(
@@ -235,25 +254,76 @@ def run_screening(
             f"${plan.estimated_cost_lower_usd:.2f}-${upper:.2f}"
         )
     runs: list[ScreeningRun] = []
+    if output_path.exists():
+        records = read_screening_jsonl(output_path)
+        if not records or records[0] != plan:
+            raise ValueError("existing screening manifest differs from plan")
+        runs = [record for record in records[1:] if isinstance(record, ScreeningRun)]
+        if len(runs) != len(records) - 1:
+            raise ValueError("screening evidence contains a second manifest")
+    else:
+        atomic_write(output_path, _canonical_line(plan))
+    completed = {
+        (run.unit.source_id, run.unit.trial_index, run.unit.arm) for run in runs
+    }
+    if len(completed) != len(runs):
+        raise ValueError("screening evidence contains duplicate completed units")
+    expected_units = set(plan.units)
+    if any(run.unit not in expected_units for run in runs):
+        raise ValueError("screening evidence contains an unscheduled unit")
+    if any(
+        run.design_digest != plan.design_digest
+        or run.model_config_digest != plan.model_config_digest
+        for run in runs
+    ):
+        raise ValueError("screening evidence identity differs from plan")
+    cumulative_cost = sum(run.estimated_cost_usd for run in runs)
     for unit in plan.units:
+        key = (unit.source_id, unit.trial_index, unit.arm)
+        if key in completed:
+            continue
+        if cumulative_cost + plan.cost.upper_per_episode_usd > spend_cap_usd:
+            raise SpendApprovalRequired(
+                f"next unit could exceed ${spend_cap_usd:.2f} cap"
+            )
         try:
-            outcome = executor(unit)
+            execution = executor(unit)
+        except ScreeningExecutionError as error:
+            execution = ScreeningExecution(
+                outcome=RunFailure(
+                    failure_kind=error.failure_kind,
+                    error_type=type(error).__name__,
+                    message=str(error),
+                ),
+                prompt_tokens=0,
+                completion_tokens=0,
+                estimated_cost_usd=plan.cost.upper_per_episode_usd,
+            )
         except Exception as error:
-            outcome = RunFailure(
-                failure_kind="agent",
-                error_type=type(error).__name__,
-                message=str(error),
+            execution = ScreeningExecution(
+                outcome=RunFailure(
+                    failure_kind="agent",
+                    error_type=type(error).__name__,
+                    message=str(error),
+                ),
+                prompt_tokens=0,
+                completion_tokens=0,
+                estimated_cost_usd=plan.cost.upper_per_episode_usd,
             )
         runs.append(
             ScreeningRun(
                 design_digest=plan.design_digest,
                 model_config_digest=plan.model_config_digest,
                 unit=unit,
-                outcome=outcome,
+                outcome=execution.outcome,
+                prompt_tokens=execution.prompt_tokens,
+                completion_tokens=execution.completion_tokens,
+                estimated_cost_usd=execution.estimated_cost_usd,
             )
         )
-    data = _canonical_line(plan) + b"".join(_canonical_line(run) for run in runs)
-    atomic_write(output_path, data)
+        cumulative_cost += execution.estimated_cost_usd
+        data = _canonical_line(plan) + b"".join(_canonical_line(run) for run in runs)
+        atomic_write(output_path, data)
     return tuple(runs)
 
 

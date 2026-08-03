@@ -8,6 +8,8 @@ from pydantic import ValidationError
 
 from parallax.evolving_intent import Message
 from parallax.provider import (
+    HUD_GATEWAY_ENDPOINT,
+    HudGatewayProvider,
     OpenAICompatibleProvider,
     ProviderConfig,
     ProviderError,
@@ -179,3 +181,46 @@ def test_text_chat_rejects_agent_tool_calls() -> None:
 
     with pytest.raises(ProviderError, match="non-empty text response"):
         provider.chat()((Message(role="user", content="hello"),), 32)
+
+
+def test_hud_gateway_adapter_uses_existing_wire_boundary() -> None:
+    def hud_response(endpoint, body, headers, timeout):
+        payload = json.loads(body)
+        assert endpoint == HUD_GATEWAY_ENDPOINT
+        assert payload["max_tokens"] == 64
+        assert "max_completion_tokens" not in payload
+        assert headers["Authorization"] == "Bearer hud-secret"
+        return json.dumps(
+            {
+                "id": "hud-response-1",
+                "model": "claude-opus-4-8",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "ready",
+                        },
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 3,
+                    "completion_tokens": 1,
+                    "total_tokens": 4,
+                },
+            }
+        ).encode()
+
+    provider = HudGatewayProvider(
+        "claude-opus-4-8",
+        environment={"HUD_API_KEY": "hud-secret"},
+        transport=hud_response,
+    )
+
+    assert provider.chat()((Message(role="user", content="hello"),), 64) == "ready"
+
+
+def test_hud_gateway_adapter_fails_before_transport_without_key() -> None:
+    with pytest.raises(ProviderError, match="missing provider credential HUD_API_KEY"):
+        HudGatewayProvider("claude-opus-4-8", environment={})

@@ -268,3 +268,23 @@
   The Slice 2 gauntlet kills all 17 active boundary mutants, covering provider
   strictness, source pins, sealed-prompt exclusion, overlay ordering,
   restoration, equal budgets, official image selection, and spend controls.
+
+## Screening safety audit
+
+- An adversarial review correctly found that the rendered single-container HUD
+  bundle is not sealed: `/app/instance.json` contains the test patch, test IDs,
+  and command and is readable by an agent with shell access.
+- Its embedded grader is not the official SWE-bench verifier. It checks only
+  process exit zero, does not parse named FAIL_TO_PASS/PASS_TO_PASS statuses,
+  misses untracked candidate files, and mishandles tests added by the patch.
+  The earlier environment claims above describe intended behavior, not an
+  admitted measurement path.
+- Paid screening was stopped before any request. Secure evaluator isolation,
+  official harness grading, and digests binding scripts/environment/provider
+  settings remain blockers.
+- The no-spend branch adds an eager HUD credential adapter, revision-bound
+  dataset rows, typed verifier failures, a $5 default cap, manifest-first
+  execution, per-unit atomic receipts, resumability, and usage/cost fields.
+- A scripted transport dry run made zero network and paid calls. Certification
+  passes 92 tests normally and under `python -O`, Ruff, `ty`, build, the 28-case
+  core mutation suite, and the 21-case adapted Slice 2 audit suite.

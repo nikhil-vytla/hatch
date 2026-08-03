@@ -10,6 +10,12 @@ repository, base commit, and pinned dataset identity. Its
 FAIL_TO_PASS and PASS_TO_PASS tests, harness revision, and test command. The
 dataset gold patch is discarded at ingestion.
 
+The current generated HUD bundle does not enforce this public/sealed split at
+runtime: it places both parts in one agent-readable container and therefore is
+not admissible for measurement. SWE-bench execution remains blocked until an
+evaluator-side authority owns the sealed fields and official named-test
+grading.
+
 ## Task and environment
 
 **Definition (TaskSpec).** A task specification is
