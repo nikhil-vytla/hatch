@@ -205,6 +205,8 @@ to a process exit code. It is not an admitted environment and must not produce
 experimental outcomes. A production path must export the candidate patch to an
 evaluator-side official harness, parse named FAIL_TO_PASS and PASS_TO_PASS
 statuses, and keep verifier material outside the agent filesystem.
+`render_environment` therefore fails closed by default; its unsafe opt-in
+exists only to retain deterministic offline inspection coverage.
 
 ## Interpretation and limits
 

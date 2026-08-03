@@ -194,6 +194,43 @@ def test_fetch_rejects_dataset_revision_drift_before_rows() -> None:
     assert calls == 1
 
 
+def test_fetch_validates_ids_before_remote_query() -> None:
+    with pytest.raises(SweBenchError, match="published set"):
+        fetch_swebench_verified(
+            ("not__published-1",),
+            runtimes={},
+            fetch=lambda url: pytest.fail(f"unexpected fetch: {url}"),
+        )
+
+
+def test_fetch_rejects_truncated_dataset_cells() -> None:
+    def fetch(url: str) -> bytes:
+        if "datasets-server" not in url:
+            return json.dumps({"sha": SWE_BENCH_REVISION}).encode()
+        return json.dumps(
+            {
+                "features": [],
+                "rows": [
+                    {
+                        "row_idx": 2,
+                        "row": row(),
+                        "truncated_cells": ["test_patch"],
+                    }
+                ],
+                "num_rows_total": 1,
+                "num_rows_per_page": 100,
+                "partial": False,
+            }
+        ).encode()
+
+    with pytest.raises(SweBenchError, match="truncated dataset cells"):
+        fetch_swebench_verified(
+            (INSTANCE_ID,),
+            runtimes={INSTANCE_ID: runtime()},
+            fetch=fetch,
+        )
+
+
 def test_loader_rejects_non_array_test_lists() -> None:
     invalid = {**row(), "FAIL_TO_PASS": '"not-an-array"'}
 

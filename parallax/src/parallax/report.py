@@ -17,6 +17,7 @@ from .runner import (
     RunFailure,
     RunRecord,
     atomic_write,
+    canonical_digest,
     read_run_jsonl,
 )
 from .types import (
@@ -82,6 +83,12 @@ def _validated(
             or row.source_digest != source_digests.get(source)
         ):
             raise ValueError(f"family_identity_drift: {source}")
+        for arm, script in row.scripts.items():
+            actual = canonical_digest(
+                {"source_id": source, "script": script.model_dump(mode="json")}
+            )
+            if actual != arm_digests[(source, arm)]:
+                raise ValueError(f"family_arm_digest_drift: {source}, arm={arm}")
         seen_sources.add(source)
     if seen_sources != set(source_digests):
         raise ValueError("family records differ from scheduled sources")

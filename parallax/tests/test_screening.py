@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from test_swebench import INSTANCE_ID, row, runtime
 
+import parallax.screening as screening_module
 from parallax.gsm8k import Verdict, Verification
 from parallax.runner import RunFailure
 from parallax.screening import (
@@ -33,6 +34,7 @@ def problem():
 def execution(verdict: Verdict) -> ScreeningExecution:
     return ScreeningExecution(
         outcome=Verification(verdict=verdict, reason="scripted"),
+        reported_model="boundary-model",
         prompt_tokens=10,
         completion_tokens=5,
         estimated_cost_usd=0.01,
@@ -184,7 +186,7 @@ def test_manifest_precedes_execution_and_completed_units_resume(
     attempts = []
 
     def interrupted(unit):
-        records = read_screening_jsonl(path)
+        records = read_screening_jsonl(path.with_name(f"{path.name}.partial"))
         assert records[0] == plan
         attempts.append(unit.trial_index)
         if unit.trial_index == 1:
@@ -198,7 +200,9 @@ def test_manifest_precedes_execution_and_completed_units_resume(
             output_path=path,
             approve_spend=True,
         )
-    assert len(read_screening_jsonl(path)) == 2
+    partial = path.with_name(f"{path.name}.partial")
+    assert not path.exists()
+    assert len(read_screening_jsonl(partial)) == 2
 
     resumed = run_screening(
         plan,
@@ -211,6 +215,137 @@ def test_manifest_precedes_execution_and_completed_units_resume(
     assert len(resumed) == 2
     assert resumed[0].outcome.verdict == Verdict.PASS
     assert resumed[1].outcome.verdict == Verdict.WRONG
+    assert path.exists()
+    assert not partial.exists()
+
+
+def test_completed_evidence_is_never_overwritten(tmp_path: Path) -> None:
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model",
+        trial_seeds=(11,),
+    )
+    path = tmp_path / "screening.jsonl"
+    run_screening(
+        plan,
+        lambda unit: execution(Verdict.PASS),
+        output_path=path,
+        approve_spend=True,
+    )
+
+    with pytest.raises(FileExistsError, match="already exists"):
+        run_screening(
+            plan,
+            lambda unit: pytest.fail("completed unit must not rerun"),
+            output_path=path,
+            approve_spend=True,
+        )
+
+
+def test_finalization_does_not_overwrite_concurrent_destination(
+    tmp_path: Path,
+) -> None:
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model",
+        trial_seeds=(11,),
+    )
+    path = tmp_path / "screening.jsonl"
+
+    def executor(unit):
+        path.write_text("concurrent evidence\n", encoding="utf-8")
+        return execution(Verdict.PASS)
+
+    with pytest.raises(FileExistsError):
+        run_screening(
+            plan,
+            executor,
+            output_path=path,
+            approve_spend=True,
+        )
+
+    assert path.read_text() == "concurrent evidence\n"
+    assert path.with_name(f"{path.name}.partial").exists()
+
+
+def test_manifest_run_and_finalization_are_fsynced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+    monkeypatch.setattr(screening_module.os, "fsync", calls.append)
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model",
+        trial_seeds=(11,),
+    )
+
+    run_screening(
+        plan,
+        lambda unit: execution(Verdict.PASS),
+        output_path=tmp_path / "screening.jsonl",
+        approve_spend=True,
+    )
+
+    assert len(calls) == 3
+
+
+def test_provider_model_mismatch_is_retained_as_run_failure(
+    tmp_path: Path,
+) -> None:
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model-alias",
+        expected_response_model="boundary-model-2026-08-01",
+        trial_seeds=(11,),
+    )
+    mismatched = ScreeningExecution(
+        outcome=Verification(verdict=Verdict.PASS, reason="scripted"),
+        reported_model="other-model",
+        prompt_tokens=10,
+        completion_tokens=5,
+        estimated_cost_usd=0.01,
+    )
+
+    runs = run_screening(
+        plan,
+        lambda unit: mismatched,
+        output_path=tmp_path / "screening.jsonl",
+        approve_spend=True,
+    )
+
+    assert runs[0].reported_model == "other-model"
+    assert isinstance(runs[0].outcome, RunFailure)
+    assert runs[0].outcome.error_type == "ProviderModelMismatch"
+
+
+def test_observed_cost_stops_and_preserves_partial_evidence(
+    tmp_path: Path,
+) -> None:
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model",
+        trial_seeds=(11,),
+    )
+    path = tmp_path / "screening.jsonl"
+    expensive = ScreeningExecution(
+        outcome=Verification(verdict=Verdict.PASS, reason="scripted"),
+        reported_model="boundary-model",
+        prompt_tokens=1_000,
+        completion_tokens=1_000,
+        estimated_cost_usd=5.01,
+    )
+
+    with pytest.raises(SpendApprovalRequired, match="observed cost"):
+        run_screening(
+            plan,
+            lambda unit: expensive,
+            output_path=path,
+            approve_spend=True,
+        )
+
+    partial = path.with_name(f"{path.name}.partial")
+    assert not path.exists()
+    assert len(read_screening_jsonl(partial)) == 2
 
 
 def test_screening_reader_rejects_unknown_fields(tmp_path: Path) -> None:

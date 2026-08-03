@@ -7,9 +7,17 @@ import urllib.request
 from collections.abc import Callable, Mapping
 from typing import Annotated, Literal, TypeAlias
 
-from pydantic import Field, JsonValue, StringConstraints, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    StringConstraints,
+    ValidationError,
+)
 
 from .evolving_intent import Chat, Message
+from .runner import BudgetError
 from .types import NonEmptyText, StrictModel
 
 HttpUrl = Annotated[str, StringConstraints(pattern=r"^https://")]
@@ -48,6 +56,10 @@ class ProviderTool(StrictModel):
     function: ProviderToolFunction
 
 
+class ProviderResponseModel(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="ignore")
+
+
 class ProviderRequest(StrictModel):
     model: NonEmptyText
     messages: Annotated[tuple[ProviderMessage, ...], Field(min_length=1)]
@@ -56,36 +68,36 @@ class ProviderRequest(StrictModel):
     tools: tuple[ProviderTool, ...] = ()
 
 
-class ProviderFunctionCall(StrictModel):
+class ProviderFunctionCall(ProviderResponseModel):
     name: NonEmptyText
     arguments: str
 
 
-class ProviderToolCall(StrictModel):
+class ProviderToolCall(ProviderResponseModel):
     id: NonEmptyText
     type: Literal["function"] = "function"
     function: ProviderFunctionCall
 
 
-class ProviderResponseMessage(StrictModel):
+class ProviderResponseMessage(ProviderResponseModel):
     role: Literal["assistant"]
     content: str | None
     tool_calls: tuple[ProviderToolCall, ...] = ()
 
 
-class ProviderChoice(StrictModel):
+class ProviderChoice(ProviderResponseModel):
     index: Annotated[int, Field(ge=0)]
     finish_reason: str | None
     message: ProviderResponseMessage
 
 
-class ProviderUsage(StrictModel):
+class ProviderUsage(ProviderResponseModel):
     prompt_tokens: Annotated[int, Field(ge=0)]
     completion_tokens: Annotated[int, Field(ge=0)]
     total_tokens: Annotated[int, Field(ge=0)]
 
 
-class ProviderResponse(StrictModel):
+class ProviderResponse(ProviderResponseModel):
     id: NonEmptyText
     model: NonEmptyText
     choices: Annotated[tuple[ProviderChoice, ...], Field(min_length=1)]
@@ -182,6 +194,8 @@ class OpenAICompatibleProvider:
             if len(response.choices) != 1:
                 raise ProviderError("text chat requires exactly one provider choice")
             choice = response.choices[0]
+            if choice.finish_reason == "length":
+                raise BudgetError("provider response reached its output-token limit")
             if choice.message.tool_calls or not choice.message.content:
                 raise ProviderError("text chat requires one non-empty text response")
             return choice.message.content

@@ -286,5 +286,15 @@
   dataset rows, typed verifier failures, a $5 default cap, manifest-first
   execution, per-unit atomic receipts, resumability, and usage/cost fields.
 - A scripted transport dry run made zero network and paid calls. Certification
-  passes 92 tests normally and under `python -O`, Ruff, `ty`, build, the 28-case
-  core mutation suite, and the 21-case adapted Slice 2 audit suite.
+  passes 102 tests normally and under `python -O`, Ruff, `ty`, build, the
+  28-case core mutation suite, and the 30-case adapted Slice 2 audit suite.
+- Consolidated review fixes keep request models closed while allowing
+  unconsumed real-provider response fields, classify output truncation as a
+  budget fault, bind dataset rows to the requested revision, validate published
+  IDs before query construction, and reject truncated cells.
+- Screening evidence now uses an exclusive partial file with append-and-fsync
+  per unit, resume identity checks, no final-file overwrite, recorded provider
+  model/usage/cost, and cumulative observed-cost checks.
+- Report validation closes the retained-script arm-digest chain. The unsafe
+  embedded-verifier renderer fails closed unless explicitly enabled for offline
+  inspection.
