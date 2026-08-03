@@ -191,3 +191,37 @@ files across 2 bundles -> 3 stored objects (shared policy file deduped).
 Depth audit added to README: argued (axes/pruning) vs modeled (arithmetic)
 vs prototyped (this) vs untouched (serving path, multi-node cache, memory
 capture, fencing, security).
+
+## Benchmark platform pass
+
+Direction change: this is a learning/exploration project; removed the
+buy-vs-build product framing from the docs (kept internal), restored named
+citations (academic + industry) since we want sources to learn from, and
+built bench/, a config-driven experiment platform over the prototype.
+
+Mechanics learned the hard way: /workspace is overlayfs, and overlay
+upperdirs cannot live on overlay, so sandbox upper/work dirs live on tmpfs
+(/dev/shm). Overlay lower on overlayfs is fine. Chroot into the merged
+mount needs no /proc or /dev for these tasks.
+
+Harness: per-rollout overlayfs sandbox -> chroot task -> grader ->
+optional checkpoint (tar of dirty upper layer) -> optional re-grade after
+destroying the sandbox, restoring from the checkpoint alone. Delivery
+policies (eager_full, lazy_none, hot_tier, profile, profile_loo) get
+(upfront, lazy) byte predictions from the prototype's access profiles;
+fetch seconds are modeled bytes/bandwidth and labeled as modeled.
+
+Results (bench/results/, 4-vCPU host):
+- delivery_policies: 25 rollouts, all reward 1.00. Eager 70.2 MB / 0.47s
+  modeled vs hot tier 21.6 MB / 0.14s; lazy tails visible per policy.
+- capture_regrade: capture 9-66 ms, checkpoints 0.03-0.3 MB; re-grade from
+  checkpoint alone 16-68 ms and reproduces every live reward exactly.
+- concurrency_scale: throughput flat 322->353 rollouts/min from
+  concurrency 1->16 while task p95 degrades 0.24s->2.67s. One host buys
+  latency variance, not throughput; fleets scale horizontally, and this is
+  also where timing-based reward noise comes from.
+
+New citations folded into README (REAP/vHive ASPLOS'21 is the memory-page
+twin of our file-level leave-one-out finding; also SOCK, Catalyzer,
+FaaSnap, Firecracker NSDI'20, CernVM-FS, Dragonfly/Kraken, Archil blog,
+Modal, E2B, Morph, Grab, and the OCI seekability survey).
