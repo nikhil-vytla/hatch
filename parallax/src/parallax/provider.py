@@ -14,6 +14,7 @@ from pydantic import (
     JsonValue,
     StringConstraints,
     ValidationError,
+    field_validator,
 )
 
 from .evolving_intent import Chat, Message
@@ -83,6 +84,15 @@ class ProviderResponseMessage(ProviderResponseModel):
     role: Literal["assistant"]
     content: str | None
     tool_calls: tuple[ProviderToolCall, ...] = ()
+
+    @field_validator("tool_calls", mode="before")
+    @classmethod
+    def null_tool_calls_are_empty(cls, value: object) -> object:
+        if value is None:
+            return ()
+        if isinstance(value, list):
+            return tuple(value)
+        return value
 
 
 class ProviderChoice(ProviderResponseModel):

@@ -98,3 +98,30 @@
   Ruff check and format check passed; `uvx ty check src` passed; the package
   built; the core suite killed 28 of 28 mutants; and the Slice 2 suite killed
   36 of 36 mutants.
+
+## Fresh-key launch attempt
+
+- Docker was unavailable at its local socket. No amd64 image could build or
+  pull, so the explicit one-construction-call fallback applied.
+- The first source-row request returned HTTP 500 from Hugging Face. That
+  attempt never reached HUD and spent nothing.
+- The retry loaded the pinned row and made exactly one request to the HUD
+  gateway with Claude Haiku 4.5. Authentication succeeded and HUD returned a
+  completion.
+- HUD serialized `message.tool_calls` as explicit JSON `null`. The response
+  model accepted an omitted field but rejected `null`, so validation failed
+  before Parallax retained the response model or usage.
+- No second inference retry ran. No screening unit, boundary-model episode,
+  image build, or official-harness grading started.
+- Actual token usage and billed spend are unavailable for this request. HUD
+  documents token usage in its platform inference logs but does not document a
+  gateway-log retrieval endpoint.
+- The committed receipt records one paid request and an actual spend of
+  `null`. Its conservative upper estimate is $0.113895. The estimate charges
+  one token per prompt UTF-8 byte, the full 1,024-token output allowance, and
+  the higher Opus rates already used by the screening cap.
+- `ProviderResponseMessage` now normalizes explicit null `tool_calls` to an
+  empty tuple at the external response boundary. A focused regression test
+  covers the observed HUD payload. The fix was tested offline only.
+- Evidence:
+  `evidence/hud-construction-sanity-failure.json`.
