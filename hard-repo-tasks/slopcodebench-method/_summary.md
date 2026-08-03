@@ -11,9 +11,9 @@ research questions the single-episode method cannot ask, and specifies a
 repeatable synthesis pipeline with six admission gates — including a
 churn-ratio gate that mechanizes the
 [slop-code-bench](https://github.com/SprocketLab/slop-code-bench) authors'
-hand judgment of "does this test design decisions." A draft
-`checkpoint-evolution.md` method doc is included, marked proposed and not
-implemented.
+hand judgment of "does this test design decisions." The resulting method doc
+lives at `parallax/docs/methods/checkpoint-evolution.md`, marked proposed and
+not implemented.
 
 - Strongest experiment: the `carry-reference` matched arm, which tests the
   self-accumulation mechanism the benchmark asserts but never controls for.

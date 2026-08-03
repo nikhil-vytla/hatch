@@ -158,3 +158,21 @@ Documentation and formal modeling only; no implementation.
   can be made cheap enough (it doubles reference-build cost) and whether
   probe-based quality measurement is stable enough across probe seeds to
   serve as a primary outcome.
+
+## Promotion follow-up
+
+- The no-touching-parallax constraint was lifted after the concurrent
+  parallax rewrites merged. Rebased onto origin/main (picked up #12
+  RESEARCH-PROCESS.md and #14 parallax/docs/decisions/; evolving-intent.md
+  unchanged) — clean, no conflicts.
+- `git mv`'d the draft to parallax/docs/methods/checkpoint-evolution.md.
+  Edits during promotion: dropped the "currently lives in" placement note,
+  added a References pointer to this research folder, linked
+  synthesis-workflow.md from Interpretation and limits, and added a [!NOTE]
+  proposing (not applying) the MODEL.md extension: family-valued G_θ output
+  coupled by cross-episode persistent state, and monotonically accumulating
+  sealed obligations. MODEL.md itself untouched — that edit deserves its own
+  review.
+- Everything else (algorithmic model, quality audit, RQs, workflow) stays
+  here as research trail; folder README and _summary now point at the
+  promoted doc.

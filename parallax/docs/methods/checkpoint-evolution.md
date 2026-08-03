@@ -4,9 +4,6 @@
 > This method is proposed and not implemented. No Parallax slice, admission
 > gate, or run evidence exists for it. Every definition below is a
 > specification target, not a description of executable behavior.
->
-> This document is drafted for `parallax/docs/methods/checkpoint-evolution.md`
-> and currently lives in `hard-repo-tasks/slopcodebench-method/`.
 
 Checkpoint Evolution is a synthesis strategy \(\mathcal G_{\mathrm{CE}}\) in
 the [Parallax research model](../MODEL.md). It perturbs the initial workspace
@@ -35,6 +32,12 @@ Measurement critique was checked against HumanLayer's
 and
 ["Why Software Factories Fail"](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/wsff.md).
 
+The research trail behind this document — the full algorithmic model with
+derivations and citations, the quality-measurement audit, the research
+questions with estimands, and the synthesis-workflow and admission-gate
+design — lives in
+[`hard-repo-tasks/slopcodebench-method/`](../../../hard-repo-tasks/slopcodebench-method/README.md).
+
 ## Strategy
 
 Let \(\sigma\) be an admitted seed with a checkpoint family plan of length
@@ -43,6 +46,18 @@ Let \(\sigma\) be an admitted seed with a checkpoint family plan of length
 **Definition (family).** The strategy emits an ordered family of task pairs
 \([(\tau_1,\varepsilon_1),\ldots,(\tau_n,\varepsilon_n)]\) coupled through
 persistent agent state.
+
+> [!NOTE]
+> Proposed `MODEL.md` extension, not applied here: `MODEL.md` defines
+> \(\mathcal G_\theta(\tau,\varepsilon;\omega)=(\tau',\varepsilon')\) — a
+> single output pair — and treats sealed evaluator information as fixed per
+> task. Checkpoint Evolution needs two method-agnostic additions: (1) a
+> family-valued strategy output whose members are coupled by cross-episode
+> persistent state (\(\mu_{0,i+1}\) a declared function of the agent's
+> terminal state under \(\tau_i\)), and (2) monotonically accumulating
+> sealed authority (\(x_{\mathrm{seal},i} \supseteq x_{\mathrm{seal},i-1}\)
+> obligations). Both are stated locally in this document; editing `MODEL.md`
+> deserves its own review.
 
 **Definition (persistent state and obligations).** Agent-side state
 \(W_i = (y_i, d_i)\) carries the produced workspace and dependency manifest;
@@ -180,9 +195,10 @@ obligation mapping).
 
 The upstream problem set is public, and its sealed suites target the Python
 track in evaluation despite language-agnostic specifications. Parallax
-families synthesized under the workflow in the accompanying documents are
-new constructions; no claim of upstream score reproduction is available or
-intended.
+families synthesized under the
+[research-trail workflow](../../../hard-repo-tasks/slopcodebench-method/synthesis-workflow.md)
+are new constructions; no claim of upstream score reproduction is available
+or intended.
 
 > **TODO:** Before implementation, freeze the first-slice choices: seed
 > class, family length, probe policy, quality-measurement pinning, and the
