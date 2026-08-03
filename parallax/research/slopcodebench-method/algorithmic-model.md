@@ -2,7 +2,7 @@
 
 This document formalizes checkpoint evolution — the synthesis strategy behind
 SlopCodeBench (SCBench) — in the vocabulary of Parallax's
-[`docs/MODEL.md`](../../parallax/docs/MODEL.md). It characterizes what the
+[`docs/MODEL.md`](../../docs/MODEL.md). It characterizes what the
 paper and repository actually do before abstracting, and cites the specific
 sections and files each claim comes from.
 

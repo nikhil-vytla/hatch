@@ -124,7 +124,8 @@ Documentation and formal modeling only; no implementation.
   (handoff) is natively verifiable and turns "maintainability" into an
   estimand.
 - "Four-review gate" referent: the gold / no-op / mutant / tamper admission
-  matrix in hard-repo-tasks/scripts/admit.py (report keys gold_reward,
+  matrix in scripts/admit.py on the archive branch
+  cursor/hard-repo-tasks-5fc8 (report keys gold_reward,
   no_op_reward, mutant rejection, forbidden_path_reward). CE needs a
   sequence-level analog.
 
@@ -176,3 +177,14 @@ Documentation and formal modeling only; no implementation.
 - Everything else (algorithmic model, quality audit, RQs, workflow) stays
   here as research trail; folder README and _summary now point at the
   promoted doc.
+
+## Placement fix
+
+- hard-repo-tasks/ does not exist on origin/main — it is the superseded
+  experiment's namespace, alive only on the PR #5 archive branch. New
+  research committed against main must not resurrect it.
+- Established parallax/research/<topic>/ as the on-main home for research
+  trails (rule stated in parallax/research/README.md) and moved this folder
+  there. Repointed links in both directions (method doc ↔ folder) and
+  redirected citations of the archive experiment's scripts/admit.py to the
+  archive branch, since that path has no on-main referent.
