@@ -78,6 +78,12 @@ $2.147440 all-in bound for unmetered construction failures under the $5 cap.
 Candidate patches were graded from a pinned SWE-bench source checkout after its
 wheel omitted a required harness fixture.
 
+Screening round 2 found three Claude Opus 4.8 boundary instances at 2/3:
+Astropy 14508, Django 13786, and Xarray 4695. Actual token-metered round-two
+spend was $2.972512 under the $5 cap. These instances and model are the
+recommended operating point for the first single-vs-evolved comparison; the
+small-run power rule still withholds any advance/reject decision.
+
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the
 method contract, implementation choices, and evidence limits.
