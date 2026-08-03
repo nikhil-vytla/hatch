@@ -225,3 +225,18 @@ New citations folded into README (REAP/vHive ASPLOS'21 is the memory-page
 twin of our file-level leave-one-out finding; also SOCK, Catalyzer,
 FaaSnap, Firecracker NSDI'20, CernVM-FS, Dragonfly/Kraken, Archil blog,
 Modal, E2B, Morph, Grab, and the OCI seekability survey).
+
+## DSec reference (user-supplied)
+
+Added DeepSeek-V4 tech report section 5.2.5 (arxiv 2606.19348): DSec,
+their production sandbox platform for agentic post-training. Independent
+production confirmation of the design's axis choices: 4 substrates
+(pre-warmed pool / container / Firecracker microVM / QEMU fullVM) behind
+one SDK; EROFS lazy loading over 3FS with metadata local at mount, data
+on demand; overlaybd read-only base shared cross-instance + local COW,
+chainable snapshots, ms-scale resumption; globally ordered per-sandbox
+trajectory logs for preemption-safe resume (replay cached command
+results), provenance, deterministic replay. Notable extras we hadn't
+emphasized: page-cache dedup across VMs and runtime spinlock contention
+as density bottlenecks; trajectory-log fast-forward as the answer to
+GPU-training preemption.

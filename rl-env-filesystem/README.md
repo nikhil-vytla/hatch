@@ -288,6 +288,24 @@ is a migration while mounting a filesystem is an integration. The
 capabilities of this archetype re-enter archetype 2 as adapters wherever
 the fleet's runtime exposes snapshot hooks.
 
+A production data point on where these archetypes converge: DeepSeek's V4
+technical report (section 5.2.5) describes DSec, the sandbox platform
+behind their agentic post-training, running hundreds of thousands of
+concurrent sandboxes. It is an archetype-3 build, as expected for a lab
+that controls its whole stack, and its internals validate the axis choices
+made here one for one: four execution substrates (pre-warmed function
+pool, container, microVM, full VM) behind one SDK, which is the
+multi-runtime-adapter thesis applied inward; lazy image loading with file
+metadata local at mount time and data blocks fetched on demand from a
+distributed filesystem (axis D); read-only base layers shared across
+instances with local copy-on-write writes and chainable snapshots giving
+millisecond-scale resumption (axes B and G); and a globally ordered
+per-sandbox trajectory log used for preemption-safe resumption,
+provenance, and deterministic replay, which is job 5 as a production
+feature. When a frontier lab's in-house system and an outside-in design
+exercise land on the same combination, the combination is probably not an
+accident of either.
+
 ## What the numbers say
 
 From the cost model (assumptions are parameters, replace with measured
@@ -588,6 +606,15 @@ the concepts came from somewhere and we are here to learn.
 
 ### Engineering writeups from industry
 
+- DeepSeek-AI, [DeepSeek-V4 technical report](https://arxiv.org/html/2606.19348),
+  section 5.2.5 "Sandbox Infrastructure for Agentic AI". DSec: a
+  production sandbox platform for agentic RL post-training (hundreds of
+  thousands of concurrent sandboxes) with four execution substrates behind
+  one SDK, EROFS on-demand image loading over the 3FS distributed
+  filesystem, overlaybd copy-on-write layers with chainable snapshots and
+  millisecond resumption, and per-sandbox trajectory logs for
+  preemption-safe resumption and deterministic replay. The closest thing
+  in print to this document's recommendation, built lab-side.
 - Modal, [How we achieved truly serverless GPUs](https://modal.com/blog/truly-serverless-gpus).
   The four-ingredient stack this project's delivery/checkpoint framing
   started from: warm buffers, content-addressed lazy image FS, CPU
