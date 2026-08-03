@@ -76,6 +76,7 @@ describe("resource lifecycle", () => {
         status: "idle" | "running" | "error";
         createdAt: number;
         lastActiveAt: number;
+        archivedAt?: number | null;
       }
     >();
     sessions.set("idle", {
@@ -96,6 +97,52 @@ describe("resource lifecycle", () => {
     const removed = await life.reap(sessions);
     expect(removed).toEqual(["idle"]);
     expect(sessions.has("run")).toBe(true);
+  });
+
+  it("reap skips archived sessions", async () => {
+    const root = path.join("/tmp", "hatch-inspect-test", `arch_${Date.now()}`);
+    const mgr = new GitSandboxManager(root);
+    const sb = await mgr.create({ id: "arch1" });
+    const sessions = new Map<
+      string,
+      {
+        id: string;
+        sandboxId: string;
+        status: "idle" | "running" | "error";
+        createdAt: number;
+        lastActiveAt: number;
+        archivedAt?: number | null;
+      }
+    >();
+    sessions.set("a", {
+      id: "a",
+      sandboxId: sb.id,
+      status: "idle",
+      createdAt: 0,
+      lastActiveAt: 0,
+      archivedAt: Date.now(),
+    });
+    const life = new ResourceLifecycle(mgr, { ttlMs: 1 });
+    const removed = await life.reap(sessions);
+    expect(removed).toEqual([]);
+    expect(sessions.has("a")).toBe(true);
+  });
+});
+
+describe("sandbox fork", () => {
+  it("clones committed HEAD onto a new branch", async () => {
+    const root = path.join("/tmp", "hatch-inspect-test", `fork_${Date.now()}`);
+    const mgr = new GitSandboxManager(root);
+    const parent = await mgr.create({
+      id: "parent",
+      seedFiles: { "src/a.ts": "export const a = 1;\n" },
+    });
+    const child = await mgr.forkFrom({ sourceRepoDir: parent.repoDir, id: "child" });
+    expect(child.id).toBe("child");
+    expect(child.branch).toBe("inspect/child");
+    const { readFile } = await import("node:fs/promises");
+    const body = await readFile(path.join(child.repoDir, "src/a.ts"), "utf8");
+    expect(body).toContain("export const a");
   });
 });
 

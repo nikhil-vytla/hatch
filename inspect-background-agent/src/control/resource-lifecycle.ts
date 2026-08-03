@@ -6,6 +6,8 @@ export type LifecycleSession = {
   status: "idle" | "running" | "error";
   createdAt: number;
   lastActiveAt: number;
+  /** Soft-hidden sessions keep disk until DELETE; TTL reap skips them. */
+  archivedAt?: number | null;
 };
 
 /**
@@ -37,6 +39,7 @@ export class ResourceLifecycle {
     const removed: string[] = [];
     for (const session of [...sessions.values()]) {
       if (session.status === "running") continue;
+      if (session.archivedAt) continue;
       if (now - session.lastActiveAt < this.opts.ttlMs) continue;
       await this.destroy(session, sessions);
       removed.push(session.id);

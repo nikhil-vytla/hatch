@@ -62,7 +62,9 @@ We kept the **ideas** that make Inspect work (isolated git workspace, serial pro
 | Spec | Hatch |
 | --- | --- |
 | Slack + repo classifier | No |
-| Polished multi-client web + mobile | Minimal embedded UI |
+| Polished multi-client web + mobile | Minimal embedded UI with multi-session list |
+| Session archive / restore / delete | Yes locally (see [`SESSIONS.md`](SESSIONS.md)); no durable DO/snapshot yet |
+| User fork + agent spawn-child | User fork yes; agent spawn-child tool no |
 | code-server / VNC / ttyd iframes | No (`ideUrl`/`vncUrl`/`ttyUrl` removed with the old actor) |
 | Chrome extension / React Grab | No |
 | Org stats / merged-PR dashboards | No |

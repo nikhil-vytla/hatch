@@ -28,8 +28,12 @@ await cp.close();
 | GET | `/api/health` | ok + selected model |
 | GET | `/api/models` | known-free OpenCode models |
 | POST | `/api/sessions` | `{ prompt?, title?, cloneUrl?, authorName?, authorEmail? }` |
+| GET | `/api/sessions` | list; `?include=archived` |
 | GET | `/api/sessions/:id` | status + git diff |
 | POST | `/api/sessions/:id/prompt` | `{ text }` queued serially per session |
+| POST | `/api/sessions/:id/fork` | new sandbox from parent HEAD |
+| POST | `/api/sessions/:id/archive` | soft-hide; disk kept |
+| POST | `/api/sessions/:id/restore` | clear archive |
 | POST | `/api/sessions/:id/commit` | commit dirty tree as author |
 | DELETE | `/api/sessions/:id` | destroy sandbox disk |
 | WS | `/api/sessions/:id/events` | `SessionEventEnvelope` stream |

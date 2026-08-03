@@ -25,6 +25,10 @@ export type SessionRow = {
   lastActiveAt: number;
   status: "idle" | "running" | "error";
   lastError?: string;
+  /** Soft archive: hidden from default list, disk kept, prompts rejected until restore. */
+  archivedAt: number | null;
+  /** Set when created via POST .../fork. */
+  parentSessionId: string | null;
 };
 
 export type ControlPlaneOptions = {
@@ -92,18 +96,24 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
 
   app.get("/api/models", (c) => c.json({ models: listModels(), selected: model }));
 
-  app.get("/api/sessions", (c) =>
-    c.json({
-      sessions: [...sessions.values()].map((s) => ({
+  app.get("/api/sessions", (c) => {
+    const includeArchived = c.req.query("include") === "archived";
+    const rows = [...sessions.values()].filter((s) => includeArchived || !s.archivedAt);
+    rows.sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    return c.json({
+      sessions: rows.map((s) => ({
         id: s.id,
         title: s.title,
         branch: s.branch,
         status: s.status,
         createdAt: s.createdAt,
         lastActiveAt: s.lastActiveAt,
+        archivedAt: s.archivedAt,
+        parentSessionId: s.parentSessionId,
+        lastError: s.lastError ?? null,
       })),
-    }),
-  );
+    });
+  });
 
   app.post("/api/sessions", async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as {
@@ -142,6 +152,8 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
       status: "idle",
+      archivedAt: null,
+      parentSessionId: null,
     };
     sessions.set(row.id, row);
     emit(row.id, "system", {
@@ -180,6 +192,82 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     return c.json({ ok: true, destroyed: sandboxId, diskGone: gone });
   });
 
+  app.post("/api/sessions/:id/archive", async (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    if (row.status === "running") return c.json({ error: "session running" }, 409);
+    row.archivedAt = Date.now();
+    lifecycle.touch(row);
+    emit(row.id, "system", { kind: "session.closed", reason: "archived" });
+    return c.json({ ok: true, id: row.id, archivedAt: row.archivedAt });
+  });
+
+  app.post("/api/sessions/:id/restore", async (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    row.archivedAt = null;
+    lifecycle.touch(row);
+    return c.json({ ok: true, id: row.id, archivedAt: null });
+  });
+
+  app.post("/api/sessions/:id/fork", async (c) => {
+    const parent = sessions.get(c.req.param("id") ?? "");
+    if (!parent) return c.json({ error: "not found" }, 404);
+    if (parent.archivedAt) return c.json({ error: "archived; restore first" }, 409);
+    const body = (await c.req.json().catch(() => ({}))) as {
+      title?: string;
+      prompt?: string;
+      commitDirty?: boolean;
+    };
+    if (body.commitDirty !== false) {
+      const dirty = await sandboxes.status(parent.repoDir);
+      if (dirty) {
+        await sandboxes.commitAll(
+          parent.repoDir,
+          "inspect: snapshot before fork",
+          parent.author,
+        );
+      }
+    }
+    const sandbox = await sandboxes.forkFrom({ sourceRepoDir: parent.repoDir });
+    await sandboxes.setAuthor(sandbox.repoDir, parent.author);
+    const ocSession = await bridge.createSession(sandbox.repoDir);
+    const row: SessionRow = {
+      id: id("ses"),
+      title: body.title ?? `Fork of ${parent.title}`.slice(0, 72),
+      sandboxId: sandbox.id,
+      repoDir: sandbox.repoDir,
+      branch: sandbox.branch,
+      opencodeSessionId: ocSession,
+      author: parent.author,
+      createdAt: Date.now(),
+      lastActiveAt: Date.now(),
+      status: "idle",
+      archivedAt: null,
+      parentSessionId: parent.id,
+    };
+    sessions.set(row.id, row);
+    emit(row.id, "system", {
+      kind: "session.started",
+      repo: { owner: "local", name: sandbox.id },
+      by: {
+        id: brandString<"ActorId">(parent.author.email),
+        display: parent.author.name,
+        github: null,
+      },
+    });
+    if (body.prompt) {
+      void queues.enqueue(row.id, () => runPrompt(row.id, body.prompt!));
+    }
+    return c.json({
+      id: row.id,
+      branch: row.branch,
+      repoDir: row.repoDir,
+      status: row.status,
+      parentSessionId: parent.id,
+    });
+  });
+
   app.get("/api/sessions/:id", async (c) => {
     const row = sessions.get(c.req.param("id"));
     if (!row) return c.json({ error: "not found" }, 404);
@@ -191,6 +279,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   app.post("/api/sessions/:id/prompt", async (c) => {
     const row = sessions.get(c.req.param("id"));
     if (!row) return c.json({ error: "not found" }, 404);
+    if (row.archivedAt) return c.json({ error: "archived; restore first" }, 409);
     const body = (await c.req.json()) as { text?: string };
     if (!body.text?.trim()) return c.json({ error: "text required" }, 400);
     void queues.enqueue(row.id, () => runPrompt(row.id, body.text!.trim()));
@@ -240,7 +329,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
 
   async function runPrompt(sessionId: string, text: string) {
     const row = sessions.get(sessionId);
-    if (!row || !row.opencodeSessionId) return;
+    if (!row || !row.opencodeSessionId || row.archivedAt) return;
     row.status = "running";
     lifecycle.touch(row);
     const turnId = brandString<"TurnId">(id("trn"));
@@ -508,6 +597,51 @@ function webUiHtml(): string {
       margin-right: 6px;
     }
     .pill.live { border-color: var(--accent); color: var(--accent); }
+    .session-list {
+      list-style: none; margin: 14px 0 0; padding: 0;
+      max-height: 220px; overflow: auto;
+      border: 1px solid var(--line); border-radius: 10px;
+    }
+    .session-list li {
+      display: grid;
+      grid-template-columns: 8px 1fr auto;
+      gap: 8px;
+      align-items: start;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      font-size: 12.5px;
+    }
+    .session-list li:last-child { border-bottom: none; }
+    .session-list li:hover { background: color-mix(in oklab, var(--bg0) 55%, transparent); }
+    .session-list li.active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+    .session-list li.archived { opacity: 0.55; }
+    .session-list .st {
+      width: 8px; height: 8px; border-radius: 50%; margin-top: 5px;
+      background: var(--line);
+    }
+    .session-list .st.idle { background: #5a8f66; }
+    .session-list .st.running { background: var(--accent); }
+    .session-list .st.error { background: var(--danger); }
+    .session-list .title {
+      font-weight: 600; line-height: 1.3;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .session-list .sub {
+      color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+      margin-top: 2px;
+    }
+    .session-list .badge {
+      font-size: 10px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.04em; margin-top: 4px;
+    }
+    .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row-actions button { margin-top: 8px; }
+    .show-archived {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 8px; color: var(--muted); font-size: 12px;
+    }
+    .show-archived input { width: auto; }
     @media (max-width: 820px) {
       main { grid-template-columns: 1fr; }
       aside { border-right: none; border-bottom: 1px solid var(--line); }
@@ -523,11 +657,20 @@ function webUiHtml(): string {
   <main>
     <aside>
       <div><span class="pill" id="health">…</span><span class="pill" id="sesspill">no session</span></div>
+      <label>Sessions</label>
+      <ul class="session-list" id="sessionList"></ul>
+      <label class="show-archived"><input type="checkbox" id="showArchived" /> Show archived</label>
       <label>Prompt</label>
       <textarea id="prompt">Add a function called add in src/math.ts that returns the sum of two numbers, and export it. Keep it TypeScript.</textarea>
       <button id="start">Start session + run</button>
       <button class="secondary" id="follow" disabled>Send follow-up</button>
       <button class="secondary" id="commit" disabled>Commit changes</button>
+      <div class="row-actions">
+        <button class="secondary" id="fork" disabled>Fork</button>
+        <button class="secondary" id="archive" disabled>Archive</button>
+        <button class="secondary" id="restore" disabled>Restore</button>
+        <button class="secondary" id="destroy" disabled>Delete</button>
+      </div>
       <div class="meta" id="meta"></div>
     </aside>
     <section>
@@ -539,10 +682,31 @@ function webUiHtml(): string {
     const meta = document.getElementById('meta');
     const health = document.getElementById('health');
     const sesspill = document.getElementById('sesspill');
+    const sessionList = document.getElementById('sessionList');
+    const showArchived = document.getElementById('showArchived');
     let sessionId = null;
+    let sessionMeta = null;
     let ws = null;
     let agentBuf = '';
     let agentEl = null;
+
+    function setActionsEnabled(on) {
+      document.getElementById('follow').disabled = !on;
+      document.getElementById('commit').disabled = !on;
+      document.getElementById('fork').disabled = !on;
+      document.getElementById('archive').disabled = !on;
+      document.getElementById('restore').disabled = !on;
+      document.getElementById('destroy').disabled = !on;
+      if (on && sessionMeta && sessionMeta.archivedAt) {
+        document.getElementById('follow').disabled = true;
+        document.getElementById('commit').disabled = true;
+        document.getElementById('fork').disabled = true;
+        document.getElementById('archive').disabled = true;
+        document.getElementById('restore').disabled = false;
+      } else if (on) {
+        document.getElementById('restore').disabled = true;
+      }
+    }
 
     function scrollLog() {
       logEl.scrollTop = logEl.scrollHeight;
@@ -653,6 +817,7 @@ function webUiHtml(): string {
       else if (e.kind === 'turn.finished') {
         const err = typeof e.summary === 'string' && e.summary.startsWith('error:');
         turnMarker(err ? e.summary : 'Turn finished', err ? 'err' : 'done');
+        refreshSessions();
       }
       else if (e.kind === 'git.pushed') note('Committed ' + e.head + ' on ' + e.branch);
       else if (e.kind === 'session.closed') note('Session closed' + (e.reason ? ': ' + e.reason : ''));
@@ -669,7 +834,57 @@ function webUiHtml(): string {
         health.textContent = 'down';
       }
     }
-    refreshHealth();
+
+    async function refreshSessions() {
+      const q = showArchived.checked ? '?include=archived' : '';
+      const r = await fetch('/api/sessions' + q);
+      const j = await r.json();
+      sessionList.replaceChildren();
+      for (const s of j.sessions || []) {
+        const li = document.createElement('li');
+        if (s.id === sessionId) li.classList.add('active');
+        if (s.archivedAt) li.classList.add('archived');
+        const st = document.createElement('span');
+        st.className = 'st ' + (s.status || 'idle');
+        const mid = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = s.title || s.id;
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.textContent = s.status + (s.parentSessionId ? ' · fork' : '');
+        mid.appendChild(title);
+        mid.appendChild(sub);
+        const badge = document.createElement('div');
+        badge.className = 'badge';
+        badge.textContent = s.archivedAt ? 'archived' : s.status;
+        li.appendChild(st);
+        li.appendChild(mid);
+        li.appendChild(badge);
+        li.onclick = () => selectSession(s.id, { clear: true });
+        sessionList.appendChild(li);
+      }
+      refreshHealth();
+    }
+
+    async function selectSession(id, opts) {
+      sessionId = id;
+      const r = await fetch('/api/sessions/' + id);
+      const j = await r.json();
+      sessionMeta = j;
+      sesspill.textContent = id;
+      sesspill.classList.add('live');
+      meta.textContent = 'branch: ' + j.branch + '\\nrepo: ' + j.repoDir
+        + (j.parentSessionId ? '\\nparent: ' + j.parentSessionId : '')
+        + (j.archivedAt ? '\\narchived' : '');
+      setActionsEnabled(true);
+      if (opts && opts.clear) {
+        clearLog();
+        note('Switched to ' + id + (j.archivedAt ? ' (archived)' : ''));
+      }
+      connectEvents(id);
+      refreshSessions();
+    }
 
     function connectEvents(id) {
       if (ws) ws.close();
@@ -686,6 +901,11 @@ function webUiHtml(): string {
       };
     }
 
+    showArchived.onchange = () => refreshSessions();
+    refreshHealth();
+    refreshSessions();
+    setInterval(refreshSessions, 2500);
+
     document.getElementById('start').onclick = async () => {
       const text = document.getElementById('prompt').value.trim();
       document.getElementById('start').disabled = true;
@@ -697,15 +917,9 @@ function webUiHtml(): string {
         body: JSON.stringify({ prompt: text, title: text.slice(0, 72) }),
       });
       const j = await r.json();
-      sessionId = j.id;
-      sesspill.textContent = sessionId;
-      sesspill.classList.add('live');
-      meta.textContent = 'branch: ' + j.branch + '\\nrepo: ' + j.repoDir;
-      connectEvents(sessionId);
-      document.getElementById('follow').disabled = false;
-      document.getElementById('commit').disabled = false;
       document.getElementById('start').disabled = false;
-      refreshHealth();
+      await selectSession(j.id, { clear: false });
+      note('Session ' + j.id);
     };
 
     document.getElementById('follow').onclick = async () => {
@@ -717,6 +931,7 @@ function webUiHtml(): string {
         body: JSON.stringify({ text }),
       });
       note('Follow-up queued…');
+      refreshSessions();
     };
 
     document.getElementById('commit').onclick = async () => {
@@ -728,6 +943,53 @@ function webUiHtml(): string {
       });
       const j = await r.json();
       note('Committed ' + j.sha + ' on ' + j.branch);
+    };
+
+    document.getElementById('fork').onclick = async () => {
+      if (!sessionId) return;
+      note('Forking…');
+      const r = await fetch('/api/sessions/' + sessionId + '/fork', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Fork of ' + (sessionMeta && sessionMeta.title ? sessionMeta.title : sessionId) }),
+      });
+      const j = await r.json();
+      if (!r.ok) { note('Fork failed: ' + (j.error || r.status)); return; }
+      await selectSession(j.id, { clear: true });
+      note('Forked from ' + j.parentSessionId);
+    };
+
+    document.getElementById('archive').onclick = async () => {
+      if (!sessionId) return;
+      await fetch('/api/sessions/' + sessionId + '/archive', { method: 'POST' });
+      note('Archived ' + sessionId);
+      sessionId = null;
+      sessionMeta = null;
+      sesspill.textContent = 'no session';
+      setActionsEnabled(false);
+      clearLog();
+      refreshSessions();
+    };
+
+    document.getElementById('restore').onclick = async () => {
+      if (!sessionId) return;
+      await fetch('/api/sessions/' + sessionId + '/restore', { method: 'POST' });
+      await selectSession(sessionId, { clear: false });
+      note('Restored ' + sessionId);
+    };
+
+    document.getElementById('destroy').onclick = async () => {
+      if (!sessionId) return;
+      if (!confirm('Delete session and destroy sandbox disk?')) return;
+      const id = sessionId;
+      const r = await fetch('/api/sessions/' + id, { method: 'DELETE' });
+      const j = await r.json();
+      note('Deleted ' + id + (j.diskGone ? ' (disk gone)' : ''));
+      sessionId = null;
+      sessionMeta = null;
+      sesspill.textContent = 'no session';
+      setActionsEnabled(false);
+      refreshSessions();
     };
   </script>
 </body>

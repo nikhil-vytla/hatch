@@ -123,6 +123,33 @@ export class GitSandboxManager {
     return git(repoDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
   }
 
+  /**
+   * Fork: new sandbox from another repo's committed HEAD (+ optional dirty tree commit first by caller).
+   * Clones the source path locally onto a fresh inspect/ branch.
+   */
+  async forkFrom(args: {
+    readonly sourceRepoDir: string;
+    readonly id?: string;
+    readonly branchPrefix?: string;
+  }): Promise<SandboxInfo> {
+    await this.ensureBase();
+    const id = args.id ?? `sb_${randomBytes(4).toString("hex")}`;
+    const root = path.join(this.baseDir, id);
+    const repoDir = path.join(root, "repo");
+    await mkdir(root, { recursive: true });
+    const branchPrefix = args.branchPrefix ?? "inspect/";
+    const branch = `${branchPrefix}${id}`;
+    await git(root, ["clone", args.sourceRepoDir, "repo"]);
+    await git(repoDir, ["checkout", "-B", branch]);
+    return {
+      id,
+      root,
+      repoDir,
+      branch,
+      remoteUrl: null,
+    };
+  }
+
   async destroy(id: string): Promise<void> {
     await rm(path.join(this.baseDir, id), { recursive: true, force: true });
   }

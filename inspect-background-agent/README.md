@@ -35,7 +35,10 @@ then `DELETE`s the session and checks the sandbox directory is gone.
 ## API
 
 - `POST /api/sessions` `{ prompt, title?, cloneUrl?, authorName?, authorEmail? }`
+- `GET /api/sessions` list (+ `?include=archived`)
 - `POST /api/sessions/:id/prompt` `{ text }` (queued)
+- `POST /api/sessions/:id/fork` `{ title?, prompt? }` new sandbox from HEAD
+- `POST /api/sessions/:id/archive` / `.../restore`
 - `POST /api/sessions/:id/commit` `{ message? }`
 - `DELETE /api/sessions/:id` destroy sandbox
 - `GET /api/sessions/:id` status + diff
@@ -56,6 +59,7 @@ then `DELETE`s the session and checks the sandbox directory is gone.
 ## Design notes
 
 - **Deviations vs Ramp / Open-Inspect:** [`design/DEVIATIONS.md`](design/DEVIATIONS.md)
+- **Sessions / fork / archive:** [`design/SESSIONS.md`](design/SESSIONS.md)
 - **CF + Modal plan:** [`design/CLOUD.md`](design/CLOUD.md)
 - Topology / CTO diagram: [`design/TOPOLOGY.md`](design/TOPOLOGY.md)
 - Peer harness survey: [`design/HARNESSES.md`](design/HARNESSES.md)

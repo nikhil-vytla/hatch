@@ -5,6 +5,10 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
+## Sessions list / fork / archive (2026-08-03)
+
+API already had `GET /api/sessions` + hard `DELETE`. UI was single-thread. Added sidebar list with status polling, `POST .../fork` (git clone parent HEAD, optional dirty auto-commit), `archive`/`restore` soft-hide (TTL reap skips archived), and Delete in the UI. Doc: `design/SESSIONS.md`. Not yet: agent spawn-child tool, durable archive across process restart, Modal snapshots.
+
 ## UI log formatting (2026-08-03)
 
 `#log` was a raw `textContent` dump: markdown fences stayed literal, and `turn.finished` repeated the whole agent summary. Switched to structured entries (system / turn markers / agent bubble / tool chips) with a tiny fenced-code + inline-`code` renderer. Finished turns no longer re-dump the summary.
