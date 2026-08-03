@@ -16,7 +16,7 @@ implementation code.
 | [`quality-measurement.md`](quality-measurement.md) | Exact extraction of the paper's quality metrics, HumanLayer's findings about them, and the sealed / judged authority classification |
 | [`research-questions.md`](research-questions.md) | Eight falsifiable RQs unavailable to Evolving Intent, with estimands |
 | [`synthesis-workflow.md`](synthesis-workflow.md) | Repeatable synthesis pipeline, admission gates G1–G6, Cursor skill specs, automation boundary |
-| [`parallax/docs/methods/checkpoint-evolution.md`](../../parallax/docs/methods/checkpoint-evolution.md) | Method doc, promoted from this folder's draft; marked proposed/not-implemented |
+| [`parallax/docs/methods/checkpoint-evolution.md`](../../docs/methods/checkpoint-evolution.md) | Method doc, promoted from this folder's draft; marked proposed/not-implemented |
 | [`NOTES.md`](NOTES.md) | Working notes and source characterization |
 
 ## Key algorithmic insights
@@ -124,7 +124,7 @@ fidelity.
 - Parallax: `parallax/docs/MODEL.md`, `parallax/docs/methods/evolving-intent.md`
 
 No implementation code was written. The method doc drafted here was promoted
-to [`parallax/docs/methods/checkpoint-evolution.md`](../../parallax/docs/methods/checkpoint-evolution.md);
+to [`parallax/docs/methods/checkpoint-evolution.md`](../../docs/methods/checkpoint-evolution.md);
 everything else in this folder is the research trail behind it. The doc
 proposes (but does not apply) a small `MODEL.md` vocabulary extension for
 family-valued strategy output and accumulating sealed obligations.

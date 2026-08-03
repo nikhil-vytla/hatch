@@ -36,7 +36,7 @@ The research trail behind this document — the full algorithmic model with
 derivations and citations, the quality-measurement audit, the research
 questions with estimands, and the synthesis-workflow and admission-gate
 design — lives in
-[`hard-repo-tasks/slopcodebench-method/`](../../../hard-repo-tasks/slopcodebench-method/README.md).
+[`parallax/research/slopcodebench-method/`](../../research/slopcodebench-method/README.md).
 
 ## Strategy
 
@@ -196,7 +196,7 @@ obligation mapping).
 The upstream problem set is public, and its sealed suites target the Python
 track in evaluation despite language-agnostic specifications. Parallax
 families synthesized under the
-[research-trail workflow](../../../hard-repo-tasks/slopcodebench-method/synthesis-workflow.md)
+[research-trail workflow](../../research/slopcodebench-method/synthesis-workflow.md)
 are new constructions; no claim of upstream score reproduction is available
 or intended.
 
