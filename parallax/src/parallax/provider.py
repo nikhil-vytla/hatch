@@ -17,7 +17,7 @@ from pydantic import (
 )
 
 from .evolving_intent import Chat, Message
-from .runner import BudgetError
+from .outcome import BudgetError
 from .types import NonEmptyText, StrictModel
 
 HttpUrl = Annotated[str, StringConstraints(pattern=r"^https://")]
@@ -179,28 +179,34 @@ class OpenAICompatibleProvider:
             detail = error.errors(include_url=False)[0]["msg"]
             raise ProviderError(f"provider response is invalid: {detail}") from error
 
-    def chat(self) -> Chat:
-        def call(messages: tuple[Message, ...], max_output_tokens: int) -> str:
-            response = self.complete(
-                ProviderRequest(
-                    model=self.config.model,
-                    messages=tuple(
-                        ProviderMessage(role=message.role, content=message.content)
-                        for message in messages
-                    ),
-                    max_output_tokens=max_output_tokens,
-                )
+    def text_completion(
+        self,
+        messages: tuple[Message, ...],
+        max_output_tokens: int,
+    ) -> tuple[str, ProviderResponse]:
+        response = self.complete(
+            ProviderRequest(
+                model=self.config.model,
+                messages=tuple(
+                    ProviderMessage(role=message.role, content=message.content)
+                    for message in messages
+                ),
+                max_output_tokens=max_output_tokens,
             )
-            if len(response.choices) != 1:
-                raise ProviderError("text chat requires exactly one provider choice")
-            choice = response.choices[0]
-            if choice.finish_reason == "length":
-                raise BudgetError("provider response reached its output-token limit")
-            if choice.message.tool_calls or not choice.message.content:
-                raise ProviderError("text chat requires one non-empty text response")
-            return choice.message.content
+        )
+        if len(response.choices) != 1:
+            raise ProviderError("text chat requires exactly one provider choice")
+        choice = response.choices[0]
+        if choice.finish_reason == "length":
+            raise BudgetError("provider response reached its output-token limit")
+        if choice.message.tool_calls or not choice.message.content:
+            raise ProviderError("text chat requires one non-empty text response")
+        return choice.message.content, response
 
-        return call
+    def chat(self) -> Chat:
+        return lambda messages, max_output_tokens: self.text_completion(
+            messages, max_output_tokens
+        )[0]
 
 
 class HudGatewayProvider(OpenAICompatibleProvider):

@@ -53,22 +53,24 @@ The second slice adds an offline-ready SWE-bench Verified path:
    published evaluation IDs. It discards the gold patch, separates the public
    issue from the sealed official verifier, builds budget-equal arms, and
    records the pinned SWE symptom-overlay transformation.
-3. `swebench_env.py` renders deterministic `instance.json`, `env.py`, and
-   `Dockerfile.hud` files. Generated images use digest-pinned official
-   `swebench/sweb.eval` bases and one total agent-step budget per episode. This
-   renderer is an offline scaffold, not an admitted evaluation environment:
-   its single container exposes verifier data to the agent and its grader does
-   not implement official named-test semantics. Rendering fails closed unless
-   a caller explicitly opts into the unsafe bundle for offline inspection.
-4. `screening.py` preregisters boundary-model screening units and canonical
+3. `swebench_env.py` renders public-only `instance.json`, a one-line `env.py`,
+   the importable `swebench_runtime.py`, and `Dockerfile.hud`. The agent works
+   in a probed HUD `bubblewrap` Workspace and exports a candidate patch that
+   includes untracked files. Sealed verifier data never enters this image.
+4. `swebench_harness.py` runs the pinned official SWE-bench harness
+   evaluator-side against the digest-pinned official image. The harness verdict
+   is authoritative; report coverage is checked against the committed
+   FAIL_TO_PASS and PASS_TO_PASS sets.
+5. `screening.py` preregisters boundary-model screening units and canonical
    outcomes before execution, appends and fsyncs each unit to a resumable
    partial file, records provider model/usage and estimated cost, refuses to
-   overwrite completed evidence, and defaults to a $5 upper cap.
+   overwrite completed evidence, defaults to a $5 upper cap, and withholds a
+   decision while the design's minimum-detectable-effect is too large.
 
-These components have scripted offline coverage only. No provider request,
-official image pull, HUD deployment, or paid screening episode has run.
-Screening remains blocked on evaluator-side verifier isolation, official
-SWE-bench grading, and execution-identity binding.
+HUD model discovery authenticated during the first screening attempt, but the
+inference gateway returned HTTP 403 before the first model response. No paid
+episode ran; recorded usage and estimated spend are zero. Screening can resume
+after HUD inference entitlement is restored.
 
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the

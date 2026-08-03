@@ -122,7 +122,9 @@ def test_approved_scripted_screening_finds_boundary_instance(
     )
     summary = summarize_screening(plan, runs)
 
-    assert summary.action == "proceed"
+    assert summary.action == "underpowered"
+    assert not summary.powered
+    assert summary.minimum_detectable_effect > 0.5
     assert summary.boundary_sources == (problem().record_id,)
     assert summary.sources[0].pass_rate == 0.5
     assert sum(run.prompt_tokens for run in runs) == 20
@@ -148,7 +150,7 @@ def test_executor_exceptions_remain_run_failures(tmp_path: Path) -> None:
 
     assert isinstance(runs[0].outcome, RunFailure)
     assert runs[0].outcome.failure_kind == "agent"
-    assert summarize_screening(plan, runs).action == "change_model_or_instances"
+    assert summarize_screening(plan, runs).action == "underpowered"
 
 
 def test_typed_verifier_exception_preserves_failure_taxonomy(

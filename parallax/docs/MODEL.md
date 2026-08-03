@@ -7,14 +7,15 @@ implementations and experiments. It is a specification, not a theorem.
 The SWE-bench Verified scaffold instantiates \(x_{\mathrm{pub}}\) as the issue,
 repository, base commit, and pinned dataset identity. Its
 \(x_{\mathrm{seal}}\) contains the official image digest, test patch,
-FAIL_TO_PASS and PASS_TO_PASS tests, harness revision, and test command. The
-dataset gold patch is discarded at ingestion.
+FAIL_TO_PASS and PASS_TO_PASS tests, and harness revision. The dataset gold
+patch is discarded at ingestion.
 
-The current generated HUD bundle does not enforce this public/sealed split at
-runtime: it places both parts in one agent-readable container and therefore is
-not admissible for measurement. SWE-bench execution remains blocked until an
-evaluator-side authority owns the sealed fields and official named-test
-grading.
+The generated HUD image contains only \(x_{\mathrm{pub}}\). It exports the
+agent's candidate patch to an evaluator process, which supplies
+\(x_{\mathrm{seal}}\) to the pinned official SWE-bench harness in a separate
+official image. A `bubblewrap` Workspace and UID wall restrict the agent shell,
+but verifier secrecy does not depend on that wall because sealed fields are
+absent from the agent image.
 
 ## Task and environment
 

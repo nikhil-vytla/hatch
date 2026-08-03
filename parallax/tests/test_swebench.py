@@ -59,10 +59,7 @@ def row() -> dict[str, object]:
 
 
 def runtime() -> VerifierRuntime:
-    return VerifierRuntime(
-        image_digest=ImageDigest("a" * 64),
-        test_command=("pytest", "-q", "astropy/table/tests/test_mixin.py"),
-    )
+    return VerifierRuntime(image_digest=ImageDigest("a" * 64))
 
 
 def construction() -> SweConstruction:

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
-import pytest
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
 from parallax.swebench import build_swe_script_family, load_swebench_rows
-from parallax.swebench_env import UnsafeVerifierIsolationError, render_environment
+from parallax.swebench_env import render_environment
+from parallax.swebench_runtime import collect_patch, isolation_probe_argv, workspace
 
 
 def family():
@@ -25,60 +26,99 @@ def family():
     )
 
 
-def unsafe_bundle():
-    return render_environment(family(), allow_unsafe_embedded_verifier=True)
-
-
-def test_environment_rendering_fails_closed_without_isolation() -> None:
-    with pytest.raises(UnsafeVerifierIsolationError, match="agent-readable"):
-        render_environment(family())
-
-
-def test_environment_bundle_is_deterministic_and_compilable() -> None:
-    first = unsafe_bundle()
-    second = unsafe_bundle()
+def test_environment_bundle_is_public_deterministic_and_importable() -> None:
+    first = render_environment(family())
+    second = render_environment(family())
 
     assert first == second
     compile(first.env_py, "env.py", "exec")
-    assert b"ALLOWED_PATHS" not in first.env_py
+    compile(first.runtime_py, "swebench_runtime.py", "exec")
     config = json.loads(first.instance_json)
-    assert config["verifier"]["test_patch"] == "sealed test patch"
-    assert all(
-        "sealed test patch" not in turn
-        for script in config["scripts"].values()
-        for turn in script["turns"]
-    )
+    assert "verifier" not in config
+    assert "sealed test patch" not in first.instance_json.decode()
+    assert first.env_py == b"from swebench_runtime import env\n"
 
 
-def test_dockerfile_uses_official_pinned_eval_image() -> None:
-    dockerfile = unsafe_bundle().dockerfile.decode()
+def test_dockerfile_uses_pinned_base_and_isolated_hud_venv() -> None:
+    dockerfile = render_environment(family()).dockerfile.decode()
 
     assert (
         "swebench/sweb.eval.x86_64.astropy_1776_astropy-13236@sha256:" + "a" * 64
     ) in dockerfile
+    assert "/opt/hud-venv" in dockerfile
     assert "hud==0.6.12" in dockerfile
+    assert "bubblewrap util-linux" in dockerfile
+    assert "chown -R 1000:1000 /testbed" in dockerfile
     assert "git clone" not in dockerfile
     assert "git fetch" not in dockerfile
 
 
 def test_all_arms_receive_one_equal_episode_budget() -> None:
-    config = json.loads(unsafe_bundle().instance_json)
+    config = json.loads(render_environment(family()).instance_json)
     scripts = config["scripts"]
 
     assert sum(scripts["static"]["agent_steps"]) == 12
     assert sum(scripts["matched"]["agent_steps"]) == 12
     assert sum(scripts["evolved"]["agent_steps"]) == 12
     assert scripts["static"]["agent_steps"] == [12]
-    assert "step_budget" in unsafe_bundle().env_py.decode()
+    assert b"step_budget" in render_environment(family()).runtime_py
 
 
 def test_bundle_writes_only_expected_files(tmp_path: Path) -> None:
-    bundle = unsafe_bundle()
+    bundle = render_environment(family())
     bundle.write(tmp_path)
 
     assert {path.name for path in tmp_path.iterdir()} == {
         "Dockerfile.hud",
         "env.py",
         "instance.json",
+        "swebench_runtime.py",
     }
     assert (tmp_path / "instance.json").read_bytes() == bundle.instance_json
+
+
+def test_patch_export_includes_modified_and_untracked_files(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=tmp_path,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=tmp_path,
+        check=True,
+    )
+    (tmp_path / "existing.py").write_text("before\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=tmp_path, check=True)
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    (tmp_path / "existing.py").write_text("after\n", encoding="utf-8")
+    (tmp_path / "new.py").write_text("new\n", encoding="utf-8")
+
+    patch = collect_patch(base, tmp_path)
+
+    assert "existing.py" in patch
+    assert "new.py" in patch
+    assert "new file mode" in patch
+
+
+def test_workspace_namespace_does_not_mount_app(monkeypatch) -> None:
+    monkeypatch.setattr(workspace, "_bwrap", "/usr/bin/bwrap")
+    monkeypatch.setattr(workspace, "_drops_privileges", lambda: False)
+
+    argv = isolation_probe_argv()
+
+    mounts = tuple(
+        argv[index + 2]
+        for index, value in enumerate(argv)
+        if value in {"--bind", "--ro-bind"}
+    )
+    assert "/app" not in mounts
+    assert "/testbed" in mounts
