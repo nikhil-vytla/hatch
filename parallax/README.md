@@ -42,6 +42,27 @@ execution, grading, manifest validation, JSONL round-trips, missing-outcome
 bounds, and source-clustered reporting without network calls. Parallax has no
 real-provider evidence, generated benchmark pool, or paper-score reproduction.
 
+The second slice adds an offline-ready SWE-bench Verified path:
+
+1. `provider.py` defines strict OpenAI-compatible request and response models.
+   One direct HTTP client serves text-only construction calls and tool-call
+   agent requests. Credentials come from a named environment variable and
+   never enter serialized requests.
+2. `swebench.py` pins the Verified dataset revision and the paper's 50
+   published evaluation IDs. It discards the gold patch, separates the public
+   issue from the sealed official verifier, builds budget-equal arms, and
+   records the pinned SWE symptom-overlay transformation.
+3. `swebench_env.py` renders deterministic `instance.json`, `env.py`, and
+   `Dockerfile.hud` files. Generated images use digest-pinned official
+   `swebench/sweb.eval` bases and one total agent-step budget per episode.
+4. `screening.py` preregisters boundary-model screening units and canonical
+   outcomes. It refuses unapproved execution and stops any plan whose upper
+   estimate exceeds $20.
+
+These components have scripted offline coverage only. No provider request,
+official image pull, HUD deployment, or paid screening episode has run from
+this slice.
+
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the
 method contract, implementation choices, and evidence limits.
