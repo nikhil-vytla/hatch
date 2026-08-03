@@ -1,0 +1,6 @@
+# Regenerable heavyweight artifacts: the pulled image, extracted rootfs,
+# repacked layer tars, staging dirs, and raw syscall traces.
+image/
+repacked/
+deps_stage/
+traces/*.raw

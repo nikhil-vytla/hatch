@@ -1,0 +1,6 @@
+date,employee,category,amount,receipt
+2026-05-02,jkim,travel,1240.50,yes
+2026-05-03,mchen,meals,842.00,no
+2026-05-03,jkim,meals,61.20,yes
+2026-05-07,rpatel,equipment,2999.99,no
+2026-05-09,mchen,travel,310.75,yes

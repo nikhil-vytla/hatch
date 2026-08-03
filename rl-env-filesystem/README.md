@@ -16,7 +16,33 @@ each axis, prunes combinations that violate hard constraints, and lands on
 the archetypes that survive. The working log is in [NOTES.md](NOTES.md). Two
 small scripts ground the argument: a latency/cost model in
 [model/coldstart_model.py](model/coldstart_model.py) and a design-space
-enumerator in [model/design_space.py](model/design_space.py).
+enumerator in [model/design_space.py](model/design_space.py). A working
+prototype in [prototype/](prototype/) pulls a real OCI image without a
+container runtime, traces which bytes stand-in agent tasks actually touch,
+and repacks layers by observed access; its findings are reported below.
+
+## How deep this design goes
+
+An honest depth audit, because "design document" can mean anything.
+
+- Argued on paper: the jobs, the seven axes, the pruning rules, the three
+  archetypes, the recommendation. This level is a structured argument, and
+  its weakest joints are the hand-written pruning rules.
+- Modeled with arithmetic: cold-start decomposition and re-grade economics
+  (parametric, assumptions not measurements) and the mechanical enumeration
+  of the option space. These bound orders of magnitude; they prove nothing
+  about tails.
+- Prototyped with running code: registry pull and layer extraction, syscall
+  -level access tracing of tasks in a sandbox, the join of traces against
+  layer ownership, access-based repacking, a prefetch-policy evaluation
+  with held-out tasks, and the content-addressed seed store for the
+  drag-and-drop flow. All on one machine with free tooling.
+- Not touched: a real lazy filesystem serving reads on demand (the
+  prototype measures what one would serve, not the serving), the multi-node
+  cache tier, checkpoint restore under concurrency, memory-state capture,
+  lease/fencing protocol details, failure injection, and any security
+  review. Each of these is a separate experiment with a clear setup; none
+  is blocked on a decision made here.
 
 ## Jobs the layer must do
 
@@ -280,6 +306,132 @@ problem. A warm pool of pre-booted machines is a prerequisite the customer
 owns; without it, the data layer shaves a minority of the cold start. The
 sales narrative should say so, because overclaiming here surfaces in the
 first proof-of-concept.
+
+## Prototype: decomposing image layers by observed agent access
+
+The question the prototype answers: can you determine, from the accesses an
+agent actually makes while completing a task, how an image's layers should
+be decomposed for delivery? Yes, with about 600 lines of Python and no
+container runtime, no paid platform, and no kernel modules. Method:
+
+1. [prototype/oci_pull.py](prototype/oci_pull.py) speaks the registry HTTP
+   API directly (token auth, manifest negotiation, blob fetch), extracts
+   layers in order with whiteout handling, and records the ownership map:
+   for every path in the final rootfs, which layer serves it. This map is
+   what overlay semantics give a running container implicitly; materializing
+   it is what lets us join access traces to layers.
+2. [prototype/make_deps_layer.sh](prototype/make_deps_layer.sh) adds a
+   synthetic dependency layer (numpy + pandas, 97 MB) to a slim Python base
+   image, mimicking the deps layer every real environment image carries.
+   Final image: 5 layers, 7,400 files, 213 MB uncompressed, 70 MB
+   compressed.
+3. [prototype/trace_task.sh](prototype/trace_task.sh) runs a task inside a
+   chroot of the extracted rootfs under strace, capturing every open, read,
+   pread and file-backed mmap with file-descriptor-to-path resolution. Five
+   stand-in agent tasks cover distinct behavior classes: stdlib CSV
+   analysis, shell-tool code search and edit, relational DB work, numeric
+   work touching numpy only, and a dataframe pipeline touching pandas.
+4. [prototype/analyze.py](prototype/analyze.py) joins traces against the
+   ownership map, estimating unique bytes touched per file (reads plus
+   mapped lengths, capped at file size), and emits a per-task access
+   profile, which is exactly the artifact a profile-guided prefetcher
+   consumes.
+5. [prototype/repack.py](prototype/repack.py) classifies files into hot
+   (touched by two or more tasks), warm (one task), and cold (none), emits
+   real repacked layer tars with real gzip sizes, and evaluates prefetch
+   policies including leave-one-out coverage for a never-seen task. Full
+   output in [prototype/results/summary.md](prototype/results/summary.md).
+
+What the traces showed, on real bytes:
+
+| task | files touched | bytes touched | deps-layer utilization |
+| --- | --- | --- | --- |
+| CSV report (stdlib) | 21 of 7,400 (0.3%) | 11.1 of 213 MB (5.2%) | 0% |
+| code search + edit | 1,278 (17.3%) | 29.5 MB (13.8%) | 0% |
+| DB query | 19 (0.3%) | 12.5 MB (5.9%) | 0% |
+| numeric solve | 49 (0.7%) | 63.5 MB (29.8%) | 43% |
+| dataframe pipeline | 115 (1.6%) | 83.6 MB (39.2%) | 62% |
+
+And the decomposition: the hot tier across all five tasks is 69 files,
+21.7 MB compressed, against a 70.2 MB full pull. Eager delivery of the hot
+tier plus lazy everything else cuts up-front bytes 3.2x while guaranteeing
+the interpreter, loader, shared libraries and coreutils are warm. 6,044 of
+7,400 files (104 MB) were never touched by any task.
+
+The leave-one-out evaluation is the finding I'd put in front of a buyer:
+
+| held-out task | working set | covered by other tasks' profiles | missed |
+| --- | --- | --- | --- |
+| CSV report | 11.1 MB | 100% | 0 |
+| code search + edit | 29.5 MB | 23% | 22.7 MB |
+| DB query | 12.5 MB | 87% | 1.6 MB |
+| numeric solve | 63.5 MB | 100% | 0 |
+| dataframe pipeline | 83.6 MB | 78% | 18.2 MB |
+
+Three lessons. First, the Slacker result replicates on a modern
+environment-shaped image: single-digit to lowish-double-digit byte
+utilization per task. Second, build-order layers are the wrong delivery
+unit: the deps layer is 0% relevant to three tasks and 43-62% relevant to
+two, so access-based tiers dominate any layer-granularity policy. Third,
+profile-guided prefetch is a floor, not a ceiling: it approaches 100%
+coverage for tasks whose behavior is API-shaped, and collapses to 23% for a
+task that trawls the filesystem (code search), which is precisely the
+agent-shaped access pattern. That asymmetry is the argument for hot-tier
+prefetch plus a lazy tail rather than prefetch-only, and it also says
+per-task profiles converge only after observing that task a few times,
+which the rollout workload conveniently provides.
+
+Honest limitations: file-level granularity, not sub-file chunks (pread
+offsets are in the traces; extending to chunk-level is mechanical); the
+byte estimates are per-file upper bounds; the tasks are scripted stand-ins,
+not a live agent (though a real agent's tool calls cross the same syscall
+surface, which is what makes the tracer runtime-agnostic); and nothing here
+measures the serving side, only what would need to be served.
+
+To run this against a real platform instead of stand-ins, the information
+needed: the environment images (or registry references) for a
+representative task set; either recorded rollout traces or permission to
+run the tracer inside their sandbox (strace works where ptrace is allowed;
+fanotify or eBPF where it is not); the task fan-out distribution, which
+sets how quickly per-task profiles converge; and whether their image build
+pipeline permits server-side repacking or must remain untouched with
+index-only laziness.
+
+## Non-technical users: from dragged-in files to a task bundle
+
+The flow to support: a user drops n arbitrary files, writes one sentence
+about what the agent should do, and the platform synthesizes the rest. The
+data layer's half of that flow is prototyped in
+[prototype/synthesize/](prototype/synthesize/):
+
+- Ingest: every dropped file is hashed and stored once in a
+  content-addressed store; the task bundle holds digests, not bytes. Two
+  bundles that drop the same file share one object (the demo drops four
+  files across two tasks and stores three objects). This is the same dedup
+  argument the design makes for checkpoints, at drag-and-drop scale, and
+  it means a thousand variants of a task sharing a big fixture cost one
+  copy.
+- Deterministic seed: the generated setup script materializes seeds by
+  hardlink from the read-only store, so every rollout starts from
+  digest-verified state, which is what makes grading and re-grading
+  defensible. Modified-seed detection comes free: rehash and compare.
+- Synthesis: the scenario and grader are a model call in a real system.
+  The prototype emits the exact synthesis prompt (description plus a typed
+  seed inventory with samples) and a runnable grader stub encoding the
+  contract the design doc requires: reward in [0,1], unchanged seed state
+  scores 0.0, a correct completion scores 1.0, and checks should prefer
+  final filesystem state so grading works from a checkpoint without a live
+  agent.
+- Validation before publish: a null-agent rollout must score 0 and an
+  oracle rollout must score 1 before the task goes live. Those validation
+  rollouts are themselves the first entries in the task's access profile,
+  which means the delivery layer's prefetch data starts accumulating
+  before the first customer rollout runs.
+
+What is deliberately not prototyped: the model call itself, and the
+iteration loop where synthesis failures (grader scores oracle below 1)
+feed back into regeneration. Neither changes the data layer's shape; both
+consume it.
 
 ## Risks and what must be true
 
