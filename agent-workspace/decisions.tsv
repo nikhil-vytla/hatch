@@ -9,3 +9,4 @@ ts	phase	decision	why	evidence	result
 2026-08-03T16:19:00Z	U6	embedded single-page UI, no bundler	worked for inspect; server guarantees are the product	serve probes: health/memory/files/skills/UI	VERIFIED
 2026-08-03T16:22:00Z	U7	Dockerfile + compose with enforced password	deployment story; compose refuses empty WORKSPACE_PASSWORD	tsc build loads from dist; docker absent on VM	INCONCLUSIVE (image build unverified)
 2026-08-03T16:22:30Z	attention	skipped PWA/Electron/swarm/marketplace	laziness protocol; hermes built those over many releases	README Not in v1	held
+2026-08-03T16:33:00Z	U5-fix	bash -i SIGTTOU-stopped server group under tmux; switched to detached non-interactive bash	fix-root-causes; browser check caught what happy-frame probe missed	NOTES bug section; probe hello-42; browser hello-ws; health live after	VERIFIED

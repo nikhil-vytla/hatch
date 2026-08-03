@@ -26,6 +26,10 @@ Studied product: https://github.com/outsourc-e/hermes-workspace — web workspac
 - `npx tsc` build output loads from `dist/`
 - `docker build`: **not verified** — Docker is not installed on this VM. Dockerfile steps (prod install, tsc compile, tsx serve) verified individually.
 
+## Bug found by browser verification (fixed)
+
+The visual check caught what the raw WS probe missed: `bash -i` inherits the server's controlling TTY (tmux) and its job-control attempt SIGTTOU-stops the **whole server process group** — the workspace froze mid-demo. Root cause fix, not a workaround: spawn non-interactive `bash --noprofile --norc` with `detached: true` (own process group, no TTY access), kill the group on socket close. Re-verified in the browser: `echo hello-ws` round-trips and `/api/health` stays live afterward. Lesson: a probe that only checks the happy frame passes while the process is dying — verify on the real surface.
+
 ## Decisions that mattered
 
 - **No node-pty**: native build friction for marginal v1 value; piped bash documented as no-PTY. Encoded in UI copy.

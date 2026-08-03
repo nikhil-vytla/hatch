@@ -293,21 +293,31 @@ export async function startWorkspace(opts: WorkspaceOptions = {}) {
       let shell: ReturnType<typeof spawn> | null = null;
       return {
         onOpen(_evt, ws) {
-          shell = spawn("bash", ["-i"], {
+          // Non-interactive bash in its own process group: `bash -i` would try to
+          // control the server's inherited TTY and SIGTTOU-stop the whole process
+          // group when run under tmux/systemd with a terminal attached.
+          shell = spawn("bash", ["--noprofile", "--norc"], {
             cwd: filesRoot,
-            env: { ...process.env, TERM: "dumb", PS1: "\\w $ " },
+            env: { ...process.env, TERM: "dumb" },
             stdio: ["pipe", "pipe", "pipe"],
+            detached: true,
           });
           shell.stdout?.on("data", (d: Buffer) => ws.send(d.toString()));
           shell.stderr?.on("data", (d: Buffer) => ws.send(d.toString()));
           shell.on("close", () => ws.close());
-          ws.send(`connected: bash in ${filesRoot} (piped, no PTY)\r\n`);
+          ws.send(`connected: bash in ${filesRoot} (piped, line-based)\r\n`);
         },
         onMessage(evt) {
           shell?.stdin?.write(String(evt.data));
         },
         onClose() {
-          shell?.kill("SIGKILL");
+          if (shell?.pid) {
+            try {
+              process.kill(-shell.pid, "SIGKILL");
+            } catch {
+              shell.kill("SIGKILL");
+            }
+          }
           shell = null;
         },
       };
