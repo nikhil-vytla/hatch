@@ -340,8 +340,7 @@ class PublicationReplayTests(unittest.TestCase):
             with mock.patch("parallax.artifacts.os.replace", side_effect=OSError("synthetic rename fault")):
                 with self.assertRaises(StagingStateError) as raised:
                     publish_public_task(destination, self.task)
-            self.assertEqual(raised.exception.staging_state, "empty-orphan")
-            self.assertFalse(raised.exception.cleanup_succeeded)
+            self.assertEqual(raised.exception.staging_state, "empty")
             self.assertFalse(destination.exists())
             leftovers = list(Path(directory).iterdir())
             self.assertEqual(len(leftovers), 1)
@@ -396,7 +395,6 @@ class PublicationReplayTests(unittest.TestCase):
             finally:
                 os.close(original_fd)
             self.assertEqual(outcome.contents_state, "empty")
-            self.assertTrue(outcome.modified)
             self.assertEqual((original / "attacker.txt").read_text(), "attacker")
             self.assertEqual(
                 (moved_original.stat().st_dev, moved_original.stat().st_ino),
@@ -427,13 +425,80 @@ class PublicationReplayTests(unittest.TestCase):
             finally:
                 opened_parent.close()
             self.assertEqual(outcome.contents_state, "empty")
-            self.assertTrue(outcome.modified)
             self.assertEqual((original / "attacker.txt").read_text(), "attacker")
             self.assertEqual(
                 (moved_original.stat().st_dev, moved_original.stat().st_ino),
                 original_identity,
             )
             self.assertEqual(list(moved_original.iterdir()), [])
+
+    def test_tampered_staging_with_unlink_failure_is_indeterminate(self) -> None:
+        with artifact_temp_directory() as directory:
+            parent = Path(directory)
+            opened_parent = artifact_module._open_directory_path(parent)
+            staging_name, staging_fd = artifact_module._make_staging(
+                opened_parent.target_fd
+            )
+            staging = parent / staging_name
+            task_bytes = canonical_bytes(self.task.public.as_record())
+            artifact_module._write_durable(staging_fd, "task.json", task_bytes)
+            artifact_module._write_durable(
+                staging_fd,
+                "publication-manifest.json",
+                canonical_bytes(artifact_module._artifact_manifest(task_bytes)),
+            )
+            capture = artifact_module._capture_tree_fd(
+                staging_fd,
+                PUBLIC_TREE_POLICY,
+            )
+            artifact_module._verify_public_capture(capture, self.task)
+            (staging / "task.json").write_bytes(b"tampered after validation")
+            try:
+                with mock.patch(
+                    "parallax.artifacts.os.unlink",
+                    side_effect=OSError("unlink fault"),
+                ):
+                    outcome = artifact_module._cleanup_staging(staging_fd)
+            finally:
+                opened_parent.close()
+            self.assertEqual(outcome.contents_state, "indeterminate")
+            self.assertEqual(
+                (staging / "task.json").read_bytes(),
+                b"tampered after validation",
+            )
+
+    def test_cleanup_emptiness_check_consumes_at_most_one_entry(self) -> None:
+        class CountingIterator:
+            def __init__(self, size):
+                self.size = size
+                self.consumed = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, _error_type, _error, _traceback):
+                return False
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self.consumed >= self.size:
+                    raise StopIteration
+                self.consumed += 1
+                return object()
+
+        iterator = CountingIterator(10_000)
+        with (
+            mock.patch(
+                "parallax.artifacts.os.unlink",
+                side_effect=FileNotFoundError,
+            ),
+            mock.patch("parallax.artifacts.os.scandir", return_value=iterator),
+        ):
+            outcome = artifact_module._cleanup_directory_contents(123)
+        self.assertEqual(outcome.contents_state, "indeterminate")
+        self.assertEqual(iterator.consumed, 1)
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
     def test_symlinked_parent_component_fails_closed(self) -> None:
@@ -498,17 +563,14 @@ class PublicationReplayTests(unittest.TestCase):
             error = raised.exception
             self.assertFalse(error.requested_path_visible)
             self.assertFalse(error.destination_visible)
-            self.assertFalse(error.complete_orphan)
-            self.assertTrue(error.empty_orphan)
-            self.assertEqual(error.artifact_state, "empty-orphan")
+            self.assertEqual(error.artifact_state, "empty")
             self.assertEqual(error.orphan_state, "empty")
             self.assertTrue(error.cleanup_attempted)
-            self.assertFalse(error.cleanup_succeeded)
             self.assertFalse(destination.exists())
             self.assertTrue((moved_parent / "published").is_dir())
             self.assertEqual(list((moved_parent / "published").iterdir()), [])
 
-    def test_parent_swap_cleanup_failure_reports_complete_orphan(self) -> None:
+    def test_tampered_artifact_with_unlink_failure_is_indeterminate(self) -> None:
         with artifact_temp_directory() as directory:
             root = Path(directory)
             parent = root / "requested-parent"
@@ -520,32 +582,31 @@ class PublicationReplayTests(unittest.TestCase):
             def swapping_replace(source, target, *, src_dir_fd, dst_dir_fd):
                 parent.rename(moved_parent)
                 parent.mkdir()
-                return real_replace(
+                result = real_replace(
                     source,
                     target,
                     src_dir_fd=src_dir_fd,
                     dst_dir_fd=dst_dir_fd,
                 )
+                (moved_parent / "published" / "task.json").write_bytes(b"tampered")
+                return result
 
             with (
                 mock.patch("parallax.artifacts.os.replace", side_effect=swapping_replace),
-                mock.patch(
-                    "parallax.artifacts._cleanup_published",
-                    return_value=artifact_module._CleanupOutcome("unchanged", False),
-                ),
+                mock.patch("parallax.artifacts.os.unlink", side_effect=OSError("unlink fault")),
             ):
                 with self.assertRaises(PublicationStateError) as raised:
                     publish_public_task(destination, self.task)
             error = raised.exception
             self.assertFalse(error.requested_path_visible)
-            self.assertTrue(error.complete_orphan)
-            self.assertFalse(error.partial_orphan)
-            self.assertEqual(error.artifact_state, "complete")
-            self.assertEqual(error.orphan_state, "complete")
+            self.assertEqual(error.artifact_state, "indeterminate")
+            self.assertEqual(error.orphan_state, "indeterminate")
             self.assertTrue(error.cleanup_attempted)
-            self.assertFalse(error.cleanup_succeeded)
             self.assertFalse(destination.exists())
-            self.assertTrue((moved_parent / "published" / "task.json").is_file())
+            self.assertEqual(
+                (moved_parent / "published" / "task.json").read_bytes(),
+                b"tampered",
+            )
 
     def test_parent_swap_partial_cleanup_is_reported(self) -> None:
         with artifact_temp_directory() as directory:
@@ -573,8 +634,6 @@ class PublicationReplayTests(unittest.TestCase):
                     publish_public_task(destination, self.task)
             error = raised.exception
             self.assertFalse(error.requested_path_visible)
-            self.assertFalse(error.complete_orphan)
-            self.assertTrue(error.partial_orphan)
             self.assertEqual(error.artifact_state, "partial")
             self.assertEqual(error.orphan_state, "partial")
             self.assertFalse(destination.exists())
@@ -670,9 +729,8 @@ class PublicationReplayTests(unittest.TestCase):
                     publish_public_task(destination, self.task)
             error = raised.exception
             self.assertTrue(error.destination_visible)
-            self.assertEqual(error.artifact_state, "empty-orphan")
+            self.assertEqual(error.artifact_state, "empty")
             self.assertEqual(error.orphan_state, "none")
-            self.assertFalse(error.cleanup_succeeded)
             self.assertTrue(error.durability_indeterminate)
             self.assertTrue(destination.is_dir())
             self.assertEqual(list(destination.iterdir()), [])

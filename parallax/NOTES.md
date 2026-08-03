@@ -57,8 +57,9 @@
   before the final acceptance check.
 - Publication and staging cleanup remove known contents only through retained
   descriptors. They never pathname-remove a raced directory and distinguish
-  requested-path visibility from empty-, complete-, partial-, and
-  indeterminate-orphan states.
+  requested-path visibility from empty, partial, and indeterminate orphan
+  states. Cleanup never infers completeness from a pre-cleanup capture and
+  consumes at most one remaining directory entry.
 - Used labeled synthetic test values; no benchmark rows or hidden answers are
   versioned.
 - Focused tests cover evaluator injection, data-only APIs, answer boundaries,

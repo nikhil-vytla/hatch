@@ -31,7 +31,6 @@ class StagingStateError(ArtifactPathError):
         )
         self.staging_name = staging_name
         self.staging_state = staging_state
-        self.cleanup_succeeded = False
 
 
 class PublicationStateError(ArtifactError):
@@ -45,18 +44,13 @@ class PublicationStateError(ArtifactError):
         artifact_state: str,
         orphan_state: str,
         cleanup_attempted: bool,
-        cleanup_succeeded: bool,
     ) -> None:
         super().__init__(message)
         self.requested_path_visible = requested_path_visible
         self.destination_visible = requested_path_visible
         self.artifact_state = artifact_state
         self.orphan_state = orphan_state
-        self.empty_orphan = orphan_state == "empty"
-        self.complete_orphan = orphan_state == "complete"
-        self.partial_orphan = orphan_state == "partial"
         self.cleanup_attempted = cleanup_attempted
-        self.cleanup_succeeded = cleanup_succeeded
         self.durability_indeterminate = True
 
 
@@ -196,7 +190,6 @@ class _DirectoryPath:
 @dataclass(frozen=True)
 class _CleanupOutcome:
     contents_state: str
-    modified: bool
 
 
 PUBLIC_TREE_POLICY = TreePolicy(("publication-manifest.json", "task.json"))
@@ -486,7 +479,6 @@ def _make_staging(parent_fd: int) -> tuple[str, int]:
 
 def _cleanup_directory_contents(directory_fd: int) -> _CleanupOutcome:
     modified = False
-    failed = False
     for name in PUBLIC_TREE_POLICY.allowed_paths:
         try:
             os.unlink(name, dir_fd=directory_fd)
@@ -494,19 +486,18 @@ def _cleanup_directory_contents(directory_fd: int) -> _CleanupOutcome:
         except FileNotFoundError:
             pass
         except OSError:
-            failed = True
+            pass
     try:
         with os.scandir(directory_fd) as iterator:
-            remaining = tuple(iterator)
+            sentinel = object()
+            remaining = next(iterator, sentinel)
     except OSError:
-        return _CleanupOutcome("indeterminate", modified)
-    if not remaining:
-        return _CleanupOutcome("empty", modified)
+        return _CleanupOutcome("indeterminate")
+    if remaining is sentinel:
+        return _CleanupOutcome("empty")
     if modified:
-        return _CleanupOutcome("partial", True)
-    if failed:
-        return _CleanupOutcome("unchanged", False)
-    return _CleanupOutcome("indeterminate", False)
+        return _CleanupOutcome("partial")
+    return _CleanupOutcome("indeterminate")
 
 
 def _cleanup_staging(staging_fd: int) -> _CleanupOutcome:
@@ -523,7 +514,7 @@ def _cleanup_published(destination_fd: int) -> _CleanupOutcome:
     try:
         return _cleanup_directory_contents(destination_fd)
     except OSError:
-        return _CleanupOutcome("indeterminate", False)
+        return _CleanupOutcome("indeterminate")
 
 
 def publish_public_task(destination: Path, task: NativeTask) -> tuple[PublicationReceipt, TreeSnapshot]:
@@ -535,7 +526,6 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
     destination_fd = -1
     destination_identities: tuple[tuple[int, int], ...] = ()
     renamed = False
-    artifact_complete = False
     try:
         try:
             os.stat(destination.name, dir_fd=parent.target_fd, follow_symlinks=False)
@@ -567,7 +557,6 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
         )
         final_capture = _capture_tree_fd(destination_fd, PUBLIC_TREE_POLICY)
         manifest_id = _verify_public_capture(final_capture, task)
-        artifact_complete = True
         _assert_path_identity(destination, destination_identities)
         snapshot = final_capture.snapshot
         receipt = PublicationReceipt(
@@ -589,47 +578,30 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
         raise
     except Exception as error:
         if renamed:
-            visible = bool(destination_identities) and _path_identity_matches(
-                destination, destination_identities
-            )
             cleanup_attempted = destination_fd >= 0
             cleanup = (
                 _cleanup_published(destination_fd)
                 if cleanup_attempted
-                else _CleanupOutcome("indeterminate", False)
+                else _CleanupOutcome("indeterminate")
             )
-            cleanup_succeeded = False
             visible = bool(destination_identities) and _path_identity_matches(
                 destination, destination_identities
             )
-            if cleanup.contents_state == "empty":
-                artifact_state = "empty-orphan"
-            elif cleanup.contents_state == "partial":
-                artifact_state = "partial"
-            elif cleanup.contents_state == "unchanged" and artifact_complete:
-                artifact_state = "complete"
-            else:
-                artifact_state = "indeterminate"
-            if visible:
-                orphan_state = "none"
-            elif artifact_state == "empty-orphan":
-                orphan_state = "empty"
-            else:
-                orphan_state = artifact_state
+            artifact_state = cleanup.contents_state
+            orphan_state = "none" if visible else artifact_state
             raise PublicationStateError(
                 f"publication was renamed but could not be accepted: {type(error).__name__}",
                 requested_path_visible=visible,
                 artifact_state=artifact_state,
                 orphan_state=orphan_state,
                 cleanup_attempted=cleanup_attempted,
-                cleanup_succeeded=cleanup_succeeded,
             ) from error
         if staging_fd >= 0:
             cleanup = _cleanup_staging(staging_fd)
             staging_fd = -1
             raise StagingStateError(
                 staging_name,
-                f"{cleanup.contents_state}-orphan",
+                cleanup.contents_state,
             ) from error
         raise
     finally:
