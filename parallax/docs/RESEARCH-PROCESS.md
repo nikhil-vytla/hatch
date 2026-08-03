@@ -93,7 +93,10 @@ sealed answer, the verifier, and the declared output budget:
 - **Matched.** A progressive reveal of the source intent, matched to the
   evolved arm in turn count and per-turn output budget. The intent never
   changes; information only accumulates. This is the control: it carries
-  every cost of multi-turn interaction except intent evolution.
+  every cost of multi-turn interaction except intent evolution. The source
+  paper used the same kind of turn-matched control to show that added turns
+  alone did not explain its measured drop; Parallax makes that control a
+  structural requirement rather than one ablation.
 - **Evolved.** The intervention. The conversation opens under a predecessor
   intent, then moves through corrections and reveals, and terminally
   restores the exact source function, arguments, and reveals. The final
@@ -149,12 +152,6 @@ The executable slice is offline and deterministic. Its test suite uses
 real-shaped GSM8K rows and scripted chat callables, and needs no network,
 provider keys, or GPU.
 
-> [!NOTE]
-> The tree that contains only `parallax/docs/` is documentation-only. The
-> commands below require the executable slice under `parallax/src/` and
-> `parallax/tests/`; if those directories are absent in your checkout, fetch
-> the branch that carries them.
-
 ```bash
 cd parallax
 python -m pytest -q          # full offline suite; expect all tests to pass
@@ -207,6 +204,58 @@ future slices:
    method or evidence fidelity.
 4. **Behavioral mutation testing**, which mutated contract-bearing lines and
    required the test suite to kill every active mutant.
+
+## Why it is built this way
+
+The commitments above were not designed in one sitting. They descend from a
+documented research phase, and each load-bearing choice has a citable origin.
+
+- **The failure mode and the control discipline come from the literature.**
+  ["LLMs Get Lost in Evolving User Intent"](https://arxiv.org/abs/2607.20734)
+  observed the failure mode and pinned the construction algorithm Parallax
+  reimplements; the [method contract](methods/evolving-intent.md) records the
+  exact upstream revision consulted and every deliberate divergence.
+  [SlopCodeBench](https://arxiv.org/abs/2603.24755) grounds the separate
+  checkpoint-evolution strategy that [`MODEL.md`](MODEL.md) declares out of
+  scope: its state machine (a workspace persisting across separately scored
+  checkpoints) is incompatible with intent-trajectory state, which is exactly
+  why the model fixes shared vocabulary and invariants while each strategy
+  owns its own state machine. Collapsing them into one transformation algebra
+  would erase the variables experiments must control.
+- **Preregistration before outcomes.** Freezing the threshold, units, seeds,
+  and configuration digests in the evidence manifest before any outcome is
+  visible follows the preregistration rationale documented by the
+  [Center for Open Science](https://www.cos.io/initiatives/prereg): planned
+  tests must be distinguishable from later exploration, and analytical
+  choices must not depend on observed results.
+- **One vertical slice, learned from failed attempts.** Two earlier
+  directions were built and deliberately stopped: a ten-variant-family
+  contract catalog whose adversarial review concluded that typed schemas
+  without one executable end-to-end path were premature complexity, and a
+  content-addressed verifier core
+  ([closed pull request](https://github.com/nikhil-vytla/hatch/pull/9)) that
+  was over-engineered for the same reason. The current harness inverts the
+  order: one complete journey first, with structure added only where a review
+  demanded it.
+- **Failure separation and budget matching encode prior review findings.**
+  The rules that provider and harness faults must never count against the
+  model, and that matched arms must equalize budgets rather than only turn
+  counts, were explicit findings from the adversarial review of the earlier
+  prototype, where hand-annotated failure notes and unmatched step budgets
+  were caught confounding the measured effect. Both are now structural: run
+  failures are typed rows validated by the report, and the decision contrast
+  compares budget-matched arms only.
+- **The four-review gate generalizes that experience.** Standing adversarial
+  review of the prototype caught problems that authors of the code did not,
+  so the harness now requires the four independent reviews above before a
+  slice is accepted. The concrete changes each review forced are recorded in
+  [`../NOTES.md`](../NOTES.md).
+
+The wider corpus behind these decisions — a typed literature base of source,
+concept, and synthesis notes, a timestamped decision log, and the full
+adversarial review — lives with the
+[hard-repo-tasks research experiment](https://github.com/nikhil-vytla/hatch/pull/5)
+that preceded this harness.
 
 ## Deliberately out of scope
 
