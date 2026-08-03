@@ -1,6 +1,6 @@
-Built a hatch-scale Inspect-style background agent from Ramp's [builders post](https://builders.ramp.com/post/why-we-built-our-background-agent) and [Modal write-up](https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal), using `/architect` plus the CTO three-plane diagram (Cloudflare SessionAgent/EventBus, Modal managers/Queue, Bun Runner + OpenCode + side cars).
+Shipped a working local Inspect-style harness in hatch — control plane, real git sandboxes, and OpenCode free models — after studying Ramp's posts, the CTO topology, and [ColeMurray/background-agents](https://github.com/ColeMurray/background-agents) for inspiration (not a clone).
 
-- Workspace-first orchestration; SessionAgent mailbox; separate EventBus and PromptIngress; Runner owns agent + ide/vnc/tty URLs
-- Typed `admitWrites()` sync gate; InstallationToken vs UserToken for push vs PR
-- Compared peers (Valet, Open-Inspect/Rafiki, Cursor Cloud Agents, Devin, Claude Code) in `design/HARNESSES.md`
-- 9 passing tests and `npm run demo` without cloud credentials
+- `npm run e2e` creates `src/math.ts` via OpenCode in an isolated `/tmp` sandbox and commits it
+- `npm run serve` exposes a web UI + REST/WebSocket API on `:8787`
+- Sandboxes use `--dir` so OpenCode cannot write into the hatch repo by mistake
+- Design docs keep the three-plane map and peer comparison (Valet/Cursor Cloud/Devin/etc.)
