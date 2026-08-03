@@ -164,6 +164,46 @@ for an implementation:
 These choices preserve semantic fidelity without claiming provider-text parity
 with the consulted implementation.
 
+## SWE-bench Verified slice choices
+
+The SWE adapter pins the paper's 50 published evaluation IDs, the Verified
+dataset revision, the official harness revision, and each official eval image
+digest. Ingestion discards the gold patch. The public issue statement, repo,
+base commit, and version remain separate from the sealed test patch,
+FAIL_TO_PASS list, PASS_TO_PASS list, test command, and verifier commitments.
+
+Construction returns categorized arguments. The adapter removes
+`category="symptom"` arguments from each phase's scheduled argument order, then
+reinserts those symptoms at the front of the owning phase before rendering.
+This is the narrow behavior characterized in the pinned upstream SWE overlay.
+The evidence records both the stripped symptom IDs and the final injected
+order.
+
+The first SWE implementation schedules whole function phases rather than
+reproducing upstream provider prompts or every generic scheduler slot. Each
+predecessor phase is followed by an exact source-intent phase. The terminal
+turn also carries the source issue statement. This is a declared Parallax
+restriction for the screening slice, not a claim of provider-text or dataset
+parity.
+
+SWE arm semantics differ from the GSM8K presentation where the benchmark
+requires them:
+
+- Static receives the full public source issue once.
+- Matched receives the same number of turns as evolved without a function,
+  requirement, or verifier change.
+- Evolved traverses the constructed predecessor phases and restores the exact
+  source intent on its final turn.
+- Every arm receives the same total agent-step and output-token budget. Static
+  receives that budget in one turn; matched and evolved divide it across
+  turns.
+
+The generated HUD environment resets to `base_commit`, preserves agent source
+edits, restores authoritative test files, applies the sealed test patch, and
+runs the pinned test command. Generated Dockerfiles use the official
+`swebench/sweb.eval` image by digest. No edit-path allowlist is part of the
+verdict.
+
 ## Interpretation and limits
 
 Where the paper leaves behavior open, a Parallax adapter must document its

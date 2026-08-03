@@ -4,6 +4,12 @@ Parallax studies how agents respond when a task, its environment, or the
 interaction schedule changes. The model below fixes the vocabulary for
 implementations and experiments. It is a specification, not a theorem.
 
+The SWE-bench Verified scaffold instantiates \(x_{\mathrm{pub}}\) as the issue,
+repository, base commit, and pinned dataset identity. Its
+\(x_{\mathrm{seal}}\) contains the official image digest, test patch,
+FAIL_TO_PASS and PASS_TO_PASS tests, harness revision, and test command. The
+dataset gold patch is discarded at ingestion.
+
 ## Task and environment
 
 **Definition (TaskSpec).** A task specification is
