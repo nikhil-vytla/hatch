@@ -5,6 +5,10 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
+## Artifacts panel (2026-08-03)
+
+Log alone only showed agent chat. Added Files / Diff / Screenshots under the log: `GET /api/sessions/:id/artifacts` returns changed file contents + unified diff. Screenshots tab explains VNC/Chromium sidecars are not local yet (empty list).
+
 ## Sessions list / fork / archive (2026-08-03)
 
 API already had `GET /api/sessions` + hard `DELETE`. UI was single-thread. Added sidebar list with status polling, `POST .../fork` (git clone parent HEAD, optional dirty auto-commit), `archive`/`restore` soft-hide (TTL reap skips archived), and Delete in the UI. Doc: `design/SESSIONS.md`. Not yet: agent spawn-child tool, durable archive across process restart, Modal snapshots.

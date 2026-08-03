@@ -27,7 +27,7 @@ async function git(cwd: string, args: string[], env: NodeJS.ProcessEnv = {}): Pr
     env: { ...process.env, ...env },
     maxBuffer: 10 * 1024 * 1024,
   });
-  return stdout.trim();
+  return stdout.replace(/\n$/, "");
 }
 
 export class GitSandboxManager {
@@ -105,7 +105,81 @@ export class GitSandboxManager {
   }
 
   async diff(repoDir: string): Promise<string> {
-    return git(repoDir, ["diff", "HEAD"]);
+    const unstaged = await git(repoDir, ["diff", "HEAD"]);
+    if (unstaged) return unstaged;
+    // If clean working tree, show last commit patch (post-commit view).
+    try {
+      return await git(repoDir, ["show", "--stat", "--patch", "--format=", "HEAD"]);
+    } catch {
+      return "";
+    }
+  }
+
+  /**
+   * Working-tree + last-touch artifacts for the UI: porcelain paths, content, and unified diff.
+   */
+  async artifacts(repoDir: string): Promise<{
+    readonly diff: string;
+    readonly files: readonly {
+      readonly path: string;
+      readonly status: string;
+      readonly content: string | null;
+      readonly truncated: boolean;
+      readonly binary: boolean;
+    }[];
+  }> {
+    const porcelain = await this.status(repoDir);
+    const paths = new Map<string, string>();
+    for (const line of porcelain.split("\n")) {
+      if (!line.trim()) continue;
+      // Porcelain: XY PATH (XY may include leading space). Never trim the line first.
+      const status = line.slice(0, 2).replace(/ /g, "").trim() || "?";
+      let rel = line.slice(3);
+      if (rel.includes(" -> ")) rel = rel.split(" -> ").pop()!.trim();
+      else rel = rel.trim();
+      if (rel.startsWith('"') && rel.endsWith('"')) rel = rel.slice(1, -1);
+      paths.set(rel, status);
+    }
+    if (paths.size === 0) {
+      // Fall back to files touched in HEAD commit.
+      try {
+        const names = await git(repoDir, ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"]);
+        for (const rel of names.split("\n")) {
+          if (rel.trim()) paths.set(rel.trim(), "H");
+        }
+      } catch {
+        /* empty repo */
+      }
+    }
+    const files: {
+      path: string;
+      status: string;
+      content: string | null;
+      truncated: boolean;
+      binary: boolean;
+    }[] = [];
+    const maxBytes = 80_000;
+    for (const [rel, status] of [...paths.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const abs = path.join(repoDir, rel);
+      try {
+        const buf = await readFile(abs);
+        const binary = buf.includes(0);
+        if (binary) {
+          files.push({ path: rel, status, content: null, truncated: false, binary: true });
+          continue;
+        }
+        let text = buf.toString("utf8");
+        let truncated = false;
+        if (text.length > maxBytes) {
+          text = text.slice(0, maxBytes);
+          truncated = true;
+        }
+        files.push({ path: rel, status, content: text, truncated, binary: false });
+      } catch {
+        files.push({ path: rel, status, content: null, truncated: false, binary: false });
+      }
+    }
+    return { diff: await this.diff(repoDir), files };
   }
 
   async commitAll(repoDir: string, message: string, author: GitAuthor): Promise<string> {

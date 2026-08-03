@@ -50,3 +50,11 @@ DELETE /api/sessions/:id
 ```
 
 UI: Sessions list, Fork / Archive / Restore / Delete beside the prompt controls.
+
+## Artifacts (code / diff / screenshots)
+
+| Capability | Hatch now |
+| --- | --- |
+| Changed file contents | Files tab via `GET /api/sessions/:id/artifacts` |
+| Unified diff | Diff tab (working tree vs HEAD, or last commit if clean) |
+| Screenshots / VNC | Tab present; empty. Needs Modal sidecars (see CLOUD.md) |

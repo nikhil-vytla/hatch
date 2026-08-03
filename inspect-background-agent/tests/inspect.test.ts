@@ -144,6 +144,20 @@ describe("sandbox fork", () => {
     const body = await readFile(path.join(child.repoDir, "src/a.ts"), "utf8");
     expect(body).toContain("export const a");
   });
+
+  it("artifacts lists file content and diff", async () => {
+    const root = path.join("/tmp", "hatch-inspect-test", `art_${Date.now()}`);
+    const mgr = new GitSandboxManager(root);
+    const sb = await mgr.create({
+      id: "art",
+      seedFiles: { "src/x.ts": "export const x = 1;\n" },
+    });
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(path.join(sb.repoDir, "src/x.ts"), "export const x = 2;\n");
+    const art = await mgr.artifacts(sb.repoDir);
+    expect(art.files.some((f) => f.path === "src/x.ts" && f.content?.includes("x = 2"))).toBe(true);
+    expect(art.diff).toContain("x = 2");
+  });
 });
 
 describe("models", () => {

@@ -272,8 +272,27 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     const row = sessions.get(c.req.param("id"));
     if (!row) return c.json({ error: "not found" }, 404);
     const status = await sandboxes.status(row.repoDir);
-    const diff = await sandboxes.diff(row.repoDir);
-    return c.json({ ...row, gitStatus: status, diff });
+    const artifacts = await sandboxes.artifacts(row.repoDir);
+    return c.json({
+      ...row,
+      gitStatus: status,
+      diff: artifacts.diff,
+      files: artifacts.files,
+    });
+  });
+
+  app.get("/api/sessions/:id/artifacts", async (c) => {
+    const row = sessions.get(c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    const artifacts = await sandboxes.artifacts(row.repoDir);
+    return c.json({
+      sessionId: row.id,
+      branch: row.branch,
+      ...artifacts,
+      screenshots: [] as const,
+      screenshotsNote:
+        "Screenshots need in-sandbox VNC/Chromium sidecars (Modal execution plane). Not wired in the local hatch yet.",
+    });
   });
 
   app.post("/api/sessions/:id/prompt", async (c) => {
@@ -476,8 +495,14 @@ function webUiHtml(): string {
       gap: 0;
       min-height: calc(100vh - 110px);
     }
-    aside, section { padding: 20px 24px; }
+    aside, section.workspace { padding: 20px 24px; }
     aside { border-right: 1px solid var(--line); background: color-mix(in oklab, var(--bg1) 80%, transparent); }
+    section.workspace {
+      display: grid;
+      grid-template-rows: minmax(220px, 42vh) 1fr;
+      gap: 14px;
+      min-width: 0;
+    }
     label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
     textarea, input, button {
       width: 100%;
@@ -508,10 +533,87 @@ function webUiHtml(): string {
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 14px;
-      height: calc(100vh - 170px);
+      height: 100%;
+      min-height: 180px;
       overflow: auto;
     }
     #log:empty::before { content: "Waiting…"; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+    .artifacts {
+      background: #0b0f0c;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .artifacts-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--line);
+      flex: 0 0 auto;
+    }
+    .artifacts-tabs button {
+      width: auto;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      border-bottom: 2px solid transparent;
+    }
+    .artifacts-tabs button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .artifacts-body {
+      flex: 1;
+      overflow: auto;
+      padding: 12px 14px;
+      min-height: 0;
+    }
+    .file-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .file-list button {
+      width: auto;
+      margin: 0;
+      padding: 4px 8px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11.5px;
+      font-weight: 500;
+      background: var(--bg1);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .file-list button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .diff-view, .file-view {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 0;
+    }
+    .diff-view .add { color: #9be39b; }
+    .diff-view .del { color: #ff8f8f; }
+    .diff-view .hunk { color: #7aa2ff; }
+    .empty-art { color: var(--muted); font-size: 13px; line-height: 1.45; max-width: 48ch; }
+    .shot-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 52ch;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
     .entry-sys {
       color: var(--muted);
       font-family: "IBM Plex Mono", monospace;
@@ -645,7 +747,7 @@ function webUiHtml(): string {
     @media (max-width: 820px) {
       main { grid-template-columns: 1fr; }
       aside { border-right: none; border-bottom: 1px solid var(--line); }
-      #log { height: 55vh; }
+      section.workspace { grid-template-rows: 40vh 45vh; }
     }
   </style>
 </head>
@@ -673,8 +775,18 @@ function webUiHtml(): string {
       </div>
       <div class="meta" id="meta"></div>
     </aside>
-    <section>
+    <section class="workspace">
       <div id="log"></div>
+      <div class="artifacts">
+        <div class="artifacts-tabs">
+          <button type="button" class="active" data-tab="files">Files</button>
+          <button type="button" data-tab="diff">Diff</button>
+          <button type="button" data-tab="shots">Screenshots</button>
+        </div>
+        <div class="artifacts-body" id="artifactsBody">
+          <p class="empty-art">Artifacts appear here after the agent writes files: source, unified diff, and (later) screenshots.</p>
+        </div>
+      </div>
     </section>
   </main>
   <script>
@@ -684,11 +796,101 @@ function webUiHtml(): string {
     const sesspill = document.getElementById('sesspill');
     const sessionList = document.getElementById('sessionList');
     const showArchived = document.getElementById('showArchived');
+    const artifactsBody = document.getElementById('artifactsBody');
     let sessionId = null;
     let sessionMeta = null;
     let ws = null;
     let agentBuf = '';
     let agentEl = null;
+    let artTab = 'files';
+    let artData = null;
+    let selectedFile = null;
+
+    document.querySelectorAll('.artifacts-tabs button').forEach((btn) => {
+      btn.onclick = () => {
+        document.querySelectorAll('.artifacts-tabs button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        artTab = btn.getAttribute('data-tab');
+        renderArtifacts();
+      };
+    });
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function renderDiffHtml(diff) {
+      if (!diff) return '<p class="empty-art">No diff yet.</p>';
+      const lines = diff.split('\\n').map((line) => {
+        const e = escapeHtml(line);
+        if (line.startsWith('+') && !line.startsWith('+++')) return '<span class="add">' + e + '</span>';
+        if (line.startsWith('-') && !line.startsWith('---')) return '<span class="del">' + e + '</span>';
+        if (line.startsWith('@@')) return '<span class="hunk">' + e + '</span>';
+        return e;
+      });
+      return '<pre class="diff-view">' + lines.join('\\n') + '</pre>';
+    }
+
+    function renderArtifacts() {
+      if (!artData) {
+        artifactsBody.innerHTML = '<p class="empty-art">Artifacts appear here after the agent writes files: source, unified diff, and (later) screenshots.</p>';
+        return;
+      }
+      if (artTab === 'shots') {
+        artifactsBody.innerHTML = '<div class="shot-note">' + escapeHtml(artData.screenshotsNote || 'Screenshots are not available in the local hatch. They need VNC/Chromium sidecars on the Modal execution plane.') + '</div>';
+        return;
+      }
+      if (artTab === 'diff') {
+        artifactsBody.innerHTML = renderDiffHtml(artData.diff || '');
+        return;
+      }
+      const files = artData.files || [];
+      if (!files.length) {
+        artifactsBody.innerHTML = '<p class="empty-art">No changed files yet.</p>';
+        return;
+      }
+      if (!selectedFile || !files.find((f) => f.path === selectedFile)) {
+        selectedFile = files[0].path;
+      }
+      const current = files.find((f) => f.path === selectedFile) || files[0];
+      let html = '<ul class="file-list">';
+      for (const f of files) {
+        html += '<li style="display:contents"><button type="button" data-path="' + escapeHtml(f.path) + '"'
+          + (f.path === selectedFile ? ' class="active"' : '') + '>'
+          + escapeHtml(f.status + ' ' + f.path) + '</button></li>';
+      }
+      html += '</ul>';
+      if (current.binary) {
+        html += '<p class="empty-art">Binary file (not shown).</p>';
+      } else if (current.content == null) {
+        html += '<p class="empty-art">File missing or deleted.</p>';
+      } else {
+        html += '<pre class="file-view">' + escapeHtml(current.content)
+          + (current.truncated ? '\\n\\n… truncated …' : '') + '</pre>';
+      }
+      artifactsBody.innerHTML = html;
+      artifactsBody.querySelectorAll('button[data-path]').forEach((b) => {
+        b.onclick = () => {
+          selectedFile = b.getAttribute('data-path');
+          renderArtifacts();
+        };
+      });
+    }
+
+    async function refreshArtifacts() {
+      if (!sessionId) return;
+      try {
+        const r = await fetch('/api/sessions/' + sessionId + '/artifacts');
+        if (!r.ok) return;
+        artData = await r.json();
+        renderArtifacts();
+      } catch {
+        /* ignore */
+      }
+    }
 
     function setActionsEnabled(on) {
       document.getElementById('follow').disabled = !on;
@@ -818,6 +1020,7 @@ function webUiHtml(): string {
         const err = typeof e.summary === 'string' && e.summary.startsWith('error:');
         turnMarker(err ? e.summary : 'Turn finished', err ? 'err' : 'done');
         refreshSessions();
+        refreshArtifacts();
       }
       else if (e.kind === 'git.pushed') note('Committed ' + e.head + ' on ' + e.branch);
       else if (e.kind === 'session.closed') note('Session closed' + (e.reason ? ': ' + e.reason : ''));
@@ -884,6 +1087,7 @@ function webUiHtml(): string {
       }
       connectEvents(id);
       refreshSessions();
+      await refreshArtifacts();
     }
 
     function connectEvents(id) {
@@ -943,6 +1147,7 @@ function webUiHtml(): string {
       });
       const j = await r.json();
       note('Committed ' + j.sha + ' on ' + j.branch);
+      refreshArtifacts();
     };
 
     document.getElementById('fork').onclick = async () => {
