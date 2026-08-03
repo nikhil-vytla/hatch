@@ -1,10 +1,11 @@
 # SWE-bench screening safety audit
 
-The blocking measurement defects are fixed, but the five-instance paid
-screening did not start. Docker was unavailable, so the launch used its
-one-construction-call fallback. HUD accepted the fresh key and returned a
-completion, but explicit null `tool_calls` failed response validation before
-Parallax retained usage.
+The five-instance, two-trial static screening completed under the $5 cap.
+Docker Desktop ran the official amd64 SWE-bench images under emulation, HUD
+served Claude Haiku 4.5 construction and Claude Opus 4.8 episodes, and stored
+candidate patches were graded evaluator-side by the pinned official harness.
+The small design found two ceiling instances and three floor instances, but it
+is underpowered and makes no advance/reject decision.
 
 ## Finding dispositions
 
@@ -74,27 +75,33 @@ by digest before a comparative experiment.
 - Image manifests: five official amd64 images resolved to immutable Docker Hub
   digests before execution.
 - Construction model: Claude Haiku 4.5.
-- Docker status: unavailable at the local socket. No image build, image pull,
-  boundary-model episode, or official grading started.
-- Source loading: the first request returned HTTP 500; one retry succeeded
-  before inference.
-- Sanity inference: one authenticated Claude Haiku 4.5 request returned a
-  completion with explicit null `tool_calls`.
-- Observed usage: unavailable because response validation failed before the
-  usage object was retained.
-- Actual billed spend: unavailable. HUD exposes it in platform inference logs,
-  not through a documented gateway-log API.
-- Conservative upper estimate: $0.113895, using one token per prompt UTF-8 byte,
-  the full 1,024-token output allowance, and Opus prices.
-
-The fallback stopped after that one real inference request. The parser fix was
-tested offline and no retry ran.
+- Docker status: Docker Desktop was installed but stopped. Starting it restored
+  the Linux/aarch64 daemon; `DOCKER_DEFAULT_PLATFORM=linux/amd64` passed an
+  `x86_64` execution probe.
+- Runtime isolation: the outer container requires Docker privilege so its
+  inner UID-1000 `bubblewrap` namespace can create user namespaces. The probe
+  confirmed that `/app` is absent and the agent sees only the public workspace.
+- Outcomes: Astropy 0/2, Django 10914 2/2, Django 13089 2/2, Matplotlib 0/2,
+  Requests 0/2.
+- Operating points: floor, ceiling, ceiling, floor, floor respectively.
+- Statistical result: underpowered, interval [0, 1], MDE 0.607361, no
+  advance/reject decision.
+- Known metered spend: $1.669650. Three failed construction responses have
+  unavailable usage and a $0.477790 conservative reserve, so the all-in upper
+  bound is $2.147440.
+- HUD/API surprises: explicit null `tool_calls`, fenced construction JSON,
+  scalar argument values, mandatory MCP tool descriptions, Docker Desktop
+  user-namespace policy, and official empty-patch summaries without reports.
+- Official harness packaging surprise: a wheel install omitted a required
+  Cargo lock fixture. Evaluator-only regrading from the same pinned source
+  revision produced the final verdicts without repeating paid inference.
 
 ## Verification
 
-- 113 offline tests passed.
-- Ruff check and format check passed.
+- 120 tests passed under normal and optimized Python.
+- Ruff and format checks passed on project source, tests, and research scripts.
 - `uvx ty check src` passed.
 - Core mutation suite: 28/28 killed.
-- Adapted Slice 2 mutation suite: 37/37 killed.
-- Both failure receipts are canonical JSON and contain no credential value.
+- Adapted Slice 2 mutation suite: 44/44 killed.
+- Canonical construction, episode, screening, summary, and failure evidence
+  contain no credential value.

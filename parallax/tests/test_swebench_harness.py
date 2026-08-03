@@ -70,8 +70,11 @@ def test_official_harness_is_pinned_and_authoritative(tmp_path: Path) -> None:
         "pull",
         f"{environment.image.ref}@sha256:{environment.image.digest}",
     )
-    harness_call = next(call for call in calls if "--with" in call)
-    assert SWE_BENCH_HARNESS_REVISION in harness_call[harness_call.index("--with") + 1]
+    checkout_call = next(call for call in calls if "checkout" in call)
+    assert checkout_call[-1] == SWE_BENCH_HARNESS_REVISION
+    harness_call = next(call for call in calls if "--with-editable" in call)
+    harness_source = harness_call[harness_call.index("--with-editable") + 1]
+    assert harness_source.endswith("swebench-harness-source")
     dataset = json.loads((tmp_path / "run" / "dataset.json").read_text())
     assert dataset[0]["test_patch"] == task.sealed.test_patch
 
@@ -89,6 +92,33 @@ def test_official_harness_rejects_incomplete_test_coverage(tmp_path: Path) -> No
         )
 
 
+def test_official_harness_classifies_empty_patch_from_summary(tmp_path: Path) -> None:
+    def empty_patch_runner(argv: list[str], cwd: Path, timeout: int):
+        if "swebench.harness.run_evaluation" in argv:
+            summary = {
+                "empty_patch_ids": [INSTANCE_ID],
+                "completed_ids": [],
+                "resolved_ids": [],
+            }
+            path = cwd / f"boundary-model.parallax-{INSTANCE_ID}.json"
+            path.write_text(json.dumps(summary), encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    task, environment = specs()
+    result = run_official_harness(
+        task,
+        environment,
+        "",
+        model="boundary-model",
+        run_directory=tmp_path / "run",
+        runner=empty_patch_runner,
+    )
+
+    assert result.outcome.verdict == Verdict.WRONG
+    assert result.fail_to_pass_success == ()
+    assert result.pass_to_pass_success == ()
+
+
 def test_official_harness_fault_is_not_a_model_verdict(tmp_path: Path) -> None:
     def failed(argv: list[str], cwd: Path, timeout: int):
         return subprocess.CompletedProcess(argv, 1, "", "docker unavailable")
@@ -102,4 +132,25 @@ def test_official_harness_fault_is_not_a_model_verdict(tmp_path: Path) -> None:
             model="boundary-model",
             run_directory=tmp_path / "run",
             runner=failed,
+        )
+
+
+def test_official_harness_rejects_unpinned_source_checkout(tmp_path: Path) -> None:
+    source = tmp_path / "harness-source"
+    source.mkdir()
+
+    def wrong_revision(argv: list[str], cwd: Path, timeout: int):
+        stdout = "not-the-pinned-revision\n" if "rev-parse" in argv else ""
+        return subprocess.CompletedProcess(argv, 0, stdout, "")
+
+    with pytest.raises(OfficialHarnessError, match="source revision is not pinned"):
+        task, environment = specs()
+        run_official_harness(
+            task,
+            environment,
+            "diff --git a/a.py b/a.py\n",
+            model="boundary-model",
+            run_directory=tmp_path / "run",
+            harness_source_directory=source,
+            runner=wrong_revision,
         )

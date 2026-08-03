@@ -40,6 +40,10 @@ class _OfficialReport(_WireModel):
     tests_status: dict[str, _Transition]
 
 
+class _OfficialSummary(_WireModel):
+    empty_patch_ids: tuple[str, ...] = ()
+
+
 class HarnessEvaluation(StrictModel):
     outcome: Verification
     report_digest: DigestText
@@ -106,11 +110,14 @@ def run_official_harness(
     *,
     model: str,
     run_directory: Path,
+    harness_source_directory: Path | None = None,
     timeout_seconds: Annotated[int, Field(gt=0)] = 1800,
     runner: CommandRunner = _run,
 ) -> HarnessEvaluation:
     source = task.public.source
     sealed = task.sealed
+    run_directory = run_directory.resolve()
+    run_id = f"parallax-{source.instance_id}"
     if sealed.harness_revision != SWE_BENCH_HARNESS_REVISION:
         raise OfficialHarnessError(
             "problem harness revision is not the pinned revision"
@@ -120,7 +127,15 @@ def run_official_harness(
         if run_directory.exists()
         else ()
     )
-    if run_directory.exists() and not existing_reports and any(run_directory.iterdir()):
+    existing_summaries = (
+        tuple(run_directory.glob(f"*.{run_id}.json")) if run_directory.exists() else ()
+    )
+    if (
+        run_directory.exists()
+        and not existing_reports
+        and not existing_summaries
+        and any(run_directory.iterdir())
+    ):
         raise OfficialHarnessError("incomplete previous official harness directory")
     run_directory.mkdir(parents=True, exist_ok=True)
     dataset_path = run_directory / "dataset.json"
@@ -134,6 +149,11 @@ def run_official_harness(
     atomic_write(predictions_path, canonical_bytes(prediction) + b"\n")
     image = f"{environment.image.ref}@sha256:{environment.image.digest}"
     image_tag = f"{environment.image.ref}:latest"
+    harness_source = (
+        harness_source_directory
+        if harness_source_directory is not None
+        else run_directory.parent / "swebench-harness-source"
+    ).resolve()
     if not existing_reports:
         _invoke(
             ["docker", "pull", image],
@@ -149,16 +169,51 @@ def run_official_harness(
             runner=runner,
             purpose="pinned image tagging",
         )
-        run_id = f"parallax-{source.instance_id}"
-        harness = (
-            "git+https://github.com/SWE-bench/SWE-bench.git@"
-            f"{SWE_BENCH_HARNESS_REVISION}"
-        )
+        if harness_source.exists():
+            revision = _invoke(
+                ["git", "-C", str(harness_source), "rev-parse", "HEAD"],
+                cwd=harness_source.parent,
+                timeout=60,
+                runner=runner,
+                purpose="pinned harness revision check",
+            )
+            if revision.stdout.strip() != SWE_BENCH_HARNESS_REVISION:
+                raise OfficialHarnessError("harness source revision is not pinned")
+        else:
+            harness_source.parent.mkdir(parents=True, exist_ok=True)
+            _invoke(
+                [
+                    "git",
+                    "clone",
+                    "--filter=blob:none",
+                    "--no-checkout",
+                    "https://github.com/SWE-bench/SWE-bench.git",
+                    str(harness_source),
+                ],
+                cwd=harness_source.parent,
+                timeout=timeout_seconds,
+                runner=runner,
+                purpose="pinned harness clone",
+            )
+            _invoke(
+                [
+                    "git",
+                    "-C",
+                    str(harness_source),
+                    "checkout",
+                    "--detach",
+                    SWE_BENCH_HARNESS_REVISION,
+                ],
+                cwd=harness_source.parent,
+                timeout=timeout_seconds,
+                runner=runner,
+                purpose="pinned harness checkout",
+            )
         command = [
             "uv",
             "run",
-            "--with",
-            harness,
+            "--with-editable",
+            str(harness_source),
             "python",
             "-m",
             "swebench.harness.run_evaluation",
@@ -195,6 +250,28 @@ def run_official_harness(
     reports = existing_reports or tuple(
         run_directory.glob(f"**/{source.instance_id}/report.json")
     )
+    if not reports:
+        summaries = existing_summaries or tuple(run_directory.glob(f"*.{run_id}.json"))
+        if len(summaries) == 1:
+            summary_bytes = summaries[0].read_bytes()
+            try:
+                summary = _OfficialSummary.model_validate_json(summary_bytes)
+            except ValueError as error:
+                raise OfficialHarnessError(
+                    "official harness summary is invalid"
+                ) from error
+            if source.instance_id in summary.empty_patch_ids:
+                return HarnessEvaluation(
+                    outcome=Verification(
+                        verdict=Verdict.WRONG,
+                        reason="official SWE-bench harness classified an empty patch",
+                    ),
+                    report_digest=canonical_digest(json.loads(summary_bytes)),
+                    harness_revision=SWE_BENCH_HARNESS_REVISION,
+                    image_digest=environment.image.digest,
+                    fail_to_pass_success=(),
+                    pass_to_pass_success=(),
+                )
     if len(reports) != 1:
         raise OfficialHarnessError(
             f"official harness produced {len(reports)} instance reports"

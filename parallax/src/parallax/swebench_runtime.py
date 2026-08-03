@@ -9,15 +9,18 @@ import socket
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Annotated
 
 from fastmcp import FastMCP
 from hud.capabilities import Capability
 from hud.environment import Environment
 from hud.graders import EvaluationResult
+from pydantic import Field
 
 CONFIG_PATH = Path(os.environ.get("PARALLAX_INSTANCE_PATH", "/app/instance.json"))
 CONFIG = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
 WORKSPACE = Path("/testbed")
+WORKSPACE_UID = 1000
 env = Environment(
     name=CONFIG.get("environment_name", "parallax-unconfigured"),
     version=CONFIG.get("version", "0"),
@@ -33,15 +36,36 @@ _states: dict[str, dict[str, object]] = {}
 _server_task: asyncio.Task[None] | None = None
 
 
+def workspace_owner_argv(
+    argv: list[str],
+    *,
+    effective_uid: int | None = None,
+) -> list[str]:
+    uid = os.geteuid() if effective_uid is None else effective_uid
+    if uid != 0:
+        return argv
+    return [
+        "/usr/bin/setpriv",
+        "--reuid",
+        str(WORKSPACE_UID),
+        "--regid",
+        str(WORKSPACE_UID),
+        "--clear-groups",
+        "--",
+        *argv,
+    ]
+
+
 def _run(
     argv: list[str],
     *,
     cwd: Path = WORKSPACE,
     env: dict[str, str] | None = None,
     timeout: int = 900,
+    as_workspace_owner: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        argv,
+        workspace_owner_argv(argv) if as_workspace_owner else argv,
         cwd=cwd,
         env=env,
         text=True,
@@ -52,14 +76,24 @@ def _run(
 
 
 def reset_workspace(base_commit: str, workspace_path: Path = WORKSPACE) -> None:
-    reset = _run(["git", "reset", "--hard", base_commit], cwd=workspace_path)
-    clean = _run(["git", "clean", "-fdx"], cwd=workspace_path)
+    reset = _run(
+        ["git", "reset", "--hard", base_commit],
+        cwd=workspace_path,
+        as_workspace_owner=True,
+    )
+    clean = _run(
+        ["git", "clean", "-fdx"],
+        cwd=workspace_path,
+        as_workspace_owner=True,
+    )
     if reset.returncode or clean.returncode:
         raise RuntimeError(f"workspace reset failed: {reset.stderr}{clean.stderr}")
 
 
 def collect_patch(base_commit: str, workspace_path: Path = WORKSPACE) -> str:
     with tempfile.TemporaryDirectory(prefix="parallax-index-") as directory:
+        if os.geteuid() == 0:
+            os.chown(directory, WORKSPACE_UID, WORKSPACE_UID)
         index = Path(directory) / "index"
         environment = {
             **os.environ,
@@ -71,16 +105,23 @@ def collect_patch(base_commit: str, workspace_path: Path = WORKSPACE) -> str:
             ["git", "read-tree", base_commit],
             cwd=workspace_path,
             env=environment,
+            as_workspace_owner=True,
         )
         if read_tree.returncode:
             raise RuntimeError(f"temporary index failed: {read_tree.stderr}")
-        add = _run(["git", "add", "-A"], cwd=workspace_path, env=environment)
+        add = _run(
+            ["git", "add", "-A"],
+            cwd=workspace_path,
+            env=environment,
+            as_workspace_owner=True,
+        )
         if add.returncode:
             raise RuntimeError(f"candidate patch staging failed: {add.stderr}")
         diff = _run(
             ["git", "diff", "--cached", "--binary", "--full-index", base_commit],
             cwd=workspace_path,
             env=environment,
+            as_workspace_owner=True,
         )
         if diff.returncode:
             raise RuntimeError(f"candidate patch export failed: {diff.stderr}")
@@ -94,7 +135,10 @@ def isolation_probe_argv() -> list[str]:
 
 
 @_director.tool
-def advance(token: str) -> dict[str, object]:
+def advance(
+    token: Annotated[str, Field(description="Opaque token for the active episode")],
+) -> dict[str, object]:
+    """Advance the scripted user by one turn."""
     state = _states[token]
     turns = state["turns"]
     if not isinstance(turns, list):

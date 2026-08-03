@@ -28,6 +28,10 @@ CLAUDE_OPUS_PRICING = TokenPricing(
 )
 
 
+def _docker_runtime(image: str) -> DockerRuntime:
+    return DockerRuntime(image, run_args=("--privileged",))
+
+
 class HudEpisode(StrictModel):
     model_patch: str
     reported_model: NonEmptyText
@@ -79,7 +83,7 @@ async def _run_episode(
     try:
         job = await task.run(
             agent,
-            runtime=DockerRuntime(image),
+            runtime=_docker_runtime(image),
             rollout_timeout=3600,
         )
     except TimeoutError as error:
@@ -204,6 +208,9 @@ class HudStaticExecutor:
                 episode.model_patch,
                 model=episode.reported_model,
                 run_directory=harness_directory,
+                harness_source_directory=(
+                    self.work_directory / "swebench-harness-source"
+                ),
             )
         except OfficialHarnessError as error:
             raise ScreeningExecutionError(
