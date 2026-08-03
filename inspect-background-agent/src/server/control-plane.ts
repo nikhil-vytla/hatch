@@ -12,6 +12,17 @@ import { SessionQueues } from "../control/session-queues.js";
 import { ResourceLifecycle } from "../control/resource-lifecycle.js";
 import { Automations } from "../control/automations.js";
 import { openPullRequest, parseGitHubRemote } from "../scm/github.js";
+import {
+  assertBindAllowed,
+  authMiddleware,
+  COOKIE_NAME,
+  LoginLimiter,
+  passwordsMatch,
+  SessionTokens,
+  setSessionCookie,
+} from "./security.js";
+import { getCookie } from "hono/cookie";
+import { spawn } from "node:child_process";
 import type { SessionEventEnvelope } from "../session/index.js";
 import { brandNumber, brandString } from "../kernel/index.js";
 
@@ -50,6 +61,9 @@ export type ControlPlaneOptions = {
   readonly hookToken?: string;
   /** GitHub token for opening PRs as the prompting user. */
   readonly githubToken?: string;
+  /** Web/API password. Required (fail-closed) when binding non-loopback. */
+  readonly password?: string;
+  readonly cookieSecure?: boolean;
 };
 
 function addParticipant(row: SessionRow, author: GitAuthor): void {
@@ -65,6 +79,14 @@ function id(prefix: string): string {
 
 export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   const rootDir = opts.rootDir ?? path.join("/tmp", "hatch-inspect");
+  // Fail-closed like hermes-workspace: loopback by default; non-loopback needs a password.
+  const host = opts.host ?? process.env.HOST ?? "127.0.0.1";
+  const password = opts.password ?? process.env.INSPECT_PASSWORD;
+  assertBindAllowed(host, password);
+  const cookieSecure = opts.cookieSecure ?? process.env.COOKIE_SECURE === "1";
+  const tokens = new SessionTokens();
+  const limiter = new LoginLimiter();
+
   const sandboxes = new GitSandboxManager(path.join(rootDir, "sandboxes"));
   await sandboxes.ensureBase();
 
@@ -90,7 +112,10 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   const automations = new Automations(async (a) => {
     const r = await app.request("/api/sessions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${internalToken}`,
+      },
       body: JSON.stringify({
         prompt: a.prompt,
         title: a.title ?? `auto: ${a.name}`,
@@ -125,14 +150,38 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   const app = new Hono();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
+  app.use("*", authMiddleware({ password, tokens, cookieSecure, exempt: ["/api/hooks"] }));
+
+  // Internal bearer for server-initiated requests (automations, hook forwarding).
+  const internalToken = tokens.issue();
+
   app.get("/api/health", (c) =>
     c.json({
       ok: true,
       sessions: sessions.size,
       service: "@hatch/inspect",
       model,
+      authRequired: Boolean(password),
     }),
   );
+
+  app.post("/api/login", async (c) => {
+    if (!password) return c.json({ ok: true, authRequired: false });
+    const who = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+    if (!limiter.allow(who)) return c.json({ error: "too many attempts" }, 429);
+    const body = (await c.req.json().catch(() => ({}))) as { password?: string };
+    if (!body.password || !passwordsMatch(body.password, password)) {
+      return c.json({ error: "wrong password" }, 401);
+    }
+    const token = tokens.issue();
+    setSessionCookie(c, token, cookieSecure);
+    return c.json({ ok: true, token });
+  });
+
+  app.post("/api/logout", (c) => {
+    tokens.revoke(getCookie(c, COOKIE_NAME));
+    return c.json({ ok: true });
+  });
 
   app.get("/api/models", (c) => c.json({ models: listModels(), selected: model }));
 
@@ -237,7 +286,10 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     if (!body.prompt?.trim()) return c.json({ error: "prompt required" }, 400);
     const r = await app.request("/api/sessions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${internalToken}`,
+      },
       body: JSON.stringify({
         prompt: body.prompt,
         title: body.title ?? `hook: ${body.prompt.slice(0, 60)}`,
@@ -515,6 +567,49 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     }),
   );
 
+  // Terminal into a session's sandbox (workspace-grade frontend feature).
+  app.get(
+    "/api/sessions/:id/terminal",
+    upgradeWebSocket((c) => {
+      const row = sessions.get(c.req.param("id") ?? "");
+      let shell: ReturnType<typeof spawn> | null = null;
+      return {
+        onOpen(_evt, ws) {
+          if (!row) {
+            ws.send("no such session\r\n");
+            ws.close();
+            return;
+          }
+          // Non-interactive bash in its own process group: `bash -i` would grab the
+          // server's controlling TTY and SIGTTOU-stop the whole process group.
+          shell = spawn("bash", ["--noprofile", "--norc"], {
+            cwd: row.repoDir,
+            env: { ...process.env, TERM: "dumb" },
+            stdio: ["pipe", "pipe", "pipe"],
+            detached: true,
+          });
+          shell.stdout?.on("data", (d: Buffer) => ws.send(d.toString()));
+          shell.stderr?.on("data", (d: Buffer) => ws.send(d.toString()));
+          shell.on("close", () => ws.close());
+          ws.send(`connected: bash in sandbox ${row.sandboxId} (piped, line-based)\r\n`);
+        },
+        onMessage(evt) {
+          shell?.stdin?.write(String(evt.data));
+        },
+        onClose() {
+          if (shell?.pid) {
+            try {
+              process.kill(-shell.pid, "SIGKILL");
+            } catch {
+              shell.kill("SIGKILL");
+            }
+          }
+          shell = null;
+        },
+      };
+    }),
+  );
+
   // Static web UI
   app.get("/", (c) => c.html(webUiHtml()));
   app.get("/ui", (c) => c.html(webUiHtml()));
@@ -597,7 +692,6 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   }
 
   const port = opts.port ?? 8787;
-  const host = opts.host ?? "0.0.0.0";
   const server = serve({ fetch: app.fetch, port, hostname: host });
   injectWebSocket(server);
 
@@ -876,6 +970,32 @@ export function webUiHtml(): string {
       margin-right: 6px;
     }
     .pill.live { border-color: var(--accent); color: var(--accent); }
+    #login {
+      position: fixed; inset: 0; background: rgba(8,10,9,.93);
+      display: none; align-items: center; justify-content: center; z-index: 50;
+    }
+    #login.open { display: flex; }
+    #login form {
+      background: var(--bg1); border: 1px solid var(--line); border-radius: 14px;
+      padding: 26px; width: 320px; display: flex; flex-direction: column; gap: 12px;
+    }
+    #login input {
+      font: inherit; background: var(--bg0); border: 1px solid var(--line);
+      color: var(--ink); border-radius: 8px; padding: 10px 12px;
+    }
+    #login .lerr { color: var(--danger); font-size: 12px; min-height: 14px; }
+    .term-wrap { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+    #termOut {
+      flex: 1; min-height: 120px; overflow: auto;
+      background: var(--code); border: 1px solid var(--line); border-radius: 8px;
+      padding: 10px 12px; font-family: "IBM Plex Mono", monospace; font-size: 12px;
+      white-space: pre-wrap; word-break: break-all; margin: 0;
+    }
+    #termIn {
+      font-family: "IBM Plex Mono", monospace; font-size: 12.5px;
+      background: var(--bg0); color: var(--ink);
+      border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; width: 100%;
+    }
     .session-list {
       list-style: none; margin: 14px 0 0; padding: 0;
       max-height: 220px; overflow: auto;
@@ -958,6 +1078,7 @@ export function webUiHtml(): string {
         <div class="artifacts-tabs">
           <button type="button" class="active" data-tab="files">Files</button>
           <button type="button" data-tab="diff">Diff</button>
+          <button type="button" data-tab="term">Terminal</button>
           <button type="button" data-tab="shots">Screenshots</button>
         </div>
         <div class="artifacts-body" id="artifactsBody">
@@ -966,6 +1087,13 @@ export function webUiHtml(): string {
       </div>
     </section>
   </main>
+  <div id="login"><form id="loginForm">
+    <strong>Inspect locked</strong>
+    <span class="empty-art">This deployment sets INSPECT_PASSWORD. Enter it to continue.</span>
+    <input type="password" id="pw" placeholder="password" autofocus />
+    <div class="lerr" id="loginErr"></div>
+    <button type="submit">Unlock</button>
+  </form></div>
   <script>
     const logEl = document.getElementById('log');
     const meta = document.getElementById('meta');
@@ -982,6 +1110,32 @@ export function webUiHtml(): string {
     let artTab = 'files';
     let artData = null;
     let selectedFile = null;
+    let termWs = null;
+    let termBuf = '';
+
+    async function api(url, opts) {
+      const r = await fetch(url, opts);
+      if (r.status === 401) {
+        document.getElementById('login').classList.add('open');
+        throw new Error('unauthorized');
+      }
+      return r;
+    }
+
+    document.getElementById('loginForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password: document.getElementById('pw').value }),
+      });
+      if (r.ok) {
+        document.getElementById('login').classList.remove('open');
+        refreshSessions();
+      } else {
+        document.getElementById('loginErr').textContent = (await r.json()).error || 'login failed';
+      }
+    };
 
     document.querySelectorAll('.artifacts-tabs button').forEach((btn) => {
       btn.onclick = () => {
@@ -991,6 +1145,43 @@ export function webUiHtml(): string {
         renderArtifacts();
       };
     });
+
+    function connectTerm() {
+      if (!sessionId) return;
+      if (termWs && termWs.readyState === WebSocket.OPEN && termWs.__session === sessionId) return;
+      if (termWs) termWs.close();
+      termBuf = '';
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      termWs = new WebSocket(proto + '://' + location.host + '/api/sessions/' + sessionId + '/terminal');
+      termWs.__session = sessionId;
+      termWs.onmessage = (ev) => {
+        termBuf += ev.data;
+        const out = document.getElementById('termOut');
+        if (out) { out.textContent = termBuf; out.scrollTop = out.scrollHeight; }
+      };
+      termWs.onclose = () => {
+        termBuf += '\\n[disconnected]\\n';
+        const out = document.getElementById('termOut');
+        if (out) out.textContent = termBuf;
+      };
+    }
+
+    function renderTerminal() {
+      artifactsBody.innerHTML =
+        '<div class="term-wrap"><pre id="termOut"></pre>' +
+        '<input id="termIn" placeholder="command in the session sandbox — Enter to run" /></div>';
+      const out = document.getElementById('termOut');
+      out.textContent = termBuf || (sessionId ? 'connecting…' : 'select or start a session first');
+      if (sessionId) connectTerm();
+      const input = document.getElementById('termIn');
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter' && termWs && termWs.readyState === WebSocket.OPEN) {
+          termWs.send(input.value + '\\n');
+          input.value = '';
+        }
+      };
+      input.focus();
+    }
 
     function escapeHtml(s) {
       return String(s)
@@ -1012,6 +1203,10 @@ export function webUiHtml(): string {
     }
 
     function renderArtifacts() {
+      if (artTab === 'term') {
+        renderTerminal();
+        return;
+      }
       if (!artData) {
         artifactsBody.innerHTML = '<p class="empty-art">Artifacts appear here after the agent writes files: source, unified diff, and (later) screenshots.</p>';
         return;
@@ -1060,7 +1255,7 @@ export function webUiHtml(): string {
     async function refreshArtifacts() {
       if (!sessionId) return;
       try {
-        const r = await fetch('/api/sessions/' + sessionId + '/artifacts');
+        const r = await api('/api/sessions/' + sessionId + '/artifacts');
         if (!r.ok) return;
         artData = await r.json();
         renderArtifacts();
@@ -1217,7 +1412,7 @@ export function webUiHtml(): string {
 
     async function refreshSessions() {
       const q = showArchived.checked ? '?include=archived' : '';
-      const r = await fetch('/api/sessions' + q);
+      const r = await api('/api/sessions' + q);
       const j = await r.json();
       sessionList.replaceChildren();
       for (const s of j.sessions || []) {
@@ -1249,7 +1444,7 @@ export function webUiHtml(): string {
 
     async function selectSession(id, opts) {
       sessionId = id;
-      const r = await fetch('/api/sessions/' + id);
+      const r = await api('/api/sessions/' + id);
       const j = await r.json();
       sessionMeta = j;
       sesspill.textContent = id;
@@ -1292,7 +1487,7 @@ export function webUiHtml(): string {
       document.getElementById('start').disabled = true;
       clearLog();
       note('Creating session…');
-      const r = await fetch('/api/sessions', {
+      const r = await api('/api/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ prompt: text, title: text.slice(0, 72) }),
@@ -1306,7 +1501,7 @@ export function webUiHtml(): string {
     document.getElementById('follow').onclick = async () => {
       if (!sessionId) return;
       const text = document.getElementById('prompt').value.trim();
-      await fetch('/api/sessions/' + sessionId + '/prompt', {
+      await api('/api/sessions/' + sessionId + '/prompt', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -1317,7 +1512,7 @@ export function webUiHtml(): string {
 
     document.getElementById('commit').onclick = async () => {
       if (!sessionId) return;
-      const r = await fetch('/api/sessions/' + sessionId + '/commit', {
+      const r = await api('/api/sessions/' + sessionId + '/commit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '{}',
@@ -1330,7 +1525,7 @@ export function webUiHtml(): string {
     document.getElementById('fork').onclick = async () => {
       if (!sessionId) return;
       note('Forking…');
-      const r = await fetch('/api/sessions/' + sessionId + '/fork', {
+      const r = await api('/api/sessions/' + sessionId + '/fork', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ title: 'Fork of ' + (sessionMeta && sessionMeta.title ? sessionMeta.title : sessionId) }),
@@ -1343,7 +1538,7 @@ export function webUiHtml(): string {
 
     document.getElementById('archive').onclick = async () => {
       if (!sessionId) return;
-      await fetch('/api/sessions/' + sessionId + '/archive', { method: 'POST' });
+      await api('/api/sessions/' + sessionId + '/archive', { method: 'POST' });
       note('Archived ' + sessionId);
       sessionId = null;
       sessionMeta = null;
@@ -1355,7 +1550,7 @@ export function webUiHtml(): string {
 
     document.getElementById('restore').onclick = async () => {
       if (!sessionId) return;
-      await fetch('/api/sessions/' + sessionId + '/restore', { method: 'POST' });
+      await api('/api/sessions/' + sessionId + '/restore', { method: 'POST' });
       await selectSession(sessionId, { clear: false });
       note('Restored ' + sessionId);
     };
@@ -1364,7 +1559,7 @@ export function webUiHtml(): string {
       if (!sessionId) return;
       if (!confirm('Delete session and destroy sandbox disk?')) return;
       const id = sessionId;
-      const r = await fetch('/api/sessions/' + id, { method: 'DELETE' });
+      const r = await api('/api/sessions/' + id, { method: 'DELETE' });
       const j = await r.json();
       note('Deleted ' + id + (j.diskGone ? ' (disk gone)' : ''));
       sessionId = null;

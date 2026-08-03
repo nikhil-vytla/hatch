@@ -5,6 +5,16 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
+## Workspace-grade frontend folded in (2026-08-03)
+
+Clarified brief: one product — the Inspect background agent — with a proper frontend (hermes-workspace was the interaction bar, not a separate build). Folded the `agent-workspace/` experiment into this one and deleted the standalone folder (history stays in git):
+
+- **Auth**: `INSPECT_PASSWORD` enables cookie/bearer auth on every `/api` route; login rate limiting; constant-time compare; fail-closed — refuses non-loopback bind without a password (default host is now `127.0.0.1`)
+- **Per-session terminal**: Terminal tab opens a WS shell (`/api/sessions/:id/terminal`) whose cwd is that session's sandbox; browser-verified with `cat src/math.ts` after an agent turn
+- Terminal uses detached non-interactive bash — the standalone experiment found `bash -i` grabs the server's controlling TTY and SIGTTOU-stops the whole process group under tmux
+- `/api/hooks` keeps its own token auth (exempt from session auth); automations authenticate internally
+- e2e now boots a password-protected instance and proves 401 → login → 200
+
 ## Team features (2026-08-03)
 
 Toward Open-Inspect parity without external credentials:

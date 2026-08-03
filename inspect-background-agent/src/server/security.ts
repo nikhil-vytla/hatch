@@ -3,11 +3,8 @@
  *  - fail-closed: refuse to bind non-loopback without a password
  *  - cookie-session auth middleware on every /api route when a password is set
  *  - login rate limiting
- *  - path traversal prevention by resolved real path, not string prefix
  */
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { realpathSync } from "node:fs";
-import path from "node:path";
 import type { Context, Next } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 
@@ -15,7 +12,7 @@ export function assertBindAllowed(host: string, password: string | undefined): v
   const loopback = host === "127.0.0.1" || host === "::1" || host === "localhost";
   if (!loopback && !password) {
     throw new Error(
-      `refusing to bind ${host} without WORKSPACE_PASSWORD — set it or bind 127.0.0.1`,
+      `refusing to bind ${host} without INSPECT_PASSWORD — set it or bind 127.0.0.1`,
     );
   }
 }
@@ -70,11 +67,18 @@ export function authMiddleware(opts: {
   password: string | undefined;
   tokens: SessionTokens;
   cookieSecure: boolean;
+  /** Paths with their own auth (e.g. /api/hooks with X-Hook-Token). */
+  exempt?: readonly string[];
 }) {
   return async (c: Context, next: Next) => {
     if (!opts.password) return next();
     const p = new URL(c.req.url).pathname;
-    if (p === "/api/login" || p === "/api/health" || !p.startsWith("/api")) {
+    if (
+      p === "/api/login" ||
+      p === "/api/health" ||
+      !p.startsWith("/api") ||
+      opts.exempt?.includes(p)
+    ) {
       return next();
     }
     const cookie = getCookie(c, COOKIE_NAME);
@@ -94,33 +98,3 @@ export function setSessionCookie(c: Context, token: string, secure: boolean): vo
   });
 }
 
-/**
- * Resolve `rel` under `root`, then verify the resolved REAL path is still
- * inside root's real path. Blocks ../ tricks and symlink escapes.
- */
-export function safeResolve(root: string, rel: string): string {
-  if (path.isAbsolute(rel)) throw new PathError("absolute paths not allowed");
-  const rootReal = realpathSync(root);
-  const target = path.resolve(rootReal, rel);
-  if (target !== rootReal && !target.startsWith(rootReal + path.sep)) {
-    throw new PathError("path escapes workspace root");
-  }
-  // If the target exists, its real path must also stay inside (symlink escape).
-  try {
-    const real = realpathSync(target);
-    if (real !== rootReal && !real.startsWith(rootReal + path.sep)) {
-      throw new PathError("symlink escapes workspace root");
-    }
-    return real;
-  } catch (e) {
-    if (e instanceof PathError) throw e;
-    // Target does not exist yet (e.g. new file): parent must resolve inside.
-    const parentReal = realpathSync(path.dirname(target));
-    if (parentReal !== rootReal && !parentReal.startsWith(rootReal + path.sep)) {
-      throw new PathError("parent escapes workspace root");
-    }
-    return path.join(parentReal, path.basename(target));
-  }
-}
-
-export class PathError extends Error {}

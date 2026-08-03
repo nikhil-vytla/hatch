@@ -51,3 +51,9 @@ export { SqliteSessionStore } from "./control/session-store-sqlite.js";
 export { startCloudControlPlane } from "./server/control-plane-cloud.js";
 export { startControlPlane } from "./server/control-plane.js";
 export { webUiHtml } from "./server/control-plane.js";
+export {
+  assertBindAllowed,
+  LoginLimiter,
+  passwordsMatch,
+  SessionTokens,
+} from "./server/security.js";

@@ -83,6 +83,31 @@ async function main() {
     if (!dj.diskGone) throw new Error(`sandbox still on disk after DELETE: ${dj.destroyed}`);
     console.log("destroyed", dj.destroyed, "diskGone", dj.diskGone);
 
+    // Auth: a password-protected instance rejects anonymous API calls and accepts login.
+    const locked = await startControlPlane({
+      port: 8792,
+      host: "127.0.0.1",
+      password: "e2e-secret",
+      rootDir: "/tmp/hatch-inspect-e2e-auth",
+    });
+    try {
+      const anon = await fetch("http://127.0.0.1:8792/api/sessions");
+      if (anon.status !== 401) throw new Error(`expected 401, got ${anon.status}`);
+      const login = await fetch("http://127.0.0.1:8792/api/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: "e2e-secret" }),
+      });
+      const { token } = (await login.json()) as { token: string };
+      const authed = await fetch("http://127.0.0.1:8792/api/sessions", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!authed.ok) throw new Error(`authed list failed: ${authed.status}`);
+      console.log("auth gate OK");
+    } finally {
+      await locked.close();
+    }
+
     console.log("E2E OK");
   } finally {
     await cp.close();

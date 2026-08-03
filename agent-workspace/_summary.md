@@ -1,5 +1,0 @@
-A hermes-workspace-shaped command center built from scratch for the agents this hatch can actually run: one Hono process serving streaming chat (OpenCode free models or any OpenAI-compatible server), SQLite-backed sessions that survive restarts, a traversal-guarded file browser and memory notes, a skills pane, and a WebSocket terminal. The security model follows [hermes-workspace](https://github.com/outsourc-e/hermes-workspace)'s rules and is test-proven: fail-closed non-loopback bind, auth middleware on every API route, login rate limiting, and a real-path guard that blocks `../`, absolute, and symlink escapes. `npm test` (7) and `npm run e2e` (login, streamed model reply, restart persistence) are green without API keys.
-
-- Backend port with capability probe: `opencode-cli` default, `openai-compat` via `OPENAI_BASE_URL` (Ollama/LM Studio/vLLM)
-- E2E proves the core promise: transcript intact after a full server restart
-- Docker compose included; image build unverified on this VM (no Docker) — logged honestly in decisions.tsv

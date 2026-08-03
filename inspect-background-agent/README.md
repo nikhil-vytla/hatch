@@ -38,25 +38,33 @@ then `DELETE`s the session and checks the sandbox directory is gone.
 | Layer | Implementation |
 | --- | --- |
 | Control plane | Hono REST + WebSocket event stream + embedded web UI |
+| Frontend | Workspace-grade UI: session sidebar, streaming log, Files/Diff/**Terminal** tabs, login overlay |
+| Auth | `INSPECT_PASSWORD` → cookie/bearer auth on all `/api` routes; fail-closed non-loopback bind; rate-limited login |
+| Terminal | Per-session WS shell in that session's sandbox (`/api/sessions/:id/terminal`) |
 | Async | Per-session promise queue (`SessionQueues`) — no overlapping OpenCode in one sandbox |
 | Lifecycle | `DELETE` destroys disk; idle TTL reaper; destroy is idempotent |
 | Sandbox | Real git repo per session, branch `inspect/<id>` under `/tmp` |
 | Agent | OpenCode CLI with free `opencode/*` models (default `big-pickle`) |
 | Models | `GET /api/models` + `OPENCODE_MODEL` |
-| Authorship | Commits use the prompting author's name/email |
+| Authorship | Commits attribute to the prompting author (multiplayer: per-prompt identity) |
 
 ## API
 
+- `POST /api/login` / `POST /api/logout` (when `INSPECT_PASSWORD` set)
 - `POST /api/sessions` `{ prompt, title?, cloneUrl?, authorName?, authorEmail? }`
 - `GET /api/sessions` list (+ `?include=archived`)
-- `POST /api/sessions/:id/prompt` `{ text }` (queued)
+- `POST /api/sessions/:id/prompt` `{ text, authorName?, authorEmail? }` (queued, multiplayer)
 - `POST /api/sessions/:id/fork` `{ title?, prompt? }` new sandbox from HEAD
 - `POST /api/sessions/:id/archive` / `.../restore`
 - `POST /api/sessions/:id/commit` `{ message? }`
+- `POST /api/sessions/:id/pr` push branch; open GitHub PR as the user when a token exists
+- `POST /api/hooks` external triggers (Slack workflows, Sentry, CI) with `X-Hook-Token`
+- `GET/POST/DELETE /api/automations` recurring prompts
 - `DELETE /api/sessions/:id` destroy sandbox
 - `GET /api/sessions/:id` status + diff
 - `GET /api/models` known-free models
 - `WS /api/sessions/:id/events` realtime envelopes
+- `WS /api/sessions/:id/terminal` shell in the session sandbox
 
 ## Harness problems this layer hits
 
