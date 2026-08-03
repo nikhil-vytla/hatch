@@ -4,12 +4,12 @@ import json
 import os
 from pathlib import Path
 
+from parallax.canonical import atomic_write, canonical_digest
 from parallax.provider import (
     HUD_GATEWAY_ENDPOINT,
     HudGatewayProvider,
     ProviderRequest,
 )
-from parallax.runner import atomic_write, canonical_digest
 
 
 def _scripted_transport(endpoint, body, headers, timeout_seconds):

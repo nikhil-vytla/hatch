@@ -198,15 +198,19 @@ requires them:
   receives that budget in one turn; matched and evolved divide it across
   turns.
 
-The generated HUD bundle is only an offline rendering scaffold. Although its
-Dockerfile uses the official `swebench/sweb.eval` image by digest, it copies
-sealed verifier material into the agent-readable container and reduces grading
-to a process exit code. It is not an admitted environment and must not produce
-experimental outcomes. A production path must export the candidate patch to an
-evaluator-side official harness, parse named FAIL_TO_PASS and PASS_TO_PASS
-statuses, and keep verifier material outside the agent filesystem.
-`render_environment` therefore fails closed by default; its unsafe opt-in
-exists only to retain deterministic offline inspection coverage.
+The generated HUD bundle contains public task and schedule data only. It runs
+the agent in a probed `bubblewrap` Workspace and exports a binary Git patch
+through an evaluator-owned task result. A separate evaluator supplies sealed
+instance data to `swebench.harness.run_evaluation` at the pinned harness
+revision in the digest-pinned official image. The official `resolved` verdict
+is authoritative; Parallax additionally checks that the report covers every
+committed FAIL_TO_PASS and PASS_TO_PASS test without serializing those names
+into run rows.
+
+Screening summaries expose the source-clustered interval and
+minimum-detectable-effect. A small design is explicitly `underpowered` and
+cannot emit an advance or reject decision even when its observed pass rate is
+extreme.
 
 ## Interpretation and limits
 

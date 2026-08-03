@@ -1,0 +1,1 @@
+{"attempted_source":"swebench:astropy__astropy-13236","completion_tokens":0,"endpoint":"https://inference.beta.hud.ai/v1/chat/completions","error_type":"ProviderError","estimated_cost_usd":0.0,"message":"provider request failed: HTTP Error 403: Forbidden","model":"claude-haiku-4-5","prompt_tokens":0,"stage":"construction","status":"authorization_denied"}

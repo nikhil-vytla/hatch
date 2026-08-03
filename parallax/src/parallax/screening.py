@@ -10,9 +10,9 @@ from typing import Annotated, Literal, Self, TypeAlias, assert_never
 
 from pydantic import Field, TypeAdapter, ValidationError, model_validator
 
+from .canonical import atomic_write, canonical_digest
 from .evolving_intent import Arm
-from .gsm8k import Verdict, Verification
-from .runner import FailureKind, Outcome, RunFailure, atomic_write, canonical_digest
+from .outcome import FailureKind, Outcome, RunFailure, Verdict, Verification
 from .swebench import SweBenchProblem
 from .types import (
     DesignDigest,
@@ -27,6 +27,7 @@ from .types import (
 
 Usd = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 SCREENING_SPEND_CAP_USD = 5.0
+MAXIMUM_SCREENING_MDE = 0.2
 
 
 class SpendApprovalRequired(RuntimeError):
@@ -34,9 +35,22 @@ class SpendApprovalRequired(RuntimeError):
 
 
 class ScreeningExecutionError(RuntimeError):
-    def __init__(self, failure_kind: FailureKind, message: str) -> None:
+    def __init__(
+        self,
+        failure_kind: FailureKind,
+        message: str,
+        *,
+        reported_model: str | None = None,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        estimated_cost_usd: float = 0.0,
+    ) -> None:
         super().__init__(message)
         self.failure_kind = failure_kind
+        self.reported_model = reported_model
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
+        self.estimated_cost_usd = estimated_cost_usd
 
 
 class ScreeningCost(StrictModel):
@@ -114,6 +128,9 @@ class ScreeningRun(StrictModel):
     prompt_tokens: Annotated[int, Field(ge=0)]
     completion_tokens: Annotated[int, Field(ge=0)]
     estimated_cost_usd: Usd
+    verifier_report_digest: str | None = None
+    harness_revision: str | None = None
+    image_digest: str | None = None
 
     @model_validator(mode="after")
     def consistent_usage(self) -> Self:
@@ -131,6 +148,9 @@ class ScreeningExecution(StrictModel):
     prompt_tokens: Annotated[int, Field(ge=0)]
     completion_tokens: Annotated[int, Field(ge=0)]
     estimated_cost_usd: Usd
+    verifier_report_digest: str | None = None
+    harness_revision: str | None = None
+    image_digest: str | None = None
 
     @model_validator(mode="after")
     def consistent_usage(self) -> Self:
@@ -162,7 +182,15 @@ class ScreeningSummary(StrictModel):
     design_digest: DesignDigest
     sources: tuple[ScreeningSourceResult, ...]
     boundary_sources: tuple[SourceId, ...]
-    action: Literal["proceed", "change_model_or_instances"]
+    interval_lower: Annotated[float, Field(ge=0, le=1)]
+    interval_upper: Annotated[float, Field(ge=0, le=1)]
+    minimum_detectable_effect: Annotated[float, Field(ge=0, le=1)]
+    powered: bool
+    action: Literal[
+        "operating_point_found",
+        "change_model_or_instances",
+        "underpowered",
+    ]
 
 
 def _canonical_line(record: ScreeningRecord) -> bytes:
@@ -352,10 +380,10 @@ def run_screening(
                     error_type=type(error).__name__,
                     message=str(error),
                 ),
-                reported_model=plan.expected_response_model,
-                prompt_tokens=0,
-                completion_tokens=0,
-                estimated_cost_usd=plan.cost.upper_per_episode_usd,
+                reported_model=error.reported_model or plan.expected_response_model,
+                prompt_tokens=error.prompt_tokens,
+                completion_tokens=error.completion_tokens,
+                estimated_cost_usd=error.estimated_cost_usd,
             )
         except Exception as error:
             execution = ScreeningExecution(
@@ -367,7 +395,7 @@ def run_screening(
                 reported_model=plan.expected_response_model,
                 prompt_tokens=0,
                 completion_tokens=0,
-                estimated_cost_usd=plan.cost.upper_per_episode_usd,
+                estimated_cost_usd=0.0,
             )
         runs.append(
             ScreeningRun(
@@ -379,6 +407,9 @@ def run_screening(
                 prompt_tokens=execution.prompt_tokens,
                 completion_tokens=execution.completion_tokens,
                 estimated_cost_usd=execution.estimated_cost_usd,
+                verifier_report_digest=execution.verifier_report_digest,
+                harness_revision=execution.harness_revision,
+                image_digest=execution.image_digest,
             )
         )
         if execution.reported_model != plan.expected_response_model:
@@ -426,6 +457,7 @@ def summarize_screening(
     for run in actual.values():
         outcomes[run.unit.source_id].append(run.outcome)
     source_results: list[ScreeningSourceResult] = []
+    source_bounds: list[tuple[float, float]] = []
     for source_id, values in sorted(outcomes.items()):
         verdicts: Counter[Verdict] = Counter()
         failures = 0
@@ -437,6 +469,9 @@ def summarize_screening(
             else:
                 assert_never(outcome)
         verified = sum(verdicts.values())
+        total = len(values)
+        passes = verdicts[Verdict.PASS]
+        source_bounds.append((passes / total, (passes + failures) / total))
         pass_rate = verdicts[Verdict.PASS] / verified if verified else None
         operating_point: Literal["floor", "boundary", "ceiling", "unknown"]
         if pass_rate is None:
@@ -461,9 +496,31 @@ def summarize_screening(
         for result in source_results
         if result.operating_point == "boundary"
     )
+    source_count = len(source_results)
+    identification = (
+        sum(lower for lower, _ in source_bounds) / source_count,
+        sum(upper for _, upper in source_bounds) / source_count,
+    )
+    epsilon = math.sqrt(math.log(40) / (2 * source_count))
+    interval = (
+        max(0.0, identification[0] - epsilon),
+        min(1.0, identification[1] + epsilon),
+    )
+    powered = epsilon <= MAXIMUM_SCREENING_MDE
+    action = (
+        "underpowered"
+        if not powered
+        else "operating_point_found"
+        if boundary
+        else "change_model_or_instances"
+    )
     return ScreeningSummary(
         design_digest=plan.design_digest,
         sources=tuple(source_results),
         boundary_sources=boundary,
-        action="proceed" if boundary else "change_model_or_instances",
+        interval_lower=interval[0],
+        interval_upper=interval[1],
+        minimum_detectable_effect=min(1.0, epsilon),
+        powered=powered,
+        action=action,
     )

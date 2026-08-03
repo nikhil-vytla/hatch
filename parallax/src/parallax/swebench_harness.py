@@ -1,0 +1,238 @@
+from __future__ import annotations
+
+import json
+import subprocess
+from collections.abc import Callable
+from pathlib import Path
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .canonical import atomic_write, canonical_bytes, canonical_digest
+from .outcome import Verdict, Verification
+from .swebench import (
+    SWE_BENCH_HARNESS_REVISION,
+    SweBenchProblem,
+)
+from .types import DigestText, NonEmptyText, StrictModel
+
+CommandRunner = Callable[
+    [list[str], Path, int],
+    subprocess.CompletedProcess[str],
+]
+
+
+class OfficialHarnessError(RuntimeError):
+    pass
+
+
+class _WireModel(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="ignore")
+
+
+class _Transition(_WireModel):
+    success: tuple[str, ...]
+    failure: tuple[str, ...]
+
+
+class _OfficialReport(_WireModel):
+    patch_exists: bool
+    patch_successfully_applied: bool
+    resolved: bool
+    tests_status: dict[str, _Transition]
+
+
+class HarnessEvaluation(StrictModel):
+    outcome: Verification
+    report_digest: DigestText
+    harness_revision: NonEmptyText
+    image_digest: DigestText
+    fail_to_pass_success: tuple[str, ...]
+    pass_to_pass_success: tuple[str, ...]
+
+
+def _run(
+    argv: list[str],
+    cwd: Path,
+    timeout: int,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        argv,
+        cwd=cwd,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _dataset_row(problem: SweBenchProblem) -> dict[str, object]:
+    verifier = problem.verifier
+    return {
+        "instance_id": problem.instance_id,
+        "repo": problem.repo,
+        "version": problem.version,
+        "base_commit": problem.base_commit,
+        "problem_statement": problem.problem_statement,
+        "hints_text": "",
+        "test_patch": verifier.test_patch,
+        "FAIL_TO_PASS": list(verifier.fail_to_pass),
+        "PASS_TO_PASS": list(verifier.pass_to_pass),
+    }
+
+
+def _invoke(
+    argv: list[str],
+    *,
+    cwd: Path,
+    timeout: int,
+    runner: CommandRunner,
+    purpose: str,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        result = runner(argv, cwd, timeout)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise OfficialHarnessError(f"{purpose} failed: {error}") from error
+    if result.returncode:
+        raise OfficialHarnessError(
+            f"{purpose} failed with exit {result.returncode}: {result.stderr}"
+        )
+    return result
+
+
+def run_official_harness(
+    problem: SweBenchProblem,
+    model_patch: str,
+    *,
+    model: str,
+    run_directory: Path,
+    timeout_seconds: Annotated[int, Field(gt=0)] = 1800,
+    runner: CommandRunner = _run,
+) -> HarnessEvaluation:
+    if problem.verifier.harness_revision != SWE_BENCH_HARNESS_REVISION:
+        raise OfficialHarnessError(
+            "problem harness revision is not the pinned revision"
+        )
+    existing_reports = (
+        tuple(run_directory.glob(f"**/{problem.instance_id}/report.json"))
+        if run_directory.exists()
+        else ()
+    )
+    if run_directory.exists() and not existing_reports and any(run_directory.iterdir()):
+        raise OfficialHarnessError("incomplete previous official harness directory")
+    run_directory.mkdir(parents=True, exist_ok=True)
+    dataset_path = run_directory / "dataset.json"
+    predictions_path = run_directory / "predictions.jsonl"
+    atomic_write(dataset_path, canonical_bytes([_dataset_row(problem)]) + b"\n")
+    prediction = {
+        "instance_id": problem.instance_id,
+        "model_name_or_path": model,
+        "model_patch": model_patch,
+    }
+    atomic_write(predictions_path, canonical_bytes(prediction) + b"\n")
+    image = f"{problem.verifier.image_ref}@sha256:{problem.verifier.image_digest}"
+    image_tag = f"{problem.verifier.image_ref}:latest"
+    if not existing_reports:
+        _invoke(
+            ["docker", "pull", image],
+            cwd=run_directory,
+            timeout=timeout_seconds,
+            runner=runner,
+            purpose="pinned image pull",
+        )
+        _invoke(
+            ["docker", "tag", image, image_tag],
+            cwd=run_directory,
+            timeout=60,
+            runner=runner,
+            purpose="pinned image tagging",
+        )
+        run_id = f"parallax-{problem.instance_id}"
+        harness = (
+            "git+https://github.com/SWE-bench/SWE-bench.git@"
+            f"{SWE_BENCH_HARNESS_REVISION}"
+        )
+        command = [
+            "uv",
+            "run",
+            "--with",
+            harness,
+            "python",
+            "-m",
+            "swebench.harness.run_evaluation",
+            "--dataset_name",
+            str(dataset_path),
+            "--split",
+            "test",
+            "--predictions_path",
+            str(predictions_path),
+            "--instance_ids",
+            problem.instance_id,
+            "--max_workers",
+            "1",
+            "--run_id",
+            run_id,
+            "--namespace",
+            "swebench",
+            "--instance_image_tag",
+            "latest",
+            "--cache_level",
+            "instance",
+            "--clean",
+            "false",
+            "--timeout",
+            str(timeout_seconds),
+        ]
+        _invoke(
+            command,
+            cwd=run_directory,
+            timeout=timeout_seconds + 300,
+            runner=runner,
+            purpose="official SWE-bench harness",
+        )
+    reports = existing_reports or tuple(
+        run_directory.glob(f"**/{problem.instance_id}/report.json")
+    )
+    if len(reports) != 1:
+        raise OfficialHarnessError(
+            f"official harness produced {len(reports)} instance reports"
+        )
+    report_bytes = reports[0].read_bytes()
+    try:
+        envelope = json.loads(report_bytes)
+        report = _OfficialReport.model_validate_json(
+            json.dumps(envelope[problem.instance_id])
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise OfficialHarnessError("official harness report is invalid") from error
+    statuses = report.tests_status
+    try:
+        fail_to_pass = statuses["FAIL_TO_PASS"]
+        pass_to_pass = statuses["PASS_TO_PASS"]
+    except KeyError as error:
+        raise OfficialHarnessError(
+            "official harness omitted test transitions"
+        ) from error
+    observed_fail = set(fail_to_pass.success) | set(fail_to_pass.failure)
+    observed_pass = set(pass_to_pass.success) | set(pass_to_pass.failure)
+    if observed_fail != set(problem.verifier.fail_to_pass):
+        raise OfficialHarnessError("official harness FAIL_TO_PASS coverage drift")
+    if observed_pass != set(problem.verifier.pass_to_pass):
+        raise OfficialHarnessError("official harness PASS_TO_PASS coverage drift")
+    if not report.patch_exists or not report.patch_successfully_applied:
+        verdict = Verdict.WRONG
+        reason = "candidate patch was absent or did not apply"
+    elif report.resolved:
+        verdict = Verdict.PASS
+        reason = "pinned official SWE-bench harness resolved the instance"
+    else:
+        verdict = Verdict.WRONG
+        reason = "pinned official SWE-bench harness did not resolve the instance"
+    return HarnessEvaluation(
+        outcome=Verification(verdict=verdict, reason=reason),
+        report_digest=canonical_digest(envelope),
+        harness_revision=SWE_BENCH_HARNESS_REVISION,
+        image_digest=problem.verifier.image_digest,
+        fail_to_pass_success=fail_to_pass.success,
+        pass_to_pass_success=pass_to_pass.success,
+    )

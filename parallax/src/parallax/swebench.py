@@ -15,8 +15,8 @@ from pydantic import (
     model_validator,
 )
 
+from .canonical import canonical_digest
 from .evolving_intent import Arm, Chat, Message
-from .runner import canonical_digest
 from .types import (
     ConstructionSeed,
     DigestText,
@@ -114,7 +114,6 @@ class SweBenchError(ValueError):
 
 class VerifierRuntime(StrictModel):
     image_digest: ImageDigest
-    test_command: Annotated[tuple[str, ...], Field(min_length=1)]
 
 
 class SweBenchVerifier(StrictModel):
@@ -124,7 +123,6 @@ class SweBenchVerifier(StrictModel):
     test_patch: NonEmptyText
     fail_to_pass: Annotated[tuple[NonEmptyText, ...], Field(min_length=1)]
     pass_to_pass: tuple[NonEmptyText, ...]
-    test_command: Annotated[tuple[str, ...], Field(min_length=1)]
 
     @property
     def digest(self) -> str:
@@ -263,7 +261,6 @@ def load_swebench_rows(
             test_patch=row.test_patch,
             fail_to_pass=row.FAIL_TO_PASS,
             pass_to_pass=row.PASS_TO_PASS,
-            test_command=runtime.test_command,
         )
         problems.append(
             SweBenchProblem(

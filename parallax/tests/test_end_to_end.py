@@ -9,6 +9,7 @@ import pytest
 from conftest import HistoryAgent, LastMessageAgent, make_family
 from pydantic import TypeAdapter, ValidationError
 
+from parallax.canonical import canonical_bytes, canonical_digest
 from parallax.evolving_intent import Arm, Chat, Message, Script, ScriptFamily
 from parallax.gsm8k import Verdict, Verification
 from parallax.report import build_report, report_from_jsonl
@@ -22,8 +23,6 @@ from parallax.runner import (
     RunRecord,
     RunResult,
     Threshold,
-    _canonical,
-    canonical_digest,
     read_run_jsonl,
     run_experiment,
 )
@@ -104,7 +103,7 @@ def test_outcome_union_has_an_explicit_discriminator() -> None:
 
 def test_canonical_json_rejects_nonfinite_numbers() -> None:
     with pytest.raises(ValueError, match="not JSON compliant"):
-        _canonical({"value": float("nan")})
+        canonical_bytes({"value": float("nan")})
 
 
 def test_threshold_model_rejects_nonfinite_numbers() -> None:
@@ -301,8 +300,12 @@ def test_source_clustered_hoeffding_golden(tmp_path: Path) -> None:
                     )
                 }
             )
-    assert build_report(tuple(positive))["action"] == "advance"
-    assert build_report(tuple(negative))["action"] == "reject"
+    positive_report = build_report(tuple(positive))
+    negative_report = build_report(tuple(negative))
+    assert positive_report["action"] == "inconclusive"
+    assert negative_report["action"] == "inconclusive"
+    assert not positive_report["interval"]["powered"]
+    assert not negative_report["interval"]["powered"]
 
 
 def test_single_source_interval_is_uninformative(tmp_path: Path) -> None:

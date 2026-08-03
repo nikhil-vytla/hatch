@@ -30,3 +30,33 @@
 - Family script digests are recomputed during report validation.
 - The unsafe embedded-verifier renderer now requires an explicit offline-only
   opt-in. This prevents accidental use but does not resolve verifier isolation.
+- HUD v6's native Workspace is a `bubblewrap`-isolated SSH capability. SDK
+  0.6.12 mounts `/usr`, `/etc`, `/proc`, `/dev`, a private `/tmp`, and the
+  workspace by default; it does not mount `/app`. Its coding-agent guide uses
+  the same pattern for authoritative tests outside the agent workspace.
+- Replaced the embedded verifier with an evaluator-side topology. The generated
+  HUD image now contains public issue/script data only and exports a candidate
+  patch. A separate evaluator invokes `swebench.harness.run_evaluation` at the
+  pinned harness revision against the digest-pinned official image.
+- The runtime requires `bubblewrap`, drops agent shells to UID 1000, and probes
+  that `/app/instance.json` is not visible before an episode. This is
+  defense-in-depth: sealed verifier data is absent from the image.
+- Moved the generated environment implementation into importable
+  `swebench_runtime.py`; generated `env.py` is a one-line import. Extracted
+  `canonical.py` and `outcome.py` leaves so SWE code no longer imports GSM8K
+  grading internals.
+- Candidate patch export uses a temporary index plus `git add -A`, covering
+  untracked additions. The official harness supersedes the flawed test restore
+  and process-return-code grader.
+- Small-n reporting now exposes its Hoeffding interval and
+  minimum-detectable-effect and remains `inconclusive`/`underpowered` until the
+  source-cluster count supports the declared maximum MDE.
+- Added paid-stage receipts before official grading, official report/image/
+  harness commitments, and preservation of paid usage on verifier failures.
+- Resolved immutable image manifests for five screening instances. HUD model
+  discovery authenticated and advertised Claude Haiku 4.5 and Claude Opus 4.8.
+- The first construction request returned HTTP 403 before a model response.
+  Stopped immediately under the authorization-failure rule. Recorded usage is
+  zero tokens and estimated spend is $0; the key value was never logged.
+- Offline certification reached 106 tests and the adapted audit mutation suite
+  killed all 34 active mutants.
