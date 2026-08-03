@@ -1,0 +1,19 @@
+{
+  "name": "expense_audit",
+  "description": "Audit these expense reports against the policy and produce violations.csv listing each violating row and the rule it breaks.",
+  "seeds": [
+    {
+      "path": "expenses.csv",
+      "sha256": "d81072634a69588ae88aa111a9af7fa5675d44055b5deb6b5f865d3e98b1e9af",
+      "bytes": 212,
+      "kind": "tabular"
+    },
+    {
+      "path": "policy.txt",
+      "sha256": "43612bb39effd670b248776a0f0fefc49f9d0a175159d95f6a31d2724373602f",
+      "bytes": 183,
+      "kind": "text"
+    }
+  ],
+  "store": "../../store"
+}

@@ -1,0 +1,4 @@
+Expense policy v3:
+- Meals over $75 require a receipt.
+- Equipment over $1000 requires manager pre-approval noted in the report.
+- All travel requires a receipt regardless of amount.

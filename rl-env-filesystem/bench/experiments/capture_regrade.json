@@ -1,0 +1,11 @@
+{
+  "name": "capture_regrade",
+  "tasks": ["task_csv_report", "task_grep_fix", "task_sqlite_query",
+            "task_numpy_solve", "task_pandas_pipeline"],
+  "delivery_policies": ["hot_tier"],
+  "capture": true,
+  "regrade": true,
+  "repeats": 3,
+  "concurrency": 4,
+  "bandwidth_mbps": 150
+}
