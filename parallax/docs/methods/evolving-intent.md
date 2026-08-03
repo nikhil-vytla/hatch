@@ -198,11 +198,13 @@ requires them:
   receives that budget in one turn; matched and evolved divide it across
   turns.
 
-The generated HUD environment resets to `base_commit`, preserves agent source
-edits, restores authoritative test files, applies the sealed test patch, and
-runs the pinned test command. Generated Dockerfiles use the official
-`swebench/sweb.eval` image by digest. No edit-path allowlist is part of the
-verdict.
+The generated HUD bundle is only an offline rendering scaffold. Although its
+Dockerfile uses the official `swebench/sweb.eval` image by digest, it copies
+sealed verifier material into the agent-readable container and reduces grading
+to a process exit code. It is not an admitted environment and must not produce
+experimental outcomes. A production path must export the candidate patch to an
+evaluator-side official harness, parse named FAIL_TO_PASS and PASS_TO_PASS
+statuses, and keep verifier material outside the agent filesystem.
 
 ## Interpretation and limits
 

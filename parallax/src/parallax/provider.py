@@ -14,6 +14,7 @@ from .types import NonEmptyText, StrictModel
 
 HttpUrl = Annotated[str, StringConstraints(pattern=r"^https://")]
 PositiveInt = Annotated[int, Field(gt=0)]
+HUD_GATEWAY_ENDPOINT = "https://inference.beta.hud.ai/v1/chat/completions"
 
 
 class ProviderError(RuntimeError):
@@ -186,3 +187,28 @@ class OpenAICompatibleProvider:
             return choice.message.content
 
         return call
+
+
+class HudGatewayProvider(OpenAICompatibleProvider):
+    def __init__(
+        self,
+        model: str,
+        *,
+        transport: Transport = _http_post,
+        environment: Mapping[str, str] | None = None,
+        timeout_seconds: float = 300.0,
+    ) -> None:
+        selected_environment = environment if environment is not None else os.environ
+        if not selected_environment.get("HUD_API_KEY"):
+            raise ProviderError("missing provider credential HUD_API_KEY")
+        super().__init__(
+            ProviderConfig(
+                endpoint=HUD_GATEWAY_ENDPOINT,
+                api_key_env="HUD_API_KEY",
+                model=model,
+                timeout_seconds=timeout_seconds,
+                token_field="max_tokens",
+            ),
+            transport=transport,
+            environment=selected_environment,
+        )
