@@ -1,0 +1,76 @@
+$ uv sync
+[stdout]
+[stderr]
+Resolved 114 packages in 16ms
+Checked 7 packages in 2ms
+[exit 0]
+
+$ uv run parallax --help
+[stdout]
+usage: parallax [-h] {compile,grade,export,build} ...
+
+Compile pinned repositories into counterfactual agent tasks.
+
+positional arguments:
+  {compile,grade,export,build}
+
+options:
+  -h, --help            show this help message and exit
+[stderr]
+[exit 0]
+
+$ uv run python -c import\ parallax\;\ print\(parallax.__file__\)
+[stdout]
+/Users/nikhil/work/hatch/hard-repo-tasks/src/parallax/__init__.py
+[stderr]
+[exit 0]
+
+$ uv run python -c from\ pathlib\ import\ Path\;\ paths=\[Path\(\"tests/fixtures/synthesis_kernel\"\)/name\ for\ name\ in\ \(\"experiment.toml\"\,\"gsm8k.json\"\,\"proposal.json\"\)\]\;\ assert\ all\(path.is_file\(\)\ for\ path\ in\ paths\)\;\ print\(\"\\n\".join\(str\(path.resolve\(\)\)\ for\ path\ in\ paths\)\)
+[stdout]
+/Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/experiment.toml
+/Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/gsm8k.json
+/Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/proposal.json
+[stderr]
+[exit 0]
+
+$ cp /Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/experiment.toml /Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/gsm8k.json /Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/proposal.json /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-rerun/config/
+[stdout]
+[stderr]
+[exit 0]
+
+$ uv run parallax build /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-rerun/config/experiment.toml --store /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-rerun/build
+[stdout]
+{
+  "arms": {
+    "evolved": "23f89c49b86a1751c3b02cc51a9354596e590a2e93659ed1fd19f9317245b394",
+    "matched": "dd51bccece1a22a94ca689846044e6c1254c1ec8ae05b1f1b2c9e2760cdf8c5b",
+    "static": "cb6c3f435e5e3f7e167885a4587b39159cca91f7e343f0e694d669ada0221dc2"
+  },
+  "family_id": "5ebc593aee75327d17e2a9d01c2e8f86752566990c7eafeaee5c2dcb55469cf7"
+}
+[stderr]
+[exit 0]
+
+$ uv run parallax build --locked /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-rerun/config/family.lock --store /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-rerun/replay
+[stdout]
+{
+  "arms": {
+    "evolved": "23f89c49b86a1751c3b02cc51a9354596e590a2e93659ed1fd19f9317245b394",
+    "matched": "dd51bccece1a22a94ca689846044e6c1254c1ec8ae05b1f1b2c9e2760cdf8c5b",
+    "static": "cb6c3f435e5e3f7e167885a4587b39159cca91f7e343f0e694d669ada0221dc2"
+  },
+  "family_id": "5ebc593aee75327d17e2a9d01c2e8f86752566990c7eafeaee5c2dcb55469cf7"
+}
+[stderr]
+[exit 0]
+
+$ uv run pytest -q tests/test_synthesis_kernel.py::test_cli_build_reruns_idempotently_and_replays_lock
+[stdout]
+.                                                                        [100%]
+1 passed in 0.25s
+[stderr]
+[exit 0]
+
+$ rm -rf /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-rerun
+[exit 0]
+[evidence preserved] /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/evidence/unit0-family-build-rerun

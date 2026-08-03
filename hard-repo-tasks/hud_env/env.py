@@ -16,16 +16,17 @@ from hud.graders import EvaluationResult, SubScore
 EXPERIMENT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EXPERIMENT_ROOT / "src"))
 
-from parallax.grading import grade_candidate  # noqa: E402
+from parallax.grading import TreeSnapshot, grade_candidate  # noqa: E402
 from parallax.models import Recipe  # noqa: E402
 
 env = Environment(name="parallax_repo", version="0.1.0")
 WORKSPACE = Path(tempfile.mkdtemp(prefix="hud-parallax-repo-"))
+HUD_HOME = Path(tempfile.mkdtemp(prefix="hud-parallax-home-"))
 env.workspace(
     WORKSPACE,
     network=False,
     track_files=True,
-    env={"HOME": str(WORKSPACE), "PARALLAX_WORKSPACE": str(WORKSPACE)},
+    env={"HOME": str(HUD_HOME), "PARALLAX_WORKSPACE": str(WORKSPACE)},
 )
 
 
@@ -66,15 +67,8 @@ def _prepare(
     _run(["git", "commit", "--quiet", "-m", "synthetic starter"], WORKSPACE)
 
 
-def _grade(recipe_name: str):
-    candidates = [
-        path
-        for path in (EXPERIMENT_ROOT / "recipes" / "click").glob("*.json")
-        if Recipe.load(path).name == recipe_name
-    ]
-    if len(candidates) != 1:
-        raise ValueError(f"expected one trusted recipe named {recipe_name!r}")
-    return grade_candidate(Recipe.load(candidates[0]), WORKSPACE)
+def _grade(recipe: Recipe, baseline: TreeSnapshot):
+    return grade_candidate(recipe, WORKSPACE, baseline)
 
 
 @env.template(id="repair")
@@ -86,13 +80,22 @@ async def repair(
     starter_patch_b64: str,
     recipe_name: str,
 ):
+    recipe_paths = [
+        path
+        for path in (EXPERIMENT_ROOT / "recipes" / "click").glob("*.json")
+        if Recipe.load(path).name == recipe_name
+    ]
+    if len(recipe_paths) != 1:
+        raise ValueError(f"expected one trusted recipe named {recipe_name!r}")
+    recipe = Recipe.load(recipe_paths[0])
     await asyncio.to_thread(_prepare, source, revision, starter_patch_b64)
+    baseline = await asyncio.to_thread(TreeSnapshot.capture, WORKSPACE, recipe.ignored_paths)
     _answer = yield (
         prompt
         + "\n\nThe repository root is your current working directory. "
         "Do not search outside it or traverse `/`."
     )
-    grade = await asyncio.to_thread(_grade, recipe_name)
+    grade = await asyncio.to_thread(_grade, recipe, baseline)
     children = [
         SubScore(
             name=component.name,
@@ -110,6 +113,7 @@ async def repair(
         content=f"gated reward={grade.reward:.3f}",
         info={
             "task_id": task_id,
+            "outcome": grade.outcome.value,
             "integrity_gate": grade.integrity_gate,
             "changed_paths": list(grade.changed_paths),
             "violations": list(grade.violations),

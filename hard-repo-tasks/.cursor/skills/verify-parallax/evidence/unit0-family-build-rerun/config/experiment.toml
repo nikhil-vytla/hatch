@@ -1,0 +1,9 @@
+[source]
+kind = "gsm8k"
+path = "gsm8k.json"
+
+[proposal]
+path = "proposal.json"
+
+[build]
+output_tokens_per_turn = 256

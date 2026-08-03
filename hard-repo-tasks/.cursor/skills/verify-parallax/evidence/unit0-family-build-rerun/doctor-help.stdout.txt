@@ -1,0 +1,9 @@
+usage: parallax [-h] {compile,grade,export,build} ...
+
+Compile pinned repositories into counterfactual agent tasks.
+
+positional arguments:
+  {compile,grade,export,build}
+
+options:
+  -h, --help            show this help message and exit

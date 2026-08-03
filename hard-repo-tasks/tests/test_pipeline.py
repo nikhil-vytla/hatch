@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -11,8 +12,9 @@ import pytest
 from parallax.adapters import export_hud, export_verifiers, render_verifiers_taskset
 from parallax.calibration import RolloutObservation, decide_curriculum
 from parallax.compiler import compile_recipe
-from parallax.grading import grade_candidate
-from parallax.models import Check, Recipe, SourceSpec, TextEdit
+from parallax.grading import TreeSnapshot, grade_candidate
+from parallax.ids import digest_value
+from parallax.models import Check, CheckCategory, Recipe, SourceSpec, TextEdit
 from parallax.patching import EditError, apply_edits
 
 
@@ -38,6 +40,17 @@ def _source(tmp_path: Path) -> tuple[Path, str]:
     _git(root, "add", ".")
     _git(root, "commit", "-qm", "fixture")
     return root, _git(root, "rev-parse", "HEAD")
+
+
+def _check(name: str, code: str, weight: float, category: CheckCategory) -> Check:
+    marker = digest_value({"name": name, "category": category.value, "semantics": code})
+    return Check(
+        name=name,
+        argv=("python", "-c", f"{code}\nprint({marker!r})"),
+        weight=weight,
+        category=category,
+        success_marker=marker,
+    )
 
 
 def _recipe(revision: str) -> Recipe:
@@ -66,29 +79,36 @@ def _recipe(revision: str) -> Recipe:
         starter_omissions=("implement",),
         probe_edits=(),
         checks=(
-            Check(
-                name="regression",
-                argv=("python", "-c", 'import policy; assert policy.resolve("sys") == "sys"'),
-                weight=0.2,
-                category="regression",
+            _check(
+                "regression",
+                'import policy; assert policy.resolve("sys") == "sys"',
+                0.2,
+                CheckCategory.REGRESSION,
             ),
-            Check(
-                name="contract",
-                argv=(
-                    "python",
-                    "-c",
-                    'import policy; assert policy.resolve("adaptive") == "sys"',
-                ),
-                weight=0.8,
-                category="counterfactual",
+            _check(
+                "contract",
+                'import policy; assert policy.resolve("adaptive") == "sys"',
+                0.8,
+                CheckCategory.COUNTERFACTUAL,
             ),
         ),
         allowed_paths=("policy.py",),
+        ignored_paths=(
+            ".cache/pip/**",
+            "**/__pycache__/**",
+            "**/.pytest_cache/**",
+            ".coverage",
+        ),
         behavior_tags=("scope-control",),
     )
 
 
-def _candidate(source: Path, recipe: Recipe, root: Path, complete: bool) -> Path:
+def _candidate(
+    source: Path,
+    recipe: Recipe,
+    root: Path,
+    complete: bool,
+) -> tuple[Path, TreeSnapshot]:
     shutil.copytree(source, root, ignore=shutil.ignore_patterns(".git"))
     apply_edits(root, recipe.implementation_edits[:1])
     _git(root, "init", "-q")
@@ -96,9 +116,10 @@ def _candidate(source: Path, recipe: Recipe, root: Path, complete: bool) -> Path
     _git(root, "config", "user.name", "Test")
     _git(root, "add", ".")
     _git(root, "commit", "-qm", "starter")
+    baseline = TreeSnapshot.capture(root, recipe.ignored_paths)
     if complete:
         apply_edits(root, (recipe.implementation_edits[1],))
-    return root
+    return root, baseline
 
 
 def test_compile_is_deterministic_and_separates_public_from_sealed(tmp_path: Path) -> None:
@@ -121,35 +142,63 @@ def test_compile_is_deterministic_and_separates_public_from_sealed(tmp_path: Pat
     assert all(check["passed"] for check in admission["gold"])
     assert any(not check["passed"] for check in admission["starter"])
 
+    prompt_recipe = replace(recipe, prompt="A different public prompt.")
+    prompt_manifest = compile_recipe(prompt_recipe, source, tmp_path / "prompt")
+    assert prompt_manifest.task_id != first.task_id
+
+    changed_contract = _check(
+        "contract",
+        'import policy; assert policy.resolve("adaptive") in {"sys", "fd"}',
+        0.8,
+        CheckCategory.COUNTERFACTUAL,
+    )
+    sealed_recipe = replace(recipe, checks=(recipe.checks[0], changed_contract))
+    sealed_manifest = compile_recipe(sealed_recipe, source, tmp_path / "sealed-change")
+    assert sealed_manifest.task_id != first.task_id
+
+    with pytest.raises(ValueError, match="task_id mismatch"):
+        replace(first, task_id="0" * 64)
+    with pytest.raises(ValueError, match="public_digest"):
+        replace(first, public_digest="short")
+
 
 def test_grading_gates_contract_and_forbidden_paths(tmp_path: Path) -> None:
     source, revision = _source(tmp_path)
     recipe = _recipe(revision)
 
-    no_op = _candidate(source, recipe, tmp_path / "no-op", complete=True)
-    assert grade_candidate(recipe, no_op).reward == 1.0
+    oracle_candidate, oracle_baseline = _candidate(
+        source, recipe, tmp_path / "oracle", complete=True
+    )
+    assert grade_candidate(recipe, oracle_candidate, oracle_baseline).reward == 1.0
+    failed_gate = _check(
+        "adversarial",
+        "raise AssertionError('hard gate')",
+        1.0,
+        CheckCategory.ADVERSARIAL,
+    )
+    gated_recipe = replace(recipe, checks=(*recipe.checks, failed_gate))
+    assert grade_candidate(gated_recipe, oracle_candidate, oracle_baseline).reward == 0.0
 
-    cache_only = _candidate(source, recipe, tmp_path / "cache-only", complete=True)
-    cache_path = cache_only / "Library" / "Caches" / "pip" / "http-v2" / "artifact"
+    cache_only, cache_baseline = _candidate(
+        source, recipe, tmp_path / "cache-only", complete=True
+    )
+    cache_path = cache_only / ".cache" / "pip" / "http-v2" / "artifact"
     cache_path.parent.mkdir(parents=True)
     cache_path.write_text("ephemeral")
-    assert grade_candidate(recipe, cache_only).reward == 1.0
+    assert grade_candidate(recipe, cache_only, cache_baseline).reward == 1.0
 
-    tampered = _candidate(source, recipe, tmp_path / "tampered", complete=True)
+    tampered, tampered_baseline = _candidate(
+        source, recipe, tmp_path / "tampered", complete=True
+    )
     (tampered / "unrelated.txt").write_text("reward hack")
-    grade = grade_candidate(recipe, tampered)
+    grade = grade_candidate(recipe, tampered, tampered_baseline)
     assert grade.reward == 0.0
     assert grade.integrity_gate == 0.0
 
-    incomplete = tmp_path / "incomplete"
-    shutil.copytree(source, incomplete, ignore=shutil.ignore_patterns(".git"))
-    apply_edits(incomplete, recipe.implementation_edits[:1])
-    _git(incomplete, "init", "-q")
-    _git(incomplete, "config", "user.email", "test@example.com")
-    _git(incomplete, "config", "user.name", "Test")
-    _git(incomplete, "add", ".")
-    _git(incomplete, "commit", "-qm", "starter")
-    assert grade_candidate(recipe, incomplete).reward == 0.0
+    incomplete, incomplete_baseline = _candidate(
+        source, recipe, tmp_path / "incomplete", complete=False
+    )
+    assert grade_candidate(recipe, incomplete, incomplete_baseline).reward == 0.0
 
 
 def test_exports_match_platform_public_contracts(tmp_path: Path) -> None:
@@ -170,6 +219,18 @@ def test_exports_match_platform_public_contracts(tmp_path: Path) -> None:
     vf_row = json.loads(vf_path.read_text())
     assert vf_row["task_id"] == manifest.task_id
     compile(render_verifiers_taskset(), "taskset.py", "exec")
+
+
+def test_generated_click_recipes_use_explicit_markers_and_ignore_policy() -> None:
+    root = Path(__file__).resolve().parents[1]
+    recipes = [
+        Recipe.load(path) for path in sorted((root / "recipes" / "click").glob("*.json"))
+    ]
+
+    assert len(recipes) == 12
+    for recipe in recipes:
+        assert recipe.ignored_paths
+        assert all(check.success_marker in check.argv[-1] for check in recipe.checks)
 
 
 def test_edit_requires_exact_pinned_context(tmp_path: Path) -> None:

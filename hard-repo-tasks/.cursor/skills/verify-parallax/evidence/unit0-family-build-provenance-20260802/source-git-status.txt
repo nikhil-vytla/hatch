@@ -1,0 +1,16 @@
+ M hard-repo-tasks/src/parallax/__init__.py
+ M hard-repo-tasks/src/parallax/cli.py
+ M hard-repo-tasks/src/parallax/compiler.py
+ M hard-repo-tasks/src/parallax/grading.py
+ M hard-repo-tasks/src/parallax/models.py
+?? hard-repo-tasks/.cursor/skills/verify-parallax/prove-family-build.sh
+?? hard-repo-tasks/src/parallax/checks.py
+?? hard-repo-tasks/src/parallax/evolving_intent.py
+?? hard-repo-tasks/src/parallax/gsm8k.py
+?? hard-repo-tasks/src/parallax/ids.py
+?? hard-repo-tasks/src/parallax/kernel.py
+?? hard-repo-tasks/src/parallax/swebench.py
+?? hard-repo-tasks/tests/fixtures/synthesis_kernel/experiment.toml
+?? hard-repo-tasks/tests/fixtures/synthesis_kernel/gsm8k.json
+?? hard-repo-tasks/tests/fixtures/synthesis_kernel/proposal.json
+?? hard-repo-tasks/tests/test_synthesis_kernel.py

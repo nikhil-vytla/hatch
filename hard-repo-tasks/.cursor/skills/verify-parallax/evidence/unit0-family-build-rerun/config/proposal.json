@@ -1,0 +1,28 @@
+{
+  "events": [
+    {
+      "after": "school_supply_sales",
+      "kind": "reveal",
+      "message": "Before solving a word problem, identify the quantity being counted and whether the later amount is larger or smaller than the earlier amount.",
+      "target": "context"
+    },
+    {
+      "after": "answer_source_task",
+      "before": "classify_word_problem",
+      "kind": "switch",
+      "message": "Switch to the pinned source problem when it is provided. Treat that exact final problem as authoritative."
+    }
+  ],
+  "format": "parallax.frozen-proposal.v1",
+  "initial_goal": "classify_word_problem",
+  "initial_values": {},
+  "model": "frozen-proposal-fixture",
+  "opening_turn": "Before solving a word problem, identify the quantity being counted and whether the later amount is larger or smaller than the earlier amount.",
+  "parameters": {
+    "temperature": 0
+  },
+  "prompt_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "raw_response_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "seed": 7,
+  "upstream_revision": "993d6be9597ac03854b46362ccd647eb1bfd267a"
+}

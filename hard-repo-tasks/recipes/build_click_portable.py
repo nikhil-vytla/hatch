@@ -8,6 +8,7 @@ diff or private helper name.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -48,6 +49,23 @@ ASSIGNMENT_BEFORE = '''        self.catch_exceptions = catch_exceptions
 INVOKE_BEFORE = '''        if self.capture == "fd":
             cap_out = _FDCapture(1)
 '''
+
+
+def check(name: str, category: str, weight: float, code: str) -> dict[str, object]:
+    marker_payload = json.dumps(
+        {"name": name, "category": category, "semantics": code},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    marker = hashlib.sha256(marker_payload.encode()).hexdigest()
+    return {
+        "name": name,
+        "argv": ["python", "-c", f"{code}\nprint({marker!r})"],
+        "weight": weight,
+        "category": category,
+        "success_marker": marker,
+        "env": {"PYTHONPATH": "src"},
+    }
 
 
 def build(mode: str, index: int) -> dict[str, object]:
@@ -173,29 +191,18 @@ else:
         "starter_omissions": omission_sets[index % len(omission_sets)],
         "probe_edits": [],
         "checks": [
-            {
-                "name": "existing-capture-regression",
-                "argv": ["python", "-c", regression],
-                "weight": 0.2,
-                "category": "regression",
-                "env": {"PYTHONPATH": "src"},
-            },
-            {
-                "name": "counterfactual-native-capture",
-                "argv": ["python", "-c", contract],
-                "weight": 0.6,
-                "category": "counterfactual",
-                "env": {"PYTHONPATH": "src"},
-            },
-            {
-                "name": "near-match-rejected",
-                "argv": ["python", "-c", invalid],
-                "weight": 0.2,
-                "category": "adversarial",
-                "env": {"PYTHONPATH": "src"},
-            },
+            check("existing-capture-regression", "regression", 0.2, regression),
+            check("counterfactual-native-capture", "counterfactual", 0.6, contract),
+            check("near-match-rejected", "adversarial", 0.2, invalid),
         ],
         "allowed_paths": ["src/click/testing.py", "tests/test_testing.py"],
+        "ignored_paths": [
+            ".cache/pip/**",
+            ".coverage",
+            ".venv/**",
+            "**/__pycache__/**",
+            "**/.pytest_cache/**",
+        ],
         "behavior_tags": [
             "repository-grounding",
             "scope-control",

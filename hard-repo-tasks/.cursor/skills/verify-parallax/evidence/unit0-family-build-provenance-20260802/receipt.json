@@ -1,0 +1,62 @@
+{
+  "arms": {
+    "evolved": "23f89c49b86a1751c3b02cc51a9354596e590a2e93659ed1fd19f9317245b394",
+    "matched": "dd51bccece1a22a94ca689846044e6c1254c1ec8ae05b1f1b2c9e2760cdf8c5b",
+    "static": "cb6c3f435e5e3f7e167885a4587b39159cca91f7e343f0e694d669ada0221dc2"
+  },
+  "artifact_file_count_per_tree": 7,
+  "artifact_trees_byte_identical": true,
+  "claim": "Current Parallax GSM8K family build and locked replay from a hand-authored frozen proposal.",
+  "claim_limits": [
+    "No Microsoft Evolving Intent generation was executed.",
+    "The family identity includes digest-shaped placeholder prompt and response strings from the hand-authored proposal; artifact determinism does not establish provenance integrity or semantic proposal validity.",
+    "The proposal fixture sets context to school_supply_sales for a source task about Natalia selling clips; this known mismatch is not validated by the current admission checks.",
+    "No upstream scheduler or renderer parity was characterized.",
+    "No external benchmark assets, provider calls, or native HUD rollout were exercised."
+  ],
+  "commands": {
+    "build": [
+      "uv",
+      "run",
+      "parallax",
+      "build",
+      "/Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-provenance-20260802/config/experiment.toml",
+      "--store",
+      "/Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-provenance-20260802/build"
+    ],
+    "locked_replay": [
+      "uv",
+      "run",
+      "parallax",
+      "build",
+      "--locked",
+      "/Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-provenance-20260802/config/family.lock",
+      "--store",
+      "/Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/.scratch/unit0-family-build-provenance-20260802/replay"
+    ]
+  },
+  "doctor": {
+    "console_script": "available",
+    "fixture_files": "present",
+    "import_path": "/Users/nikhil/work/hatch/hard-repo-tasks/src/parallax/__init__.py"
+  },
+  "family_id": "5ebc593aee75327d17e2a9d01c2e8f86752566990c7eafeaee5c2dcb55469cf7",
+  "format": "verify-parallax.family-build-proof.v2",
+  "proposal_provenance": {
+    "integrity": "not-proven",
+    "kind": "hand-authored-placeholder",
+    "known_semantic_mismatch": "school_supply_sales versus Natalia selling clips",
+    "semantic_validity": "not-proven"
+  },
+  "pytest_support": "tests/test_synthesis_kernel.py::test_cli_build_reruns_idempotently_and_replays_lock",
+  "repository_head": "94e532d98b33250957d19d7d1e7d9ff09556d403",
+  "source_provenance": {
+    "base_head": "94e532d98b33250957d19d7d1e7d9ff09556d403",
+    "git_status": "source-git-status.txt",
+    "git_status_sha256": "b1609ff1b3dde4de1b75617ce00e94efe31e733a8ea737382ff761c7f6769aab",
+    "manifest": "source-manifest.json",
+    "manifest_sha256": "f01385588509a7e65584b2e4771731e1bf1c2c5e0f68301a7ccc170a6510e8d6",
+    "tracked_diff_sha256": "c1170dcf87ed38cb8f0a44e145a86a4f5e7ea3c1ae172dadfb48d18bac2dc3cc",
+    "worktree_claim": "The manifest binds exact current bytes, including relevant untracked files, rather than treating base HEAD as the complete source state."
+  }
+}

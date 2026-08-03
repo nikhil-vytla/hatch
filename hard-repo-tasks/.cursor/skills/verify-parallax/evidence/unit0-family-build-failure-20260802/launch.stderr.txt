@@ -1,0 +1,1 @@
+/Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/prove-family-build.sh: line 76: uv: command not found

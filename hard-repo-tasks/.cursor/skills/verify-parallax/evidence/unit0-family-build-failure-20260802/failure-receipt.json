@@ -1,0 +1,8 @@
+{
+  "claim": "This records a failed proof attempt only. It does not establish family build, replay, or cleanup success.",
+  "exit_code": 127,
+  "format": "verify-parallax.family-build-failure.v1",
+  "retention": "Only the transcript and explicitly captured command stdout/stderr are retained; scratch stores, caches, and credentials are excluded.",
+  "run_id": "unit0-family-build-failure-20260802",
+  "stage": "launch"
+}

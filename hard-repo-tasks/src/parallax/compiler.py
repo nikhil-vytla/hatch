@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
-from parallax.models import Check, Recipe, TaskManifest
+from parallax.checks import run_check
+from parallax.ids import digest_value, task_id_for
+from parallax.models import CheckCategory, Recipe, TaskManifest
 from parallax.patching import apply_edits, make_patch, sha256_text
 
 
@@ -39,8 +40,8 @@ def compile_recipe(recipe: Recipe, source_root: Path, output_root: Path) -> Task
         )
         apply_edits(starter, starter_edits)
 
-        gold_results = [_run_check(gold, check) for check in recipe.checks]
-        starter_results = [_run_check(starter, check) for check in recipe.checks]
+        gold_results = [run_check(gold, check) for check in recipe.checks]
+        starter_results = [run_check(starter, check) for check in recipe.checks]
         if not all(result["passed"] for result in gold_results):
             failures = [result for result in gold_results if not result["passed"]]
             raise CompilationError(
@@ -51,7 +52,7 @@ def compile_recipe(recipe: Recipe, source_root: Path, output_root: Path) -> Task
         regression_failures = [
             result["name"]
             for result in starter_results
-            if result["category"] == "regression" and not result["passed"]
+            if result["category"] == CheckCategory.REGRESSION.value and not result["passed"]
         ]
         if regression_failures:
             raise CompilationError(
@@ -60,15 +61,45 @@ def compile_recipe(recipe: Recipe, source_root: Path, output_root: Path) -> Task
 
         implementation_paths = tuple(edit.path for edit in recipe.implementation_edits)
         starter_patch = make_patch(base, starter, implementation_paths)
-        gold_patch = make_patch(base, gold, implementation_paths)
-        canonical = json.dumps(recipe.to_dict(), sort_keys=True, separators=(",", ":"))
-        task_id = hashlib.sha256(canonical.encode()).hexdigest()[:16]
+        gold_paths = tuple(
+            dict.fromkeys(
+                edit.path for edit in (*recipe.implementation_edits, *recipe.probe_edits)
+            )
+        )
+        gold_patch = make_patch(base, gold, gold_paths)
+        starter_patch_sha256 = sha256_text(starter_patch)
+        gold_patch_sha256 = sha256_text(gold_patch)
+        public_digest = digest_value(
+            {
+                "recipe_name": recipe.name,
+                "source": {
+                    "locator": recipe.source.locator,
+                    "revision": recipe.source.revision,
+                    "license": recipe.source.license,
+                },
+                "prompt": recipe.prompt,
+                "starter_patch_sha256": starter_patch_sha256,
+                "generator_version": recipe.generator_version,
+                "behavior_tags": recipe.behavior_tags,
+                "allowed_paths": recipe.allowed_paths,
+                "ignored_paths": recipe.ignored_paths,
+            }
+        )
+        sealed_digest = digest_value(
+            {
+                "recipe": recipe.to_dict(),
+                "gold_patch_sha256": gold_patch_sha256,
+            }
+        )
+        task_id = task_id_for(public_digest, sealed_digest)
         manifest = TaskManifest(
             task_id=task_id,
+            public_digest=public_digest,
+            sealed_digest=sealed_digest,
             recipe_name=recipe.name,
             source=recipe.source,
             prompt=recipe.prompt,
-            starter_patch_sha256=sha256_text(starter_patch),
+            starter_patch_sha256=starter_patch_sha256,
             generator_version=recipe.generator_version,
             behavior_tags=recipe.behavior_tags,
             allowed_paths=recipe.allowed_paths,
@@ -98,43 +129,6 @@ def compile_recipe(recipe: Recipe, source_root: Path, output_root: Path) -> Task
             + "\n"
         )
         return manifest
-
-
-def run_check(root: Path, check: Check) -> dict[str, object]:
-    return _run_check(root, check)
-
-
-def _run_check(root: Path, check: Check) -> dict[str, object]:
-    env = os.environ.copy()
-    env.update(check.env)
-    try:
-        completed = subprocess.run(
-            check.argv,
-            cwd=root,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=check.timeout_seconds,
-            check=False,
-        )
-        return {
-            "name": check.name,
-            "category": check.category,
-            "passed": completed.returncode == 0,
-            "returncode": completed.returncode,
-            "stdout": completed.stdout[-4000:],
-            "stderr": completed.stderr[-4000:],
-        }
-    except subprocess.TimeoutExpired as error:
-        return {
-            "name": check.name,
-            "category": check.category,
-            "passed": False,
-            "returncode": None,
-            "stdout": (error.stdout or "")[-4000:],
-            "stderr": (error.stderr or "")[-4000:],
-            "timeout": True,
-        }
 
 
 def _assert_revision(root: Path, expected: str) -> None:

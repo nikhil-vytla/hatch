@@ -14,41 +14,51 @@
       "argv": [
         "python",
         "-c",
-        "import click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    click.echo(\"out\")\n    click.echo(\"err\", err=True)\n\nfor mode in (\"sys\", \"fd\"):\n    result = CliRunner(capture=mode).invoke(command)\n    assert result.exit_code == 0\n    assert result.stdout == \"out\\n\"\n    assert result.stderr == \"err\\n\"\n"
+        "import click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    click.echo(\"out\")\n    click.echo(\"err\", err=True)\n\nfor mode in (\"sys\", \"fd\"):\n    result = CliRunner(capture=mode).invoke(command)\n    assert result.exit_code == 0\n    assert result.stdout == \"out\\n\"\n    assert result.stderr == \"err\\n\"\n\nprint('d6f5f7841768ca1f44e4b6e3d15b2f423e14426a0b7848c4766503c0158ba4a4')"
       ],
       "category": "regression",
       "env": {
         "PYTHONPATH": "src"
       },
       "name": "existing-capture-regression",
+      "success_marker": "d6f5f7841768ca1f44e4b6e3d15b2f423e14426a0b7848c4766503c0158ba4a4",
       "weight": 0.2
     },
     {
       "argv": [
         "python",
         "-c",
-        "import os\nimport click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    os.write(1, b\"native-stdout\\n\")\n    os.write(2, b\"native-stderr\\n\")\n    click.echo(\"python-stdout\")\n    click.echo(\"python-stderr\", err=True)\n\nrunner = CliRunner(capture=\"platform_auto\")\nresult = runner.invoke(command)\nassert result.exit_code == 0, result.exception\nassert result.stdout == \"python-stdout\\nnative-stdout\\n\", repr(result.stdout)\nassert result.stderr == \"python-stderr\\nnative-stderr\\n\", repr(result.stderr)\nassert result.output == (\n    \"python-stdout\\npython-stderr\\nnative-stdout\\nnative-stderr\\n\"\n), repr(result.output)\n"
+        "import os\nimport click\nfrom click.testing import CliRunner\n\n@click.command()\ndef command():\n    os.write(1, b\"native-stdout\\n\")\n    os.write(2, b\"native-stderr\\n\")\n    click.echo(\"python-stdout\")\n    click.echo(\"python-stderr\", err=True)\n\nrunner = CliRunner(capture=\"platform_auto\")\nresult = runner.invoke(command)\nassert result.exit_code == 0, result.exception\nassert result.stdout == \"python-stdout\\nnative-stdout\\n\", repr(result.stdout)\nassert result.stderr == \"python-stderr\\nnative-stderr\\n\", repr(result.stderr)\nassert result.output == (\n    \"python-stdout\\npython-stderr\\nnative-stdout\\nnative-stderr\\n\"\n), repr(result.output)\n\nprint('50eea30a468cc58008609152ceb9413cd9f334c3dfaaf520a7e8b3600c0bad46')"
       ],
       "category": "counterfactual",
       "env": {
         "PYTHONPATH": "src"
       },
       "name": "counterfactual-native-capture",
+      "success_marker": "50eea30a468cc58008609152ceb9413cd9f334c3dfaaf520a7e8b3600c0bad46",
       "weight": 0.6
     },
     {
       "argv": [
         "python",
         "-c",
-        "from click.testing import CliRunner\n\ntry:\n    CliRunner(capture=\"platform_auto-almost\")\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError(\"near-match mode must not be accepted\")\n"
+        "from click.testing import CliRunner\n\ntry:\n    CliRunner(capture=\"platform_auto-almost\")\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError(\"near-match mode must not be accepted\")\n\nprint('d9cef47bfef7c7b314a4bd6a3ec12e216d684f0a6f8430b03cf7069104b8c6ca')"
       ],
       "category": "adversarial",
       "env": {
         "PYTHONPATH": "src"
       },
       "name": "near-match-rejected",
+      "success_marker": "d9cef47bfef7c7b314a4bd6a3ec12e216d684f0a6f8430b03cf7069104b8c6ca",
       "weight": 0.2
     }
+  ],
+  "ignored_paths": [
+    ".cache/pip/**",
+    ".coverage",
+    ".venv/**",
+    "**/__pycache__/**",
+    "**/.pytest_cache/**"
   ],
   "implementation_edits": [
     {

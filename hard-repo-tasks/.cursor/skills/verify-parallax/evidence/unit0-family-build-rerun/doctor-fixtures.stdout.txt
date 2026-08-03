@@ -1,0 +1,3 @@
+/Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/experiment.toml
+/Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/gsm8k.json
+/Users/nikhil/work/hatch/hard-repo-tasks/tests/fixtures/synthesis_kernel/proposal.json

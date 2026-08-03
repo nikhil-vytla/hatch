@@ -1,0 +1,208 @@
+{
+  "base_head": "94e532d98b33250957d19d7d1e7d9ff09556d403",
+  "claim": "These path-and-SHA-256 entries commit the exact current input bytes, including relevant untracked files, even when the worktree is uncommitted.",
+  "files": [
+    {
+      "git_state": "untracked",
+      "path": ".cursor/skills/verify-parallax/prove-family-build.sh",
+      "sha256": "f59cff465e88e7869442fa6550c1083944f235810e67799c99c6960280ce9918",
+      "size_bytes": 16245,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "README.md",
+      "sha256": "326f93b99f02b73e4c16287927223e25aabb6b99d669043c820490f253d9a181",
+      "size_bytes": 15251,
+      "source": "worktree"
+    },
+    {
+      "git_state": "not-applicable",
+      "path": "copied-config/experiment.toml",
+      "sha256": "63139ec4513d8d7c4c9308337ba74a1cab406805cb664717ee6b2f1318ad26ff",
+      "size_bytes": 117,
+      "source": "copied-config"
+    },
+    {
+      "git_state": "not-applicable",
+      "path": "copied-config/gsm8k.json",
+      "sha256": "96c27e8430de780e5276d8fda8b556cfdfc29e031548318c4f97114ddd9631bd",
+      "size_bytes": 403,
+      "source": "copied-config"
+    },
+    {
+      "git_state": "not-applicable",
+      "path": "copied-config/proposal.json",
+      "sha256": "46eae32d313c770f95b115777d46922487460182a349905b313cf658d96281ae",
+      "size_bytes": 1139,
+      "source": "copied-config"
+    },
+    {
+      "git_state": "tracked",
+      "path": "pyproject.toml",
+      "sha256": "1ddc3d8d6eb8365e224fbe1ee8a7860b57b3eb8e4cf73d0d37a4d2e5734f2854",
+      "size_bytes": 773,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/__init__.py",
+      "sha256": "06b411b788a47d90de3c58e523d237767bc2e691bebf1b99c9d4abc196e421e3",
+      "size_bytes": 540,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/adapters.py",
+      "sha256": "3e8e193816b447f6627dbe3d6c7c2ab23a3b87e3b8a8286e69b36e5309ac6aa1",
+      "size_bytes": 4102,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/autoresearch.py",
+      "sha256": "e539a6e4a002b41b63ba2c65080fc694444cf247b658f9635004cde4b8492443",
+      "size_bytes": 32019,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/calibration.py",
+      "sha256": "f49799d7a1630d76c639e87617a2efede4e6a822c7948b755c25ca059da04728",
+      "size_bytes": 3108,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "src/parallax/checks.py",
+      "sha256": "a3fce91bfbf2594067d643fce0c6c320231d7d40743de81bd2d2170077fd583f",
+      "size_bytes": 1982,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/cli.py",
+      "sha256": "cd304b5830e317fa64427eaaa4001005ca4305311b3cbac918d31f0cdb0fe8fe",
+      "size_bytes": 3158,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/compiler.py",
+      "sha256": "d5ea0174a612617d012243a73ed09a69e15c417653c46a89d4f269d5d6458957",
+      "size_bytes": 6441,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "src/parallax/evolving_intent.py",
+      "sha256": "5c7b88c17d80d654376bb03e6dc77c65db523749bd564a936fd7c6ad3fb36bdd",
+      "size_bytes": 13705,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/grading.py",
+      "sha256": "fdaf0a5f186703a1ddbc6275f0e92c53c5f243e4bb12f1e9cc164cfd28de4136",
+      "size_bytes": 8717,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "src/parallax/gsm8k.py",
+      "sha256": "e5650aae2f42e920d0854e517471149a25a6d34f54e42d11528b5a6b2a090bae",
+      "size_bytes": 5281,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "src/parallax/ids.py",
+      "sha256": "d0df57bc5582de39d9832a6cba356162bb84c4f6e92af7d56c96b9f040a4f5b1",
+      "size_bytes": 1681,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "src/parallax/kernel.py",
+      "sha256": "9ad888080604398784176c6a8ada646690cb840f6ade24b29979930f2a250cac",
+      "size_bytes": 21265,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/models.py",
+      "sha256": "b0385d62901ef05d30ec4acf226977946bd992d6624d43f21e498a2f1db36259",
+      "size_bytes": 4923,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/patching.py",
+      "sha256": "1ac67b33dfabc627db8f181d92d65254a86e3cb5e58a0933eb814e34bab951e9",
+      "size_bytes": 1751,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "src/parallax/swebench.py",
+      "sha256": "230fecb7ee1b933ba6aa7e6e2a97418a1f0a8c2148a3685412b3b4620a0beb44",
+      "size_bytes": 3477,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "src/parallax/variants.py",
+      "sha256": "757cff173bc38e85fc4bd1d9f6a14c369826d883102aa2546c4294fa31d114c2",
+      "size_bytes": 16483,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "tests/fixtures/synthesis_kernel/experiment.toml",
+      "sha256": "63139ec4513d8d7c4c9308337ba74a1cab406805cb664717ee6b2f1318ad26ff",
+      "size_bytes": 117,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "tests/fixtures/synthesis_kernel/gsm8k.json",
+      "sha256": "96c27e8430de780e5276d8fda8b556cfdfc29e031548318c4f97114ddd9631bd",
+      "size_bytes": 403,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "tests/fixtures/synthesis_kernel/proposal.json",
+      "sha256": "46eae32d313c770f95b115777d46922487460182a349905b313cf658d96281ae",
+      "size_bytes": 1139,
+      "source": "worktree"
+    },
+    {
+      "git_state": "untracked",
+      "path": "tests/test_synthesis_kernel.py",
+      "sha256": "ddb50099f4c78f5729167025609b019dda8d5c59400148ce2704657b66b00912",
+      "size_bytes": 10280,
+      "source": "worktree"
+    },
+    {
+      "git_state": "tracked",
+      "path": "uv.lock",
+      "sha256": "85455ad8186a28544ae86a5648e4b7e1778028f8fd86cb0139a1b8d2d4bf8941",
+      "size_bytes": 735632,
+      "source": "worktree"
+    }
+  ],
+  "format": "verify-parallax.source-manifest.v1",
+  "git_status_pathspecs": [
+    "pyproject.toml",
+    "uv.lock",
+    "README.md",
+    "src/parallax",
+    "tests/test_synthesis_kernel.py",
+    "tests/fixtures/synthesis_kernel",
+    ".cursor/skills/verify-parallax/prove-family-build.sh"
+  ],
+  "git_status_sha256": "b1609ff1b3dde4de1b75617ce00e94efe31e733a8ea737382ff761c7f6769aab",
+  "tracked_diff_basis": "git diff --binary --full-index --no-ext-diff HEAD -- <git_status_pathspecs>",
+  "tracked_diff_sha256": "c1170dcf87ed38cb8f0a44e145a86a4f5e7ea3c1ae172dadfb48d18bac2dc3cc"
+}

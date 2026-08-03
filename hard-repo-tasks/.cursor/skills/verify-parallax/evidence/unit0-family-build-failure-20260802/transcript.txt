@@ -1,0 +1,8 @@
+$ uv sync
+[stdout]
+[stderr]
+/Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/prove-family-build.sh: line 76: uv: command not found
+[exit 127]
+
+[failure evidence preserved] /Users/nikhil/work/hatch/hard-repo-tasks/.cursor/skills/verify-parallax/evidence/unit0-family-build-failure-20260802
+[scratch removed]

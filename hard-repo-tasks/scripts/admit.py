@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 from parallax.compiler import compile_recipe
-from parallax.grading import grade_candidate
+from parallax.grading import TreeSnapshot, grade_candidate
 from parallax.models import Recipe
 from parallax.patching import apply_edits
 
@@ -51,7 +51,8 @@ def main() -> None:
             second = compile_recipe(recipe, args.source, second_root)
             starter = temp_root / f"starter-{index}"
             make_starter(args.source, recipe, starter)
-            no_op = grade_candidate(recipe, starter)
+            baseline = TreeSnapshot.capture(starter, recipe.ignored_paths)
+            starter_grade = grade_candidate(recipe, starter, baseline)
 
             oracle = temp_root / f"oracle-{index}"
             shutil.copytree(starter, oracle)
@@ -60,18 +61,18 @@ def main() -> None:
                 oracle,
                 tuple(edit for edit in recipe.implementation_edits if edit.id in omitted),
             )
-            oracle_grade = grade_candidate(recipe, oracle)
+            oracle_grade = grade_candidate(recipe, oracle, baseline)
 
             restored = temp_root / f"restored-{index}"
             shutil.copytree(starter, restored)
             patch = first_root / first.task_id / "public" / "starter.patch"
             run(["git", "apply", "--reverse", str(patch)], restored)
-            restored_grade = grade_candidate(recipe, restored)
+            restored_grade = grade_candidate(recipe, restored, baseline)
 
             tampered = temp_root / f"tampered-{index}"
             shutil.copytree(oracle, tampered)
             (tampered / "parallax_reward_override.txt").write_text("1.0")
-            tampered_grade = grade_candidate(recipe, tampered)
+            tampered_grade = grade_candidate(recipe, tampered, baseline)
 
             report.append(
                 {
@@ -81,7 +82,7 @@ def main() -> None:
                         first.task_id == second.task_id
                         and first.starter_patch_sha256 == second.starter_patch_sha256
                     ),
-                    "no_op_reward": no_op.reward,
+                    "no_op_reward": starter_grade.reward,
                     "upstream_restore_reward": restored_grade.reward,
                     "oracle_reward": oracle_grade.reward,
                     "forbidden_path_reward": tampered_grade.reward,
