@@ -1,0 +1,18 @@
+FROM --platform=linux/amd64 sweb.env.py.x86_64.01c6e6c71349434a25f883:latest
+
+RUN /opt/miniconda3/bin/python -m pip install --no-cache-dir "hud==0.6.12"
+
+RUN git init /testbed \
+    && git -C /testbed remote add origin https://github.com/django/django.git \
+    && git -C /testbed fetch --depth 1 origin d26b2424437dabeeca94d7900b37d2df4410da0c \
+    && git -C /testbed checkout --detach FETCH_HEAD \
+    && git -C /testbed remote remove origin \
+    && /opt/miniconda3/bin/conda run -n testbed python -m pip install -e /testbed \
+    && git -C /testbed config user.email task@parallax.invalid \
+    && git -C /testbed config user.name "Parallax task"
+
+WORKDIR /app
+COPY env.py /app/env.py
+
+EXPOSE 8765
+CMD ["hud", "serve", "env.py", "--host", "0.0.0.0", "--port", "8765"]

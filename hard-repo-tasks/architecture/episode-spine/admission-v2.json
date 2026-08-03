@@ -1,0 +1,396 @@
+{
+  "summary": {
+    "all_deterministic": true,
+    "all_forbidden_paths_rejected": true,
+    "all_no_op_rejected": true,
+    "all_oracles_pass": true,
+    "all_upstream_restores_rejected": true,
+    "tasks": 12
+  },
+  "tasks": [
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-portable-capture-00",
+      "task_id": "18159c5e8a0b5c068ceb44615661e1882b23439eeee012595b157c6f14d081af",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-adaptive-capture-01",
+      "task_id": "f4a77b1309d66d29d9e85a1a931ed1e518dbd18dd4135bba9048e6281f23b3f8",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-native-safe-capture-02",
+      "task_id": "45088357e2d07bb57cac31ccc19a15f9cecfe02c3ad557adb8654c85fc5d96c7",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-platform-auto-capture-03",
+      "task_id": "3352d837245d767b810cd83b473cabea3d459cb0bdde3f0a23bdeb3c11d75596",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-host-capture-capture-04",
+      "task_id": "e915b2319e6beed47fbc18cef4c3079f1999c093e7d4522c071493d49b225269",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-fd-preferred-capture-05",
+      "task_id": "f5ec7610c9208689d240db34b844e24f940aae760f3177a248709395512affb3",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-cross-platform-capture-06",
+      "task_id": "10243e794ddab6f7812846eb242c8bd487ae4fd44d46f9aa87fdaf35eeefc56f",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-runtime-native-capture-07",
+      "task_id": "9d07e2e7f253d43954ee8ed1a34cc18817da5cf2a149e1a82a2e4318e753ace8",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-best-available-capture-08",
+      "task_id": "cbf6114b3e964537e608d0f403f085937e28ecd9d3c7bf04cb8a44b7e5cb8c3c",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-system-adaptive-capture-09",
+      "task_id": "f23a1e400d0935d3cf915b2728014234451e5e8ec9c33056a20249e6d0cbbedc",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-native-or-sys-capture-10",
+      "task_id": "7dff2a8be6e7ea5f53f00dc37436bb09ac0e5ced089762ef204782560c9f588c",
+      "upstream_restore_reward": 0.0
+    },
+    {
+      "deterministic": true,
+      "forbidden_path_reward": 0.0,
+      "no_op_reward": 0.0,
+      "oracle_changed_paths": [
+        "src/click/testing.py"
+      ],
+      "oracle_components": [
+        {
+          "category": "regression",
+          "name": "existing-capture-regression",
+          "value": 1.0,
+          "weight": 0.2
+        },
+        {
+          "category": "counterfactual",
+          "name": "counterfactual-native-capture",
+          "value": 1.0,
+          "weight": 0.6
+        },
+        {
+          "category": "adversarial",
+          "name": "near-match-rejected",
+          "value": 1.0,
+          "weight": 0.2
+        }
+      ],
+      "oracle_reward": 1.0,
+      "recipe": "click-portable-fd-capture-11",
+      "task_id": "e55efa13fc74656dceac569f47e831d47910c83df2265bc5a5208899ab29f53d",
+      "upstream_restore_reward": 0.0
+    }
+  ]
+}

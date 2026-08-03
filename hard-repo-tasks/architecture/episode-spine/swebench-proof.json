@@ -1,0 +1,22 @@
+{
+  "dataset": "SWE-bench/SWE-bench_Lite",
+  "dataset_revision": "69611d31007e1c6731db8bd5b5c3f2d33f5bab6e",
+  "elapsed_seconds": 846.939,
+  "error_instances": 0,
+  "harness_revision": "f7bbbb2ccdf479001d6467c9e34af59e44a840f9",
+  "instance_id": "django__django-11099",
+  "namespace": "",
+  "patch_successfully_applied": true,
+  "predictions": "gold",
+  "resolved": true,
+  "tests": {
+    "fail_to_pass": {
+      "failed": 0,
+      "passed": 3
+    },
+    "pass_to_pass": {
+      "failed": 0,
+      "passed": 19
+    }
+  }
+}

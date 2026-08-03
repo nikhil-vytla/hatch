@@ -107,6 +107,9 @@ Intellect Verifiers.
     12 attempted runs.
   - Fully hosted submission returned "No registry found" for two smoke runs,
     even though the image deployment succeeded.
+  - Later investigation showed the deployed registry key was `parallax-repo`
+    while those tasks used `parallax_repo`; the same deploy-normalization
+    mismatch reproduced and explained the Episode Spine 404.
 - Tightened local prompt/workspace guidance and ran serial calibration:
   - GPT-5.6 Sol passed the semantic contract in 4/4 audited completed runs.
     Three scored 1. The fourth scored 0 only because it added focused tests.
@@ -228,3 +231,183 @@ Intellect Verifiers.
     verifier transformation, runtime execution, and grading are still missing.
   - Final validation after these additions: 13 tests passed, Ruff passed, and
     all 25 knowledge notes remained valid.
+
+## 2026-07-31 goal correction
+
+- Restated the project objective as one task-synthesis system: derive novel
+  and/or empirically hard tasks and task variants from existing codebases and
+  benchmarks.
+- Counterfactual repository contracts and Evolving Intent are generator
+  families inside that system. Evolving Intent is not a separate research goal
+  whose replication must finish before Parallax can proceed.
+- Every generated family must declare which claim it supports:
+  - semantic novelty changes the required behavior or solution;
+  - interaction novelty changes the trajectory to the terminal task;
+  - empirical hardness is a measured model-performance effect;
+  - validity means the verifier still measures the declared terminal objective.
+- The next meaningful Evolving Intent milestone is to ingest SWE-bench Verified
+  tasks, generate static, matched no-change, and evolved-intent conditions, and
+  reuse each task's native verifier under a fixed model, harness, runtime, and
+  budget.
+- Static versus evolved alone is not a valid causal contrast. The matched
+  no-change condition controls for conversation length and model-call count.
+- For stateful coding tasks, obsolete intents must not leave uncontrolled
+  repository mutations. The first implementation should keep precursor turns
+  read-only and enable writes only after the terminal anchor intent, or provide
+  explicit reset and episode-level verification.
+- The current pieces remain disconnected: repository compilation works for one
+  Click family, typed variant planning works, and the multi-turn measurement
+  loop works on synthetic arithmetic and lookup tasks. No end-to-end pipeline
+  yet turns a repository or benchmark source task into an admitted, calibrated
+  family across these generator types.
+- Inspected the Evolving Intent SWE implementation at pinned commit
+  `993d6be9597ac03854b46362ccd647eb1bfd267a` rather than inferring its state
+  policy from the paper summary.
+  - Its construction pipeline extracts the target function and arguments,
+    creates category-aware argument counterfactuals, generates a repository
+    orientation precursor, and generates an implementation-planning precursor.
+  - The intended three-function chain is G1 orientation, G2 implementation
+    planning, and G3 the original SWE-bench bug fix.
+  - One mini-SWE-agent and one container persist across turns. When the agent
+    submits or exhausts its per-turn step budget, the runner injects the next
+    user turn and continues with the same conversation and repository state.
+  - Only the final patch is graded by the official SWE-bench harness. The
+    native verifier therefore establishes terminal resolution, not the
+    correctness or safety of intermediate actions.
+  - Failures in the evolved condition combine intent tracking with the burden
+    of retaining or undoing prior edits. This is a valid persistent-workspace
+    task claim, but it must not be described as pure conversational forgetting.
+  - The public repository fixes a 50-instance evaluation subset but does not
+    include the exact generated conversations or paper result files.
+
+## 2026-07-31 architecture decision
+
+- Ran four independent architecture sketches and a cross-judge after grounding
+  the design in HUD 0.6.12, mini-swe-agent 2.4.6, Microsoft Evolving Intent,
+  the official SWE-bench harness, and Prime Verifiers v1.
+- Selected one content-addressed episode spine to replace the three peer task
+  models. Repository recipes, symbolic variants, and conversations become
+  source or generator inputs to one task specification, admission certificate,
+  runtime projection, and reward authority.
+- HUD `Chat` is restricted to stateless tasks. Stateful coding episodes use one
+  custom HUD `Agent`, one `Run`, one workspace, and one mini-swe-agent
+  conversation. Submission or per-turn budget exhaustion reveals the next
+  scheduled intent; global cost exhaustion terminates the episode.
+- The task template must return the real sealed verifier reward during the HUD
+  rollout. Post-hoc grading cannot supply GRPO training rewards.
+- A turn-director capability must be registered during environment
+  initialization. Adding it from the task template is too late because HUD has
+  already negotiated the capability manifest.
+- Skills may author source adapters and backend projections offline. Their
+  output is compiled hermetically, fixture-tested, content-addressed, and
+  admitted. Skills cannot define identity, reward programs, admission policy,
+  or runtime turn transitions.
+- Implemented two architecture spikes under
+  `architecture/episode-spine/spikes`:
+  - a pre-registered FastMCP director revealed task-scoped future turns without
+    placing them in the opening prompt;
+  - mini-swe-agent 2.4.6 `DefaultAgent.step()` executed through a synchronous
+    adapter backed by HUD's asynchronous SSH client, including two concurrent
+    worker-thread calls.
+- The combined spike passed in 1.49 seconds with HUD telemetry disabled.
+  Docker concurrency, `hud deploy`, and synchronous official SWE-bench grading
+  remain the next environment-level proofs.
+
+## 2026-08-01 first Episode Spine migration unit
+
+- Implemented canonical public and sealed commitments for task identity,
+  immutable baseline snapshots, typed grading outcomes, explicit primary and
+  hard-gate reward semantics, scrubbed verifier environments, and mandatory
+  success markers.
+- The adversarial reward suite and complete local suite pass: 47 tests.
+- Re-admitted 12 generated Click tasks against the pinned upstream revision.
+  All oracles passed deterministically; no-op, forbidden-path, and
+  upstream-restore submissions were rejected. The result is recorded at
+  `architecture/episode-spine/admission-v2.json`.
+- The next proof sequence was a persistent synthetic Docker episode through the
+  director and mini-swe bridge, one local official SWE-bench instance, and
+  finally `hud deploy`.
+- Completed that sequence:
+  - the three-turn Docker episode retained one mini-swe-agent conversation and
+    accumulated workspace state before receiving reward 1;
+  - the pinned official SWE-bench harness resolved `django__django-11099`
+    from its gold patch with 3/3 fail-to-pass and 19/19 pass-to-pass tests;
+  - HUD remotely built, introspected, and published
+    `parallax_episode_spine` version 1.
+- Corrected the post-deploy diagnosis. HUD 0.6.12 is the latest v6 release and
+  its runtime endpoint is live. The 404 came from deploy normalizing
+  `parallax_episode_spine` to `parallax-episode-spine` while `HUDRuntime` sent
+  the task name verbatim.
+- A normalized-name diagnostic then returned 409 because telemetry was
+  disabled and the tunnel could not authorize against a platform-visible
+  trace. Renamed the environment canonically, retained telemetry for hosted
+  runs, deployed version 2, and passed the unmodified hosted canary with
+  reward 1 in 43.84 seconds.
+
+## 2026-08-02 decision-trail audit
+
+- Cross-model review found that the hardened `TreeSnapshot` grader is not wired
+  into either HUD prototype. The SWE episode still gates scope with
+  `git diff --name-only`, which misses untracked and ignored files. Reward
+  integrity for the prototype remains open.
+- Read-only SWE precursors are prompt instructions, not runtime enforcement.
+  The real-model calibration therefore mixes intent tracking with voluntary
+  compliance and cannot establish the staged-state-policy claim.
+- The official harness proof and episode calibration are separate. The proof
+  used SWE-bench Lite's pinned harness and classified 3 fail-to-pass plus 19
+  pass-to-pass tests. The episode grader runs the same focused Django test
+  command and sealed patch but does not invoke the complete harness parser.
+- Qwen3 8B made no tracked changes in any arm and received invalid-submission
+  zeros. That is insufficient evidence that the task discriminates model
+  capability; the only supported conclusion is zero matched-to-evolved
+  degradation in this six-run smoke test.
+- The hosted v2 canary exercised only the synthetic persistent-write task. The
+  SWE-bench environment remained local because its Dockerfile depends on a
+  non-public cached harness base image.
+- Static calibration allowed at most 12 agent steps, while matched and evolved
+  allowed up to 12 steps per turn. Matched and evolved remain paired controls,
+  but static is not budget-equivalent to either multi-turn arm.
+- The table-last cycle was archived without further model calls after local
+  review showed the answer was shortcut-solvable from the final table row. Its
+  campaign fixture remains, but it produced no accepted evaluation evidence.
+- Several historical decision rows point to mutable receipts or test sources
+  rather than immutable run receipts. The claims were checked against this
+  transcript and surviving artifacts, but future runs should publish
+  machine-readable receipts beside the decision they support.
+
+## 2026-08-01 first real SWE-bench episode
+- Added a content-addressed SWE-bench adapter and a local HUD environment for
+  `django__django-11099` with static, matched-no-change, and evolved schedules.
+  All schedules share the pinned source and sealed official verifier.
+- The gold semantic edit passed all three arms and no-op failed. The complete
+  local unit suite now passes 50 tests.
+- Initial GPT-5.6 Sol runs exposed another false-zero policy: all arms fixed the
+  source and added focused tests, but the scope gate forbade that test path.
+  Since grading restores the official test file and applies a sealed patch,
+  focused agent tests cannot affect reward and are now allowed.
+- Corrected calibration produced GPT-5.6 Sol rewards `[1, 1, 1]` and Qwen3 8B
+  rewards `[0, 0, 0]` across static, matched, and evolved arms. The aggregate
+  mean is 0.5, but each model is internally saturated and the paired evolving
+  effect is zero. This validates the path, not the hardness claim.
+- The benchmark Dockerfile currently depends on the official harness's local
+  cached `sweb.env` base, which is not publicly pullable. Hosted deployment
+  requires a self-contained public-base build before broader calibration.
+
+## 2026-08-01 synthesis kernel vertical slice
+
+- Implemented the accepted immutable lifecycle from pinned GSM8K source through
+  frozen proposal, closed synthesis plan, rendered task, atomic family
+  admission, runtime projection, and typed verdict.
+- Static, matched no-change, and evolved arms share source and verifier
+  commitments. Evolved plans replay typed reveal, revise, and switch events and
+  must terminate at the exact source-copied question.
+- Public and sealed payloads use the existing canonical identity helpers.
+  Public artifacts expose only the opening turn and safe metadata; future turns
+  and answer authority remain sealed.
+- Added deterministic `parallax build` and `--locked` paths. A direct build and
+  locked replay produced byte-identical files for family
+  `5ebc593aee75327d17e2a9d01c2e8f86752566990c7eafeaee5c2dcb55469cf7`.
+- `ConversationRun` now executes synchronous or asynchronous caller callbacks.
+  Workspace and checkpoint runtimes remain typed non-executing placeholders.
+- Verification passed with 15 focused tests, 65 complete-suite tests, and Ruff
+  on every Phase D Python file. No provider, deployment, or dataset calls ran.

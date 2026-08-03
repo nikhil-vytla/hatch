@@ -1,0 +1,54 @@
+{
+  "arms": {
+    "evolved": {
+      "mean_reward": 0.5,
+      "runs": 2
+    },
+    "matched": {
+      "mean_reward": 0.5,
+      "runs": 2
+    },
+    "static": {
+      "mean_reward": 0.5,
+      "runs": 2
+    }
+  },
+  "current_interpretation": {
+    "evidence": [
+      "architecture/episode-spine/swebench-calibration.jsonl",
+      "architecture/episode-spine/swebench-calibration-qwen3-8b.jsonl",
+      "autoresearch/decisions.tsv"
+    ],
+    "status": "inconclusive",
+    "supported": "The six raw rows show no matched-to-evolved reward difference within either sampled model.",
+    "why_inconclusive": [
+      "GPT-5.6 Sol was at ceiling with one run per arm.",
+      "Qwen3 8B made no tracked changes and produced invalid submissions with one run per arm.",
+      "Static allowed at most 12 agent steps, while matched and evolved allowed up to 12 steps per turn, so static is not budget-equivalent to the multi-turn arms."
+    ]
+  },
+  "historical_conclusion": {
+    "original": {
+      "benchmark_discrimination": "The task separates the two sampled model capabilities.",
+      "intent_effect": "No matched-to-evolved degradation is measurable at this sample size.",
+      "saturation": "Each sampled model is saturated within-model: GPT-5.6 Sol passed every arm and Qwen3 8B failed every arm.",
+      "scale_decision": "Do not use this single canary to claim evolving-intent hardness; add harder instances, models near the decision boundary, and repetitions."
+    },
+    "status": "superseded by the raw Qwen rows and append-only corrections in decisions.tsv"
+  },
+  "instance_id": "django__django-11099",
+  "models": {
+    "Qwen/Qwen3-8B": {
+      "evolved": 0.0,
+      "matched": 0.0,
+      "static": 0.0
+    },
+    "gpt-5.6-sol": {
+      "evolved": 1.0,
+      "matched": 1.0,
+      "static": 1.0
+    }
+  },
+  "overall_mean_reward": 0.5,
+  "runs": 6
+}

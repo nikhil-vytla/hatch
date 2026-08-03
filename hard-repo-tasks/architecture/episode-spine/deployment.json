@@ -1,0 +1,20 @@
+{
+  "deployed": true,
+  "environment": "parallax-episode-spine",
+  "environment_id": "ad29e1f1-a035-4b6c-98e1-9f035b5e6e16",
+  "hosted_canary": {
+    "endpoint": "https://mcp.beta.hud.ai/runtime/sessions",
+    "elapsed_seconds": 43.84,
+    "launched": true,
+    "reward": 1.0
+  },
+  "image_digest": "sha256:2f2e67d6b5332a71ea3eb1f4b7e8e22e60fc7994ce6f3de0546877489fb0e1e0",
+  "introspection": {
+    "capabilities": 3,
+    "control_channel": "v6",
+    "tasks": 1
+  },
+  "sdk_version": "0.6.12",
+  "url": "https://hud.ai/environments/ad29e1f1-a035-4b6c-98e1-9f035b5e6e16",
+  "version": 2
+}
