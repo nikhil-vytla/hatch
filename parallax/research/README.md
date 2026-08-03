@@ -15,3 +15,7 @@ be recreated on `main`.
 - [`slopcodebench-method/`](slopcodebench-method/README.md) — design of the
   checkpoint-evolution synthesis method behind
   [`../docs/methods/checkpoint-evolution.md`](../docs/methods/checkpoint-evolution.md).
+- [`spec-translation/`](spec-translation/README.md) — research and design of
+  the minimal spec layer that compiles Parallax task/environment
+  specifications to RL platforms (HUD, `verifiers`) with structural sealing
+  and a cross-platform conformance check.
