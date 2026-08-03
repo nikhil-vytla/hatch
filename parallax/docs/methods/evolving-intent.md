@@ -119,13 +119,50 @@ These are semantic contracts. They do not require provider-text or byte parity
 with the consulted repository.
 
 > [!NOTE]
-> No executable Evolving Intent implementation or behavioral regression suite
-> exists in the repository yet.
+> The executable GSM8K slice covers extraction, argument counterfactuals,
+> predecessor fallback, typed trajectory construction, seeded dependency
+> scheduling, rendering, terminal restoration, matched budgets, native grading,
+> deterministic run evidence, and paired reporting.
 
-> **TODO:** Add behavioral tests for extraction and argument expansion;
-> predecessor and fallback behavior; trajectory construction; partial-order
-> scheduling; rendering; terminal source restoration; matched budgets and
-> verifier authority; overlays; and every documented implementation deviation.
+## GSM8K slice choices
+
+The slice makes the following choices where the paper and reference leave room
+for an implementation:
+
+- Construction uses one synchronous `Chat` callable. Every stage returns one
+  strict JSON object parsed into a frozen model with unknown fields forbidden.
+  The primary predecessor generator gets two attempts, then an optional
+  fallback generator gets one attempt.
+- The slice generates one accepted counterfactual for every extracted
+  argument. It retains every accepted and rejected output with the model label
+  and acceptance reason.
+- The first vertical slice uses one immediate predecessor function. Each reveal,
+  revision, and switch occupies one turn. A seeded randomized topological sort
+  orders ready events. The switch back to the source function depends on every
+  reveal, while a correction may follow that switch. Terminal restoration is
+  exact final-state equality, not a rule about the last event type. Events carry
+  explicit `reveal`, `revise`, or `switch` discriminator values in evidence.
+- The matched intervention is a turn-count-and-budget-matched progressive
+  source reveal. It keeps the source function and source argument values for
+  the whole conversation. Extra turns restate continuity without adding a
+  revision or function switch.
+- Static uses the same extracted intent as the other arms and renders its
+  function and all source arguments in one turn. The raw source question is
+  never rendered. Static's total declared output-token budget equals the
+  matched and evolved totals. Matched and evolved also have identical per-turn
+  budgets.
+- GSM8K grading accepts canonical integers only. The final model marker is
+  `FINAL_ANSWER: <integer>` on the final non-empty line. Source authority uses
+  the final `#### <integer>` line. Source authority is validated and branded
+  when `Problem` is created; grading trusts that proof and validates only the
+  model submission.
+- Parallax preregisters expected source-trial units before execution. The paired
+  report averages trial bounds within each source, then averages across source
+  clusters. Recorded run failures produce worst-case identification bounds.
+  A closed-form Hoeffding term supplies the deterministic 95% interval.
+
+These choices preserve semantic fidelity without claiming provider-text parity
+with the consulted implementation.
 
 ## Interpretation and limits
 
@@ -136,11 +173,15 @@ interpretation.
 > Every intentional difference from the consulted implementation requires an
 > explicit rationale and behavioral regression coverage.
 
-Two details may affect adapters. BIRD-SQL construction uses global
-shuffling, multiple workers, and completion-order collection, so a seed alone
-does not define output order. The consulted SWE overlay strips symptom
-arguments before scheduling and reinserts them later; its final category sort
-can place symptoms after recognized categories.
+Upstream seed reproducibility is limited across benchmarks. GSM8K extraction
+and counterfactual pools use worker-completion order, and its predecessor
+generator creates an unseeded `random.Random()` instance. BIRD-SQL also uses
+global shuffling and completion-order collection. Parallax's deterministic
+local scheduler is a deliberate scientific choice, not upstream parity.
+
+The consulted SWE overlay strips symptom arguments before scheduling and
+reinserts them later. Its final category sort can place symptoms after
+recognized categories.
 
 The upstream generated pools and provider transcripts are not published in the
 repository. Parallax therefore makes no claim of byte-identical dataset
