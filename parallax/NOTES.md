@@ -268,3 +268,73 @@
   The Slice 2 gauntlet kills all 17 active boundary mutants, covering provider
   strictness, source pins, sealed-prompt exclusion, overlay ordering,
   restoration, equal budgets, official image selection, and spend controls.
+
+## Screening safety audit
+
+- An adversarial review correctly found that the rendered single-container HUD
+  bundle is not sealed: `/app/instance.json` contains the test patch, test IDs,
+  and command and is readable by an agent with shell access.
+- Its embedded grader is not the official SWE-bench verifier. It checks only
+  process exit zero, does not parse named FAIL_TO_PASS/PASS_TO_PASS statuses,
+  misses untracked candidate files, and mishandles tests added by the patch.
+  The earlier environment claims above describe intended behavior, not an
+  admitted measurement path.
+- Paid screening was stopped before any request. Secure evaluator isolation,
+  official harness grading, and digests binding scripts/environment/provider
+  settings remain blockers.
+- The no-spend branch adds an eager HUD credential adapter, revision-bound
+  dataset rows, typed verifier failures, a $5 default cap, manifest-first
+  execution, per-unit atomic receipts, resumability, and usage/cost fields.
+- A scripted transport dry run made zero network and paid calls. Certification
+  passes 102 tests normally and under `python -O`, Ruff, `ty`, build, the
+  28-case core mutation suite, and the 30-case adapted Slice 2 audit suite.
+- Consolidated review fixes keep request models closed while allowing
+  unconsumed real-provider response fields, classify output truncation as a
+  budget fault, bind dataset rows to the requested revision, validate published
+  IDs before query construction, and reject truncated cells.
+- Screening evidence now uses an exclusive partial file with append-and-fsync
+  per unit, resume identity checks, no final-file overwrite, recorded provider
+  model/usage/cost, and cumulative observed-cost checks.
+- Report validation closes the retained-script arm-digest chain. The unsafe
+  embedded-verifier renderer fails closed unless explicitly enabled for offline
+  inspection.
+
+## Screening boundary revision
+
+- Investigated HUD v6 before selecting an isolation design. Its native
+  `Workspace` serves agent shell operations through a `bubblewrap` namespace;
+  the SDK's coding-agent pattern keeps authoritative checks outside that
+  workspace. SDK 0.6.12 does not mount `/app` by default and supports a
+  fail-closed UID drop.
+- Replaced the unsafe embedded grader rather than extending it. The HUD image
+  now contains public config only, requires/probes the namespace and UID wall,
+  and exports a candidate patch. The evaluator alone holds the sealed dataset
+  row and runs `swebench.harness.run_evaluation` at the pinned revision against
+  the digest-pinned official image.
+- Deleted the custom restore path and `test_command` authority. A temporary Git
+  index plus `git add -A` captures modified, deleted, and untracked files. The
+  official harness report is authoritative, with exact test-set coverage as a
+  cross-check.
+- Moved the environment implementation from an embedded source string to
+  importable `swebench_runtime.py`; generated `env.py` imports it. Extracted
+  `canonical.py` and `outcome.py` leaves so canonical evidence and outcome
+  unions no longer belong to the GSM8K runner.
+- Screening persists the manifest before execution, each completed unit with
+  fsync, and each paid HUD episode before official grading. Receipts include
+  provider-reported model, usage, conservative cost, official report digest,
+  harness revision, and image digest.
+- Reports expose minimum-detectable-effect and power. Designs above the
+  declared MDE tolerance remain inconclusive/underpowered instead of emitting
+  advance or reject.
+- Added the pinned HUD runtime dependency and reproducible test/lint
+  development dependencies. HUD is isolated in `/opt/hud-venv` in generated
+  images; its transitive wheels are still resolved at image-build time, a
+  residual agent-runtime reproducibility limitation that cannot alter the
+  separate official grader.
+- Offline certification reached 106 tests. The adapted mutation suite killed
+  34/34 mutants, including official coverage, untracked patch export,
+  public-only environments, and small-n power gates.
+- Resolved immutable Docker Hub manifests for five preregistered instances.
+  HUD model discovery authenticated, but the first Claude Haiku 4.5
+  construction request returned HTTP 403 before any response. The stop rule
+  terminated screening at zero recorded tokens and $0 estimated spend.

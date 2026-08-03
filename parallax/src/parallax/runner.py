@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import hashlib
-import json
-import os
-import tempfile
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Annotated, Literal, Self, TypeAlias
 
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError, model_validator
+from pydantic import Field, TypeAdapter, ValidationError, model_validator
 
+from .canonical import atomic_write, canonical_bytes, canonical_digest
 from .evolving_intent import (
     Arm,
     Chat,
@@ -21,7 +18,8 @@ from .evolving_intent import (
     ScriptFamily,
     Turn,
 )
-from .gsm8k import Verification, grade
+from .gsm8k import grade
+from .outcome import BudgetError, Outcome, RunFailure
 from .types import (
     ArmConfigDigest,
     ConstructionSeed,
@@ -35,27 +33,9 @@ from .types import (
     TrialSeed,
 )
 
-FailureKind: TypeAlias = Literal["agent", "budget", "verifier"]
 ARMS: tuple[Arm, Arm, Arm] = ("static", "matched", "evolved")
 Threshold = Annotated[float, Field(ge=-1, le=1, allow_inf_nan=False)]
 _THRESHOLD = TypeAdapter(Threshold)
-
-
-class BudgetError(RuntimeError):
-    pass
-
-
-class RunFailure(StrictModel):
-    kind: Literal["run_failure"] = "run_failure"
-    failure_kind: FailureKind
-    error_type: str
-    message: str
-
-
-Outcome: TypeAlias = Annotated[
-    Verification | RunFailure,
-    Field(discriminator="kind"),
-]
 
 
 class RunIdentity(StrictModel):
@@ -205,39 +185,6 @@ EvidenceRecord: TypeAlias = Annotated[
 _EVIDENCE = TypeAdapter(EvidenceRecord)
 
 
-def _jsonable(value: object) -> object:
-    return value.model_dump(mode="json") if isinstance(value, BaseModel) else value
-
-
-def _canonical(value: object) -> bytes:
-    return json.dumps(
-        _jsonable(value),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode()
-
-
-def canonical_digest(value: object) -> str:
-    return hashlib.sha256(_canonical(value)).hexdigest()
-
-
-def atomic_write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile("wb", dir=path.parent, delete=False) as output:
-            temporary = output.name
-            output.write(data)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, path)
-    finally:
-        if temporary is not None and os.path.exists(temporary):
-            os.unlink(temporary)
-
-
 def _source_digest(family: ScriptFamily) -> SourceDigest:
     digest = canonical_digest(family.static.problem)
     return SourceDigest(digest)
@@ -245,7 +192,9 @@ def _source_digest(family: ScriptFamily) -> SourceDigest:
 
 def _arm_digest(source_id: SourceId, script: Script) -> ArmConfigDigest:
     record = ScriptRecord.from_script(script)
-    digest = canonical_digest({"source_id": source_id, "script": _jsonable(record)})
+    digest = canonical_digest(
+        {"source_id": source_id, "script": record.model_dump(mode="json")}
+    )
     return ArmConfigDigest(digest)
 
 
@@ -288,8 +237,8 @@ def _build_manifest(
         "schema_version": 1,
         "threshold": valid_threshold,
         "model_config_digest": model_digest,
-        "units": [_jsonable(unit) for unit in units],
-        "arm_config_digests": [_jsonable(item) for item in arm_digests],
+        "units": [unit.model_dump(mode="json") for unit in units],
+        "arm_config_digests": [item.model_dump(mode="json") for item in arm_digests],
     }
     return ManifestRecord(
         threshold=valid_threshold,
@@ -466,7 +415,7 @@ def run_experiment(
                 )
             results.append(result)
             records.append(RunRecord.from_result(result))
-    data = b"".join(_canonical(record) + b"\n" for record in records)
+    data = b"".join(canonical_bytes(record) + b"\n" for record in records)
     atomic_write(output_path, data)
     return tuple(results)
 

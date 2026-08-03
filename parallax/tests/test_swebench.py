@@ -59,10 +59,7 @@ def row() -> dict[str, object]:
 
 
 def runtime() -> VerifierRuntime:
-    return VerifierRuntime(
-        image_digest=ImageDigest("a" * 64),
-        test_command=("pytest", "-q", "astropy/table/tests/test_mixin.py"),
-    )
+    return VerifierRuntime(image_digest=ImageDigest("a" * 64))
 
 
 def construction() -> SweConstruction:
@@ -143,6 +140,7 @@ def test_fetch_checks_revision_before_and_after_rows() -> None:
         calls += 1
         if "datasets-server" not in url:
             return json.dumps({"sha": SWE_BENCH_REVISION}).encode()
+        assert f"revision={SWE_BENCH_REVISION}" in url
         return json.dumps(
             {
                 "features": [
@@ -193,6 +191,43 @@ def test_fetch_rejects_dataset_revision_drift_before_rows() -> None:
     assert calls == 1
 
 
+def test_fetch_validates_ids_before_remote_query() -> None:
+    with pytest.raises(SweBenchError, match="published set"):
+        fetch_swebench_verified(
+            ("not__published-1",),
+            runtimes={},
+            fetch=lambda url: pytest.fail(f"unexpected fetch: {url}"),
+        )
+
+
+def test_fetch_rejects_truncated_dataset_cells() -> None:
+    def fetch(url: str) -> bytes:
+        if "datasets-server" not in url:
+            return json.dumps({"sha": SWE_BENCH_REVISION}).encode()
+        return json.dumps(
+            {
+                "features": [],
+                "rows": [
+                    {
+                        "row_idx": 2,
+                        "row": row(),
+                        "truncated_cells": ["test_patch"],
+                    }
+                ],
+                "num_rows_total": 1,
+                "num_rows_per_page": 100,
+                "partial": False,
+            }
+        ).encode()
+
+    with pytest.raises(SweBenchError, match="truncated dataset cells"):
+        fetch_swebench_verified(
+            (INSTANCE_ID,),
+            runtimes={INSTANCE_ID: runtime()},
+            fetch=fetch,
+        )
+
+
 def test_loader_rejects_non_array_test_lists() -> None:
     invalid = {**row(), "FAIL_TO_PASS": '"not-an-array"'}
 
@@ -226,6 +261,43 @@ def test_constructor_prompt_excludes_all_sealed_material() -> None:
     )
 
     assert evidence.construction == construction()
+
+
+def test_constructor_accepts_exact_json_code_fence() -> None:
+    problem = load_swebench_rows(
+        (row(),),
+        (INSTANCE_ID,),
+        runtimes={INSTANCE_ID: runtime()},
+    )[0]
+    output = f"```json\n{construction().model_dump_json()}\n```"
+
+    evidence = construct_swe_intent(
+        problem,
+        lambda messages, budget: output,
+        model="scripted-constructor",
+    )
+
+    assert evidence.construction == construction()
+    assert evidence.output == output
+
+
+def test_constructor_normalizes_json_scalar_argument_values() -> None:
+    problem = load_swebench_rows(
+        (row(),),
+        (INSTANCE_ID,),
+        runtimes={INSTANCE_ID: runtime()},
+    )[0]
+    payload = construction().model_dump(mode="json")
+    payload["source"]["arguments"][0]["value"] = True
+    output = json.dumps(payload)
+
+    evidence = construct_swe_intent(
+        problem,
+        lambda messages, budget: output,
+        model="scripted-constructor",
+    )
+
+    assert evidence.construction.source.arguments[0].value == "true"
 
 
 def test_swe_overlay_reinjects_symptoms_and_restores_source() -> None:

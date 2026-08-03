@@ -7,8 +7,15 @@ implementations and experiments. It is a specification, not a theorem.
 The SWE-bench Verified scaffold instantiates \(x_{\mathrm{pub}}\) as the issue,
 repository, base commit, and pinned dataset identity. Its
 \(x_{\mathrm{seal}}\) contains the official image digest, test patch,
-FAIL_TO_PASS and PASS_TO_PASS tests, harness revision, and test command. The
-dataset gold patch is discarded at ingestion.
+FAIL_TO_PASS and PASS_TO_PASS tests, and harness revision. The dataset gold
+patch is discarded at ingestion.
+
+The generated HUD image contains only \(x_{\mathrm{pub}}\). It exports the
+agent's candidate patch to an evaluator process, which supplies
+\(x_{\mathrm{seal}}\) to the pinned official SWE-bench harness in a separate
+official image. A `bubblewrap` Workspace and UID wall restrict the agent shell,
+but verifier secrecy does not depend on that wall because sealed fields are
+absent from the agent image.
 
 ## Task and environment
 
@@ -129,11 +136,11 @@ requirement.
 > event, outcome, and evidence-record variants explicit. The manifest fixes
 > expected source-trial units, seeds, model configuration, arm configuration,
 > and the decision threshold before outcomes are aggregated. The slice does
-> not claim to implement the full abstract task and environment specifications
-> defined above.
-
-> **TODO:** Generalize only after another research journey demonstrates which
-> task and environment fields need a shared executable representation.
+> The SWE-bench slice adds versioned `TaskSpecV1` and `EnvSpecV1` models.
+> `TaskSpecV1` makes the public and sealed authority branches structural.
+> `compile_hud` creates agent artifacts only from the public branch and emits
+> evaluator artifacts separately. This is one narrow executable target, not a
+> general platform compiler framework.
 
 **Estimand.** For outcome \(Y\), a basic matched-arm effect is
 

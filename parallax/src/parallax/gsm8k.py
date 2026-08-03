@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import re
-from enum import Enum
 from pathlib import Path
-from typing import Literal
 
 from pydantic import ValidationError, field_validator
 
+from .outcome import Verdict, Verification
 from .types import CanonicalInteger, SourceAnswer, SourceId, StrictModel
 
 SOURCE_MARKER = "#### "
@@ -56,18 +55,6 @@ class _Gsm8kRow(StrictModel):
     @classmethod
     def source_answer(cls, value: object) -> SourceAnswer:
         return parse_source_answer(value)
-
-
-class Verdict(str, Enum):
-    PASS = "pass"
-    WRONG = "wrong"
-    INVALID = "invalid"
-
-
-class Verification(StrictModel):
-    kind: Literal["verification"] = "verification"
-    verdict: Verdict
-    reason: str
 
 
 def validate_answer(value: object) -> CanonicalInteger:

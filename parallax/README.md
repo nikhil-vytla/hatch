@@ -47,21 +47,36 @@ The second slice adds an offline-ready SWE-bench Verified path:
 1. `provider.py` defines strict OpenAI-compatible request and response models.
    One direct HTTP client serves text-only construction calls and tool-call
    agent requests. Credentials come from a named environment variable and
-   never enter serialized requests.
+   never enter serialized requests. Response-side models tolerate unconsumed
+   provider fields while validating every field Parallax reads.
 2. `swebench.py` pins the Verified dataset revision and the paper's 50
    published evaluation IDs. It discards the gold patch, separates the public
    issue from the sealed official verifier, builds budget-equal arms, and
    records the pinned SWE symptom-overlay transformation.
-3. `swebench_env.py` renders deterministic `instance.json`, `env.py`, and
-   `Dockerfile.hud` files. Generated images use digest-pinned official
-   `swebench/sweb.eval` bases and one total agent-step budget per episode.
-4. `screening.py` preregisters boundary-model screening units and canonical
-   outcomes. It refuses unapproved execution and stops any plan whose upper
-   estimate exceeds $20.
+3. `specs.py` freezes each family into versioned `TaskSpecV1` and `EnvSpecV1`
+   models. `hud_compile.py` creates agent artifacts only from `PublicTaskV1`.
+   It tags every output by audience, scans the agent build context for sealed
+   fragments, and records artifact digests.
+4. `swebench_runtime.py` runs the agent in a probed HUD `bubblewrap` Workspace
+   and exports a candidate patch that includes untracked files. The evaluator
+   reloads its separate compiled artifact before grading.
+5. `swebench_harness.py` runs the pinned official SWE-bench harness
+   evaluator-side against the digest-pinned official image. The harness verdict
+   is authoritative; report coverage is checked against the committed
+   FAIL_TO_PASS and PASS_TO_PASS sets.
+6. `screening.py` preregisters boundary-model screening units and canonical
+   outcomes before execution, appends and fsyncs each unit to a resumable
+   partial file, records provider model/usage and estimated cost, refuses to
+   overwrite completed evidence, defaults to a $5 upper cap, and withholds a
+   decision while the design's minimum-detectable-effect is too large.
 
-These components have scripted offline coverage only. No provider request,
-official image pull, HUD deployment, or paid screening episode has run from
-this slice.
+The preregistered HUD screening completed five SWE-bench instances with two
+static Claude Opus 4.8 trials each. Both Django instances passed 2/2; Astropy,
+Matplotlib, and Requests passed 0/2. The design is underpowered and makes no
+advance/reject decision. Known metered spend was $1.669650, with a conservative
+$2.147440 all-in bound for unmetered construction failures under the $5 cap.
+Candidate patches were graded from a pinned SWE-bench source checkout after its
+wheel omitted a required harness fixture.
 
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the
