@@ -201,3 +201,70 @@
   hand-written structural parser but adds explicit reusable schemas, branded
   constraints, discriminator contracts, and adversarial boundary tests. The
   statistical formulas and the 50-source Hoeffding golden are unchanged.
+
+## SWE-bench Verified Slice 2
+
+- Started `cursor/parallax-swebench-slice-2` on the final PR #11 head. The
+  unchanged baseline passed 62 tests and `uvx ty check src`. After PR #11
+  merged, the branch rebased cleanly onto `origin/main`.
+- Read the benchmark decision from PR #13. The selected source is
+  `SWE-bench/SWE-bench_Verified` at
+  `91aa3ed51b709be6457e12d00300a6a596d4c6a3`. The admissible source set is the
+  50 IDs published by Evolving Intent at
+  `993d6be9597ac03854b46362ccd647eb1bfd267a`; ten cross-repository IDs are named
+  as the initial screening pool.
+- Chose direct OpenAI-compatible HTTP over LiteLLM. Construction needs a
+  synchronous text call, while the agent boundary needs the same request and
+  response records plus tool calls. Strict frozen wire models cover both
+  without adding provider routing or SDK dependencies. The API key remains in
+  a named environment variable and never enters request evidence.
+- `SweBenchProblem` owns public issue metadata. `SweBenchVerifier` owns the
+  sealed test patch, FAIL_TO_PASS and PASS_TO_PASS tests, harness revision,
+  official image identity, and test command. The dataset gold patch is parsed
+  at the source boundary and discarded. It is absent from every domain model,
+  prompt, environment script family, and screening row.
+- The loader checks the pinned Hugging Face revision before and after reading
+  rows, rejects partial responses and IDs outside the published 50, and
+  requires an image digest and test command for every selected source. Tests
+  use scripted transports only.
+- The SWE construction boundary returns categorized source and predecessor
+  intents. The scheduler records symptom removal and reinserts symptom
+  arguments first in their owning phase before text rendering, matching the
+  characterized overlay. It deliberately schedules whole function phases
+  rather than claiming upstream prompt or slot parity. The terminal evolved
+  state equals the exact source intent.
+- Static receives the public issue once. Matched remains at the source intent
+  for the evolved turn count. Evolved traverses predecessor phases and restores
+  the source. All three arms share the exact problem and verifier and receive
+  one equal total agent-step and output-token budget. This fixes the calibration
+  confound where static previously received 12 steps total while multi-turn
+  arms received 12 per turn.
+- Environment rendering produces canonical `instance.json`, a generic HUD
+  `env.py`, and `Dockerfile.hud`. The Dockerfile uses an official
+  `swebench/sweb.eval` image by digest and contains no clone or fetch. The
+  grader removes test edits from the submitted patch, restores and applies the
+  sealed test patch, and runs the preregistered command. The per-instance path
+  allowlist was removed; changed paths remain an audit metric.
+- Screening uses a strict manifest, source and verifier digests, trial seeds,
+  canonical JSONL outcomes, and the existing Verification/RunFailure split.
+  Executor exceptions remain operational failures. The harness refuses every
+  unapproved run and hard-stops any plan with an upper estimate above $20.
+- The recommended first gate is five published instances, two static trials,
+  and one boundary model. At the plan's calibrated $0.10-$0.50 per episode,
+  ten episodes cost an estimated $1-$5. The ten-instance version costs $2-$10.
+  The 135-episode pilot remains $13.50-$67.50 and is explicitly outside the
+  screening approval.
+- No provider call, image pull, environment build, HUD deployment, or paid
+  episode ran. A read-only live metadata probe loaded
+  `astropy__astropy-13236` through the pinned Hugging Face boundary and found
+  2 FAIL_TO_PASS plus 644 PASS_TO_PASS tests.
+- Final certification passes 88 tests in normal and optimized Python,
+  `ruff check src tests`, `ruff format --check src tests`,
+  `uvx ty check src`, bytecode compilation, source and wheel builds, package
+  import with Pydantic 2.13.4, and `git diff --check`.
+  Source is 2,942 lines across ten modules, up 1,423 from Slice 1. Tests are
+  1,677 lines, up 589.
+- The unchanged Slice 1 mutation gauntlet still kills all 28 contract mutants.
+  The Slice 2 gauntlet kills all 17 active boundary mutants, covering provider
+  strictness, source pins, sealed-prompt exclusion, overlay ordering,
+  restoration, equal budgets, official image selection, and spend controls.
