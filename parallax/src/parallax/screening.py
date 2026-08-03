@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -16,6 +17,7 @@ from .swebench import SweBenchProblem
 from .types import (
     DesignDigest,
     ModelConfigDigest,
+    NonEmptyText,
     SourceDigest,
     SourceId,
     StrictModel,
@@ -68,6 +70,7 @@ class ScreeningPlan(StrictModel):
     schema_version: Literal[1] = 1
     design_digest: DesignDigest
     model: str
+    expected_response_model: NonEmptyText
     model_config_digest: ModelConfigDigest
     sources: Annotated[tuple[ScreeningSource, ...], Field(min_length=1)]
     units: Annotated[tuple[ScreeningUnit, ...], Field(min_length=1)]
@@ -105,18 +108,38 @@ class ScreeningRun(StrictModel):
     schema_version: Literal[1] = 1
     design_digest: DesignDigest
     model_config_digest: ModelConfigDigest
+    reported_model: NonEmptyText
     unit: ScreeningUnit
     outcome: Outcome
     prompt_tokens: Annotated[int, Field(ge=0)]
     completion_tokens: Annotated[int, Field(ge=0)]
     estimated_cost_usd: Usd
 
+    @model_validator(mode="after")
+    def consistent_usage(self) -> Self:
+        if (
+            isinstance(self.outcome, Verification)
+            and self.prompt_tokens + self.completion_tokens < 1
+        ):
+            raise ValueError("screening usage must contain at least one token")
+        return self
+
 
 class ScreeningExecution(StrictModel):
     outcome: Outcome
+    reported_model: NonEmptyText
     prompt_tokens: Annotated[int, Field(ge=0)]
     completion_tokens: Annotated[int, Field(ge=0)]
     estimated_cost_usd: Usd
+
+    @model_validator(mode="after")
+    def consistent_usage(self) -> Self:
+        if (
+            isinstance(self.outcome, Verification)
+            and self.prompt_tokens + self.completion_tokens < 1
+        ):
+            raise ValueError("screening usage must contain at least one token")
+        return self
 
 
 ScreeningRecord: TypeAlias = Annotated[
@@ -159,12 +182,14 @@ def build_screening_plan(
     problems: Iterable[SweBenchProblem],
     *,
     model: str,
+    expected_response_model: str | None = None,
     trial_seeds: tuple[int, ...],
     arms: tuple[Arm, ...] = ("static",),
     cost: ScreeningCost | None = None,
 ) -> ScreeningPlan:
     ordered = tuple(sorted(problems, key=lambda item: item.record_id))
     selected_cost = cost or ScreeningCost()
+    selected_response_model = expected_response_model or model
     if not ordered or not trial_seeds or not arms:
         raise ValueError("screening sources, trials, and arms must be non-empty")
     if len({problem.record_id for problem in ordered}) != len(ordered):
@@ -174,6 +199,7 @@ def build_screening_plan(
             {
                 "arms": arms,
                 "model": model,
+                "expected_response_model": selected_response_model,
                 "screening_policy": "boundary-v1",
             }
         )
@@ -202,6 +228,7 @@ def build_screening_plan(
     body = {
         "schema_version": 1,
         "model": model,
+        "expected_response_model": selected_response_model,
         "model_config_digest": model_digest,
         "sources": [source.model_dump(mode="json") for source in sources],
         "units": [unit.model_dump(mode="json") for unit in units],
@@ -210,6 +237,7 @@ def build_screening_plan(
     return ScreeningPlan(
         design_digest=DesignDigest(canonical_digest(body)),
         model=model,
+        expected_response_model=selected_response_model,
         model_config_digest=model_digest,
         sources=sources,
         units=units,
@@ -233,6 +261,28 @@ def read_screening_jsonl(path: Path) -> tuple[ScreeningRecord, ...]:
     return tuple(records)
 
 
+def _partial_path(output_path: Path) -> Path:
+    return output_path.with_name(f"{output_path.name}.partial")
+
+
+def _append_fsync(path: Path, data: bytes, *, exclusive: bool = False) -> None:
+    mode = "xb" if exclusive else "ab"
+    with path.open(mode) as destination:
+        destination.write(data)
+        destination.flush()
+        os.fsync(destination.fileno())
+
+
+def _finalize_partial(partial_path: Path, output_path: Path) -> None:
+    os.link(partial_path, output_path)
+    os.unlink(partial_path)
+    directory = os.open(output_path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 def run_screening(
     plan: ScreeningPlan,
     executor: ScreeningExecutor,
@@ -253,16 +303,19 @@ def run_screening(
             f"screening requires approval for estimated "
             f"${plan.estimated_cost_lower_usd:.2f}-${upper:.2f}"
         )
-    runs: list[ScreeningRun] = []
     if output_path.exists():
-        records = read_screening_jsonl(output_path)
+        raise FileExistsError(f"screening evidence already exists: {output_path}")
+    partial_path = _partial_path(output_path)
+    runs: list[ScreeningRun] = []
+    if partial_path.exists():
+        records = read_screening_jsonl(partial_path)
         if not records or records[0] != plan:
             raise ValueError("existing screening manifest differs from plan")
         runs = [record for record in records[1:] if isinstance(record, ScreeningRun)]
         if len(runs) != len(records) - 1:
             raise ValueError("screening evidence contains a second manifest")
     else:
-        atomic_write(output_path, _canonical_line(plan))
+        _append_fsync(partial_path, _canonical_line(plan), exclusive=True)
     completed = {
         (run.unit.source_id, run.unit.trial_index, run.unit.arm) for run in runs
     }
@@ -278,6 +331,10 @@ def run_screening(
     ):
         raise ValueError("screening evidence identity differs from plan")
     cumulative_cost = sum(run.estimated_cost_usd for run in runs)
+    if cumulative_cost > spend_cap_usd:
+        raise SpendApprovalRequired(
+            f"observed cost ${cumulative_cost:.2f} exceeds ${spend_cap_usd:.2f} cap"
+        )
     for unit in plan.units:
         key = (unit.source_id, unit.trial_index, unit.arm)
         if key in completed:
@@ -295,6 +352,7 @@ def run_screening(
                     error_type=type(error).__name__,
                     message=str(error),
                 ),
+                reported_model=plan.expected_response_model,
                 prompt_tokens=0,
                 completion_tokens=0,
                 estimated_cost_usd=plan.cost.upper_per_episode_usd,
@@ -306,6 +364,7 @@ def run_screening(
                     error_type=type(error).__name__,
                     message=str(error),
                 ),
+                reported_model=plan.expected_response_model,
                 prompt_tokens=0,
                 completion_tokens=0,
                 estimated_cost_usd=plan.cost.upper_per_episode_usd,
@@ -316,14 +375,32 @@ def run_screening(
                 model_config_digest=plan.model_config_digest,
                 unit=unit,
                 outcome=execution.outcome,
+                reported_model=execution.reported_model,
                 prompt_tokens=execution.prompt_tokens,
                 completion_tokens=execution.completion_tokens,
                 estimated_cost_usd=execution.estimated_cost_usd,
             )
         )
+        if execution.reported_model != plan.expected_response_model:
+            runs[-1] = runs[-1].model_copy(
+                update={
+                    "outcome": RunFailure(
+                        failure_kind="agent",
+                        error_type="ProviderModelMismatch",
+                        message=(
+                            f"expected {plan.expected_response_model}, "
+                            f"provider reported {execution.reported_model}"
+                        ),
+                    )
+                }
+            )
         cumulative_cost += execution.estimated_cost_usd
-        data = _canonical_line(plan) + b"".join(_canonical_line(run) for run in runs)
-        atomic_write(output_path, data)
+        _append_fsync(partial_path, _canonical_line(runs[-1]))
+        if cumulative_cost > spend_cap_usd:
+            raise SpendApprovalRequired(
+                f"observed cost ${cumulative_cost:.2f} exceeds ${spend_cap_usd:.2f} cap"
+            )
+    _finalize_partial(partial_path, output_path)
     return tuple(runs)
 
 

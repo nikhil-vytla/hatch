@@ -9,6 +9,11 @@ from .types import StrictModel
 
 HUD_VERSION = "0.6.12"
 
+
+class UnsafeVerifierIsolationError(RuntimeError):
+    pass
+
+
 ENVIRONMENT_SOURCE = """from __future__ import annotations
 
 import asyncio
@@ -207,7 +212,15 @@ class EnvironmentBundle(StrictModel):
         atomic_write(directory / "Dockerfile.hud", self.dockerfile)
 
 
-def render_environment(family: SweScriptFamily) -> EnvironmentBundle:
+def render_environment(
+    family: SweScriptFamily,
+    *,
+    allow_unsafe_embedded_verifier: bool = False,
+) -> EnvironmentBundle:
+    if not allow_unsafe_embedded_verifier:
+        raise UnsafeVerifierIsolationError(
+            "embedded verifier is agent-readable; evaluator-side isolation required"
+        )
     problem = family.static.problem
     verifier = problem.verifier
     instance = {

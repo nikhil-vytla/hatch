@@ -60,6 +60,7 @@ def main() -> None:
         "network_calls": 0,
         "paid_calls": 0,
         "request_digest": canonical_digest(request),
+        "response_model": response.model,
         "response_usage": response.usage.model_dump(mode="json"),
         "transport": "scripted",
     }

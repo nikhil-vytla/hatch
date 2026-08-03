@@ -47,7 +47,8 @@ The second slice adds an offline-ready SWE-bench Verified path:
 1. `provider.py` defines strict OpenAI-compatible request and response models.
    One direct HTTP client serves text-only construction calls and tool-call
    agent requests. Credentials come from a named environment variable and
-   never enter serialized requests.
+   never enter serialized requests. Response-side models tolerate unconsumed
+   provider fields while validating every field Parallax reads.
 2. `swebench.py` pins the Verified dataset revision and the paper's 50
    published evaluation IDs. It discards the gold patch, separates the public
    issue from the sealed official verifier, builds budget-equal arms, and
@@ -57,10 +58,12 @@ The second slice adds an offline-ready SWE-bench Verified path:
    `swebench/sweb.eval` bases and one total agent-step budget per episode. This
    renderer is an offline scaffold, not an admitted evaluation environment:
    its single container exposes verifier data to the agent and its grader does
-   not implement official named-test semantics.
+   not implement official named-test semantics. Rendering fails closed unless
+   a caller explicitly opts into the unsafe bundle for offline inspection.
 4. `screening.py` preregisters boundary-model screening units and canonical
-   outcomes before execution, persists each unit for safe resume, and defaults
-   to a $5 upper cap.
+   outcomes before execution, appends and fsyncs each unit to a resumable
+   partial file, records provider model/usage and estimated cost, refuses to
+   overwrite completed evidence, and defaults to a $5 upper cap.
 
 These components have scripted offline coverage only. No provider request,
 official image pull, HUD deployment, or paid screening episode has run.

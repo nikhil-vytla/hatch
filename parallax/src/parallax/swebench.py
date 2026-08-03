@@ -288,6 +288,9 @@ def fetch_swebench_verified(
     fetch: Fetch = _fetch,
     dataset_revision: str = SWE_BENCH_REVISION,
 ) -> tuple[SweBenchProblem, ...]:
+    unknown = set(instance_ids) - set(PUBLISHED_INSTANCE_IDS)
+    if unknown:
+        raise SweBenchError(f"instance ids are not in the published set: {unknown}")
     revision_url = (
         "https://huggingface.co/api/datasets/"
         f"{SWE_BENCH_DATASET}/revision/{dataset_revision}?expand=sha"
@@ -317,6 +320,13 @@ def fetch_swebench_verified(
         raise SweBenchError("invalid Hugging Face dataset response") from error
     if response.partial:
         raise SweBenchError("Hugging Face returned a partial dataset response")
+    truncated = {
+        item.row_idx: item.truncated_cells
+        for item in response.rows
+        if item.truncated_cells
+    }
+    if truncated:
+        raise SweBenchError(f"Hugging Face truncated dataset cells: {truncated}")
     if after.sha != before.sha:
         raise SweBenchError(
             f"dataset revision changed while reading: before={before.sha}, "

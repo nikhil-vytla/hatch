@@ -355,6 +355,28 @@ def test_structural_and_identity_drift_are_rejected(
     )
     with pytest.raises(ValueError, match="config_drift"):
         build_report(tuple(drifted))
+    family_index = next(
+        index
+        for index, record in enumerate(records)
+        if isinstance(record, FamilyRecord)
+    )
+    family_record = records[family_index]
+    assert isinstance(family_record, FamilyRecord)
+    static = family_record.scripts["static"]
+    tampered_static = static.model_copy(
+        update={
+            "turns": (
+                static.turns[0].model_copy(update={"text": "tampered"}),
+                *static.turns[1:],
+            )
+        }
+    )
+    drifted = list(records)
+    drifted[family_index] = family_record.model_copy(
+        update={"scripts": {**family_record.scripts, "static": tampered_static}}
+    )
+    with pytest.raises(ValueError, match="family_arm_digest_drift"):
+        build_report(tuple(drifted))
 
 
 @pytest.mark.parametrize(

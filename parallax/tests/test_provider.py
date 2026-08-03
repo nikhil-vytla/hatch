@@ -17,6 +17,7 @@ from parallax.provider import (
     ProviderTool,
     ProviderToolFunction,
 )
+from parallax.runner import BudgetError
 
 
 def config() -> ProviderConfig:
@@ -143,6 +144,71 @@ def test_provider_rejects_missing_key_and_malformed_response() -> None:
         transport=lambda endpoint, body, headers, timeout: b'{"id":"bad"}',
     )
     with pytest.raises(ProviderError, match="provider response is invalid"):
+        provider.chat()((Message(role="user", content="hello"),), 32)
+
+
+def test_provider_response_tolerates_unconsumed_wire_fields() -> None:
+    real_shaped = json.dumps(
+        {
+            "id": "response-1",
+            "object": "chat.completion",
+            "created": 1777777777,
+            "model": "boundary-model-2026-08-01",
+            "system_fingerprint": "fp_123",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "logprobs": None,
+                    "message": {
+                        "role": "assistant",
+                        "content": "ready",
+                        "refusal": None,
+                        "annotations": [],
+                    },
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 2,
+                "total_tokens": 12,
+                "prompt_tokens_details": {"cached_tokens": 0},
+            },
+        }
+    ).encode()
+    provider = OpenAICompatibleProvider(
+        config(),
+        environment={"PARALLAX_PROVIDER_KEY": "secret"},
+        transport=lambda endpoint, body, headers, timeout: real_shaped,
+    )
+
+    assert provider.chat()((Message(role="user", content="hello"),), 32) == "ready"
+
+
+def test_text_chat_classifies_output_truncation_as_budget_failure() -> None:
+    truncated = json.dumps(
+        {
+            "id": "response-1",
+            "model": "boundary-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "length",
+                    "message": {
+                        "role": "assistant",
+                        "content": "partial",
+                    },
+                }
+            ],
+        }
+    ).encode()
+    provider = OpenAICompatibleProvider(
+        config(),
+        environment={"PARALLAX_PROVIDER_KEY": "secret"},
+        transport=lambda endpoint, body, headers, timeout: truncated,
+    )
+
+    with pytest.raises(BudgetError, match="output-token limit"):
         provider.chat()((Message(role="user", content="hello"),), 32)
 
 

@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
 from parallax.swebench import build_swe_script_family, load_swebench_rows
-from parallax.swebench_env import render_environment
+from parallax.swebench_env import UnsafeVerifierIsolationError, render_environment
 
 
 def family():
@@ -24,9 +25,18 @@ def family():
     )
 
 
+def unsafe_bundle():
+    return render_environment(family(), allow_unsafe_embedded_verifier=True)
+
+
+def test_environment_rendering_fails_closed_without_isolation() -> None:
+    with pytest.raises(UnsafeVerifierIsolationError, match="agent-readable"):
+        render_environment(family())
+
+
 def test_environment_bundle_is_deterministic_and_compilable() -> None:
-    first = render_environment(family())
-    second = render_environment(family())
+    first = unsafe_bundle()
+    second = unsafe_bundle()
 
     assert first == second
     compile(first.env_py, "env.py", "exec")
@@ -41,7 +51,7 @@ def test_environment_bundle_is_deterministic_and_compilable() -> None:
 
 
 def test_dockerfile_uses_official_pinned_eval_image() -> None:
-    dockerfile = render_environment(family()).dockerfile.decode()
+    dockerfile = unsafe_bundle().dockerfile.decode()
 
     assert (
         "swebench/sweb.eval.x86_64.astropy_1776_astropy-13236@sha256:" + "a" * 64
@@ -52,18 +62,18 @@ def test_dockerfile_uses_official_pinned_eval_image() -> None:
 
 
 def test_all_arms_receive_one_equal_episode_budget() -> None:
-    config = json.loads(render_environment(family()).instance_json)
+    config = json.loads(unsafe_bundle().instance_json)
     scripts = config["scripts"]
 
     assert sum(scripts["static"]["agent_steps"]) == 12
     assert sum(scripts["matched"]["agent_steps"]) == 12
     assert sum(scripts["evolved"]["agent_steps"]) == 12
     assert scripts["static"]["agent_steps"] == [12]
-    assert "step_budget" in render_environment(family()).env_py.decode()
+    assert "step_budget" in unsafe_bundle().env_py.decode()
 
 
 def test_bundle_writes_only_expected_files(tmp_path: Path) -> None:
-    bundle = render_environment(family())
+    bundle = unsafe_bundle()
     bundle.write(tmp_path)
 
     assert {path.name for path in tmp_path.iterdir()} == {

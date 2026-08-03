@@ -21,18 +21,34 @@ so its pass rate would not measure the preregistered outcome.
 3. **Confirmed and fixed — failure taxonomy.**
    Merged `src/parallax/screening.py:237-246` converted every executor exception
    to an agent failure. `ScreeningExecutionError` now carries the typed failure
-   kind, and `run_screening` preserves verifier failures at `:289-312`.
+   kind, and `run_screening` preserves verifier failures.
 4. **Confirmed and fixed — crash-unsafe evidence.**
-   The merged runner held all outcomes in memory and wrote once. It now writes
-   the manifest before the first executor call, atomically persists each
-   completed unit, validates existing receipts, and resumes without repeating
-   completed units (`src/parallax/screening.py:256-326`).
-5. **Confirmed; two fixes and one remaining blocker.**
-   Dataset row requests now carry `revision=` at
-   `src/parallax/swebench.py:307-312`. The manifest now precedes outcomes.
+   The merged runner held all outcomes in memory and wrote once. It now creates
+   a partial file exclusively, fsyncs the manifest before the first executor
+   call, appends and fsyncs each unit, validates resume identity, skips
+   completed units, atomically finalizes, and refuses to overwrite final
+   evidence.
+5. **Confirmed and fixed — provider response incompatibility.**
+   Request models still forbid unknown fields. Response-side models validate
+   consumed values but ignore provider extensions, and a real-shaped response
+   fixture covers top-level, choice, message, and usage extras.
+6. **Confirmed and fixed — missing usage, model, and observed metering.**
+   Each screening receipt carries the provider-reported model, prompt tokens,
+   completion tokens, and estimated cost. The expected response model is
+   preregistered and mismatches become run failures. Observed cumulative cost
+   is checked after every persisted unit.
+7. **Confirmed and fixed — unpinned and unsafe row query.**
+   Dataset row requests carry the pinned `revision`; IDs are rejected against
+   `PUBLISHED_INSTANCE_IDS` before query construction; truncated cells fail
+   closed.
+8. **Confirmed and fixed — output truncation classification.**
+   Text chat raises `BudgetError` when `finish_reason == "length"` rather than
+   grading a partial response as an invalid model answer.
+9. **Confirmed; one cheap identity fix and remaining blockers.**
+   Report validation now recomputes family script digests against the manifest.
    Screening identity still omits script, environment, and public provider
-   configuration (`src/parallax/screening.py:158-217`), so paid execution
-   remains blocked on identity binding as well as official grading.
+   configuration, so paid execution remains blocked on identity binding as
+   well as official grading.
 
 ## No-spend implementation
 
@@ -40,20 +56,21 @@ so its pass rate would not measure the preregistered outcome.
   response models, the HUD inference endpoint, `max_tokens`, and an eager
   `HUD_API_KEY` presence check.
 - Screening execution receipts now retain prompt tokens, completion tokens,
-  and estimated cost. The spend cap is configurable; a future approved run
-  must pass `spend_cap_usd=5.0`.
+  reported model, and estimated cost. The spend cap defaults to $5.
+- The unsafe embedded-verifier renderer now fails closed unless explicitly
+  enabled for offline inspection. This is a guard, not evaluator isolation.
 - The scripted dry run exercised credential discovery and HUD request/response
   serialization without a network call. Its canonical receipt records
   `paid_calls: 0`.
 
 ## Verification
 
-- 92 tests passed normally and under `python -O`.
+- 102 tests passed normally and under `python -O`.
 - Ruff check and format check passed.
 - `uvx ty check src` passed.
 - Source distribution and wheel build passed.
 - Core mutation suite: 28/28 killed.
-- Adapted Slice 2/audit mutation suite: 21/21 killed.
+- Adapted Slice 2/audit mutation suite: 30/30 killed.
 
 ## Rework before screening
 
