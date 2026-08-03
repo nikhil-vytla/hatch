@@ -79,6 +79,28 @@ def test_openai_compatible_chat_uses_strict_wire_models() -> None:
     assert output.startswith('{"function"')
 
 
+def test_provider_accepts_explicit_null_tool_calls() -> None:
+    def null_tool_calls(
+        endpoint: str,
+        body: bytes,
+        headers: Mapping[str, str],
+        timeout_seconds: float,
+    ) -> bytes:
+        payload = json.loads(response(endpoint, body, headers, timeout_seconds))
+        payload["choices"][0]["message"]["tool_calls"] = None
+        return json.dumps(payload).encode()
+
+    provider = OpenAICompatibleProvider(
+        config(),
+        transport=null_tool_calls,
+        environment={"PARALLAX_PROVIDER_KEY": "secret"},
+    )
+
+    output = provider.chat()((Message(role="user", content="Extract intent."),), 64)
+
+    assert output.startswith('{"function"')
+
+
 def test_provider_request_supports_agent_tools() -> None:
     request = ProviderRequest(
         model="boundary-model",

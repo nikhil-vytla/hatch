@@ -1,9 +1,10 @@
 # SWE-bench screening safety audit
 
 The blocking measurement defects are fixed, but the five-instance paid
-screening did not start. HUD accepted the local API key for model discovery,
-then returned HTTP 403 on the first construction inference request. No model
-response or token-usage receipt was returned, so recorded spend is $0.
+screening did not start. Docker was unavailable, so the launch used its
+one-construction-call fallback. HUD accepted the fresh key and returned a
+completion, but explicit null `tool_calls` failed response validation before
+Parallax retained usage.
 
 ## Finding dispositions
 
@@ -26,7 +27,9 @@ response or token-usage receipt was returned, so recorded spend is $0.
    agent's index. The obsolete test-file restore implementation was deleted;
    the official harness applies the candidate patch in a fresh image.
 4. **Provider wires — fixed.** Request models remain closed. Response models
-   strictly validate consumed fields and ignore provider extensions.
+   strictly validate consumed fields and ignore provider extensions. The
+   response boundary normalizes HUD's explicit null `tool_calls` to an empty
+   tuple.
 5. **Evidence persistence — fixed.** The manifest is fsynced before execution;
    each completed unit is appended and fsynced; final evidence cannot overwrite
    an existing file. Paid HUD episode receipts are persisted before official
@@ -71,21 +74,27 @@ by digest before a comparative experiment.
 - Image manifests: five official amd64 images resolved to immutable Docker Hub
   digests before execution.
 - Construction model: Claude Haiku 4.5.
-- HUD model discovery: authenticated and listed both selected models.
-- First inference: HTTP 403 from
-  `https://inference.beta.hud.ai/v1/chat/completions`.
-- Observed usage: 0 prompt tokens, 0 completion tokens.
-- Estimated spend: $0.
+- Docker status: unavailable at the local socket. No image build, image pull,
+  boundary-model episode, or official grading started.
+- Source loading: the first request returned HTTP 500; one retry succeeded
+  before inference.
+- Sanity inference: one authenticated Claude Haiku 4.5 request returned a
+  completion with explicit null `tool_calls`.
+- Observed usage: unavailable because response validation failed before the
+  usage object was retained.
+- Actual billed spend: unavailable. HUD exposes it in platform inference logs,
+  not through a documented gateway-log API.
+- Conservative upper estimate: $0.113895, using one token per prompt UTF-8 byte,
+  the full 1,024-token output allowance, and Opus prices.
 
-The run stopped on the authorization denial as required. Retrying a different
-model or endpoint would violate the stop condition; HUD inference entitlement
-must be corrected before resuming the same manifest.
+The fallback stopped after that one real inference request. The parser fix was
+tested offline and no retry ran.
 
 ## Verification
 
-- 112 offline tests passed.
+- 113 offline tests passed.
 - Ruff check and format check passed.
 - `uvx ty check src` passed.
 - Core mutation suite: 28/28 killed.
-- Adapted Slice 2 mutation suite: 36/36 killed.
-- The failure receipt is canonical JSON and contains no credential value.
+- Adapted Slice 2 mutation suite: 37/37 killed.
+- Both failure receipts are canonical JSON and contain no credential value.
