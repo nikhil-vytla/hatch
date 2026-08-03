@@ -358,6 +358,8 @@ function webUiHtml(): string {
       --accent: #c4f542;
       --line: #2c3a30;
       --danger: #ff6b6b;
+      --agent: #121814;
+      --code: #080b09;
     }
     * { box-sizing: border-box; }
     body {
@@ -410,16 +412,91 @@ function webUiHtml(): string {
     button:disabled { opacity: 0.5; cursor: wait; }
     .meta { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); margin-top: 14px; white-space: pre-wrap; }
     #log {
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 12.5px;
-      line-height: 1.45;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       background: #0b0f0c;
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 14px;
       height: calc(100vh - 170px);
       overflow: auto;
-      white-space: pre-wrap;
+    }
+    #log:empty::before { content: "Waiting…"; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+    .entry-sys {
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .entry-turn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .entry-turn .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--line);
+      flex: 0 0 auto;
+    }
+    .entry-turn.running .dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent); }
+    .entry-turn.done .dot { background: #5a8f66; }
+    .entry-turn.err { color: var(--danger); }
+    .entry-turn.err .dot { background: var(--danger); }
+    .entry-agent {
+      background: var(--agent);
+      border-left: 3px solid var(--accent);
+      padding: 12px 14px;
+      border-radius: 0 10px 10px 0;
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+    .entry-agent .md-text { white-space: pre-wrap; word-break: break-word; }
+    .entry-agent code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12.5px;
+      background: color-mix(in oklab, var(--code) 80%, #1a2a1c);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .entry-agent pre {
+      margin: 10px 0 0;
+      padding: 12px 14px;
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .entry-agent pre code {
+      background: none;
+      padding: 0;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #d7e6d9;
+      white-space: pre;
+    }
+    .entry-agent .lang {
+      display: block;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .entry-tool {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: #b7c9a0;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: color-mix(in oklab, var(--bg1) 70%, transparent);
     }
     .pill {
       display: inline-block;
@@ -431,12 +508,17 @@ function webUiHtml(): string {
       margin-right: 6px;
     }
     .pill.live { border-color: var(--accent); color: var(--accent); }
+    @media (max-width: 820px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: none; border-bottom: 1px solid var(--line); }
+      #log { height: 55vh; }
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>Hatch Inspect</h1>
-    <p>Local background coding agent — real git sandbox + OpenCode (free models). Inspired by Ramp Inspect / Open-Inspect, not a clone.</p>
+    <p>Local background coding agent. Real git sandbox + OpenCode free models. Inspired by Ramp Inspect / Open-Inspect, not a clone.</p>
   </header>
   <main>
     <aside>
@@ -449,7 +531,7 @@ function webUiHtml(): string {
       <div class="meta" id="meta"></div>
     </aside>
     <section>
-      <div id="log">Waiting…</div>
+      <div id="log"></div>
     </section>
   </main>
   <script>
@@ -459,10 +541,122 @@ function webUiHtml(): string {
     const sesspill = document.getElementById('sesspill');
     let sessionId = null;
     let ws = null;
+    let agentBuf = '';
+    let agentEl = null;
 
-    function log(line) {
-      logEl.textContent += line + '\\n';
+    function scrollLog() {
       logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function clearLog() {
+      logEl.replaceChildren();
+      agentBuf = '';
+      agentEl = null;
+    }
+
+    function note(text) {
+      const d = document.createElement('div');
+      d.className = 'entry-sys';
+      d.textContent = text;
+      logEl.appendChild(d);
+      scrollLog();
+    }
+
+    function turnMarker(label, state) {
+      const d = document.createElement('div');
+      d.className = 'entry-turn' + (state ? ' ' + state : '');
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      d.appendChild(dot);
+      d.appendChild(document.createTextNode(label));
+      logEl.appendChild(d);
+      scrollLog();
+    }
+
+    function renderInline(text) {
+      const wrap = document.createElement('span');
+      wrap.className = 'md-text';
+      const parts = text.split(/\`([^\`]+)\`/);
+      for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 1) {
+          const c = document.createElement('code');
+          c.textContent = parts[i];
+          wrap.appendChild(c);
+        } else if (parts[i]) {
+          wrap.appendChild(document.createTextNode(parts[i]));
+        }
+      }
+      return wrap;
+    }
+
+    function renderRich(text) {
+      const root = document.createDocumentFragment();
+      const fence = /\`\`\`(\\w*)\\n?([\\s\\S]*?)\`\`\`/g;
+      let last = 0;
+      let m;
+      while ((m = fence.exec(text))) {
+        if (m.index > last) root.appendChild(renderInline(text.slice(last, m.index)));
+        const pre = document.createElement('pre');
+        if (m[1]) {
+          const lang = document.createElement('span');
+          lang.className = 'lang';
+          lang.textContent = m[1];
+          pre.appendChild(lang);
+        }
+        const code = document.createElement('code');
+        code.textContent = m[2].replace(/\\n$/, '');
+        pre.appendChild(code);
+        root.appendChild(pre);
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) root.appendChild(renderInline(text.slice(last)));
+      return root;
+    }
+
+    function flushAgent() {
+      agentEl = null;
+      agentBuf = '';
+    }
+
+    function onAgentDelta(text) {
+      const tool = text.trim().match(/^\\[tool:([^\\]\\s]+)(?:\\s+([^\\]]+))?\\]$/);
+      if (tool) {
+        flushAgent();
+        const d = document.createElement('div');
+        d.className = 'entry-tool';
+        d.textContent = 'tool · ' + tool[1] + (tool[2] ? ' · ' + tool[2] : '');
+        logEl.appendChild(d);
+        scrollLog();
+        return;
+      }
+      if (!agentEl) {
+        agentEl = document.createElement('div');
+        agentEl.className = 'entry-agent';
+        logEl.appendChild(agentEl);
+        agentBuf = '';
+      }
+      agentBuf += text;
+      agentEl.replaceChildren(renderRich(agentBuf));
+      scrollLog();
+    }
+
+    function handleEnvelope(msg) {
+      const e = msg.event || msg;
+      if (e.kind === 'agent.delta') {
+        onAgentDelta(e.text || '');
+        return;
+      }
+      flushAgent();
+      if (e.kind === 'session.started') note('Session started');
+      else if (e.kind === 'turn.queued') note('Prompt queued');
+      else if (e.kind === 'turn.started') turnMarker('Turn started', 'running');
+      else if (e.kind === 'turn.finished') {
+        const err = typeof e.summary === 'string' && e.summary.startsWith('error:');
+        turnMarker(err ? e.summary : 'Turn finished', err ? 'err' : 'done');
+      }
+      else if (e.kind === 'git.pushed') note('Committed ' + e.head + ' on ' + e.branch);
+      else if (e.kind === 'session.closed') note('Session closed' + (e.reason ? ': ' + e.reason : ''));
+      else note('[' + (msg.origin || '?') + '] ' + e.kind);
     }
 
     async function refreshHealth() {
@@ -485,11 +679,9 @@ function webUiHtml(): string {
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === 'hello') return;
-          const e = msg.event || msg;
-          if (e.kind === 'agent.delta') log(e.text);
-          else log('[' + (msg.origin || '?') + '] ' + e.kind + (e.summary ? ' — ' + e.summary : ''));
+          handleEnvelope(msg);
         } catch {
-          log(ev.data);
+          note(String(ev.data));
         }
       };
     }
@@ -497,8 +689,8 @@ function webUiHtml(): string {
     document.getElementById('start').onclick = async () => {
       const text = document.getElementById('prompt').value.trim();
       document.getElementById('start').disabled = true;
-      logEl.textContent = '';
-      log('Creating session…');
+      clearLog();
+      note('Creating session…');
       const r = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -524,14 +716,18 @@ function webUiHtml(): string {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-      log('Follow-up queued…');
+      note('Follow-up queued…');
     };
 
     document.getElementById('commit').onclick = async () => {
       if (!sessionId) return;
-      const r = await fetch('/api/sessions/' + sessionId + '/commit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const r = await fetch('/api/sessions/' + sessionId + '/commit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
       const j = await r.json();
-      log('Committed ' + j.sha + ' on ' + j.branch);
+      note('Committed ' + j.sha + ' on ' + j.branch);
     };
   </script>
 </body>

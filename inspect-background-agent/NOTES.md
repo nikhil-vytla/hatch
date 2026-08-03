@@ -5,6 +5,10 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
+## UI log formatting (2026-08-03)
+
+`#log` was a raw `textContent` dump: markdown fences stayed literal, and `turn.finished` repeated the whole agent summary. Switched to structured entries (system / turn markers / agent bubble / tool chips) with a tiny fenced-code + inline-`code` renderer. Finished turns no longer re-dump the summary.
+
 ## Figure-it-out run (2026-08-03)
 
 Targeted usual harness failure modes without rewriting to CF/Modal.
