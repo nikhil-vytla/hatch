@@ -1,0 +1,5 @@
+2026-06-01T10:02:11Z INFO  api    request ok path=/v1/rollouts
+2026-06-01T10:02:14Z ERROR api    db timeout after 30s path=/v1/rollouts
+2026-06-01T10:02:15Z ERROR api    db timeout after 30s path=/v1/rollouts
+2026-06-01T10:04:02Z WARN  worker retry queue depth=1204
+2026-06-01T10:05:44Z ERROR api    db timeout after 30s path=/v1/grades

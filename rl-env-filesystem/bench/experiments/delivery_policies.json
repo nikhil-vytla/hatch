@@ -1,0 +1,12 @@
+{
+  "name": "delivery_policies",
+  "tasks": ["task_csv_report", "task_grep_fix", "task_sqlite_query",
+            "task_numpy_solve", "task_pandas_pipeline"],
+  "delivery_policies": ["eager_full", "lazy_none", "hot_tier",
+                         "profile", "profile_loo"],
+  "capture": false,
+  "regrade": false,
+  "repeats": 1,
+  "concurrency": 4,
+  "bandwidth_mbps": 150
+}

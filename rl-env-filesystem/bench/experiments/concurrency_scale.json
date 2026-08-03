@@ -1,0 +1,11 @@
+{
+  "name": "concurrency_scale",
+  "tasks": ["task_csv_report", "task_sqlite_query", "task_numpy_solve",
+            "task_pandas_pipeline"],
+  "delivery_policies": ["hot_tier"],
+  "capture": true,
+  "regrade": false,
+  "repeats": 4,
+  "concurrency_sweep": [1, 4, 16],
+  "bandwidth_mbps": 150
+}

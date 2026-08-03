@@ -1,0 +1,19 @@
+{
+  "name": "log_triage",
+  "description": "Triage this service log: identify the dominant failure, when it started, and write an incident_summary.md; check the policy file for any reporting requirements.",
+  "seeds": [
+    {
+      "path": "policy.txt",
+      "sha256": "43612bb39effd670b248776a0f0fefc49f9d0a175159d95f6a31d2724373602f",
+      "bytes": 183,
+      "kind": "text"
+    },
+    {
+      "path": "service.log",
+      "sha256": "91f2de94ba20a6c7643af70e37cb153b309cd31ca16c125a3529138708dcfb4c",
+      "bytes": 337,
+      "kind": "logs"
+    }
+  ],
+  "store": "../../store"
+}
