@@ -2,6 +2,7 @@
 
 from .artifacts import (
     ArtifactError,
+    ArtifactPathError,
     PUBLIC_TREE_POLICY,
     PublicationDurabilityError,
     PublicationReceipt,
@@ -34,6 +35,7 @@ from .records import (
 __all__ = [
     "AdmissionError",
     "ArtifactError",
+    "ArtifactPathError",
     "AssetEntry",
     "AssetManifest",
     "CanonicalValueError",

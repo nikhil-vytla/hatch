@@ -56,6 +56,12 @@ must not enter agent-visible observations in an admitted non-leakage study.
 > [!IMPORTANT]
 > Verifier authority and sealed evaluator information are part of experimental
 > validity. An arm that leaks or silently changes them is not comparable.
+> The implemented verifier assumes a trusted controller process; agent code is
+> not an admitted participant inside that process.
+
+> **TODO:** Add an isolated verifier process, container, or capability boundary
+> before evaluating any runtime that executes hostile code near verifier
+> authority.
 
 ## Synthesis and admission
 

@@ -17,6 +17,10 @@ class ArtifactError(ValueError):
     """Published bytes do not satisfy their committed artifact contract."""
 
 
+class ArtifactPathError(ArtifactError):
+    """A protected path changed or could not be opened without following links."""
+
+
 class PublicationStateError(ArtifactError):
     """Publication renamed a destination but could not confirm a valid final state."""
 
@@ -45,7 +49,7 @@ class TreePolicy:
     allowed_paths: tuple[str, ...]
     ignored_paths: tuple[str, ...] = ()
     reject_unexpected: bool = True
-    schema: str = "parallax.tree-policy.v2"
+    schema: str = "parallax.tree-policy.v3"
 
     def __post_init__(self) -> None:
         for path in self.allowed_paths + self.ignored_paths:
@@ -117,7 +121,7 @@ class ReplayLock:
     tree_snapshot: TreeSnapshot
     verifier_commitment_id: str
     asset_manifest_id: str
-    schema: str = "parallax.replay-lock.v2"
+    schema: str = "parallax.replay-lock.v3"
 
     def __post_init__(self) -> None:
         validate_content_id(self.verifier_commitment_id, "verifier-commitment")
@@ -157,17 +161,22 @@ def _open_directory_path(path: Path) -> int:
     lexical = path if path.is_absolute() else Path.cwd() / path
     if any(part in (".", "..") for part in lexical.parts):
         raise ArtifactError("directory path must not contain dot or parent components")
-    if path.is_symlink():
-        raise ArtifactError("directory root must not be a symlink")
-    absolute = path.resolve(strict=True)
-    descriptor = os.open(os.path.sep, _descriptor_flags(directory=True))
     try:
-        for part in absolute.parts[1:]:
-            next_descriptor = os.open(
-                part,
-                _descriptor_flags(directory=True),
-                dir_fd=descriptor,
-            )
+        descriptor = os.open(os.path.sep, _descriptor_flags(directory=True))
+    except OSError as error:
+        raise ArtifactPathError("could not open filesystem root") from error
+    try:
+        for part in lexical.parts[1:]:
+            try:
+                next_descriptor = os.open(
+                    part,
+                    _descriptor_flags(directory=True),
+                    dir_fd=descriptor,
+                )
+            except OSError as error:
+                raise ArtifactPathError(
+                    f"protected directory traversal failed at component: {part}"
+                ) from error
             os.close(descriptor)
             descriptor = next_descriptor
         return descriptor
@@ -195,7 +204,12 @@ def _directory_changed(before: os.stat_result, after: os.stat_result) -> bool:
 
 
 def _read_once(directory_fd: int, name: str, relative: str) -> bytes:
-    file_fd = os.open(name, _descriptor_flags(), dir_fd=directory_fd)
+    try:
+        file_fd = os.open(name, _descriptor_flags(), dir_fd=directory_fd)
+    except OSError as error:
+        raise ArtifactPathError(
+            f"protected file open failed during capture: {relative}"
+        ) from error
     try:
         before = os.fstat(file_fd)
         if not stat.S_ISREG(before.st_mode):
@@ -233,12 +247,22 @@ def _capture_tree_fd(root_fd: int, policy: TreePolicy) -> _TreeCapture:
 
     def visit(directory_fd: int, prefix: str = "") -> None:
         before_directory = os.fstat(directory_fd)
-        with os.scandir(directory_fd) as iterator:
-            entries = sorted(iterator, key=lambda entry: entry.name)
+        try:
+            with os.scandir(directory_fd) as iterator:
+                entries = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as error:
+            raise ArtifactPathError(
+                f"protected directory scan failed: {prefix or '.'}"
+            ) from error
         for item in entries:
             relative = f"{prefix}/{item.name}" if prefix else item.name
             validate_relative_path(relative)
-            item_stat = item.stat(follow_symlinks=False)
+            try:
+                item_stat = item.stat(follow_symlinks=False)
+            except OSError as error:
+                raise ArtifactPathError(
+                    f"tree entry changed before inspection: {relative}"
+                ) from error
             if stat.S_ISLNK(item_stat.st_mode):
                 raise ArtifactError(f"symlink is forbidden: {relative}")
             if _is_ignored(relative, policy):
@@ -249,7 +273,16 @@ def _capture_tree_fd(root_fd: int, policy: TreePolicy) -> _TreeCapture:
                 )
                 if policy.reject_unexpected and not contains_allowed:
                     raise ArtifactError(f"unexpected directory: {relative}")
-                child_fd = os.open(item.name, _descriptor_flags(directory=True), dir_fd=directory_fd)
+                try:
+                    child_fd = os.open(
+                        item.name,
+                        _descriptor_flags(directory=True),
+                        dir_fd=directory_fd,
+                    )
+                except OSError as error:
+                    raise ArtifactPathError(
+                        f"protected directory open failed during capture: {relative}"
+                    ) from error
                 try:
                     visit(child_fd, relative)
                 finally:
@@ -273,10 +306,7 @@ def _capture_tree_fd(root_fd: int, policy: TreePolicy) -> _TreeCapture:
 
 
 def _capture_tree(root: Path, policy: TreePolicy) -> _TreeCapture:
-    try:
-        root_fd = _open_directory_path(root)
-    except OSError as error:
-        raise ArtifactError("snapshot root must be a non-symlink directory") from error
+    root_fd = _open_directory_path(root)
     try:
         return _capture_tree_fd(root_fd, policy)
     finally:
@@ -321,7 +351,10 @@ def verify_publication(root: Path, task: NativeTask) -> str:
 
 def _write_durable(directory_fd: int, name: str, data: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
-    file_fd = os.open(name, flags, 0o600, dir_fd=directory_fd)
+    try:
+        file_fd = os.open(name, flags, 0o600, dir_fd=directory_fd)
+    except OSError as error:
+        raise ArtifactPathError(f"protected artifact creation failed: {name}") from error
     try:
         view = memoryview(data)
         while view:
@@ -341,7 +374,25 @@ def _make_staging(parent_fd: int) -> tuple[str, int]:
             os.mkdir(name, 0o700, dir_fd=parent_fd)
         except FileExistsError:
             continue
-        return name, os.open(name, _descriptor_flags(directory=True), dir_fd=parent_fd)
+        except OSError as error:
+            raise ArtifactPathError("staging directory creation failed") from error
+        try:
+            descriptor = os.open(
+                name,
+                _descriptor_flags(directory=True),
+                dir_fd=parent_fd,
+            )
+        except OSError as error:
+            try:
+                os.rmdir(name, dir_fd=parent_fd)
+            except OSError as cleanup_error:
+                raise ArtifactPathError(
+                    "staging descriptor open failed and its directory could not be removed"
+                ) from cleanup_error
+            raise ArtifactPathError(
+                "staging descriptor open failed; the new directory was removed"
+            ) from error
+        return name, descriptor
     raise ArtifactError("could not allocate a unique staging directory")
 
 
@@ -361,11 +412,7 @@ def _cleanup_staging(parent_fd: int, staging_name: str, staging_fd: int) -> None
 def publish_public_task(destination: Path, task: NativeTask) -> tuple[PublicationReceipt, TreeSnapshot]:
     destination = destination.absolute()
     validate_relative_path(destination.name)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        parent_fd = _open_directory_path(destination.parent)
-    except OSError as error:
-        raise ArtifactError("publication parent must be a non-symlink directory") from error
+    parent_fd = _open_directory_path(destination.parent)
     staging_name = ""
     staging_fd = -1
     renamed = False
@@ -382,12 +429,15 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
         _write_durable(staging_fd, "task.json", task_bytes)
         _write_durable(staging_fd, "publication-manifest.json", manifest_bytes)
         _verify_public_capture(_capture_tree_fd(staging_fd, PUBLIC_TREE_POLICY), task)
-        os.replace(
-            staging_name,
-            destination.name,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-        )
+        try:
+            os.replace(
+                staging_name,
+                destination.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+        except OSError as error:
+            raise ArtifactPathError("atomic publication rename failed") from error
         renamed = True
         os.close(staging_fd)
         staging_fd = -1

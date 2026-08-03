@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import os
 import stat
 import sys
@@ -13,10 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 import parallax.artifacts as artifact_module  # noqa: E402
-import parallax.gsm8k as gsm8k_module  # noqa: E402
 from parallax import (  # noqa: E402
     AdmissionError,
     ArtifactError,
+    ArtifactPathError,
     CanonicalValueError,
     DomainSourceIdentity,
     PUBLIC_TREE_POLICY,
@@ -42,6 +43,7 @@ SYNTHETIC_SOURCE = b'{"question":"SYNTHETIC: add two counters"}'
 # These invented constants are not GSM8K benchmark answers.
 SYNTHETIC_ANSWER = "314159"
 SYNTHETIC_WRONG_ANSWER = "271828"
+PHYSICAL_TEMP_ROOT = Path(tempfile.gettempdir()).resolve()
 
 
 def fixture(answer: str = SYNTHETIC_ANSWER, source_bytes: bytes = SYNTHETIC_SOURCE):
@@ -68,6 +70,10 @@ def fixture(answer: str = SYNTHETIC_ANSWER, source_bytes: bytes = SYNTHETIC_SOUR
 
 def replay_lock(receipt, snapshot, task):
     return make_replay_lock(receipt, snapshot, task, PUBLIC_TREE_POLICY)
+
+
+def artifact_temp_directory():
+    return tempfile.TemporaryDirectory(dir=PHYSICAL_TEMP_ROOT)
 
 
 class CanonicalTests(unittest.TestCase):
@@ -138,7 +144,24 @@ class AdmissionAndGradeTests(unittest.TestCase):
             Verdict.HARNESS_FAILURE,
         )
 
-    def test_arbitrary_evaluator_injection_is_not_an_api(self) -> None:
+    def test_public_grading_api_accepts_data_not_callables(self) -> None:
+        public_apis = (
+            admit_task,
+            build_task,
+            grade_gsm8k,
+            parse_final_answer,
+            source_asset_manifest,
+        )
+        prohibited_callbacks = {"digest", "evaluator", "parser", "result", "runtime"}
+        for api in public_apis:
+            with self.subTest(api=api.__name__):
+                signature = inspect.signature(api)
+                self.assertTrue(prohibited_callbacks.isdisjoint(signature.parameters))
+                self.assertNotIn("Callable", str(signature))
+        self.assertEqual(
+            tuple(inspect.signature(grade_gsm8k).parameters),
+            ("task", "submission", "available_assets"),
+        )
         with self.assertRaises(TypeError):
             grade_gsm8k(
                 self.task,
@@ -155,59 +178,15 @@ class AdmissionAndGradeTests(unittest.TestCase):
             Verdict.TASK_FAILURE,
         )
 
-    def test_module_global_monkeypatch_does_not_change_admitted_engine(self) -> None:
-        with (
-            mock.patch.object(gsm8k_module, "parse_final_answer", return_value=SYNTHETIC_ANSWER),
-            mock.patch.object(gsm8k_module, "PARSER_POLICY", {"tampered": True}),
-            mock.patch.object(gsm8k_module, "RUNTIME_POLICY", "tampered"),
-            mock.patch.object(gsm8k_module, "canonical_bytes", return_value=b"tampered"),
-            mock.patch.object(gsm8k_module, "sha256_digest", return_value="sha256:" + "0" * 64),
-            mock.patch.object(gsm8k_module, "content_id", return_value="tampered"),
-            mock.patch.object(gsm8k_module, "CodeType", str),
-            mock.patch.object(gsm8k_module, "sys", None),
-        ):
-            result = grade_gsm8k(
-                self.task,
-                f"FINAL_ANSWER: {SYNTHETIC_WRONG_ANSWER}",
-                self.available,
-            )
-        self.assertEqual(result.verdict, Verdict.TASK_FAILURE)
-
-    def test_file_change_after_import_does_not_misstate_loaded_semantics(self) -> None:
-        source_path = Path(gsm8k_module.__file__)
-        original = source_path.read_bytes()
-        commitment_id = self.task.verifier.id
-        try:
-            source_path.write_bytes(original + b"\n# synthetic post-import disk mutation\n")
+    def test_loaded_code_commitment_does_not_read_source_file(self) -> None:
+        with mock.patch.object(Path, "read_bytes", side_effect=AssertionError("disk read")):
             admit_task(self.task, self.available)
             result = grade_gsm8k(
                 self.task,
                 f"FINAL_ANSWER: {SYNTHETIC_ANSWER}",
                 self.available,
             )
-            self.assertEqual(result.verdict, Verdict.PASS)
-            self.assertEqual(self.task.verifier.id, commitment_id)
-        finally:
-            source_path.write_bytes(original)
-
-    def test_loaded_evaluator_code_mutation_fails_admission(self) -> None:
-        closure = dict(zip(grade_gsm8k.__code__.co_freevars, grade_gsm8k.__closure__, strict=True))
-        evaluator = closure["evaluate"].cell_contents
-        original_code = evaluator.__code__
-
-        def always_true(_prediction, _authority):
-            return True
-
-        try:
-            evaluator.__code__ = always_true.__code__
-            result = grade_gsm8k(
-                self.task,
-                f"FINAL_ANSWER: {SYNTHETIC_WRONG_ANSWER}",
-                self.available,
-            )
-            self.assertEqual(result.verdict, Verdict.HARNESS_FAILURE)
-        finally:
-            evaluator.__code__ = original_code
+        self.assertEqual(result.verdict, Verdict.PASS)
 
     def test_answer_authority_and_parser_share_canonical_boundaries(self) -> None:
         hundred_digits = "9" * 100
@@ -286,13 +265,26 @@ class PortablePathTests(unittest.TestCase):
             "back\\slash",
             "CON",
             "con.txt",
+            "CONIN$",
+            "conout$.json",
+            "CLOCK$",
             "AUX.json",
             "COM1",
+            "COM¹.txt",
+            "com²",
+            "CoM³.log",
             "LPT9.log",
+            "LPT¹",
+            "lpt².txt",
+            "LpT³.bin",
             "name.",
             "name ",
+            "CON .txt",
             "stream:name",
             "wild*card",
+            "line\nbreak",
+            "tab\tname",
+            "delete\x7fname",
             "nul\x00byte",
             "e\u0301.txt",
         )
@@ -302,13 +294,31 @@ class PortablePathTests(unittest.TestCase):
                     TreePolicy((path,))
         self.assertEqual(TreePolicy(("nested/portable-name.json",)).allowed_paths[0], "nested/portable-name.json")
 
+    def test_windows_reserved_name_table_with_extensions_is_rejected(self) -> None:
+        reserved = (
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            "CONIN$",
+            "CONOUT$",
+            "CLOCK$",
+            *(f"COM{suffix}" for suffix in "123456789¹²³"),
+            *(f"LPT{suffix}" for suffix in "123456789¹²³"),
+        )
+        for name in reserved:
+            for candidate in (name, name.lower(), f"{name}.txt", f"{name} .json"):
+                with self.subTest(candidate=candidate):
+                    with self.assertRaises(ValueError):
+                        TreePolicy((candidate,))
+
 
 class PublicationReplayTests(unittest.TestCase):
     def setUp(self) -> None:
         self.task, self.available = fixture()
 
     def test_atomic_publication_and_no_sealed_data(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             receipt, snapshot = publish_public_task(destination, self.task)
             self.assertTrue(destination.is_dir())
@@ -323,13 +333,102 @@ class PublicationReplayTests(unittest.TestCase):
                 self.assertNotIn(secret, combined)
 
     def test_rename_failure_never_exposes_destination(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             with mock.patch("parallax.artifacts.os.replace", side_effect=OSError("synthetic rename fault")):
-                with self.assertRaises(OSError):
+                with self.assertRaises(ArtifactPathError) as raised:
                     publish_public_task(destination, self.task)
+            self.assertIsInstance(raised.exception.__cause__, OSError)
             self.assertFalse(destination.exists())
             self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_staging_open_failure_removes_new_directory(self) -> None:
+        with artifact_temp_directory() as directory:
+            parent = Path(directory)
+            parent_fd = artifact_module._open_directory_path(parent)
+            real_open = artifact_module.os.open
+
+            def failing_staging_open(path, flags, mode=0o777, *, dir_fd=None):
+                if isinstance(path, str) and path.startswith(".parallax-staging-"):
+                    raise OSError("synthetic staging open fault")
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            try:
+                with mock.patch("parallax.artifacts.os.open", side_effect=failing_staging_open):
+                    with self.assertRaises(ArtifactPathError) as raised:
+                        artifact_module._make_staging(parent_fd)
+                self.assertIsInstance(raised.exception.__cause__, OSError)
+                self.assertEqual(list(parent.iterdir()), [])
+            finally:
+                os.close(parent_fd)
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
+    def test_symlinked_parent_component_fails_closed(self) -> None:
+        with artifact_temp_directory() as directory:
+            root = Path(directory)
+            real_parent = root / "real-parent"
+            real_parent.mkdir()
+            alias = root / "parent-alias"
+            os.symlink(real_parent, alias)
+            with self.assertRaises(ArtifactPathError) as raised:
+                publish_public_task(alias / "published", self.task)
+            self.assertIsInstance(raised.exception.__cause__, OSError)
+            self.assertEqual(list(real_parent.iterdir()), [])
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
+    def test_root_swap_to_symlink_fails_closed(self) -> None:
+        with artifact_temp_directory() as directory:
+            parent = Path(directory)
+            root = parent / "protected-root"
+            root.mkdir()
+            (root / "kept.txt").write_text("kept", encoding="utf-8")
+            backup = parent / "protected-root-original"
+            policy = TreePolicy(("kept.txt",))
+            real_open = artifact_module.os.open
+            swapped = False
+
+            def swapping_open(path, flags, mode=0o777, *, dir_fd=None):
+                nonlocal swapped
+                if path == root.name and dir_fd is not None and not swapped:
+                    root.rename(backup)
+                    os.symlink(backup, root)
+                    swapped = True
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            with mock.patch("parallax.artifacts.os.open", side_effect=swapping_open):
+                with self.assertRaises(ArtifactPathError) as raised:
+                    snapshot_tree(root, policy)
+            self.assertIsInstance(raised.exception.__cause__, OSError)
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
+    def test_file_swap_to_symlink_has_artifact_path_error_taxonomy(self) -> None:
+        with artifact_temp_directory() as directory:
+            destination = Path(directory) / "published"
+            receipt, snapshot = publish_public_task(destination, self.task)
+            lock = replay_lock(receipt, snapshot, self.task)
+            task_path = destination / "task.json"
+            backup = destination / "task-original.json"
+            real_open = artifact_module.os.open
+            swapped = False
+
+            def swapping_open(path, flags, mode=0o777, *, dir_fd=None):
+                nonlocal swapped
+                if path == "task.json" and dir_fd is not None and not swapped:
+                    task_path.rename(backup)
+                    os.symlink(backup, task_path)
+                    swapped = True
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            with mock.patch("parallax.artifacts.os.open", side_effect=swapping_open):
+                with self.assertRaises(ArtifactPathError) as raised:
+                    replay_locked(
+                        destination,
+                        lock,
+                        self.task,
+                        self.available,
+                        PUBLIC_TREE_POLICY,
+                    )
+            self.assertIsInstance(raised.exception.__cause__, OSError)
 
     def test_tamper_before_rename_is_detected_as_visible_state_error(self) -> None:
         original_replace = artifact_module.os.replace
@@ -351,7 +450,7 @@ class PublicationReplayTests(unittest.TestCase):
                 dst_dir_fd=dst_dir_fd,
             )
 
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             with mock.patch("parallax.artifacts.os.replace", side_effect=tampering_replace):
                 with self.assertRaises(PublicationStateError) as raised:
@@ -368,7 +467,7 @@ class PublicationReplayTests(unittest.TestCase):
                 raise OSError("synthetic parent fsync fault")
             return real_fsync(file_descriptor)
 
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             with mock.patch("parallax.artifacts.os.fsync", side_effect=failing_parent_fsync):
                 with self.assertRaises(PublicationDurabilityError) as raised:
@@ -381,7 +480,7 @@ class PublicationReplayTests(unittest.TestCase):
             self.assertEqual(artifact_module.verify_publication(destination, self.task), error.receipt.artifact_manifest_id)
 
     def test_locked_replay_returns_single_verified_capture(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             receipt, snapshot = publish_public_task(destination, self.task)
             lock = replay_lock(receipt, snapshot, self.task)
@@ -406,7 +505,7 @@ class PublicationReplayTests(unittest.TestCase):
 
     def test_replay_rejects_mutation_and_unexpected_paths(self) -> None:
         for mutation in ("changed", "unexpected-file", "unexpected-directory"):
-            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+            with self.subTest(mutation=mutation), artifact_temp_directory() as directory:
                 destination = Path(directory) / "published"
                 receipt, snapshot = publish_public_task(destination, self.task)
                 lock = replay_lock(receipt, snapshot, self.task)
@@ -421,7 +520,7 @@ class PublicationReplayTests(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
     def test_replay_rejects_symlinks_and_symlink_root(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             receipt, snapshot = publish_public_task(destination, self.task)
             lock = replay_lock(receipt, snapshot, self.task)
@@ -431,11 +530,12 @@ class PublicationReplayTests(unittest.TestCase):
             (destination / "escape").unlink()
             alias = Path(directory) / "alias"
             os.symlink(destination, alias)
-            with self.assertRaisesRegex(ArtifactError, "symlink"):
+            with self.assertRaises(ArtifactPathError) as raised:
                 replay_locked(alias, lock, self.task, self.available, PUBLIC_TREE_POLICY)
+            self.assertIsInstance(raised.exception.__cause__, OSError)
 
     def test_replay_rejects_changed_verifier_assets_and_policy(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             receipt, snapshot = publish_public_task(destination, self.task)
             lock = replay_lock(receipt, snapshot, self.task)
@@ -455,7 +555,7 @@ class PublicationReplayTests(unittest.TestCase):
                 replay_locked(destination, lock, self.task, self.available, other_policy)
 
     def test_mismatched_receipt_policy_cannot_form_replay_lock(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             destination = Path(directory) / "published"
             receipt, snapshot = publish_public_task(destination, self.task)
             other_policy = TreePolicy(("other.json",))
@@ -466,7 +566,7 @@ class PublicationReplayTests(unittest.TestCase):
                 make_replay_lock(mismatched, snapshot, self.task, PUBLIC_TREE_POLICY)
 
     def test_tree_policy_defines_allowed_ignored_and_traversal(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with artifact_temp_directory() as directory:
             root = Path(directory)
             (root / "kept.txt").write_text("kept", encoding="utf-8")
             (root / "ignored").mkdir()
