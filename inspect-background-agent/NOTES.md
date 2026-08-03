@@ -5,6 +5,16 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
+## Team features (2026-08-03)
+
+Toward Open-Inspect parity without external credentials:
+- Multiplayer: `POST .../prompt` accepts `authorName/authorEmail`; participants tracked; commits attribute to the last prompting author
+- Webhook ingress: `POST /api/hooks` (X-Hook-Token when `HOOK_TOKEN` set) — Slack workflows/Sentry/CI can spawn sessions
+- PR flow: `POST .../pr` commits, pushes branch to origin (test-proven against a bare repo), opens a GitHub PR as the user when `GITHUB_TOKEN`/body token exists
+- Automations: `POST /api/automations` `{name, prompt, everyMs}` spawns sessions on an interval; auto-pauses after 3 consecutive failures
+
+Needs credentials to fully light up: real GitHub PR (token), Slack bot (bot token), hosted deploy (CF/Modal accounts).
+
 ## Cloudflare + Modal planes (2026-08-03)
 
 Landed three-plane split without breaking the local monolith:

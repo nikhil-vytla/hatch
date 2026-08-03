@@ -197,6 +197,19 @@ export class GitSandboxManager {
     return git(repoDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
   }
 
+  /** Push the session branch to origin. Token (if given) is injected for https GitHub remotes. */
+  async push(repoDir: string, branch: string, token?: string): Promise<void> {
+    if (token) {
+      const remote = await git(repoDir, ["remote", "get-url", "origin"]);
+      const url = new URL(remote);
+      url.username = "x-access-token";
+      url.password = token;
+      await git(repoDir, ["push", url.toString(), `HEAD:${branch}`]);
+      return;
+    }
+    await git(repoDir, ["push", "origin", `HEAD:${branch}`]);
+  }
+
   /**
    * Fork: new sandbox from another repo's committed HEAD (+ optional dirty tree commit first by caller).
    * Clones the source path locally onto a fresh inspect/ branch.

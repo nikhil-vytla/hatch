@@ -10,6 +10,8 @@ import { listModels, resolveModel } from "../agent/models.js";
 import { createMemoryEventBus } from "../control/event-bus.js";
 import { SessionQueues } from "../control/session-queues.js";
 import { ResourceLifecycle } from "../control/resource-lifecycle.js";
+import { Automations } from "../control/automations.js";
+import { openPullRequest, parseGitHubRemote } from "../scm/github.js";
 import type { SessionEventEnvelope } from "../session/index.js";
 import { brandNumber, brandString } from "../kernel/index.js";
 
@@ -19,8 +21,14 @@ export type SessionRow = {
   sandboxId: string;
   repoDir: string;
   branch: string;
+  remoteUrl: string | null;
   opencodeSessionId: string | null;
+  /** Session opener. Individual prompts may carry their own author (multiplayer). */
   author: GitAuthor;
+  /** Everyone who has prompted this session, opener first. */
+  participants: GitAuthor[];
+  /** Author of the most recent prompt; used for commit attribution. */
+  lastPromptAuthor: GitAuthor;
   createdAt: number;
   lastActiveAt: number;
   status: "idle" | "running" | "error";
@@ -38,7 +46,18 @@ export type ControlPlaneOptions = {
   readonly modelProvider?: string;
   readonly modelId?: string;
   readonly sessionTtlMs?: number;
+  /** Shared secret for POST /api/hooks (external triggers: Slack workflows, Sentry, CI). */
+  readonly hookToken?: string;
+  /** GitHub token for opening PRs as the prompting user. */
+  readonly githubToken?: string;
 };
+
+function addParticipant(row: SessionRow, author: GitAuthor): void {
+  if (!row.participants.some((p) => p.email === author.email)) {
+    row.participants.push(author);
+  }
+  row.lastPromptAuthor = author;
+}
 
 function id(prefix: string): string {
   return `${prefix}_${randomBytes(5).toString("hex")}`;
@@ -63,6 +82,27 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     void lifecycle.reap(sessions);
   }, 60_000);
   reapTimer.unref?.();
+
+  const hookToken = opts.hookToken ?? process.env.HOOK_TOKEN;
+  const githubToken = opts.githubToken ?? process.env.GITHUB_TOKEN;
+
+  // Recurring prompts that spawn sessions unattended (cron-style automations).
+  const automations = new Automations(async (a) => {
+    const r = await app.request("/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: a.prompt,
+        title: a.title ?? `auto: ${a.name}`,
+        authorName: `Automation ${a.name}`,
+        authorEmail: `automation+${a.id}@localhost`,
+      }),
+    });
+    if (!r.ok) throw new Error(`automation session failed: ${r.status}`);
+    const j = (await r.json()) as { id: string };
+    return j.id;
+  });
+  automations.start();
 
   let seq = 0;
 
@@ -147,8 +187,11 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       sandboxId: sandbox.id,
       repoDir: sandbox.repoDir,
       branch: sandbox.branch,
+      remoteUrl: body.cloneUrl ?? null,
       opencodeSessionId: ocSession,
       author,
+      participants: [author],
+      lastPromptAuthor: author,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
       status: "idle",
@@ -167,13 +210,45 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     });
 
     if (body.prompt) {
-      void queues.enqueue(row.id, () => runPrompt(row.id, body.prompt!));
+      void queues.enqueue(row.id, () => runPrompt(row.id, body.prompt!, author));
     }
     return c.json({
       id: row.id,
       branch: row.branch,
       repoDir: row.repoDir,
       status: row.status,
+    });
+  });
+
+  // External trigger ingress: Slack workflows, Sentry alerts, CI hooks.
+  // POST /api/hooks { prompt, title?, cloneUrl?, authorName?, authorEmail? }
+  // Requires X-Hook-Token to match HOOK_TOKEN when one is configured.
+  app.post("/api/hooks", async (c) => {
+    if (hookToken && c.req.header("x-hook-token") !== hookToken) {
+      return c.json({ error: "bad hook token" }, 401);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as {
+      prompt?: string;
+      title?: string;
+      cloneUrl?: string;
+      authorName?: string;
+      authorEmail?: string;
+    };
+    if (!body.prompt?.trim()) return c.json({ error: "prompt required" }, 400);
+    const r = await app.request("/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: body.prompt,
+        title: body.title ?? `hook: ${body.prompt.slice(0, 60)}`,
+        cloneUrl: body.cloneUrl,
+        authorName: body.authorName ?? "Webhook",
+        authorEmail: body.authorEmail ?? "hook@localhost",
+      }),
+    });
+    return new Response(r.body, {
+      status: r.status,
+      headers: { "content-type": "application/json" },
     });
   });
 
@@ -238,8 +313,11 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       sandboxId: sandbox.id,
       repoDir: sandbox.repoDir,
       branch: sandbox.branch,
+      remoteUrl: parent.remoteUrl,
       opencodeSessionId: ocSession,
       author: parent.author,
+      participants: [parent.author],
+      lastPromptAuthor: parent.author,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
       status: "idle",
@@ -299,10 +377,22 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     const row = sessions.get(c.req.param("id"));
     if (!row) return c.json({ error: "not found" }, 404);
     if (row.archivedAt) return c.json({ error: "archived; restore first" }, 409);
-    const body = (await c.req.json()) as { text?: string };
+    const body = (await c.req.json()) as {
+      text?: string;
+      authorName?: string;
+      authorEmail?: string;
+    };
     if (!body.text?.trim()) return c.json({ error: "text required" }, 400);
-    void queues.enqueue(row.id, () => runPrompt(row.id, body.text!.trim()));
-    return c.json({ ok: true, status: "queued" });
+    // Multiplayer: any client may prompt with its own identity; commits attribute to them.
+    const author: GitAuthor =
+      body.authorName || body.authorEmail
+        ? {
+            name: body.authorName ?? body.authorEmail!,
+            email: body.authorEmail ?? `${body.authorName}@localhost`,
+          }
+        : row.lastPromptAuthor;
+    void queues.enqueue(row.id, () => runPrompt(row.id, body.text!.trim(), author));
+    return c.json({ ok: true, status: "queued", author });
   });
 
   app.post("/api/sessions/:id/commit", async (c) => {
@@ -312,14 +402,97 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     const sha = await sandboxes.commitAll(
       row.repoDir,
       body.message ?? `inspect: ${row.title}`,
-      row.author,
+      row.lastPromptAuthor,
     );
     emit(row.id, "sandbox", {
       kind: "git.pushed",
       branch: brandString<"BranchName">(row.branch),
       head: brandString<"CommitSha">(sha),
     });
-    return c.json({ sha, branch: row.branch });
+    return c.json({ sha, branch: row.branch, author: row.lastPromptAuthor });
+  });
+
+  // Push branch to origin; open a GitHub PR as the prompting user when a token exists.
+  app.post("/api/sessions/:id/pr", async (c) => {
+    const row = sessions.get(c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    if (!row.remoteUrl) {
+      return c.json({ error: "session has no cloneUrl remote; nothing to push to" }, 400);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as {
+      title?: string;
+      body?: string;
+      base?: string;
+      token?: string;
+    };
+    const sha = await sandboxes.commitAll(
+      row.repoDir,
+      `inspect: ${row.title}`,
+      row.lastPromptAuthor,
+    );
+    const token = body.token ?? githubToken;
+    const gh = parseGitHubRemote(row.remoteUrl);
+    await sandboxes.push(row.repoDir, row.branch, gh ? token : undefined);
+    emit(row.id, "sandbox", {
+      kind: "git.pushed",
+      branch: brandString<"BranchName">(row.branch),
+      head: brandString<"CommitSha">(sha),
+    });
+    if (!gh || !token) {
+      return c.json({
+        pushed: true,
+        branch: row.branch,
+        sha,
+        pr: null,
+        note: gh
+          ? "no GitHub token (set GITHUB_TOKEN or pass token) — branch pushed, PR not opened"
+          : "remote is not GitHub — branch pushed, PR not opened",
+      });
+    }
+    const pr = await openPullRequest({
+      repo: gh,
+      head: row.branch,
+      ...(body.base ? { base: body.base } : {}),
+      title: body.title ?? row.title,
+      body:
+        body.body ??
+        `Session ${row.id} by ${row.participants.map((p) => p.name).join(", ")}.`,
+      token,
+    });
+    emit(row.id, "webhook", {
+      kind: "pr.opened",
+      number: pr.number,
+      url: pr.url,
+      by: brandString<"ActorId">(row.lastPromptAuthor.email),
+    });
+    return c.json({ pushed: true, branch: row.branch, sha, pr });
+  });
+
+  app.get("/api/automations", (c) => c.json({ automations: automations.list() }));
+
+  app.post("/api/automations", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      name?: string;
+      prompt?: string;
+      everyMs?: number;
+      title?: string;
+    };
+    if (!body.name?.trim() || !body.prompt?.trim()) {
+      return c.json({ error: "name and prompt required" }, 400);
+    }
+    const automation = automations.add({
+      id: id("auto"),
+      name: body.name.trim(),
+      prompt: body.prompt.trim(),
+      everyMs: Math.max(10_000, body.everyMs ?? 3_600_000),
+      ...(body.title ? { title: body.title } : {}),
+    });
+    return c.json(automation);
+  });
+
+  app.delete("/api/automations/:id", (c) => {
+    const ok = automations.remove(c.req.param("id"));
+    return ok ? c.json({ ok: true }) : c.json({ error: "not found" }, 404);
   });
 
   app.get(
@@ -346,9 +519,11 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   app.get("/", (c) => c.html(webUiHtml()));
   app.get("/ui", (c) => c.html(webUiHtml()));
 
-  async function runPrompt(sessionId: string, text: string) {
+  async function runPrompt(sessionId: string, text: string, author?: GitAuthor) {
     const row = sessions.get(sessionId);
     if (!row || !row.opencodeSessionId || row.archivedAt) return;
+    const by = author ?? row.lastPromptAuthor;
+    addParticipant(row, by);
     row.status = "running";
     lifecycle.touch(row);
     const turnId = brandString<"TurnId">(id("trn"));
@@ -357,8 +532,8 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       turn: {
         id: turnId,
         author: {
-          id: brandString<"ActorId">(row.author.email),
-          display: row.author.name,
+          id: brandString<"ActorId">(by.email),
+          display: by.name,
           github: null,
         },
         text,
@@ -435,7 +610,9 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     sandboxes,
     bridge,
     bus,
+    automations,
     async close() {
+      automations.stop();
       clearInterval(reapTimer);
       for (const session of [...sessions.values()]) {
         await queues.drain(session.id);
