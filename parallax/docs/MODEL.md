@@ -136,11 +136,11 @@ requirement.
 > event, outcome, and evidence-record variants explicit. The manifest fixes
 > expected source-trial units, seeds, model configuration, arm configuration,
 > and the decision threshold before outcomes are aggregated. The slice does
-> not claim to implement the full abstract task and environment specifications
-> defined above.
-
-> **TODO:** Generalize only after another research journey demonstrates which
-> task and environment fields need a shared executable representation.
+> The SWE-bench slice adds versioned `TaskSpecV1` and `EnvSpecV1` models.
+> `TaskSpecV1` makes the public and sealed authority branches structural.
+> `compile_hud` creates agent artifacts only from the public branch and emits
+> evaluator artifacts separately. This is one narrow executable target, not a
+> general platform compiler framework.
 
 **Estimand.** For outcome \(Y\), a basic matched-arm effect is
 

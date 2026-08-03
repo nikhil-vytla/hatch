@@ -9,9 +9,10 @@ from hud.eval import DockerRuntime, Task
 from pydantic import Field
 
 from .canonical import atomic_write, canonical_bytes
+from .hud_compile import CompiledBundleV1, compile_hud, load_evaluator_specs
 from .screening import ScreeningExecution, ScreeningExecutionError, ScreeningUnit
+from .specs import freeze_swe_specs
 from .swebench import SweScriptFamily
-from .swebench_env import render_environment
 from .swebench_harness import OfficialHarnessError, run_official_harness
 from .types import NonEmptyText, StrictModel
 
@@ -142,28 +143,30 @@ class HudStaticExecutor:
         self.model = model
         self.work_directory = work_directory
         self.pricing = pricing
-        self._images: dict[str, str] = {}
+        self._compiled: dict[str, tuple[str, CompiledBundleV1]] = {}
 
-    def _image(self, family: SweScriptFamily) -> str:
+    def _compile(self, family: SweScriptFamily) -> tuple[str, CompiledBundleV1]:
         problem = family.static.problem
         key = str(problem.record_id)
         instance_id = str(problem.instance_id)
-        if key in self._images:
-            return self._images[key]
+        if key in self._compiled:
+            return self._compiled[key]
         directory = self.work_directory / "environments" / instance_id
         directory.mkdir(parents=True, exist_ok=True)
-        bundle = render_environment(family)
-        bundle.write(directory)
+        task_spec, env_spec = freeze_swe_specs(family)
+        bundle = compile_hud(task_spec, env_spec)
+        bundle.write_agent_context(directory)
         image = f"parallax-screening-{instance_id.lower()}:local"
         _docker_build(directory, image)
-        self._images[key] = image
-        return image
+        self._compiled[key] = (image, bundle)
+        return image, bundle
 
     def __call__(self, unit: ScreeningUnit) -> ScreeningExecution:
         source_id = str(unit.source_id)
         family = self.families[source_id]
         problem = family.static.problem
-        image = self._image(family)
+        image, bundle = self._compile(family)
+        task_spec, env_spec = load_evaluator_specs(bundle)
         episode_path = (
             self.work_directory
             / "episodes"
@@ -196,7 +199,8 @@ class HudStaticExecutor:
         )
         try:
             evaluation = run_official_harness(
-                problem,
+                task_spec,
+                env_spec,
                 episode.model_patch,
                 model=episode.reported_model,
                 run_directory=harness_directory,

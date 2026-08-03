@@ -60,3 +60,41 @@
   zero tokens and estimated spend is $0; the key value was never logged.
 - Offline certification reached 106 tests and the adapted audit mutation suite
   killed all 34 active mutants.
+
+## Spec translation
+
+- Merged the design record from PR #19 before implementation. The old
+  `render_environment(family)` entry point received both public and sealed data.
+  It is deleted.
+- `TaskSpecV1` contains `public: PublicTaskV1` and
+  `sealed: SealedAuthorityV1`.
+- `EnvSpecV1` contains the pinned image, Workspace policy, tool declarations,
+  and equal arm budget.
+- `_compile_agent_artifacts(public: PublicTaskV1, environment: EnvSpecV1)` is
+  the only function that creates agent artifacts.
+- `compile_hud(task, environment)` emits audience-tagged artifacts and a digest
+  receipt.
+- The evaluator reloads `evaluator.json` from the compiled bundle before it
+  invokes the official harness.
+- The byte scan checks every agent artifact path and body for the test patch,
+  patch hunk headers, added test function names, and both test ID sets.
+- Red evidence: `test_red_phase_catches_returncode_only_grading` rejects the
+  revived return-code grader because it treats a weakened sealed test as a pass
+  and a harness crash as a model failure.
+- Red evidence: `test_red_phase_catches_sealed_bytes_in_agent_context` rejects
+  a compiled agent artifact that contains the sealed test patch.
+- Green evidence: `test_green_phase_matches_all_conformance_vectors` matches
+  concrete miniature patches for known-good, known-bad, sealed-test-touching,
+  and harness-crash outcomes across the reference grader and the compiled HUD
+  grader.
+- `Chat` remains the only inference protocol. HUD's inference endpoint uses the
+  OpenAI chat-completions request and response wire, so `HudGatewayProvider`
+  configures `OpenAICompatibleProvider` and returns `Chat`. The 403 was an
+  entitlement failure, not evidence of a different protocol. No endpoint ABC
+  or provider registry was added.
+- No paid inference or HUD network request ran during this unit. Screening
+  remains paused on the same 403.
+- Final offline gate: 112 tests passed under normal Python and `python -O`;
+  Ruff check and format check passed; `uvx ty check src` passed; the package
+  built; the core suite killed 28 of 28 mutants; and the Slice 2 suite killed
+  36 of 36 mutants.
