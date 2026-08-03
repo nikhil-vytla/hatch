@@ -152,3 +152,42 @@ model/coldstart_model.py, assumptions tunable:
   services vs memory), runtime mix at target customers, custody
   requirements, dedup value on real catalogs, retention economics, fork
   fan-out frequency.
+
+## Prototype pass (depth interrogation follow-up)
+
+Constraint: no paid platforms, no container runtime on the box. Turned out
+to be a feature: pulling straight from the registry HTTP API exposes layer
+mechanics (manifest negotiation, blob redirect to presigned CDN URLs,
+whiteout handling) that a runtime hides. Gotcha hit: the standard library
+HTTP client re-sends the Authorization header on the blob redirect, which
+presigned CDN URLs reject with 400; fixed by stripping auth on redirect.
+
+Setup: slim Python base (4 layers, 119 MB) + synthetic deps layer
+(numpy+pandas, 97 MB) = 7,400 files, 213 MB uncompressed, 70 MB compressed.
+Five stand-in tasks traced in a chroot under strace -f -y (opens, reads,
+preads, file-backed mmaps; unfinished/resumed lines handled per pid).
+Python 3.12 chroot ran with no /proc or /dev mounts needed.
+
+Numbers (results/summary.md has full tables):
+- Per-task utilization: 0.3-17.3% of files, 5.2-39.2% of bytes. Slacker
+  replicates on a modern env-shaped image.
+- Layer boundaries mislead: deps layer 0% relevant to 3 of 5 tasks, 43-62%
+  to the other two. Access tiers beat build-order layers.
+- Hot tier (files touched by >=2 tasks): 69 files, 21.7 MB compressed vs
+  70.2 MB full pull = 3.2x less up-front. Cold: 6,044 files, 104 MB, never
+  touched.
+- Leave-one-out prefetch coverage: 100% (csv), 100% (numpy), 87% (db), 78%
+  (dataframes), 23% (code-search). The filesystem-trawling task is the
+  adversarial case; hot-tier + lazy tail is the right default, profiles
+  are a floor.
+- PEP 479 bite in synth prototype (StopIteration in genexp -> RuntimeError);
+  switched to islice.
+
+Synthesis prototype (synthesize/): drops + description -> content-addressed
+bundle (manifest of digests, hardlink seed setup, grader stub with the
+0.0/1.0 sanity contract, synthesis prompt for the model step). Demo: 4 seed
+files across 2 bundles -> 3 stored objects (shared policy file deduped).
+
+Depth audit added to README: argued (axes/pruning) vs modeled (arithmetic)
+vs prototyped (this) vs untouched (serving path, multi-node cache, memory
+capture, fencing, security).
