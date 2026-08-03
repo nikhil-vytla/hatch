@@ -1,0 +1,11 @@
+ts	phase	decision	why	evidence	result
+2026-08-03T16:08:00Z	frame	built hermes-workspace product shape on OpenCode/OpenAI-compat backends	study established products; no credentials available in hatch	PLAYBOOK.md done predicate	framed
+2026-08-03T16:08:00Z	frame	rigor high on security + restart persistence	"production-ready" claim lives there; UI polish medium	PLAYBOOK Rigor	held
+2026-08-03T16:12:00Z	U1	ChatBackend port; OpenCode transcript-in-prompt + OpenAI-compat SSE	model-the-domain; opencode run is single-shot	src/backend.ts; fake-backend unit	VERIFIED
+2026-08-03T16:14:00Z	U2	SQLite WorkspaceStore; SSE chat route persists both turns	restart survival is the workspace promise	tests store restart; e2e "restart persistence OK: 2 messages"	VERIFIED
+2026-08-03T16:15:00Z	U3	fail-closed bind + auth middleware + limiter + constant-time compare	hermes security rules; auth on every /api route	tests 401/refuse-0.0.0.0; e2e auth gate	VERIFIED
+2026-08-03T16:15:30Z	U4	safeResolve real-path guard for files/memory/skills	string-prefix checks miss symlinks; hermes audit lesson	tests ../ absolute symlink; e2e 400s	VERIFIED
+2026-08-03T16:18:00Z	U5	piped bash terminal, no node-pty	native build cost > v1 value; limitation stated in UI	term-probe echo term-42 round-trip	VERIFIED
+2026-08-03T16:19:00Z	U6	embedded single-page UI, no bundler	worked for inspect; server guarantees are the product	serve probes: health/memory/files/skills/UI	VERIFIED
+2026-08-03T16:22:00Z	U7	Dockerfile + compose with enforced password	deployment story; compose refuses empty WORKSPACE_PASSWORD	tsc build loads from dist; docker absent on VM	INCONCLUSIVE (image build unverified)
+2026-08-03T16:22:30Z	attention	skipped PWA/Electron/swarm/marketplace	laziness protocol; hermes built those over many releases	README Not in v1	held
