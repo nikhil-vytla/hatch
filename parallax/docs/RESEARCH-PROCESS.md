@@ -221,7 +221,10 @@ documented research phase, and each load-bearing choice has a citable origin.
   checkpoints) is incompatible with intent-trajectory state, which is exactly
   why the model fixes shared vocabulary and invariants while each strategy
   owns its own state machine. Collapsing them into one transformation algebra
-  would erase the variables experiments must control.
+  would erase the variables experiments must control. That decision is
+  recorded in [`decisions/ADR-001.md`](decisions/ADR-001.md), and the exact
+  papers and repository revisions it was checked against are pinned in
+  [`decisions/LITERATURE-PINS.md`](decisions/LITERATURE-PINS.md).
 - **Preregistration before outcomes.** Freezing the threshold, units, seeds,
   and configuration digests in the evidence manifest before any outcome is
   visible follows the preregistration rationale documented by the
@@ -236,7 +239,10 @@ documented research phase, and each load-bearing choice has a citable origin.
   ([closed pull request](https://github.com/nikhil-vytla/hatch/pull/9)) that
   was over-engineered for the same reason. The current harness inverts the
   order: one complete journey first, with structure added only where a review
-  demanded it.
+  demanded it. The architecture that replaced those directions was selected
+  in a four-candidate arena; the winning base, accepted grafts, and
+  rejections are preserved in
+  [`decisions/DESIGN-SELECTION.md`](decisions/DESIGN-SELECTION.md).
 - **Failure separation and budget matching encode prior review findings.**
   The rules that provider and harness faults must never count against the
   model, and that matched arms must equalize budgets rather than only turn
@@ -251,11 +257,14 @@ documented research phase, and each load-bearing choice has a citable origin.
   slice is accepted. The concrete changes each review forced are recorded in
   [`../NOTES.md`](../NOTES.md).
 
-The wider corpus behind these decisions — a typed literature base of source,
-concept, and synthesis notes, a timestamped decision log, and the full
-adversarial review — lives with the
-[hard-repo-tasks research experiment](https://github.com/nikhil-vytla/hatch/pull/5)
-that preceded this harness.
+The decision records behind this section live in
+[`decisions/`](decisions/README.md). The wider experimental archive — the
+formal-model ancestor of `MODEL.md`, the complete literature review, the
+arena candidate files, the typed knowledge base of source, concept, and
+synthesis notes, the timestamped decision log, and the full adversarial
+review — lives on the
+[archive branch](https://github.com/nikhil-vytla/hatch/tree/cursor/hard-repo-tasks-5fc8/hard-repo-tasks)
+of the superseded experiment that preceded this harness.
 
 ## Deliberately out of scope
 
