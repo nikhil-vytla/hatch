@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import os
-import secrets
-import socket
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Annotated
 
-from fastmcp import FastMCP
-from hud.capabilities import Capability
-from hud.environment import Environment
+from hud.environment import Answer, Environment
 from hud.graders import EvaluationResult
-from pydantic import Field
+
+from .delivery import CompleteDeliveryReceiptV1
 
 CONFIG_PATH = Path(os.environ.get("PARALLAX_INSTANCE_PATH", "/app/instance.json"))
 CONFIG = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
@@ -31,9 +26,6 @@ workspace = env.workspace(
     track_files=True,
     shell_uid=1000,
 )
-_director = FastMCP(name="parallax-swebench-turn-director")
-_states: dict[str, dict[str, object]] = {}
-_server_task: asyncio.Task[None] | None = None
 
 
 def workspace_owner_argv(
@@ -134,37 +126,20 @@ def isolation_probe_argv() -> list[str]:
     return workspace.shell_argv("test ! -e /app/instance.json")
 
 
-@_director.tool
-def advance(
-    token: Annotated[str, Field(description="Opaque token for the active episode")],
-) -> dict[str, object]:
-    """Advance the scripted user by one turn."""
-    state = _states[token]
-    turns = state["turns"]
-    if not isinstance(turns, list):
-        raise RuntimeError("invalid turn state")
-    index = state["index"]
-    if not isinstance(index, int):
-        raise RuntimeError("invalid turn index")
-    if index + 1 >= len(turns):
-        return {"done": True, "index": index}
-    index += 1
-    state["index"] = index
-    steps = state["agent_steps"]
-    if not isinstance(steps, list):
-        raise RuntimeError("invalid step state")
-    return {
-        "done": False,
-        "index": index,
-        "step_budget": steps[index],
-        "turn": turns[index],
-    }
-
-
-def _unused_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
+def require_complete_delivery(
+    answer: Answer[CompleteDeliveryReceiptV1],
+    *,
+    turns: list[str],
+    step_budgets: list[int],
+) -> CompleteDeliveryReceiptV1:
+    receipt = answer.content
+    if not isinstance(receipt, CompleteDeliveryReceiptV1):
+        raise RuntimeError("episode answer is not a complete delivery receipt")
+    if receipt.turn_count != len(turns):
+        raise RuntimeError("delivery receipt turn count differs from script")
+    if tuple(phase.step_budget for phase in receipt.phases) != tuple(step_budgets):
+        raise RuntimeError("delivery receipt phase budgets differ from script")
+    return receipt
 
 
 @env.initialize
@@ -176,33 +151,7 @@ async def _verify_isolation() -> None:
         )
 
 
-@env.initialize
-async def _start_director() -> None:
-    global _server_task
-    port = _unused_port()
-    _server_task = asyncio.create_task(
-        _director.run_http_async(
-            show_banner=False,
-            host="127.0.0.1",
-            port=port,
-            log_level="error",
-        )
-    )
-    env.add_capability(
-        Capability.mcp(name="director", url=f"http://127.0.0.1:{port}/mcp")
-    )
-    await asyncio.sleep(0.2)
-
-
-@env.shutdown
-async def _stop_director() -> None:
-    if _server_task is not None:
-        _server_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await _server_task
-
-
-@env.template(id="episode")
+@env.template(id="episode", returns=CompleteDeliveryReceiptV1)
 async def episode(arm: str):
     scripts = CONFIG["scripts"]
     if arm not in scripts:
@@ -210,41 +159,24 @@ async def episode(arm: str):
     source = CONFIG["source"]
     await asyncio.to_thread(reset_workspace, source["base_commit"])
     script = scripts[arm]
-    token = secrets.token_urlsafe(24)
-    _states[token] = {
-        "agent_steps": script["agent_steps"],
-        "index": 0,
-        "turns": script["turns"],
-    }
-    _answer = yield json.dumps(
-        {
-            "arm": arm,
-            "step_budget": script["agent_steps"][0],
-            "token": token,
-            "turn": script["turns"][0],
-        },
-        sort_keys=True,
+    answer = yield script["turns"][0]
+    receipt = require_complete_delivery(
+        answer,
+        turns=script["turns"],
+        step_budgets=script["agent_steps"],
     )
-    final = _states.pop(token)
     patch = await asyncio.to_thread(collect_patch, source["base_commit"])
-    index = final["index"]
-    turns = final["turns"]
-    steps = final["agent_steps"]
-    if not isinstance(index, int) or not isinstance(turns, list):
-        raise RuntimeError("invalid completed episode state")
-    if not isinstance(steps, list) or not all(isinstance(step, int) for step in steps):
-        raise RuntimeError("invalid completed budget state")
-    complete = index == len(turns) - 1
-    total_steps = sum(step for step in steps if isinstance(step, int))
     yield EvaluationResult(
         reward=0.0,
         content="candidate patch exported for evaluator-side official grading",
         info={
             "arm": arm,
-            "final_turn": index,
+            "delivery": receipt.model_dump(mode="json"),
+            "final_turn": receipt.turn_count - 1,
             "model_patch": patch,
-            "schedule_complete": complete,
-            "total_agent_steps": total_steps,
-            "turns": len(turns),
+            "schedule_complete": True,
+            "steps_consumed": sum(phase.steps_consumed for phase in receipt.phases),
+            "total_agent_steps": receipt.total_step_budget,
+            "turns": receipt.turn_count,
         },
     )

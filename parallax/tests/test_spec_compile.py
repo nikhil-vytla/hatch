@@ -31,16 +31,24 @@ def test_compile_hud_is_deterministic_and_audience_tagged(tmp_path: Path) -> Non
         "Dockerfile.hud",
         "env.py",
         "instance.json",
-        "swebench_runtime.py",
+        "parallax/__init__.py",
+        "parallax/delivery.py",
+        "parallax/swebench_runtime.py",
     }
     evaluator = json.loads(first.evaluator_artifacts[0].content)
     assert evaluator["task"]["sealed"]["test_patch"] == task.sealed.test_patch
     first.write_agent_context(tmp_path)
-    assert {path.name for path in tmp_path.iterdir()} == {
+    assert {
+        path.relative_to(tmp_path).as_posix()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    } == {
         "Dockerfile.hud",
         "env.py",
         "instance.json",
-        "swebench_runtime.py",
+        "parallax/__init__.py",
+        "parallax/delivery.py",
+        "parallax/swebench_runtime.py",
     }
 
 
