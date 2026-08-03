@@ -198,11 +198,21 @@ requires them:
   receives that budget in one turn; matched and evolved divide it across
   turns.
 
-The generated HUD environment resets to `base_commit`, preserves agent source
-edits, restores authoritative test files, applies the sealed test patch, and
-runs the pinned test command. Generated Dockerfiles use the official
-`swebench/sweb.eval` image by digest. No edit-path allowlist is part of the
-verdict.
+`TaskSpecV1` separates `PublicTaskV1` from `SealedAuthorityV1`.
+`compile_hud` creates agent artifacts only from the public branch. It tags each
+artifact as agent or evaluator, scans the agent build context for sealed
+fragments, and records a digest receipt. The HUD runtime uses a probed
+`bubblewrap` Workspace and exports a binary Git patch. The evaluator reloads
+its compiled artifact and calls `swebench.harness.run_evaluation` at the pinned
+harness revision in the digest-pinned official image. The official `resolved`
+verdict is authoritative. Parallax checks that the report covers every
+committed FAIL_TO_PASS and PASS_TO_PASS test without serializing those names
+into run rows.
+
+Screening summaries expose the source-clustered interval and
+minimum-detectable-effect. A small design is explicitly `underpowered` and
+cannot emit an advance or reject decision even when its observed pass rate is
+extreme.
 
 ## Interpretation and limits
 

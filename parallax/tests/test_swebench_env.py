@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import subprocess
 from pathlib import Path
 
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
+from parallax.hud_compile import compile_hud
+from parallax.hud_screening import _docker_runtime
+from parallax.specs import freeze_swe_specs
 from parallax.swebench import build_swe_script_family, load_swebench_rows
-from parallax.swebench_env import render_environment
+from parallax.swebench_runtime import (
+    _director,
+    collect_patch,
+    isolation_probe_argv,
+    workspace,
+    workspace_owner_argv,
+)
 
 
 def family():
@@ -24,51 +35,154 @@ def family():
     )
 
 
-def test_environment_bundle_is_deterministic_and_compilable() -> None:
-    first = render_environment(family())
-    second = render_environment(family())
+def bundle():
+    task, environment = freeze_swe_specs(family())
+    return compile_hud(task, environment)
+
+
+def test_environment_bundle_is_public_deterministic_and_importable() -> None:
+    first = bundle()
+    second = bundle()
 
     assert first == second
-    compile(first.env_py, "env.py", "exec")
-    assert b"ALLOWED_PATHS" not in first.env_py
-    config = json.loads(first.instance_json)
-    assert config["verifier"]["test_patch"] == "sealed test patch"
-    assert all(
-        "sealed test patch" not in turn
-        for script in config["scripts"].values()
-        for turn in script["turns"]
-    )
+    artifacts = {artifact.path: artifact.content for artifact in first.agent_artifacts}
+    compile(artifacts["env.py"], "env.py", "exec")
+    compile(artifacts["swebench_runtime.py"], "swebench_runtime.py", "exec")
+    config = json.loads(artifacts["instance.json"])
+    assert "verifier" not in config
+    assert "sealed test patch" not in artifacts["instance.json"].decode()
+    assert artifacts["env.py"] == b"from swebench_runtime import env\n"
 
 
-def test_dockerfile_uses_official_pinned_eval_image() -> None:
-    dockerfile = render_environment(family()).dockerfile.decode()
+def test_dockerfile_uses_pinned_base_and_isolated_hud_venv() -> None:
+    dockerfile = next(
+        artifact.content
+        for artifact in bundle().agent_artifacts
+        if artifact.path == "Dockerfile.hud"
+    ).decode()
 
     assert (
         "swebench/sweb.eval.x86_64.astropy_1776_astropy-13236@sha256:" + "a" * 64
     ) in dockerfile
+    assert "/opt/hud-venv" in dockerfile
     assert "hud==0.6.12" in dockerfile
+    assert "bubblewrap util-linux" in dockerfile
+    assert "chown -R 1000:1000 /testbed" in dockerfile
     assert "git clone" not in dockerfile
     assert "git fetch" not in dockerfile
 
 
+def test_local_docker_runtime_allows_inner_bubblewrap() -> None:
+    runtime = _docker_runtime("screening-image")
+
+    assert runtime.run_args == ("--privileged",)
+    assert runtime.runtime_config.image == "screening-image"
+
+
+def test_environment_git_commands_drop_to_workspace_owner() -> None:
+    command = workspace_owner_argv(["git", "status"], effective_uid=0)
+
+    assert command[:7] == [
+        "/usr/bin/setpriv",
+        "--reuid",
+        "1000",
+        "--regid",
+        "1000",
+        "--clear-groups",
+        "--",
+    ]
+    assert command[7:] == ["git", "status"]
+
+
+def test_director_tool_has_hud_manifest_metadata() -> None:
+    tool = asyncio.run(_director.get_tool("advance"))
+
+    assert tool.description == "Advance the scripted user by one turn."
+    assert tool.parameters["properties"]["token"]["description"]
+
+
 def test_all_arms_receive_one_equal_episode_budget() -> None:
-    config = json.loads(render_environment(family()).instance_json)
+    compiled = bundle()
+    instance = next(
+        artifact.content
+        for artifact in compiled.agent_artifacts
+        if artifact.path == "instance.json"
+    )
+    config = json.loads(instance)
     scripts = config["scripts"]
 
     assert sum(scripts["static"]["agent_steps"]) == 12
     assert sum(scripts["matched"]["agent_steps"]) == 12
     assert sum(scripts["evolved"]["agent_steps"]) == 12
     assert scripts["static"]["agent_steps"] == [12]
-    assert "step_budget" in render_environment(family()).env_py.decode()
+    runtime_source = next(
+        artifact.content
+        for artifact in compiled.agent_artifacts
+        if artifact.path == "swebench_runtime.py"
+    )
+    assert b"step_budget" in runtime_source
 
 
 def test_bundle_writes_only_expected_files(tmp_path: Path) -> None:
-    bundle = render_environment(family())
-    bundle.write(tmp_path)
+    compiled = bundle()
+    compiled.write_agent_context(tmp_path)
 
     assert {path.name for path in tmp_path.iterdir()} == {
         "Dockerfile.hud",
         "env.py",
         "instance.json",
+        "swebench_runtime.py",
     }
-    assert (tmp_path / "instance.json").read_bytes() == bundle.instance_json
+    expected = next(
+        artifact.content
+        for artifact in compiled.agent_artifacts
+        if artifact.path == "instance.json"
+    )
+    assert (tmp_path / "instance.json").read_bytes() == expected
+
+
+def test_patch_export_includes_modified_and_untracked_files(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=tmp_path,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=tmp_path,
+        check=True,
+    )
+    (tmp_path / "existing.py").write_text("before\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=tmp_path, check=True)
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    (tmp_path / "existing.py").write_text("after\n", encoding="utf-8")
+    (tmp_path / "new.py").write_text("new\n", encoding="utf-8")
+
+    patch = collect_patch(base, tmp_path)
+
+    assert "existing.py" in patch
+    assert "new.py" in patch
+    assert "new file mode" in patch
+
+
+def test_workspace_namespace_does_not_mount_app(monkeypatch) -> None:
+    monkeypatch.setattr(workspace, "_bwrap", "/usr/bin/bwrap")
+    monkeypatch.setattr(workspace, "_drops_privileges", lambda: False)
+
+    argv = isolation_probe_argv()
+
+    mounts = tuple(
+        argv[index + 2]
+        for index, value in enumerate(argv)
+        if value in {"--bind", "--ro-bind"}
+    )
+    assert "/app" not in mounts
+    assert "/testbed" in mounts

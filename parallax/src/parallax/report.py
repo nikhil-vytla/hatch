@@ -6,17 +6,15 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import assert_never
 
+from .canonical import atomic_write, canonical_digest
 from .evolving_intent import Arm
-from .gsm8k import Verification
+from .outcome import Outcome, RunFailure, Verification
 from .runner import (
     ARMS,
     EvidenceRecord,
     FamilyRecord,
     ManifestRecord,
-    Outcome,
-    RunFailure,
     RunRecord,
-    atomic_write,
     read_run_jsonl,
 )
 from .types import (
@@ -26,6 +24,8 @@ from .types import (
     TrialIndex,
     TrialSeed,
 )
+
+MAXIMUM_DECISION_MDE = 0.2
 
 
 def _manifest(
@@ -82,6 +82,12 @@ def _validated(
             or row.source_digest != source_digests.get(source)
         ):
             raise ValueError(f"family_identity_drift: {source}")
+        for arm, script in row.scripts.items():
+            actual = canonical_digest(
+                {"source_id": source, "script": script.model_dump(mode="json")}
+            )
+            if actual != arm_digests[(source, arm)]:
+                raise ValueError(f"family_arm_digest_drift: {source}, arm={arm}")
         seen_sources.add(source)
     if seen_sources != set(source_digests):
         raise ValueError("family records differ from scheduled sources")
@@ -213,17 +219,17 @@ def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
     ]
     difference = sum(source_means) / len(source_means) if source_means else None
     epsilon = math.sqrt(2 * math.log(40) / source_count)
+    powered = epsilon <= MAXIMUM_DECISION_MDE
     interval = (
         max(-1.0, identification[0] - epsilon),
         min(1.0, identification[1] + epsilon),
     )
-    action = (
-        "advance"
-        if interval[0] >= threshold
-        else "reject"
-        if interval[1] < threshold
-        else "inconclusive"
-    )
+    action = "inconclusive"
+    if powered:
+        if interval[0] >= threshold:
+            action = "advance"
+        elif interval[1] < threshold:
+            action = "reject"
     return {
         "population": {
             "source_clusters": source_count,
@@ -242,6 +248,8 @@ def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
             "method": "source_clustered_hoeffding",
             "epsilon": epsilon,
             "lower": interval[0],
+            "minimum_detectable_effect": epsilon,
+            "powered": powered,
             "upper": interval[1],
         },
         "missing_pairs": {

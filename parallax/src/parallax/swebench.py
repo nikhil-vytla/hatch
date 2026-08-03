@@ -15,8 +15,8 @@ from pydantic import (
     model_validator,
 )
 
+from .canonical import canonical_digest
 from .evolving_intent import Arm, Chat, Message
-from .runner import canonical_digest
 from .types import (
     ConstructionSeed,
     DigestText,
@@ -114,7 +114,6 @@ class SweBenchError(ValueError):
 
 class VerifierRuntime(StrictModel):
     image_digest: ImageDigest
-    test_command: Annotated[tuple[str, ...], Field(min_length=1)]
 
 
 class SweBenchVerifier(StrictModel):
@@ -124,7 +123,6 @@ class SweBenchVerifier(StrictModel):
     test_patch: NonEmptyText
     fail_to_pass: Annotated[tuple[NonEmptyText, ...], Field(min_length=1)]
     pass_to_pass: tuple[NonEmptyText, ...]
-    test_command: Annotated[tuple[str, ...], Field(min_length=1)]
 
     @property
     def digest(self) -> str:
@@ -263,7 +261,6 @@ def load_swebench_rows(
             test_patch=row.test_patch,
             fail_to_pass=row.FAIL_TO_PASS,
             pass_to_pass=row.PASS_TO_PASS,
-            test_command=runtime.test_command,
         )
         problems.append(
             SweBenchProblem(
@@ -288,6 +285,9 @@ def fetch_swebench_verified(
     fetch: Fetch = _fetch,
     dataset_revision: str = SWE_BENCH_REVISION,
 ) -> tuple[SweBenchProblem, ...]:
+    unknown = set(instance_ids) - set(PUBLISHED_INSTANCE_IDS)
+    if unknown:
+        raise SweBenchError(f"instance ids are not in the published set: {unknown}")
     revision_url = (
         "https://huggingface.co/api/datasets/"
         f"{SWE_BENCH_DATASET}/revision/{dataset_revision}?expand=sha"
@@ -308,6 +308,7 @@ def fetch_swebench_verified(
         "https://datasets-server.huggingface.co/filter?"
         f"dataset={urllib.parse.quote(SWE_BENCH_DATASET, safe='')}"
         f"&config=default&split=test&where={where}"
+        f"&revision={dataset_revision}"
     )
     try:
         response = _FilterResponse.model_validate_json(fetch(rows_url))
@@ -316,6 +317,13 @@ def fetch_swebench_verified(
         raise SweBenchError("invalid Hugging Face dataset response") from error
     if response.partial:
         raise SweBenchError("Hugging Face returned a partial dataset response")
+    truncated = {
+        item.row_idx: item.truncated_cells
+        for item in response.rows
+        if item.truncated_cells
+    }
+    if truncated:
+        raise SweBenchError(f"Hugging Face truncated dataset cells: {truncated}")
     if after.sha != before.sha:
         raise SweBenchError(
             f"dataset revision changed while reading: before={before.sha}, "
@@ -333,6 +341,13 @@ class SweArgument(StrictModel):
     identifier: NonEmptyText
     value: NonEmptyText
     category: ArgumentCategory
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def scalar_value_as_text(cls, value: object) -> object:
+        if isinstance(value, bool | int | float):
+            return json.dumps(value, allow_nan=False, separators=(",", ":"))
+        return value
 
 
 class SweIntent(StrictModel):
@@ -377,9 +392,11 @@ def construct_swe_intent(
             role="system",
             content=(
                 "Extract one source software intent and one immediate predecessor. "
-                "Return strict JSON with source and predecessors. Each intent has "
-                "function and arguments. Each argument has identifier, value, and "
-                "category: symptom, context, constraint, or implementation."
+                'Return only JSON with top-level keys "source" and "predecessors". '
+                "Do not use Markdown fences. Each intent has exactly function and "
+                "arguments. Each argument has exactly identifier, value, and "
+                "category. Value is always a JSON string, including booleans and "
+                "numbers. Category is symptom, context, constraint, or implementation."
             ),
         ),
         Message(
@@ -396,8 +413,11 @@ def construct_swe_intent(
         ),
     )
     output = chat(messages, max_output_tokens)
+    payload = output
+    if output.startswith("```json\n") and output.endswith("\n```"):
+        payload = output[8:-4]
     try:
-        construction = SweConstruction.model_validate_json(output)
+        construction = SweConstruction.model_validate_json(payload)
     except ValidationError as error:
         detail = error.errors(include_url=False)[0]["msg"]
         raise SweBenchError(f"SWE intent construction is invalid: {detail}") from error

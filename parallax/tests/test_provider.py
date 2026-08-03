@@ -8,6 +8,8 @@ from pydantic import ValidationError
 
 from parallax.evolving_intent import Message
 from parallax.provider import (
+    HUD_GATEWAY_ENDPOINT,
+    HudGatewayProvider,
     OpenAICompatibleProvider,
     ProviderConfig,
     ProviderError,
@@ -15,6 +17,7 @@ from parallax.provider import (
     ProviderTool,
     ProviderToolFunction,
 )
+from parallax.runner import BudgetError
 
 
 def config() -> ProviderConfig:
@@ -72,6 +75,28 @@ def test_openai_compatible_chat_uses_strict_wire_models() -> None:
         (Message(role="user", content="Extract intent."),),
         64,
     )
+
+    assert output.startswith('{"function"')
+
+
+def test_provider_accepts_explicit_null_tool_calls() -> None:
+    def null_tool_calls(
+        endpoint: str,
+        body: bytes,
+        headers: Mapping[str, str],
+        timeout_seconds: float,
+    ) -> bytes:
+        payload = json.loads(response(endpoint, body, headers, timeout_seconds))
+        payload["choices"][0]["message"]["tool_calls"] = None
+        return json.dumps(payload).encode()
+
+    provider = OpenAICompatibleProvider(
+        config(),
+        transport=null_tool_calls,
+        environment={"PARALLAX_PROVIDER_KEY": "secret"},
+    )
+
+    output = provider.chat()((Message(role="user", content="Extract intent."),), 64)
 
     assert output.startswith('{"function"')
 
@@ -144,6 +169,71 @@ def test_provider_rejects_missing_key_and_malformed_response() -> None:
         provider.chat()((Message(role="user", content="hello"),), 32)
 
 
+def test_provider_response_tolerates_unconsumed_wire_fields() -> None:
+    real_shaped = json.dumps(
+        {
+            "id": "response-1",
+            "object": "chat.completion",
+            "created": 1777777777,
+            "model": "boundary-model-2026-08-01",
+            "system_fingerprint": "fp_123",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "logprobs": None,
+                    "message": {
+                        "role": "assistant",
+                        "content": "ready",
+                        "refusal": None,
+                        "annotations": [],
+                    },
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 2,
+                "total_tokens": 12,
+                "prompt_tokens_details": {"cached_tokens": 0},
+            },
+        }
+    ).encode()
+    provider = OpenAICompatibleProvider(
+        config(),
+        environment={"PARALLAX_PROVIDER_KEY": "secret"},
+        transport=lambda endpoint, body, headers, timeout: real_shaped,
+    )
+
+    assert provider.chat()((Message(role="user", content="hello"),), 32) == "ready"
+
+
+def test_text_chat_classifies_output_truncation_as_budget_failure() -> None:
+    truncated = json.dumps(
+        {
+            "id": "response-1",
+            "model": "boundary-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "length",
+                    "message": {
+                        "role": "assistant",
+                        "content": "partial",
+                    },
+                }
+            ],
+        }
+    ).encode()
+    provider = OpenAICompatibleProvider(
+        config(),
+        environment={"PARALLAX_PROVIDER_KEY": "secret"},
+        transport=lambda endpoint, body, headers, timeout: truncated,
+    )
+
+    with pytest.raises(BudgetError, match="output-token limit"):
+        provider.chat()((Message(role="user", content="hello"),), 32)
+
+
 def test_text_chat_rejects_agent_tool_calls() -> None:
     tool_response = json.dumps(
         {
@@ -179,3 +269,46 @@ def test_text_chat_rejects_agent_tool_calls() -> None:
 
     with pytest.raises(ProviderError, match="non-empty text response"):
         provider.chat()((Message(role="user", content="hello"),), 32)
+
+
+def test_hud_gateway_adapter_uses_existing_wire_boundary() -> None:
+    def hud_response(endpoint, body, headers, timeout):
+        payload = json.loads(body)
+        assert endpoint == HUD_GATEWAY_ENDPOINT
+        assert payload["max_tokens"] == 64
+        assert "max_completion_tokens" not in payload
+        assert headers["Authorization"] == "Bearer hud-secret"
+        return json.dumps(
+            {
+                "id": "hud-response-1",
+                "model": "claude-opus-4-8",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "ready",
+                        },
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 3,
+                    "completion_tokens": 1,
+                    "total_tokens": 4,
+                },
+            }
+        ).encode()
+
+    provider = HudGatewayProvider(
+        "claude-opus-4-8",
+        environment={"HUD_API_KEY": "hud-secret"},
+        transport=hud_response,
+    )
+
+    assert provider.chat()((Message(role="user", content="hello"),), 64) == "ready"
+
+
+def test_hud_gateway_adapter_fails_before_transport_without_key() -> None:
+    with pytest.raises(ProviderError, match="missing provider credential HUD_API_KEY"):
+        HudGatewayProvider("claude-opus-4-8", environment={})
