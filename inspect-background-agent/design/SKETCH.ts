@@ -1,5 +1,7 @@
 /**
  * Synthesized type sketch — workspace-first Inspect hatch.
+ * Refined for three planes: control (SessionAgent + EventBus + PromptIngress),
+ * orchestration (Workspace), execution (Runner → agent + sidecars).
  * Bodies filled in under src/; this file is the contract snapshot.
  */
 declare const brand: unique symbol;
@@ -115,6 +117,8 @@ export type SessionView = {
   readonly authors: readonly Actor[];
   readonly pr?: PullRequestView;
   readonly ideUrl: string | null;
+  readonly vncUrl: string | null;
+  readonly ttyUrl: string | null;
 };
 
 export interface Workspace {
