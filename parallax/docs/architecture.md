@@ -65,11 +65,17 @@ verifying its single byte capture and immediately before returning it.
 
 A post-rename validation or ancestry failure raises `PublicationStateError`.
 It separately reports whether the operation's directory is securely observed
-at the requested lexical path and whether retained contents are empty,
-complete, partial, or indeterminate. Cleanup removes known files only through
+at the requested lexical path and whether retained contents are `empty`,
+`partial`, or `indeterminate`. Cleanup removes known files only through
 the retained destination descriptor. It never pathname-removes the directory,
 so it cannot delete an attacker replacement installed at the requested name.
 An empty original directory is reported as an empty orphan rather than removed.
+If entries remain, cleanup reports `partial` only when it safely removed at
+least one known entry; otherwise it reports `indeterminate`. It never infers
+completeness from the pre-cleanup publication capture.
+
+The post-cleanup emptiness check reads at most one directory entry, so an
+attacker-controlled directory cannot force unbounded result materialization.
 
 Staging cleanup follows the same rule. Benign failures may leave an empty,
 randomly named staging directory because portable POSIX APIs provide no
