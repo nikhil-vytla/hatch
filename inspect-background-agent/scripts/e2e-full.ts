@@ -61,6 +61,13 @@ async function main() {
       if (!math.includes("add")) throw new Error("math.ts missing add");
     }
 
+    const models = await fetch("http://127.0.0.1:8791/api/models");
+    const mj = (await models.json()) as { models: unknown[]; selected: { modelID: string } };
+    if (!Array.isArray(mj.models) || mj.models.length < 2) {
+      throw new Error("models endpoint empty");
+    }
+    console.log("models", mj.models.length, "selected", mj.selected.modelID);
+
     const commit = await fetch(`http://127.0.0.1:8791/api/sessions/${session.id}/commit`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -68,6 +75,13 @@ async function main() {
     });
     const cj = (await commit.json()) as { sha: string };
     console.log("committed", cj.sha);
+
+    const del = await fetch(`http://127.0.0.1:8791/api/sessions/${session.id}`, {
+      method: "DELETE",
+    });
+    const dj = (await del.json()) as { diskGone: boolean; destroyed: string };
+    if (!dj.diskGone) throw new Error(`sandbox still on disk after DELETE: ${dj.destroyed}`);
+    console.log("destroyed", dj.destroyed, "diskGone", dj.diskGone);
 
     console.log("E2E OK");
   } finally {

@@ -1,6 +1,6 @@
-Shipped a working local Inspect-style harness in hatch — control plane, real git sandboxes, and OpenCode free models — after studying Ramp's posts, the CTO topology, and [ColeMurray/background-agents](https://github.com/ColeMurray/background-agents) for inspiration (not a clone).
+Hardened the local Inspect hatch against the usual harness failure modes: serial session queues, idempotent sandbox lifecycle with TTL reap, a thin free-model surface, and scripted smoke evals, steered by a verbatim experiment [AGENTS.md](AGENTS.md). Fake demo/adapter paths and the unused session actor were removed so the control plane is the only product. `npm test`, `npm run e2e` (including DELETE diskGone), and `npm run eval:smoke` (2/2) are green on OpenCode free models without API keys.
 
-- `npm run e2e` creates `src/math.ts` via OpenCode in an isolated `/tmp` sandbox and commits it
-- `npm run serve` exposes a web UI + REST/WebSocket API on `:8787`
-- Sandboxes use `--dir` so OpenCode cannot write into the hatch repo by mistake
-- Design docs keep the three-plane map and peer comparison (Valet/Cursor Cloud/Devin/etc.)
+- Async: per-session promise chain, not a global worker pool
+- Lifecycle: `DELETE` + idle TTL; destroy twice is safe
+- Evals/models: [`eval-smoke`](scripts/eval-smoke.ts) + [`GET /api/models`](src/agent/models.ts)
+- Inspiration (not a fork): [ColeMurray/background-agents](https://github.com/ColeMurray/background-agents); Ramp topology in [`design/TOPOLOGY.md`](design/TOPOLOGY.md)

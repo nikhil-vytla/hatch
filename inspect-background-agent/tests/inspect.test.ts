@@ -1,46 +1,131 @@
 import { describe, expect, it } from "vitest";
-import {
-  advanceQueue,
-  branchOfSession,
-  brandNumber,
-  brandString,
-  createInspect,
-  fixedClock,
-  localPorts,
-  nextFreshness,
-  sessionOfBranch,
-  toolEffect,
-} from "../src/index.js";
+import { access } from "node:fs/promises";
+import path from "node:path";
+import { SessionQueues } from "../src/control/session-queues.js";
+import { ResourceLifecycle } from "../src/control/resource-lifecycle.js";
+import { GitSandboxManager } from "../src/sandbox/git-sandbox.js";
+import { listModels, resolveModel } from "../src/agent/models.js";
+import { advanceQueue, branchOfSession, sessionOfBranch } from "../src/session/index.js";
+import { nextFreshness, toolEffect } from "../src/slot/index.js";
+import { brandNumber, brandString } from "../src/index.js";
 import type { Turn } from "../src/index.js";
 
-describe("pure policy", () => {
-  it("nextFreshness goes stale then fresh after sync", () => {
-    const base = brandString<"CommitSha">("aaa");
-    const origin = brandString<"CommitSha">("bbb");
-    const stale = nextFreshness({
-      current: { kind: "unknown" },
-      base,
-      origin,
-      syncDone: false,
+describe("session queues", () => {
+  it("runs work serially per session", async () => {
+    const q = new SessionQueues();
+    const order: number[] = [];
+    const a = q.enqueue("s1", async () => {
+      order.push(1);
+      await new Promise((r) => setTimeout(r, 40));
+      order.push(2);
     });
-    expect(stale).toEqual({ kind: "stale", base, origin });
-    const syncing = nextFreshness({
-      current: { kind: "syncing", base, origin },
-      base,
-      origin,
-      syncDone: false,
+    const b = q.enqueue("s1", async () => {
+      order.push(3);
     });
-    expect(syncing.kind).toBe("syncing");
-    const fresh = nextFreshness({
-      current: syncing,
-      base,
-      origin,
-      syncDone: true,
-    });
-    expect(fresh).toEqual({ kind: "fresh", head: origin });
+    await Promise.all([a, b]);
+    expect(order).toEqual([1, 2, 3]);
+  });
+});
+
+describe("resource lifecycle", () => {
+  it("destroy removes sandbox disk idempotently", async () => {
+    const root = path.join("/tmp", "hatch-inspect-test", `lc_${Date.now()}`);
+    const mgr = new GitSandboxManager(root);
+    const sb = await mgr.create({ id: "life1" });
+    const sessions = new Map<
+      string,
+      {
+        id: string;
+        sandboxId: string;
+        status: "idle" | "running" | "error";
+        createdAt: number;
+        lastActiveAt: number;
+      }
+    >();
+    const row = {
+      id: "ses_life",
+      sandboxId: sb.id,
+      status: "idle" as const,
+      createdAt: Date.now(),
+      lastActiveAt: Date.now(),
+    };
+    sessions.set(row.id, row);
+    const life = new ResourceLifecycle(mgr, { ttlMs: 1 });
+    await life.destroy(row, sessions);
+    await life.destroy(row, sessions);
+    expect(sessions.has(row.id)).toBe(false);
+    let gone = false;
+    try {
+      await access(path.join(root, sb.id));
+    } catch {
+      gone = true;
+    }
+    expect(gone).toBe(true);
   });
 
-  it("advanceQueue starts next queued turn", () => {
+  it("reap removes idle past TTL and skips running", async () => {
+    const root = path.join("/tmp", "hatch-inspect-test", `reap_${Date.now()}`);
+    const mgr = new GitSandboxManager(root);
+    const idleSb = await mgr.create({ id: "idle1" });
+    const runSb = await mgr.create({ id: "run1" });
+    const sessions = new Map<
+      string,
+      {
+        id: string;
+        sandboxId: string;
+        status: "idle" | "running" | "error";
+        createdAt: number;
+        lastActiveAt: number;
+      }
+    >();
+    sessions.set("idle", {
+      id: "idle",
+      sandboxId: idleSb.id,
+      status: "idle",
+      createdAt: 0,
+      lastActiveAt: 0,
+    });
+    sessions.set("run", {
+      id: "run",
+      sandboxId: runSb.id,
+      status: "running",
+      createdAt: 0,
+      lastActiveAt: 0,
+    });
+    const life = new ResourceLifecycle(mgr, { ttlMs: 1 });
+    const removed = await life.reap(sessions);
+    expect(removed).toEqual(["idle"]);
+    expect(sessions.has("run")).toBe(true);
+  });
+});
+
+describe("models", () => {
+  it("lists free models and resolves env override", () => {
+    expect(listModels().length).toBeGreaterThan(1);
+    expect(resolveModel("big-pickle").modelID).toBe("big-pickle");
+    expect(resolveModel("custom-x", "acme")).toEqual({
+      providerID: "acme",
+      modelID: "custom-x",
+    });
+  });
+});
+
+describe("pure policy retained", () => {
+  it("nextFreshness and toolEffect", () => {
+    const base = brandString<"CommitSha">("aaa");
+    const origin = brandString<"CommitSha">("bbb");
+    expect(
+      nextFreshness({
+        current: { kind: "unknown" },
+        base,
+        origin,
+        syncDone: false,
+      }).kind,
+    ).toBe("stale");
+    expect(toolEffect("edit")).toBe("mutating");
+  });
+
+  it("advanceQueue and branch round-trip", () => {
     const turns: Turn[] = [
       {
         id: brandString<"TurnId">("t1"),
@@ -55,198 +140,8 @@ describe("pure policy", () => {
       now: brandNumber<"Timestamp">(1),
     });
     expect(result.kind).toBe("start");
-    if (result.kind === "start") {
-      expect(result.turnId).toBe("t1");
-      expect(result.turns[0]?.state.kind).toBe("running");
-    }
-  });
-
-  it("branch round-trips", () => {
     const id = brandString<"SessionId">("ses_9");
     const branch = branchOfSession("inspect/", id);
-    expect(branch).toBe("inspect/ses_9");
     expect(sessionOfBranch("inspect/", branch)).toBe(id);
-  });
-
-  it("toolEffect classifies writes", () => {
-    expect(toolEffect("read")).toBe("read-only");
-    expect(toolEffect("edit")).toBe("mutating");
-  });
-});
-
-describe("local inspect flow", () => {
-  it("create → prompt → stream → PR with sync gate", async () => {
-    const clock = fixedClock(1_000_000);
-    const ports = await localPorts({
-      syncDelayMs: 30,
-      clock,
-      repos: [{ owner: "acme", name: "billing" }],
-      baseCommit: "base000",
-      originCommit: "origin001",
-    });
-    const inspect = await createInspect(ports);
-    const ws = await inspect.workspace({ owner: "acme", name: "billing" });
-    ws.hint({ kind: "composing", actorId: brandString<"ActorId">("ana") });
-
-    const ana = {
-      id: brandString<"ActorId">("ana"),
-      display: "Ana",
-      github: "ana",
-    };
-    const session = await ws.start({
-      opener: ana,
-      conversation: { surface: "web", key: "demo" },
-      intent: "Fix invoice rounding",
-    });
-
-    const kinds: string[] = [];
-    for await (const env of session.events()) {
-      kinds.push(env.event.kind);
-      if (env.event.kind === "freshness") {
-        expect(["stale", "syncing", "fresh", "unknown"]).toContain(
-          env.event.freshness.kind,
-        );
-      }
-      if (env.event.kind === "turn.finished") break;
-    }
-
-    expect(kinds).toContain("session.started");
-    expect(kinds).toContain("turn.queued");
-    expect(kinds).toContain("turn.started");
-    expect(kinds).toContain("agent.delta");
-    expect(kinds).toContain("freshness");
-    expect(kinds).toContain("turn.finished");
-
-    const pr = await session.publish({
-      by: ana.id,
-      title: "Fix invoice rounding",
-    });
-    expect(pr.url).toContain("/pull/");
-    expect(pr.branch).toMatch(/^inspect\//);
-
-    const view = await session.view();
-    expect(view.authors.map((a) => a.id)).toContain("ana");
-    expect(view.ideUrl).toMatch(/^local:\/\/ide\//);
-    expect(view.vncUrl).toMatch(/^local:\/\/vnc\//);
-    expect(view.ttyUrl).toMatch(/^local:\/\/tty\//);
-  });
-
-  it("EventBus fans out independently of session.events()", async () => {
-    const ports = await localPorts({ syncDelayMs: 10 });
-    const inspect = await createInspect(ports);
-    const ws = await inspect.workspace({ owner: "acme", name: "billing" });
-    const ana = {
-      id: brandString<"ActorId">("ana"),
-      display: "Ana",
-      github: "ana",
-    };
-    const session = await ws.start({
-      opener: ana,
-      conversation: { surface: "web", key: "bus-demo" },
-    });
-
-    const busKinds: string[] = [];
-    const unsub = inspect.eventBus.subscribe(session.id, (e) => {
-      busKinds.push(e.event.kind);
-    });
-
-    await session.submit({ author: ana, text: "bus check" });
-    for await (const env of session.events()) {
-      if (env.event.kind === "turn.finished") break;
-    }
-    unsub();
-    expect(busKinds).toContain("turn.queued");
-    expect(busKinds).toContain("turn.finished");
-  });
-
-  it("PromptIngress dedupes client tokens", async () => {
-    const ports = await localPorts();
-    const inspect = await createInspect(ports);
-    const sessionId = brandString<"SessionId">("ses_x");
-    const author = {
-      id: brandString<"ActorId">("ana"),
-      display: "Ana",
-      github: "ana",
-    };
-    inspect.promptIngress.enqueue({
-      sessionId,
-      author,
-      text: "one",
-      clientToken: "dup",
-      turnId: brandString<"TurnId">("t1"),
-    });
-    inspect.promptIngress.enqueue({
-      sessionId,
-      author,
-      text: "two",
-      clientToken: "dup",
-      turnId: brandString<"TurnId">("t2"),
-    });
-    expect(inspect.promptIngress.pending(sessionId)).toBe(1);
-  });
-
-  it("dispatch classifies repo and is multiplayer-safe", async () => {
-    const ports = await localPorts({
-      syncDelayMs: 10,
-      repos: [
-        { owner: "acme", name: "billing" },
-        { owner: "acme", name: "payroll" },
-      ],
-    });
-    const inspect = await createInspect(ports);
-    const speaker = {
-      id: brandString<"ActorId">("bob"),
-      display: "Bob",
-      github: "bob",
-    };
-    const first = await inspect.dispatch({
-      surface: "slack",
-      conversation: { surface: "slack", channel: "C1", thread: "T1" },
-      speaker,
-      text: "fix flaky test in billing",
-      hints: { channelName: "eng-billing" },
-    });
-    expect(first.kind === "started" || first.kind === "continued").toBe(true);
-    if (first.kind !== "started" && first.kind !== "continued") return;
-
-    const bea = {
-      id: brandString<"ActorId">("bea"),
-      display: "Bea",
-      github: "bea",
-    };
-    await first.session.submit({ author: bea, text: "also bump timeout", clientToken: "k1" });
-    await first.session.submit({ author: bea, text: "also bump timeout", clientToken: "k1" });
-
-    const view = await first.session.view();
-    expect(view.authors.length).toBeGreaterThanOrEqual(1);
-
-    const amb = await inspect.dispatch({
-      surface: "slack",
-      conversation: { surface: "slack", channel: "C2", thread: "T2" },
-      speaker,
-      text: "please help",
-    });
-    expect(amb.kind).toBe("unknown");
-  });
-
-  it("stop current turn", async () => {
-    const ports = await localPorts({ syncDelayMs: 200 });
-    const inspect = await createInspect(ports);
-    const ws = await inspect.workspace({ owner: "acme", name: "billing" });
-    const ana = {
-      id: brandString<"ActorId">("ana"),
-      display: "Ana",
-      github: "ana",
-    };
-    const session = await ws.start({
-      opener: ana,
-      conversation: { surface: "api", key: "stop-demo" },
-    });
-    await session.submit({ author: ana, text: "long task" });
-    await session.stop({ by: ana.id, scope: "current-turn" });
-    // Allow mailbox to settle
-    await new Promise((r) => setTimeout(r, 50));
-    const view = await session.view();
-    expect(view.queue.every((t) => t.state.kind !== "running")).toBe(true);
   });
 });

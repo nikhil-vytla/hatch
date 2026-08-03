@@ -11,9 +11,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "demo": "tsx scripts/demo.ts",
     "serve": "tsx scripts/serve.ts",
-    "e2e": "tsx scripts/e2e-full.ts"
+    "e2e": "tsx scripts/e2e-full.ts",
+    "eval:smoke": "tsx scripts/eval-smoke.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",

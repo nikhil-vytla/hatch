@@ -1,0 +1,12 @@
+ts	phase	decision	why	evidence	result
+2026-08-03T07:20:18Z	frame	wrote PLAYBOOK.md with falsifiable done predicate	rigor high on async/lifecycle; skip second arena	PLAYBOOK.md	framed
+2026-08-03T07:20:18Z	U0	added AGENTS.md verbatim from user	encode steering in structure	AGENTS.md matches user text incl. typos	landed
+2026-08-03T07:22:00Z	U1	deleted demo/localPorts/workspace/runner/prompt-ingress/createSessionActor	AGENTS: no backward compat; product is control-plane	git rm + empty dirs gone; tsc/tests green	landed
+2026-08-03T07:22:30Z	U2	SessionQueues promise chain per sessionId	serial OpenCode; reject global pool as premature	tests/inspect.test.ts order [1,2,3]; control-plane enqueue	landed
+2026-08-03T07:23:00Z	U3	ResourceLifecycle destroy+TTL reap	idempotent disk free; skip running	unit destroy/reap; e2e DELETE diskGone=true	landed
+2026-08-03T07:23:30Z	U4	models.ts + GET /api/models + OPENCODE_MODEL	thin free list not OAuth matrix	e2e models≥2; resolveModel env override test	landed
+2026-08-03T07:24:00Z	U5	eval:smoke math-add + greet-txt	encode evals as scripts not self-report	npm run eval:smoke passed=2 failed=0	landed
+2026-08-03T07:26:00Z	U6	decisions.tsv + playbook closed	auditable trail for figure-it-out	this file	landed
+2026-08-03T07:26:30Z	attention	reject plugin registry / CF rewrite this layer	laziness: OpenCode is extension surface; grow on working product	README Not included; MODULES map	held
+2026-08-03T07:26:30Z	attention	keep branded kernel + SessionRow server-local	types without god Session actor	session/index.ts types-only after strip	held
+2026-08-03T07:26:30Z	attention	study Ramp/Modal/ColeMurray before inventing	AGENTS long-term + established products	design/HARNESSES.md + TOPOLOGY.md	held

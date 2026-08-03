@@ -1,59 +1,50 @@
-# Inspect hatch — usage (synthesized)
+# Inspect hatch — usage (working product)
 
-Background coding agent from Ramp's [Inspect post](https://builders.ramp.com/post/why-we-built-our-background-agent).
+Local background coding agent. Control plane is the product surface.
 
-You hold a **workspace** (repo + image + warm pool + branch namespace). A **session** is a short lease on one slot plus the conversation. You never boot, sync, snapshot, or reclaim sandboxes yourself.
+## Quickstart
 
-## Quickstart (local, no cloud credentials)
-
-```ts
-import { createInspect, localPorts } from "@hatch/inspect";
-
-const inspect = createInspect(await localPorts({ root: "./.inspect" }));
-
-const ws = await inspect.workspace({ owner: "acme", name: "billing" });
-ws.hint({ kind: "composing", actorId: "ana" });
-
-const session = await ws.start({
-  opener: { id: "ana", display: "Ana", github: "ana" },
-  conversation: { surface: "web", key: "demo-1" },
-  intent: "Fix the flaky invoice rounding test",
-});
-
-for await (const ev of session.events()) {
-  if (ev.event.kind === "agent.delta") process.stdout.write(ev.event.text);
-  if (ev.event.kind === "turn.finished") break;
-}
-
-const pr = await session.publish({ by: "ana", title: "Fix invoice rounding" });
-console.log(pr.url);
+```bash
+cd inspect-background-agent
+npm install
+npm run serve   # http://127.0.0.1:8787
 ```
 
-## Call site — Slack
+Or scripted:
 
 ```ts
-const result = await inspect.dispatch({
-  surface: "slack",
-  conversation: { surface: "slack", channel, thread },
-  speaker: actor,
-  text: event.text,
-  hints: { channelName, recentText },
-});
-if (result.kind === "ambiguous") return askWhichRepo(result.candidates);
-if (result.kind === "unknown") return askForRepo();
-// result.kind === "started" | "continued"
+import { startControlPlane } from "@hatch/inspect";
+
+const cp = await startControlPlane({ port: 8787 });
+// POST /api/sessions { prompt } → OpenCode writes in /tmp sandbox
+// DELETE /api/sessions/:id → disk gone
+await cp.close();
 ```
 
-## Call site — multiplayer web
+## HTTP API
 
-```ts
-const session = await hub.get(sessionId); // or ws.start with same conversation
-await session.submit({
-  author: { id: "bea", display: "Bea", github: "bea" },
-  text: "Also update the OpenAPI spec.",
-  clientToken: requestId,
-});
-await session.stop({ by: "bea", scope: "current-turn" });
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/health` | ok + selected model |
+| GET | `/api/models` | known-free OpenCode models |
+| POST | `/api/sessions` | `{ prompt?, title?, cloneUrl?, authorName?, authorEmail? }` |
+| GET | `/api/sessions/:id` | status + git diff |
+| POST | `/api/sessions/:id/prompt` | `{ text }` queued serially per session |
+| POST | `/api/sessions/:id/commit` | commit dirty tree as author |
+| DELETE | `/api/sessions/:id` | destroy sandbox disk |
+| WS | `/api/sessions/:id/events` | `SessionEventEnvelope` stream |
+
+## Env
+
+- `OPENCODE_MODEL` — model id under provider `opencode` (default `big-pickle`)
+- `OPENCODE_PROVIDER` — default `opencode`
+
+## Verify
+
+```bash
+npm test
+npm run e2e
+npm run eval:smoke
 ```
 
-Callers never see Modal, Durable Object, or OpenCode wire types.
+Cloud adapters (CF Durable Objects, Modal) are design targets in `TOPOLOGY.md`, not this local product.

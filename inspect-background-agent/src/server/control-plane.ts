@@ -3,11 +3,15 @@ import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
-import { GitSandboxManager, defaultSandboxRoot, type GitAuthor } from "../sandbox/git-sandbox.js";
+import { access } from "node:fs/promises";
+import { GitSandboxManager, type GitAuthor } from "../sandbox/git-sandbox.js";
 import { OpenCodeBridge } from "../agent/opencode-bridge.js";
+import { listModels, resolveModel } from "../agent/models.js";
 import { createMemoryEventBus } from "../control/event-bus.js";
+import { SessionQueues } from "../control/session-queues.js";
+import { ResourceLifecycle } from "../control/resource-lifecycle.js";
 import type { SessionEventEnvelope } from "../session/index.js";
-import { brandNumber, brandString, type ActorId, type BranchName, type CommitSha, type TurnId } from "../kernel/index.js";
+import { brandNumber, brandString } from "../kernel/index.js";
 
 export type SessionRow = {
   id: string;
@@ -18,6 +22,7 @@ export type SessionRow = {
   opencodeSessionId: string | null;
   author: GitAuthor;
   createdAt: number;
+  lastActiveAt: number;
   status: "idle" | "running" | "error";
   lastError?: string;
 };
@@ -28,6 +33,7 @@ export type ControlPlaneOptions = {
   readonly host?: string;
   readonly modelProvider?: string;
   readonly modelId?: string;
+  readonly sessionTtlMs?: number;
 };
 
 function id(prefix: string): string {
@@ -39,16 +45,21 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   const sandboxes = new GitSandboxManager(path.join(rootDir, "sandboxes"));
   await sandboxes.ensureBase();
 
-  const bridge = new OpenCodeBridge({
-    model: {
-      providerID: opts.modelProvider ?? "opencode",
-      modelID: opts.modelId ?? "big-pickle",
-    },
-  });
+  const model = resolveModel(opts.modelId ?? process.env.OPENCODE_MODEL, opts.modelProvider ?? process.env.OPENCODE_PROVIDER);
+  const bridge = new OpenCodeBridge({ model });
   await bridge.start();
 
   const sessions = new Map<string, SessionRow>();
   const bus = createMemoryEventBus();
+  const queues = new SessionQueues();
+  const lifecycle = new ResourceLifecycle(sandboxes, {
+    ttlMs: opts.sessionTtlMs ?? 30 * 60_000,
+  });
+  const reapTimer = setInterval(() => {
+    void lifecycle.reap(sessions);
+  }, 60_000);
+  reapTimer.unref?.();
+
   let seq = 0;
 
   function emit(
@@ -71,8 +82,15 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
   app.get("/api/health", (c) =>
-    c.json({ ok: true, sessions: sessions.size, service: "@hatch/inspect" }),
+    c.json({
+      ok: true,
+      sessions: sessions.size,
+      service: "@hatch/inspect",
+      model,
+    }),
   );
+
+  app.get("/api/models", (c) => c.json({ models: listModels(), selected: model }));
 
   app.get("/api/sessions", (c) =>
     c.json({
@@ -82,6 +100,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
         branch: s.branch,
         status: s.status,
         createdAt: s.createdAt,
+        lastActiveAt: s.lastActiveAt,
       })),
     }),
   );
@@ -121,6 +140,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       opencodeSessionId: ocSession,
       author,
       createdAt: Date.now(),
+      lastActiveAt: Date.now(),
       status: "idle",
     };
     sessions.set(row.id, row);
@@ -135,7 +155,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     });
 
     if (body.prompt) {
-      void runPrompt(row.id, body.prompt);
+      void queues.enqueue(row.id, () => runPrompt(row.id, body.prompt!));
     }
     return c.json({
       id: row.id,
@@ -143,6 +163,21 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       repoDir: row.repoDir,
       status: row.status,
     });
+  });
+
+  app.delete("/api/sessions/:id", async (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    await queues.drain(row.id);
+    const sandboxId = row.sandboxId;
+    await lifecycle.destroy(row, sessions);
+    let gone = false;
+    try {
+      await access(path.join(rootDir, "sandboxes", sandboxId));
+    } catch {
+      gone = true;
+    }
+    return c.json({ ok: true, destroyed: sandboxId, diskGone: gone });
   });
 
   app.get("/api/sessions/:id", async (c) => {
@@ -158,7 +193,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     if (!row) return c.json({ error: "not found" }, 404);
     const body = (await c.req.json()) as { text?: string };
     if (!body.text?.trim()) return c.json({ error: "text required" }, 400);
-    void runPrompt(row.id, body.text.trim());
+    void queues.enqueue(row.id, () => runPrompt(row.id, body.text!.trim()));
     return c.json({ ok: true, status: "queued" });
   });
 
@@ -207,6 +242,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     const row = sessions.get(sessionId);
     if (!row || !row.opencodeSessionId) return;
     row.status = "running";
+    lifecycle.touch(row);
     const turnId = brandString<"TurnId">(id("trn"));
     emit(sessionId, "user", {
       kind: "turn.queued",
@@ -246,6 +282,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
         } else if (delta.kind === "error") {
           row.status = "error";
           row.lastError = delta.message;
+          lifecycle.touch(row);
           emit(sessionId, "system", {
             kind: "turn.finished",
             turnId,
@@ -257,6 +294,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
         }
       }
       row.status = "idle";
+      lifecycle.touch(row);
       const gitStatus = await sandboxes.status(row.repoDir);
       emit(sessionId, "agent", {
         kind: "turn.finished",
@@ -266,6 +304,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     } catch (e) {
       row.status = "error";
       row.lastError = e instanceof Error ? e.message : String(e);
+      lifecycle.touch(row);
       emit(sessionId, "system", {
         kind: "turn.finished",
         turnId,
@@ -289,6 +328,11 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     bridge,
     bus,
     async close() {
+      clearInterval(reapTimer);
+      for (const session of [...sessions.values()]) {
+        await queues.drain(session.id);
+        await lifecycle.destroy(session, sessions);
+      }
       await bridge.close();
       server.close();
     },

@@ -5,31 +5,36 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
-## What works now (full local stack)
+## Figure-it-out run (2026-08-03)
 
-Control plane on Hono + WebSocket UI at `npm run serve` (port 8787).
+Targeted usual harness failure modes without rewriting to CF/Modal.
 
-Real path:
-1. Create session → independent git sandbox under `/tmp/hatch-inspect/sandboxes`
-2. Run OpenCode via `opencode run --dir <sandbox> --model opencode/big-pickle`
-3. Stream tool/text events to the web UI / EventBus
-4. Commit on the session branch as the prompting author
+Done:
+- Verbatim experiment `AGENTS.md` (no backward compat; subtract obsolete paths)
+- `SessionQueues` — serial prompts per session
+- `ResourceLifecycle` — DELETE + idle TTL reaper, idempotent destroy
+- `models.ts` + `GET /api/models` + `OPENCODE_MODEL`
+- `npm run eval:smoke` — math-add + greet-txt against real OpenCode
+- Removed fake product path: `scripts/demo.ts`, `adapters/local`, `workspace/`, `runner/`, `prompt-ingress`, `createSessionActor`
+- Playbook + `decisions.tsv`
 
-Verified: `npm run e2e` creates `src/math.ts` with `add`, commits SHA, exits 0.
-Unit tests still cover domain types/fakes: `npm test`.
+Verified green:
+- `npm test` (6)
+- `npm run e2e` (file + commit + DELETE diskGone)
+- `npm run eval:smoke` (2/2)
 
-## Critical learning
+## Critical learning (earlier)
 
 OpenCode resolves the *git project root*, not just `cwd`. Sandboxes nested inside this hatch repo caused writes to land in `inspect-background-agent/src/`. Fix: sandboxes live under `/tmp/hatch-inspect` and every run passes `--dir`.
 
 ## Architecture retained
 
 Three planes from the CTO diagram, local stand-ins:
-- Control: Hono API + in-memory EventBus + session map
-- Orchestration: GitSandboxManager (clone/seed, branch, commit)
-- Execution: OpenCodeBridge (`opencode run`)
+- Control: Hono API + EventBus + SessionQueues + ResourceLifecycle
+- Orchestration: GitSandboxManager
+- Execution: OpenCodeBridge
 
-Peer survey remains in `design/HARNESSES.md`. Arena synthesis history in `arena/`.
+Peer survey: `design/HARNESSES.md`. Arena history: `arena/`.
 
 ## Commands
 
@@ -38,6 +43,7 @@ cd inspect-background-agent
 npm install
 npm test
 npm run e2e
+npm run eval:smoke
 npm run serve   # http://127.0.0.1:8787
 ```
 
