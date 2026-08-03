@@ -1,0 +1,154 @@
+# Notes: RL rollout data layer design space
+
+Working log for the investigation into a data layer for RL rollout
+sandboxes: fast starts without full container image downloads, plus
+checkpointing at rollout stage boundaries (post-setup, post-agent-loop,
+post-grading).
+
+## Context
+
+- Customer shape: RL environment and evaluation companies. Common
+  architecture: control plane (API + scheduler) -> one sandbox per rollout
+  on cloud instances -> metadata in a relational database, artifacts in
+  object storage. Cold chain per rollout: boot instance -> pull image ->
+  env setup -> agent works; instance terminated after, next rollout cold.
+- Checkpoint stages called out in the brief:
+  - pre-agent-loop: fork setup progress onto multiple rollouts (flagged low
+    priority for lack of latency evidence)
+  - post-agent-loop: decouple grading; re-run an updated grader on existing
+    rollouts instead of re-running the rollouts
+  - post-grading: archival, audit, training-data export
+- Direction after review: do not design for any single platform. Frame the
+  layer as a standalone product sellable across RL environment vendors, and
+  exhaust the design space rather than jumping to one architecture. Keep
+  all docs, code, and metadata vendor-neutral.
+
+## Research log
+
+### Fast-start techniques in production systems (public writeups)
+
+Surveyed engineering writeups from serverless compute platforms, hosted
+sandbox providers, and container-runtime projects. Recurring ingredients:
+
+1. Warm instance buffers: pre-booted, health-checked machines shared across
+   workloads; scheduling onto the buffer takes seconds and removes instance
+   provisioning (minutes) from the hot path. Not a storage problem; a
+   prerequisite that sits next to the data layer.
+2. Lazy image delivery: container start blocks only on a few MB of metadata
+   index (~100ms-class), file or chunk contents served on demand from a
+   tiered content-addressed cache (host memory -> local NVMe -> zone cache
+   tier -> region -> object storage). Content addressing beats layer
+   addressing because shared bytes across images are rarely layer-aligned.
+   Empirical basis: Slacker (USENIX FAST '16) showed containers read only a
+   small fraction of image bytes.
+3. Process checkpoint/restore to skip host-side init (interpreter imports,
+   service startup): ~10x on that phase in published numbers. Snapshots are
+   sensitive to host CPU features, so heterogeneous fleets need
+   per-host-class snapshots.
+4. Compression choice matters: single-threaded DEFLATE caps out around
+   100 MB/s, below every other link; production systems recompress or skip.
+
+### Lazy-pull mechanisms in the container ecosystem
+
+Four mechanism families, all proven in production somewhere:
+- Embedded seek tables in recompressed layers. Requires image conversion,
+  changes digests, breaks signatures.
+- External per-layer index stored beside an UNMODIFIED image. No digest
+  change; index can be built after push, server-side; needs registry
+  support for associated artifacts. The most adoption-friendly option.
+- Purpose-built chunked filesystem formats with content-defined dedup and
+  an in-kernel read path (bypassing FUSE, ~10-50us/op vs 100-500us).
+  Fastest, most invasive to adopt.
+- Block-device presentation of layers via a kernel target. High density,
+  kernel module dependency.
+
+Common finding: lazy delivery redistributes download time rather than
+eliminating it; background prefetch after start bounds the mid-run miss
+window. For RL there is a determinism angle: cache-state-dependent tool
+latency can leak into reward variance on timing-sensitive tasks.
+
+### Snapshot/fork capability in sandbox platforms
+
+- MicroVM-based platforms treat "a sandbox is a resumed snapshot":
+  templates are pre-booted VM snapshots (memory + disk + device state) in
+  object storage; memory pages fault in lazily; the rootfs is a read-only
+  template plus per-sandbox copy-on-write layer; pause exports dirty blocks
+  as a diff, uploaded asynchronously; peer-to-peer chunk transfer between
+  hosts avoids origin bottlenecks. One open-source implementation of this
+  exists with a permissive license.
+- At least one commercial platform branches running VMs (memory included)
+  in the 100-250ms range and markets it directly at RL rollouts.
+- Full-VM capture is the most powerful mechanism and the least portable:
+  it couples the data layer to a specific hypervisor and host fleet.
+
+### Storage-layer options below the cache
+
+- Raw object storage: right home for write-once-read-few immutable blobs
+  (checkpoint diffs, trajectories, indices). No POSIX, ~100-200ms first
+  byte, cheapest capacity.
+- FUSE clients that translate file ops to object APIs: fine for streaming
+  reads, poor for metadata-heavy or random-write workloads.
+- Managed NFS-over-object-storage services: easy shared POSIX, but the NFS
+  protocol forces a round trip per mutation and caps per-client throughput.
+- POSIX caching filesystems with custom protocols (checkout/checkin
+  semantics, NVMe cache, read-after-write consistency across mounts,
+  object storage as source of truth in native format). One surveyed product
+  has git-like checkpoints/branches, but exclusive with object-storage
+  backing (a disk syncs to a bucket OR branches, not both), and branches
+  are not a security boundary (credentials scope to the whole disk).
+- Chunked POSIX filesystems with a separate metadata database: strong
+  consistency and dedup, but the bucket contents become a proprietary
+  layout, and someone must operate the metadata tier.
+
+### Synthesis
+
+Three separable problems, often conflated:
+1. Delivery INTO a fresh sandbox (read path, latency-bound, hot):
+   content-addressed cache + lazy load.
+2. Capture OUT of a sandbox at stage boundaries (write path,
+   throughput-bound, async-able): copy-on-write diff export.
+3. Durable shared plane (graders, datasets, results): object storage as
+   source of truth; POSIX only where a workflow demands it.
+
+The immutability of nearly every artifact (images, seeds, checkpoints,
+trajectories, grades) is the structural gift: caching and dedup are
+trivially correct, and no distributed write-consistency problem needs to be
+solved on the rollout path. Shared read-write POSIX across sandboxes
+actively conflicts with re-gradability and audit; it is a different product.
+
+## Design-space pass
+
+Reframed the doc around seven axes (interface, capture granularity,
+addressing/dedup, materialization, cache topology, deployment/source of
+truth, sharing semantics) with pruning rules derived from seven jobs
+(fast start, stage checkpoints, re-grade, fork, audit, export,
+runtime heterogeneity). Wrote model/design_space.py to enumerate: 18,000
+combinations, 14,400 nominal after dropping object-API-only, 1,632
+core-viable, 1,632 more valid only as per-runtime adapters (anything
+needing memory capture), rest pruned. Survivors cluster into three
+archetypes: acceleration cache (delivery only, melting asset),
+checkpoint-native rollout store (recommended), integrated sandbox platform
+(strongest tech, wrong business: it competes with the prospective
+customers).
+
+## Cost model
+
+model/coldstart_model.py, assumptions tunable:
+- Pre-agent overhead: ~190s baseline; ~102s with a warm pool; ~75s adding
+  lazy delivery; ~17s adding post-setup checkpoint restore.
+- Grader update over 10,000 rollouts: re-run ~$456 instance time + model
+  tokens (dominant); re-grade stored checkpoints ~$19 compute + ~$115/mo
+  storage at 0.5 GB diff per rollout.
+
+## Wrap-up
+
+- README.md is the design-space document: jobs, artifact table, seven axes,
+  pruning rules, three archetypes, recommendation (checkpoint-native
+  rollout store: unmodified images, server-side indices, content-defined
+  chunking, profile-guided prefetch, customer-account data plane with the
+  customer's bucket as source of truth, branchable snapshot trees, memory
+  capture only as per-runtime adapters), risks, open questions.
+- Deliberately left open: grader state requirements (filesystem vs live
+  services vs memory), runtime mix at target customers, custody
+  requirements, dedup value on real catalogs, retention economics, fork
+  fan-out frequency.
