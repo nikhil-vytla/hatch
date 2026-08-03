@@ -342,6 +342,13 @@ class SweArgument(StrictModel):
     value: NonEmptyText
     category: ArgumentCategory
 
+    @field_validator("value", mode="before")
+    @classmethod
+    def scalar_value_as_text(cls, value: object) -> object:
+        if isinstance(value, bool | int | float):
+            return json.dumps(value, allow_nan=False, separators=(",", ":"))
+        return value
+
 
 class SweIntent(StrictModel):
     function: NonEmptyText
@@ -385,9 +392,11 @@ def construct_swe_intent(
             role="system",
             content=(
                 "Extract one source software intent and one immediate predecessor. "
-                "Return strict JSON with source and predecessors. Each intent has "
-                "function and arguments. Each argument has identifier, value, and "
-                "category: symptom, context, constraint, or implementation."
+                'Return only JSON with top-level keys "source" and "predecessors". '
+                "Do not use Markdown fences. Each intent has exactly function and "
+                "arguments. Each argument has exactly identifier, value, and "
+                "category. Value is always a JSON string, including booleans and "
+                "numbers. Category is symptom, context, constraint, or implementation."
             ),
         ),
         Message(
@@ -404,8 +413,11 @@ def construct_swe_intent(
         ),
     )
     output = chat(messages, max_output_tokens)
+    payload = output
+    if output.startswith("```json\n") and output.endswith("\n```"):
+        payload = output[8:-4]
     try:
-        construction = SweConstruction.model_validate_json(output)
+        construction = SweConstruction.model_validate_json(payload)
     except ValidationError as error:
         detail = error.errors(include_url=False)[0]["msg"]
         raise SweBenchError(f"SWE intent construction is invalid: {detail}") from error

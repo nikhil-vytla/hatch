@@ -70,11 +70,13 @@ The second slice adds an offline-ready SWE-bench Verified path:
    overwrite completed evidence, defaults to a $5 upper cap, and withholds a
    decision while the design's minimum-detectable-effect is too large.
 
-The fresh HUD key passed authentication during a one-call construction sanity
-check. HUD returned explicit null `tool_calls`, which exposed a response
-boundary mismatch before usage was retained. Docker was unavailable, so no
-screening episode or official grading ran. The boundary now accepts that HUD
-wire shape, but the fix has not received another paid inference test.
+The preregistered HUD screening completed five SWE-bench instances with two
+static Claude Opus 4.8 trials each. Both Django instances passed 2/2; Astropy,
+Matplotlib, and Requests passed 0/2. The design is underpowered and makes no
+advance/reject decision. Known metered spend was $1.669650, with a conservative
+$2.147440 all-in bound for unmetered construction failures under the $5 cap.
+Candidate patches were graded from a pinned SWE-bench source checkout after its
+wheel omitted a required harness fixture.
 
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the

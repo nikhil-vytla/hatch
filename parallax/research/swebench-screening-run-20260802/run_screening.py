@@ -188,8 +188,8 @@ def main() -> None:
         runs = run_screening(
             plan,
             executor,
-            SCREENING,
-            approved=True,
+            output_path=SCREENING,
+            approve_spend=True,
             spend_cap_usd=remaining,
         )
     summary = summarize_screening(plan, runs)

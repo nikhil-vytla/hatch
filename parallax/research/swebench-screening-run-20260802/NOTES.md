@@ -125,3 +125,48 @@
   covers the observed HUD payload. The fix was tested offline only.
 - Evidence:
   `evidence/hud-construction-sanity-failure.json`.
+
+## Local Docker relaunch and completed screening
+
+- `docker version` found client 29.6.2 but no `/var/run/docker.sock`.
+  Colima was absent and Docker Desktop was installed. `open -a Docker` restored
+  the `desktop-linux` daemon in 11 seconds.
+- The daemon is Linux/aarch64. With
+  `DOCKER_DEFAULT_PLATFORM=linux/amd64`, an Alpine probe reported `x86_64`, so
+  the official amd64 SWE-bench images were viable under emulation.
+- Two additional Haiku construction responses exposed real wire variation: an
+  exact Markdown JSON fence and a boolean argument value. The construction
+  boundary now strips only an exact `json` fence and canonicalizes JSON scalar
+  values to text. Five successful construction receipts total $0.143625.
+- Docker Desktop denies unprivileged user namespaces to ordinary containers.
+  The HUD outer container now runs privileged inside Docker Desktop's VM so
+  its inner UID-1000 `bubblewrap` namespace can start. The exact isolation
+  probe passed. Agent commands still see only `/testbed`, with no network and
+  no `/app`.
+- Environment reset and patch export now drop from root to UID 1000. This
+  fixed Git's dubious-ownership refusal without adding a global safe-directory
+  exception.
+- HUD 0.6.12 requires every MCP tool to have a description and described input
+  schema. The `advance` tool now emits both.
+- Ten Opus 4.8 static episodes completed. Their candidate-patch receipts were
+  fsynced before grading; episode inference cost $1.526025.
+- Installing the pinned SWE-bench revision as a wheel omitted its
+  `tokio-rs__tokio-6724.Cargo.lock` fixture, so the first grading pass produced
+  ten verifier failures. The evaluator now uses a detached source checkout at
+  the same pinned revision. A no-cost real-harness preflight passed.
+- The official harness records empty submissions in `empty_patch_ids` and does
+  not emit an instance report. Parallax now maps that official aggregate result
+  to `wrong`. Stored candidate patches allowed evaluator-only regrading with no
+  repeated inference.
+- Final outcomes: Astropy 0/2, Django 10914 2/2, Django 13089 2/2,
+  Matplotlib 0/2, and Requests 0/2. The operating point is floor, ceiling,
+  ceiling, floor, floor. The design remains underpowered: interval [0, 1],
+  MDE 0.607361, no advance/reject decision.
+- Known metered spend is $1.669650 ($0.143625 construction plus $1.526025
+  episodes). Three failed construction responses did not retain usage; their
+  conservative reserve is $0.477790. The all-in conservative bound is
+  $2.147440, below the $5 hard cap.
+- Final evidence is `evidence/construction.jsonl`,
+  `evidence/live-work/episodes/`, `evidence/screening.jsonl`, and
+  `evidence/screening-summary.json`. Preflight and wheel-grader failures remain
+  as separate immutable receipts.

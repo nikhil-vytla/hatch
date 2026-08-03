@@ -263,6 +263,43 @@ def test_constructor_prompt_excludes_all_sealed_material() -> None:
     assert evidence.construction == construction()
 
 
+def test_constructor_accepts_exact_json_code_fence() -> None:
+    problem = load_swebench_rows(
+        (row(),),
+        (INSTANCE_ID,),
+        runtimes={INSTANCE_ID: runtime()},
+    )[0]
+    output = f"```json\n{construction().model_dump_json()}\n```"
+
+    evidence = construct_swe_intent(
+        problem,
+        lambda messages, budget: output,
+        model="scripted-constructor",
+    )
+
+    assert evidence.construction == construction()
+    assert evidence.output == output
+
+
+def test_constructor_normalizes_json_scalar_argument_values() -> None:
+    problem = load_swebench_rows(
+        (row(),),
+        (INSTANCE_ID,),
+        runtimes={INSTANCE_ID: runtime()},
+    )[0]
+    payload = construction().model_dump(mode="json")
+    payload["source"]["arguments"][0]["value"] = True
+    output = json.dumps(payload)
+
+    evidence = construct_swe_intent(
+        problem,
+        lambda messages, budget: output,
+        model="scripted-constructor",
+    )
+
+    assert evidence.construction.source.arguments[0].value == "true"
+
+
 def test_swe_overlay_reinjects_symptoms_and_restores_source() -> None:
     problem = load_swebench_rows(
         (row(),),

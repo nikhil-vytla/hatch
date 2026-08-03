@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 from pathlib import Path
@@ -7,9 +8,16 @@ from pathlib import Path
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
 from parallax.hud_compile import compile_hud
+from parallax.hud_screening import _docker_runtime
 from parallax.specs import freeze_swe_specs
 from parallax.swebench import build_swe_script_family, load_swebench_rows
-from parallax.swebench_runtime import collect_patch, isolation_probe_argv, workspace
+from parallax.swebench_runtime import (
+    _director,
+    collect_patch,
+    isolation_probe_argv,
+    workspace,
+    workspace_owner_argv,
+)
 
 
 def family():
@@ -62,6 +70,35 @@ def test_dockerfile_uses_pinned_base_and_isolated_hud_venv() -> None:
     assert "chown -R 1000:1000 /testbed" in dockerfile
     assert "git clone" not in dockerfile
     assert "git fetch" not in dockerfile
+
+
+def test_local_docker_runtime_allows_inner_bubblewrap() -> None:
+    runtime = _docker_runtime("screening-image")
+
+    assert runtime.run_args == ("--privileged",)
+    assert runtime.runtime_config.image == "screening-image"
+
+
+def test_environment_git_commands_drop_to_workspace_owner() -> None:
+    command = workspace_owner_argv(["git", "status"], effective_uid=0)
+
+    assert command[:7] == [
+        "/usr/bin/setpriv",
+        "--reuid",
+        "1000",
+        "--regid",
+        "1000",
+        "--clear-groups",
+        "--",
+    ]
+    assert command[7:] == ["git", "status"]
+
+
+def test_director_tool_has_hud_manifest_metadata() -> None:
+    tool = asyncio.run(_director.get_tool("advance"))
+
+    assert tool.description == "Advance the scripted user by one turn."
+    assert tool.parameters["properties"]["token"]["description"]
 
 
 def test_all_arms_receive_one_equal_episode_budget() -> None:
