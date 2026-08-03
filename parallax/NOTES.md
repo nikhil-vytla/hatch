@@ -18,14 +18,186 @@
   published, so this work cannot support byte-identical or paper-score
   reproduction claims.
 - Removed the earlier executable evidence scaffolding and split-out research
-  notes after review. Behavioral validation remains unimplemented.
+  notes before the focused vertical slice was implemented.
 - Kept the versioned documentation to the required product trio and two
   focused method documents.
 - Final checks covered internal and external links, balanced display math,
   required classification labels and symbols, summary shape, private paths and
   credential patterns, and Markdown formatting.
 
-> [!NOTE]
-> Current capability is documentation-only: the model and Evolving Intent
-> contract exist, while synthesis, native verification, regression tests, and
-> experiment execution do not.
+## Implementation notes
+
+- Named the slice before writing logic. `Problem` owns the sealed normalized
+  answer. `Intent`, method-local events, `Turn`, and `Script` own construction.
+  `Verification`, `RunFailure`, and `RunResult` own evaluation evidence.
+- Kept ownership flat across `gsm8k.py`, `evolving_intent.py`, `runner.py`, and
+  `report.py`. JSON parsers validate external rows, provider output, and JSONL
+  evidence at their boundaries.
+- Initially chose explicit frozen dataclasses and literal variants over a
+  shared protocol core. The later Pydantic redesign below supersedes the
+  dataclass choice while keeping the three arms concrete.
+- Throughput checkpoint: define package and typed contracts first; implement
+  disjoint modules in dependency order; isolate the only shared mutation behind
+  atomic JSONL replacement; keep one implementation owner because terminal
+  restoration, grading, and evidence serialization cross module boundaries.
+- Implemented the offline GSM8K path with strict source and submission markers,
+  typed Evolving Intent events, explicit matched controls, native grading,
+  deterministic run JSONL, and deterministic paired reporting.
+- Kept provider-stage construction and trajectory logic together after review
+  removed the separate construction mini-framework. The provider boundary is
+  synchronous and local.
+- Verified 17 focused tests, Ruff lint and formatting, `py_compile`, source and
+  wheel builds, isolated wheel install and import, documentation links and
+  display math, timeless README and summary language, private paths, credential
+  patterns, excluded architecture terms, and `git diff --check`.
+- The repository-wide test command cannot collect unrelated projects in this
+  worktree because their packages and Hypothesis are not installed. The
+  complete Parallax suite passes from its package root.
+- Mypy is not configured for Parallax and is not installed. No provider or
+  network-backed experiment ran.
+
+## Independent review revision
+
+- Fidelity review changed the static arm from the raw GSM8K question to the
+  fully revealed extracted intent rendered by the method path. No arm renders
+  the source question.
+- Terminal restoration remains exact state equality. The scheduler now permits
+  corrections after the source-function switch, so tests cannot equate
+  restoration with the position of the switch event.
+- Parallax uses deterministic local scheduling as an explicit divergence.
+  Upstream GSM8K construction is not seed-reproducible because predecessor
+  randomness is unseeded and parallel pools use completion order.
+- Statistical review replaced trial-level bootstrap inference with a
+  preregistered design manifest, source-clustered identification bounds, and a
+  closed-form Hoeffding interval. Recorded run failures remain scheduled rows.
+- Complexity review removed the separate construction module, public helper
+  constants, repeated construction evidence, duplicate atomic writers, and
+  test-only schedule injection.
+- Throughput checkpoint: fix shared extraction and rendering first; define the
+  manifest and canonical evidence records next; aggregate only validated rows;
+  keep one atomic writer; verify each boundary before the final package run.
+- Rejected simplifications that would remove rejected generation attempts,
+  merge verification with run failures, soften exact JSON keys, tuple-encode
+  events, or delete a controlled arm. Each would weaken method or evidence
+  fidelity.
+- Final verification passes 25 offline tests, Ruff lint and formatting,
+  `py_compile`, source and wheel builds, isolated wheel installation and import,
+  documentation scans, private-path and credential scans, and
+  `git diff --check`.
+- Source is 1,239 lines across the five package modules. The revision applies
+  the requested structural simplifications, but it does not meet the suggested
+  800-line target. Strict manifest, nested row, identity-drift, missing-row,
+  and source-cluster validation account for the added size. Removing those
+  checks would violate the higher-priority statistical audit.
+
+## Behavior-audit revision
+
+- Replayed the old-tree behavior audit against the revised implementation and
+  printed all current arm transcripts. The evolved arm names the predecessor
+  goal on its first turn, contains no experimental-condition cue, permits
+  corrections after the switch, and restores the fully revealed source intent.
+- Findings 1 and 3 were fixed now. All load-bearing source assertions became
+  domain exceptions, and schedule validation now rejects mismatched reveals,
+  revise-before-reveal, switch-before-reveal, missing restoration, and duplicate
+  switches.
+- Finding 2 was partly already resolved because the public event-injection seam
+  had been deleted. This revision made generated schedules pass a direct domain
+  validator before rendering.
+- Findings 4 and 5 were already resolved when the percentile bootstrap was
+  replaced by source-clustered Hoeffding inference. This revision added a direct
+  one-source `[-1, 1]` decision-gate test.
+- Findings 8 and 10 were fixed in that revision. `Problem` validated authority
+  at construction and `grade` defensively revalidated it. The later Pydantic
+  redesign removes the second check because `SourceAnswer` now carries the
+  proof.
+- Findings 6, 9, 13, 14, 15, 16, 19, and 20 were fixed or strengthened now.
+  Tests cover matched text purity, sorted canonical JSON keys, nested evidence
+  validation, value-derived history sensitivity, validated script budgets, and
+  one family-level authority with no authority in run rows. Stale capability
+  prose was removed and the summary was narrowed to an implemented offline test
+  path.
+- Findings 7, 12, 17, and 18 were already resolved by the prior revision. The
+  confounded evolved cue, trial-level bootstrap, cross-module private builder
+  import, and duplicate `measured_value` field no longer exist.
+- Finding 11 was rejected as stated. The static arm is intentionally one fully
+  specified turn, so equal total budget implies a larger per-turn cap. The
+  decision estimand compares matched with evolved, whose per-turn and total
+  budgets match.
+- Findings 21 and 22 were rejected as scope or declared design choices. A real
+  provider adapter and CLI were explicitly outside this offline slice, and one
+  changed candidate per source argument is documented as a local construction
+  choice rather than an upstream parity claim.
+- The audit's warning against a design manifest was superseded by the later
+  statistical review, which explicitly required preregistered units, digests,
+  and drift validation. The implementation keeps this narrow and local rather
+  than introducing a generic artifact subsystem.
+- The original mutation run reported 8 survivors among 24 mutants. The adapted
+  revised-tree gauntlet has 28 active contract mutants and 3 obsolete bootstrap
+  or switch-order mutants. One reveal-guard mutant survived the first adapted
+  run; a mismatched-reveal regression killed it. The final adapted run killed
+  all 28 active mutants.
+- Final behavior-audit verification passes 40 tests in normal and optimized
+  Python, Ruff lint and format checks, bytecode compilation, and source and
+  wheel builds. Source is 1,283 lines and test Python is 804 lines.
+  The source remains 483 lines above the suggested 800-line target because the
+  higher-priority manifest, nested evidence, schedule, and statistical
+  validation contracts remain explicit.
+
+## Pydantic type-layer redesign
+
+- The user explicitly removed compatibility and migration-churn constraints.
+  The target became the clearest design we would choose if strict validated
+  data had been foundational from the first slice.
+- Added Pydantic 2.13.4 through `uv add pydantic`. `uv.lock` records Pydantic,
+  pydantic-core, and their transitive runtime dependencies.
+- `StrictModel` applies strict parsing, frozen instances, and
+  `extra="forbid"` once. GSM8K rows, construction-stage replies, manifests,
+  families, run rows, and every nested model now cross that boundary.
+- `Problem`, `Argument`, `Intent`, `Turn`, `Script`, `ScriptFamily`,
+  `GenerationAttempt`, `Verification`, `RunFailure`, `RunIdentity`, `Usage`,
+  and `RunResult` are Pydantic models. They are one validated domain graph that
+  can be serialized directly; retaining parallel dataclass and wire graphs
+  would duplicate invariants.
+- `Reveal`, `Revise`, and `Switch` form a discriminated event union.
+  `Verification` and `RunFailure` form a discriminated outcome union.
+  Manifest, family, and run records form a discriminated evidence union. Every
+  discriminator is serialized as `kind`, and branch sites use `assert_never`.
+- `SourceId`, `CanonicalInteger`, `SourceAnswer`, `DesignDigest`,
+  `SourceDigest`, `ModelConfigDigest`, `ArmConfigDigest`, `ConstructionSeed`,
+  `TrialSeed`, and `TrialIndex` are branded primitives. Runtime-constrained
+  brands use `Annotated` constraints under `NewType`; seed brands remain
+  static distinctions over strict integers.
+- `Verdict` remains an enum and `Arm`, `Role`, stage names, and failure kinds
+  remain literal aliases. They are closed scalar vocabularies, not records with
+  independent invariants.
+- No dataclasses remain. Pydantic is the clearer choice for every retained
+  record because all domain values either originate at a parse boundary or
+  become nested evidence. A second internal representation would add mapping
+  code without removing an invalid state.
+- `read_run_jsonl` now returns a typed `EvidenceRecord` union. `report.py`
+  contains no `Any`, raw evidence dictionaries, exact-key tables, or nested
+  structural parser. Manifest-local invariants moved into `ManifestRecord`;
+  report validation is limited to relationships across scheduled records.
+- `grade` no longer revalidates `Problem.answer`. `Problem` creates a validated
+  `SourceAnswer`, and a regression proves grading invokes the canonical
+  validator only for the model submission.
+- Canonical serialization still uses `json.dumps` over
+  `model_dump(mode="json")` with sorted keys, compact separators, and
+  `allow_nan=False`. The representative evidence golden is 21,813 bytes with
+  SHA-256
+  `d5e3e23d91d8bfdfaa29e5ed968e9565c80519d65cd3335a042da99fc1787eff`.
+- The adapted 28-mutant run initially left three survivors around canonical
+  integer branding, non-finite threshold rejection, and empty manifests.
+  Direct boundary regressions killed them. The final run killed all 28 active
+  mutants.
+- Final certification passes 62 tests in normal and optimized Python, Ruff
+  lint and format checks, `uvx ty check src`, bytecode compilation, source and
+  wheel builds, package import with Pydantic 2.13.4, and `git diff --check`.
+  Optimized pytest emits only its expected warning that test assertions are
+  disabled by `python -O`; source invariants use exceptions and model
+  validation.
+- Source is 1,519 lines across six package modules, up 236 from the reviewed
+  dataclass tree. Tests are 1,088 lines, up 284. The redesign deletes the
+  hand-written structural parser but adds explicit reusable schemas, branded
+  constraints, discriminator contracts, and adversarial boundary tests. The
+  statistical formulas and the 50-source Hoeffding golden are unchanged.

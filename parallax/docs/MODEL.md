@@ -117,11 +117,17 @@ usage, verifier verdict, reward, and relevant randomness. This is a conceptual
 requirement.
 
 > [!NOTE]
-> No code representation or serialization format for task specifications,
-> environment specifications, admission results, or run evidence exists yet.
+> The GSM8K Evolving Intent slice represents its method-local task, intent,
+> events, scripts, outcomes, design manifest, and run evidence with frozen
+> strict Pydantic models and deterministic JSONL. Discriminated unions make
+> event, outcome, and evidence-record variants explicit. The manifest fixes
+> expected source-trial units, seeds, model configuration, arm configuration,
+> and the decision threshold before outcomes are aggregated. The slice does
+> not claim to implement the full abstract task and environment specifications
+> defined above.
 
-> **TODO:** Define content-addressed representations for admitted task and
-> environment specifications, verifier identity, and retained run evidence.
+> **TODO:** Generalize only after another research journey demonstrates which
+> task and environment fields need a shared executable representation.
 
 **Estimand.** For outcome \(Y\), a basic matched-arm effect is
 
