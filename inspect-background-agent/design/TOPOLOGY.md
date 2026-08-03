@@ -1,10 +1,8 @@
 # Topology: three planes
 
-Source: Ramp CTO diagram (saved as [`ramp-cto-topology.mmd`](ramp-cto-topology.mmd)) plus [Modal's Inspect write-up](https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal).
+Source: Ramp CTO diagram ([`ramp-cto-topology.mmd`](ramp-cto-topology.mmd)) plus [Modal's Inspect write-up](https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal).
 
-Our first synthesis treated "workspace" and "session" as the whole story. The CTO diagram splits the system into three planes. That split is load-bearing; collapsing it is how harnesses accidentally put prompt queues inside VMs or put image rebuilds inside session actors.
-
-## Planes
+## Target (Ramp / Open-Inspect shape)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -30,36 +28,35 @@ Our first synthesis treated "workspace" and "session" as the whole story. The CT
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Prompt path (happy case)
+## Local today (one process, same ownership)
 
-1. Client HTTP posts a prompt to the Worker API (or Slack → API).
-2. SessionAgent DO records authorship and durable message parts.
-3. Prompt lands on Modal Queue (multiplayer fan-in without blocking the DO).
-4. Session Manager drains the queue into the live sandbox's Runner.
-5. Runner calls OpenCode over localhost HTTP; events stream back.
-6. Runner WebSockets opencode events into SessionAgent; EventBus fans to UIs.
-7. Side-car iframes (VS Code / VNC / ttyd) hit Modal tunnels through JWT proxies the Runner minted. Humans edit the same repo FS the agent uses.
+```
+┌─────────────────────────────────────────────────────────────┐
+│  control-plane.ts (Hono + WS UI)                            │
+│  SessionRow Map · EventBus · SessionQueues · Lifecycle      │
+│  GitSandboxManager (/tmp) · OpenCodeBridge (host run --dir) │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Mapping onto our hatch modules
-
-| Real Inspect | Hatch module | Note |
+| Plane | Target | Local stand-in |
 | --- | --- | --- |
-| SessionAgent DO | `session/` mailbox + event log | Durable transcript owner |
-| EventBus DO | `control/event-bus` | Fan-out separated from persistence |
-| Modal Queue | `control/prompt-ingress` | Decouples client submit from Runner drain |
-| Session/Sandbox Manager + images + Dict | `workspace/` | Supply / leases / freshness (unchanged root) |
-| Runner | `runner/` | Was buried in "agent runtime"; now first-class |
-| OpenCode | `agent/` port | Still a port; Runner is the only caller |
-| code-server / VNC / ttyd | `runner/sidecars` | JWT tunnel endpoints on SessionView |
-| D1 / R2 | local adapters stubs | Metadata + artifact bags |
+| Control | SessionAgent DO + EventBus DO | session map + memory EventBus + Hono |
+| Orchestration | Modal managers + Queue + images | `GitSandboxManager` + in-process queue |
+| Execution | Bun Runner + OpenCode serve + sidecars | `OpenCodeBridge` on the host |
 
-## What we got wrong earlier (and fixed)
+How we diverge in full: [`DEVIATIONS.md`](DEVIATIONS.md). How we add CF + Modal without rewriting local: [`CLOUD.md`](CLOUD.md).
 
-- **Merged EventBus into Session.** Clients reconnecting and Slack notifications want a broadcast DO that can hibernate sockets cheaply. Session SQLite stays the source of transcript truth; EventBus is a projection fan-out.
-- **No Runner.** Treating OpenCode as talking directly to the DO skips proxy/JWT tunnels, prompt webhook callbacks, and the Bun process that survives OpenCode restarts.
-- **Prompt queue only inside the session actor.** Modal Queue is the cross-client ingress; the session actor still serializes *execution*, but enqueue from Slack/web/extension should not require the sandbox to be awake.
-- **Flat "image".** Recipes layer: base tools → app runtime → data-plane services → platform images. Staleness and pool expiry key off generation + recipe hash.
+## Prompt path
 
-## Hatch simplification (still intentional)
+**Target:** Client → Worker → SessionAgent records turn → Modal Queue → Runner → OpenCode → WS back to SessionAgent → EventBus → UIs.
 
-In-process EventBus and an in-memory prompt ingress stand in for DO + Modal Queue. Runner is a local object that drives the scripted agent and publishes sidecar URLs. Cross-DO leasing and real Modal tunnels remain adapter swaps, not public API.
+**Local:** Client → Hono → `SessionQueues` → `OpenCodeBridge.runPrompt` → memory EventBus → WS.
+
+Serial execution per session is the same rule in both.
+
+## Mistakes to avoid when adding cloud
+
+- Merging EventBus into SessionAgent (reconnect + Slack want a broadcast DO).
+- Skipping Runner (sidecars/JWT and OpenCode restarts need an in-sandbox supervisor).
+- Putting cross-client enqueue only inside a hot sandbox (use Modal Queue).
+- Flat "one image" with no generation/recipe hash for pool expiry.

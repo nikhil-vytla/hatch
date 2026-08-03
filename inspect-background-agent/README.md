@@ -55,6 +55,8 @@ then `DELETE`s the session and checks the sandbox directory is gone.
 
 ## Design notes
 
+- **Deviations vs Ramp / Open-Inspect:** [`design/DEVIATIONS.md`](design/DEVIATIONS.md)
+- **CF + Modal plan:** [`design/CLOUD.md`](design/CLOUD.md)
 - Topology / CTO diagram: [`design/TOPOLOGY.md`](design/TOPOLOGY.md)
 - Peer harness survey: [`design/HARNESSES.md`](design/HARNESSES.md)
 - Arena history: [`arena/`](arena/)
@@ -63,7 +65,7 @@ then `DELETE`s the session and checks the sandbox directory is gone.
 Sandboxes must sit **outside** this git checkout. OpenCode resolves the enclosing project root;
 we force `--dir` and store sandboxes in `/tmp/hatch-inspect`.
 
-## Not included (on purpose for hatch)
+## Not included yet (planned in CLOUD.md)
 
-Cloudflare Durable Objects, Modal snapshots, Slack/GitHub bots, VNC. Same three-plane shape;
-cloud adapters are a later layer on a product that already works locally.
+Cloudflare Durable Objects, Modal snapshots/Queue, Slack/GitHub bots, VNC/code-server.
+Local stays green while those land as adapters behind the same plane split.

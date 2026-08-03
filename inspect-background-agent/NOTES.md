@@ -9,6 +9,12 @@ Source posts:
 
 `#log` was a raw `textContent` dump: markdown fences stayed literal, and `turn.finished` repeated the whole agent summary. Switched to structured entries (system / turn markers / agent bubble / tool chips) with a tiny fenced-code + inline-`code` renderer. Finished turns no longer re-dump the summary.
 
+## Deviations + CF/Modal path (2026-08-03)
+
+Documented exact gaps vs Ramp blog, CTO topology, and ColeMurray Open-Inspect in `design/DEVIATIONS.md`. Layered CF + Modal plan (ports + landable units, local stays default) in `design/CLOUD.md`. Updated `TOPOLOGY.md` so target vs local stand-ins are explicit.
+
+We match serial prompts, authorship, OpenCode, and event shapes. We do not yet have DOs, Modal snapshots/Queue, Runner-in-sandbox, sidecars, GitHub App PR flow, Slack, or warm pools.
+
 ## Figure-it-out run (2026-08-03)
 
 Targeted usual harness failure modes without rewriting to CF/Modal.

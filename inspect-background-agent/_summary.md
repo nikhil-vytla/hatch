@@ -1,6 +1,5 @@
-Hardened the local Inspect hatch against the usual harness failure modes: serial session queues, idempotent sandbox lifecycle with TTL reap, a thin free-model surface, and scripted smoke evals, steered by a verbatim experiment [AGENTS.md](AGENTS.md). Fake demo/adapter paths and the unused session actor were removed so the control plane is the only product. `npm test`, `npm run e2e` (including DELETE diskGone), and `npm run eval:smoke` (2/2) are green on OpenCode free models without API keys.
+Hatch Inspect is a working local slice of Ramp's background-agent shape: Hono control plane, `/tmp` git sandboxes, and host-side OpenCode, with serial queues and lifecycle already proven by e2e/eval smoke. [`design/DEVIATIONS.md`](design/DEVIATIONS.md) spells out every gap versus the [Ramp Inspect post](https://builders.ramp.com/post/why-we-built-our-background-agent) and [Open-Inspect](https://github.com/ColeMurray/background-agents) (no CF DOs, Modal snapshots/Queue, in-sandbox Runner, sidecars, or GitHub PR authorship yet). [`design/CLOUD.md`](design/CLOUD.md) is the layered path to add those planes as adapters without replacing the green local product.
 
-- Async: per-session promise chain, not a global worker pool
-- Lifecycle: `DELETE` + idle TTL; destroy twice is safe
-- Evals/models: [`eval-smoke`](scripts/eval-smoke.ts) + [`GET /api/models`](src/agent/models.ts)
-- Inspiration (not a fork): [ColeMurray/background-agents](https://github.com/ColeMurray/background-agents); Ramp topology in [`design/TOPOLOGY.md`](design/TOPOLOGY.md)
+- Match today: serial prompts, author commits, OpenCode, typed event envelopes, three-plane ownership in docs
+- Defer: Durable Objects, Modal image cron/warm pool, Bun Runner + sidecars, Slack/GitHub bots
+- Next landable unit toward cloud: inject ports behind `startControlPlane`, then CF SessionAgent/EventBus, then Modal SandboxManager+Queue
