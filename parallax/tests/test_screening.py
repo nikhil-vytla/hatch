@@ -15,6 +15,7 @@ from parallax.screening import (
     ScreeningExecutionError,
     SpendApprovalRequired,
     build_screening_plan,
+    initialize_screening_manifest,
     read_screening_jsonl,
     run_screening,
     summarize_screening,
@@ -113,7 +114,7 @@ def test_approved_scripted_screening_finds_boundary_instance(
         verdict = Verdict.PASS if unit.trial_index == 0 else Verdict.WRONG
         return execution(verdict)
 
-    path = tmp_path / "screening.jsonl"
+    path = tmp_path / "evidence" / "screening.jsonl"
     runs = run_screening(
         plan,
         executor,
@@ -219,6 +220,22 @@ def test_manifest_precedes_execution_and_completed_units_resume(
     assert resumed[1].outcome.verdict == Verdict.WRONG
     assert path.exists()
     assert not partial.exists()
+
+
+def test_manifest_can_be_fsynced_before_paid_setup(tmp_path: Path) -> None:
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model",
+        expected_response_model="boundary-model",
+        trial_seeds=(11,),
+    )
+    path = tmp_path / "preregistered" / "screening.jsonl"
+    partial = path.with_name(f"{path.name}.partial")
+
+    initialize_screening_manifest(plan, path)
+    initialize_screening_manifest(plan, path)
+
+    assert read_screening_jsonl(partial) == (plan,)
 
 
 def test_completed_evidence_is_never_overwritten(tmp_path: Path) -> None:
