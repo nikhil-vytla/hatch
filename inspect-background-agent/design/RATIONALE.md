@@ -10,17 +10,19 @@ See [USAGE.md](USAGE.md). Callers open a workspace, start a session, submit turn
 
 ## Shape
 
-**Workspace-first (arena candidate 4), with grafts.**
+**Workspace-first (arena candidate 4), refined against the CTO three-plane topology.**
 
-- `Workspace` owns supply (images, pool, leases, branch routing). `Session` owns conversation (queue, roster, transcript) and holds a fenced slot lease.
-- Write gate is typed: `LeasedSlot` is read-only; `admitWrites()` yields `MutableSlot`. OpenCode's sync plugin awaits admit rather than polling a flag.
-- Credentials: `InstallationToken` for clone/push, `UserToken` for PR open; callers pass `Actor`, never tokens.
-- Session mutations serialize through a command mailbox (graft from candidate 1) with pure transition helpers.
-- Provider calls carry `EffectId` for at-least-once retries (graft from candidate 2).
-- Agent plugins get attenuated `TurnCapabilities` including `childStatus` (graft from C3/C1). Browser streams may use a read-only grant (graft from C3).
-- Hatch: workspace + session run in-process with local fencing; Durable Object / Modal are adapter swaps.
+See [TOPOLOGY.md](TOPOLOGY.md) and [HARNESSES.md](HARNESSES.md).
 
-Interface depth: Workspace (~6 methods) + Session (~7) hide pool, sync, resume, and publish sequencing. Exposed decisions are repo, speaker, prompt text, and whether to open a PR.
+- **Orchestration plane:** `Workspace` owns supply (layered images, pool, leases, branch routing). Matches Modal Session/Sandbox managers + Dict.
+- **Control plane:** `Session` owns durable turns/authorship (SessionAgent DO–shaped). `EventBus` fans events to clients; `PromptIngress` accepts multiplayer enqueue while compute is cold (Modal Queue–shaped).
+- **Execution plane:** `Runner` is first-class — drains prompts, talks to OpenCode, mints JWT sidecar URLs (code-server / VNC / ttyd). Agent port is only reachable through Runner.
+- Write gate stays typed: `admitWrites()` → `MutableSlot`.
+- Credentials: `InstallationToken` vs `UserToken`; callers pass `Actor`.
+- Session mailbox serializes execution; ingress queue decouples client submit from Runner drain.
+- Hatch: in-process bus/queue/runner; CF DO + Modal remain adapter swaps.
+
+Public surface stays small: `Inspect` → `Workspace` → `Session`. Side-car URLs appear on `SessionView`, not as raw tunnel handles.
 
 ## Synthesis decision
 

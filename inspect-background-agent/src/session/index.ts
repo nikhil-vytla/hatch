@@ -65,6 +65,8 @@ export type SessionView = {
   readonly authors: readonly Actor[];
   readonly pr?: PullRequestView;
   readonly ideUrl: string | null;
+  readonly vncUrl: string | null;
+  readonly ttyUrl: string | null;
 };
 
 export type SessionCommand =
@@ -162,6 +164,14 @@ export type SessionPorts = {
     readonly shouldStop: () => boolean;
     readonly toolGate: (kind: ToolKind) => Promise<"allow" | "park-then-allow">;
   }) => Promise<{ readonly summary: string; readonly changedCode: boolean }>;
+  readonly sidecars: (sessionId: SessionId) => {
+    readonly ideUrl: string;
+    readonly vncUrl: string | null;
+    readonly ttyUrl: string | null;
+  };
+  readonly eventBus: {
+    publish(sessionId: SessionId, envelope: SessionEventEnvelope): void;
+  };
   readonly installationToken: () => Promise<InstallationToken>;
   readonly userTokenFor: (actorId: ActorId) => Promise<UserToken>;
   readonly openPullRequest: (args: {
@@ -192,6 +202,8 @@ export type SessionRecord = {
   slot?: LeasedSlot;
   mutable?: MutableSlot;
   ideUrl: string | null;
+  vncUrl: string | null;
+  ttyUrl: string | null;
 };
 
 export function createSessionActor(
@@ -219,6 +231,7 @@ export function createSessionActor(
     };
     record.events.push(envelope);
     for (const sub of subscribers) sub(envelope);
+    ports.eventBus.publish(record.id, envelope);
     return envelope;
   }
 
@@ -228,7 +241,10 @@ export function createSessionActor(
     if (record.slot) return record.slot;
     const slot = await ports.acquireSlot();
     record.slot = slot;
-    record.ideUrl = `local://ide/${record.id}`;
+    const urls = ports.sidecars(record.id);
+    record.ideUrl = urls.ideUrl;
+    record.vncUrl = urls.vncUrl;
+    record.ttyUrl = urls.ttyUrl;
     emit("sandbox", { kind: "freshness", freshness: slot.freshness() });
     return slot;
   }
@@ -406,6 +422,8 @@ export function createSessionActor(
         queue: record.turns.filter((t) => t.state.kind === "queued" || t.state.kind === "running"),
         authors: authorsOf(record.turns, record.opener),
         ideUrl: record.ideUrl,
+        vncUrl: record.vncUrl,
+        ttyUrl: record.ttyUrl,
       };
       if (record.pr) {
         return { ...view, pr: record.pr };

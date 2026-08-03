@@ -1,6 +1,6 @@
-Built a hatch-scale Inspect-style background agent from Ramp's [why we built our background agent](https://builders.ramp.com/post/why-we-built-our-background-agent) post using `/architect`: grounded the Sandbox/API/Clients/OpenCode spec, ran a four-way arena (session-actor, event-log, capability tokens, workspace-first), and implemented the synthesized design as a TypeScript ports/adapters package with local fakes.
+Built a hatch-scale Inspect-style background agent from Ramp's [builders post](https://builders.ramp.com/post/why-we-built-our-background-agent) and [Modal write-up](https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal), using `/architect` plus the CTO three-plane diagram (Cloudflare SessionAgent/EventBus, Modal managers/Queue, Bun Runner + OpenCode + side cars).
 
-- Workspace-first base: repo owns images/pool/leases; session is a short lease plus conversation
-- Typed write gate via `admitWrites()`; `InstallationToken` vs `UserToken` for clone/push vs PR
-- Session command mailbox, prompt queue, multiplayer authorship, Slack-shaped `dispatch`
-- 7 passing tests and `npm run demo` covering create → sync-park → stream → PR without cloud credentials
+- Workspace-first orchestration; SessionAgent mailbox; separate EventBus and PromptIngress; Runner owns agent + ide/vnc/tty URLs
+- Typed `admitWrites()` sync gate; InstallationToken vs UserToken for push vs PR
+- Compared peers (Valet, Open-Inspect/Rafiki, Cursor Cloud Agents, Devin, Claude Code) in `design/HARNESSES.md`
+- 9 passing tests and `npm run demo` without cloud credentials

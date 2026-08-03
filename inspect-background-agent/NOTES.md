@@ -97,3 +97,19 @@ Implemented `@hatch/inspect` under `src/` against the synthesized design.
 Verification: `npm test` (7 passed), `npm run build`, `npm run demo` showed freshness park then PR URL.
 
 No Phase E scrap: fill-in stayed within the sketch; hatch lease simplification was planned in synthesis.
+
+## Follow-up research (Modal blog + CTO diagram + peers)
+
+Sources added:
+- https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
+- Ramp CTO Mermaid (Frontend / CF Worker DOs / Modal Python / Sandbox Runner+OpenCode+sidecars)
+- Peers: Valet, enkaybit background-agents, Rafiki, Cursor Cloud Agents, Devin, Claude Code, Codex
+
+Findings that changed the hatch model (not a scrap — planned refinement):
+1. Control plane splits SessionAgent DO (durable SQLite) from EventBus DO (WS fan-out).
+2. Modal Queue is prompt ingress; Dict holds locks/image metadata.
+3. Bun Runner inside the sandbox is first-class: WS to DO, OpenCode HTTP, JWT proxy factory for code-server/VNC/ttyd.
+4. Image recipes layer (base → webapp → core services → platform).
+5. Adoption metric in Modal post: >50% merged PRs; 80%+ of Inspect written by Inspect.
+
+Code updates: `control/event-bus`, `control/prompt-ingress`, `runner/` with sidecar URLs on SessionView; tests now 9.

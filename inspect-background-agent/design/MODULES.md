@@ -1,29 +1,43 @@
-# Module map (synthesized)
+# Module map (refined)
+
+Three planes, ownership-first. Public callers still see `Inspect` → `Workspace` → `Session`.
 
 ```
 src/
-  kernel/       brands, Result, Clock
-  identity/     Actor, InstallationToken, UserToken
-  workspace/    root aggregate: images, pool, leases, routing, stats
-  slot/         Freshness, LeasedSlot, MutableSlot, admitWrites, ToolEffectPolicy
-  session/      turn queue, mailbox, transcript, publish
-  agent/        AgentRuntime port + TurnCapabilities (spawn, childStatus, status)
-  clients/      slack dispatch binder, web grant helpers
-  ports/        ComputePort, ImagePort, StorePort, ForgePort, BusPort, …
-  adapters/
-    local/      directories, tarballs, fake forge, scripted agent
-    (future)    modal, cloudflare, github, opencode
-  index.ts      createInspect, localPorts
+  kernel/              brands, Result, Clock
+  identity/            Actor, tokens, conversation refs
+  control/
+    event-bus.ts       fan-out port (EventBus DO–shaped)
+    prompt-ingress.ts  queue port (Modal Queue–shaped)
+  workspace/           orchestration plane: images, pool, leases, routing
+  slot/                Freshness, LeasedSlot, MutableSlot, tool effects
+  session/             SessionAgent–shaped: mailbox, transcript, publish
+  runner/              in-sandbox supervisor: OpenCode bridge, sidecar URLs
+  agent/               OpenCode (or fake) port — only Runner calls it
+  adapters/local/      in-process stand-ins for CF + Modal + sandbox
+  index.ts
 ```
 
-Import direction: `clients → index → {workspace, session} → {slot, agent, identity} → {ports, kernel}`.
-Adapters implement ports only.
+## Ownership
 
-| Module | Owns | Does not own |
+| Module | Owns | Maps to Inspect |
 | --- | --- | --- |
-| workspace | image cadence, pool, lease fencing, branch namespace, webhook→session | turn text, PR body |
-| slot | freshness derivation, read vs mutate capability | prompt queue |
-| session | queue, roster, event seq, stop, publish orchestration | VM boot policy |
-| agent | runtime process, plugins, child spawn/status | persistence |
-| authorship (in session) | Actor→UserToken exchange at publish | clone credentials |
-| clients | transport translation | domain invariants |
+| `control/event-bus` | Live subscriber fan-out, origin-tagged publish | EventBus DO |
+| `control/prompt-ingress` | Cross-client enqueue while sandbox cold | Modal Queue |
+| `workspace/` | Image generation, pool, leases, branch namespace | Modal Session/Sandbox Mgr + Dict + images |
+| `slot/` | Sync gate capability (`admitWrites`) | Sandbox FS freshness |
+| `session/` | Durable turns, authorship, PR open orchestration | SessionAgent DO |
+| `runner/` | Prompt drain → agent, sidecar endpoint minting | Bun Runner + Proxy Factory |
+| `agent/` | Model tool loop | OpenCode serve/SDK |
+
+## Dependency direction
+
+```
+clients → Inspect → session + workspace
+session → control (bus, ingress) + runner
+runner  → agent + slot (via session-held lease)
+workspace → slot acquisition
+adapters/local implements all ports
+```
+
+No path from `agent/` up to `session/`. Runner is the only bridge, matching the CTO diagram's PromptHandler ↔ SessionAgent WebSocket.

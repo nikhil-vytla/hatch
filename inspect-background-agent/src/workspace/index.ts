@@ -18,10 +18,13 @@ import {
   type SessionPorts,
   type SessionRecord,
 } from "../session/index.js";
-import type { Freshness, LeasedSlot, MutableSlot, ToolKind } from "../slot/index.js";
+import type { Freshness, LeasedSlot, MutableSlot } from "../slot/index.js";
 import { nextFreshness } from "../slot/index.js";
 import type { CommitSha, BranchName, InstallationToken, UserToken } from "../kernel/index.js";
 import type { PullRequestView } from "../session/index.js";
+import type { EventBus } from "../control/event-bus.js";
+import type { PromptIngress } from "../control/prompt-ingress.js";
+import type { Runner } from "../runner/index.js";
 
 export type DemandHint = {
   readonly kind: "composing";
@@ -55,6 +58,9 @@ export type WorkspaceDeps = {
   readonly installationToken: InstallationToken;
   readonly userTokens: Map<string, UserToken>;
   readonly prs: { next: number; byBranch: Map<string, PullRequestView> };
+  readonly eventBus: EventBus;
+  readonly promptIngress: PromptIngress;
+  readonly runner: Runner;
 };
 
 class LocalSlot implements LeasedSlot {
@@ -192,6 +198,8 @@ export function createWorkspace(deps: WorkspaceDeps): Workspace {
         lastSeq: 0,
         events: [],
         ideUrl: null,
+        vncUrl: null,
+        ttyUrl: null,
       };
 
       const ports: SessionPorts = {
@@ -200,6 +208,8 @@ export function createWorkspace(deps: WorkspaceDeps): Workspace {
         now: deps.now,
         newTurnId: deps.newTurnId,
         newEffectId: deps.newEffectId,
+        eventBus: deps.eventBus,
+        sidecars: (sessionId) => deps.runner.sidecars(sessionId),
         async acquireSlot() {
           const slot = new LocalSlot({
             id: deps.newSlotId(),
@@ -210,39 +220,13 @@ export function createWorkspace(deps: WorkspaceDeps): Workspace {
           });
           return slot;
         },
-        async runTurn({ turn, slot, onDelta, shouldStop, toolGate }) {
-          onDelta(`Working on: ${turn.text}\n`);
-          // Agent may read immediately.
-          const readme = await slot.read("README.md");
-          onDelta(`Read README (${readme.length} bytes)\n`);
-          if (shouldStop()) {
-            return { summary: "stopped before mutate", changedCode: false };
-          }
-          const gate = await toolGate("edit");
-          if (gate === "park-then-allow") {
-            onDelta("Parked for git sync, then writing.\n");
-          }
-          if (shouldStop()) {
-            return { summary: "stopped during sync", changedCode: false };
-          }
-          const mutable = await slot.admitWrites();
-          await mutable.write(
-            "fix.txt",
-            `fixed by ${turn.author.display}: ${turn.text}\n`,
-          );
-          onDelta("Wrote fix.txt\n");
-          return {
-            summary: `Applied fix for: ${turn.text.slice(0, 80)}`,
-            changedCode: true,
-          };
-        },
+        runTurn: (args) => deps.runner.runTurn(args),
         async installationToken() {
           return deps.installationToken;
         },
         async userTokenFor(actorId: ActorId) {
           const token = deps.userTokens.get(actorId);
           if (!token) {
-            // Hatch: mint a branded fake token bound to the actor id.
             const minted = brandString<"UserToken">(`user-token:${actorId}`);
             deps.userTokens.set(actorId, minted);
             return minted;
@@ -251,7 +235,7 @@ export function createWorkspace(deps: WorkspaceDeps): Workspace {
         },
         async openPullRequest({ repo, branch, title, token, effectId }) {
           void effectId;
-          void token; // brand ensures callers cannot pass InstallationToken
+          void token;
           const existing = deps.prs.byBranch.get(branch);
           if (existing) return existing;
           const number = deps.prs.next++;

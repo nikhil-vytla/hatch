@@ -16,6 +16,16 @@ import {
 import type { PullRequestView } from "../../session/index.js";
 import type { Session } from "../../session/index.js";
 import { createWorkspace, type Workspace } from "../../workspace/index.js";
+import { createMemoryEventBus, type EventBus } from "../../control/event-bus.js";
+import {
+  createMemoryPromptIngress,
+  type PromptIngress,
+} from "../../control/prompt-ingress.js";
+import {
+  createLocalRunner,
+  createScriptedAgent,
+  type Runner,
+} from "../../runner/index.js";
 
 export type DispatchResult =
   | { readonly kind: "started"; readonly session: Session }
@@ -33,6 +43,9 @@ export interface Inspect {
     readonly hints?: { readonly channelName?: string; readonly recentText?: string };
     readonly repo?: RepoRef;
   }): Promise<DispatchResult>;
+  /** Hatch inspection seam for EventBus DO stand-in. */
+  readonly eventBus: EventBus;
+  readonly promptIngress: PromptIngress;
 }
 
 export type LocalPortsOptions = {
@@ -54,6 +67,9 @@ export type LocalInspectState = {
   readonly installationToken: ReturnType<typeof brandString<"InstallationToken">>;
   readonly userTokens: Map<string, ReturnType<typeof brandString<"UserToken">>>;
   readonly prs: { next: number; byBranch: Map<string, PullRequestView> };
+  readonly eventBus: EventBus;
+  readonly promptIngress: PromptIngress;
+  readonly runner: Runner;
   seq: number;
 };
 
@@ -65,7 +81,10 @@ function classifyRepo(
   text: string,
   hints: { channelName?: string; recentText?: string } | undefined,
   repos: readonly RepoRef[],
-): { kind: "repo"; repo: RepoRef } | { kind: "ambiguous"; candidates: readonly RepoRef[] } | { kind: "unknown" } {
+):
+  | { kind: "repo"; repo: RepoRef }
+  | { kind: "ambiguous"; candidates: readonly RepoRef[] }
+  | { kind: "unknown" } {
   const hay = `${text} ${hints?.channelName ?? ""} ${hints?.recentText ?? ""}`.toLowerCase();
   const hits = repos.filter(
     (r) => hay.includes(r.name.toLowerCase()) || hay.includes(r.owner.toLowerCase()),
@@ -81,6 +100,9 @@ export async function localPorts(opts: LocalPortsOptions = {}): Promise<{
   state: LocalInspectState;
 }> {
   const clock = opts.clock ?? systemClock();
+  const eventBus = createMemoryEventBus();
+  const promptIngress = createMemoryPromptIngress();
+  const runner = createLocalRunner(createScriptedAgent());
   const state: LocalInspectState = {
     workspaces: new Map(),
     repos: [...(opts.repos ?? [{ owner: "acme", name: "billing" }])],
@@ -91,6 +113,9 @@ export async function localPorts(opts: LocalPortsOptions = {}): Promise<{
     installationToken: brandString<"InstallationToken">("install-token"),
     userTokens: new Map(),
     prs: { next: 1, byBranch: new Map() },
+    eventBus,
+    promptIngress,
+    runner,
     seq: 0,
   };
 
@@ -104,6 +129,8 @@ export async function localPorts(opts: LocalPortsOptions = {}): Promise<{
 
   function create(): Inspect {
     return {
+      eventBus: state.eventBus,
+      promptIngress: state.promptIngress,
       async workspace(repo: RepoRef): Promise<Workspace> {
         const key = repoKey(repo);
         const existing = state.workspaces.get(key);
@@ -126,6 +153,9 @@ export async function localPorts(opts: LocalPortsOptions = {}): Promise<{
           installationToken: state.installationToken,
           userTokens: state.userTokens,
           prs: state.prs,
+          eventBus: state.eventBus,
+          promptIngress: state.promptIngress,
+          runner: state.runner,
         });
         state.workspaces.set(key, ws);
         return ws;
@@ -143,7 +173,6 @@ export async function localPorts(opts: LocalPortsOptions = {}): Promise<{
           repo = classified.repo;
         }
         const ws = await this.workspace(repo);
-        // Heuristic: if conversation already mapped, start returns continued session.
         const before = await ws.stats();
         const session = await ws.start({
           opener: msg.speaker,
@@ -168,5 +197,4 @@ export async function createInspect(
   return ports.create();
 }
 
-// silence unused import warnings for types used only in public re-exports elsewhere
 export type { ActorId, Timestamp, WorkspaceId, SessionId, TurnId, EffectId };

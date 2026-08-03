@@ -127,6 +127,62 @@ describe("local inspect flow", () => {
     const view = await session.view();
     expect(view.authors.map((a) => a.id)).toContain("ana");
     expect(view.ideUrl).toMatch(/^local:\/\/ide\//);
+    expect(view.vncUrl).toMatch(/^local:\/\/vnc\//);
+    expect(view.ttyUrl).toMatch(/^local:\/\/tty\//);
+  });
+
+  it("EventBus fans out independently of session.events()", async () => {
+    const ports = await localPorts({ syncDelayMs: 10 });
+    const inspect = await createInspect(ports);
+    const ws = await inspect.workspace({ owner: "acme", name: "billing" });
+    const ana = {
+      id: brandString<"ActorId">("ana"),
+      display: "Ana",
+      github: "ana",
+    };
+    const session = await ws.start({
+      opener: ana,
+      conversation: { surface: "web", key: "bus-demo" },
+    });
+
+    const busKinds: string[] = [];
+    const unsub = inspect.eventBus.subscribe(session.id, (e) => {
+      busKinds.push(e.event.kind);
+    });
+
+    await session.submit({ author: ana, text: "bus check" });
+    for await (const env of session.events()) {
+      if (env.event.kind === "turn.finished") break;
+    }
+    unsub();
+    expect(busKinds).toContain("turn.queued");
+    expect(busKinds).toContain("turn.finished");
+  });
+
+  it("PromptIngress dedupes client tokens", async () => {
+    const ports = await localPorts();
+    const inspect = await createInspect(ports);
+    const sessionId = brandString<"SessionId">("ses_x");
+    const author = {
+      id: brandString<"ActorId">("ana"),
+      display: "Ana",
+      github: "ana",
+    };
+    inspect.promptIngress.enqueue({
+      sessionId,
+      author,
+      text: "one",
+      clientToken: "dup",
+      turnId: brandString<"TurnId">("t1"),
+    });
+    inspect.promptIngress.enqueue({
+      sessionId,
+      author,
+      text: "two",
+      clientToken: "dup",
+      turnId: brandString<"TurnId">("t2"),
+    });
+    expect(inspect.promptIngress.pending(sessionId)).toBe(1);
   });
 
   it("dispatch classifies repo and is multiplayer-safe", async () => {

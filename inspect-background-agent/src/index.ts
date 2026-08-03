@@ -31,6 +31,12 @@ export {
 export type { Freshness, LeasedSlot, MutableSlot, ToolKind } from "./slot/index.js";
 export { nextFreshness, toolEffect } from "./slot/index.js";
 export type { DemandHint, Workspace } from "./workspace/index.js";
+export type { EventBus } from "./control/event-bus.js";
+export { createMemoryEventBus } from "./control/event-bus.js";
+export type { PromptIngress, IngressPrompt } from "./control/prompt-ingress.js";
+export { createMemoryPromptIngress } from "./control/prompt-ingress.js";
+export type { Runner, SidecarUrls, AgentPort } from "./runner/index.js";
+export { createLocalRunner, createScriptedAgent } from "./runner/index.js";
 export {
   createInspect,
   localPorts,
