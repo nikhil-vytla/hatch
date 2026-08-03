@@ -65,10 +65,18 @@ verifying its single byte capture and immediately before returning it.
 
 A post-rename validation or ancestry failure raises `PublicationStateError`.
 It separately reports whether the operation's directory is securely observed
-at the requested lexical path, whether cleanup succeeded, and whether any
-remaining moved artifact is complete, partial, or indeterminate. Cleanup uses
-the retained parent and destination descriptors, so it never removes an
-attacker replacement at the requested path.
+at the requested lexical path and whether retained contents are empty,
+complete, partial, or indeterminate. Cleanup removes known files only through
+the retained destination descriptor. It never pathname-removes the directory,
+so it cannot delete an attacker replacement installed at the requested name.
+An empty original directory is reported as an empty orphan rather than removed.
+
+Staging cleanup follows the same rule. Benign failures may leave an empty,
+randomly named staging directory because portable POSIX APIs provide no
+conditional `rmdir` tied to an already-open inode.
+
+> **TODO:** Add a trusted janitor or locked-parent cleanup boundary if empty
+> publication and staging orphans need automatic directory removal.
 
 If parent-directory fsync fails after rename, the API raises
 `PublicationDurabilityError` with the verified receipt and snapshot. The

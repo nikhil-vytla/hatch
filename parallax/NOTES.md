@@ -55,9 +55,10 @@
   final lexical-path revalidation. Directory-to-directory parent, ancestor,
   and replay-root swaps now fail unless the original ancestry is restored
   before the final acceptance check.
-- Publication ancestry failures attempt cleanup through retained descriptors
-  and distinguish requested-path visibility from removed, complete-orphan,
-  partial-orphan, and indeterminate artifact states.
+- Publication and staging cleanup remove known contents only through retained
+  descriptors. They never pathname-remove a raced directory and distinguish
+  requested-path visibility from empty-, complete-, partial-, and
+  indeterminate-orphan states.
 - Used labeled synthetic test values; no benchmark rows or hidden answers are
   versioned.
 - Focused tests cover evaluator injection, data-only APIs, answer boundaries,

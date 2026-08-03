@@ -21,6 +21,19 @@ class ArtifactPathError(ArtifactError):
     """A protected path changed or could not be opened without following links."""
 
 
+class StagingStateError(ArtifactPathError):
+    """A staging directory may remain because pathname removal is unsafe."""
+
+    def __init__(self, staging_name: str, staging_state: str) -> None:
+        super().__init__(
+            f"staging directory {staging_name!r} was not pathname-removed; "
+            f"state: {staging_state}"
+        )
+        self.staging_name = staging_name
+        self.staging_state = staging_state
+        self.cleanup_succeeded = False
+
+
 class PublicationStateError(ArtifactError):
     """Publication renamed a destination but could not return an ordinary receipt."""
 
@@ -39,6 +52,7 @@ class PublicationStateError(ArtifactError):
         self.destination_visible = requested_path_visible
         self.artifact_state = artifact_state
         self.orphan_state = orphan_state
+        self.empty_orphan = orphan_state == "empty"
         self.complete_orphan = orphan_state == "complete"
         self.partial_orphan = orphan_state == "partial"
         self.cleanup_attempted = cleanup_attempted
@@ -181,7 +195,7 @@ class _DirectoryPath:
 
 @dataclass(frozen=True)
 class _CleanupOutcome:
-    removed: bool
+    contents_state: str
     modified: bool
 
 
@@ -465,59 +479,51 @@ def _make_staging(parent_fd: int) -> tuple[str, int]:
                 dir_fd=parent_fd,
             )
         except OSError as error:
-            try:
-                os.rmdir(name, dir_fd=parent_fd)
-            except OSError as cleanup_error:
-                raise ArtifactPathError(
-                    "staging descriptor open failed and its directory could not be removed"
-                ) from cleanup_error
-            raise ArtifactPathError(
-                "staging descriptor open failed; the new directory was removed"
-            ) from error
+            raise StagingStateError(name, "indeterminate") from error
         return name, descriptor
     raise ArtifactError("could not allocate a unique staging directory")
 
 
-def _cleanup_staging(parent_fd: int, staging_name: str, staging_fd: int) -> None:
+def _cleanup_directory_contents(directory_fd: int) -> _CleanupOutcome:
+    modified = False
+    failed = False
+    for name in PUBLIC_TREE_POLICY.allowed_paths:
+        try:
+            os.unlink(name, dir_fd=directory_fd)
+            modified = True
+        except FileNotFoundError:
+            pass
+        except OSError:
+            failed = True
     try:
-        for name in PUBLIC_TREE_POLICY.allowed_paths:
-            try:
-                os.unlink(name, dir_fd=staging_fd)
-            except OSError:
-                pass
+        with os.scandir(directory_fd) as iterator:
+            remaining = tuple(iterator)
+    except OSError:
+        return _CleanupOutcome("indeterminate", modified)
+    if not remaining:
+        return _CleanupOutcome("empty", modified)
+    if modified:
+        return _CleanupOutcome("partial", True)
+    if failed:
+        return _CleanupOutcome("unchanged", False)
+    return _CleanupOutcome("indeterminate", False)
+
+
+def _cleanup_staging(staging_fd: int) -> _CleanupOutcome:
+    try:
+        return _cleanup_directory_contents(staging_fd)
     finally:
         try:
             os.close(staging_fd)
         except OSError:
             pass
-    try:
-        os.rmdir(staging_name, dir_fd=parent_fd)
-    except OSError:
-        pass
 
 
-def _cleanup_published(parent_fd: int, name: str, destination_fd: int) -> _CleanupOutcome:
+def _cleanup_published(destination_fd: int) -> _CleanupOutcome:
     try:
-        destination_identity = _directory_identity(destination_fd)
-        named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        if not stat.S_ISDIR(named.st_mode):
-            return _CleanupOutcome(False, False)
-        if (named.st_dev, named.st_ino) != destination_identity:
-            return _CleanupOutcome(False, False)
-    except (ArtifactError, OSError):
-        return _CleanupOutcome(False, False)
-    modified = False
-    try:
-        for allowed in PUBLIC_TREE_POLICY.allowed_paths:
-            try:
-                os.unlink(allowed, dir_fd=destination_fd)
-                modified = True
-            except FileNotFoundError:
-                modified = True
-        os.rmdir(name, dir_fd=parent_fd)
+        return _cleanup_directory_contents(destination_fd)
     except OSError:
-        return _CleanupOutcome(False, modified)
-    return _CleanupOutcome(True, modified)
+        return _CleanupOutcome("indeterminate", False)
 
 
 def publish_public_task(destination: Path, task: NativeTask) -> tuple[PublicationReceipt, TreeSnapshot]:
@@ -588,34 +594,28 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
             )
             cleanup_attempted = destination_fd >= 0
             cleanup = (
-                _cleanup_published(
-                    parent.target_fd,
-                    destination.name,
-                    destination_fd,
-                )
+                _cleanup_published(destination_fd)
                 if cleanup_attempted
-                else _CleanupOutcome(False, False)
+                else _CleanupOutcome("indeterminate", False)
             )
-            cleanup_succeeded = cleanup.removed
-            if cleanup_succeeded:
-                visible = False
-            else:
-                visible = bool(destination_identities) and _path_identity_matches(
-                    destination, destination_identities
-                )
-            if cleanup_succeeded:
-                artifact_state = "removed"
-            elif cleanup.modified:
+            cleanup_succeeded = False
+            visible = bool(destination_identities) and _path_identity_matches(
+                destination, destination_identities
+            )
+            if cleanup.contents_state == "empty":
+                artifact_state = "empty-orphan"
+            elif cleanup.contents_state == "partial":
                 artifact_state = "partial"
-            elif artifact_complete:
+            elif cleanup.contents_state == "unchanged" and artifact_complete:
                 artifact_state = "complete"
             else:
                 artifact_state = "indeterminate"
-            orphan_state = (
-                artifact_state
-                if not visible and artifact_state in ("complete", "partial")
-                else "none"
-            )
+            if visible:
+                orphan_state = "none"
+            elif artifact_state == "empty-orphan":
+                orphan_state = "empty"
+            else:
+                orphan_state = artifact_state
             raise PublicationStateError(
                 f"publication was renamed but could not be accepted: {type(error).__name__}",
                 requested_path_visible=visible,
@@ -625,8 +625,12 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
                 cleanup_succeeded=cleanup_succeeded,
             ) from error
         if staging_fd >= 0:
-            _cleanup_staging(parent.target_fd, staging_name, staging_fd)
+            cleanup = _cleanup_staging(staging_fd)
             staging_fd = -1
+            raise StagingStateError(
+                staging_name,
+                f"{cleanup.contents_state}-orphan",
+            ) from error
         raise
     finally:
         if destination_fd >= 0:
@@ -636,7 +640,7 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
                 pass
         try:
             if staging_fd >= 0:
-                _cleanup_staging(parent.target_fd, staging_name, staging_fd)
+                _cleanup_staging(staging_fd)
         finally:
             parent.close()
 
