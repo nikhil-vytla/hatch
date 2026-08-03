@@ -67,3 +67,33 @@ Rubric draft:
 4. Interface depth: callers don't coordinate warm/sync/snapshot themselves.
 5. At least one structurally distinct alternative considered (e.g. session-as-job-queue vs session-as-actor).
 6. Hatch-scale: implementable without Cloudflare/Modal accounts via ports/adapters.
+
+## Arena outcome
+
+Four candidates completed (A actor, B event-log, C capabilities, D workspace-first).
+
+Parent first-pick: C1 (hatch simplicity, Ramp DO mapping).
+Cross-judge pick: C4 (typed write gate, repo-scoped supply, deeper invariants).
+
+**Resolved base: C4**, with C1's session mailbox grafted and cross-DO leasing simplified for hatch (in-process fencing). See `arena/synthesis/SYNTHESIS.md`.
+
+## Implementation plan
+
+1. Ship design package under `design/` (usage, sketch, modules, rationale with synthesis decision).
+2. Implement packages: kernel, ports, workspace, session, adapters/local, thin clients.
+3. Runnable local demo + tests for freshness gate and queue.
+
+## Implementation
+
+Implemented `@hatch/inspect` under `src/` against the synthesized design.
+
+- Pure policy: `nextFreshness`, `advanceQueue`, `branchOfSession`, `toolEffect`
+- Session mailbox serializes submit/stop/publish; events carry `EventOrigin`
+- LocalSlot starts stale when base≠origin; `admitWrites` waits `syncDelayMs` then yields MutableSlot
+- Agent stub reads before sync, parks mutating tools, writes after admit
+- `publish` pushes with InstallationToken brand, opens PR with UserToken brand
+- `dispatch` classifies repo from text/channel hints; ambiguous/unknown are first-class
+
+Verification: `npm test` (7 passed), `npm run build`, `npm run demo` showed freshness park then PR URL.
+
+No Phase E scrap: fill-in stayed within the sketch; hatch lease simplification was planned in synthesis.
