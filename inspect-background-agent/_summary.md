@@ -1,5 +1,5 @@
-Hatch Inspect is a working local slice of Ramp's background-agent shape: Hono control plane, `/tmp` git sandboxes, and host-side OpenCode, with serial queues and lifecycle already proven by e2e/eval smoke. [`design/DEVIATIONS.md`](design/DEVIATIONS.md) spells out gaps versus the [Ramp Inspect post](https://builders.ramp.com/post/why-we-built-our-background-agent) and [Open-Inspect](https://github.com/ColeMurray/background-agents). Multi-session list, user fork, and archive-vs-delete are documented and wired locally in [`design/SESSIONS.md`](design/SESSIONS.md); CF + Modal remain the next plane layer in [`design/CLOUD.md`](design/CLOUD.md).
+Hatch Inspect now has a real three-plane path: Cloudflare-shaped control (SQLite SessionAgent locally, Durable Objects in `cloud/cloudflare`) talking a shared compute HTTP contract implemented by a Node shim and by Modal (`cloud/modal`). The original all-in-one `npm run serve` stays green; `npm run e2e:cloud` proves control→compute→OpenCode→artifacts→destroy. See [design/CLOUD.md](design/CLOUD.md) and [ColeMurray/background-agents](https://github.com/ColeMurray/background-agents) for the Inspect topology we mirrored without forking.
 
-- Match today: serial prompts, author commits, OpenCode, session list + statuses, fork from HEAD, soft archive / hard delete
-- Still missing vs Inspect: Durable Objects, Modal snapshots/Queue, agent spawn-child tool, sidecars, Slack/GitHub bots
-- Next cloud unit: ports behind `startControlPlane`, then CF SessionAgent/EventBus, then Modal SandboxManager+Queue
+- Local monolith: `npm run serve` / `npm run e2e`
+- Three-plane: `npm run compute:shim` + `npm run serve:cloud` / `npm run e2e:cloud`
+- Deploy targets: Modal ASGI app + Wrangler Worker with SessionAgent/EventBus DOs

@@ -1,99 +1,67 @@
 # Cloudflare + Modal layer
 
-Target: same three planes as Ramp / Open-Inspect, with the **local stack remaining the default** until each adapter is green on its own.
+Target topology matches Ramp / Open-Inspect. Local monolith (`npm run serve`) stays the default demo. Cloud is a **second entry** that splits planes.
 
 ```
-Clients (web → Slack/GitHub later)
+Clients (web UI on serve:cloud, bots → CF Worker)
         │
         ▼
-Control plane ………… Cloudflare Worker
-  SessionAgent DO     durable transcript, authorship, stop
-  EventBus DO         hibernating WS fan-out
-  D1 / R2             metadata, artifacts
-        │ spawn / queue / locks
+Control plane ………… Cloudflare Worker + DOs
+                     OR Node serve:cloud (SQLite SessionAgent stand-in)
+        │ HTTP compute contract
         ▼
-Orchestration ……… Modal (Python)
-  Session + Sandbox managers
-  Dict locks, image metadata
-  Queue prompt ingress
-  Cron ~30m image rebuild + snapshot
-        │ sandbox from snapshot
-        ▼
-Execution ………… Modal Sandbox
-  Bun Runner          WS↔DO, prompt handler, JWT proxy factory
-  OpenCode serve      in-sandbox
-  Sidecars            code-server, VNC+Chromium, ttyd
+Orchestration/Execution … Modal ASGI (cloud/modal)
+                     OR local compute shim (npm run compute:shim)
 ```
 
-Local today collapses all three into one Node process. CF + Modal **replace the stand-ins**, they do not fork a second product API.
+## What landed
 
-## Port boundaries (what each plane must own)
-
-These are the seams. Local already behaves like a trivial implementation of each.
-
-| Port | Local stand-in | CF / Modal implementation |
+| Piece | Path | Role |
 | --- | --- | --- |
-| `SessionStore` | `Map` + event list in memory | SessionAgent DO SQLite |
-| `EventBus` | `createMemoryEventBus` | EventBus DO + hibernation |
-| `PromptIngress` | `SessionQueues.enqueue` | Modal Queue (+ DO records turn) |
-| `SandboxManager` | `GitSandboxManager` | Modal Sandbox Manager (snapshot boot, destroy, exec) |
-| `ImageRegistry` | none (seed/clone) | Modal image recipes + 30m cron + Dict generation |
-| `Runner` | `OpenCodeBridge` in-process | Bun process inside sandbox; only it talks to OpenCode |
-| `Sidecars` | none | code-server / VNC / ttyd + JWT tunnels |
-| `ScmAuth` | hardcoded local author | GitHub App install token + user OAuth for PRs |
+| Compute contract + client | `src/compute/client.ts` | Shared HTTP API |
+| Local compute shim | `scripts/compute-shim.ts` | Modal stand-in (`backend: local-shim`) |
+| Modal app | `cloud/modal/inspect_modal/app.py` | Sandboxes + Dict + Queue + same HTTP API |
+| SQLite SessionAgent | `src/control/session-store-sqlite.ts` | DO-shaped durable transcript (Node) |
+| Cloud control plane | `src/server/control-plane-cloud.ts` | Control → compute; same `/api` + UI |
+| Cloudflare Worker | `cloud/cloudflare/` | Real `SessionAgent` + `EventBus` DOs |
 
-Do not put prompt queues inside the sandbox. Do not put image rebuilds inside the SessionAgent DO. That split is load-bearing ([`TOPOLOGY.md`](TOPOLOGY.md)).
+## Commands
 
-## Growth order (landable units)
+```bash
+# Plane B — compute (pick one)
+npm run compute:shim                          # :8790 local
+# or: modal deploy cloud/modal/inspect_modal/app.py
 
-Each unit leaves `npm test` / `npm run e2e` green on local. Cloud units get their own smoke under `scripts/` when credentials exist.
+# Plane A — control (pick one)
+COMPUTE_URL=http://127.0.0.1:8790 npm run serve:cloud   # :8788 + UI
+# or: cd cloud/cloudflare && npm i && npm run dev
 
-1. **Extract ports behind the control plane**  
-   `startControlPlane` takes `SessionStore` / `SandboxManager` / `AgentBridge` / `EventBus`. Local wiring becomes the default inject. No behavior change.
+# Prove three-plane path
+npm run e2e:cloud
+```
 
-2. **`opencode serve` Runner shape (still local)**  
-   Move from host `opencode run` to a long-lived serve + HTTP/SDK inside a dedicated child (or container). Matches Ramp's server-first agent and unblocks sidecars later.
+## Port boundaries
 
-3. **Cloudflare SessionAgent + EventBus**  
-   Durable transcript and WS fan-out. Prompt HTTP still enqueues; execution may still be local Runner for a while (hybrid is fine).
+| Port | Local monolith | Cloud |
+| --- | --- | --- |
+| SessionStore | in-memory `Map` | SQLite store / CF SessionAgent DO |
+| EventBus | memory bus | memory bus / CF EventBus DO |
+| SandboxManager + Runner | in-process git + OpenCode | Compute HTTP (shim or Modal) |
+| Prompt queue | `SessionQueues` | same + Modal Queue on ingest (Modal) |
 
-4. **Modal SandboxManager + Queue**  
-   Replace `/tmp` git with snapshot boot. PromptIngress becomes Modal Queue. SessionQueues serial rule stays (drain one turn at a time per session).
+## Growth still open
 
-5. **Image cron + freshness plugin**  
-   30m rebuild, warm pool, OpenCode `tool.execute.before` write gate until sync completes.
+1. OpenCode baked into Modal image (prompt currently falls back to a note file if `opencode` missing)
+2. Image cron + snapshot restore
+3. Sidecars (VNC/code-server) → Screenshots tab
+4. Point production web UI at CF Worker URL
+5. SCM / PR authorship
 
-6. **SCM + PR**  
-   Push with install token; open PR with user token (Ramp's attribution rule).
+## Verify
 
-7. **Sidecars + Slack**  
-   JWT tunnels, then clients. Clients stay thin over the same session API.
-
-## What we will not do
-
-- Fork Open-Inspect into this hatch folder.
-- Ship CF stubs that cannot create a session.
-- Keep a second "fake cloud" demo path beside the working local product (already deleted once).
-- Collapse EventBus into SessionAgent "to save a DO".
-
-## Credentials / packages (when implementing)
-
-Prefer maintained SDKs already common in this ecosystem:
-
-- Cloudflare: Workers + Durable Objects (Agents SDK for hibernating WS, as Ramp cites)
-- Modal: Modal Python sandbox APIs + snapshots (orchestration plane)
-- OpenCode: typed SDK / serve (execution plane)
-- Study [Open-Inspect `packages/control-plane` + `modal-infra` + `sandbox-runtime`](https://github.com/ColeMurray/background-agents) for proven wire shapes, then write our own modules under `src/` mapped to the ports above
-
-## Verify when cloud lands
-
-| Layer | Check |
+| Check | Command |
 | --- | --- |
-| Local | `npm test` && `npm run e2e` && `npm run eval:smoke` (must stay green) |
-| CF | Worker deploy; create session; WS receives `agent.delta`; DO survives isolate restart |
-| Modal | Sandbox from snapshot; `opencode` write visible in repo FS; destroy frees sandbox |
-| Hybrid | Prompt via CF → Queue → Modal Runner → events back on EventBus |
-
-## Relation to deviations
-
-See [`DEVIATIONS.md`](DEVIATIONS.md) for the full gap list. This file is only the path to close the control + orchestration + execution gaps without abandoning the local product.
+| Local monolith | `npm test && npm run e2e` |
+| Three-plane | `npm run e2e:cloud` |
+| Modal | `modal deploy` then `COMPUTE_URL=… npm run serve:cloud` |
+| Cloudflare | `cd cloud/cloudflare && npm run dev` with shim running |

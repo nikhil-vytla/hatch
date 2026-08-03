@@ -10,11 +10,24 @@ Experiment steering lives in [`AGENTS.md`](AGENTS.md). Hardening playbook: [`PLA
 ```bash
 cd inspect-background-agent
 npm install
-npm test          # queues, lifecycle, models, pure policy
-npm run e2e       # sandbox + OpenCode + commit + DELETE disk
+npm test
+npm run e2e
 npm run eval:smoke
-npm run serve     # http://127.0.0.1:8787 web UI + API
+npm run serve          # local monolith :8787
 ```
+
+### Cloudflare + Modal (three planes)
+
+```bash
+npm run compute:shim                                    # compute :8790
+COMPUTE_URL=http://127.0.0.1:8790 npm run serve:cloud   # control+UI :8788
+npm run e2e:cloud                                       # proves the split
+
+# Real Modal:  modal deploy cloud/modal/inspect_modal/app.py
+# Real CF:     cd cloud/cloudflare && npm i && npm run dev
+```
+
+See [`design/CLOUD.md`](design/CLOUD.md).
 
 `npm run e2e` boots a control plane, seeds a git sandbox under `/tmp/hatch-inspect`, runs
 `opencode run --dir <sandbox> --model opencode/big-pickle`, verifies `src/math.ts`, commits,
@@ -69,7 +82,7 @@ then `DELETE`s the session and checks the sandbox directory is gone.
 Sandboxes must sit **outside** this git checkout. OpenCode resolves the enclosing project root;
 we force `--dir` and store sandboxes in `/tmp/hatch-inspect`.
 
-## Not included yet (planned in CLOUD.md)
+## Not included yet (see CLOUD.md)
 
-Cloudflare Durable Objects, Modal snapshots/Queue, Slack/GitHub bots, VNC/code-server.
-Local stays green while those land as adapters behind the same plane split.
+Image cron / snapshot restore, VNC sidecars, CF-hosted full web UI, SCM PR authorship.
+Local monolith and three-plane paths both work. Deploy Modal + Wrangler when you have credentials.

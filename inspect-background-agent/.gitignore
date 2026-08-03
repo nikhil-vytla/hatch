@@ -3,3 +3,6 @@ dist/
 .inspect/
 *.log
 .DS_Store
+cloud/cloudflare/node_modules/
+cloud/cloudflare/.wrangler/
+__pycache__/

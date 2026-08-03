@@ -37,4 +37,17 @@ export { ResourceLifecycle } from "./control/resource-lifecycle.js";
 export { OpenCodeBridge } from "./agent/opencode-bridge.js";
 export { listModels, resolveModel, FREE_OPENCODE_MODELS } from "./agent/models.js";
 export { GitSandboxManager, defaultSandboxRoot } from "./sandbox/git-sandbox.js";
+export { ComputeClient } from "./compute/client.js";
+export type {
+  ComputeArtifacts,
+  ComputeAuthor,
+  ComputeClientOptions,
+  ComputeCreateSandbox,
+  ComputeDelta,
+  ComputeFileArtifact,
+  ComputeSandbox,
+} from "./compute/client.js";
+export { SqliteSessionStore } from "./control/session-store-sqlite.js";
+export { startCloudControlPlane } from "./server/control-plane-cloud.js";
 export { startControlPlane } from "./server/control-plane.js";
+export { webUiHtml } from "./server/control-plane.js";

@@ -1,0 +1,21 @@
+name = "hatch-inspect"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "SESSION_AGENT"
+class_name = "SessionAgent"
+
+[[durable_objects.bindings]]
+name = "EVENT_BUS"
+class_name = "EventBus"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SessionAgent", "EventBus"]
+
+[vars]
+COMPUTE_URL = "http://127.0.0.1:8790"
+
+# Set COMPUTE_TOKEN in .dev.vars or dashboard secrets when needed.

@@ -5,6 +5,16 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
+## Cloudflare + Modal planes (2026-08-03)
+
+Landed three-plane split without breaking the local monolith:
+- Compute contract + `ComputeClient`
+- Local compute shim (`npm run compute:shim`) and Modal app (`cloud/modal`)
+- Cloud control plane with SQLite SessionAgent (`npm run serve:cloud`, `npm run e2e:cloud` green)
+- Cloudflare Worker with SessionAgent + EventBus Durable Objects (`cloud/cloudflare`)
+
+Still open: OpenCode inside Modal image, snapshot cron, sidecars/screenshots, CF-hosted UI.
+
 ## Artifacts panel (2026-08-03)
 
 Log alone only showed agent chat. Added Files / Diff / Screenshots under the log: `GET /api/sessions/:id/artifacts` returns changed file contents + unified diff. Screenshots tab explains VNC/Chromium sidecars are not local yet (empty list).

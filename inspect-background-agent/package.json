@@ -1,6 +1,6 @@
 {
   "name": "@hatch/inspect",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -12,7 +12,10 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "serve": "tsx scripts/serve.ts",
+    "serve:cloud": "tsx scripts/serve-cloud.ts",
+    "compute:shim": "tsx scripts/compute-shim.ts",
     "e2e": "tsx scripts/e2e-full.ts",
+    "e2e:cloud": "tsx scripts/e2e-cloud.ts",
     "eval:smoke": "tsx scripts/eval-smoke.ts"
   },
   "devDependencies": {

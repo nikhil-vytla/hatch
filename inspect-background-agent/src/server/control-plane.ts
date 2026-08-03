@@ -447,7 +447,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   };
 }
 
-function webUiHtml(): string {
+export function webUiHtml(): string {
   return `<!doctype html>
 <html lang="en">
 <head>
