@@ -15,3 +15,6 @@ be recreated on `main`.
 - [`slopcodebench-method/`](slopcodebench-method/README.md) — design of the
   checkpoint-evolution synthesis method behind
   [`../docs/methods/checkpoint-evolution.md`](../docs/methods/checkpoint-evolution.md).
+- [`benchmark-selection-coding/`](benchmark-selection-coding/README.md) —
+  benchmark selection for the next slice (SWE-bench Verified under Evolving
+  Intent, chosen over BIRD-SQL).

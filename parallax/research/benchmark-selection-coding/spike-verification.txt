@@ -1,0 +1,20 @@
+# Non-destructive spike verification, 2026-08-02
+
+## Image import check
+docker run --rm --platform linux/amd64 --entrypoint /opt/miniconda3/bin/python parallax-swebench-django-11099:local -c "import env; ..."
+env import OK: django__django-11099 d26b2424437d
+arms: ['evolved', 'matched', 'static']
+
+## Docker Hub official eval image probes (manifest inspect, no pull)
+swebench/sweb.eval.x86_64.django_1776_django-11099:latest -> manifest v2 OK
+swebench/sweb.eval.x86_64.astropy_1776_astropy-12907:latest -> manifest v2 OK
+
+## Episode test (no-op arm, real container + director + grader scope gate)
+command: "PARALLAX_SWEBENCH_IMAGE=parallax-swebench-django-11099:local uv run --with pytest --with mini-swe-agent pytest ../spikes/test_swebench_episode.py::test_no_op_fails_official_verifier -q 2>&1 | tail -20"
+.                                                                        [100%]
+1 passed in 28.93s
+
+---
+exit_code: 0
+elapsed_ms: 30493
+ended_at: 2026-08-03T02:19:03.032Z
