@@ -54,9 +54,21 @@ Publication accepts identity records, derives immutable public bytes, and
 writes its own same-filesystem staging directory. It opens directories and
 files relative to no-follow descriptors, fsyncs each file, captures and checks
 the staging tree, atomically renames it, then captures the visible destination
-again before issuing a receipt. A failed rename leaves no destination. A
-post-rename validation failure raises `PublicationStateError`, which explicitly
-reports that a destination is visible and durability is indeterminate.
+again before issuing a receipt. A failed rename leaves no destination.
+
+Traversal retains descriptors and device/inode identity for the filesystem
+root and every lexical directory component. Publication reopens and compares
+the complete ancestry immediately before rename, after validating the renamed
+artifact, and after parent-directory fsync immediately before acceptance.
+Replay performs the same complete ancestry and target comparison after
+verifying its single byte capture and immediately before returning it.
+
+A post-rename validation or ancestry failure raises `PublicationStateError`.
+It separately reports whether the operation's directory is securely observed
+at the requested lexical path, whether cleanup succeeded, and whether any
+remaining moved artifact is complete, partial, or indeterminate. Cleanup uses
+the retained parent and destination descriptors, so it never removes an
+attacker replacement at the requested path.
 
 If parent-directory fsync fails after rename, the API raises
 `PublicationDurabilityError` with the verified receipt and snapshot. The
@@ -76,6 +88,11 @@ component is opened relative to the previous directory descriptor with
 Symlinked parents and roots fail closed. A publication destination's parent
 must already exist so publication never creates directories through an
 unverified ancestor.
+
+The final revalidation establishes the lexical ancestry and target identity at
+that acceptance check. It cannot prevent an external actor from renaming or
+mutating the path after the function returns; callers remain responsible for
+post-publication access control.
 
 Paths use canonical forward slashes. Validation rejects absolute and parent
 paths, empty and dot components, backslashes, Windows drives and reserved

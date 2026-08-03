@@ -22,11 +22,27 @@ class ArtifactPathError(ArtifactError):
 
 
 class PublicationStateError(ArtifactError):
-    """Publication renamed a destination but could not confirm a valid final state."""
+    """Publication renamed a destination but could not return an ordinary receipt."""
 
-    def __init__(self, message: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        requested_path_visible: bool,
+        artifact_state: str,
+        orphan_state: str,
+        cleanup_attempted: bool,
+        cleanup_succeeded: bool,
+    ) -> None:
         super().__init__(message)
-        self.destination_visible = True
+        self.requested_path_visible = requested_path_visible
+        self.destination_visible = requested_path_visible
+        self.artifact_state = artifact_state
+        self.orphan_state = orphan_state
+        self.complete_orphan = orphan_state == "complete"
+        self.partial_orphan = orphan_state == "partial"
+        self.cleanup_attempted = cleanup_attempted
+        self.cleanup_succeeded = cleanup_succeeded
         self.durability_indeterminate = True
 
 
@@ -145,6 +161,30 @@ class _TreeCapture:
         return dict(self.files)
 
 
+@dataclass
+class _DirectoryPath:
+    lexical: Path
+    descriptors: tuple[int, ...]
+    identities: tuple[tuple[int, int], ...]
+
+    @property
+    def target_fd(self) -> int:
+        return self.descriptors[-1]
+
+    def close(self) -> None:
+        for descriptor in reversed(self.descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
+@dataclass(frozen=True)
+class _CleanupOutcome:
+    removed: bool
+    modified: bool
+
+
 PUBLIC_TREE_POLICY = TreePolicy(("publication-manifest.json", "task.json"))
 
 
@@ -157,15 +197,27 @@ def _descriptor_flags(*, directory: bool = False) -> int:
     return flags
 
 
-def _open_directory_path(path: Path) -> int:
+def _directory_identity(descriptor: int) -> tuple[int, int]:
+    try:
+        metadata = os.fstat(descriptor)
+    except OSError as error:
+        raise ArtifactPathError("could not inspect protected directory descriptor") from error
+    return metadata.st_dev, metadata.st_ino
+
+
+def _open_directory_path(path: Path) -> _DirectoryPath:
     lexical = path if path.is_absolute() else Path.cwd() / path
     if any(part in (".", "..") for part in lexical.parts):
         raise ArtifactError("directory path must not contain dot or parent components")
+    descriptors: list[int] = []
+    identities: list[tuple[int, int]] = []
     try:
         descriptor = os.open(os.path.sep, _descriptor_flags(directory=True))
     except OSError as error:
         raise ArtifactPathError("could not open filesystem root") from error
+    descriptors.append(descriptor)
     try:
+        identities.append(_directory_identity(descriptor))
         for part in lexical.parts[1:]:
             try:
                 next_descriptor = os.open(
@@ -177,12 +229,34 @@ def _open_directory_path(path: Path) -> int:
                 raise ArtifactPathError(
                     f"protected directory traversal failed at component: {part}"
                 ) from error
-            os.close(descriptor)
             descriptor = next_descriptor
-        return descriptor
+            descriptors.append(descriptor)
+            identities.append(_directory_identity(descriptor))
+        return _DirectoryPath(lexical, tuple(descriptors), tuple(identities))
     except Exception:
-        os.close(descriptor)
+        for opened in reversed(descriptors):
+            try:
+                os.close(opened)
+            except OSError:
+                pass
         raise
+
+
+def _assert_path_identity(path: Path, identities: tuple[tuple[int, int], ...]) -> None:
+    reopened = _open_directory_path(path)
+    try:
+        if reopened.identities != identities:
+            raise ArtifactPathError("requested lexical directory ancestry changed")
+    finally:
+        reopened.close()
+
+
+def _path_identity_matches(path: Path, identities: tuple[tuple[int, int], ...]) -> bool:
+    try:
+        _assert_path_identity(path, identities)
+    except ArtifactError:
+        return False
+    return True
 
 
 def _is_ignored(relative: str, policy: TreePolicy) -> bool:
@@ -306,11 +380,13 @@ def _capture_tree_fd(root_fd: int, policy: TreePolicy) -> _TreeCapture:
 
 
 def _capture_tree(root: Path, policy: TreePolicy) -> _TreeCapture:
-    root_fd = _open_directory_path(root)
+    opened = _open_directory_path(root)
     try:
-        return _capture_tree_fd(root_fd, policy)
+        capture = _capture_tree_fd(opened.target_fd, policy)
+        _assert_path_identity(opened.lexical, opened.identities)
+        return capture
     finally:
-        os.close(root_fd)
+        opened.close()
 
 
 def snapshot_tree(root: Path, policy: TreePolicy) -> TreeSnapshot:
@@ -345,8 +421,14 @@ def _verify_public_capture(capture: _TreeCapture, task: NativeTask) -> str:
 
 
 def verify_publication(root: Path, task: NativeTask) -> str:
-    capture = _capture_tree(root, PUBLIC_TREE_POLICY)
-    return _verify_public_capture(capture, task)
+    opened = _open_directory_path(root)
+    try:
+        capture = _capture_tree_fd(opened.target_fd, PUBLIC_TREE_POLICY)
+        manifest_id = _verify_public_capture(capture, task)
+        _assert_path_identity(opened.lexical, opened.identities)
+        return manifest_id
+    finally:
+        opened.close()
 
 
 def _write_durable(directory_fd: int, name: str, data: bytes) -> None:
@@ -397,60 +479,90 @@ def _make_staging(parent_fd: int) -> tuple[str, int]:
 
 
 def _cleanup_staging(parent_fd: int, staging_name: str, staging_fd: int) -> None:
-    for name in PUBLIC_TREE_POLICY.allowed_paths:
+    try:
+        for name in PUBLIC_TREE_POLICY.allowed_paths:
+            try:
+                os.unlink(name, dir_fd=staging_fd)
+            except OSError:
+                pass
+    finally:
         try:
-            os.unlink(name, dir_fd=staging_fd)
-        except FileNotFoundError:
+            os.close(staging_fd)
+        except OSError:
             pass
-    os.close(staging_fd)
     try:
         os.rmdir(staging_name, dir_fd=parent_fd)
     except OSError:
         pass
 
 
+def _cleanup_published(parent_fd: int, name: str, destination_fd: int) -> _CleanupOutcome:
+    try:
+        destination_identity = _directory_identity(destination_fd)
+        named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISDIR(named.st_mode):
+            return _CleanupOutcome(False, False)
+        if (named.st_dev, named.st_ino) != destination_identity:
+            return _CleanupOutcome(False, False)
+    except (ArtifactError, OSError):
+        return _CleanupOutcome(False, False)
+    modified = False
+    try:
+        for allowed in PUBLIC_TREE_POLICY.allowed_paths:
+            try:
+                os.unlink(allowed, dir_fd=destination_fd)
+                modified = True
+            except FileNotFoundError:
+                modified = True
+        os.rmdir(name, dir_fd=parent_fd)
+    except OSError:
+        return _CleanupOutcome(False, modified)
+    return _CleanupOutcome(True, modified)
+
+
 def publish_public_task(destination: Path, task: NativeTask) -> tuple[PublicationReceipt, TreeSnapshot]:
     destination = destination.absolute()
     validate_relative_path(destination.name)
-    parent_fd = _open_directory_path(destination.parent)
+    parent = _open_directory_path(destination.parent)
     staging_name = ""
     staging_fd = -1
+    destination_fd = -1
+    destination_identities: tuple[tuple[int, int], ...] = ()
     renamed = False
+    artifact_complete = False
     try:
         try:
-            os.stat(destination.name, dir_fd=parent_fd, follow_symlinks=False)
+            os.stat(destination.name, dir_fd=parent.target_fd, follow_symlinks=False)
         except FileNotFoundError:
             pass
         else:
             raise ArtifactError("publication destination already exists")
-        staging_name, staging_fd = _make_staging(parent_fd)
+        staging_name, staging_fd = _make_staging(parent.target_fd)
         task_bytes = canonical_bytes(task.public.as_record())
         manifest_bytes = canonical_bytes(_artifact_manifest(task_bytes))
         _write_durable(staging_fd, "task.json", task_bytes)
         _write_durable(staging_fd, "publication-manifest.json", manifest_bytes)
         _verify_public_capture(_capture_tree_fd(staging_fd, PUBLIC_TREE_POLICY), task)
+        _assert_path_identity(parent.lexical, parent.identities)
         try:
             os.replace(
                 staging_name,
                 destination.name,
-                src_dir_fd=parent_fd,
-                dst_dir_fd=parent_fd,
+                src_dir_fd=parent.target_fd,
+                dst_dir_fd=parent.target_fd,
             )
         except OSError as error:
             raise ArtifactPathError("atomic publication rename failed") from error
         renamed = True
-        os.close(staging_fd)
+        destination_fd = staging_fd
         staging_fd = -1
-        destination_fd = os.open(
-            destination.name,
-            _descriptor_flags(directory=True),
-            dir_fd=parent_fd,
+        destination_identities = parent.identities + (
+            _directory_identity(destination_fd),
         )
-        try:
-            final_capture = _capture_tree_fd(destination_fd, PUBLIC_TREE_POLICY)
-        finally:
-            os.close(destination_fd)
+        final_capture = _capture_tree_fd(destination_fd, PUBLIC_TREE_POLICY)
         manifest_id = _verify_public_capture(final_capture, task)
+        artifact_complete = True
+        _assert_path_identity(destination, destination_identities)
         snapshot = final_capture.snapshot
         receipt = PublicationReceipt(
             task.public.id,
@@ -458,26 +570,75 @@ def publish_public_task(destination: Path, task: NativeTask) -> tuple[Publicatio
             snapshot.id,
             PUBLIC_TREE_POLICY.id,
         )
+        durability_error: OSError | None = None
         try:
-            os.fsync(parent_fd)
+            os.fsync(parent.target_fd)
         except OSError as error:
-            raise PublicationDurabilityError(receipt, snapshot) from error
+            durability_error = error
+        _assert_path_identity(destination, destination_identities)
+        if durability_error is not None:
+            raise PublicationDurabilityError(receipt, snapshot) from durability_error
         return receipt, snapshot
     except PublicationDurabilityError:
         raise
     except Exception as error:
         if renamed:
+            visible = bool(destination_identities) and _path_identity_matches(
+                destination, destination_identities
+            )
+            cleanup_attempted = destination_fd >= 0
+            cleanup = (
+                _cleanup_published(
+                    parent.target_fd,
+                    destination.name,
+                    destination_fd,
+                )
+                if cleanup_attempted
+                else _CleanupOutcome(False, False)
+            )
+            cleanup_succeeded = cleanup.removed
+            if cleanup_succeeded:
+                visible = False
+            else:
+                visible = bool(destination_identities) and _path_identity_matches(
+                    destination, destination_identities
+                )
+            if cleanup_succeeded:
+                artifact_state = "removed"
+            elif cleanup.modified:
+                artifact_state = "partial"
+            elif artifact_complete:
+                artifact_state = "complete"
+            else:
+                artifact_state = "indeterminate"
+            orphan_state = (
+                artifact_state
+                if not visible and artifact_state in ("complete", "partial")
+                else "none"
+            )
             raise PublicationStateError(
-                f"publication destination is visible but final validation failed: {type(error).__name__}"
+                f"publication was renamed but could not be accepted: {type(error).__name__}",
+                requested_path_visible=visible,
+                artifact_state=artifact_state,
+                orphan_state=orphan_state,
+                cleanup_attempted=cleanup_attempted,
+                cleanup_succeeded=cleanup_succeeded,
             ) from error
         if staging_fd >= 0:
-            _cleanup_staging(parent_fd, staging_name, staging_fd)
+            _cleanup_staging(parent.target_fd, staging_name, staging_fd)
             staging_fd = -1
         raise
     finally:
-        if staging_fd >= 0:
-            _cleanup_staging(parent_fd, staging_name, staging_fd)
-        os.close(parent_fd)
+        if destination_fd >= 0:
+            try:
+                os.close(destination_fd)
+            except OSError:
+                pass
+        try:
+            if staging_fd >= 0:
+                _cleanup_staging(parent.target_fd, staging_name, staging_fd)
+        finally:
+            parent.close()
 
 
 def make_replay_lock(
@@ -513,10 +674,15 @@ def replay_locked(
         or lock.tree_snapshot.policy_id != policy.id
     ):
         raise ArtifactError("receipt, snapshot, and actual replay policies disagree")
-    capture = _capture_tree(root, policy)
-    if capture.snapshot != lock.tree_snapshot:
-        raise ArtifactError("published tree differs from replay lock")
-    manifest_id = _verify_public_capture(capture, task)
-    if manifest_id != lock.publication_receipt.artifact_manifest_id:
-        raise ArtifactError("artifact manifest differs from publication receipt")
-    return capture.as_dict()
+    opened = _open_directory_path(root)
+    try:
+        capture = _capture_tree_fd(opened.target_fd, policy)
+        if capture.snapshot != lock.tree_snapshot:
+            raise ArtifactError("published tree differs from replay lock")
+        manifest_id = _verify_public_capture(capture, task)
+        if manifest_id != lock.publication_receipt.artifact_manifest_id:
+            raise ArtifactError("artifact manifest differs from publication receipt")
+        _assert_path_identity(opened.lexical, opened.identities)
+        return capture.as_dict()
+    finally:
+        opened.close()
