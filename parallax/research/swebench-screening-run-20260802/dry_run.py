@@ -56,6 +56,7 @@ def main() -> None:
     receipt = {
         "credential_present": True,
         "endpoint": HUD_GATEWAY_ENDPOINT,
+        "estimated_cost_usd": 0.0,
         "kind": "hud_adapter_no_spend_dry_run",
         "network_calls": 0,
         "paid_calls": 0,
