@@ -53,15 +53,18 @@ The second slice adds an offline-ready SWE-bench Verified path:
    published evaluation IDs. It discards the gold patch, separates the public
    issue from the sealed official verifier, builds budget-equal arms, and
    records the pinned SWE symptom-overlay transformation.
-3. `swebench_env.py` renders public-only `instance.json`, a one-line `env.py`,
-   the importable `swebench_runtime.py`, and `Dockerfile.hud`. The agent works
-   in a probed HUD `bubblewrap` Workspace and exports a candidate patch that
-   includes untracked files. Sealed verifier data never enters this image.
-4. `swebench_harness.py` runs the pinned official SWE-bench harness
+3. `specs.py` freezes each family into versioned `TaskSpecV1` and `EnvSpecV1`
+   models. `hud_compile.py` creates agent artifacts only from `PublicTaskV1`.
+   It tags every output by audience, scans the agent build context for sealed
+   fragments, and records artifact digests.
+4. `swebench_runtime.py` runs the agent in a probed HUD `bubblewrap` Workspace
+   and exports a candidate patch that includes untracked files. The evaluator
+   reloads its separate compiled artifact before grading.
+5. `swebench_harness.py` runs the pinned official SWE-bench harness
    evaluator-side against the digest-pinned official image. The harness verdict
    is authoritative; report coverage is checked against the committed
    FAIL_TO_PASS and PASS_TO_PASS sets.
-5. `screening.py` preregisters boundary-model screening units and canonical
+6. `screening.py` preregisters boundary-model screening units and canonical
    outcomes before execution, appends and fsyncs each unit to a resumable
    partial file, records provider model/usage and estimated cost, refuses to
    overwrite completed evidence, defaults to a $5 upper cap, and withholds a

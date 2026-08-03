@@ -198,12 +198,14 @@ requires them:
   receives that budget in one turn; matched and evolved divide it across
   turns.
 
-The generated HUD bundle contains public task and schedule data only. It runs
-the agent in a probed `bubblewrap` Workspace and exports a binary Git patch
-through an evaluator-owned task result. A separate evaluator supplies sealed
-instance data to `swebench.harness.run_evaluation` at the pinned harness
-revision in the digest-pinned official image. The official `resolved` verdict
-is authoritative; Parallax additionally checks that the report covers every
+`TaskSpecV1` separates `PublicTaskV1` from `SealedAuthorityV1`.
+`compile_hud` creates agent artifacts only from the public branch. It tags each
+artifact as agent or evaluator, scans the agent build context for sealed
+fragments, and records a digest receipt. The HUD runtime uses a probed
+`bubblewrap` Workspace and exports a binary Git patch. The evaluator reloads
+its compiled artifact and calls `swebench.harness.run_evaluation` at the pinned
+harness revision in the digest-pinned official image. The official `resolved`
+verdict is authoritative. Parallax checks that the report covers every
 committed FAIL_TO_PASS and PASS_TO_PASS test without serializing those names
 into run rows.
 

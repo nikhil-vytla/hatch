@@ -10,10 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .canonical import atomic_write, canonical_bytes, canonical_digest
 from .outcome import Verdict, Verification
-from .swebench import (
-    SWE_BENCH_HARNESS_REVISION,
-    SweBenchProblem,
-)
+from .specs import EnvSpecV1, TaskSpecV1
+from .swebench import SWE_BENCH_HARNESS_REVISION
 from .types import DigestText, NonEmptyText, StrictModel
 
 CommandRunner = Callable[
@@ -66,18 +64,19 @@ def _run(
     )
 
 
-def _dataset_row(problem: SweBenchProblem) -> dict[str, object]:
-    verifier = problem.verifier
+def _dataset_row(task: TaskSpecV1) -> dict[str, object]:
+    source = task.public.source
+    sealed = task.sealed
     return {
-        "instance_id": problem.instance_id,
-        "repo": problem.repo,
-        "version": problem.version,
-        "base_commit": problem.base_commit,
-        "problem_statement": problem.problem_statement,
+        "instance_id": source.instance_id,
+        "repo": source.repo,
+        "version": source.version,
+        "base_commit": source.base_commit,
+        "problem_statement": source.problem_statement,
         "hints_text": "",
-        "test_patch": verifier.test_patch,
-        "FAIL_TO_PASS": list(verifier.fail_to_pass),
-        "PASS_TO_PASS": list(verifier.pass_to_pass),
+        "test_patch": sealed.test_patch,
+        "FAIL_TO_PASS": list(sealed.fail_to_pass),
+        "PASS_TO_PASS": list(sealed.pass_to_pass),
     }
 
 
@@ -101,7 +100,8 @@ def _invoke(
 
 
 def run_official_harness(
-    problem: SweBenchProblem,
+    task: TaskSpecV1,
+    environment: EnvSpecV1,
     model_patch: str,
     *,
     model: str,
@@ -109,12 +109,14 @@ def run_official_harness(
     timeout_seconds: Annotated[int, Field(gt=0)] = 1800,
     runner: CommandRunner = _run,
 ) -> HarnessEvaluation:
-    if problem.verifier.harness_revision != SWE_BENCH_HARNESS_REVISION:
+    source = task.public.source
+    sealed = task.sealed
+    if sealed.harness_revision != SWE_BENCH_HARNESS_REVISION:
         raise OfficialHarnessError(
             "problem harness revision is not the pinned revision"
         )
     existing_reports = (
-        tuple(run_directory.glob(f"**/{problem.instance_id}/report.json"))
+        tuple(run_directory.glob(f"**/{source.instance_id}/report.json"))
         if run_directory.exists()
         else ()
     )
@@ -123,15 +125,15 @@ def run_official_harness(
     run_directory.mkdir(parents=True, exist_ok=True)
     dataset_path = run_directory / "dataset.json"
     predictions_path = run_directory / "predictions.jsonl"
-    atomic_write(dataset_path, canonical_bytes([_dataset_row(problem)]) + b"\n")
+    atomic_write(dataset_path, canonical_bytes([_dataset_row(task)]) + b"\n")
     prediction = {
-        "instance_id": problem.instance_id,
+        "instance_id": source.instance_id,
         "model_name_or_path": model,
         "model_patch": model_patch,
     }
     atomic_write(predictions_path, canonical_bytes(prediction) + b"\n")
-    image = f"{problem.verifier.image_ref}@sha256:{problem.verifier.image_digest}"
-    image_tag = f"{problem.verifier.image_ref}:latest"
+    image = f"{environment.image.ref}@sha256:{environment.image.digest}"
+    image_tag = f"{environment.image.ref}:latest"
     if not existing_reports:
         _invoke(
             ["docker", "pull", image],
@@ -147,7 +149,7 @@ def run_official_harness(
             runner=runner,
             purpose="pinned image tagging",
         )
-        run_id = f"parallax-{problem.instance_id}"
+        run_id = f"parallax-{source.instance_id}"
         harness = (
             "git+https://github.com/SWE-bench/SWE-bench.git@"
             f"{SWE_BENCH_HARNESS_REVISION}"
@@ -167,7 +169,7 @@ def run_official_harness(
             "--predictions_path",
             str(predictions_path),
             "--instance_ids",
-            problem.instance_id,
+            source.instance_id,
             "--max_workers",
             "1",
             "--run_id",
@@ -191,7 +193,7 @@ def run_official_harness(
             purpose="official SWE-bench harness",
         )
     reports = existing_reports or tuple(
-        run_directory.glob(f"**/{problem.instance_id}/report.json")
+        run_directory.glob(f"**/{source.instance_id}/report.json")
     )
     if len(reports) != 1:
         raise OfficialHarnessError(
@@ -201,7 +203,7 @@ def run_official_harness(
     try:
         envelope = json.loads(report_bytes)
         report = _OfficialReport.model_validate_json(
-            json.dumps(envelope[problem.instance_id])
+            json.dumps(envelope[source.instance_id])
         )
     except (KeyError, TypeError, ValueError) as error:
         raise OfficialHarnessError("official harness report is invalid") from error
@@ -215,9 +217,9 @@ def run_official_harness(
         ) from error
     observed_fail = set(fail_to_pass.success) | set(fail_to_pass.failure)
     observed_pass = set(pass_to_pass.success) | set(pass_to_pass.failure)
-    if observed_fail != set(problem.verifier.fail_to_pass):
+    if observed_fail != set(sealed.fail_to_pass):
         raise OfficialHarnessError("official harness FAIL_TO_PASS coverage drift")
-    if observed_pass != set(problem.verifier.pass_to_pass):
+    if observed_pass != set(sealed.pass_to_pass):
         raise OfficialHarnessError("official harness PASS_TO_PASS coverage drift")
     if not report.patch_exists or not report.patch_successfully_applied:
         verdict = Verdict.WRONG
@@ -232,7 +234,7 @@ def run_official_harness(
         outcome=Verification(verdict=verdict, reason=reason),
         report_digest=canonical_digest(envelope),
         harness_revision=SWE_BENCH_HARNESS_REVISION,
-        image_digest=problem.verifier.image_digest,
+        image_digest=environment.image.digest,
         fail_to_pass_success=fail_to_pass.success,
         pass_to_pass_success=pass_to_pass.success,
     )

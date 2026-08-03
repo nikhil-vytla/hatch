@@ -6,8 +6,9 @@ from pathlib import Path
 
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
+from parallax.hud_compile import compile_hud
+from parallax.specs import freeze_swe_specs
 from parallax.swebench import build_swe_script_family, load_swebench_rows
-from parallax.swebench_env import render_environment
 from parallax.swebench_runtime import collect_patch, isolation_probe_argv, workspace
 
 
@@ -26,21 +27,31 @@ def family():
     )
 
 
+def bundle():
+    task, environment = freeze_swe_specs(family())
+    return compile_hud(task, environment)
+
+
 def test_environment_bundle_is_public_deterministic_and_importable() -> None:
-    first = render_environment(family())
-    second = render_environment(family())
+    first = bundle()
+    second = bundle()
 
     assert first == second
-    compile(first.env_py, "env.py", "exec")
-    compile(first.runtime_py, "swebench_runtime.py", "exec")
-    config = json.loads(first.instance_json)
+    artifacts = {artifact.path: artifact.content for artifact in first.agent_artifacts}
+    compile(artifacts["env.py"], "env.py", "exec")
+    compile(artifacts["swebench_runtime.py"], "swebench_runtime.py", "exec")
+    config = json.loads(artifacts["instance.json"])
     assert "verifier" not in config
-    assert "sealed test patch" not in first.instance_json.decode()
-    assert first.env_py == b"from swebench_runtime import env\n"
+    assert "sealed test patch" not in artifacts["instance.json"].decode()
+    assert artifacts["env.py"] == b"from swebench_runtime import env\n"
 
 
 def test_dockerfile_uses_pinned_base_and_isolated_hud_venv() -> None:
-    dockerfile = render_environment(family()).dockerfile.decode()
+    dockerfile = next(
+        artifact.content
+        for artifact in bundle().agent_artifacts
+        if artifact.path == "Dockerfile.hud"
+    ).decode()
 
     assert (
         "swebench/sweb.eval.x86_64.astropy_1776_astropy-13236@sha256:" + "a" * 64
@@ -54,19 +65,30 @@ def test_dockerfile_uses_pinned_base_and_isolated_hud_venv() -> None:
 
 
 def test_all_arms_receive_one_equal_episode_budget() -> None:
-    config = json.loads(render_environment(family()).instance_json)
+    compiled = bundle()
+    instance = next(
+        artifact.content
+        for artifact in compiled.agent_artifacts
+        if artifact.path == "instance.json"
+    )
+    config = json.loads(instance)
     scripts = config["scripts"]
 
     assert sum(scripts["static"]["agent_steps"]) == 12
     assert sum(scripts["matched"]["agent_steps"]) == 12
     assert sum(scripts["evolved"]["agent_steps"]) == 12
     assert scripts["static"]["agent_steps"] == [12]
-    assert b"step_budget" in render_environment(family()).runtime_py
+    runtime_source = next(
+        artifact.content
+        for artifact in compiled.agent_artifacts
+        if artifact.path == "swebench_runtime.py"
+    )
+    assert b"step_budget" in runtime_source
 
 
 def test_bundle_writes_only_expected_files(tmp_path: Path) -> None:
-    bundle = render_environment(family())
-    bundle.write(tmp_path)
+    compiled = bundle()
+    compiled.write_agent_context(tmp_path)
 
     assert {path.name for path in tmp_path.iterdir()} == {
         "Dockerfile.hud",
@@ -74,7 +96,12 @@ def test_bundle_writes_only_expected_files(tmp_path: Path) -> None:
         "instance.json",
         "swebench_runtime.py",
     }
-    assert (tmp_path / "instance.json").read_bytes() == bundle.instance_json
+    expected = next(
+        artifact.content
+        for artifact in compiled.agent_artifacts
+        if artifact.path == "instance.json"
+    )
+    assert (tmp_path / "instance.json").read_bytes() == expected
 
 
 def test_patch_export_includes_modified_and_untracked_files(tmp_path: Path) -> None:

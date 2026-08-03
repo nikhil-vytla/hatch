@@ -41,6 +41,12 @@ response or token-usage receipt was returned, so recorded spend is $0.
 8. **Failure taxonomy — fixed.** Agent, budget, and verifier failures remain
    distinct. Provider output truncation is a budget failure; official harness
    exceptions are verifier failures and retain any already-paid HUD usage.
+9. **Spec translation — fixed by construction.** `TaskSpecV1` separates
+   `PublicTaskV1` from `SealedAuthorityV1`. `compile_hud` creates agent
+   artifacts only from the public branch, tags each artifact by audience,
+   scans the build context for sealed fragments, and records a digest receipt.
+   The four-case conformance check matches reference and compiled grader
+   outcomes.
 
 ## HUD isolation evidence
 
@@ -77,9 +83,9 @@ must be corrected before resuming the same manifest.
 
 ## Verification
 
-- 106 offline tests passed.
+- 112 offline tests passed.
 - Ruff check and format check passed.
 - `uvx ty check src` passed.
 - Core mutation suite: 28/28 killed.
-- Adapted Slice 2 mutation suite: 34/34 killed.
+- Adapted Slice 2 mutation suite: 36/36 killed.
 - The failure receipt is canonical JSON and contains no credential value.
