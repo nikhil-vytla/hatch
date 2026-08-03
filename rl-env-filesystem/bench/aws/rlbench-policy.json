@@ -1,0 +1,76 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Ec2ReadOnly",
+      "Effect": "Allow",
+      "Action": "ec2:Describe*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "RunInstancesInOneRegion",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "us-east-2" } }
+    },
+    {
+      "Sid": "DenyAllButCheapInstanceTypes",
+      "Effect": "Deny",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:*:*:instance/*",
+      "Condition": {
+        "StringNotEquals": {
+          "ec2:InstanceType": ["t3.micro", "t3.small", "t3.medium", "t3.large", "t3.xlarge"]
+        }
+      }
+    },
+    {
+      "Sid": "TagAtLaunchOnly",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "ec2:CreateAction": "RunInstances" } }
+    },
+    {
+      "Sid": "ManageOnlyOurTaggedInstances",
+      "Effect": "Allow",
+      "Action": ["ec2:TerminateInstances", "ec2:StopInstances"],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:ResourceTag/Project": "rlbench" } }
+    },
+    {
+      "Sid": "KeypairsAndSecurityGroups",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:ImportKeyPair", "ec2:CreateKeyPair", "ec2:DeleteKeyPair",
+        "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup",
+        "ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"
+      ],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "us-east-2" } }
+    },
+    {
+      "Sid": "OurBucketsOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket", "s3:DeleteBucket", "s3:ListBucket", "s3:GetBucketLocation",
+        "s3:PutObject", "s3:GetObject", "s3:DeleteObject",
+        "s3:PutLifecycleConfiguration", "s3:GetLifecycleConfiguration"
+      ],
+      "Resource": ["arn:aws:s3:::rlbench-*", "arn:aws:s3:::rlbench-*/*"]
+    },
+    {
+      "Sid": "ListBucketNamesForTeardownVerify",
+      "Effect": "Allow",
+      "Action": "s3:ListAllMyBuckets",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadVcpuQuotas",
+      "Effect": "Allow",
+      "Action": ["servicequotas:GetServiceQuota", "servicequotas:ListServiceQuotas"],
+      "Resource": "*"
+    }
+  ]
+}
