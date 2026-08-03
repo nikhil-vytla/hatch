@@ -29,14 +29,15 @@ Public identity must remain unchanged when only answer authority changes. Sealed
 
 ## Admission and grading invariants
 
-The grading entry point closes over its parser, evaluator, answer validator,
-runtime probe, and identity helpers. It accepts no evaluator argument and does
-not look them up through replaceable module globals. Commitments fingerprint
-the loaded CPython code objects and transitive answer validator, not the source
-file on disk. Admission recomputes those fingerprints and the exact
-implementation name, patch version, and cache tag immediately before parsing.
-It also requires exact equality for sealed identity, asset manifest, public
-asset reference, and available asset names and bytes.
+The grading API accepts task data, submission text, and committed asset bytes.
+It has no evaluator, parser, digest, result-routing, or runtime callback
+parameter. Commitments fingerprint loaded CPython evaluator, parser, and answer
+validator code objects plus the implementation name, patch version, cache tag,
+and semantic policies. These commitments are reproducibility and integrity
+evidence for a trusted controller. They are not process isolation and do not
+defend against monkeypatching or code-object mutation inside that process.
+Admission also requires exact equality for sealed identity, asset manifest,
+public asset reference, and available asset names and bytes.
 
 One canonical answer validator governs authority construction, commitment,
 admission, parser output, and grading. It accepts `0` or an optional minus
@@ -69,29 +70,39 @@ during capture. Replay derives the snapshot, verifies the manifest, and returns
 bytes from that same capture. Receipt, snapshot, and actual replay policy IDs
 must match.
 
+Protected roots are traversed lexically from the filesystem root. Every path
+component is opened relative to the previous directory descriptor with
+`O_NOFOLLOW|O_DIRECTORY`; no component is resolved through a symlink.
+Symlinked parents and roots fail closed. A publication destination's parent
+must already exist so publication never creates directories through an
+unverified ancestor.
+
 Paths use canonical forward slashes. Validation rejects absolute and parent
 paths, empty and dot components, backslashes, Windows drives and reserved
-device names, trailing dots or spaces, alternate data-stream colons, wildcard
+device names including superscript-numbered COM/LPT forms, trailing dots or
+spaces, alternate data-stream colons, wildcard characters, ASCII control
 characters, NUL, and non-NFC text.
 
 ## Trust boundary
 
-This core authenticates supplied bytes and loaded verifier semantics. It does
-not establish that a mutable dataset URL still serves those bytes, perform
-provider-backed construction, prove Evolving Intent compatibility, or provide
-a hostile-process sandbox.
+> [!IMPORTANT]
+> Parallax assumes a trusted controller and evaluator Python process.
+> Agent-controlled task data, submissions, artifact trees, and workspaces are
+> untrusted and may race or mutate. Agent code must not execute in or
+> monkeypatch the evaluator process.
+
+This core authenticates supplied bytes and records loaded verifier semantics
+for reproducibility. It does not establish that a mutable dataset URL still
+serves those bytes, perform provider-backed construction, prove Evolving Intent
+compatibility, or isolate hostile code.
 
 > [!WARNING]
 > A valid content commitment proves which bytes were admitted. It does not
 > prove that caller-supplied source or answer bytes came from the claimed
 > dataset revision; audited ingestion remains a separate requirement.
 
-> [!IMPORTANT]
-> The loaded-semantics checks resist evaluator arguments, source-file changes
-> after import, and ordinary module-global monkeypatching. They cannot protect a
-> process that deliberately replaces the public grading callable, mutates
-> closure cells or code objects through introspection or native memory access,
-> or writes published files after a verified capture. Process isolation and
-> post-publication access control remain caller responsibilities.
-
 > **TODO:** Add audited dataset ingestion before producing non-synthetic tasks.
+
+> **TODO:** If a runtime must execute hostile code near grading, add a separate
+> verifier process, container, or capability boundary before admitting that
+> runtime. Pure Python commitment checks are not that boundary.

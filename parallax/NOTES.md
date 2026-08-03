@@ -42,14 +42,17 @@
 - Implemented only GSM8K native final-answer parsing and exact grading.
 - Added admission checks before evaluator execution and closed verdicts for
   pass, task failure, invalid submission, harness failure, and verifier failure.
-- Removed evaluator injection from grading and made ordinary module-global and
-  post-import source-file changes irrelevant to the closed-over engine.
+- Removed evaluator injection from grading. The public grading API accepts
+  task, submission, and asset data only.
+- Adopted a trusted controller/evaluator process threat model. Loaded-code and
+  runtime commitments are reproducibility evidence, not protection from
+  monkeypatching or code-object mutation inside that process.
 - Added manifest-verified atomic publication and single-capture replay with
-  no-follow descriptors, portable path checks, explicit post-rename durability
-  states, and consistent receipt, snapshot, and replay policies.
+  lexical component-by-component no-follow root traversal, portable path
+  checks, explicit post-rename durability states, and consistent receipt,
+  snapshot, and replay policies.
 - Used labeled synthetic test values; no benchmark rows or hidden answers are
   versioned.
-- The focused suite now has 22 tests, including evaluator injection,
-  post-import file changes, loaded-code and module-global mutation, answer
-  boundaries, pre-rename tampering, post-verification mutation, parent fsync
-  failure, portable paths, symlinks, and replay-policy mismatch.
+- Focused tests cover evaluator injection, data-only APIs, answer boundaries,
+  root and file swaps, symlinked parents, staging cleanup, publication races,
+  parent fsync failure, portable paths, and replay-policy mismatch.

@@ -9,6 +9,9 @@ from typing import Mapping
 
 from .canonical import content_id, validate_content_id, validate_digest
 
+_WINDOWS_RESERVED = {"AUX", "CLOCK$", "CON", "CONIN$", "CONOUT$", "NUL", "PRN"}
+_WINDOWS_NUMBERED_DEVICE = re.compile(r"^(?:COM|LPT)(?:[1-9¹²³])$", re.IGNORECASE)
+
 
 def _nonempty(value: str, field: str) -> str:
     if not value or value.strip() != value or "\x00" in value:
@@ -20,17 +23,20 @@ def validate_relative_path(value: str) -> str:
     _nonempty(value, "path")
     if unicodedata.normalize("NFC", value) != value:
         raise ValueError("path must be NFC-normalized")
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ValueError("path must not contain ASCII control characters")
     if "\\" in value or re.match(r"^[A-Za-z]:", value):
         raise ValueError("Windows path forms are forbidden")
     if value.startswith("/") or "//" in value or "/./" in value or "/../" in value:
         raise ValueError("path must be a normalized relative POSIX path")
     path = PurePosixPath(value)
-    reserved = re.compile(r"^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", re.IGNORECASE)
     for part in path.parts:
+        windows_stem = part.rstrip(" .").split(".", 1)[0].rstrip(" ").upper()
         if (
             part in ("", ".", "..")
             or part.endswith((".", " "))
-            or reserved.match(part)
+            or windows_stem in _WINDOWS_RESERVED
+            or _WINDOWS_NUMBERED_DEVICE.fullmatch(windows_stem)
             or any(character in part for character in '<>:"|?*')
         ):
             raise ValueError("path contains a non-portable component")

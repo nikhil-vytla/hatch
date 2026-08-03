@@ -18,6 +18,11 @@ source links, interpretation policy, and evidence limits.
 > publication; and locked replay. The Evolving Intent method remains a contract,
 > not an executable synthesis implementation.
 
+> [!IMPORTANT]
+> The controller and evaluator Python process is trusted. Agent-controlled task
+> data, submissions, artifact trees, and workspaces are untrusted, but agent
+> code must not execute in or monkeypatch the evaluator process.
+
 [`docs/architecture.md`](docs/architecture.md) maps the research model to the
 implemented records and states their identity, admission, publication, and
 replay invariants.
@@ -27,6 +32,9 @@ replay invariants.
 
 > **TODO:** Implement controlled experiment execution with matched arms,
 > retained run evidence, and declared estimands.
+
+> **TODO:** Introduce an isolated verifier process, container, or capability
+> boundary before any runtime executes hostile code near grading.
 
 Run the implemented core checks from `parallax/`:
 
