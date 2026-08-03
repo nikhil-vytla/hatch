@@ -35,7 +35,7 @@ AXES = {
         "node_local", "zone_tier", "p2p", "multi_tier",
     ],
     "deployment": [
-        "managed", "customer_data_plane", "self_hosted",
+        "managed", "platform_account_data_plane", "self_hosted",
     ],
     "semantics": [
         "immutable_snapshots", "branchable", "shared_rw",
@@ -71,7 +71,7 @@ RECOMMENDED = {
     "addressing": "content_defined_chunk",
     "materialization": "profile_prefetch",
     "topology": "multi_tier",
-    "deployment": "customer_data_plane",
+    "deployment": "platform_account_data_plane",
     "semantics": "branchable",
 }
 

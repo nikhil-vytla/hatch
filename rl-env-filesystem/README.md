@@ -1,16 +1,18 @@
 # Exhausting the design space for an RL rollout data layer
 
-Design exploration for a standalone data layer that RL environment and
-evaluation companies could buy instead of build. The customer profile: a
-company that runs agent rollouts inside sandboxes at scale, one sandbox per
-rollout, driven by a control plane and scheduler, with metadata in a
-relational database and artifacts in object storage. Every one of them hits
-the same wall: each rollout pays a cold start (boot instance, pull the full
-container image, run environment setup) before the agent does any work, the
-sandbox is torn down afterward, and nothing about the rollout's state
-survives except a trajectory log.
+Design exploration for the data layer underneath RL environment rollouts:
+how sandboxes get their filesystems fast, how rollout state gets captured at
+stage boundaries, and how grading decouples from the agent loop. The
+platform profile this studies: a system that runs agent rollouts inside
+sandboxes at scale, one sandbox per rollout, driven by a control plane and
+scheduler, with metadata in a relational database and artifacts in object
+storage. Such systems hit the same wall: each rollout pays a cold start
+(boot instance, pull the full container image, run environment setup)
+before the agent does any work, the sandbox is torn down afterward, and
+nothing about the rollout's state survives except a trajectory log.
 
-This document deliberately does not design for any one company. It defines
+This is a learning and exploration exercise, deliberately not designed
+around any one platform. The document defines
 the jobs the layer must do, enumerates the design axes and the options on
 each axis, prunes combinations that violate hard constraints, and lands on
 the archetypes that survive. The working log is in [NOTES.md](NOTES.md). Two
@@ -19,7 +21,9 @@ small scripts ground the argument: a latency/cost model in
 enumerator in [model/design_space.py](model/design_space.py). A working
 prototype in [prototype/](prototype/) pulls a real OCI image without a
 container runtime, traces which bytes stand-in agent tasks actually touch,
-and repacks layers by observed access; its findings are reported below.
+and repacks layers by observed access. A benchmark platform in
+[bench/](bench/) turns the design axes into experiment configs you can run
+and measure; both sets of findings are reported below.
 
 ## How deep this design goes
 
@@ -50,8 +54,7 @@ Everything below is derived from these seven jobs. An option that serves no
 job gets cut, no matter how elegant.
 
 1. Start a rollout's filesystem in seconds, independent of image size, and
-   without requiring the customer to change how they build environment
-   images.
+   without requiring anyone to change how they build environment images.
 2. Checkpoint rollout state at stage boundaries: after environment setup,
    after the agent loop, after grading.
 3. Re-grade: run a new grader version against the stored final state of
@@ -60,17 +63,18 @@ job gets cut, no matter how elegant.
    rollouts.
 5. Audit and provenance: given a reward, reproduce the exact state it was
    computed from, indefinitely later and cheaply.
-6. Export: hand trajectories, state diffs, and grades to the customer's
-   training pipeline, in their storage, in a format they can read without us.
-7. Slot into heterogeneous runtimes. Customers run plain containers on cloud
-   VMs, microVM fleets, container orchestrators, and third-party sandbox
-   providers, across clouds. A layer that demands one runtime is a rewrite,
-   not a purchase.
+6. Export: hand trajectories, state diffs, and grades to the training
+   pipeline, in the platform's own storage, in a format readable without
+   the layer that produced them.
+7. Slot into heterogeneous runtimes. Rollout platforms run plain containers
+   on cloud VMs, microVM fleets, container orchestrators, and third-party
+   sandbox providers, across clouds. A layer that demands one runtime is a
+   rewrite, not an integration.
 
-Job 7 is the one that shapes the product most, because it is where "ideal
-data layer" and "sellable data layer" diverge. The technically maximal
-design owns the whole sandbox runtime. The sellable design treats the
-runtime as someone else's and meets it at a stable interface.
+Job 7 shapes the design most, because it is where the ideal-on-paper layer
+and the adoptable-in-practice layer diverge. The technically maximal design
+owns the whole sandbox runtime. The adoptable design treats the runtime as
+someone else's and meets it at a stable interface.
 
 ## The artifacts and their access patterns
 
@@ -81,7 +85,7 @@ runtime as someone else's and meets it at a stable interface.
 | working writes (agent's changes) | continuously during the loop | grader, auditors | mutable then frozen | 10 MB - few GB dirty | days-months |
 | stage checkpoints | at 2-3 boundaries per rollout | re-grade, fork, audit | immutable once taken | diff-sized | months |
 | trajectory (tokens, tool calls) | streamed during the loop | training, audit | append-only | MB | years |
-| grade record | once per grading pass | training, product UI | append-only, versioned | KB | years |
+| grade record | once per grading pass | training, review UIs | append-only, versioned | KB | years |
 
 Two structural facts fall out of this table and drive the whole design.
 First, almost everything is immutable or append-only; the only mutable thing
@@ -109,7 +113,7 @@ Seven axes. For each: the options, and what pushes toward or away from each.
    sees blocks, not files), needs kernel or hypervisor cooperation.
 4. Container-runtime snapshotter plugin. Integrates below the container
    runtime so images mount lazily with zero change to the user workflow.
-   Only works where the customer runs a pluggable runtime.
+   Only works where the fleet runs a pluggable runtime.
 5. VM disk plus memory image. The unit is the whole machine. Maximal
    capture power, minimal portability.
 
@@ -166,20 +170,21 @@ Seven axes. For each: the options, and what pushes toward or away from each.
 
 ### Axis F: deployment and source of truth
 
-1. Fully managed: data lives in the vendor's cloud. Easiest to run, hardest
-   to sell to companies whose customers (the labs) demand data custody.
-2. Customer-hosted data plane, vendor control plane: our software (cache
-   nodes, agents, snapshotter) runs in their account; chunks and snapshots
-   land in their object storage bucket; we run the metadata and coordination
-   service. This is the classic pattern for selling infrastructure to
-   infrastructure companies.
-3. Fully self-hosted (licensed software). Maximal custody, slowest
-   iteration, heavy support burden.
+1. Fully managed elsewhere: data lives outside the platform's own cloud.
+   Easiest to operate, hardest to square with data custody, which labs
+   downstream often demand.
+2. Data plane in the platform's account, control plane separate: cache
+   nodes, agents, and the snapshotter run next to the fleet; chunks and
+   snapshots land in the platform's own object storage bucket; only
+   metadata and coordination live outside. The common pattern for
+   infrastructure that must run inside someone else's trust boundary.
+3. Fully self-hosted. Maximal custody, slowest iteration, heaviest
+   operational burden.
 
 Orthogonal sub-choice: is the durable format native (objects a human can
 read with standard tools) or chunked-proprietary? Native format sacrifices
 chunk-level dedup in the bottom tier but means job 6 (export) is free and
-the customer is never hostage to our software to read their own data. A
+the data outlives the layer that wrote it. A
 hybrid works: native-format source of truth for images and exports,
 chunked content-addressed format for checkpoints, with an export tool that
 rehydrates any checkpoint to plain files.
@@ -192,7 +197,8 @@ rehydrates any checkpoint to plain files.
 2. Branchable trees of snapshots (git-like). Same guarantees, richer
    lineage; a fork is a branch, a checkpoint is a commit.
 3. Shared read-write POSIX across sandboxes. Genuinely useful for a
-   different product (shared scratch space, cross-agent memory), and
+   different problem (shared scratch space, cross-agent memory; this is the
+   territory staked out by shared-disk services in the agent space), and
    genuinely hard: consistency protocols, locking, fencing. Note that it
    actively conflicts with the reproducibility jobs, since a rollout whose
    inputs can be mutated concurrently is not re-gradable or auditable.
@@ -204,26 +210,26 @@ enumerator counts them; axis A option 1 is pruned as failing job 1 outright).
 Hard constraints cut this down fast:
 
 - Memory or VM-state capture (B4, B5) requires runtime or hypervisor
-  cooperation (A4, A5), which violates job 7 for every customer whose
-  runtime we do not control. Not pruned globally, but demoted to an adapter:
-  offered where the customer's runtime supports it, never required by the
-  core product.
+  cooperation (A4, A5), which violates job 7 wherever the runtime is not
+  ours to change. Not pruned globally, but demoted to an adapter: used
+  where the fleet's runtime supports it, never required by the core.
 - Lazy materialization (D2-D4) requires seekable addressing (C3-C5, or C2
   with an external index). Path addressing plus laziness has no way to know
   what a file's bytes are without fetching the whole object.
 - Shared read-write semantics (G3) conflict with jobs 3 and 5
-  (re-gradability, audit). Excluded from the rollout path; possible future
-  side product.
+  (re-gradability, audit). Excluded from the rollout path; a separate
+  problem worth studying on its own.
 - Whole-filesystem-image capture (B3) fails the economics of job 5: audit
   storage priced at full copies per rollout is orders of magnitude worse
   than diffs, given dirty sets are typically under a gigabyte against
   multi-gigabyte images.
-- Fully managed deployment (F1) fails job 6 and, in practice, the sales
-  motion: the buyers sell to labs that contractually require data custody.
-  Kept only as a free tier / evaluation mode.
-- Owning the runtime (A5 as the only interface) makes the product a sandbox
-  platform, not a data layer, and turns every prospective customer into a
-  competitor. Excluded as the core; kept as one adapter among several.
+- Fully managed deployment (F1) fails job 6 and the custody requirements
+  common downstream (labs frequently require data to stay in the platform's
+  own account). Kept only as an evaluation mode.
+- Owning the runtime (A5 as the only interface) makes the layer a sandbox
+  platform, not a data layer, and shrinks the set of fleets it can serve to
+  the ones willing to migrate. Excluded as the core; kept as one adapter
+  among several.
 
 Running the enumerator with these rules leaves a coherent region of the
 space rather than a single point, and the surviving combinations cluster
@@ -235,10 +241,10 @@ into three archetypes.
 
 Delivery only. Lazy mount of unmodified OCI images through a
 snapshotter/FUSE interface, content-addressed multi-tier cache, no capture.
-Sells on one number (cold start), integrates in a day. But it creates no new
-workflows, it is a feature every large cloud is drifting toward shipping
-natively, and nothing about it compounds: churn risk is maximal. Right as an
-on-ramp, wrong as the product.
+Wins on one number (cold start) and integrates in a day. But it creates no
+new workflows, large clouds are drifting toward shipping it natively, and
+nothing about it compounds. Right as a first step, insufficient as a
+destination.
 
 ### Archetype 2: checkpoint-native rollout store
 
@@ -248,7 +254,7 @@ filesystem state at a stage boundary, with a manifest binding it to base
 image, seed data, config, and trajectory. Concretely:
 
 - Interface: A2/A4 (FUSE mount or runtime snapshotter plugin), with A3
-  (block device) as an adapter for microVM customers. Whatever the mount
+  (block device) as an adapter for microVM fleets. Whatever the mount
   path, images are unmodified; indices are built server-side at publish.
 - Capture: B2 (block COW diff) where the mount is block-backed, B1 (file
   diff of the writable layer) where it is file-backed. B4/B5 memory capture
@@ -259,34 +265,33 @@ image, seed data, config, and trajectory. Concretely:
   differentiator; nobody is better positioned to have per-task access
   profiles than the layer that serves every rollout of that task.
 - Topology: E4, multi-tier with a zone-shared NVMe tier.
-- Deployment: F2, customer account data plane, vendor control plane,
-  customer's bucket as the durable bottom.
+- Deployment: F2, data plane in the platform's account, its own bucket as
+  the durable bottom.
 - Semantics: G2, branchable snapshot trees. Fork = branch, checkpoint =
   commit, re-grade = read-only mount of a commit.
 
-This archetype is the recommendation, and the reasoning is as much about
-the market as the technology. Every listed job maps to a billable workflow:
-re-grading is a metered API, forking is a scheduler feature the customer
-markets to labs, audit storage is a retention tier. The checkpoint manifest
-format can be published as an open spec, which converts job 6 from a risk
-into lock-in-by-honesty: customers can always leave, which is exactly why
-they can buy.
+This archetype is the recommendation. Every listed job maps onto a concrete
+workflow it enables: re-grading becomes an API call over stored state,
+forking becomes a scheduler feature, audit becomes a retention policy. The
+checkpoint manifest format can be published as an open spec, so captured
+state stays readable without the layer that produced it, which is what
+keeps job 6 honest.
 
 ### Archetype 3: integrated sandbox platform
 
 Own the runtime, the hypervisor, and the storage; get memory-state forking
-in the hundreds of milliseconds and pause/resume for free. Technically the
-strongest point in the space and the wrong business here: the target
-customers already operate sandbox fleets or rent them, several sell exactly
-this capability themselves, and "replace your runtime" is a multi-quarter
-migration pitch against "mount this and get checkpoints today." The
-capabilities of this archetype re-enter archetype 2 as adapters where the
-customer's runtime exposes snapshot hooks.
+in the hundreds of milliseconds and pause/resume for free (this is the
+point in the space that microVM sandbox platforms occupy). Technically the
+strongest position and the wrong fit for the problem as framed: rollout
+platforms already operate or rent sandbox fleets, and replacing a runtime
+is a migration while mounting a filesystem is an integration. The
+capabilities of this archetype re-enter archetype 2 as adapters wherever
+the fleet's runtime exposes snapshot hooks.
 
 ## What the numbers say
 
 From the cost model (assumptions are parameters, replace with measured
-values per customer):
+values per fleet):
 
 | architecture | pre-agent latency | overhead vs 10-min agent loop |
 | --- | --- | --- |
@@ -302,10 +307,10 @@ Re-grading the same 10,000 stored checkpoints costs roughly $19 of compute
 plus about $115/month of object storage at 0.5 GB of diff per rollout.
 
 One boundary worth stating plainly: instance boot time is not a data-layer
-problem. A warm pool of pre-booted machines is a prerequisite the customer
-owns; without it, the data layer shaves a minority of the cold start. The
-sales narrative should say so, because overclaiming here surfaces in the
-first proof-of-concept.
+problem. A warm pool of pre-booted machines is a prerequisite that lives
+with the scheduler; without it, the data layer shaves a minority of the
+cold start. Any evaluation should say so up front, because overclaiming
+here surfaces in the first measurement.
 
 ## Prototype: decomposing image layers by observed agent access
 
@@ -358,7 +363,11 @@ tier plus lazy everything else cuts up-front bytes 3.2x while guaranteeing
 the interpreter, loader, shared libraries and coreutils are warm. 6,044 of
 7,400 files (104 MB) were never touched by any task.
 
-The leave-one-out evaluation is the finding I'd put in front of a buyer:
+The leave-one-out evaluation is the finding I'd highlight, and it has a
+direct academic twin: REAP (ASPLOS '21) found that serverless functions
+touch a stable working set of memory pages across invocations and that
+recording-then-prefetching that set cuts cold starts 3.7x. The same
+recurrence shows up here at file granularity:
 
 | held-out task | working set | covered by other tasks' profiles | missed |
 | --- | --- | --- | --- |
@@ -426,12 +435,67 @@ data layer's half of that flow is prototyped in
   oracle rollout must score 1 before the task goes live. Those validation
   rollouts are themselves the first entries in the task's access profile,
   which means the delivery layer's prefetch data starts accumulating
-  before the first customer rollout runs.
+  before the first real rollout runs.
 
 What is deliberately not prototyped: the model call itself, and the
 iteration loop where synthesis failures (grader scores oracle below 1)
 feed back into regeneration. Neither changes the data layer's shape; both
 consume it.
+
+## The experiment platform: benchmarking the axes
+
+The design axes should not stay arguments; they should be columns in a
+results table. [bench/](bench/) is a config-driven benchmark platform that
+runs fleets of rollouts under different data-layer configurations and
+measures every phase. An experiment is a JSON spec (tasks x delivery
+policies x capture/re-grade settings x concurrency); the harness expands
+the matrix, runs each rollout in its own copy-on-write sandbox (a real
+overlayfs mount with a tmpfs dirty layer, a real chroot, a real grader),
+and writes per-phase timings to JSONL, which the reporter aggregates into
+markdown. Adding a task is one shell script plus one grader; adding a
+policy is one method; adding an experiment is one JSON file.
+
+What is real: mounts, task execution, checkpoint capture (tar of the dirty
+layer), decoupled re-grading from the checkpoint alone, and all timings
+under real concurrency. What is modeled: network fetch time, computed from
+the byte counts each policy must move (measured by the prototype's access
+profiles) divided by a configured bandwidth. One machine cannot honestly
+measure a fleet's network, so the harness does not pretend to; the byte
+counts are real, the seconds are arithmetic. "Distributed" is a worker
+pool here, but each rollout is a pure function from spec row to result
+record with no shared state, which is the property that lets the same
+code fan out to remote executors when there is a fleet to run it on.
+
+Three experiments are committed with their results
+(all rollouts scored 1.00 by their graders; results in
+[bench/results/](bench/results/)):
+
+- [delivery_policies](bench/results/delivery_policies.md): five tasks
+  under eager-full, lazy-no-prefetch, hot-tier, profile, and
+  leave-one-out-profile delivery. Reproduces the prototype's byte
+  asymmetries as end-to-end rollout rows: at 150 MB/s, modeled fetch drops
+  from 0.47s (eager full) to 0.14s (hot tier) with the lazy tail visible
+  per policy.
+- [capture_regrade](bench/results/capture_regrade.md): checkpoint capture
+  costs 9-66 ms and 0.03-0.3 MB per rollout on these tasks, and re-grading
+  from the checkpoint alone (the sandbox is destroyed first) takes
+  16-68 ms and reproduces the live reward exactly for every task. That is
+  the post-agent-loop decoupling working end to end: grade twice, run
+  once.
+- [concurrency_scale](bench/results/concurrency_scale.md): the same
+  rollout set at worker-pool sizes 1, 4, and 16 on a 4-vCPU host.
+  Throughput stays flat (322 to 353 rollouts/min) while p95 task time
+  degrades 11x (0.24s to 2.67s). Piling concurrency onto one host buys
+  latency variance, not throughput. This is the cheapest possible
+  demonstration of why rollout fleets scale horizontally, and of where
+  timing noise that can contaminate rewards comes from.
+
+The harness is also the vehicle for the experiments this document says
+should exist but could not run on one machine: the reward-noise A/B
+(lazy vs eager delivery, comparing reward distributions), cache-tier
+hit-rate studies, and restore-under-concurrency. Those need either a
+second machine or a real network between fetch and mount, and the spec
+format already has room for them.
 
 ## Risks and what must be true
 
@@ -439,15 +503,15 @@ consume it.
   FS-level checkpoints cover re-grading fully. If a meaningful fraction
   needs live services, restore must boot base-plus-diff and re-run service
   startup (seconds, usually fine). If graders need in-memory-only state,
-  only the memory-capture adapters help, and the core value pitch narrows.
-  Surveying real graders across 2-3 design partners is the single highest
-  information-per-dollar step.
+  only the memory-capture adapters help, and the case for FS-level capture
+  narrows. Surveying real graders across a few platforms is the single
+  highest information-per-effort step.
 - Reward noise from laziness. Mid-rollout cache misses inject timing
   variance into environments, and timing-sensitive tasks may translate that
   into reward variance. Background and profile-guided prefetch bound the
   window; an A/B harness that compares reward distributions with and
-  without lazy delivery should be part of the product's own QA, and is a
-  credibility asset in sales conversations.
+  without lazy delivery should be part of the layer's own QA. The
+  benchmark platform below is the seed of exactly that harness.
 - Dedup scope versus tenancy. Content addressing across tenants leaks blob
   existence through cache timing and creates a poisoning surface if hashing
   or verification is ever wrong. Default to per-tenant dedup; cross-tenant
@@ -457,40 +521,108 @@ consume it.
   the writable layer at freeze time, seal and upload asynchronously, and
   mark the checkpoint available when the upload lands.
 - Standards drift. The container ecosystem is steadily absorbing lazy
-  delivery. The moat is not lazy pull; it is the checkpoint semantics,
-  lineage, and the workflows above them. Archetype 1 alone is a melting
-  asset.
+  delivery. The durable contribution is not lazy pull; it is the
+  checkpoint semantics, lineage, and the workflows above them. Archetype 1
+  alone is a melting asset.
 
 ## Open questions
 
-1. Across target customers, what fraction of graders read only final
+1. Across real rollout platforms, what fraction of graders read only final
    filesystem state versus needing live services or process memory?
-2. What runtimes are actually in production at the target customers (plain
+2. What runtimes are actually in production across such platforms (plain
    containers on VMs, microVMs, orchestrators, rented sandboxes), and in
    what proportions? This sets the adapter build order.
-3. Do the labs buying from these companies require data custody in the
-   customer's cloud account contractually, or is that assumption
-   sales-lore? F2 rests on it.
-4. How much cross-image byte overlap exists in practice across a real
-   customer's task catalog? This prices content-defined chunking against
-   simpler file-hash dedup.
+3. Is data custody in the platform's own cloud account a hard contractual
+   requirement downstream, or folklore? F2 rests on it.
+4. How much cross-image byte overlap exists in practice across a real task
+   catalog? This prices content-defined chunking against simpler file-hash
+   dedup.
 5. What retention window do training and audit workflows actually demand
    for checkpoints, and who pays for it?
-6. Is shared mutable storage across sandboxes (agent memory, shared scratch)
-   demanded by the same buyers, or a different product for a different
-   buyer? It sits outside the pruned region and should not ride along by
+6. Is shared mutable storage across sandboxes (agent memory, shared
+   scratch) part of the same problem, or a different layer for a different
+   need? It sits outside the pruned region and should not ride along by
    default.
 7. For the fork job: how often is fan-out from a common prepared state
    (hundreds of rollouts of one task within minutes) versus embarrassingly
    parallel distinct tasks? Fork frequency decides whether pre-agent
    checkpoints justify memory-capture adapters early.
 
-## References
+## Sources and further reading
 
-- Slacker (lazy container distribution),
+The design text above stays vendor-neutral; this section names names, since
+the concepts came from somewhere and we are here to learn.
+
+### Academic papers
+
+- Harter et al., Slacker: Fast Distribution with Lazy Docker Containers,
   [USENIX FAST '16](https://www.usenix.org/conference/fast16/technical-sessions/presentation/harter).
-  The empirical basis for lazy delivery: containers read a small fraction of
-  their image bytes.
-- To FUSE or Not to FUSE: Performance of User-Space File Systems,
+  The empirical basis for lazy delivery: containers read a small fraction
+  of their image bytes before and during useful work.
+- Vangoor et al., To FUSE or Not to FUSE,
   [USENIX FAST '17](https://www.usenix.org/conference/fast17/technical-sessions/presentation/vangoor).
-  The cost model for userspace filesystem interfaces.
+  The cost model for userspace filesystem interfaces (axis A option 2).
+- Oakes et al., SOCK: Rapid Task Provisioning with Serverless-Optimized
+  Containers, [USENIX ATC '18](https://www.usenix.org/conference/atc18/presentation/oakes).
+  Lean containers and zygote-style pre-initialization; an ancestor of the
+  pre-agent-checkpoint idea.
+- Agache et al., Firecracker: Lightweight Virtualization for Serverless
+  Applications, [NSDI '20](https://www.usenix.org/conference/nsdi20/presentation/agache).
+  The microVM base underneath most snapshot/restore sandbox platforms.
+- Du et al., Catalyzer: Sub-millisecond Startup for Serverless Computing
+  with Initialization-less Booting,
+  [ASPLOS '20](https://ipads.se.sjtu.edu.cn/_media/publications/catalyzer-asplos20.pdf).
+  Restore-instead-of-boot with lazy memory mapping.
+- Ustiugov et al., Benchmarking, Analysis, and Optimization of Serverless
+  Function Snapshots (vHive/REAP),
+  [ASPLOS '21](https://doi.org/10.1145/3445814.3446714). Functions touch a
+  stable working set of memory pages across invocations; record-and-
+  prefetch cuts cold starts 3.7x. The memory-page twin of this project's
+  file-level leave-one-out result.
+- Ao et al., FaaSnap: FaaS Made Fast Using Snapshot-based VMs,
+  [EuroSys '22](https://dl.acm.org/doi/10.1145/3492321.3524270). Concurrent
+  paging and per-region mapping on top of REAP-style working sets.
+- Seekable OCI: Lazy-Loading Container Images via Range-Request Indexing,
+  [arXiv 2607.06868](https://arxiv.org/html/2607.06868). External-index
+  lazy pull over unmodified images.
+
+### Engineering writeups from industry
+
+- Modal, [How we achieved truly serverless GPUs](https://modal.com/blog/truly-serverless-gpus).
+  The four-ingredient stack this project's delivery/checkpoint framing
+  started from: warm buffers, content-addressed lazy image FS, CPU
+  snapshots, GPU snapshots.
+- E2B, [infrastructure architecture](https://github.com/e2b-dev/infra/blob/main/docs/ARCHITECTURE.md).
+  "A sandbox is a resumed snapshot": userfaultfd lazy page-in, COW rootfs
+  as NBD, async diff sealing, P2P chunk transfer. Open source, and the
+  closest existing implementation of archetype 2's capture side.
+- Archil, [Bash is the SQL for file systems](https://archil.com/post/serverless-execution)
+  and [S3 Files: the right product on the wrong foundation](https://archil.com/post/s3-files-deep-dive);
+  docs on [branches and checkpoints](https://docs.archil.com/concepts/branches-and-checkpoints)
+  and [architecture](https://docs.archil.com/details/architecture).
+  The persistent-shared-disk view of agent storage (axis G option 3
+  territory): the filesystem outlives the sandbox, compute is ephemeral.
+  Their branches-or-backing-bucket exclusivity and "a branch is not a
+  security boundary" caveat both informed the pruning here.
+- Morph Cloud, [Infinibranch](https://cloud.morph.so/docs/developers).
+  VM snapshot/branch/restore in the 100-250 ms range, aimed directly at
+  RL rollouts; archetype 3 in its purest commercial form.
+- Grab engineering, [Docker lazy loading with eStargz and SOCI in production](https://noise.getoto.net/2026/01/21/docker-lazy-loading-at-grab-accelerating-container-startup-times/).
+  Production comparison; lazy pull redistributes rather than eliminates
+  download time.
+- Zain Malik, [Lazy-pulling container images: a deep dive into OCI seekability](https://blog.zmalik.dev/p/lazy-pulling-container-images-a-deep).
+  The clearest survey of the eStargz/SOCI/Nydus/overlaybd tradeoff space.
+
+### Projects and tools
+
+- [stargz-snapshotter](https://github.com/containerd/stargz-snapshotter),
+  [soci-snapshotter](https://github.com/awslabs/soci-snapshotter),
+  [Nydus](https://github.com/dragonflyoss/nydus): the three main lazy-pull
+  snapshotter families for containerd.
+- [Dragonfly](https://d7y.io/) and [Kraken](https://github.com/uber/kraken):
+  P2P image/blob distribution (axis E option 3 at fleet scale).
+- [CernVM-FS](https://cvmfs.readthedocs.io/): lazy, content-addressed,
+  globally distributed read-only FS; two decades of prior art on serving
+  software to ephemeral workers.
+- [CRIU](https://criu.org/): checkpoint/restore in userspace, the base
+  mechanism under most process-level capture (axis B option 4).
