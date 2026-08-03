@@ -51,8 +51,16 @@
   lexical component-by-component no-follow root traversal, portable path
   checks, explicit post-rename durability states, and consistent receipt,
   snapshot, and replay policies.
+- Retained device/inode identity for every opened ancestry component and added
+  final lexical-path revalidation. Directory-to-directory parent, ancestor,
+  and replay-root swaps now fail unless the original ancestry is restored
+  before the final acceptance check.
+- Publication ancestry failures attempt cleanup through retained descriptors
+  and distinguish requested-path visibility from removed, complete-orphan,
+  partial-orphan, and indeterminate artifact states.
 - Used labeled synthetic test values; no benchmark rows or hidden answers are
   versioned.
 - Focused tests cover evaluator injection, data-only APIs, answer boundaries,
-  root and file swaps, symlinked parents, staging cleanup, publication races,
-  parent fsync failure, portable paths, and replay-policy mismatch.
+  root, parent, ancestor, file, and symlink swaps; swap-back; staging cleanup;
+  publication races; parent fsync failure; portable paths; and replay-policy
+  mismatch.

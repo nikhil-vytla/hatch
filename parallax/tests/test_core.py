@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import os
+import shutil
 import stat
 import sys
 import tempfile
@@ -345,7 +346,7 @@ class PublicationReplayTests(unittest.TestCase):
     def test_staging_open_failure_removes_new_directory(self) -> None:
         with artifact_temp_directory() as directory:
             parent = Path(directory)
-            parent_fd = artifact_module._open_directory_path(parent)
+            opened_parent = artifact_module._open_directory_path(parent)
             real_open = artifact_module.os.open
 
             def failing_staging_open(path, flags, mode=0o777, *, dir_fd=None):
@@ -356,11 +357,11 @@ class PublicationReplayTests(unittest.TestCase):
             try:
                 with mock.patch("parallax.artifacts.os.open", side_effect=failing_staging_open):
                     with self.assertRaises(ArtifactPathError) as raised:
-                        artifact_module._make_staging(parent_fd)
+                        artifact_module._make_staging(opened_parent.target_fd)
                 self.assertIsInstance(raised.exception.__cause__, OSError)
                 self.assertEqual(list(parent.iterdir()), [])
             finally:
-                os.close(parent_fd)
+                opened_parent.close()
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
     def test_symlinked_parent_component_fails_closed(self) -> None:
@@ -400,6 +401,145 @@ class PublicationReplayTests(unittest.TestCase):
                     snapshot_tree(root, policy)
             self.assertIsInstance(raised.exception.__cause__, OSError)
 
+    def test_parent_directory_swap_during_publication_cleans_orphan(self) -> None:
+        with artifact_temp_directory() as directory:
+            root = Path(directory)
+            parent = root / "requested-parent"
+            parent.mkdir()
+            moved_parent = root / "moved-parent"
+            destination = parent / "published"
+            real_replace = artifact_module.os.replace
+
+            def swapping_replace(source, target, *, src_dir_fd, dst_dir_fd):
+                parent.rename(moved_parent)
+                parent.mkdir()
+                return real_replace(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            with mock.patch("parallax.artifacts.os.replace", side_effect=swapping_replace):
+                with self.assertRaises(PublicationStateError) as raised:
+                    publish_public_task(destination, self.task)
+            error = raised.exception
+            self.assertFalse(error.requested_path_visible)
+            self.assertFalse(error.destination_visible)
+            self.assertFalse(error.complete_orphan)
+            self.assertEqual(error.artifact_state, "removed")
+            self.assertEqual(error.orphan_state, "none")
+            self.assertTrue(error.cleanup_attempted)
+            self.assertTrue(error.cleanup_succeeded)
+            self.assertFalse(destination.exists())
+            self.assertFalse((moved_parent / "published").exists())
+
+    def test_parent_swap_cleanup_failure_reports_complete_orphan(self) -> None:
+        with artifact_temp_directory() as directory:
+            root = Path(directory)
+            parent = root / "requested-parent"
+            parent.mkdir()
+            moved_parent = root / "moved-parent"
+            destination = parent / "published"
+            real_replace = artifact_module.os.replace
+
+            def swapping_replace(source, target, *, src_dir_fd, dst_dir_fd):
+                parent.rename(moved_parent)
+                parent.mkdir()
+                return real_replace(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            with (
+                mock.patch("parallax.artifacts.os.replace", side_effect=swapping_replace),
+                mock.patch(
+                    "parallax.artifacts._cleanup_published",
+                    return_value=artifact_module._CleanupOutcome(False, False),
+                ),
+            ):
+                with self.assertRaises(PublicationStateError) as raised:
+                    publish_public_task(destination, self.task)
+            error = raised.exception
+            self.assertFalse(error.requested_path_visible)
+            self.assertTrue(error.complete_orphan)
+            self.assertFalse(error.partial_orphan)
+            self.assertEqual(error.artifact_state, "complete")
+            self.assertEqual(error.orphan_state, "complete")
+            self.assertTrue(error.cleanup_attempted)
+            self.assertFalse(error.cleanup_succeeded)
+            self.assertFalse(destination.exists())
+            self.assertTrue((moved_parent / "published" / "task.json").is_file())
+
+    def test_parent_swap_partial_cleanup_is_reported(self) -> None:
+        with artifact_temp_directory() as directory:
+            root = Path(directory)
+            parent = root / "requested-parent"
+            parent.mkdir()
+            moved_parent = root / "moved-parent"
+            destination = parent / "published"
+            real_replace = artifact_module.os.replace
+
+            def swapping_replace(source, target, *, src_dir_fd, dst_dir_fd):
+                parent.rename(moved_parent)
+                parent.mkdir()
+                return real_replace(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            with (
+                mock.patch("parallax.artifacts.os.replace", side_effect=swapping_replace),
+                mock.patch(
+                    "parallax.artifacts.os.rmdir",
+                    side_effect=OSError("synthetic cleanup fault"),
+                ),
+            ):
+                with self.assertRaises(PublicationStateError) as raised:
+                    publish_public_task(destination, self.task)
+            error = raised.exception
+            self.assertFalse(error.requested_path_visible)
+            self.assertFalse(error.complete_orphan)
+            self.assertTrue(error.partial_orphan)
+            self.assertEqual(error.artifact_state, "partial")
+            self.assertEqual(error.orphan_state, "partial")
+            self.assertFalse(destination.exists())
+            self.assertEqual(list((moved_parent / "published").iterdir()), [])
+
+    def test_ancestor_swap_and_swap_back_before_publication_acceptance(self) -> None:
+        with artifact_temp_directory() as directory:
+            root = Path(directory)
+            ancestor = root / "ancestor"
+            parent = ancestor / "parent"
+            parent.mkdir(parents=True)
+            moved_ancestor = root / "moved-ancestor"
+            destination = parent / "published"
+            real_replace = artifact_module.os.replace
+
+            def swapping_back_replace(source, target, *, src_dir_fd, dst_dir_fd):
+                ancestor.rename(moved_ancestor)
+                (ancestor / "parent").mkdir(parents=True)
+                result = real_replace(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+                (ancestor / "parent").rmdir()
+                ancestor.rmdir()
+                moved_ancestor.rename(ancestor)
+                return result
+
+            with mock.patch("parallax.artifacts.os.replace", side_effect=swapping_back_replace):
+                receipt, snapshot = publish_public_task(destination, self.task)
+            self.assertTrue(destination.is_dir())
+            self.assertEqual(receipt.tree_snapshot_id, snapshot.id)
+            self.assertFalse(moved_ancestor.exists())
+
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
     def test_file_swap_to_symlink_has_artifact_path_error_taxonomy(self) -> None:
         with artifact_temp_directory() as directory:
@@ -430,7 +570,7 @@ class PublicationReplayTests(unittest.TestCase):
                     )
             self.assertIsInstance(raised.exception.__cause__, OSError)
 
-    def test_tamper_before_rename_is_detected_as_visible_state_error(self) -> None:
+    def test_tamper_during_rename_is_cleaned_and_reported(self) -> None:
         original_replace = artifact_module.os.replace
 
         def tampering_replace(source, destination, *, src_dir_fd, dst_dir_fd):
@@ -455,9 +595,10 @@ class PublicationReplayTests(unittest.TestCase):
             with mock.patch("parallax.artifacts.os.replace", side_effect=tampering_replace):
                 with self.assertRaises(PublicationStateError) as raised:
                     publish_public_task(destination, self.task)
-            self.assertTrue(raised.exception.destination_visible)
+            self.assertFalse(raised.exception.destination_visible)
+            self.assertTrue(raised.exception.cleanup_succeeded)
             self.assertTrue(raised.exception.durability_indeterminate)
-            self.assertTrue(destination.is_dir())
+            self.assertFalse(destination.exists())
 
     def test_parent_fsync_failure_reports_visible_complete_publication(self) -> None:
         real_fsync = artifact_module.os.fsync
@@ -502,6 +643,89 @@ class PublicationReplayTests(unittest.TestCase):
                 )
             self.assertEqual(replayed["task.json"], original_task_bytes)
             self.assertNotEqual(replayed["task.json"], (destination / "task.json").read_bytes())
+
+    def test_root_directory_swap_during_replay_is_rejected(self) -> None:
+        with artifact_temp_directory() as directory:
+            parent = Path(directory)
+            destination = parent / "published"
+            receipt, snapshot = publish_public_task(destination, self.task)
+            lock = replay_lock(receipt, snapshot, self.task)
+            moved_original = parent / "moved-original"
+            attacker = parent / "attacker"
+            shutil.copytree(destination, attacker)
+            (attacker / "task.json").write_bytes(b"attacker tree")
+            attacker_identity = (attacker.stat().st_dev, attacker.stat().st_ino)
+            real_verify = artifact_module._verify_public_capture
+
+            def verify_then_swap_root(capture, task):
+                manifest_id = real_verify(capture, task)
+                destination.rename(moved_original)
+                attacker.rename(destination)
+                return manifest_id
+
+            with mock.patch(
+                "parallax.artifacts._verify_public_capture",
+                side_effect=verify_then_swap_root,
+            ):
+                with self.assertRaisesRegex(
+                    ArtifactPathError, "ancestry changed"
+                ):
+                    replay_locked(
+                        destination,
+                        lock,
+                        self.task,
+                        self.available,
+                        PUBLIC_TREE_POLICY,
+                    )
+            self.assertEqual(
+                (destination.stat().st_dev, destination.stat().st_ino),
+                attacker_identity,
+            )
+            self.assertEqual((destination / "task.json").read_bytes(), b"attacker tree")
+            self.assertTrue((moved_original / "task.json").is_file())
+
+    def test_ancestor_directory_swap_during_replay_is_rejected(self) -> None:
+        with artifact_temp_directory() as directory:
+            parent = Path(directory)
+            ancestor = parent / "ancestor"
+            destination = ancestor / "child" / "published"
+            destination.parent.mkdir(parents=True)
+            receipt, snapshot = publish_public_task(destination, self.task)
+            lock = replay_lock(receipt, snapshot, self.task)
+            moved_ancestor = parent / "moved-ancestor"
+            attacker_ancestor = parent / "attacker-ancestor"
+            attacker_destination = attacker_ancestor / "child" / "published"
+            shutil.copytree(destination, attacker_destination)
+            (attacker_destination / "task.json").write_bytes(b"ancestor attacker")
+            real_verify = artifact_module._verify_public_capture
+
+            def verify_then_swap_ancestor(capture, task):
+                manifest_id = real_verify(capture, task)
+                ancestor.rename(moved_ancestor)
+                attacker_ancestor.rename(ancestor)
+                return manifest_id
+
+            with mock.patch(
+                "parallax.artifacts._verify_public_capture",
+                side_effect=verify_then_swap_ancestor,
+            ):
+                with self.assertRaisesRegex(
+                    ArtifactPathError, "ancestry changed"
+                ):
+                    replay_locked(
+                        destination,
+                        lock,
+                        self.task,
+                        self.available,
+                        PUBLIC_TREE_POLICY,
+                    )
+            self.assertEqual(
+                (destination / "task.json").read_bytes(),
+                b"ancestor attacker",
+            )
+            self.assertTrue(
+                (moved_ancestor / "child" / "published" / "task.json").is_file()
+            )
 
     def test_replay_rejects_mutation_and_unexpected_paths(self) -> None:
         for mutation in ("changed", "unexpected-file", "unexpected-directory"):
