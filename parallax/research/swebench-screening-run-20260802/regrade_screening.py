@@ -58,6 +58,7 @@ def _problem(instance_id: str, trial_index: int) -> SweBenchProblem:
             harness_revision=SWE_BENCH_HARNESS_REVISION,
             image_ref=official_image_ref(instance_id),
             image_digest=ImageDigest(INSTANCE_DIGESTS[instance_id]),
+            gold_patch="historical regrade did not retain the source gold patch",
             test_patch=row["test_patch"],
             fail_to_pass=tuple(row["FAIL_TO_PASS"]),
             pass_to_pass=tuple(row["PASS_TO_PASS"]),
