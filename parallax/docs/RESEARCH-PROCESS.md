@@ -1,0 +1,230 @@
+# The Parallax research process
+
+This document walks a new collaborator through the full Parallax research
+process: what problem the harness solves, how one experiment moves from an
+observed agent failure to a bounded finding, how to rerun the evidence, and
+where the honest limits are. It assumes no prior context. The vocabulary it
+uses is defined in [`MODEL.md`](MODEL.md); the strategy it walks through is
+specified in [`methods/evolving-intent.md`](methods/evolving-intent.md).
+
+## The problem Parallax solves
+
+Modern agents fail in ways that are easy to notice and hard to study. A model
+that solves a task when it is stated up front may fail when the user's intent
+arrives piecemeal, changes mid-conversation, or is corrected late. Anecdotes
+about such failures do not support training or environment decisions, because
+an uncontrolled comparison confounds the interesting cause (how the task was
+presented) with boring ones (different tasks, different budgets, different
+graders, silently dropped failures).
+
+Parallax turns an observed failure mode into a controlled, auditable
+experiment. Its core commitments:
+
+- **Sealed grading authority.** The correct answer and the verifier are held
+  by the evaluator only. No experiment arm may leak them to the agent or
+  change them, so a measured difference cannot be an artifact of grading
+  drift.
+- **Matched arms.** Every comparison isolates one named intervention. All
+  other factors, including source tasks, budgets, turn counts, and the
+  grader, are equalized or declared.
+- **Evidence before interpretation.** Every scheduled run produces a retained
+  record. Reports are recomputed from that evidence, and refuse to aggregate
+  evidence that has drifted from the preregistered design.
+- **Bounded claims.** Findings state what the design can identify and no
+  more. Failed runs widen the reported bounds instead of vanishing from
+  denominators.
+
+## The research loop
+
+Each Parallax study follows one loop:
+
+1. **Observed failure mode.** A concrete, repeatable misbehavior in a real
+   agent, for example losing track of the user's goal as it evolves.
+2. **Research question.** A falsifiable statement with a declared effect
+   direction and threshold, for example: presenting the same verifiable task
+   through an evolving intent trajectory changes the pass rate by at least
+   the preregistered threshold, relative to a matched multi-turn control.
+3. **Controlled intervention.** The single difference between arms is named
+   as the intervention. Everything else is matched.
+4. **Task and environment construction.** A synthesis strategy transforms
+   existing verifiable tasks into experiment arms, and admission checks
+   reject constructions that leak sealed answers or break the contract.
+   Evolving Intent over GSM8K is the implemented strategy.
+5. **Verified runs.** Every scheduled (source, trial, arm) unit executes and
+   is graded by the sealed native verifier. Infrastructure faults are
+   recorded as run failures, distinct from wrong answers.
+6. **Paired contrast with identification bounds.** The report estimates the
+   paired arm difference clustered by source task, treats missing outcomes
+   with worst-case and best-case bounds, and wraps the result in a
+   closed-form 95% confidence interval.
+7. **Bounded finding.** The report returns `advance`, `reject`, or
+   `inconclusive` against the preregistered threshold. The finding is the
+   interval and the decision, not a narrative.
+8. **Next hypothesis.** The finding, including an inconclusive one, narrows
+   the next question. The loop repeats.
+
+## A walked example: Evolving Intent over GSM8K
+
+GSM8K is a pool of grade-school math word problems whose canonical answers
+have the form `#### <integer>`. Each problem becomes one source task. The
+integer answer is stripped from everything the agent sees and retained as
+sealed grading authority.
+
+### Construction
+
+A construction model (any synchronous chat callable returning strict JSON) is
+asked to extract the source intent as a function with arguments, propose
+accepted counterfactual values for eligible arguments, and build predecessor
+intents that step toward the source intent. Rejected construction attempts
+are retained in the evidence alongside accepted ones, once per source.
+Scheduling of intent events onto turns is seed-deterministic. This is a
+declared divergence from the consulted upstream implementation, whose
+construction order is not reproducible from a seed.
+
+### Three arms
+
+Every source task yields three scripts that share the extracted intent, the
+sealed answer, the verifier, and the declared output budget:
+
+- **Static.** One turn that renders the fully revealed extracted intent. No
+  arm renders the raw source question, so rendering style cannot confound
+  the comparison. This arm measures baseline capability with no multi-turn
+  dynamics.
+- **Matched.** A progressive reveal of the source intent, matched to the
+  evolved arm in turn count and per-turn output budget. The intent never
+  changes; information only accumulates. This is the control: it carries
+  every cost of multi-turn interaction except intent evolution.
+- **Evolved.** The intervention. The conversation opens under a predecessor
+  intent, then moves through corrections and reveals, and terminally
+  restores the exact source function, arguments, and reveals. The final
+  state the agent must answer is checked for exact equality with the source
+  intent, so the sealed answer remains the right grading authority.
+
+The decision contrast is matched versus evolved. Because those two arms agree
+on turn count and budget, a difference between them is attributable to intent
+evolution rather than conversation length.
+
+### Grading and run-failure separation
+
+The native grader accepts one submission policy: the final non-empty line of
+the agent's last message must be `FINAL_ANSWER: <integer>`, with exactly one
+marker and a canonical integer. Grading produces one of two record kinds:
+
+- **Verification** with verdict `pass`, `wrong` (well-formed but not the
+  sealed answer), or `invalid` (malformed submission). All three are model
+  behavior.
+- **Run failure** with kind `agent` (the provider raised), `budget` (the
+  declared budget is unusable), or `verifier` (grading authority was
+  corrupt). These are infrastructure faults, not model behavior.
+
+The separation matters for honesty in both directions: a malformed answer
+counts against the model, and a provider timeout does not count for or
+against it. Model pass rates use only verification outcomes as the
+denominator; run failures are reported separately and propagate into the
+identification bounds below.
+
+### The report and its decision
+
+For each (source, trial) unit the report takes the paired difference in pass
+indicators, evolved minus matched, so the estimand lives in \([-1, 1]\).
+Differences are averaged within each source task and then across source
+tasks, so sources with more trials do not dominate. When either side of a
+pair is a run failure, that unit contributes its worst-case and best-case
+interval instead of a point value, which yields identification bounds for
+the effect. A closed-form Hoeffding interval at 95% confidence, clustered by
+source, widens those bounds for sampling error. The decision rule against
+the preregistered threshold:
+
+- `advance` when the entire interval is at or above the threshold;
+- `reject` when the entire interval is below the threshold;
+- `inconclusive` otherwise, which is the expected outcome at small sample
+  sizes or high run-failure rates.
+
+An inconclusive result is a finding: it says the design, sample size, and
+failure rate cannot support the claim yet, and it says so with numbers.
+
+## Run it yourself
+
+The executable slice is offline and deterministic. Its test suite uses
+real-shaped GSM8K rows and scripted chat callables, and needs no network,
+provider keys, or GPU.
+
+> [!NOTE]
+> The tree that contains only `parallax/docs/` is documentation-only. The
+> commands below require the executable slice under `parallax/src/` and
+> `parallax/tests/`; if those directories are absent in your checkout, fetch
+> the branch that carries them.
+
+```bash
+cd parallax
+python -m pytest -q          # full offline suite; expect all tests to pass
+python -m ruff check .       # lint; expect no findings
+```
+
+`tests/test_end_to_end.py` is the runnable walkthrough of the whole loop: it
+builds script families, executes all three arms with scripted agents, writes
+evidence JSONL, and checks report semantics including byte stability, the
+identification bounds, and the decision gate. `tests/conftest.py` shows how a
+family is constructed from a raw GSM8K row. The programmatic entry points are
+`runner.run_experiment` (families in, evidence JSONL out) and
+`report.report_from_jsonl` (evidence in, decision report out).
+
+## How findings are recorded and audited
+
+One experiment writes one evidence JSONL file through atomic replacement,
+with canonical sorted-key JSON so identical experiments are byte-identical.
+It contains exactly three record kinds:
+
+- one **manifest**, preregistering the threshold, every (source, trial) unit
+  with its seed, and content digests of the design, model configuration, and
+  each arm configuration;
+- one **family** record per source, holding the sealed answer, the extracted
+  intent, all accepted and rejected construction attempts, and the three
+  scripts — the sealed answer appears here exactly once and never in run
+  rows;
+- one **run** record per scheduled (source, trial, arm), holding the full
+  transcript, final answer, outcome, and usage.
+
+Reports are recomputed from the evidence file alone and validate before
+aggregating: seed drift, configuration drift, duplicate or missing scheduled
+rows, unknown arms, and malformed outcomes are hard errors with named
+reasons. Shuffling the evidence rows must not change the report bytes.
+
+Process-level auditing is layered on top. Chronological decisions and their
+reversals live in [`../NOTES.md`](../NOTES.md), and `git log -- parallax`
+gives the delivery trail. The first executable slice was gated by four
+independent reviews before acceptance, and the same discipline applies to
+future slices:
+
+1. **Upstream algorithmic fidelity** against the published method and the
+   immutable reference implementation commit, with every deliberate
+   divergence documented in the method contract.
+2. **Statistical soundness**, which replaced trial-level bootstrap inference
+   with the preregistered manifest, source-clustered identification bounds,
+   and the closed-form interval described above.
+3. **Complexity**, which removed structure that did not pay for itself and
+   recorded the simplifications that were rejected because they would weaken
+   method or evidence fidelity.
+4. **Behavioral mutation testing**, which mutated contract-bearing lines and
+   required the test suite to kill every active mutant.
+
+## Deliberately out of scope
+
+- **Real-model evidence.** All existing runs use scripted agents. No claim
+  about real agent behavior is supported yet; the harness exists so that the
+  first real-provider run is already controlled and auditable.
+- **Paper reproduction.** Upstream generated pools and provider transcripts
+  are not published, so Parallax makes no byte-identical dataset, provider
+  replay, or paper-score reproduction claims.
+- **Other benchmarks.** GSM8K is the only implemented source pool. Harder
+  benchmarks require their own adapters and admission checks.
+- **Other strategies.** Checkpoint evolution is a separate strategy with its
+  own unwritten state machine; it is not an Evolving Intent stage.
+- **A command-line interface.** The entry points are the Python API and the
+  test suite.
+
+> **TODO:** Run the preregistered matched-versus-evolved contrast with one
+> real model provider over a declared GSM8K sample. Pass: the report returns
+> `advance` or `reject`. Fail: the interval still spans the threshold at the
+> preregistered sample size, or run failures leave the identification bounds
+> uninformative — either result forces a design revision before scaling.
