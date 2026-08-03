@@ -6,20 +6,20 @@ Three references matter:
 2. Ramp CTO three-plane topology ([`TOPOLOGY.md`](TOPOLOGY.md), [`ramp-cto-topology.mmd`](ramp-cto-topology.mmd)) + [Modal write-up](https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal)
 3. [ColeMurray/background-agents](https://github.com/ColeMurray/background-agents) (Open-Inspect), the closest OSS clone
 
-This hatch is **inspired by those**, not a fork. Local `npm run serve` is a thin end-to-end slice so we can prove agent + git + lifecycle before wiring Cloudflare and Modal.
+This hatch is **inspired by those**, not a fork. Local `npm run serve` remains the simplest path. Cloudflare + Modal landed as a second three-plane entry (see [`CLOUD.md`](CLOUD.md)).
 
 ## Short answer
 
 | Plane | Ramp / Open-Inspect | Hatch today |
 | --- | --- | --- |
-| Control | Cloudflare Worker + SessionAgent DO (SQLite) + EventBus DO + D1/R2 | Single Node Hono process, in-memory session map + EventBus |
-| Orchestration | Modal Session/Sandbox managers, Dict locks, Queue ingress, 30m image cron | `GitSandboxManager` under `/tmp` (seed or clone, no snapshots) |
-| Execution | Modal Sandbox: Bun Runner + `opencode serve` + sidecars (code-server/VNC/ttyd) | Host process: `opencode run --dir` via SDK bridge, no sidecars |
-| Clients | Web, Slack, Chrome extension, GitHub/Linear bots | Embedded web UI + REST/WS only |
+| Control | Cloudflare Worker + SessionAgent DO (SQLite) + EventBus DO + D1/R2 | Monolith Hono **or** `serve:cloud` (SQLite SessionAgent) **or** `cloud/cloudflare` Worker + DOs |
+| Orchestration | Modal Session/Sandbox managers, Dict locks, Queue ingress, 30m image cron | Compute HTTP: `compute:shim` **or** Modal ASGI (`cloud/modal`); Dict/Queue created; image cron not yet |
+| Execution | Modal Sandbox: Bun Runner + `opencode serve` + sidecars (code-server/VNC/ttyd) | Shim: host `opencode run`; Modal sandbox exec (OpenCode when imaged) |
+| Clients | Web, Slack, Chrome extension, GitHub/Linear bots | Embedded web UI on Node planes; CF Worker is API-first |
 | Auth / PRs | GitHub App install token for clone/push; user OAuth to open PRs as the human | Local git author only; no GitHub App, no PR open |
 | Multiplayer | Many authors on one SessionAgent DO; attribution per prompt | One author field per session; follow-ups reuse that author |
 | Warm start | Snapshot pool + typeahead warm + sync gate before writes | Cold seed/clone each session |
-| Agent | OpenCode **server** inside sandbox, Runner bridges WS↔DO | OpenCode **CLI/run** on the control host against the sandbox dir |
+| Agent | OpenCode **server** inside sandbox, Runner bridges WS↔DO | OpenCode **CLI/run** (shim) or Modal `exec` |
 
 We kept the **ideas** that make Inspect work (isolated git workspace, serial prompts, authorship, OpenCode, event envelopes). We deferred the **cloud machinery** that makes it scale and feel instant.
 
