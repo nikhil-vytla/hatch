@@ -49,6 +49,7 @@ class HarnessEvaluation(StrictModel):
     report_digest: DigestText
     harness_revision: NonEmptyText
     image_digest: DigestText
+    patch_successfully_applied: bool
     fail_to_pass_success: tuple[str, ...]
     pass_to_pass_success: tuple[str, ...]
 
@@ -269,6 +270,7 @@ def run_official_harness(
                     report_digest=canonical_digest(json.loads(summary_bytes)),
                     harness_revision=SWE_BENCH_HARNESS_REVISION,
                     image_digest=environment.image.digest,
+                    patch_successfully_applied=False,
                     fail_to_pass_success=(),
                     pass_to_pass_success=(),
                 )
@@ -312,6 +314,7 @@ def run_official_harness(
         report_digest=canonical_digest(envelope),
         harness_revision=SWE_BENCH_HARNESS_REVISION,
         image_digest=environment.image.digest,
+        patch_successfully_applied=report.patch_successfully_applied,
         fail_to_pass_success=fail_to_pass.success,
         pass_to_pass_success=pass_to_pass.success,
     )

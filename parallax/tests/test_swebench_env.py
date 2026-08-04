@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import subprocess
 from pathlib import Path
 
+import pytest
+from hud.environment import Answer
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
+from parallax.delivery import CompleteDeliveryReceiptV1, PhaseActivityV1
 from parallax.hud_compile import compile_hud
 from parallax.hud_screening import (
     CLAUDE_HAIKU_PRICING,
@@ -16,9 +18,9 @@ from parallax.hud_screening import (
 from parallax.specs import freeze_swe_specs
 from parallax.swebench import build_swe_script_family, load_swebench_rows
 from parallax.swebench_runtime import (
-    _director,
     collect_patch,
     isolation_probe_argv,
+    require_complete_delivery,
     workspace,
     workspace_owner_argv,
 )
@@ -51,11 +53,16 @@ def test_environment_bundle_is_public_deterministic_and_importable() -> None:
     assert first == second
     artifacts = {artifact.path: artifact.content for artifact in first.agent_artifacts}
     compile(artifacts["env.py"], "env.py", "exec")
-    compile(artifacts["swebench_runtime.py"], "swebench_runtime.py", "exec")
+    compile(
+        artifacts["parallax/swebench_runtime.py"],
+        "parallax/swebench_runtime.py",
+        "exec",
+    )
     config = json.loads(artifacts["instance.json"])
     assert "verifier" not in config
     assert "sealed test patch" not in artifacts["instance.json"].decode()
-    assert artifacts["env.py"] == b"from swebench_runtime import env\n"
+    assert artifacts["env.py"] == b"from parallax.swebench_runtime import env\n"
+    assert b"class CompleteDeliveryReceiptV1" in artifacts["parallax/delivery.py"]
 
 
 def test_dockerfile_uses_pinned_base_and_isolated_hud_venv() -> None:
@@ -105,11 +112,41 @@ def test_environment_git_commands_drop_to_workspace_owner() -> None:
     assert command[7:] == ["git", "status"]
 
 
-def test_director_tool_has_hud_manifest_metadata() -> None:
-    tool = asyncio.run(_director.get_tool("advance"))
+def test_compiled_environment_has_no_agent_turn_control_tool() -> None:
+    compiled = bundle()
+    task, environment = freeze_swe_specs(family())
+    runtime_source = next(
+        artifact.content
+        for artifact in compiled.agent_artifacts
+        if artifact.path == "parallax/swebench_runtime.py"
+    )
 
-    assert tool.description == "Advance the scripted user by one turn."
-    assert tool.parameters["properties"]["token"]["description"]
+    assert tuple(tool.name for tool in environment.tools) == ("shell",)
+    assert b"def advance(" not in runtime_source
+    assert b"FastMCP" not in runtime_source
+    assert task.public.scripts[2].agent_steps == task.public.scripts[1].agent_steps
+
+
+def test_environment_rejects_receipt_for_incomplete_script() -> None:
+    receipt = CompleteDeliveryReceiptV1(
+        turn_count=1,
+        total_step_budget=3,
+        phases=(
+            PhaseActivityV1(
+                turn_index=0,
+                step_budget=3,
+                steps_consumed=1,
+                advance_trigger="terminal_submission",
+            ),
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="turn count differs"):
+        require_complete_delivery(
+            Answer(content=receipt, raw=receipt.as_answer()),
+            turns=["first", "second"],
+            step_budgets=[3, 3],
+        )
 
 
 def test_all_arms_receive_one_equal_episode_budget() -> None:
@@ -129,20 +166,26 @@ def test_all_arms_receive_one_equal_episode_budget() -> None:
     runtime_source = next(
         artifact.content
         for artifact in compiled.agent_artifacts
-        if artifact.path == "swebench_runtime.py"
+        if artifact.path == "parallax/swebench_runtime.py"
     )
-    assert b"step_budget" in runtime_source
+    assert b"require_complete_delivery" in runtime_source
 
 
 def test_bundle_writes_only_expected_files(tmp_path: Path) -> None:
     compiled = bundle()
     compiled.write_agent_context(tmp_path)
 
-    assert {path.name for path in tmp_path.iterdir()} == {
+    assert {
+        path.relative_to(tmp_path).as_posix()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    } == {
         "Dockerfile.hud",
         "env.py",
         "instance.json",
-        "swebench_runtime.py",
+        "parallax/__init__.py",
+        "parallax/delivery.py",
+        "parallax/swebench_runtime.py",
     }
     expected = next(
         artifact.content
