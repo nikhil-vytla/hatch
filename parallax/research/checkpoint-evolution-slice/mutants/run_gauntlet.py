@@ -3,9 +3,10 @@
 Applies targeted semantic mutants to the two new modules and requires the
 offline suite to fail (kill) for every mutant. Restores the tree afterward.
 
-Run from the parallax package root:
+Run from the repo root:
 
-    uv run python research/checkpoint-evolution-slice/mutants/run_gauntlet.py
+    uv run --project parallax \\
+        python parallax/research/checkpoint-evolution-slice/mutants/run_gauntlet.py
 """
 
 from __future__ import annotations
@@ -63,15 +64,14 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
     (
         "M07 exit codes not compared",
         EVOLUTION,
-        '    if completed.returncode != case.expected_exit_code:\n'
+        "    if completed.returncode != case.expected_exit_code:\n"
         '        return "exit-code-mismatch"\n',
         "",
     ),
     (
         "M08 case timeout reclassified as infrastructure",
         EVOLUTION,
-        "        except subprocess.TimeoutExpired:\n"
-        '            return "timeout"\n',
+        '        except subprocess.TimeoutExpired:\n            return "timeout"\n',
         "        except subprocess.TimeoutExpired as error:\n"
         '            raise VerifierError("timeout") from error\n',
     ),
@@ -90,11 +90,11 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
     (
         "M11 missing workspace does not censor the evolved arm",
         RUNNER,
-        "        if arm == \"evolved\":\n"
+        '        if arm == "evolved":\n'
         "            if produced is None:\n"
         "                break\n"
         "            carried = produced\n",
-        "        if arm == \"evolved\":\n"
+        '        if arm == "evolved":\n'
         "            if produced is not None:\n"
         "                carried = produced\n",
     ),
