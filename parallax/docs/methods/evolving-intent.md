@@ -232,9 +232,8 @@ committed FAIL_TO_PASS and PASS_TO_PASS test without serializing those names
 into run rows.
 
 Screening summaries expose the source-clustered interval and
-minimum-detectable-effect. A small design is explicitly `underpowered` and
-cannot emit an advance or reject decision even when its observed pass rate is
-extreme.
+minimum-detectable-effect so that a reader can see how little a small design
+resolves, even when its observed pass rate is extreme.
 
 ## Interpretation and limits
 
