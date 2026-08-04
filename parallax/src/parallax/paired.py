@@ -17,10 +17,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from typing import TypeVar
 
 from .types import StrictModel
 
 HOEFFDING_CONFIDENCE_TERM = 40.0
+
+SourceKeyT = TypeVar("SourceKeyT", bound=str)
 
 
 class PairedBoundsV1(StrictModel):
@@ -54,7 +57,7 @@ def pair_bounds(treatment: int | None, baseline: int | None) -> tuple[float, flo
 
 
 def paired_bounds(
-    pairs: Mapping[str, Sequence[tuple[int | None, int | None]]],
+    pairs: Mapping[SourceKeyT, Sequence[tuple[int | None, int | None]]],
     *,
     estimand: str,
 ) -> PairedBoundsV1:
