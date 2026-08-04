@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from parallax.canonical import atomic_write, canonical_bytes
-from parallax.hud_screening import HudStaticExecutor, TokenPricing
+from parallax.hud_screening import HudExecutor, TokenPricing
 from parallax.screening import (
     ScreeningCost,
     ScreeningPlan,
@@ -110,7 +110,7 @@ def main() -> None:
             record for record in records[1:] if isinstance(record, ScreeningRun)
         )
     else:
-        executor = HudStaticExecutor(
+        executor = HudExecutor(
             families,
             model=MODEL,
             work_directory=WORK,

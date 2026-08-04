@@ -69,11 +69,15 @@ class PublicTaskV1(StrictModel):
         }
         if len(budgets) != 1:
             raise ValueError("public task arms must have equal budgets")
+        matched, evolved = self.scripts[1:]
+        if matched.agent_steps != evolved.agent_steps:
+            raise ValueError("matched and evolved per-turn budgets must match")
         return self
 
 
 class SealedAuthorityV1(StrictModel):
     harness_revision: CommitSha
+    gold_patch: NonEmptyText
     test_patch: NonEmptyText
     fail_to_pass: Annotated[tuple[NonEmptyText, ...], Field(min_length=1)]
     pass_to_pass: tuple[NonEmptyText, ...]
@@ -159,6 +163,7 @@ def freeze_swe_specs(family: SweScriptFamily) -> tuple[TaskSpecV1, EnvSpecV1]:
         public=public,
         sealed=SealedAuthorityV1(
             harness_revision=verifier.harness_revision,
+            gold_patch=verifier.gold_patch,
             test_patch=verifier.test_patch,
             fail_to_pass=verifier.fail_to_pass,
             pass_to_pass=verifier.pass_to_pass,
@@ -170,10 +175,7 @@ def freeze_swe_specs(family: SweScriptFamily) -> tuple[TaskSpecV1, EnvSpecV1]:
             digest=verifier.image_digest,
         ),
         workspace=WorkspacePolicyV1(reset_to=problem.base_commit),
-        tools=(
-            ToolDeclV1(name="shell", protocol="ssh/2"),
-            ToolDeclV1(name="director", protocol="mcp"),
-        ),
+        tools=(ToolDeclV1(name="shell", protocol="ssh/2"),),
         budget=BudgetDeclV1(
             total_agent_steps=family.static.total_agent_steps,
             max_output_tokens=family.static.max_output_tokens,
