@@ -44,6 +44,12 @@ class ArtifactDigestV1(StrictModel):
     digest: DigestText
 
 
+class SealedLeakMatchV1(StrictModel):
+    artifact_path: str
+    fragment_digest: DigestText
+    fragment_length: int
+
+
 class CompileReceiptV1(StrictModel):
     compiler_version: Literal["hud-v1"] = COMPILER_VERSION
     public_digest: DigestText
@@ -99,7 +105,10 @@ def sealed_fragments(
     *,
     public: PublicTaskV1 | None = None,
 ) -> tuple[bytes, ...]:
-    mandatory = {sealed.test_patch.encode()}
+    mandatory = {
+        sealed.gold_patch.encode(),
+        sealed.test_patch.encode(),
+    }
     derived = {
         value.encode()
         for value in (*sealed.fail_to_pass, *sealed.pass_to_pass)
@@ -129,15 +138,32 @@ def assert_agent_artifacts_clean(
     *,
     public: PublicTaskV1 | None = None,
 ) -> None:
+    match = find_sealed_leak(sealed, artifacts, public=public)
+    if match is not None:
+        raise SealedLeakError(
+            f"agent artifact contains sealed verifier fragment: {match.artifact_path}"
+        )
+
+
+def find_sealed_leak(
+    sealed: SealedAuthorityV1,
+    artifacts: tuple[CompiledArtifactV1, ...],
+    *,
+    public: PublicTaskV1 | None = None,
+) -> SealedLeakMatchV1 | None:
     fragments = sealed_fragments(sealed, public=public)
     for artifact in artifacts:
         if artifact.audience != "agent":
             continue
         surface = artifact.path.encode() + b"\0" + artifact.content
-        if any(fragment in surface for fragment in fragments):
-            raise SealedLeakError(
-                f"agent artifact contains sealed verifier fragment: {artifact.path}"
-            )
+        for fragment in fragments:
+            if fragment in surface:
+                return SealedLeakMatchV1(
+                    artifact_path=artifact.path,
+                    fragment_digest=_artifact_digest(fragment),
+                    fragment_length=len(fragment),
+                )
+    return None
 
 
 def _compile_agent_artifacts(
@@ -172,12 +198,14 @@ def _compile_agent_artifacts(
         f"RUN chown -R {environment.workspace.shell_uid}:"
         f"{environment.workspace.shell_uid} {environment.workspace.root}\n\n"
         "WORKDIR /app\n"
-        "COPY env.py instance.json swebench_runtime.py /app/\n\n"
+        "COPY env.py instance.json /app/\n"
+        "COPY parallax /app/parallax\n\n"
         "EXPOSE 8765\n"
         'CMD ["/opt/hud-venv/bin/hud", "serve", "env.py", '
         '"--host", "0.0.0.0", "--port", "8765"]\n'
     ).encode()
     runtime_path = Path(__file__).with_name("swebench_runtime.py")
+    delivery_path = Path(__file__).with_name("delivery.py")
     return (
         CompiledArtifactV1(
             path="instance.json",
@@ -187,10 +215,20 @@ def _compile_agent_artifacts(
         CompiledArtifactV1(
             path="env.py",
             audience="agent",
-            content=b"from swebench_runtime import env\n",
+            content=b"from parallax.swebench_runtime import env\n",
         ),
         CompiledArtifactV1(
-            path="swebench_runtime.py",
+            path="parallax/__init__.py",
+            audience="agent",
+            content=b"",
+        ),
+        CompiledArtifactV1(
+            path="parallax/delivery.py",
+            audience="agent",
+            content=delivery_path.read_bytes(),
+        ),
+        CompiledArtifactV1(
+            path="parallax/swebench_runtime.py",
             audience="agent",
             content=runtime_path.read_bytes(),
         ),

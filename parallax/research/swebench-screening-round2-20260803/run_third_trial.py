@@ -8,7 +8,7 @@ from pyarrow.parquet import read_table
 from run_remaining_medium import INSTANCE_DIGESTS, PINNED_PARQUET
 
 from parallax.canonical import atomic_write, canonical_bytes
-from parallax.hud_screening import HudStaticExecutor
+from parallax.hud_screening import HudExecutor
 from parallax.screening import (
     ScreeningCost,
     ScreeningPlan,
@@ -94,7 +94,7 @@ def main() -> None:
             record for record in records[1:] if isinstance(record, ScreeningRun)
         )
     else:
-        executor = HudStaticExecutor(
+        executor = HudExecutor(
             families,
             model=MODEL,
             work_directory=WORK,
