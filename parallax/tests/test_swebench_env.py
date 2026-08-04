@@ -8,7 +8,11 @@ from pathlib import Path
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
 from parallax.hud_compile import compile_hud
-from parallax.hud_screening import _docker_runtime
+from parallax.hud_screening import (
+    CLAUDE_HAIKU_PRICING,
+    CLAUDE_OPUS_PRICING,
+    _docker_runtime,
+)
 from parallax.specs import freeze_swe_specs
 from parallax.swebench import build_swe_script_family, load_swebench_rows
 from parallax.swebench_runtime import (
@@ -77,6 +81,13 @@ def test_local_docker_runtime_allows_inner_bubblewrap() -> None:
 
     assert runtime.run_args == ("--privileged",)
     assert runtime.runtime_config.image == "screening-image"
+
+
+def test_screening_uses_current_model_specific_pricing() -> None:
+    assert CLAUDE_OPUS_PRICING.input_usd_per_million == 5.0
+    assert CLAUDE_OPUS_PRICING.output_usd_per_million == 25.0
+    assert CLAUDE_HAIKU_PRICING.input_usd_per_million == 1.0
+    assert CLAUDE_HAIKU_PRICING.output_usd_per_million == 5.0
 
 
 def test_environment_git_commands_drop_to_workspace_owner() -> None:
