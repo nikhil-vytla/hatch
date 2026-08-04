@@ -1,8 +1,8 @@
 {
   "delivered_receipts": 60,
-  "design_digest": "24e2659005ce99ba72c6b94fcb56d1277430fb5790fd08b6a6a3a71d485f69ac",
-  "evidence": "screening.jsonl",
-  "family_digest": "77045638260fe39cbdcfe53173e552a8e4b417abd4f4eb6ed492df0452df274d",
+  "design_digest": "7ea18ed0cded244fd756eb53243243b66486d8bb6ede4fff54c878f95ba78798",
+  "evidence": "screening-headroom.jsonl",
+  "family_digest": "f3693a94df8884df956fcffb1804e14924c48ad34b95a98abdf9b25388215812",
   "paired_strict_contrast": {
     "2": {
       "bound_lower": 0,
@@ -11,10 +11,10 @@
       "observed_pairs": 10
     },
     "3": {
-      "bound_lower": -10,
-      "bound_upper": 10,
+      "bound_lower": 0,
+      "bound_upper": 0,
       "observed_diff_sum": 0,
-      "observed_pairs": 0
+      "observed_pairs": 10
     }
   },
   "per_seed_outcomes": {
@@ -27,7 +27,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "102": {
@@ -39,7 +39,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "103": {
@@ -51,7 +51,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "104": {
@@ -63,7 +63,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "105": {
@@ -75,7 +75,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "106": {
@@ -87,7 +87,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "107": {
@@ -99,7 +99,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "108": {
@@ -111,7 +111,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "109": {
@@ -123,7 +123,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     },
     "110": {
@@ -135,7 +135,7 @@
       "evolved": [
         "strict",
         "strict",
-        "FAIL(budget)"
+        "strict"
       ]
     }
   },
@@ -146,15 +146,13 @@
     "manifest": 1,
     "runs": 20
   },
-  "run_failure_rate": 0.1667,
+  "run_failure_rate": 0.0,
   "scheduled_stage_calls": 60,
   "spend": {
-    "completion_tokens": 46737,
-    "estimated_cost_usd": 0.281291,
-    "prompt_tokens": 47606
+    "completion_tokens": 46455,
+    "estimated_cost_usd": 0.279563,
+    "prompt_tokens": 47288
   },
-  "stage_run_failures": {
-    "budget": 10
-  },
-  "verified_stages": 50
+  "stage_run_failures": {},
+  "verified_stages": 60
 }

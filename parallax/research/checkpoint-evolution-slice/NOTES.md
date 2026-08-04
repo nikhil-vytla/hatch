@@ -356,3 +356,50 @@ drift accepted, fence unwrap disabled, spend approval removed.
   stage-3 budget failure says the byte cap interacts with reply format
   (full file map) and model verbosity; cap choice and delta-style
   replies must be preregistered questions, not incidental settings.
+
+## Budget-headroom disambiguation (2026-08-03, follow-up)
+
+- The flag above got upgraded to a confound diagnosis: the evolved arm
+  is the only arm that must re-serialize its own accumulated workspace
+  in every full-file-map reply, so the flat 4096-byte cap made the
+  arms nominally matched but effectively unmatched — the budget
+  guaranteed for new stage content is the *cap increment*, which flat
+  caps set to zero. The 10/10 stage-3 budget failures could be either
+  real degradation or pure instrument. Worth $0.30 to know which.
+- Lever choice: raise the mechanical output ceiling only (caps
+  4096/8192/12288 plus max output tokens 2048→4096, since a maximal
+  legal 12288-byte reply cannot fit in 2048 tokens), keep the
+  full-file-map reply format, same seeds/specs/cases/references/model.
+  The delta-reply lever stays unpulled so the variant changes exactly
+  one thing.
+- Structural enforcement added first: `budget_headroom_violations`
+  (stage-1 cap ≥ 2× stage-1 reference; every cap increment ≥ 2× the
+  reference increment) with `BudgetMatchingError` refusal on the live
+  screening path. The original family fails it at stages 2 and 3, so
+  the gate would have caught this confound before the first paid call.
+  Gauntlet extended to 25 mutants (M25: refusal removed — killed);
+  M15's patch target refreshed after the live-path edit made it
+  NOT APPLICABLE (the gauntlet's target-occurrence check caught the
+  staleness loudly, as designed).
+- Preregistered (PREREGISTRATION-HEADROOM.md, committed at `a7c21a8`
+  with dry-run evidence 60/60 at $0) before the paid run. Full gate
+  first: 216 tests, ruff, ty, 25/25 mutants.
+- Outcome: **H-instrument, decisively.** Evolved strict 10/10 at every
+  stage, verdict-identical to carry (paired bounds [0, 0] at stages 2
+  and 3), zero RunFailures, $0.2796. The original separation was our
+  cap schedule, not self-accumulation. Details and the three-way
+  comparison in disambiguation-report.md; the first report now carries
+  a superseded banner on its headline contrast.
+- What survives: evolved workspaces still bloat (stage 3: 2601–4851
+  bytes vs carry's uniform 2082) and cost 1.52× carry — accumulation
+  is real but lands in cost/bloat (Class B territory), not in
+  verification, at this scale.
+- Monitoring postmortem from the first run resolved: the silent
+  `docker events` probe failure was a wrong template field
+  (`{{.Status}}` instead of `{{.Action}}`) with stderr discarded, plus
+  UTC timestamps that docker read as local. Probe validated against
+  live activity this run (36 containers/2 min observed mid-run).
+- Summarizer bug found while regenerating: it wrote every summary to
+  the hardcoded name `screening-summary.json`, so the variant summary
+  clobbered the original's. Fixed to derive `<stem>-summary.json`;
+  both summaries regenerated from their evidence.

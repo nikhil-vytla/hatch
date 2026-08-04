@@ -1,8 +1,12 @@
 # Preregistration: budget-headroom disambiguation run
 
-Status: **preregistered before spend; committed before the first paid
-call.** Follow-up to the executed screening in
-[PREREGISTRATION-DRAFT.md](PREREGISTRATION-DRAFT.md) /
+Status: **executed 2026-08-03** (preregistered and committed at
+`a7c21a8` before the first paid call; design unchanged). Outcome:
+**H-instrument** — see
+[disambiguation-report.md](disambiguation-report.md). Evidence:
+`evidence/screening-headroom.jsonl` (60/60 verified, all strict, zero
+RunFailures), actual spend $0.2796. Follow-up to the executed
+screening in [PREREGISTRATION-DRAFT.md](PREREGISTRATION-DRAFT.md) /
 [screening-report.md](screening-report.md).
 
 ## Question

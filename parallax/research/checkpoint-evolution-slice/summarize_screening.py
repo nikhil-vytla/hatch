@@ -160,7 +160,7 @@ def main(evidence_path: Path, seed_path: Path = DEFAULT_SEED_PATH) -> None:
         },
     }
 
-    out_path = evidence_path.with_name("screening-summary.json")
+    out_path = evidence_path.with_name(f"{evidence_path.stem}-summary.json")
     out_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
 
     print(f"validated: manifest + family + {len(runs)} runs")
