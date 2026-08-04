@@ -3,9 +3,10 @@
 Applies targeted semantic mutants to the two new modules and requires the
 offline suite to fail (kill) for every mutant. Restores the tree afterward.
 
-Run from the parallax package root:
+Run from the repo root:
 
-    uv run python research/checkpoint-evolution-slice/mutants/run_gauntlet.py
+    uv run --project parallax \\
+        python parallax/research/checkpoint-evolution-slice/mutants/run_gauntlet.py
 """
 
 from __future__ import annotations

@@ -1,19 +1,19 @@
 """Generate the hand-verified checkpoint-evolution seed family fixture.
 
 Writes parallax/tests/fixtures/checkpoint_family.json deterministically.
-Run from anywhere: python3 make_seed_family.py
+Run from the repo root:
+
+    uv run --project parallax \\
+        python parallax/research/checkpoint-evolution-slice/make_seed_family.py
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
-PARALLAX = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PARALLAX / "src"))
-
-from parallax.checkpoint_evolution import (  # noqa: E402
+from parallax.checkpoint_evolution import (
+    CaseCategory,
     CheckpointFamily,
     CheckpointSpec,
     EntrypointContract,
@@ -24,7 +24,9 @@ from parallax.checkpoint_evolution import (  # noqa: E402
     WorkspaceFile,
     admit_family,
 )
-from parallax.types import SourceId  # noqa: E402
+from parallax.types import SourceId
+
+PARALLAX = Path(__file__).resolve().parents[2]
 
 SPEC_1 = """\
 # tally, checkpoint 1: totals
@@ -240,7 +242,7 @@ if __name__ == "__main__":
 
 def case(
     case_id: str,
-    category: str,
+    category: CaseCategory,
     argv: tuple[str, ...],
     stdin_text: str,
     expected_stdout: str,
@@ -251,7 +253,7 @@ def case(
 ) -> SealedCase:
     return SealedCase(
         case_id=case_id,
-        category=category,  # type: ignore[arg-type]
+        category=category,
         argv=argv,
         stdin_text=stdin_text,
         input_files=tuple(
