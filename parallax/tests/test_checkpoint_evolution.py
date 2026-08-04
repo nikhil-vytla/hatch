@@ -13,6 +13,7 @@ from parallax.checkpoint_evolution import (
     CheckpointSpec,
     EntrypointContract,
     GateResult,
+    Operator,
     ReferenceBuild,
     SealedCase,
     SeedFamilyFixture,
@@ -41,7 +42,7 @@ def _case(case_id: str, **overrides: object) -> SealedCase:
     return SealedCase.model_validate(fields)
 
 
-def _checkpoint(index: int, operator: str, case_id: str) -> CheckpointSpec:
+def _checkpoint(index: int, operator: Operator, case_id: str) -> CheckpointSpec:
     return CheckpointSpec(
         index=index,
         operator=operator,
