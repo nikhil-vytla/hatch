@@ -173,8 +173,8 @@ No experiment unit had run before this unit.
   verified (gateway healthy again). Final file totals $1.105265; unique
   metered spend across all attempts is $1.219080 (sum of fresh-episode
   receipts and metered failure receipts), plus an estimated $0.40-0.80
-  unmetered from the run-1 defect. `account_spend.py` (added alongside
-  the 17:17 preservation work) independently attributes each payment to
+  unmetered from the run-1 defect. `account_spend.py` (added during the
+  21:0x recovery session) independently attributes each payment to
   its paying session and reconstructs the same $1.21908 total;
   `evidence/cross-session-spend.json` is its output. Results: astropy static 2/3 vs evolved
   1/3; django 3/3 vs 3/3; xarray 0/3 vs 0/3. Paired single-minus-evolved
