@@ -21,7 +21,8 @@ The executable slice follows one complete path:
    replacement. Construction attempts and scripts appear once per source.
 4. `report.py` validates every scheduled row before aggregation. It reports
    source-clustered matched-versus-evolved identification bounds, a closed-form
-   95% Hoeffding interval, and an `advance`, `reject`, or `inconclusive` action.
+   95% Hoeffding interval, and the interval's minimum detectable effect. The
+   report describes what the evidence supports; it does not return a verdict.
 
 All JSON boundaries parse into strict frozen Pydantic models with unknown fields
 forbidden. Manifest, family, and run records use a `kind` discriminator, as do
@@ -67,22 +68,22 @@ The second slice adds an offline-ready SWE-bench Verified path:
 6. `screening.py` preregisters boundary-model screening units and canonical
    outcomes before execution, appends and fsyncs each unit to a resumable
    partial file, records provider model/usage and estimated cost, refuses to
-   overwrite completed evidence, defaults to a $5 upper cap, and withholds a
-   decision while the design's minimum-detectable-effect is too large.
+   overwrite completed evidence, defaults to a $5 upper cap, and reports the
+   design's source-clustered interval and minimum detectable effect.
 
 The preregistered HUD screening completed five SWE-bench instances with two
 static Claude Opus 4.8 trials each. Both Django instances passed 2/2; Astropy,
-Matplotlib, and Requests passed 0/2. The design is underpowered and makes no
-advance/reject decision. Known metered spend was $1.669650, with a conservative
-$2.147440 all-in bound for unmetered construction failures under the $5 cap.
-Candidate patches were graded from a pinned SWE-bench source checkout after its
-wheel omitted a required harness fixture.
+Matplotlib, and Requests passed 0/2. At five sources the interval is far wider
+than any effect worth measuring, so the run locates an operating point rather
+than supporting a comparison. Known metered spend was $1.669650, with a
+conservative $2.147440 all-in bound for unmetered construction failures under
+the $5 cap. Candidate patches were graded from a pinned SWE-bench source
+checkout after its wheel omitted a required harness fixture.
 
 Screening round 2 found three Claude Opus 4.8 boundary instances at 2/3:
 Astropy 14508, Django 13786, and Xarray 4695. Actual token-metered round-two
 spend was $2.972512 under the $5 cap. These instances and model are the
-recommended operating point for the first single-vs-evolved comparison; the
-small-run power rule still withholds any advance/reject decision.
+recommended operating point for the first single-vs-evolved comparison.
 
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the

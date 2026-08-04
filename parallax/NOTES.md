@@ -338,3 +338,25 @@
   HUD model discovery authenticated, but the first Claude Haiku 4.5
   construction request returned HTTP 403 before any response. The stop rule
   terminated screening at zero recorded tokens and $0 estimated spend.
+
+## Power gate removed
+
+- An adversarial audit found the `powered`/`action` gate unreachable at every
+  scale this harness can run, reversing the decision recorded two sections
+  above. Screening's half-width is `sqrt(ln 40 / 2n)`, so the 0.2 tolerance
+  needs 47 source clusters and rounds ran 5 to 6. The report's half-width is
+  `sqrt(2 ln 40 / n)`, needing 185 clusters against a published admissible
+  pool of 50. `advance` and `reject` were therefore dead states, the
+  preregistered `threshold` never influenced an output, and every run was
+  condemned to `inconclusive`/`underpowered` by arithmetic rather than by
+  evidence.
+- Deleted `ManifestRecord.threshold` and its validator, the `Threshold` type,
+  the `threshold` parameter on `run_experiment`, `MAXIMUM_DECISION_MDE`,
+  `MAXIMUM_SCREENING_MDE`, `ScreeningSummary.powered`, `ScreeningSummary.action`,
+  and the `powered`/`threshold`/`action` keys on the report. Kept the paired
+  point estimate, identification bounds, confidence interval, and
+  minimum-detectable-effect as reported facts.
+- Dropping `threshold` from the manifest body changes the design digest, so
+  the byte-stability golden hash moved. Committed evidence and report JSON
+  under `research/` are historical records and were left untouched; nothing
+  reads a `ScreeningSummary` or a manifest back from those files.
