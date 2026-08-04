@@ -20,6 +20,9 @@ be recreated on `main`.
 - [`slopcodebench-method/`](slopcodebench-method/README.md) — design of the
   checkpoint-evolution synthesis method behind
   [`../docs/methods/checkpoint-evolution.md`](../docs/methods/checkpoint-evolution.md).
+- [`checkpoint-evolution-slice/`](checkpoint-evolution-slice/README.md) —
+  the executable offline slice of that method: domain model, admission
+  gates, two-arm runner, seed family, and mutation gauntlet.
 - [`spec-translation/`](spec-translation/README.md) — research and design of
   the minimal spec layer that compiles Parallax task/environment
   specifications to RL platforms (HUD, `verifiers`) with structural sealing

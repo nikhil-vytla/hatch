@@ -1,0 +1,160 @@
+{
+  "delivered_receipts": 60,
+  "design_digest": "24e2659005ce99ba72c6b94fcb56d1277430fb5790fd08b6a6a3a71d485f69ac",
+  "evidence": "screening.jsonl",
+  "family_digest": "77045638260fe39cbdcfe53173e552a8e4b417abd4f4eb6ed492df0452df274d",
+  "paired_strict_contrast": {
+    "2": {
+      "bound_lower": 0,
+      "bound_upper": 0,
+      "observed_diff_sum": 0,
+      "observed_pairs": 10
+    },
+    "3": {
+      "bound_lower": -10,
+      "bound_upper": 10,
+      "observed_diff_sum": 0,
+      "observed_pairs": 0
+    }
+  },
+  "per_seed_outcomes": {
+    "101": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "102": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "103": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "104": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "105": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "106": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "107": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "108": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "109": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    },
+    "110": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "FAIL(budget)"
+      ]
+    }
+  },
+  "receipt_chain_confirmed": 60,
+  "records": {
+    "all_validated": true,
+    "family": 1,
+    "manifest": 1,
+    "runs": 20
+  },
+  "run_failure_rate": 0.1667,
+  "scheduled_stage_calls": 60,
+  "spend": {
+    "completion_tokens": 46737,
+    "estimated_cost_usd": 0.281291,
+    "prompt_tokens": 47606
+  },
+  "stage_run_failures": {
+    "budget": 10
+  },
+  "verified_stages": 50
+}

@@ -3,6 +3,11 @@ pyproject.toml
 src/parallax/__init__.py
 src/parallax/admission.py
 src/parallax/canonical.py
+src/parallax/checkpoint_agent.py
+src/parallax/checkpoint_evolution.py
+src/parallax/checkpoint_runner.py
+src/parallax/checkpoint_sandbox.py
+src/parallax/checkpoint_screening.py
 src/parallax/delivery.py
 src/parallax/evolving_intent.py
 src/parallax/gsm8k.py
@@ -28,6 +33,11 @@ src/parallax_research.egg-info/dependency_links.txt
 src/parallax_research.egg-info/requires.txt
 src/parallax_research.egg-info/top_level.txt
 tests/test_admission.py
+tests/test_checkpoint_agent.py
+tests/test_checkpoint_evolution.py
+tests/test_checkpoint_runner.py
+tests/test_checkpoint_sandbox.py
+tests/test_checkpoint_screening.py
 tests/test_delivery.py
 tests/test_end_to_end.py
 tests/test_evolving_intent.py

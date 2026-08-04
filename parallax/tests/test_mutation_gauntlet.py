@@ -160,6 +160,20 @@ MUTATIONS = (
         ("tests/test_screening.py",),
     ),
     Mutation(
+        "checkpoint_replies_are_parsed_without_unwrapping_the_fence",
+        "src/parallax/checkpoint_agent.py",
+        "    payload = strip_json_fence(text)",
+        "    payload = text",
+        ("tests/test_checkpoint_agent.py",),
+    ),
+    Mutation(
+        "checkpoint_stage_pricing_drifts_from_the_canonical_table",
+        "src/parallax/checkpoint_agent.py",
+        'STAGE_MODEL = "claude-haiku-4-5"',
+        'STAGE_MODEL = "claude-opus-4-8"',
+        ("tests/test_checkpoint_agent.py", "tests/test_checkpoint_screening.py"),
+    ),
+    Mutation(
         "paired_bounds_treat_a_missing_side_as_a_point",
         "src/parallax/paired.py",
         "        return float(-baseline), float(1 - baseline)",
