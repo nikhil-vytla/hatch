@@ -15,3 +15,4 @@ ts	phase	decision	why	evidence	result
 ---
 2026-08-03T08:00:00Z	cloud	landed CF+Modal planes via compute contract	grow on working local; shim for hatch; Modal+Wrangler for deploy	e2e:cloud green; cloud/cloudflare; cloud/modal	landed
 2026-08-03T19:10:00Z	frontend	folded agent-workspace into inspect as its frontend; deleted standalone folder	clarified brief: one product; hermes was the interaction bar	auth+terminal in control-plane; browser cat src/math.ts in sandbox; e2e auth gate	landed
+2026-08-04T04:15:00Z	gaps	stop/interrupt + opencode --continue + sqlite session index	retrospective named the 3 credential-free SOTA gaps	e2e: continuity codeword recall, stop OK, restart survival OK	VERIFIED

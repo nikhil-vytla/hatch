@@ -5,6 +5,16 @@ Source posts:
 - https://modal.com/blog/how-ramp-built-a-full-context-background-coding-agent-on-modal
 - Inspiration (not a fork): https://github.com/ColeMurray/background-agents
 
+## Interaction gaps closed (2026-08-04)
+
+The retrospective named three credential-free gaps where SOTA harnesses lead; all landed and e2e-proven in one run:
+
+- **Stop/interrupt**: `POST /api/sessions/:id/stop` aborts the running OpenCode process (AbortController → SIGKILL); UI "Stop turn" button; `turn.stopped` event. Queued prompts still run afterwards.
+- **Conversation continuity**: turns after the first use `opencode run --continue` (each sandbox is its own project root, so sessions stay isolated). Proven by codeword recall: turn N tells the agent a nonce, turn N+1 writes it to a file without it existing anywhere in the repo.
+- **Durable session index**: `sessions.sqlite` under the root dir; restart reloads rows whose sandbox still exists (running → idle on load, since a dead process can't be resumed). `close()` no longer destroys sessions — restart survival is the point.
+
+e2e additions: `continuity OK: zebra…`, `stop OK`, `restart survival OK`.
+
 ## Workspace-grade frontend folded in (2026-08-03)
 
 Clarified brief: one product — the Inspect background agent — with a proper frontend (hermes-workspace was the interaction bar, not a separate build). Folded the `agent-workspace/` experiment into this one and deleted the standalone folder (history stays in git):

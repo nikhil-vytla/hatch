@@ -38,9 +38,12 @@ then `DELETE`s the session and checks the sandbox directory is gone.
 | Layer | Implementation |
 | --- | --- |
 | Control plane | Hono REST + WebSocket event stream + embedded web UI |
-| Frontend | Workspace-grade UI: session sidebar, streaming log, Files/Diff/**Terminal** tabs, login overlay |
+| Frontend | Workspace-grade UI: session sidebar, streaming log, Files/Diff/**Terminal** tabs, **Stop turn**, login overlay |
 | Auth | `INSPECT_PASSWORD` → cookie/bearer auth on all `/api` routes; fail-closed non-loopback bind; rate-limited login |
 | Terminal | Per-session WS shell in that session's sandbox (`/api/sessions/:id/terminal`) |
+| Interrupt | `POST /api/sessions/:id/stop` aborts the running turn; queued prompts still run |
+| Continuity | Follow-up turns run `opencode --continue`; the agent remembers earlier turns (codeword-recall e2e) |
+| Persistence | `sessions.sqlite` index — sessions and sandboxes survive control-plane restarts |
 | Async | Per-session promise queue (`SessionQueues`) — no overlapping OpenCode in one sandbox |
 | Lifecycle | `DELETE` destroys disk; idle TTL reaper; destroy is idempotent |
 | Sandbox | Real git repo per session, branch `inspect/<id>` under `/tmp` |

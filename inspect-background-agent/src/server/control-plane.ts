@@ -11,6 +11,7 @@ import { createMemoryEventBus } from "../control/event-bus.js";
 import { SessionQueues } from "../control/session-queues.js";
 import { ResourceLifecycle } from "../control/resource-lifecycle.js";
 import { Automations } from "../control/automations.js";
+import { SessionIndex } from "../control/session-index.js";
 import { openPullRequest, parseGitHubRemote } from "../scm/github.js";
 import {
   assertBindAllowed,
@@ -40,6 +41,8 @@ export type SessionRow = {
   participants: GitAuthor[];
   /** Author of the most recent prompt; used for commit attribution. */
   lastPromptAuthor: GitAuthor;
+  /** Completed agent turns; turns after the first continue the OpenCode session. */
+  turns: number;
   createdAt: number;
   lastActiveAt: number;
   status: "idle" | "running" | "error";
@@ -94,14 +97,22 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   const bridge = new OpenCodeBridge({ model });
   await bridge.start();
 
-  const sessions = new Map<string, SessionRow>();
+  const index = new SessionIndex(path.join(rootDir, "sessions.sqlite"));
+  const sessions = new Map<string, SessionRow>(
+    index.load().map((row) => [row.id, row]),
+  );
+  const persist = (row: SessionRow) => index.upsert(row);
   const bus = createMemoryEventBus();
   const queues = new SessionQueues();
+  // Abort handle for the currently running turn of each session.
+  const running = new Map<string, AbortController>();
   const lifecycle = new ResourceLifecycle(sandboxes, {
     ttlMs: opts.sessionTtlMs ?? 30 * 60_000,
   });
   const reapTimer = setInterval(() => {
-    void lifecycle.reap(sessions);
+    void (async () => {
+      for (const id of await lifecycle.reap(sessions)) index.delete(id);
+    })();
   }, 60_000);
   reapTimer.unref?.();
 
@@ -241,6 +252,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       author,
       participants: [author],
       lastPromptAuthor: author,
+      turns: 0,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
       status: "idle",
@@ -248,6 +260,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       parentSessionId: null,
     };
     sessions.set(row.id, row);
+    persist(row);
     emit(row.id, "system", {
       kind: "session.started",
       repo: { owner: "local", name: sandbox.id },
@@ -307,9 +320,11 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
   app.delete("/api/sessions/:id", async (c) => {
     const row = sessions.get(c.req.param("id") ?? "");
     if (!row) return c.json({ error: "not found" }, 404);
+    running.get(row.id)?.abort();
     await queues.drain(row.id);
     const sandboxId = row.sandboxId;
     await lifecycle.destroy(row, sessions);
+    index.delete(row.id);
     let gone = false;
     try {
       await access(path.join(rootDir, "sandboxes", sandboxId));
@@ -325,6 +340,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     if (row.status === "running") return c.json({ error: "session running" }, 409);
     row.archivedAt = Date.now();
     lifecycle.touch(row);
+    persist(row);
     emit(row.id, "system", { kind: "session.closed", reason: "archived" });
     return c.json({ ok: true, id: row.id, archivedAt: row.archivedAt });
   });
@@ -334,7 +350,18 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     if (!row) return c.json({ error: "not found" }, 404);
     row.archivedAt = null;
     lifecycle.touch(row);
+    persist(row);
     return c.json({ ok: true, id: row.id, archivedAt: null });
+  });
+
+  // Interrupt the currently running turn. Queued prompts still run afterwards.
+  app.post("/api/sessions/:id/stop", (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    const controller = running.get(row.id);
+    if (!controller) return c.json({ ok: false, note: "no running turn" });
+    controller.abort();
+    return c.json({ ok: true, stopping: true });
   });
 
   app.post("/api/sessions/:id/fork", async (c) => {
@@ -370,6 +397,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       author: parent.author,
       participants: [parent.author],
       lastPromptAuthor: parent.author,
+      turns: 0,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
       status: "idle",
@@ -377,6 +405,7 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       parentSessionId: parent.id,
     };
     sessions.set(row.id, row);
+    persist(row);
     emit(row.id, "system", {
       kind: "session.started",
       repo: { owner: "local", name: sandbox.id },
@@ -621,6 +650,9 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     addParticipant(row, by);
     row.status = "running";
     lifecycle.touch(row);
+    persist(row);
+    const controller = new AbortController();
+    running.set(row.id, controller);
     const turnId = brandString<"TurnId">(id("trn"));
     emit(sessionId, "user", {
       kind: "turn.queued",
@@ -639,10 +671,13 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
 
     try {
       let summary = "";
+      let stopped = false;
       for await (const delta of bridge.runPrompt({
         sessionId: row.opencodeSessionId,
         directory: row.repoDir,
         text,
+        continueSession: row.turns > 0,
+        signal: controller.signal,
       })) {
         if (delta.kind === "text") {
           summary += delta.text;
@@ -657,10 +692,14 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
             turnId,
             text: `\n[tool:${delta.name} ${delta.status}]\n`,
           });
+        } else if (delta.kind === "stopped") {
+          stopped = true;
+          break;
         } else if (delta.kind === "error") {
           row.status = "error";
           row.lastError = delta.message;
           lifecycle.touch(row);
+          persist(row);
           emit(sessionId, "system", {
             kind: "turn.finished",
             turnId,
@@ -672,7 +711,17 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
         }
       }
       row.status = "idle";
+      row.turns += 1;
       lifecycle.touch(row);
+      persist(row);
+      if (stopped) {
+        emit(sessionId, "system", {
+          kind: "turn.stopped",
+          turnId,
+          by: brandString<"ActorId">(by.email),
+        });
+        return;
+      }
       const gitStatus = await sandboxes.status(row.repoDir);
       emit(sessionId, "agent", {
         kind: "turn.finished",
@@ -683,17 +732,21 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
       row.status = "error";
       row.lastError = e instanceof Error ? e.message : String(e);
       lifecycle.touch(row);
+      persist(row);
       emit(sessionId, "system", {
         kind: "turn.finished",
         turnId,
         summary: `error: ${row.lastError}`,
       });
+    } finally {
+      running.delete(row.id);
     }
   }
 
   const port = opts.port ?? 8787;
   const server = serve({ fetch: app.fetch, port, hostname: host });
   injectWebSocket(server);
+  let closed = false;
 
   return {
     app,
@@ -706,12 +759,17 @@ export async function startControlPlane(opts: ControlPlaneOptions = {}) {
     bus,
     automations,
     async close() {
+      if (closed) return;
+      closed = true;
       automations.stop();
       clearInterval(reapTimer);
+      // Sessions survive restarts: drain running turns, keep sandboxes + index.
       for (const session of [...sessions.values()]) {
+        running.get(session.id)?.abort();
         await queues.drain(session.id);
-        await lifecycle.destroy(session, sessions);
+        persist(session);
       }
+      index.close();
       await bridge.close();
       server.close();
     },
@@ -1065,6 +1123,7 @@ export function webUiHtml(): string {
       <button class="secondary" id="follow" disabled>Send follow-up</button>
       <button class="secondary" id="commit" disabled>Commit changes</button>
       <div class="row-actions">
+        <button class="secondary" id="stop" disabled>Stop turn</button>
         <button class="secondary" id="fork" disabled>Fork</button>
         <button class="secondary" id="archive" disabled>Archive</button>
         <button class="secondary" id="restore" disabled>Restore</button>
@@ -1267,6 +1326,7 @@ export function webUiHtml(): string {
     function setActionsEnabled(on) {
       document.getElementById('follow').disabled = !on;
       document.getElementById('commit').disabled = !on;
+      document.getElementById('stop').disabled = !on;
       document.getElementById('fork').disabled = !on;
       document.getElementById('archive').disabled = !on;
       document.getElementById('restore').disabled = !on;
@@ -1274,6 +1334,7 @@ export function webUiHtml(): string {
       if (on && sessionMeta && sessionMeta.archivedAt) {
         document.getElementById('follow').disabled = true;
         document.getElementById('commit').disabled = true;
+        document.getElementById('stop').disabled = true;
         document.getElementById('fork').disabled = true;
         document.getElementById('archive').disabled = true;
         document.getElementById('restore').disabled = false;
@@ -1394,6 +1455,7 @@ export function webUiHtml(): string {
         refreshSessions();
         refreshArtifacts();
       }
+      else if (e.kind === 'turn.stopped') { turnMarker('Turn stopped by user', 'err'); refreshSessions(); }
       else if (e.kind === 'git.pushed') note('Committed ' + e.head + ' on ' + e.branch);
       else if (e.kind === 'session.closed') note('Session closed' + (e.reason ? ': ' + e.reason : ''));
       else note('[' + (msg.origin || '?') + '] ' + e.kind);
@@ -1553,6 +1615,13 @@ export function webUiHtml(): string {
       await api('/api/sessions/' + sessionId + '/restore', { method: 'POST' });
       await selectSession(sessionId, { clear: false });
       note('Restored ' + sessionId);
+    };
+
+    document.getElementById('stop').onclick = async () => {
+      if (!sessionId) return;
+      const r = await api('/api/sessions/' + sessionId + '/stop', { method: 'POST' });
+      const j = await r.json();
+      note(j.stopping ? 'Stopping current turn…' : 'No running turn.');
     };
 
     document.getElementById('destroy').onclick = async () => {

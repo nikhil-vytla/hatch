@@ -12,6 +12,7 @@ export type OpenCodeDelta =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "tool"; readonly name: string; readonly status: string }
   | { readonly kind: "error"; readonly message: string }
+  | { readonly kind: "stopped" }
   | { readonly kind: "idle" }
   | { readonly kind: "raw"; readonly type: string; readonly data: unknown };
 
@@ -51,6 +52,10 @@ export class OpenCodeBridge {
     readonly directory: string;
     readonly text: string;
     readonly timeoutMs?: number;
+    /** Continue the sandbox's previous OpenCode session (conversation memory). */
+    readonly continueSession?: boolean;
+    /** Abort kills the run; the generator ends with kind: "stopped". */
+    readonly signal?: AbortSignal;
   }): AsyncGenerator<OpenCodeDelta> {
     const bin = opencodeBin();
     const model = `${this.model.providerID}/${this.model.modelID}`;
@@ -66,8 +71,9 @@ export class OpenCodeBridge {
         args.directory,
         "--model",
         model,
-        "--title",
-        `inspect-${args.sessionId}`,
+        ...(args.continueSession
+          ? ["--continue"]
+          : ["--title", `inspect-${args.sessionId}`]),
         args.text,
       ],
       {
@@ -76,6 +82,14 @@ export class OpenCodeBridge {
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
+
+    let stoppedBySignal = false;
+    const onAbort = () => {
+      stoppedBySignal = true;
+      child.kill("SIGKILL");
+    };
+    if (args.signal?.aborted) onAbort();
+    args.signal?.addEventListener("abort", onAbort, { once: true });
 
     const killTimer = setTimeout(() => {
       child.kill("SIGTERM");
@@ -125,6 +139,12 @@ export class OpenCodeBridge {
     await stderrTask;
     exitCode = await exitPromise;
     clearTimeout(killTimer);
+    args.signal?.removeEventListener("abort", onAbort);
+
+    if (stoppedBySignal) {
+      yield { kind: "stopped" };
+      return;
+    }
 
     for (const d of stderrChunks) {
       if (d.kind === "error") yield d;
