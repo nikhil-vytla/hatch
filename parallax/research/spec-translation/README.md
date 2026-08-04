@@ -29,10 +29,9 @@ second-consumer proof.
 ## 1. What already constitutes a spec in Parallax
 
 `MODEL.md` already defines the abstract objects: a task
-\(\tau = (g, c, x_{\mathrm{pub}}, x_{\mathrm{seal}}, V, R)\) with the
+$\tau = (g, c, x_{\mathrm{pub}}, x_{\mathrm{seal}}, V, R)$ with the
 authority-separation invariant, and an environment
-\(\varepsilon = (\mathcal S, \mathcal O, \mathcal A, P, Z, \mu_0, H, B,
-\mathcal U, \kappa)\). It also carries an explicit gate: "Generalize only
+$\varepsilon = (\mathcal S, \mathcal O, \mathcal A, P, Z, \mu_0, H, B, \mathcal U, \kappa)$. It also carries an explicit gate: "Generalize only
 after another research journey demonstrates which task and environment
 fields need a shared executable representation."
 
@@ -41,8 +40,8 @@ question. Inventorying `src/parallax/`:
 
 | Model | File | Role in the formal model |
 | --- | --- | --- |
-| `Problem` (branded `SourceAnswer`) | `gsm8k.py` | \(x_{\mathrm{pub}}\) = question; \(x_{\mathrm{seal}}\) = answer; \(V\) = `grade` |
-| `Intent`, `Turn`, `Script`, `ScriptFamily` | `evolving_intent.py` | \(\kappa\) (interaction schedule) + matched-arm construction, invariants as model validators |
+| `Problem` (branded `SourceAnswer`) | `gsm8k.py` | $x_{\mathrm{pub}}$ = question; $x_{\mathrm{seal}}$ = answer; $V$ = `grade` |
+| `Intent`, `Turn`, `Script`, `ScriptFamily` | `evolving_intent.py` | $\kappa$ (interaction schedule) + matched-arm construction, invariants as model validators |
 | `SweBenchProblem` + nested `SweBenchVerifier` | `swebench.py` | public issue fields vs sealed test patch/lists/command/image digest; `public_digest` excludes the verifier |
 | `SweScript`, `SweScriptFamily` | `swebench.py` | arm schedules, equal budgets, a substring leak check in `aligned_budget` |
 | `Verification` \| `RunFailure` (`Outcome`) | `gsm8k.py`, `runner.py` | verdict vs run-failure discriminated union |
@@ -64,7 +63,7 @@ FAIL_TO_PASS, PASS_TO_PASS, test command — into `instance.json`, and the
 generated Dockerfile does `COPY env.py instance.json /app/` into the same
 image whose `/testbed` workspace the agent occupies. With HUD's ssh
 capability the agent can read the whole container filesystem, so
-\(x_{\mathrm{seal}}\) is agent-reachable during the episode: a direct
+$x_{\mathrm{seal}}$ is agent-reachable during the episode: a direct
 violation of the authority-separation invariant, in an arm-comparison
 setting where `MODEL.md` says a leaking arm "is not comparable."
 
@@ -104,7 +103,7 @@ Execution is a DataLoader-like object
 seed, ...)` renders conversations **at load time** through a plan-first turn
 scheduler; the scenario is inferred from the parameters. The SWE overlay is
 a `post_fill_hook` (`turn_scheduler_swe.py`). Each sample serializes its
-`ChangePlan` (the paper's \(I_t\)/\(\Delta I_t\) formalization as frozen
+`ChangePlan` (the paper's $I_t$/$\Delta I_t$ formalization as frozen
 dataclasses) into metadata.
 
 The spec/execution boundary is therefore: *intent structure is data;
@@ -296,8 +295,8 @@ today. Third, `MODEL.md`'s own TODO gate — generalize only after another
 journey demonstrates *which fields* need a shared executable representation
 — has been satisfied by the SWE journey: the fields are the public/sealed
 split and the verdict contract, and (importantly) **only** those. Nothing
-observed demands executable representations of \(P\), \(Z\), or
-\(\mathcal S\); the environment spec should stay at image identity,
+observed demands executable representations of $P$, $Z$, or
+$\mathcal S$; the environment spec should stay at image identity,
 workspace, tools, budgets, and schedule.
 
 For a general framework — plugin registries, N platforms, a transformation

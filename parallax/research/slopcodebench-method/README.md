@@ -26,9 +26,8 @@ Evolving Intent perturbs the intent schedule *within* one episode and ends
 with terminal restoration — the source verifier, sealed answer, and task are
 recovered exactly, and nothing the agent did persists. Checkpoint evolution
 perturbs *across* episodes and never restores: the agent's own terminal
-workspace is the next stage's initial state (\(\mu_{0,i+1} =
-\delta_{W_i}\)), and sealed authority accumulates monotonically
-(\(\Omega_i = \Omega_{i-1}\cup T_i\)) instead of being restored. The
+workspace is the next stage's initial state ($\mu_{0,i+1} = \delta_{W_i}$), and sealed authority accumulates monotonically
+($\Omega_i = \Omega_{i-1}\cup T_i$) instead of being restored. The
 integrity invariant dual to terminal restoration is **non-destructive
 accumulation**: no checkpoint may invalidate a prior sealed test. That single
 substitution — restore-the-end vs never-invalidate-the-past — generates the
@@ -37,8 +36,8 @@ whole method.
 **2. The artifact is the only channel, so persistence is analyzable.** The
 benchmark resets everything between checkpoints except the working directory
 (fresh container, no conversation carry-over). Persistent state is exactly
-\(W_i = (\text{workspace}, \text{dependency manifest})\) on the agent side
-and \(\Omega_i\) on the evaluator side, and neither crosses the authority
+$W_i = (\text{workspace}, \text{dependency manifest})$ on the agent side
+and $\Omega_i$ on the evaluator side, and neither crosses the authority
 boundary. This makes the method's causal claim crisp: any cross-stage effect
 is mediated by the code the agent wrote.
 
@@ -52,8 +51,8 @@ and anticipatory reference builds, which turns it into an admission gate
 (G4) instead of a matter of taste.
 
 **4. "Maintainability" gets a native, sealed, behavioral price.** The future
-stages themselves — and probe variants (freeze \(y_i\), let a pinned weaker
-agent attempt stage \(i+1\)) — price the quality of today's artifact in
+stages themselves — and probe variants (freeze $y_i$, let a pinned weaker
+agent attempt stage $i+1$) — price the quality of today's artifact in
 verification and cost, with sealed authority. Static quality composites
 (erosion, verbosity) are sealable as pinned deterministic measurements but
 carry documented validity limits: the paper's own sensitivity analysis shows
@@ -105,8 +104,8 @@ computable oracle — which is why the workflow keeps humans at exactly two
 points (design-pressure naturalness, residual semantic leakage) and treats
 generation as automatable but **admission as where honesty lives**.
 
-Evidence that would settle it: author \(k\) families through the pipeline,
-take \(k\) matched hand-authored SCBench problems, run the same pinned agent
+Evidence that would settle it: author $k$ families through the pipeline,
+take $k$ matched hand-authored SCBench problems, run the same pinned agent
 panel on both, and compare model-ranking agreement, strict-rate headroom,
 degradation-slope distributions, post-freeze defect rates, and blind expert
 spec review. Ranking agreement with comparable headroom and no excess defect
