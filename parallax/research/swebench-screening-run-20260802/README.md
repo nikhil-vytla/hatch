@@ -89,6 +89,13 @@ by digest before a comparative experiment.
 - Known metered spend: $1.669650. Three failed construction responses have
   unavailable usage and a $0.477790 conservative reserve, so the all-in upper
   bound is $2.147440.
+  - **Correction (2026-08-03).** Those three figures were produced by the
+    retired Opus 4.1 rate card, which also priced Haiku construction calls.
+    Re-metered from the same retained tokens at correct rates: $0.518250
+    metered, a $0.022779 reserve on the original conservative method, and a
+    $0.541029 all-in bound. The receipts are left as written; see the cost
+    correction in `NOTES.md` and the ledger in
+    `research/spend-audit-20260803/`.
 - HUD/API surprises: explicit null `tool_calls`, fenced construction JSON,
   scalar argument values, mandatory MCP tool descriptions, Docker Desktop
   user-namespace policy, and official empty-patch summaries without reports.

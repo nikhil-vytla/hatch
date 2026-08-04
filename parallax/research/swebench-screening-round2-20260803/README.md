@@ -54,6 +54,13 @@ model-specific rates. Runtime pricing constants now use $5/$25 per million
 Opus input/output tokens and $1/$5 for Haiku. Sonnet 4.6 used its current
 introductory $2/$10 rate.
 
+The `estimated_cost_usd` fields inside `evidence/screening.jsonl` and
+`evidence/construction.jsonl` still hold the retired-rate values they were
+written with, so summing receipts across this folder's evidence gives
+$8.544627 — nearly three times the truth. $2.972512 is the token-derived
+figure and the one to quote; `research/spend-audit-20260803/` recomputes it
+from the retained tokens and reconciles it against these six components.
+
 ## Evidence
 
 - `round2-report.json` is the canonical combined result and cost receipt.

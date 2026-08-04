@@ -21,6 +21,9 @@ from pathlib import Path
 import pytest
 
 SOURCE = Path(__file__).parents[1]
+# `research/` comes along: several tests replay committed evidence, and a
+# sandbox without it would fail them for a missing file, which reads as a kill
+# no matter what the mutation did.
 IGNORED = shutil.ignore_patterns(
     ".git",
     ".pytest_cache",
@@ -29,7 +32,6 @@ IGNORED = shutil.ignore_patterns(
     "__pycache__",
     "dist",
     "live-work",
-    "research",
 )
 
 
@@ -179,6 +181,28 @@ MUTATIONS = (
         "        return float(-baseline), float(1 - baseline)",
         "        return float(-baseline), float(-baseline)",
         ("tests/test_paired.py",),
+    ),
+    Mutation(
+        "spend_audit_trusts_the_recorded_dollar_figures",
+        "research/spend-audit-20260803/audit_spend.py",
+        "        payments[_unit_key(record)] = meter(\n"
+        "            record.reported_model,\n"
+        "            prompt_tokens=record.prompt_tokens,\n"
+        "            completion_tokens=record.completion_tokens,\n"
+        "        )",
+        "        payments[_unit_key(record)] = MeteredUsage(\n"
+        "            prompt_tokens=record.prompt_tokens,\n"
+        "            completion_tokens=record.completion_tokens,\n"
+        "            cost_usd=record.estimated_cost_usd,\n"
+        "        )",
+        ("tests/test_spend_ledger.py",),
+    ),
+    Mutation(
+        "spend_audit_counts_replayed_episodes_again",
+        "research/spend-audit-20260803/audit_spend.py",
+        "    if key in spec.superseded_units:",
+        "    if True:",
+        ("tests/test_spend_ledger.py",),
     ),
 )
 

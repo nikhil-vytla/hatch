@@ -475,7 +475,7 @@ Encodings, strongest rung available for each:
 - `paired.py` holds the source-clustered paired-bounds math that a driver had
   reimplemented line-for-line. It decides nothing: no threshold, no action, no
   power verdict.
-- `tests/test_mutation_gauntlet.py` is a committed gauntlet, 17 mutants over
+- `tests/test_mutation_gauntlet.py` is a committed gauntlet, 19 mutants over
   delivery, admission, metering, the wire boundary, the arm cache key, the
   evidence lock, preflight and paired bounds. Run it with `pytest -m mutation`.
 
@@ -509,3 +509,35 @@ literals. Both now go through `strip_json_fence` and `pricing_for`. Its
 budget-based `StagePricing` estimator keeps its own shape, because it prices a
 worst case from a token budget rather than metering spend that happened; only
 its rates come from the canonical table. Two gauntlet mutants cover both.
+Follow-ups after PR #30 merged, 2026-08-03 late:
+
+- `report.py` now calls `paired.py`. The decision gate that had entangled that
+  block with report-local state is gone, so the last copy of the paired math
+  went with it: 41 lines out, 18 in, and regenerating the flagship experiment
+  report reproduces every field bit-for-bit except the `powered` flag that #30
+  deleted. `paired_bounds` takes a `TypeVar` bound to `str` for its source key,
+  because `Mapping` is invariant in its key and `report.py` keys by `SourceId`.
+- Audited what the paid runs actually cost, in `research/spend-audit-20260803/`.
+  The short version: round 1 is overstated on record ($1.669650 written,
+  $0.518250 true), round 2's widely quoted $2.972512 is correct and
+  token-derived, the single-vs-evolved $1.219080 is correct but its unmetered
+  band was retired-rate-derived ($0.31-0.52, not $0.40-0.80), and the
+  checkpoint slice's $0.281291 is correct. Total: $4.991133 metered,
+  $5.30-$5.53 all-in.
+- Two things made this worth encoding as a script rather than a paragraph.
+  Receipts cannot be summed, because several were written at retired rates and
+  because a resume replays cached episodes into a new file, so a naive sum over
+  all evidence gives $14.381233 against a true $4.991133. `audit_spend.py`
+  therefore re-meters from retained tokens only, and asserts each replay
+  relation instead of assuming it: if a supposed replay's token counts moved, it
+  re-paid, and the audit fails rather than merging the rows.
+- Zero-token rows needed reading one by one. Round 1's preflight failures and
+  round 2's leak-scan and Docker-disk failures aborted before inference and cost
+  nothing. The single-vs-evolved run-1 rows recorded zero on episodes that had
+  already run and been billed, because the pre-fix failure path raised before
+  capturing usage. Only that one is an unmetered gap.
+- The gauntlet gained two mutants over the audit itself (trust the recorded
+  dollars; count replayed episodes again) and now copies `research/` into its
+  sandbox. It had been excluding it, which meant every evidence-replay test
+  failed for a missing file inside the sandbox and read as a kill regardless of
+  what the mutation did. 21 mutants, all killed.
