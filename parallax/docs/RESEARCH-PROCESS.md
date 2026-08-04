@@ -129,7 +129,7 @@ identification bounds below.
 ### The report and its decision
 
 For each (source, trial) unit the report takes the paired difference in pass
-indicators, evolved minus matched, so the estimand lives in \([-1, 1]\).
+indicators, evolved minus matched, so the estimand lives in $[-1, 1]$.
 Differences are averaged within each source task and then across source
 tasks, so sources with more trials do not dominate. When either side of a
 pair is a run failure, that unit contributes its worst-case and best-case

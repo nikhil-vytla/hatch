@@ -49,13 +49,31 @@ def test_agent_compiler_byte_scan_rejects_sealed_fragment() -> None:
     leaked_public = task.public.model_copy(
         update={
             "source": task.public.source.model_copy(
-                update={"problem_statement": task.sealed.fail_to_pass[0]}
+                update={"problem_statement": task.sealed.test_patch}
             )
         }
     )
 
     with pytest.raises(SealedLeakError, match="agent artifact"):
         compile_hud(task.model_copy(update={"public": leaked_public}), environment)
+
+
+def test_agent_compiler_allows_derived_fragment_already_public() -> None:
+    task, environment = freeze_swe_specs(family())
+    overlapping_public = task.public.model_copy(
+        update={
+            "source": task.public.source.model_copy(
+                update={"problem_statement": task.sealed.fail_to_pass[0]}
+            )
+        }
+    )
+
+    bundle = compile_hud(
+        task.model_copy(update={"public": overlapping_public}),
+        environment,
+    )
+
+    assert task.sealed.fail_to_pass[0].encode() in bundle.agent_artifacts[0].content
 
 
 def test_compiler_receipt_binds_specs_and_every_artifact() -> None:

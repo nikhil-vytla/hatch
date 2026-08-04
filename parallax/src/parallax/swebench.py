@@ -456,11 +456,15 @@ class SweScript(StrictModel):
     def aligned_budget(self) -> Self:
         if len(self.turns) != len(self.agent_steps):
             raise ValueError("turns and step allocations must align")
-        sealed = (
-            self.problem.verifier.test_patch,
-            *self.problem.verifier.fail_to_pass,
-            *self.problem.verifier.pass_to_pass,
+        derived = (
+            value
+            for value in (
+                *self.problem.verifier.fail_to_pass,
+                *self.problem.verifier.pass_to_pass,
+            )
+            if value not in self.problem.problem_statement
         )
+        sealed = (self.problem.verifier.test_patch, *derived)
         if any(value and value in turn.text for value in sealed for turn in self.turns):
             raise ValueError("agent turn contains sealed verifier material")
         return self
