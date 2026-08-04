@@ -1,21 +1,18 @@
-The preregistered single-vs-evolved experiment ran to completion: 3 admitted
-SWE-bench Verified boundary instances x 2 conditions x 3 paired trials, all
-18 units verified by the pinned [official SWE-bench
-harness](https://github.com/SWE-bench/SWE-bench) with Claude Opus 4.8 driven
-through [HUD](https://hud.so)'s gateway under harness-owned turn delivery.
-The paired single-minus-evolved pass-rate delta is +0.111 with
-identification bounds [0.111, 0.111] and a minimum detectable effect of
-1.57 over three source clusters — bounds-only, no advance/reject claim.
-Getting there surfaced and fixed two real defects (strict-mode rejection of
-JSON-wire delivery receipts; hud 0.6.12's 64 KiB frame limit destroying
-paid episodes) and one HUD gateway instability window, each preserved as
-failure evidence. Unique metered spend was $1.22 against the $2.73
-estimate.
+After three infrastructure-defeated sessions (a strict-validation bug on
+the delivery-receipt wire, a 64 KiB asyncio frame limit in the pinned
+[hud SDK](https://pypi.org/project/hud/), and an evening of HUD gateway
+connection drops), the preregistered 18-unit single-vs-evolved SWE-bench
+experiment completed with every unit verified by the pinned
+[official SWE-bench harness](https://github.com/SWE-bench/SWE-bench) and
+every evolved episode carrying a complete two-phase delivery receipt. The
+recovery replayed 13 cached paid episodes with no new inference,
+re-graded one blemished astropy unit from its cached episode, and re-ran
+five xarray casualties as fresh episodes under sleep protection. Paired
+single-minus-evolved pass-rate delta is +0.111 with degenerate bounds but
+a source-clustered MDE of 1.57, so the result is bounds-only and far from
+powered; unique metered spend across all sessions was $1.22.
 
-- Per-instance static-vs-evolved pass rates: astropy 2/3 vs 1/3, django 3/3
-  vs 3/3, xarray 0/3 vs 0/3.
-- All nine evolved delivery receipts show both scripted phases delivered
-  (6+6 steps, no early-submission skips), confirming the manipulation
-  landed in every evolved episode.
-- The evolved condition was cheaper than static ($0.538 vs $0.567), so the
-  preregistered 2x evolved cost multiplier was ~2x conservative.
+- All six failure receipts are dispositioned: superseded by recovery,
+  except run 1's ~$0.40-0.80 of unmetered spend, which stands.
+- Condition-level outcomes: astropy 2/3 vs 1/3, django 3/3 vs 3/3,
+  xarray 0/3 vs 0/3 (static vs evolved).
