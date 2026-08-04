@@ -5,7 +5,8 @@ per-stage delivery/receipt chain for both arms, and emits the per-seed
 per-arm per-stage outcome table plus the paired evolved-vs-carry
 contrast the preregistration calls for.
 
-Run from `parallax/`:
+Run from `parallax/` (optional second argument: family fixture path,
+defaults to the original seed family):
 
     uv run python research/checkpoint-evolution-slice/summarize_screening.py \
         research/checkpoint-evolution-slice/evidence/screening.jsonl
@@ -24,7 +25,7 @@ from parallax.checkpoint_runner import (
     CeRunRecord,
 )
 
-SEED_PATH = Path(__file__).parent.parent.parent / (
+DEFAULT_SEED_PATH = Path(__file__).parent.parent.parent / (
     "tests/fixtures/checkpoint_family.json"
 )
 
@@ -42,13 +43,13 @@ def stage_label(receipt) -> str:
     return "fail"
 
 
-def main(evidence_path: Path) -> None:
+def main(evidence_path: Path, seed_path: Path = DEFAULT_SEED_PATH) -> None:
     lines = evidence_path.read_text().splitlines()
     manifest = CeManifestRecord.model_validate_json(lines[0])
     family_record = CeFamilyRecord.model_validate_json(lines[1])
     runs = [CeRunRecord.model_validate_json(line) for line in lines[2:]]
 
-    fixture = load_seed_family(SEED_PATH)
+    fixture = load_seed_family(seed_path)
     reference_digests = [stage.digest for stage in fixture.references.stages]
     empty_digest = EMPTY_WORKSPACE.digest
     total_stages = len(fixture.family.checkpoints)
@@ -186,4 +187,7 @@ def main(evidence_path: Path) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    if len(sys.argv) > 2:
+        main(Path(sys.argv[1]), Path(sys.argv[2]))
+    else:
+        main(Path(sys.argv[1]))

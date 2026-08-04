@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import subprocess
 import sys
 import tempfile
@@ -520,6 +521,55 @@ def _gate_no_op(family: CheckpointFamily, references: ReferenceBuild) -> GateRes
         passed=True,
         detail="every checkpoint fails on the prior stage's reference workspace",
     )
+
+
+class BudgetMatchingError(ValueError):
+    pass
+
+
+BUDGET_HEADROOM_FACTOR = 2.0
+
+
+def budget_headroom_violations(
+    family: CheckpointFamily,
+    references: ReferenceBuild,
+    *,
+    factor: float = BUDGET_HEADROOM_FACTOR,
+) -> tuple[str, ...]:
+    """Detect stage budgets that leave the arms effectively unmatched.
+
+    With full-file-map replies, the evolved arm must re-emit a carried
+    workspace whose only bound is the *previous* stage's cap, so the
+    budget guaranteed to remain for new stage content is the cap
+    increment, not the cap itself. Flat caps guarantee zero increment: a
+    workspace that legally filled stage i-1 cannot grow at all at stage
+    i, while the carry-reference arm always restarts from the lean
+    reference — nominally matched budgets, effectively unmatched arms.
+
+    A family is headroom-clean when the stage-1 cap covers `factor`
+    times the stage-1 reference and every later cap increment covers
+    `factor` times the reference increment. This is a floor that keeps
+    failure from being built into the design, not a success guarantee.
+    """
+    violations: list[str] = []
+    previous_cap = 0
+    previous_reference = 0
+    for checkpoint, reference in zip(
+        family.checkpoints, references.stages, strict=True
+    ):
+        increment = checkpoint.max_output_bytes - previous_cap
+        required = math.ceil(
+            factor * max(0, reference.content_bytes - previous_reference)
+        )
+        if increment < required:
+            violations.append(
+                f"stage {checkpoint.index}: cap increment {increment} is "
+                f"below the required {required} bytes ({factor:g}x the "
+                f"reference increment)"
+            )
+        previous_cap = checkpoint.max_output_bytes
+        previous_reference = reference.content_bytes
+    return tuple(violations)
 
 
 def admit_family(
