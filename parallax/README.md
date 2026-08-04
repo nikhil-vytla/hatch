@@ -5,6 +5,10 @@ turning them into research questions about agent training and RL environments,
 synthesizing novel or harder but verifiable tasks from existing benchmarks and
 codebases, and running controlled experiments with trustworthy evidence.
 
+For a concrete start-to-finish picture — what you put in, what you run, and
+what artifacts come out of each implemented flow — read
+[`docs/PIPELINES.md`](docs/PIPELINES.md) first.
+
 The executable slice follows one complete path:
 
 1. `gsm8k.py` loads real-shaped GSM8K JSONL and retains the canonical

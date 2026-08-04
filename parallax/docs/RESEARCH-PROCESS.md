@@ -5,7 +5,10 @@ process: what problem the harness solves, how one experiment moves from an
 observed agent failure to a bounded finding, how to rerun the evidence, and
 where the honest limits are. It assumes no prior context. The vocabulary it
 uses is defined in [`MODEL.md`](MODEL.md); the strategy it walks through is
-specified in [`methods/evolving-intent.md`](methods/evolving-intent.md).
+specified in [`methods/evolving-intent.md`](methods/evolving-intent.md). If
+you want the concrete version first — real inputs, exact commands, real
+output artifacts for every implemented flow — start with
+[`PIPELINES.md`](PIPELINES.md) and come back here for the reasoning.
 
 ## The problem Parallax solves
 
