@@ -6,11 +6,20 @@ from pathlib import Path
 
 import pytest
 
+from parallax.checkpoint_evolution import (
+    SeedFamilyFixture,
+    Workspace,
+    admit_family,
+    load_seed_family,
+)
+from parallax.checkpoint_runner import AdmittedFamily
 from parallax.evolving_intent import Message, ScriptFamily, build_script_family
 from parallax.gsm8k import Problem, load_gsm8k
 from parallax.types import SourceId
 
 FIXTURE = Path(__file__).parent / "fixtures" / "gsm8k.jsonl"
+CHECKPOINT_FIXTURE = Path(__file__).parent / "fixtures" / "checkpoint_family.json"
+TOTAL_LINE = "print(sum(count for _, count in records))"
 SOURCE_FUNCTION = "calculate daily egg-sale revenue"
 PREDECESSOR = "calculate eggs available to sell"
 SOURCE_ARGUMENTS = (
@@ -149,3 +158,26 @@ def make_family(
 @pytest.fixture
 def family() -> ScriptFamily:
     return make_family()[0]
+
+
+def broken_total_workspace(stage_workspace: Workspace) -> Workspace:
+    content = stage_workspace.files[0].content
+    if content.count(TOTAL_LINE) != 1:
+        raise AssertionError("reference workspace shape drifted")
+    return Workspace.from_files(
+        {"tally.py": content.replace(TOTAL_LINE, TOTAL_LINE[:-1] + " + 1)")}
+    )
+
+
+@pytest.fixture(scope="session")
+def seed_fixture() -> SeedFamilyFixture:
+    return load_seed_family(CHECKPOINT_FIXTURE)
+
+
+@pytest.fixture(scope="session")
+def admitted(seed_fixture: SeedFamilyFixture) -> AdmittedFamily:
+    return AdmittedFamily(
+        family=seed_fixture.family,
+        references=seed_fixture.references,
+        admission=admit_family(seed_fixture.family, seed_fixture.references),
+    )

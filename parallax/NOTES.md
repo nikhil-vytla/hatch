@@ -339,14 +339,74 @@
   construction request returned HTTP 403 before any response. The stop rule
   terminated screening at zero recorded tokens and $0 estimated spend.
 
+## Checkpoint-evolution slice
+
+- Implemented the second synthesis strategy as an offline vertical slice:
+  `checkpoint_evolution.py` (workspace/checkpoint/sealed-case domain model,
+  entrypoint-only subprocess verifier with strict/isolated/core verdicts,
+  five executable admission gates) and `checkpoint_runner.py`
+  (harness-owned checkpoint delivery, `evolved` and `carry-reference`
+  arms, digest-chained stage receipts, preregistered manifest, canonical
+  evidence JSONL). Design inputs: `research/slopcodebench-method/` and
+  `docs/methods/checkpoint-evolution.md`, now updated to as-implemented.
+- Obligations accumulate monotonically (Ω_i = Ω_{i-1} ∪ T_i) with
+  automatic regression reclassification; strict grading gates stage N on
+  stages 1..N-1 still passing. `include_prior_tests: false` is not
+  representable.
+- Delivery is unskippable by construction: agents are pure functions of
+  (public spec, carried workspace, budget); `FamilyRun` validators reject
+  skipped, reordered, or spec-drifted delivery, broken workspace-digest
+  chains, and censoring that is not exactly the undelivered suffix.
+  Unadmitted families are unrepresentable to the runner.
+- Seed family `ce-tally-1` (3 checkpoints, 10 sealed cases, hand-verified
+  incremental references) admits under all five gates; vacuous, broken,
+  misaligned, and leaky variants reject with recorded per-gate detail.
+- Declared interpretations: Python-track entrypoint pin, per-case fresh
+  materialization, oversized-return-as-budget-RunFailure, empty
+  dependency manifest, single reference build. Deferred: quality
+  measurement (all classes), `monolithic`/`foresight`/`repair-scheduled`
+  arms, synthesis pipeline S1–S6 with gates G3/G4/G6, CE report module,
+  real-agent sandboxing.
+- Certification: 153 tests in normal and optimized Python, Ruff lint and
+  format, `uvx ty check src`, `compileall`, source and wheel builds, and
+  a 14-mutant behavioral gauntlet fully killed (checkpoint-skip,
+  obligation-drop, role-mislabel, gate-inversion, chain-break, censoring,
+  digest-binding). No provider call or paid episode ran.
+
+## Checkpoint-evolution screening prerequisites
+
+- Implemented both preregistration blockers without touching the frozen
+  harness semantics: `checkpoint_agent.py` (provider adapter:
+  spec+workspace rendered to the existing HUD-gateway boundary, strict
+  JSON file-map parse with exact-fence tolerance, per-stage token/cost
+  metering into `StageReceipt.usage` even on post-spend failures,
+  truncation → budget RunFailure, model-drift/unmeterable replies →
+  agent RunFailures) and `checkpoint_sandbox.py` (every sealed case in a
+  disposable digest-pinned `python@sha256:57cd7c…` container,
+  `linux/amd64`, no network, read-only rootfs except the working
+  directory, non-root user, CPU/memory/pid limits, in-container case
+  timeout stays a case failure, docker faults are verifier RunFailures).
+- `checkpoint_screening.py` drives the preregistered design in two
+  modes: an offline dry run (scripted gateway transport, no key, no
+  spend — evidence committed for the full 10-seed shape and for a
+  sandbox-routed variant) and the live run (spend approval + $5 hard
+  cap enforced before and during, mandatory sandbox with no host
+  fallback, execution identity bound into the evidence digests).
+- Certification: 197 tests in normal and optimized Python (including
+  real-container integration probes for network/rootfs containment),
+  Ruff, ty, compileall, builds, and the gauntlet extended to 24 mutants
+  (sandbox-bypass, isolation-drop, timeout-reclassify, metering-drop,
+  fence-unwrap-drop, approval-drop all killed). Still no paid call: the
+  screening awaits user approval and a rotated HUD key.
+
 ## Power gate removed
 
 - An adversarial audit found the `powered`/`action` gate unreachable at every
-  scale this harness can run, reversing the decision recorded two sections
-  above. Screening's half-width is `sqrt(ln 40 / 2n)`, so the 0.2 tolerance
-  needs 47 source clusters and rounds ran 5 to 6. The report's half-width is
-  `sqrt(2 ln 40 / n)`, needing 185 clusters against a published admissible
-  pool of 50. `advance` and `reject` were therefore dead states, the
+  scale this harness can run, reversing the decision recorded under "Screening
+  boundary revision". Screening's half-width is `sqrt(ln 40 / 2n)`, so the 0.2
+  tolerance needs 47 source clusters and rounds ran 5 to 6. The report's
+  half-width is `sqrt(2 ln 40 / n)`, needing 185 clusters against a published
+  admissible pool of 50. `advance` and `reject` were therefore dead states, the
   preregistered `threshold` never influenced an output, and every run was
   condemned to `inconclusive`/`underpowered` by arithmetic rather than by
   evidence.
@@ -366,6 +426,6 @@
   its pasted output was regenerated by running it. `analyze_experiment.py`
   carried its own `MAXIMUM_DECISION_MDE` and `powered` flag, now deleted; its
   committed `experiment-report.json` keeps the old `powered` key, so the script
-  no longer reproduces that file byte-for-byte. `admission.py` and
-  `delivery.py` are clean — their `advance_trigger` names describe turn
-  delivery, not a statistical decision.
+  no longer reproduces that file byte-for-byte. `admission.py`, `delivery.py`,
+  and the checkpoint-evolution modules are clean — the `advance_trigger` names
+  in delivery describe turn scheduling, not a statistical decision.
