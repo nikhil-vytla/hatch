@@ -251,7 +251,7 @@ def case(
 ) -> SealedCase:
     return SealedCase(
         case_id=case_id,
-        category=category,  # type: ignore[arg-type]
+        category=category,
         argv=argv,
         stdin_text=stdin_text,
         input_files=tuple(
