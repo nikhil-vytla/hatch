@@ -15,7 +15,6 @@ EVIDENCE = ROOT / "evidence"
 EXPERIMENT = EVIDENCE / "experiment.jsonl"
 LINKAGE = EVIDENCE / "preregistration-linkage.json"
 REPORT = EVIDENCE / "experiment-report.json"
-MAXIMUM_DECISION_MDE = 0.2
 EXPECTED_PHASE_BUDGETS = {"static": (12,), "evolved": (6, 6)}
 
 
@@ -174,7 +173,6 @@ def main() -> None:
         max(-1.0, identification[0] - epsilon),
         min(1.0, identification[1] + epsilon),
     )
-    powered = epsilon <= MAXIMUM_DECISION_MDE
 
     spend = {
         "total_usd": sum(run.estimated_cost_usd for run in runs),
@@ -222,7 +220,6 @@ def main() -> None:
                 "lower": interval[0],
                 "upper": interval[1],
                 "minimum_detectable_effect": epsilon,
-                "powered": powered,
             },
             "language": "bounds_only",
         },

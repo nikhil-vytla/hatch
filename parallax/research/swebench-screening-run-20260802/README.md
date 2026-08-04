@@ -4,8 +4,9 @@ The five-instance, two-trial static screening completed under the \$5 cap.
 Docker Desktop ran the official amd64 SWE-bench images under emulation, HUD
 served Claude Haiku 4.5 construction and Claude Opus 4.8 episodes, and stored
 candidate patches were graded evaluator-side by the pinned official harness.
-The small design found two ceiling instances and three floor instances, but it
-is underpowered and makes no advance/reject decision.
+The small design found two ceiling instances and three floor instances. At five
+sources its interval is the whole estimand, so it locates operating points and
+nothing else.
 
 ## Finding dispositions
 
@@ -84,8 +85,8 @@ by digest before a comparative experiment.
 - Outcomes: Astropy 0/2, Django 10914 2/2, Django 13089 2/2, Matplotlib 0/2,
   Requests 0/2.
 - Operating points: floor, ceiling, ceiling, floor, floor respectively.
-- Statistical result: underpowered, interval [0, 1], MDE 0.607361, no
-  advance/reject decision.
+- Statistical result: interval [0, 1], minimum detectable effect 0.607361. The
+  interval spans every value the estimand can take.
 - Known metered spend: \$1.669650. Three failed construction responses have
   unavailable usage and a \$0.477790 conservative reserve, so the all-in upper
   bound is \$2.147440.

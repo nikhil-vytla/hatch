@@ -49,8 +49,7 @@
   untracked additions. The official harness supersedes the flawed test restore
   and process-return-code grader.
 - Small-n reporting now exposes its Hoeffding interval and
-  minimum-detectable-effect and remains `inconclusive`/`underpowered` until the
-  source-cluster count supports the declared maximum MDE.
+  minimum-detectable-effect, so a reader can see how little the design resolves.
 - Added paid-stage receipts before official grading, official report/image/
   harness commitments, and preservation of paid usage on verifier failures.
 - Resolved immutable image manifests for five screening instances. HUD model
@@ -160,8 +159,8 @@
   repeated inference.
 - Final outcomes: Astropy 0/2, Django 10914 2/2, Django 13089 2/2,
   Matplotlib 0/2, and Requests 0/2. The operating point is floor, ceiling,
-  ceiling, floor, floor. The design remains underpowered: interval [0, 1],
-  MDE 0.607361, no advance/reject decision.
+  ceiling, floor, floor. Interval [0, 1], minimum detectable effect 0.607361,
+  which is to say the design resolves nothing.
 - Known metered spend is \$1.669650 (\$0.143625 construction plus \$1.526025
   episodes). Three failed construction responses did not retain usage; their
   conservative reserve is \$0.477790. The all-in conservative bound is

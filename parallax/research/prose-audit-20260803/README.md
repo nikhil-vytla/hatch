@@ -19,6 +19,13 @@ Structurally: four unbacked mutation-testing certifications marked
 unreproducible, six stale claims corrected, one collapsed NOTES/README trio, and
 one surviving `\(...\)` LaTeX delimiter converted.
 
+After [PR #30](https://github.com/nikhil-vytla/hatch/pull/30) merged, the
+decision-gate prose this pass had flagged rather than rewritten was deleted.
+Intervals and minimum detectable effects stayed as measurements. The
+`underpowered` and `advance/reject` verdicts computed against them went, since
+the code that computed them is gone. `parallax/NOTES.md` keeps its record of
+building the gate, because #30 appended the entry that reverses it.
+
 ## Tools
 
 - [`check_markdown.py`](check_markdown.py) walks a directory and fails on broken

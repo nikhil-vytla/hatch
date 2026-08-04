@@ -2,4 +2,4 @@ An unslop pass over all 45 markdown files under `parallax/` removed 396 em dashe
 
 - Money and math collide on GitHub: `(\$0.1721 vs \$0.1092)` renders as LaTeX, so every `$` followed by a digit is escaped across 23 files.
 - Writing the findings index honestly exposed that no flow has both a complete design and evidence at a resolving scale, which was easy to miss while it was spread across four folders.
-- Prose describing the decision gate that [PR #30](https://github.com/nikhil-vytla/hatch/pull/30) deletes was flagged rather than polished, since rewriting text scheduled for deletion is wasted work.
+- Prose describing the decision gate was flagged rather than polished while [PR #30](https://github.com/nikhil-vytla/hatch/pull/30) was open, then deleted once #30 merged. Intervals and minimum detectable effects stayed, since those are measurements; the advance/reject verdicts computed against them named a procedure that no longer exists.

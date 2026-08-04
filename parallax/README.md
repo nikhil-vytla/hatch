@@ -27,11 +27,12 @@ The GSM8K path is offline, deterministic, and complete:
    matched to evolved on turn count and budget.
 3. `runner.py` preregisters source-trial units and identity digests, executes
    every scheduled arm, and writes deterministic JSONL through atomic
-   replacement.
+   replacement. Construction attempts and scripts appear once per source.
 4. `report.py` validates every scheduled row before aggregating, then reports the
    paired matched-versus-evolved difference, its identification bounds, a
    closed-form 95% source-clustered Hoeffding interval, and the minimum
-   detectable effect. It states what the design resolved and stops there.
+   detectable effect. It states what the design resolved and stops there. No
+   verdict.
 
 The SWE-bench Verified path runs against a real provider and the official
 harness:
@@ -59,8 +60,9 @@ harness:
    FAIL_TO_PASS and PASS_TO_PASS sets.
 6. `screening.py` preregisters units and canonical outcomes before execution,
    appends and fsyncs each unit to a resumable partial file, records provider
-   model, usage, and estimated cost, refuses to overwrite completed evidence, and
-   defaults to a \$5 cap.
+   model, usage, and estimated cost, refuses to overwrite completed evidence,
+   defaults to a \$5 cap, and reports the design's source-clustered interval and
+   minimum detectable effect.
 7. `admission.py` runs schema, sealed-leakage, identity-patch, gold-patch,
    budget-match, and arm-completeness gates before a family can be scheduled.
 

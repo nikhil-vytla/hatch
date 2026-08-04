@@ -18,7 +18,7 @@ Every manifest was canonical and fsynced before paid execution. Every episode
 recorded the provider-reported model and token usage. Candidate patches were
 graded evaluator-side with official SWE-bench revision
 `f7bbbb2ccdf479001d6467c9e34af59e44a840f9` and digest-pinned official images.
-These small screens remain underpowered and make no advance/reject claim.
+These are screens, not comparisons. They locate operating points.
 
 ## Outcomes
 

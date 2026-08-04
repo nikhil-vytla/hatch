@@ -22,7 +22,6 @@ from parallax.runner import (
     RunFailure,
     RunRecord,
     RunResult,
-    Threshold,
     read_run_jsonl,
     run_experiment,
 )
@@ -41,7 +40,6 @@ def run(
     path: Path,
     *,
     seeds: tuple[int, ...] = (11, 12),
-    threshold: float = 0.1,
 ) -> tuple[RunResult, ...]:
     return run_experiment(
         families,
@@ -49,7 +47,6 @@ def run(
         trial_seeds=seeds,
         agent_model="offline-agent",
         model_config={"temperature": 0, "provider": "scripted"},
-        threshold=threshold,
         output_path=path,
     )
 
@@ -106,16 +103,10 @@ def test_canonical_json_rejects_nonfinite_numbers() -> None:
         canonical_bytes({"value": float("nan")})
 
 
-def test_threshold_model_rejects_nonfinite_numbers() -> None:
-    with pytest.raises(ValidationError, match="finite number"):
-        TypeAdapter(Threshold).validate_python(float("nan"))
-
-
 def test_manifest_requires_scheduled_units() -> None:
     model_digest = ModelConfigDigest("0" * 64)
     body = {
         "schema_version": 1,
-        "threshold": 0.0,
         "model_config_digest": model_digest,
         "units": [],
         "arm_config_digests": [],
@@ -123,7 +114,6 @@ def test_manifest_requires_scheduled_units() -> None:
 
     with pytest.raises(ValidationError, match="at least 1 item"):
         ManifestRecord(
-            threshold=0.0,
             design_digest=DesignDigest(canonical_digest(body)),
             model_config_digest=model_digest,
             units=(),
@@ -142,7 +132,7 @@ def test_evidence_and_report_are_byte_stable_and_order_invariant(
     assert first.read_bytes() == second.read_bytes()
     assert (
         hashlib.sha256(first.read_bytes()).hexdigest()
-        == "d5e3e23d91d8bfdfaa29e5ed968e9565c80519d65cd3335a042da99fc1787eff"
+        == "9ee049a877ee3ddc92c8580120f6ed9405892eaee69e7ee614be3baa5c105d22"
     )
     records = read_run_jsonl(first)
     assert sum(record.kind == "manifest" for record in records) == 1
@@ -275,11 +265,12 @@ def test_rates_complete_difference_and_identification_bounds(
 def test_source_clustered_hoeffding_golden(tmp_path: Path) -> None:
     families = tuple(make_family(source_id=f"source-{index}")[0] for index in range(50))
     evidence = tmp_path / "fifty.jsonl"
-    run(families, history_factory, evidence, seeds=(0, 1, 2), threshold=0.0)
+    run(families, history_factory, evidence, seeds=(0, 1, 2))
     report = report_from_jsonl(evidence, tmp_path / "fifty-report.json")
 
     assert report["interval"]["lower"] == -0.38412911652796833
     assert report["interval"]["upper"] == 0.38412911652796833
+    assert report["interval"]["minimum_detectable_effect"] == 0.38412911652796833
     assert report["population"]["source_clusters"] == 50
 
     positive = list(read_run_jsonl(evidence))
@@ -302,22 +293,36 @@ def test_source_clustered_hoeffding_golden(tmp_path: Path) -> None:
             )
     positive_report = build_report(tuple(positive))
     negative_report = build_report(tuple(negative))
-    assert positive_report["action"] == "inconclusive"
-    assert negative_report["action"] == "inconclusive"
-    assert not positive_report["interval"]["powered"]
-    assert not negative_report["interval"]["powered"]
+    assert positive_report["difference"] == 1.0
+    assert negative_report["difference"] == -1.0
+    assert positive_report["interval"] == {
+        "confidence": 0.95,
+        "method": "source_clustered_hoeffding",
+        "epsilon": 0.38412911652796833,
+        "lower": 0.6158708834720317,
+        "minimum_detectable_effect": 0.38412911652796833,
+        "upper": 1.0,
+    }
+    assert negative_report["interval"] == {
+        "confidence": 0.95,
+        "method": "source_clustered_hoeffding",
+        "epsilon": 0.38412911652796833,
+        "lower": -1.0,
+        "minimum_detectable_effect": 0.38412911652796833,
+        "upper": -0.6158708834720317,
+    }
 
 
 def test_single_source_interval_is_uninformative(tmp_path: Path) -> None:
     family, _ = make_family()
     evidence = tmp_path / "single.jsonl"
-    run((family,), history_factory, evidence, seeds=(0,), threshold=0.0)
+    run((family,), history_factory, evidence, seeds=(0,))
 
     report = report_from_jsonl(evidence, tmp_path / "single-report.json")
 
     assert report["interval"]["lower"] == -1.0
     assert report["interval"]["upper"] == 1.0
-    assert report["action"] == "inconclusive"
+    assert report["interval"]["minimum_detectable_effect"] == 2.716203031481239
 
 
 def test_seed_drift_names_key_and_both_seeds(
@@ -459,17 +464,3 @@ def test_jsonl_reader_rejects_nonobject_records(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="line 1"):
         read_run_jsonl(path)
-
-
-@pytest.mark.parametrize("threshold", [float("nan"), float("inf"), -1.1, 1.1])
-def test_invalid_threshold_is_rejected(
-    family: ScriptFamily, tmp_path: Path, threshold: float
-) -> None:
-    with pytest.raises(ValueError):
-        run(
-            (family,),
-            history_factory,
-            tmp_path / "invalid.jsonl",
-            seeds=(1,),
-            threshold=threshold,
-        )

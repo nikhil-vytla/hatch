@@ -25,13 +25,10 @@ from .types import (
     TrialSeed,
 )
 
-MAXIMUM_DECISION_MDE = 0.2
-
 
 def _manifest(
     record: ManifestRecord,
 ) -> tuple[
-    float,
     dict[tuple[SourceId, TrialIndex], tuple[SourceDigest, TrialSeed]],
     dict[tuple[SourceId, Arm], ArmConfigDigest],
 ]:
@@ -45,16 +42,12 @@ def _manifest(
     arm_digests = {
         (item.source_id, item.arm): item.digest for item in record.arm_config_digests
     }
-    return float(record.threshold), units, arm_digests
+    return units, arm_digests
 
 
 def _validated(
     records: tuple[EvidenceRecord, ...],
-) -> tuple[
-    float,
-    dict[tuple[SourceId, TrialIndex, str], RunRecord],
-    int,
-]:
+) -> tuple[dict[tuple[SourceId, TrialIndex, str], RunRecord], int]:
     manifests: list[ManifestRecord] = []
     families: list[FamilyRecord] = []
     runs: list[RunRecord] = []
@@ -70,7 +63,7 @@ def _validated(
     if len(manifests) != 1:
         raise ValueError("evidence must contain exactly one manifest")
     manifest = manifests[0]
-    threshold, units, arm_digests = _manifest(manifest)
+    units, arm_digests = _manifest(manifest)
     source_digests = {source: value[0] for (source, _), value in units.items()}
     seen_sources: set[SourceId] = set()
     for row in families:
@@ -118,7 +111,7 @@ def _validated(
     expected = {(source, trial, arm) for source, trial in units for arm in ARMS}
     if missing := expected - set(indexed):
         raise ValueError(f"missing_scheduled_rows: {sorted(missing)!r}")
-    return threshold, indexed, len(seen_sources)
+    return indexed, len(seen_sources)
 
 
 def _rates(
@@ -174,7 +167,7 @@ def _failure(outcome: Outcome) -> RunFailure:
 
 
 def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
-    threshold, rows, source_count = _validated(records)
+    rows, source_count = _validated(records)
     units = sorted({(source, trial) for source, trial, _ in rows})
     bounds: dict[SourceId, list[tuple[float, float]]] = defaultdict(list)
     complete: dict[SourceId, list[int]] = defaultdict(list)
@@ -219,17 +212,10 @@ def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
     ]
     difference = sum(source_means) / len(source_means) if source_means else None
     epsilon = math.sqrt(2 * math.log(40) / source_count)
-    powered = epsilon <= MAXIMUM_DECISION_MDE
     interval = (
         max(-1.0, identification[0] - epsilon),
         min(1.0, identification[1] + epsilon),
     )
-    action = "inconclusive"
-    if powered:
-        if interval[0] >= threshold:
-            action = "advance"
-        elif interval[1] < threshold:
-            action = "reject"
     return {
         "population": {
             "source_clusters": source_count,
@@ -249,7 +235,6 @@ def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
             "epsilon": epsilon,
             "lower": interval[0],
             "minimum_detectable_effect": epsilon,
-            "powered": powered,
             "upper": interval[1],
         },
         "missing_pairs": {
@@ -263,8 +248,6 @@ def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
             },
             "failure_reasons": dict(sorted(reasons.items())),
         },
-        "threshold": threshold,
-        "action": action,
     }
 
 

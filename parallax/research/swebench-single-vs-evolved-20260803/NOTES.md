@@ -179,8 +179,8 @@ No experiment unit had run before this unit.
   `evidence/cross-session-spend.json` is its output. Results: astropy static 2/3 vs evolved
   1/3; django 3/3 vs 3/3; xarray 0/3 vs 0/3. Paired single-minus-evolved
   point delta +0.111 with identification bounds [0.111, 0.111]; Hoeffding
-  epsilon 1.568 over 3 source clusters, minimum detectable effect 1.57,
-  underpowered, bounds-only. All 18 delivery receipts complete; all nine
+  epsilon 1.568 over 3 source clusters, minimum detectable effect 1.57, so the
+  interval is the whole estimand. All 18 delivery receipts complete; all nine
   evolved episodes consumed 6+6 steps with budget_exhaustion then
   terminal_budget_exhaustion, so the harness delivered the second turn in
   every evolved episode and no early submission ever skipped a phase.

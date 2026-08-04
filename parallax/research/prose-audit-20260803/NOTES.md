@@ -71,21 +71,40 @@ where they read as a record rather than a certification.
 - `research/upstream-design-audit/_summary.md` still recommended fixing the
   `advance()` tool that had already been deleted.
 
-## Flagged, not rewritten
+## Decision-gate prose: flagged, then deleted
 
-[PR #30](https://github.com/nikhil-vytla/hatch/pull/30) deletes the
-threshold/action/powered decision gate. Prose describing that procedure is
-describing code that is going away, so it was left alone rather than polished:
+The first pass left the threshold/action/powered decision-gate prose alone,
+because [PR #30](https://github.com/nikhil-vytla/hatch/pull/30) was open and
+about to delete the code underneath it. Polishing a description of code that is
+being removed is wasted work. #30 merged, so the second pass deleted it.
 
-- `docs/RESEARCH-PROCESS.md` lines 47-49, 63-64, 142-145, 178, 231
-- `docs/MODEL.md` line 138
-- `docs/PIPELINES.md` lines 63, 67, 108, 113 (the `threshold=0.1` snippet would
-  raise `TypeError` after #30 merges)
-- `docs/methods/evolving-intent.md` lines 235-236
-- `research/swebench-screening-round2-20260803/README.md` line 21 and the
-  `_summary.md` files for both screening rounds, which say "underpowered" and
-  "no advance/reject claim"
+#30 had already handled the `docs/` copies as part of its own change: the
+`advance`/`reject`/`inconclusive` rule in `RESEARCH-PROCESS.md`, the manifest
+threshold in `MODEL.md`, the `threshold=0.1` snippet and `report["action"]` print
+in `PIPELINES.md`, and the `underpowered` sentence in `evolving-intent.md`. Those
+came through the merge as #30's facts with my sentence shapes layered back on
+top.
 
-One exception: `README.md` step 4 described the decision procedure inside a
-description of what `report.py` does, so it was rewritten to the statistics that
-survive rather than left to rot.
+What was left for me was `research/`, where five documents still reported a
+verdict:
+
+- `swebench-screening-run-20260802/` README, NOTES, and `_summary.md`
+- `swebench-screening-round2-20260803/` README, NOTES, and `_summary.md`
+- `swebench-single-vs-evolved-20260803/` README, NOTES, and `_summary.md`
+
+The rule applied: an interval and a minimum detectable effect are measurements
+and stay. "Underpowered", "no advance/reject decision", and "the +/-0.2 decision
+threshold" name a procedure that no longer exists, so they go. Where deleting the
+verdict left a sentence with no point, the numbers say the same thing more
+directly: MDE 1.568 against an estimand bounded in [-1, 1] already tells you the
+design resolves nothing, and it does so without inventing a gate to fail.
+
+`parallax/NOTES.md` is the one place the old procedure still appears, and
+deliberately. #30 appended a "Power gate removed" entry that reverses an earlier
+entry by name. Deleting the earlier entry would leave the reversal pointing at
+nothing. A chronology that records a mistake and its correction is doing its job.
+
+Two verdicts that look similar and survive: the `admit`/`admit-with-notes`/
+`reject` outcome of task admission review, and the CE preregistration's
+proceed-or-fix-first rule, which keys on evidence completeness rather than on any
+statistic.

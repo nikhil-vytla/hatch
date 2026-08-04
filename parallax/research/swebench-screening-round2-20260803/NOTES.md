@@ -118,9 +118,8 @@
 - Actual token-metered spend: \$2.972512. The canonical component breakdown is
   in `round2-report.json`.
 - Recommendation: run the first real single-vs-evolved contrast on the three
-  Opus 4.8 boundary instances. Keep the preregistered small-run rule, so this
-  first contrast estimates direction and uncertainty but cannot claim
-  advance/reject unless its power calculation permits it.
+  Opus 4.8 boundary instances. At three source clusters it estimates direction
+  and uncertainty, and that is the whole of what it can do.
 
 ## Operational findings
 

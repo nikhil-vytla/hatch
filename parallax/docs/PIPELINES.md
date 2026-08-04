@@ -60,11 +60,10 @@ run_experiment(
     trial_seeds=(11, 12),
     agent_model="offline-scripted-agent",
     model_config={"provider": "scripted", "temperature": 0},
-    threshold=0.1,
     output_path=out / "evidence.jsonl",
 )
 report = report_from_jsonl(out / "evidence.jsonl", out / "report.json")
-print({key: report[key] for key in ("difference", "identification_bounds", "action")})
+print({key: report[key] for key in ("difference", "identification_bounds", "interval")})
 PY
 ```
 
@@ -105,17 +104,20 @@ Third, `/tmp/parallax-demo/report.json`. Real output:
 
 ```text
 {'difference': 0.0, 'identification_bounds': {'lower': 0.0, 'upper': 0.0},
- 'action': 'inconclusive'}
+ 'interval': {'confidence': 0.95, 'method': 'source_clustered_hoeffding',
+              'epsilon': 2.716203031481239, 'lower': -1.0,
+              'minimum_detectable_effect': 2.716203031481239, 'upper': 1.0}}
 ```
 
 **What you can conclude.** With a history-reading scripted agent every arm
-passes, the matched-vs-evolved difference is 0, and the report still refuses a
-decision: one source cluster is far below the power gate, so `action` is
-`inconclusive` by design. Swap `HistoryAgent` for `LastMessageAgent` and the
-multi-turn arms flip to `wrong`, which is history sensitivity in its crudest
-form, shown in `tests/test_end_to_end.py`. Nothing here is evidence about real
-models. What it demonstrates is what the harness records. Real experiments keep
-their evidence under `research/<investigation>/evidence/`.
+passes, the matched-vs-evolved difference is 0, and the interval resolves
+nothing: one source cluster gives a minimum detectable effect of 2.72 against an
+estimand bounded in [-1, 1], so the interval is the whole range. Swap
+`HistoryAgent` for `LastMessageAgent` and the multi-turn arms flip to `wrong`,
+which is history sensitivity in its crudest form, shown in
+`tests/test_end_to_end.py`. Nothing here is evidence about real models. What it
+demonstrates is what the harness records. Real experiments keep their evidence
+under `research/<investigation>/evidence/`.
 
 ## 2. Evolving Intent on SWE-bench Verified
 

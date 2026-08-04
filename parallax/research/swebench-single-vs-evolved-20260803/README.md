@@ -31,10 +31,9 @@ single-minus-evolved pass rate:
 - 9/9 pairs complete, so the identification bounds are degenerate at the
   point estimate: **+0.111** (source-level means +0.333, 0, 0).
 - The source-clustered Hoeffding MDE at 95% is **1.568** with only 3
-  sources, so the interval is the trivial [-1, 1]. The experiment is
-  nowhere near powered for the +/-0.2 decision threshold. Bounds-only
-  language applies: the data neither advances nor rejects either
-  condition; it only records these bounds.
+  sources, against an estimand bounded in [-1, 1], so the interval is the
+  whole range. The design cannot detect anything. These bounds are the
+  result; the point estimate on its own would be misleading.
 
 Delivery confirmation: every evolved episode carries a complete two-phase
 receipt (6+6 steps, `budget_exhaustion` then `terminal_budget_exhaustion`)
