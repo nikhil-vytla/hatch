@@ -1,22 +1,23 @@
-# Parallax pipelines: input → command → output
+# Parallax pipelines: input, command, output
 
-This document shows, start to finish, what actually happens when you use
-Parallax today. Each walkthrough names the concrete input, the exact command
-that exists in this repository, the artifacts that come out, and what you may
-conclude from them. The theory lives in [`MODEL.md`](MODEL.md) and
-[`RESEARCH-PROCESS.md`](RESEARCH-PROCESS.md); this page is only the
-mechanics. Where something is designed but not built, it says so.
+What actually happens when you use Parallax today. Each walkthrough names the
+concrete input, the exact command that exists in this repository, the artifacts
+that come out, and what you may conclude from them. Theory lives in
+[`MODEL.md`](MODEL.md) and [`RESEARCH-PROCESS.md`](RESEARCH-PROCESS.md); results
+live in [`FINDINGS.md`](FINDINGS.md). This page is only the mechanics. Where
+something is designed but not built, it says so.
 
 Three flows are implemented:
 
-1. [Evolving Intent on GSM8K](#1-evolving-intent-on-gsm8k) — offline, free,
+1. [Evolving Intent on GSM8K](#1-evolving-intent-on-gsm8k). Offline, free,
    copy-paste runnable right now.
-2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified)
-   — three paid stages already run once; real artifacts shown.
-3. [Checkpoint evolution](#3-checkpoint-evolution-landing-in-pr-27) — offline
-   slice landing in [PR #27](https://github.com/nikhil-vytla/hatch/pull/27).
+2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified).
+   Three paid stages, already run once, with the real artifacts shown.
+3. [Checkpoint evolution](#3-checkpoint-evolution-landing-in-pr-27). Offline
+   slice, still on [PR #27](https://github.com/nikhil-vytla/hatch/pull/27).
 
-The honest counterpart is [What is NOT automated yet](#what-is-not-automated-yet).
+Then [what is not automated yet](#what-is-not-automated-yet), which is the part
+worth reading before you believe any of the above scales.
 
 ## 1. Evolving Intent on GSM8K
 
@@ -67,9 +68,9 @@ print({key: report[key] for key in ("difference", "identification_bounds", "acti
 PY
 ```
 
-**What comes out.** First, the one source problem has become three arms — a
-single-turn baseline plus two nine-turn scripts that differ only in whether
-the intent evolves. Real output, evolved arm truncated:
+**What comes out.** First, the one source problem has become three arms: a
+single-turn baseline plus two nine-turn scripts that differ only in whether the
+intent evolves. Real output, evolved arm truncated:
 
 ```text
 --- static: 1 turn(s) ---
@@ -90,7 +91,7 @@ the intent evolves. Real output, evolved arm truncated:
   Correction: change eggs baked from 5 to 4.
 ```
 
-Second, `/tmp/parallax-demo/evidence.jsonl`: 8 canonical JSONL records — one
+Second, `/tmp/parallax-demo/evidence.jsonl`: 8 canonical JSONL records. One
 preregistered manifest, one family record (the only place the sealed `18`
 appears), and six run records (2 trials × 3 arms). A real run row, trimmed:
 
@@ -108,13 +109,13 @@ Third, `/tmp/parallax-demo/report.json`. Real output:
 ```
 
 **What you can conclude.** With a history-reading scripted agent every arm
-passes, the matched-vs-evolved difference is 0, and the report still refuses
-a decision: one source cluster is far below the power gate, so `action` is
+passes, the matched-vs-evolved difference is 0, and the report still refuses a
+decision: one source cluster is far below the power gate, so `action` is
 `inconclusive` by design. Swap `HistoryAgent` for `LastMessageAgent` and the
-multi-turn arms flip to `wrong` — the mechanics of history sensitivity, shown
-in `tests/test_end_to_end.py`. Nothing here is evidence about real models;
-that is exactly what this run demonstrates the harness records. Real
-experiments keep their evidence under `research/<investigation>/evidence/`.
+multi-turn arms flip to `wrong`, which is history sensitivity in its crudest
+form, shown in `tests/test_end_to_end.py`. Nothing here is evidence about real
+models. What it demonstrates is what the harness records. Real experiments keep
+their evidence under `research/<investigation>/evidence/`.
 
 ## 2. Evolving Intent on SWE-bench Verified
 
@@ -139,9 +140,9 @@ excerpt:
  "recommended_model": "claude-opus-4-8"}
 ```
 
-**Conclude:** three instances sit at the 2/3 pass boundary — solvable but not
-saturated, so an intent-evolution effect has room to show in either
-direction. Details in
+**Conclude:** three instances sit at the 2/3 pass boundary, solvable but not
+saturated, so an intent-evolution effect has room to show in either direction.
+Details in
 [`../research/swebench-screening-round2-20260803/README.md`](../research/swebench-screening-round2-20260803/README.md).
 
 ### 2b. Admission: gate the three instances (compute only)

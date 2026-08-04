@@ -5,17 +5,17 @@ interaction schedule changes. The model below fixes the vocabulary for
 implementations and experiments. It is a specification, not a theorem.
 
 The SWE-bench Verified scaffold instantiates $x_{\mathrm{pub}}$ as the issue,
-repository, base commit, and pinned dataset identity. Its
-$x_{\mathrm{seal}}$ contains the official image digest, test patch,
-FAIL_TO_PASS and PASS_TO_PASS tests, and harness revision. The dataset gold
-patch is discarded at ingestion.
+repository, base commit, and pinned dataset identity. Its $x_{\mathrm{seal}}$
+contains the official image digest, test patch, FAIL_TO_PASS and PASS_TO_PASS
+tests, harness revision, and the dataset gold patch, which the gold admission
+gate needs.
 
-The generated HUD image contains only $x_{\mathrm{pub}}$. It exports the
-agent's candidate patch to an evaluator process, which supplies
-$x_{\mathrm{seal}}$ to the pinned official SWE-bench harness in a separate
-official image. A `bubblewrap` Workspace and UID wall restrict the agent shell,
-but verifier secrecy does not depend on that wall because sealed fields are
-absent from the agent image.
+The generated HUD image contains only $x_{\mathrm{pub}}$. It exports the agent's
+candidate patch to an evaluator process, which supplies $x_{\mathrm{seal}}$ to
+the pinned official SWE-bench harness in a separate official image. A
+`bubblewrap` Workspace and UID wall restrict the agent shell, but verifier
+secrecy does not depend on that wall: the sealed fields are simply not in the
+agent image.
 
 ## Task and environment
 
@@ -126,8 +126,8 @@ matched or randomized according to the design.
 **Definition (run evidence).** Run evidence is the retained information needed
 to audit an outcome: arm assignment, source identity, admitted specifications,
 agent and environment versions, observations, actions, tool results, resource
-usage, verifier verdict, reward, and relevant randomness. This is a conceptual
-requirement.
+usage, verifier verdict, reward, and relevant randomness. This definition fixes
+what a slice must retain; each slice picks its own record shapes.
 
 > [!NOTE]
 > The GSM8K Evolving Intent slice represents its method-local task, intent,
@@ -135,7 +135,10 @@ requirement.
 > strict Pydantic models and deterministic JSONL. Discriminated unions make
 > event, outcome, and evidence-record variants explicit. The manifest fixes
 > expected source-trial units, seeds, model configuration, arm configuration,
-> and the decision threshold before outcomes are aggregated. The slice does
+> and the decision threshold before outcomes are aggregated. Those
+> representations are method-local: nothing in them generalizes to a second
+> strategy without a review.
+>
 > The SWE-bench slice adds versioned `TaskSpecV1` and `EnvSpecV1` models.
 > `TaskSpecV1` makes the public and sealed authority branches structural.
 > `compile_hud` creates agent artifacts only from the public branch and emits
@@ -168,7 +171,12 @@ strategies may transform different task or environment axes.
 
 > [!NOTE]
 > Checkpoint evolution is a separate strategy and state machine. It is not an
-> Evolving Intent stage and is not specified here.
+> Evolving Intent stage. Its states, guards, invariants, and arms are specified
+> in [`methods/checkpoint-evolution.md`](methods/checkpoint-evolution.md), not
+> here.
 
-> **TODO:** Specify checkpoint-evolution states, transition guards, admission
-> invariants, and controlled-arm semantics before implementing that strategy.
+> **TODO:** Checkpoint evolution needs two vocabulary extensions this document
+> does not yet carry: a family-valued $\mathcal G_\theta$ output whose members
+> are coupled by cross-episode persistent state, and monotonically accumulating
+> sealed authority. Both are currently stated locally in the method doc. Decide
+> whether they belong here before a third strategy needs them.
