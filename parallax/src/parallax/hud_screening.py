@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 from pathlib import Path
 from typing import Any, cast
@@ -18,6 +19,7 @@ from pydantic import Field
 from .canonical import atomic_write, canonical_bytes
 from .delivery import CompleteDeliveryReceiptV1, TurnDeliveryController
 from .hud_compile import CompiledBundleV1, compile_hud, load_evaluator_specs
+from .outcome import FailureKind
 from .screening import ScreeningExecution, ScreeningExecutionError, ScreeningUnit
 from .specs import freeze_swe_specs
 from .swebench import SweScriptFamily
@@ -142,6 +144,16 @@ class HarnessTurnAgent(Agent):
         )
 
 
+def parse_delivery_receipt(value: object) -> CompleteDeliveryReceiptV1:
+    """Parse a delivery receipt from HUD grade info.
+
+    The receipt crosses the HUD wire as JSON, so tuple fields arrive as
+    lists. Strict python-mode validation rejects those, so validation must
+    go through JSON mode.
+    """
+    return CompleteDeliveryReceiptV1.model_validate_json(json.dumps(value))
+
+
 def _docker_build(directory: Path, image: str) -> None:
     result = subprocess.run(
         [
@@ -208,23 +220,6 @@ async def _run_episode(
     if len(job.runs) != 1:
         raise ScreeningExecutionError("agent", "HUD returned an invalid run count")
     run = job.runs[0]
-    if run.trace.stop_reason == "length":
-        raise ScreeningExecutionError("budget", "HUD model response was truncated")
-    if run.trace.is_error:
-        raise ScreeningExecutionError(
-            "agent", run.trace.error or "HUD agent run failed"
-        )
-    patch = run.grade.info.get("model_patch")
-    if not isinstance(patch, str):
-        raise ScreeningExecutionError("agent", "HUD run omitted the candidate patch")
-    try:
-        delivery = CompleteDeliveryReceiptV1.model_validate(
-            run.grade.info.get("delivery")
-        )
-    except ValueError as error:
-        raise ScreeningExecutionError(
-            "agent", "HUD run omitted a complete delivery receipt"
-        ) from error
     models: list[str] = []
     prompt_tokens = 0
     completion_tokens = 0
@@ -236,12 +231,41 @@ async def _run_episode(
         if usage is not None:
             prompt_tokens += usage.prompt_tokens or 0
             completion_tokens += usage.completion_tokens or 0
-    if not models:
-        raise ScreeningExecutionError("agent", "HUD run omitted response.model")
     cost = (
         prompt_tokens * pricing.input_usd_per_million
         + completion_tokens * pricing.output_usd_per_million
     ) / 1_000_000
+
+    def episode_error(
+        failure_kind: FailureKind,
+        message: str,
+    ) -> ScreeningExecutionError:
+        # The episode already ran, so its metered usage must survive into
+        # the failure receipt instead of being reported as zero spend.
+        return ScreeningExecutionError(
+            failure_kind,
+            message,
+            reported_model=models[-1] if models else None,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            estimated_cost_usd=cost,
+        )
+
+    if run.trace.stop_reason == "length":
+        raise episode_error("budget", "HUD model response was truncated")
+    if run.trace.is_error:
+        raise episode_error("agent", run.trace.error or "HUD agent run failed")
+    patch = run.grade.info.get("model_patch")
+    if not isinstance(patch, str):
+        raise episode_error("agent", "HUD run omitted the candidate patch")
+    try:
+        delivery = parse_delivery_receipt(run.grade.info.get("delivery"))
+    except ValueError as error:
+        raise episode_error(
+            "agent", "HUD run omitted a complete delivery receipt"
+        ) from error
+    if not models:
+        raise ScreeningExecutionError("agent", "HUD run omitted response.model")
     return HudEpisode(
         model_patch=patch,
         delivery=delivery,
