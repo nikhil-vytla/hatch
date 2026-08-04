@@ -14,26 +14,26 @@ measurement, or judged outcome.
 **Structural erosion** — the share of the codebase's complexity mass held by
 high-complexity callables:
 
-\[
+```math
 \mathrm{mass}(f) = \mathrm{CC}(f)\cdot\sqrt{\mathrm{SLOC}(f)},
 \qquad
 \mathrm{Erosion} =
 \frac{\sum_{f\in\mathcal F} \mathbb I[\mathrm{CC}(f)>10]\cdot \mathrm{mass}(f)}
      {\sum_{f\in\mathcal F} \mathrm{mass}(f)} .
-\]
+```
 
-Cyclomatic complexity per callable, size-compressed by \(\sqrt{\mathrm{SLOC}}\)
+Cyclomatic complexity per callable, size-compressed by $\sqrt{\mathrm{SLOC}}$
 "so that complexity dominates rather than pure lines of code"; the CC > 10
 cutoff follows Radon's bands. Intuition: iterating agents patch logic into
 already-complex functions instead of distributing it.
 
 **Verbosity** — the fraction of lines that are redundant by rule or by clone:
 
-\[
+```math
 \mathrm{Verbosity} =
 \frac{\big|\,\{\text{AST-grep flagged lines}\} \cup \{\text{clone lines}\}\,\big|}{\mathrm{LOC}}
 \in [0,1],
-\]
+```
 
 with 137 targeted ast-grep rules "based on observed cases of verbose code,
 best practices, and commonly cited anti-patterns," plus structural
@@ -130,15 +130,15 @@ standing. An implementation must label every reported outcome with its class.
 
 The strict verdict chain itself, and probe-based extensions of it:
 
-- \(v^{\mathrm{strict}}_i\) over accumulated obligations \(\Omega_i\) —
+- $v^{\mathrm{strict}}_i$ over accumulated obligations $\Omega_i$ —
   already sealed, deterministic, and auditable. HumanLayer's argument that
   "a codebase becoming hard to maintain would lead to failing checkpoints in
   later stages" makes future strict verdicts the primary quality signal.
-- **Probe cost** \(Q^{\mathrm{probe}}(y_i)\): freeze \(y_i\), let a fixed
-  probe policy \(\pi_p\) (a declared, pinned weaker agent) attempt stage
-  \(i+1\); record its strict verdict and resource use. This converts
-  "maintainability of \(y_i\)" into an ordinary Parallax estimand — sealed
-  authority is the stage-\(i{+}1\) suite; the probe is part of the
+- **Probe cost** $Q^{\mathrm{probe}}(y_i)$: freeze $y_i$, let a fixed
+  probe policy $\pi_p$ (a declared, pinned weaker agent) attempt stage
+  $i+1$; record its strict verdict and resource use. This converts
+  "maintainability of $y_i$" into an ordinary Parallax estimand — sealed
+  authority is the stage-$i{+}1$ suite; the probe is part of the
   *measurement instrument*, declared like any other environment field. Probe
   nondeterminism is handled the standard way: repeated trials, clustered
   intervals. Cost: real compute, and the measurement is relative to the
@@ -155,11 +155,11 @@ sense, because authority can be fixed and branded:
 - pin the measurement tool release and rule set; record content digests
   (`scb_check_version` is upstream's version of this — Parallax would brand
   the digest the way GSM8K answers are branded at `Problem` construction);
-- measurement runs evaluator-side, never enters \(x_{\mathrm{pub}}\), and is
+- measurement runs evaluator-side, never enters $x_{\mathrm{pub}}$, and is
   byte-reproducible from the retained workspace snapshot;
-- verdict-like use (e.g. a quality-gate arm where \(V_i\) also requires
-  \(\mathrm{Verbosity}(y_i)\le q\)) is legitimate **only as a declared
-  verifier intervention** — it changes \(V\), so it can never be silently
+- verdict-like use (e.g. a quality-gate arm where $V_i$ also requires
+  $\mathrm{Verbosity}(y_i)\le q$) is legitimate **only as a declared
+  verifier intervention** — it changes $V$, so it can never be silently
   added to arms meant to share source verifier semantics.
 
 Sealable is not the same as valid. Class B metrics carry three documented
@@ -203,10 +203,10 @@ Parallax standing for Class C:
 
 | Channel | Authority | Sealed? | Parallax label | Primary use |
 | --- | --- | --- | --- | --- |
-| Strict/ISO/core verdicts over \(\Omega_i\) | pinned test suites, entrypoint-only | yes | Verification | correctness estimands |
+| Strict/ISO/core verdicts over $\Omega_i$ | pinned test suites, entrypoint-only | yes | Verification | correctness estimands |
 | Future-stage verdicts, probe success/cost | stage suites + pinned probe policy | yes | Verification (probe-relative) | behavioral quality estimands |
 | Erosion, verbosity, 41-metric panel | pinned `scb-check`-equivalent digest | yes | sealed measurement | slope estimands; cost prediction |
-| Quality thresholds inside \(V_i\) | as above, but verdict-inducing | yes | declared verifier intervention | Goodhart / backpressure experiments only |
+| Quality thresholds inside $V_i$ | as above, but verdict-inducing | yes | declared verifier intervention | Goodhart / backpressure experiments only |
 | LLM rubric flags | pinned judge model + rubric | no | judged outcome | secondary, audited; hypothesis generation |
 
 > Claim limit: class assignments are design commitments, not results. No
