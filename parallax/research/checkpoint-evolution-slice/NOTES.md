@@ -317,3 +317,42 @@ the live path, network isolation dropped, rootfs writable, in-container
 timeout reclassified, docker faults regraded as verdicts, truncation no
 longer a budget fault, usage dropped before the receipt, reported-model
 drift accepted, fence unwrap disabled, spend approval removed.
+
+## Live screening run (2026-08-03, approved)
+
+- Preflight: branch tip `ebff19e`, clean tree; `HUD_API_KEY` present in
+  the login shell (verified non-revealing); Docker daemon up with the
+  pinned sandbox image already local.
+- Launched from `parallax/` under `caffeinate -dims`:
+  `uv run python research/checkpoint-evolution-slice/run_screening.py
+  --live --approve-spend`. Completed in 5 m 38 s (22:33:46–22:39:24 PT),
+  no retries, no gateway errors, no interruption.
+- Monitoring false alarm worth recording: mid-run, `docker events
+  --since 3m --until 1s` returned empty and a `sample` of the process
+  showed it blocked in an SSL read, which together looked like a hung
+  gateway connection. Independent probes (models endpoint, minimal
+  completion, the exact stage-1 body via curl, and a direct
+  `urllib` call with the Python user agent) all answered in ≤ 2.5 s,
+  and the run then finished on schedule — the `docker events` window
+  arguments were producing empty output regardless of activity, and
+  the stack sample had simply caught a normal in-flight provider call.
+  Lesson: verify the observability query against known activity before
+  trusting its silence.
+- Outcome summary (details in [screening-report.md](screening-report.md)):
+  60/60 stage calls delivered and validated; receipt digest chain
+  confirmed for all 60; stages 1–2 strict in both arms on all seeds;
+  stage 3 split completely — carry-reference 10/10 strict, evolved
+  10/10 budget RunFailures (replies 4802–4864 bytes over the 4096-byte
+  workspace cap). RunFailure rate 16.7% (< 30% stop rule), zero
+  infrastructure failures. Spend $0.2813 vs the $0.25–$0.50 estimate
+  and $5 cap; the evolved arm cost 1.6× the carry arm because its own
+  accumulated verbosity returns as billed input tokens.
+- Analysis artifacts: `summarize_screening.py` validates every record
+  against the typed models, re-derives the digest chain, and writes
+  `evidence/screening-summary.json`; the per-seed table and bounds-only
+  contrast in the report come from it verbatim.
+- Decision per the preregistered rule: **proceed** to multi-family
+  synthesis (S1–S6). Flag for the next preregistration: the uniform
+  stage-3 budget failure says the byte cap interacts with reply format
+  (full file map) and model verbosity; cap choice and delta-style
+  replies must be preregistered questions, not incidental settings.
