@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from pathlib import Path
-from typing import Annotated, Literal, Self, TypeAlias, assert_never
+from typing import Annotated, Self, TypeAlias, assert_never
 
-from pydantic import Field, TypeAdapter, ValidationError, model_validator
+from pydantic import Field, model_validator
 
-from .canonical import atomic_write, canonical_bytes, canonical_digest
 from .checkpoint_evolution import (
+    CARRY_REFERENCE,
     EMPTY_WORKSPACE,
+    EVOLVED,
     AdmissionReceipt,
     CaseExecution,
     CheckpointFamily,
@@ -20,22 +20,23 @@ from .checkpoint_evolution import (
     run_case_trusted,
     verify_stage,
 )
-from .outcome import BudgetError, RunFailure
+from .experiment import Execution, Unit
+from .outcome import (
+    BudgetError,
+    Outcome,
+    RunFailure,
+    Verdict,
+    Verification,
+)
+from .perturbation import Condition, Variant, VariantSet
 from .types import (
-    ArmConfigDigest,
-    DesignDigest,
     DigestText,
-    ModelConfigDigest,
     NonEmptyText,
     NonNegativeInt,
     SourceId,
     StrictModel,
     TrialIndex,
-    TrialSeed,
 )
-
-CheckpointArm: TypeAlias = Literal["evolved", "carry-reference"]
-CE_ARMS: tuple[CheckpointArm, CheckpointArm] = ("evolved", "carry-reference")
 
 StageOutcome: TypeAlias = Annotated[
     StageVerification | RunFailure,
@@ -89,7 +90,8 @@ CheckpointAgent: TypeAlias = Callable[
     [CheckpointDelivery], Workspace | MeteredWorkspace
 ]
 AgentFactory: TypeAlias = Callable[
-    [SourceId, CheckpointArm, TrialSeed], CheckpointAgent
+    [SourceId, Condition, TrialIndex],
+    CheckpointAgent,
 ]
 
 
@@ -134,7 +136,7 @@ class StageReceipt(StrictModel):
 
 class FamilyRun(StrictModel):
     admitted: AdmittedFamily
-    arm: CheckpointArm
+    variant: Variant
     receipts: tuple[StageReceipt, ...]
     censored: tuple[PositiveInt, ...]
     failure: RunFailure | None
@@ -158,14 +160,20 @@ class FamilyRun(StrictModel):
             raise CheckpointRunError(
                 "a run must hold receipts or exactly one pre-episode failure"
             )
+        turns = self.variant.turns
+        if len(turns) != total:
+            raise CheckpointRunError(
+                "the condition's turn count differs from the family's checkpoints"
+            )
+        for receipt, turn in zip(self.receipts, turns, strict=False):
+            if receipt.max_output_bytes != turn.output_limit:
+                raise CheckpointRunError(
+                    f"stage {receipt.index} ran under an undeclared budget"
+                )
         for receipt, checkpoint in zip(self.receipts, family.checkpoints, strict=False):
             if receipt.spec_digest != checkpoint.spec_digest:
                 raise CheckpointRunError(
                     f"stage {receipt.index} delivered a drifted specification"
-                )
-            if receipt.max_output_bytes != checkpoint.max_output_bytes:
-                raise CheckpointRunError(
-                    f"stage {receipt.index} ran under an undeclared budget"
                 )
             if isinstance(receipt.outcome, StageVerification):
                 scheduled = {
@@ -197,7 +205,7 @@ class FamilyRun(StrictModel):
     def _validate_workspace_chain(self) -> None:
         total = len(self.admitted.family.checkpoints)
         delivered = len(self.receipts)
-        if self.arm == "evolved":
+        if self.variant.condition == EVOLVED:
             previous = EMPTY_WORKSPACE.digest
             for receipt in self.receipts:
                 if previous is None or receipt.input_workspace_digest != previous:
@@ -215,7 +223,7 @@ class FamilyRun(StrictModel):
                         "evolved censoring requires a missing workspace after "
                         "a run failure"
                     )
-        elif self.arm == "carry-reference":
+        elif self.variant.condition == CARRY_REFERENCE:
             if delivered not in (0, total):
                 raise CheckpointRunError(
                     "carry-reference must deliver every checkpoint"
@@ -233,7 +241,7 @@ class FamilyRun(StrictModel):
                         "reference workspace"
                     )
         else:
-            assert_never(self.arm)
+            raise CheckpointRunError(f"unknown condition: {self.variant.condition}")
 
 
 def _failure_usage(error: Exception) -> StageUsage | None:
@@ -281,28 +289,39 @@ def run_checkpoint_family(
     admitted: AdmittedFamily,
     agent: CheckpointAgent,
     *,
-    arm: CheckpointArm,
+    variants: VariantSet,
+    condition: Condition,
     execute: CaseExecution = run_case_trusted,
 ) -> FamilyRun:
+    """Walk one condition through every checkpoint, grading as it goes.
+
+    Each stage's byte allowance comes from the condition's own turn, which is
+    `required_output + headroom`. The evolved condition therefore gets a larger
+    limit than carry-reference by exactly the size of the workspace it has to
+    carry forward, leaving both with the same room for new work.
+    """
+
     family = admitted.family
+    variant = variants.variant(condition)
+    prompts = variants.prompts(condition)
     receipts: list[StageReceipt] = []
     carried = EMPTY_WORKSPACE
     for checkpoint in family.checkpoints:
-        if arm == "evolved":
+        if condition == EVOLVED:
             opening = carried
-        elif arm == "carry-reference":
+        elif condition == CARRY_REFERENCE:
             opening = (
                 EMPTY_WORKSPACE
                 if checkpoint.index == 1
                 else admitted.references.stages[checkpoint.index - 2]
             )
         else:
-            assert_never(arm)
+            raise CheckpointRunError(f"unknown condition: {condition}")
         delivery = CheckpointDelivery(
             index=checkpoint.index,
-            public_spec=checkpoint.public_spec,
+            public_spec=prompts[checkpoint.index - 1],
             workspace=opening,
-            max_output_bytes=checkpoint.max_output_bytes,
+            max_output_bytes=variant.turns[checkpoint.index - 1].output_limit,
         )
         attempt, usage = _stage_attempt(agent, delivery)
         produced: Workspace | None
@@ -328,282 +347,82 @@ def run_checkpoint_family(
                 spec_digest=checkpoint.spec_digest,
                 input_workspace_digest=opening.digest,
                 output_workspace_digest=None if produced is None else produced.digest,
-                max_output_bytes=checkpoint.max_output_bytes,
+                max_output_bytes=variant.turns[checkpoint.index - 1].output_limit,
                 output_bytes=0 if produced is None else produced.content_bytes,
                 usage=usage,
                 outcome=outcome,
             )
         )
-        if arm == "evolved":
+        if condition == EVOLVED:
             if produced is None:
                 break
             carried = produced
     return FamilyRun(
         admitted=admitted,
-        arm=arm,
+        variant=variant,
         receipts=tuple(receipts),
         censored=tuple(range(len(receipts) + 1, len(family.checkpoints) + 1)),
         failure=None,
     )
 
 
-class CeManifestUnit(StrictModel):
-    family_id: SourceId
-    family_digest: DigestText
-    trial_index: TrialIndex
-    trial_seed: TrialSeed
-
-
-class CeArmConfig(StrictModel):
-    family_id: SourceId
-    arm: CheckpointArm
-    digest: ArmConfigDigest
-
-
-class CeManifestRecord(StrictModel):
-    kind: Literal["ce_manifest"] = "ce_manifest"
-    schema_version: Literal[1] = 1
-    design_digest: DesignDigest
-    model_config_digest: ModelConfigDigest
-    units: Annotated[tuple[CeManifestUnit, ...], Field(min_length=1)]
-    arm_configs: Annotated[tuple[CeArmConfig, ...], Field(min_length=1)]
-
-    @model_validator(mode="after")
-    def preregistered_design(self) -> Self:
-        unit_keys = tuple((unit.family_id, unit.trial_index) for unit in self.units)
-        arm_keys = tuple((config.family_id, config.arm) for config in self.arm_configs)
-        if len(set(unit_keys)) != len(unit_keys):
-            raise CheckpointRunError("manifest units must be unique")
-        if len(set(arm_keys)) != len(arm_keys):
-            raise CheckpointRunError("manifest arm configurations must be unique")
-        expected = {(unit.family_id, arm) for unit in self.units for arm in CE_ARMS}
-        if set(arm_keys) != expected:
-            raise CheckpointRunError(
-                "manifest arm configurations differ from scheduled families"
-            )
-        body = {
-            "schema_version": self.schema_version,
-            "model_config_digest": self.model_config_digest,
-            "units": [unit.model_dump(mode="json") for unit in self.units],
-            "arm_configs": [
-                config.model_dump(mode="json") for config in self.arm_configs
-            ],
-        }
-        if canonical_digest(body) != self.design_digest:
-            raise CheckpointRunError("manifest design digest does not match its body")
-        return self
-
-
-class CeFamilyRecord(StrictModel):
-    kind: Literal["ce_family"] = "ce_family"
-    schema_version: Literal[1] = 1
-    design_digest: DesignDigest
-    family: CheckpointFamily
-    reference_digest: DigestText
-    admission: AdmissionReceipt
-
-
-class CeRunRecord(StrictModel):
-    kind: Literal["ce_run"] = "ce_run"
-    schema_version: Literal[1] = 1
-    design_digest: DesignDigest
-    family_id: SourceId
-    family_digest: DigestText
-    model_config_digest: ModelConfigDigest
-    trial_index: TrialIndex
-    trial_seed: TrialSeed
-    arm: CheckpointArm
-    arm_config_digest: ArmConfigDigest
-    agent_model: NonEmptyText
-    receipts: tuple[StageReceipt, ...]
-    censored: tuple[PositiveInt, ...]
-    failure: RunFailure | None
-
-    @model_validator(mode="after")
-    def replayable_shape(self) -> Self:
-        delivered = len(self.receipts)
-        if tuple(receipt.index for receipt in self.receipts) != tuple(
-            range(1, delivered + 1)
-        ):
-            raise CheckpointRunError("run record receipts must be contiguous")
-        if self.censored != tuple(
-            range(delivered + 1, delivered + 1 + len(self.censored))
-        ):
-            raise CheckpointRunError(
-                "run record censored stages must be the undelivered suffix"
-            )
-        if (self.failure is not None) != (delivered == 0):
-            raise CheckpointRunError(
-                "run record must hold receipts or one pre-episode failure"
-            )
-        return self
-
-
-CeEvidenceRecord: TypeAlias = Annotated[
-    CeManifestRecord | CeFamilyRecord | CeRunRecord,
-    Field(discriminator="kind"),
-]
-_CE_EVIDENCE = TypeAdapter(CeEvidenceRecord)
-
-
-def _arm_config_digest(admitted: AdmittedFamily, arm: CheckpointArm) -> ArmConfigDigest:
-    body: dict[str, object] = {
-        "family_id": admitted.family.family_id,
-        "arm": arm,
-        "contract": admitted.family.contract.model_dump(mode="json"),
-        "budgets": [
-            checkpoint.max_output_bytes for checkpoint in admitted.family.checkpoints
-        ],
-    }
-    if arm == "carry-reference":
-        body["reference_digest"] = admitted.references.digest
-    return ArmConfigDigest(canonical_digest(body))
-
-
-def _build_manifest(
-    admitted_families: tuple[AdmittedFamily, ...],
-    trial_seeds: tuple[int, ...],
-    agent_model: str,
-    model_config: Mapping[str, object],
-) -> CeManifestRecord:
-    if not admitted_families or not trial_seeds:
-        raise CheckpointRunError("families and trial seeds must be non-empty")
-    family_ids = [item.family.family_id for item in admitted_families]
-    if len(set(family_ids)) != len(family_ids):
-        raise CheckpointRunError("family ids must be unique")
-    model_digest = ModelConfigDigest(
-        canonical_digest({"agent_model": agent_model, "config": dict(model_config)})
-    )
-    units = tuple(
-        CeManifestUnit(
-            family_id=item.family.family_id,
-            family_digest=item.family.digest,
-            trial_index=TrialIndex(trial_index),
-            trial_seed=TrialSeed(trial_seed),
-        )
-        for item in admitted_families
-        for trial_index, trial_seed in enumerate(trial_seeds)
-    )
-    arm_configs = tuple(
-        CeArmConfig(
-            family_id=item.family.family_id,
-            arm=arm,
-            digest=_arm_config_digest(item, arm),
-        )
-        for item in admitted_families
-        for arm in CE_ARMS
-    )
-    body = {
-        "schema_version": 1,
-        "model_config_digest": model_digest,
-        "units": [unit.model_dump(mode="json") for unit in units],
-        "arm_configs": [config.model_dump(mode="json") for config in arm_configs],
-    }
-    return CeManifestRecord(
-        design_digest=DesignDigest(canonical_digest(body)),
-        model_config_digest=model_digest,
-        units=units,
-        arm_configs=arm_configs,
-    )
-
-
-def _run_record(
-    run: FamilyRun,
-    manifest: CeManifestRecord,
-    unit: CeManifestUnit,
-    arm_config_digest: ArmConfigDigest,
-    agent_model: str,
-) -> CeRunRecord:
-    return CeRunRecord(
-        design_digest=manifest.design_digest,
-        family_id=unit.family_id,
-        family_digest=unit.family_digest,
-        model_config_digest=manifest.model_config_digest,
-        trial_index=unit.trial_index,
-        trial_seed=unit.trial_seed,
-        arm=run.arm,
-        arm_config_digest=arm_config_digest,
-        agent_model=agent_model,
-        receipts=run.receipts,
-        censored=run.censored,
-        failure=run.failure,
-    )
-
-
-def _factory_failure(
-    admitted: AdmittedFamily, arm: CheckpointArm, error: Exception
-) -> FamilyRun:
-    return FamilyRun(
-        admitted=admitted,
-        arm=arm,
-        receipts=(),
-        censored=tuple(range(1, len(admitted.family.checkpoints) + 1)),
-        failure=RunFailure(
-            failure_kind="agent",
-            error_type=type(error).__name__,
-            message=str(error),
-        ),
-    )
-
-
-def run_ce_experiment(
-    admitted_families: tuple[AdmittedFamily, ...],
-    agent_factory: AgentFactory,
+def checkpoint_executor(
+    families: Mapping[SourceId, AdmittedFamily],
+    variants: Mapping[SourceId, VariantSet],
+    build_agent: AgentFactory,
     *,
-    trial_seeds: tuple[int, ...],
-    agent_model: str,
-    model_config: Mapping[str, object],
-    output_path: Path,
-    execute: CaseExecution = run_case_trusted,
-) -> tuple[FamilyRun, ...]:
-    ordered = tuple(sorted(admitted_families, key=lambda item: item.family.family_id))
-    manifest = _build_manifest(ordered, trial_seeds, agent_model, model_config)
-    by_family = {item.family.family_id: item for item in ordered}
-    arm_digests = {
-        (config.family_id, config.arm): config.digest for config in manifest.arm_configs
-    }
-    records: list[CeEvidenceRecord] = [manifest]
-    records.extend(
-        CeFamilyRecord(
-            design_digest=manifest.design_digest,
-            family=item.family,
-            reference_digest=item.references.digest,
-            admission=item.admission,
+    model: str,
+    execute_case: CaseExecution = run_case_trusted,
+) -> Callable[[Unit], Execution]:
+    """Adapt checkpoint families to the one experiment loop.
+
+    A unit's outcome is the terminal stage's verification, so a family that
+    censored early reports the run failure that stopped it rather than a
+    fabricated verdict. This replaced a 260-line second journal format with its
+    own manifest, resume logic, and cost accounting.
+    """
+
+    def run(unit: Unit) -> Execution:
+        admitted = families[unit.task_id]
+        agent = build_agent(unit.task_id, unit.condition, unit.trial_index)
+        family_run = run_checkpoint_family(
+            admitted,
+            agent,
+            variants=variants[unit.task_id],
+            condition=unit.condition,
+            execute=execute_case,
         )
-        for item in ordered
-    )
-    runs: list[FamilyRun] = []
-    for unit in manifest.units:
-        admitted = by_family[unit.family_id]
-        for arm in CE_ARMS:
-            try:
-                agent = agent_factory(unit.family_id, arm, unit.trial_seed)
-            except Exception as error:
-                run = _factory_failure(admitted, arm, error)
-            else:
-                run = run_checkpoint_family(admitted, agent, arm=arm, execute=execute)
-            runs.append(run)
-            records.append(
-                _run_record(
-                    run,
-                    manifest,
-                    unit,
-                    arm_digests[(unit.family_id, arm)],
-                    agent_model,
-                )
+        usages = [
+            receipt.usage
+            for receipt in family_run.receipts
+            if receipt.usage is not None
+        ]
+        terminal = family_run.receipts[-1] if family_run.receipts else None
+        outcome: Outcome
+        if terminal is None:
+            outcome = family_run.failure or RunFailure(
+                failure_kind="agent",
+                error_type="NoStageDelivered",
+                message="the family produced no stage receipts",
             )
-    data = b"".join(canonical_bytes(record) + b"\n" for record in records)
-    atomic_write(output_path, data)
-    return tuple(runs)
+        elif isinstance(terminal.outcome, RunFailure):
+            outcome = terminal.outcome
+        else:
+            passed = terminal.outcome.strict_pass and not family_run.censored
+            outcome = Verification(
+                verdict=Verdict.PASS if passed else Verdict.WRONG,
+                reason=(
+                    f"stage {terminal.index} of {len(admitted.family.checkpoints)} "
+                    f"{'satisfied' if passed else 'did not satisfy'} every "
+                    "accumulated obligation"
+                ),
+            )
+        return Execution(
+            outcome=outcome,
+            reported_model=model,
+            prompt_tokens=sum(usage.prompt_tokens for usage in usages),
+            completion_tokens=sum(usage.completion_tokens for usage in usages),
+            estimated_cost_usd=sum(usage.estimated_cost_usd for usage in usages),
+        )
 
-
-def read_ce_jsonl(path: Path) -> tuple[CeEvidenceRecord, ...]:
-    records: list[CeEvidenceRecord] = []
-    with path.open(encoding="utf-8") as source:
-        for line_number, line in enumerate(source, 1):
-            try:
-                records.append(_CE_EVIDENCE.validate_json(line))
-            except ValidationError as error:
-                detail = error.errors(include_url=False)[0]["msg"]
-                raise CheckpointRunError(f"line {line_number}: {detail}") from error
-    return tuple(records)
+    return run

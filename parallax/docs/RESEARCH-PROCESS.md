@@ -161,13 +161,13 @@ python -m pytest -q          # full offline suite; expect all tests to pass
 python -m ruff check .       # lint; expect no findings
 ```
 
-`tests/test_end_to_end.py` is the runnable walkthrough of the whole loop: it
-builds script families, executes all three arms with scripted agents, writes
-evidence JSONL, and checks report semantics including byte stability and the
-identification bounds. `tests/conftest.py` shows how a family is constructed
-from a raw GSM8K row. The programmatic entry points are
-`runner.run_experiment` (families in, evidence JSONL out) and
-`report.report_from_jsonl` (evidence in, report out).
+`tests/test_experiment.py` is the runnable walkthrough of the whole loop: it
+plans a design, executes every condition with scripted executors, writes the
+evidence journal, and checks resume, replay, and spend metering. `docs/PIPELINES.md`
+has the copy-paste version end to end. `tests/conftest.py` shows how a variant
+set is constructed from a raw GSM8K row. The programmatic entry points are
+`experiment.plan_experiment` and `experiment.execute` (config in, evidence out),
+then `findings.from_journal` (evidence in, findings out).
 
 ## How findings are recorded and audited
 

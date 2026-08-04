@@ -30,8 +30,8 @@ The honest counterpart is [What is NOT automated yet](#what-is-not-automated-yet
 The `#### 18` answer is stripped from everything the agent sees and sealed as
 grading authority.
 
-**What you run.** From `parallax/`, after `uv sync`. There is no CLI; the
-entry points are `runner.run_experiment` and `report.report_from_jsonl`, and
+**What you run.** From `parallax/`, after `uv sync`. The entry points are
+`experiment.plan_experiment`, `experiment.execute`, and `findings.from_journal`;
 the scripted construction model lives in `tests/conftest.py`. This snippet is
 verified to run as-is:
 
@@ -41,42 +41,65 @@ import sys
 sys.path.insert(0, "tests")
 from pathlib import Path
 
-from conftest import HistoryAgent, make_family
-from parallax.report import report_from_jsonl
-from parallax.runner import run_experiment
+from conftest import HistoryAgent, make_variants
+from parallax.experiment import (
+    CostRange, Execution, ExperimentConfig, execute, plan_experiment,
+)
+from parallax.findings import from_journal, render
+from parallax.gsm8k import load_gsm8k, verify
+from parallax.perturbation import Condition
+from parallax.provider import Message
 
-family, _ = make_family()
-for script in family.scripts:
-    print(f"--- {script.arm}: {len(script.turns)} turn(s) ---")
-    for turn in script.turns:
+BASE, MATCHED, EVOLVED = map(Condition, ("base", "matched", "evolved"))
+task = load_gsm8k(Path("tests/fixtures/gsm8k.jsonl"))[0]
+variants, _ = make_variants(problem=task)
+for condition in variants.conditions:
+    turns = variants.variant(condition).turns
+    print(f"--- {condition}: {len(turns)} turn(s) ---")
+    for turn in turns:
         print(" ", turn.text)
+
+agent = HistoryAgent()
+
+def run(unit):
+    prompts = variants.prompts(unit.condition)
+    reply = agent(tuple(Message(role="user", content=t) for t in prompts), 64)
+    return Execution(
+        outcome=verify(task, reply),
+        reported_model="offline-scripted-agent",
+        prompt_tokens=1, completion_tokens=1, estimated_cost_usd=0.0,
+    )
 
 out = Path("/tmp/parallax-demo")
 out.mkdir(exist_ok=True)
-run_experiment(
-    (family,),
-    lambda source_id, arm, seed: HistoryAgent(),
-    trial_seeds=(11, 12),
-    agent_model="offline-scripted-agent",
-    model_config={"provider": "scripted", "temperature": 0},
-    output_path=out / "evidence.jsonl",
+plan = plan_experiment(
+    ((task, variants),),
+    ExperimentConfig(
+        model="offline-scripted-agent",
+        conditions=(BASE, MATCHED, EVOLVED),
+        trials=2,
+        temperature=0.0,
+        cost=CostRange(lower_per_episode_usd=0.0, upper_per_episode_usd=0.0),
+    ),
 )
-report = report_from_jsonl(out / "evidence.jsonl", out / "report.json")
-print({key: report[key] for key in ("difference", "identification_bounds", "interval")})
+execute(plan, run, journal_path=out / "evidence.jsonl", approve_spend=True)
+print(render(from_journal(out / "evidence.jsonl", control=MATCHED, treatment=EVOLVED)))
 PY
 ```
 
-**What comes out.** First, the one source problem has become three arms — a
-single-turn baseline plus two nine-turn scripts that differ only in whether
-the intent evolves. Real output, evolved arm truncated:
+**What comes out.** First, the one source problem has become three conditions —
+a single-turn baseline, a presentation-matched control that reveals one true
+argument per turn, and an evolved route of the same length whose goal moves.
+Real output, evolved condition truncated:
 
 ```text
---- static: 1 turn(s) ---
+--- base: 1 turn(s) ---
   I need help with calculate daily egg-sale revenue. Use eggs per day: 16.
   Use eggs eaten: 3. Use eggs baked: 4. Use price per egg: 2 dollars.
 --- matched: 9 turn(s) ---
   I need help with calculate daily egg-sale revenue. Use eggs per day: 16.
   Use eggs eaten: 3.
+  Use eggs baked: 4.
   ...same goal throughout; information only accumulates...
 --- evolved: 9 turn(s) ---
   I need help with calculate eggs available to sell. Use price per egg: 3 dollars.
@@ -89,33 +112,37 @@ the intent evolves. Real output, evolved arm truncated:
   Correction: change eggs baked from 5 to 4.
 ```
 
-Second, `/tmp/parallax-demo/evidence.jsonl`: 8 canonical JSONL records — one
-preregistered manifest, one family record (the only place the sealed `18`
-appears), and six run records (2 trials × 3 arms). A real run row, trimmed:
+Note that `variants.prompts(condition)` is what the agent receives, and it is
+the turn text plus the benchmark's submission contract. `Turn.text` alone is the
+perturbation's material and would leave the agent guessing what the grader wants.
 
-```json
-{"arm": "evolved", "final_answer": "FINAL_ANSWER: 18", "kind": "run",
- "outcome": {"kind": "verification", "verdict": "pass",
-             "reason": "final answer matches source authority"}}
-```
-
-Third, `/tmp/parallax-demo/report.json`. Real output:
+Second, `/tmp/parallax-demo/evidence.jsonl`: 7 canonical JSONL records — one
+preregistered plan carrying the design digest, and six observations
+(2 trials × 3 conditions). Third, the rendered findings. Real output:
 
 ```text
-{'difference': 0.0, 'identification_bounds': {'lower': 0.0, 'upper': 0.0},
- 'interval': {'confidence': 0.95, 'method': 'source_clustered_hoeffding',
-              'epsilon': 2.716203031481239, 'lower': -1.0,
-              'minimum_detectable_effect': 2.716203031481239, 'upper': 1.0}}
+offline-scripted-agent @ e2b0f0ad6b41
+  6/6 units | no run failures
+
+  condition            pass   verified  wrong  invalid  failed
+  base                  100%         2      0        0       0
+  matched               100%         2      0        0       0
+  evolved               100%         2      0        0       0
+
+  evolved - matched: +0.000 [-1.000, +1.000] across 1 task cluster(s)
+  the sample supports no effect smaller than 2.72; treat the sign as descriptive
+
+  operating points: 0 informative of 3 task-conditions
+
+  paid $0.00 this session; $0.00 recorded across all sessions
 ```
 
-**What you can conclude.** With a history-reading scripted agent every arm
-passes, the matched-vs-evolved difference is 0, and the interval resolves
-nothing: one source cluster gives a minimum detectable effect of 2.72, so
-the interval is the trivial [-1, 1]. Swap `HistoryAgent` for
-`LastMessageAgent` and the multi-turn arms flip to `wrong` — the mechanics
-of history sensitivity, shown in `tests/test_end_to_end.py`. Nothing here is
-evidence about real models; that is exactly what this run demonstrates the
-harness records. Real experiments keep their evidence under
+**What you can conclude.** With a history-reading scripted agent every condition
+passes and the evolved-minus-matched difference is 0, but the interval spans
+everything: one task cluster cannot support an effect smaller than 2.72, so the
+sign is descriptive and nothing here is a finding. Swap `HistoryAgent` for
+`LastMessageAgent` and the multi-turn conditions flip to `wrong`, which is the
+mechanics of history sensitivity. Real experiments keep their evidence under
 `research/<investigation>/evidence/`.
 
 ## 2. Evolving Intent on SWE-bench Verified
@@ -127,12 +154,13 @@ three stages and each costs money; the recorded spends below are actuals.
 ### 2a. Screening: find boundary instances ($2.97)
 
 **Start with:** the pinned SWE-bench Verified dataset (medium-difficulty
-stratum). **Run:** the bespoke driver
-`research/swebench-screening-round2-20260803/run_screening.py` (requires
-`HUD_API_KEY`, local Docker with `DOCKER_DEFAULT_PLATFORM=linux/amd64`, and
-`uv run --with pyarrow`; follow-up census drivers sit alongside it).
-**Out:** `round2-report.json`, the canonical result and cost receipt. Real
-excerpt:
+stratum). **Ran:** a bespoke driver in
+`research/swebench-screening-round2-20260803/`, since deleted — it was one of
+four hand-copied variations on the loop that `experiment.py` now owns, and its
+summarizer had drifted to classifying operating points at `== 0`/`== 1` where
+the package used `<= 0.1`/`>= 0.9`. The evidence it wrote is committed and
+untouched; the driver is not reproducible under current code. **Out:**
+`round2-report.json`, the canonical result and cost receipt. Real excerpt:
 
 ```json
 {"actual_metered_cost_usd": 2.972512,
@@ -148,19 +176,20 @@ direction. Details in
 
 ### 2b. Admission: gate the three instances (compute only)
 
-Landing in [PR #25](https://github.com/nikhil-vytla/hatch/pull/25). **Run:**
+Landed in [PR #25](https://github.com/nikhil-vytla/hatch/pull/25) with its own
+driver, since deleted along with the rest. No inference — Docker only. Two gates
+per instance now rather than six: an inert no-op patch must fail the official
+tests, and the sealed gold patch must pass them. The four that were dropped
+re-checked invariants that Pydantic validators or bundle compilation already
+enforce, and one of them — the arm-completeness gate — is why every family had
+to construct a third arm nobody ran. **Out:** `evidence/admission-summary.json`
+and one `admission.json` per instance; all three admitted.
 
-```bash
-DOCKER_DEFAULT_PLATFORM=linux/amd64 uv run --with pyarrow python \
-  research/swebench-experiment-prerequisites-20260803/run_admission.py
-```
-
-No inference — Docker only. Six gates per instance, including: the compiled
-agent bundle contains no sealed bytes, an inert no-op patch must fail the
-official tests, and the sealed gold patch must pass them. **Out:**
-`evidence/admission-summary.json` and one `admission.json` per instance; all
-three admitted. The same folder preregisters the 18-unit experiment design
-(digest `e230043c…`) before any paid unit runs.
+Those historical admission records no longer verify under current code, on
+purpose: the task spec digest used to hash every arm's turn text, so retiring
+one arm moved the identity of tasks whose own material never changed. Identity
+is now scoped to the condition being run. See
+[`../research/swebench-experiment-prerequisites-20260803/evidence/DIGEST-INVALIDATION.md`](../research/swebench-experiment-prerequisites-20260803/evidence/DIGEST-INVALIDATION.md).
 
 ### 2c. The experiment: single-turn vs evolved ($1.22)
 
@@ -182,8 +211,9 @@ yet."*, then the harness interjects *"Hold on — before you finalize, the user
 has new information…"* and delivers the full issue. The agent cannot skip or
 reorder phases; the harness owns the schedule and grades a delivery receipt.
 
-**Run:** `research/swebench-single-vs-evolved-20260803/run_experiment.py`
-(same environment as screening). **Out:** `evidence/experiment.jsonl` (18
+**Ran:** a driver in `research/swebench-single-vs-evolved-20260803/`, since
+deleted; its `analyze_experiment.py` reimplemented the package's paired-bounds
+math nearly line for line. **Out:** `evidence/experiment.jsonl` (18
 units, all harness-verified), `evidence/experiment-report.json`, and spend
 reconciliation. Real results:
 
@@ -199,11 +229,17 @@ the trivial [-1, 1]: the data neither advances nor rejects the hypothesis.
 Unique metered spend was $1.219080. Both stages 2b and 2c land in
 [PR #25](https://github.com/nikhil-vytla/hatch/pull/25) under
 `research/swebench-experiment-prerequisites-20260803/` and
-`research/swebench-single-vs-evolved-20260803/`. Note one design gap stated
-plainly: this experiment compared static against evolved only — the
-turn-matched control arm that the GSM8K design treats as mandatory was not
-part of the 18-unit design, so conversation length is not yet controlled for
-on SWE-bench.
+`research/swebench-single-vs-evolved-20260803/`.
+
+Note one design gap stated plainly: this experiment compared base against
+evolved only, so conversation length was not controlled for. Worse, the
+`matched` arm that existed at the time would not have controlled for it — it
+delivered the whole issue statement in both turns, so nothing accumulated,
+while GSM8K's revealed one argument per turn as documented. Two adapters
+implemented different semantics under one name and admission could not tell,
+because it compared turn counts and per-turn budgets rather than what the turns
+said. `intent_phases.py` now builds the control with GSM8K's semantics, and an
+experiment opts into it when its sample can support the attribution.
 
 ## 3. Checkpoint evolution (landing in PR #27)
 
@@ -226,13 +262,15 @@ stdin/argv/exit-code cases. Real spec excerpt from checkpoint 1:
 **Run** (offline, on the PR branch, from `parallax/`):
 
 ```bash
-uv run python research/checkpoint-evolution-slice/make_seed_family.py  # rebuild fixture; 5 admission gates
-uv run python -m pytest tests/test_checkpoint_runner.py -q             # both arms end to end
+uv run python research/checkpoint-evolution-slice/make_seed_family.py  # rebuild fixture
+uv run python -m pytest tests/test_checkpoint_runner.py -q             # both conditions end to end
+uv run python research/checkpoint-evolution-slice/run_screening.py     # dry run + findings
 ```
 
-**Out:** an `AdmissionReceipt` (five gates: schema round-trip, completeness,
-leakage, incremental gold build, per-stage no-op rejection), then evidence
-JSONL from `checkpoint_runner.run_ce_experiment` with two arms — `evolved`
+**Out:** an `AdmissionReceipt` (two gates: incremental gold build and per-stage
+no-op rejection; schema round-trip, completeness, and leakage were deleted
+because the type system already makes those states unrepresentable), then a
+journal written by the one experiment loop with two conditions — `evolved`
 (the agent's own stage-N workspace feeds stage N+1, digest-chained) and
 `carry-reference` (each stage starts from the frozen reference build). Each
 stage is graded into a verdict vector: `strict_pass` (all accumulated
@@ -255,17 +293,15 @@ preregistration draft for the first paid run.
   designed-but-unbuilt synthesis pipeline (stages S1–S6, with its own
   admission gates) is specified in
   [`../research/slopcodebench-method/synthesis-workflow.md`](../research/slopcodebench-method/synthesis-workflow.md).
-- **No one-command pilot and no CLI.** Each paid run so far was driven by a
-  bespoke script in its `research/` folder (`run_screening.py`,
-  `run_admission.py`, `run_experiment.py`), plus resume scripts written
-  mid-incident. Reproducing a paid flow means reading that folder's
-  `NOTES.md`, not invoking a stable tool.
+- **No one-command pilot.** Every paid run so far was driven by a bespoke
+  script in its `research/` folder plus resume scripts written mid-incident;
+  those are deleted and the loop they duplicated lives in `experiment.py`, but
+  no packaged launcher replaces them. Analysis does have one entry point:
+  `python -m parallax.findings JOURNAL`. Reproducing a historical paid flow
+  still means reading that folder's `NOTES.md`.
 - **GSM8K has never run against a real provider.** The full
-  static/matched/evolved design is implemented and tested offline, but all
-  GSM8K evidence uses scripted agents. Conversely, the real-model SWE-bench
-  experiment lacks the matched control (see 2c). No single flow yet has both
-  the complete design and real-model evidence — that is the current gap
-  between what the docs describe and what has been measured.
-- **Checkpoint evolution has no report module or paid run.** PR #27 stops at
-  admission, two arms, and evidence; estimands and decisions are deferred to
-  its preregistration draft.
+  base/matched/evolved design is implemented and tested offline. The
+  real-model SWE-bench experiment ran without a working control (see 2c).
+- **Checkpoint evolution has no paid run beyond screening.** Estimands and
+  decisions are deferred to its preregistration draft. Analysis is no longer
+  a gap: it shares `findings.py` with every other flow.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -17,17 +18,113 @@ from pydantic import (
     field_validator,
 )
 
-from .evolving_intent import Chat, Message
 from .outcome import BudgetError
-from .types import NonEmptyText, StrictModel
+from .types import NonEmptyText, PositiveInt, StrictModel
 
 HttpUrl = Annotated[str, StringConstraints(pattern=r"^https://")]
-PositiveInt = Annotated[int, Field(gt=0)]
 HUD_GATEWAY_ENDPOINT = "https://inference.beta.hud.ai/v1/chat/completions"
+Role: TypeAlias = Literal["system", "user", "assistant"]
+
+
+class Message(StrictModel):
+    role: Role
+    content: str
+
+
+Chat: TypeAlias = Callable[[tuple[Message, ...], int], str]
 
 
 class ProviderError(RuntimeError):
     pass
+
+
+_FENCE = re.compile(r"\A```(?:[a-z]+)?\n(?P<body>.*)\n```\Z", re.DOTALL)
+
+
+def unfence(text: str) -> str:
+    """Strip one Markdown code fence, if the whole reply is one.
+
+    Models wrap structured replies in fences whatever the prompt says. This
+    lived in `swebench.py` only, so the GSM8K path had no tolerance for it and
+    a full round's construction stage was one fenced reply away from failing.
+    One implementation, used by every parser that reads model output.
+    """
+
+    match = _FENCE.match(text.strip())
+    return match.group("body") if match else text
+
+
+def json_schema_instructions(model: type[BaseModel], purpose: str) -> str:
+    """Prompt text that states the exact schema a reply must satisfy.
+
+    Derived from the model rather than written by hand, so a prompt cannot drift
+    from the parser that validates its reply, and a stage cannot ship without
+    telling the model what shape to return — which is how a construction round
+    went out asking only for "one strict JSON object".
+    """
+
+    schema = json.dumps(
+        model.model_json_schema(),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return (
+        f"{purpose}\n"
+        "Reply with one JSON object and nothing else. No Markdown fences, no "
+        "prose. It must validate against this JSON Schema:\n"
+        f"{schema}"
+    )
+
+
+class TokenPricing(StrictModel):
+    input_usd_per_million: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    output_usd_per_million: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+
+    def cost_usd(self, prompt_tokens: int, completion_tokens: int) -> float:
+        return (
+            prompt_tokens * self.input_usd_per_million
+            + completion_tokens * self.output_usd_per_million
+        ) / 1_000_000
+
+
+FREE = TokenPricing(input_usd_per_million=0.0, output_usd_per_million=0.0)
+
+# The single pricing table. It previously existed in four places — two package
+# constants, a research driver's dict, and literals inlined into a
+# preregistration body — and one copy went stale and mispriced a whole round.
+PRICING: Mapping[str, TokenPricing] = {
+    "claude-haiku-4-5": TokenPricing(
+        input_usd_per_million=1.0,
+        output_usd_per_million=5.0,
+    ),
+    "claude-sonnet-4-6": TokenPricing(
+        input_usd_per_million=2.0,
+        output_usd_per_million=10.0,
+    ),
+    "claude-opus-4-8": TokenPricing(
+        input_usd_per_million=5.0,
+        output_usd_per_million=25.0,
+    ),
+}
+
+
+_DATED_MODEL = re.compile(r"^(?P<family>.+)-\d{8}$")
+
+
+def pricing_for(model: str) -> TokenPricing:
+    """Look up a model's rates, refusing to guess.
+
+    Providers report a dated snapshot (`claude-haiku-4-5-20251001`) for a model
+    requested by family (`claude-haiku-4-5`), so the snapshot suffix is
+    stripped before lookup. An unrecognized model raises: silently defaulting
+    to zero is how a paid run comes to report that it cost nothing.
+    """
+
+    dated = _DATED_MODEL.match(model)
+    for candidate in (model, dated.group("family") if dated else model):
+        if candidate in PRICING:
+            return PRICING[candidate]
+    raise ProviderError(f"no token pricing is recorded for model {model!r}")
 
 
 class ProviderConfig(StrictModel):

@@ -11,6 +11,14 @@ CanonicalIntegerText = Annotated[
     StringConstraints(pattern=r"^(?:0|-?[1-9][0-9]{0,99})$"),
 ]
 NonNegativeInt = Annotated[int, Field(ge=0)]
+PositiveInt = Annotated[int, Field(gt=0)]
+Usd = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+# Temperature is causally real and is preregistered. There is deliberately no
+# per-trial seed type: the gateway accepts `seed` and silently ignores it (same
+# seed, different completions, verified empirically), so a seed field in a
+# preregistered plan would promise a reproducibility we cannot deliver. Trials
+# are samples from one sampling distribution, not replicates.
+Temperature = Annotated[float, Field(ge=0, le=2, allow_inf_nan=False)]
 
 SourceId = NewType("SourceId", NonEmptyText)
 CanonicalInteger = NewType("CanonicalInteger", CanonicalIntegerText)
@@ -18,9 +26,8 @@ SourceAnswer = NewType("SourceAnswer", CanonicalInteger)
 DesignDigest = NewType("DesignDigest", DigestText)
 SourceDigest = NewType("SourceDigest", DigestText)
 ModelConfigDigest = NewType("ModelConfigDigest", DigestText)
-ArmConfigDigest = NewType("ArmConfigDigest", DigestText)
+ConditionDigest = NewType("ConditionDigest", DigestText)
 ConstructionSeed = NewType("ConstructionSeed", int)
-TrialSeed = NewType("TrialSeed", int)
 TrialIndex = NewType("TrialIndex", NonNegativeInt)
 
 

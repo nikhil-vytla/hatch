@@ -11,7 +11,15 @@ from typing import Annotated, Literal, Self, TypeAlias
 from pydantic import Field, ValidationError, model_validator
 
 from .canonical import canonical_bytes, canonical_digest
-from .types import DigestText, NonEmptyText, SourceId, StrictModel
+from .perturbation import Condition, Turn, Variant, VariantSet
+from .task import AgentContract
+from .types import (
+    DigestText,
+    NonEmptyText,
+    PositiveInt,
+    SourceId,
+    StrictModel,
+)
 
 Operator: TypeAlias = Literal[
     "core",
@@ -29,26 +37,16 @@ CaseDetail: TypeAlias = Literal[
     "stdout-mismatch",
     "stderr-missing",
 ]
-GateName: TypeAlias = Literal[
-    "schema-roundtrip",
-    "completeness",
-    "leakage",
-    "gold-incremental",
-    "no-op",
-]
-PositiveInt = Annotated[int, Field(gt=0)]
+GateName: TypeAlias = Literal["gold-incremental", "no-op"]
 ExitCode = Annotated[int, Field(ge=0, le=255)]
 TimeoutSeconds = Annotated[float, Field(gt=0, le=120, allow_inf_nan=False)]
 
-GATES: tuple[GateName, ...] = (
-    "schema-roundtrip",
-    "completeness",
-    "leakage",
-    "gold-incremental",
-    "no-op",
-)
+GATES: tuple[GateName, ...] = ("gold-incremental", "no-op")
 MINIMUM_CHECKPOINTS = 3
 MAXIMUM_CHECKPOINTS = 8
+
+EVOLVED = Condition("evolved")
+CARRY_REFERENCE = Condition("carry-reference")
 
 
 class CheckpointError(ValueError):
@@ -223,6 +221,60 @@ class CheckpointFamily(StrictModel):
     @property
     def digest(self) -> str:
         return canonical_digest(self)
+
+    @property
+    def task_id(self) -> SourceId:
+        return self.family_id
+
+    @property
+    def public_digest(self) -> DigestText:
+        """Cover exactly the specs and contract an agent may read.
+
+        Deliberately excludes the sealed cases so that editing a hidden test
+        does not change the family's public identity, which is the property the
+        `Task` protocol requires.
+        """
+
+        return canonical_digest(
+            {
+                "contract": self.contract.model_dump(mode="json"),
+                "family_id": self.family_id,
+                "specs": [
+                    {
+                        "index": checkpoint.index,
+                        "operator": checkpoint.operator,
+                        "public_spec": checkpoint.public_spec,
+                    }
+                    for checkpoint in self.checkpoints
+                ],
+            }
+        )
+
+    @property
+    def verifier_digest(self) -> DigestText:
+        return canonical_digest(
+            {
+                "contract": CONTRACT.model_dump(mode="json"),
+                "cases": [
+                    case.model_dump(mode="json") for case in self._sealed_cases()
+                ],
+            }
+        )
+
+    @property
+    def agent_contract(self) -> AgentContract:
+        return CONTRACT
+
+
+CONTRACT = AgentContract(
+    instructions=(
+        "Reply with the complete workspace as one JSON object: "
+        '{"files": {"<relative path>": "<full file content>"}}. Include every '
+        "file the program needs; any file you omit is deleted. Do not use "
+        "Markdown fences and do not add commentary. The program must behave "
+        "exactly as specified when run through the declared entry file."
+    ),
+)
 
 
 class ReferenceBuild(StrictModel):
@@ -407,73 +459,24 @@ class AdmissionReceipt(StrictModel):
         return self
 
 
-def _gate_schema_roundtrip(
-    family: CheckpointFamily, references: ReferenceBuild
-) -> GateResult:
-    try:
-        family_copy = CheckpointFamily.model_validate_json(canonical_bytes(family))
-        reference_copy = ReferenceBuild.model_validate_json(canonical_bytes(references))
-    except ValidationError as error:
-        detail = error.errors(include_url=False)[0]["msg"]
-        return GateResult(
-            gate="schema-roundtrip",
-            passed=False,
-            detail=f"canonical round-trip rejected: {detail}",
-        )
-    stable = family_copy == family and reference_copy == references
-    return GateResult(
-        gate="schema-roundtrip",
-        passed=stable,
-        detail="canonical bytes round-trip to identical models"
-        if stable
-        else "canonical round-trip produced a different model",
-    )
+def _require_aligned(family: CheckpointFamily, references: ReferenceBuild) -> None:
+    """Reject a mismatched reference build before running anything.
 
+    This was a gate. It is a precondition: nothing downstream can produce a
+    meaningful result from references bound to a different family, so recording
+    it as a failed gate only obscured which of the two real gates was tried.
+    """
 
-def _gate_completeness(
-    family: CheckpointFamily, references: ReferenceBuild
-) -> GateResult:
-    problems: list[str] = []
     if references.family_digest != family.digest:
-        problems.append("reference build is bound to a different family digest")
+        raise CheckpointError("reference build is bound to a different family digest")
     if len(references.stages) != len(family.checkpoints):
-        problems.append(
+        raise CheckpointError(
             f"reference stages ({len(references.stages)}) do not cover the "
             f"{len(family.checkpoints)} checkpoints"
         )
-    if problems:
-        return GateResult(gate="completeness", passed=False, detail="; ".join(problems))
-    return GateResult(
-        gate="completeness",
-        passed=True,
-        detail=f"references cover all {len(family.checkpoints)} checkpoints",
-    )
-
-
-def _gate_leakage(family: CheckpointFamily) -> GateResult:
-    findings = [
-        f"spec {checkpoint.index} contains sealed case {case.case_id}"
-        for checkpoint in family.checkpoints
-        for case in family._sealed_cases()
-        if case.case_id in checkpoint.public_spec
-        or canonical_bytes(case).decode() in checkpoint.public_spec
-    ]
-    if findings:
-        return GateResult(gate="leakage", passed=False, detail="; ".join(findings))
-    return GateResult(
-        gate="leakage",
-        passed=True,
-        detail="no sealed case id or body appears in any public spec",
-    )
 
 
 def _gate_gold(family: CheckpointFamily, references: ReferenceBuild) -> GateResult:
-    if len(references.stages) != len(family.checkpoints):
-        return GateResult(
-            gate="gold-incremental",
-            passed=False,
-            detail="not executed: reference stages are misaligned",
-        )
     failures = []
     for checkpoint in family.checkpoints:
         verification = verify_stage(
@@ -498,12 +501,6 @@ def _gate_gold(family: CheckpointFamily, references: ReferenceBuild) -> GateResu
 
 
 def _gate_no_op(family: CheckpointFamily, references: ReferenceBuild) -> GateResult:
-    if len(references.stages) != len(family.checkpoints):
-        return GateResult(
-            gate="no-op",
-            passed=False,
-            detail="not executed: reference stages are misaligned",
-        )
     vacuous = []
     for checkpoint in family.checkpoints:
         prior = (
@@ -525,10 +522,16 @@ def _gate_no_op(family: CheckpointFamily, references: ReferenceBuild) -> GateRes
 def admit_family(
     family: CheckpointFamily, references: ReferenceBuild
 ) -> AdmissionReceipt:
+    """Prove the family's obligations accumulate, then that they bite.
+
+    `gold-incremental` requires the reference solution for each stage to satisfy
+    every obligation accrued so far; `no-op` requires the previous stage's
+    reference to fail the current stage. A family that passes both demands new
+    work at every step and grades it against everything that came before.
+    """
+
+    _require_aligned(family, references)
     gates = (
-        _gate_schema_roundtrip(family, references),
-        _gate_completeness(family, references),
-        _gate_leakage(family),
         _gate_gold(family, references),
         _gate_no_op(family, references),
     )
@@ -540,4 +543,57 @@ def admit_family(
         reference_digest=references.digest,
         gates=gates,
         decision=decision,
+    )
+
+
+def build_checkpoint_variants(
+    family: CheckpointFamily,
+    references: ReferenceBuild,
+) -> VariantSet:
+    """Turn one admitted family into two reference-free conditions.
+
+    Both conditions walk the same stages under the same obligations. The
+    `evolved` condition carries its own accumulated workspace forward; the
+    `carry-reference` condition is handed the previous stage's reference
+    workspace instead, so only the former has to reproduce its own prior work.
+
+    That asymmetry is why `required_output` exists. Screening gave both
+    conditions the same flat byte cap, which sounds matched and is not: the
+    evolved condition had to spend part of its cap re-serializing a workspace
+    that the control was simply given, and it failed 10/10 on the cap rather
+    than on the task. Here each condition's limit is its own carrying cost plus
+    the checkpoint's declared headroom, so the room to do new work is equal by
+    construction and the difference in limits is visible in the plan.
+    """
+
+    _require_aligned(family, references)
+    carried = (0, *(stage.content_bytes for stage in references.stages[:-1]))
+    return VariantSet(
+        task_id=family.family_id,
+        provenance="reference_free",
+        agent_contract=CONTRACT,
+        variants=(
+            Variant(
+                condition=CARRY_REFERENCE,
+                turns=tuple(
+                    Turn(
+                        text=checkpoint.public_spec,
+                        required_output=0,
+                        headroom=checkpoint.max_output_bytes,
+                    )
+                    for checkpoint in family.checkpoints
+                ),
+            ),
+            Variant(
+                condition=EVOLVED,
+                turns=tuple(
+                    Turn(
+                        text=checkpoint.public_spec,
+                        required_output=carried[checkpoint.index - 1],
+                        headroom=checkpoint.max_output_bytes,
+                    )
+                    for checkpoint in family.checkpoints
+                ),
+            ),
+        ),
     )

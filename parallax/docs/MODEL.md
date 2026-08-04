@@ -134,10 +134,11 @@ requirement.
 > events, scripts, outcomes, design manifest, and run evidence with frozen
 > strict Pydantic models and deterministic JSONL. Discriminated unions make
 > event, outcome, and evidence-record variants explicit. The manifest fixes
-> expected source-trial units, seeds, model configuration, and arm
-> configuration before outcomes are aggregated.
-> The SWE-bench slice adds versioned `TaskSpecV1` and `EnvSpecV1` models.
-> `TaskSpecV1` makes the public and sealed authority branches structural.
+> expected task-trial units, temperature, model configuration, and the set of
+> conditions before outcomes are aggregated. There is no per-trial seed: the
+> gateway ignores one, so trials are samples rather than replicates.
+> The SWE-bench slice adds `SweTaskSpec` and `SweEnvSpec` models.
+> `SweTaskSpec` makes the public and sealed authority branches structural.
 > `compile_hud` creates agent artifacts only from the public branch and emits
 > evaluator artifacts separately. This is one narrow executable target, not a
 > general platform compiler framework.

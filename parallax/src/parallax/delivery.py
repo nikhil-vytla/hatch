@@ -4,10 +4,10 @@ import json
 from dataclasses import dataclass, field
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import Field, model_validator
 
-NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
-PositiveInt = Annotated[int, Field(gt=0)]
+from .types import NonEmptyText, NonNegativeInt, PositiveInt, StrictModel
+
 AdvanceTrigger = Literal[
     "submission",
     "budget_exhaustion",
@@ -21,12 +21,8 @@ INTENT_UPDATE_PREFIX = (
 )
 
 
-class StrictModel(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
-
 class PhaseActivityV1(StrictModel):
-    turn_index: Annotated[int, Field(ge=0)]
+    turn_index: NonNegativeInt
     step_budget: PositiveInt
     steps_consumed: PositiveInt
     advance_trigger: AdvanceTrigger
