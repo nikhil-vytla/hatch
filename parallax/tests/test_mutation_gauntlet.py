@@ -127,6 +127,34 @@ MUTATIONS = (
         ("tests/test_hud_wire.py",),
     ),
     Mutation(
+        "a_cached_episode_keeps_the_price_it_was_written_with",
+        "src/parallax/hud_screening.py",
+        "    @property\n"
+        "    def usage(self) -> MeteredUsage:\n"
+        "        return meter(\n"
+        "            self.reported_model,\n"
+        "            prompt_tokens=self.prompt_tokens,\n"
+        "            completion_tokens=self.completion_tokens,\n"
+        "        )",
+        "    cost_usd: float = 0.0\n"
+        "\n"
+        "    @property\n"
+        "    def usage(self) -> MeteredUsage:\n"
+        "        return MeteredUsage(\n"
+        "            prompt_tokens=self.prompt_tokens,\n"
+        "            completion_tokens=self.completion_tokens,\n"
+        "            cost_usd=self.cost_usd,\n"
+        "        )",
+        ("tests/test_hud_screening.py",),
+    ),
+    Mutation(
+        "dataset_test_lists_must_arrive_as_json_text",
+        "src/parallax/swebench.py",
+        "        return wire_tuple(value)",
+        "        return value",
+        ("tests/test_swebench.py",),
+    ),
+    Mutation(
         "episode_cache_keys_drop_the_arm",
         "src/parallax/hud_screening.py",
         'f"{unit.arm}-trial-{unit.trial_index}"',

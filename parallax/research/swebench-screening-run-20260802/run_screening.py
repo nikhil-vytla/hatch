@@ -18,6 +18,7 @@ from parallax.screening import (
     initialize_screening_manifest,
     read_screening_jsonl,
     run_screening,
+    single_writer,
     summarize_screening,
 )
 from parallax.swebench import (
@@ -75,6 +76,7 @@ class ConstructionReceipt(StrictModel):
 
 
 def _append(path: Path, value: object) -> None:
+    """Append one receipt. Callers hold `single_writer(path)` around the phase."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("ab") as output:
         output.write(canonical_bytes(value) + b"\n")
@@ -97,6 +99,17 @@ def _read_constructions() -> dict[str, ConstructionReceipt]:
 
 
 def _construct(problems) -> tuple[dict[str, SweConstruction], float]:
+    with single_writer(CONSTRUCTIONS):
+        return _construct_locked(problems)
+
+
+def _construct_locked(problems) -> tuple[dict[str, SweConstruction], float]:
+    """Pay for the missing constructions. The evidence lock is already held.
+
+    Skipping an already-receipted source is a read of the file this appends to,
+    so two sessions racing here would each see the other's work as absent and
+    pay for it twice. `run_screening` takes the same lock over the episodes.
+    """
     receipts = _read_constructions()
     provider = HudGatewayProvider(CONSTRUCTION_MODEL)
     for problem in problems:

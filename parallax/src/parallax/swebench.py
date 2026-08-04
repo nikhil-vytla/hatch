@@ -17,7 +17,7 @@ from pydantic import (
 
 from .canonical import canonical_digest
 from .evolving_intent import Arm, Chat, Message
-from .hud_wire import WireFormatError, parse_wire
+from .hud_wire import WireFormatError, parse_wire, wire_tuple
 from .types import (
     DigestText,
     NonEmptyText,
@@ -158,6 +158,12 @@ class _DatasetRow(StrictModel):
     @field_validator("FAIL_TO_PASS", "PASS_TO_PASS", mode="before")
     @classmethod
     def parse_test_list(cls, value: object) -> object:
+        """Accept the dataset's string-encoded arrays and plain arrays alike.
+
+        The rows service returns these columns as JSON text, but a plain array
+        is the shape everything else on this wire uses, and attaching this
+        validator would otherwise reject it: see `wire_tuple`.
+        """
         if isinstance(value, str):
             try:
                 parsed = json.loads(value)
@@ -166,7 +172,7 @@ class _DatasetRow(StrictModel):
             if not isinstance(parsed, list):
                 raise ValueError("test list must decode to an array")
             return tuple(parsed)
-        return value
+        return wire_tuple(value)
 
 
 class _FilteredRow(StrictModel):

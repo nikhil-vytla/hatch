@@ -28,11 +28,9 @@ import json
 import re
 from typing import TypeVar
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from .types import StrictModel
-
-WireModelT = TypeVar("WireModelT", bound=StrictModel)
+WireModelT = TypeVar("WireModelT", bound=BaseModel)
 
 FRAME_LIMIT_BYTES = 16 * 1024 * 1024
 ASYNCIO_DEFAULT_FRAME_LIMIT = 64 * 1024

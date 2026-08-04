@@ -237,6 +237,25 @@ def test_loader_rejects_non_array_test_lists() -> None:
         )
 
 
+def test_loader_accepts_test_lists_that_arrive_as_arrays() -> None:
+    """The rows service sends JSON text; a parquet read sends a real list."""
+    native = {
+        **row(),
+        "FAIL_TO_PASS": json.loads(str(row()["FAIL_TO_PASS"])),
+        "PASS_TO_PASS": json.loads(str(row()["PASS_TO_PASS"])),
+    }
+
+    problem = load_swebench_rows(
+        (native,),
+        (INSTANCE_ID,),
+        runtimes={INSTANCE_ID: runtime()},
+    )[0]
+
+    assert problem.verifier.fail_to_pass == tuple(
+        json.loads(str(row()["FAIL_TO_PASS"]))
+    )
+
+
 def test_constructor_prompt_excludes_all_sealed_material() -> None:
     problem = load_swebench_rows(
         (row(),),

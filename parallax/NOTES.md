@@ -540,4 +540,29 @@ Follow-ups after PR #30 merged, 2026-08-03 late:
   dollars; count replayed episodes again) and now copies `research/` into its
   sandbox. It had been excluding it, which meant every evidence-replay test
   failed for a missing file inside the sandbox and read as a kill regardless of
-  what the mutation did. 21 mutants, all killed.
+  what the mutation did. 23 mutants, all killed.
+
+Four gaps the wire and pricing surveys turned up, closed after the spend audit
+made their cost concrete:
+
+- `HudEpisode` no longer stores a price. It keeps tokens and the reported model
+  and derives `usage` through `meter()`, so a cached episode cannot carry a
+  retired rate into a resumed run's evidence. This is the mechanism behind the
+  defect the audit priced: round one's regrade copied each cached episode's
+  recorded cost into fresh rows, which is how retired-rate figures spread from
+  the episodes into `screening.jsonl`. `regrade_screening.py` re-meters too.
+- `swebench_harness.py` parsed the official report with
+  `model_validate_json(json.dumps(...))`, the same JSON-mode round-trip
+  `hud_wire` exists to own. Both the report and the summary go through
+  `parse_wire` now, and its type variable is bound to `BaseModel` so the
+  harness's `extra="ignore"` wire models can use it.
+- `_DatasetRow.parse_test_list` only understood the rows service's
+  string-encoded arrays, so a plain array — what a pinned parquet read
+  produces — would have been rejected by the strict tuple field for the reason
+  `wire_tuple` documents. It now routes the non-string case through
+  `wire_tuple`.
+- The round-one construction loop appended receipts with a bare `open("ab")`
+  while deciding what to pay for by reading the same file. Two sessions would
+  each have seen the other's work as absent. `_construct` now holds
+  `single_writer(CONSTRUCTIONS)` across the whole phase, matching what
+  `run_screening` already does for episodes.

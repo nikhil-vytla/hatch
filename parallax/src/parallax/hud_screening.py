@@ -25,7 +25,7 @@ from .screening import ScreeningExecution, ScreeningExecutionError, ScreeningUni
 from .specs import freeze_swe_specs
 from .swebench import SweScriptFamily
 from .swebench_harness import OfficialHarnessError, run_official_harness
-from .types import NonEmptyText, StrictModel
+from .types import NonEmptyText, NonNegativeInt, StrictModel
 
 
 def _docker_runtime(image: str) -> DockerRuntime:
@@ -33,10 +33,27 @@ def _docker_runtime(image: str) -> DockerRuntime:
 
 
 class HudEpisode(StrictModel):
+    """One paid episode, stored as tokens rather than as dollars.
+
+    A cached episode outlives the rate card that was current when it ran, and
+    a resume that trusted a stored price would carry a retired rate into fresh
+    evidence — which is exactly how a screening round came to be reported at
+    three times its cost. Price is therefore never stored, only derived.
+    """
+
     model_patch: str
     delivery: CompleteDeliveryReceiptV1
     reported_model: NonEmptyText
-    usage: MeteredUsage
+    prompt_tokens: NonNegativeInt
+    completion_tokens: NonNegativeInt
+
+    @property
+    def usage(self) -> MeteredUsage:
+        return meter(
+            self.reported_model,
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
+        )
 
 
 class HarnessTurnAgent(Agent):
@@ -246,7 +263,8 @@ async def _run_episode(
         model_patch=patch,
         delivery=delivery,
         reported_model=models[-1],
-        usage=usage,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
     )
 
 
