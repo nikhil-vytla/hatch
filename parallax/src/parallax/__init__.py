@@ -1,3 +1,4 @@
+from .checkpoint_agent import AgentReplyError, ProviderCheckpointAgent
 from .checkpoint_evolution import (
     CheckpointError,
     admit_family,
@@ -10,6 +11,8 @@ from .checkpoint_runner import (
     run_ce_experiment,
     run_checkpoint_family,
 )
+from .checkpoint_sandbox import SandboxCaseExecution
+from .checkpoint_screening import run_ce_screening
 from .evolving_intent import ConstructionError, build_script_family
 from .gsm8k import Gsm8kError, load_gsm8k
 from .hud_compile import compile_hud
@@ -25,12 +28,15 @@ from .swebench import (
 )
 
 __all__ = [
+    "AgentReplyError",
     "BudgetError",
     "CheckpointError",
     "CheckpointRunError",
     "ConstructionError",
     "Gsm8kError",
+    "ProviderCheckpointAgent",
     "ProviderError",
+    "SandboxCaseExecution",
     "SpendApprovalRequired",
     "SweBenchError",
     "admit_family",
@@ -44,6 +50,7 @@ __all__ = [
     "read_ce_jsonl",
     "report_from_jsonl",
     "run_ce_experiment",
+    "run_ce_screening",
     "run_checkpoint_family",
     "run_experiment",
     "verify_stage",

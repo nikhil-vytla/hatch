@@ -14,6 +14,7 @@ from parallax.checkpoint_evolution import (
     VerifierError,
     Workspace,
     admit_family,
+    run_case_trusted,
     verify_stage,
 )
 from parallax.checkpoint_runner import (
@@ -24,7 +25,9 @@ from parallax.checkpoint_runner import (
     CeRunRecord,
     CheckpointDelivery,
     FamilyRun,
+    MeteredWorkspace,
     StageReceipt,
+    StageUsage,
     read_ce_jsonl,
     run_ce_experiment,
     run_checkpoint_family,
@@ -195,10 +198,10 @@ def test_agent_faults_are_run_failures_with_censoring(seed_fixture, admitted) ->
 def test_verifier_fault_is_infrastructure_and_family_continues(
     seed_fixture, admitted, monkeypatch
 ) -> None:
-    def flaky(family, index, workspace):
+    def flaky(family, index, workspace, *, execute=run_case_trusted):
         if index == 2:
             raise VerifierError("interpreter spawn failed")
-        return verify_stage(family, index, workspace)
+        return verify_stage(family, index, workspace, execute=execute)
 
     monkeypatch.setattr(checkpoint_runner, "verify_stage", flaky)
     run = run_checkpoint_family(admitted, ReferenceAgent(seed_fixture), arm="evolved")
@@ -525,3 +528,66 @@ def test_run_records_reject_incoherent_replay_shapes(
         rebuild(censored=(5,))
     with pytest.raises(ValidationError, match="pre-episode failure"):
         rebuild(receipts=())
+
+
+STAGE_USAGE = StageUsage(
+    prompt_tokens=1200,
+    completion_tokens=400,
+    estimated_cost_usd=0.0032,
+)
+
+
+class MeteredReferenceAgent(ReferenceAgent):
+    def __call__(self, delivery: CheckpointDelivery) -> MeteredWorkspace:
+        return MeteredWorkspace(
+            workspace=super().__call__(delivery),
+            usage=STAGE_USAGE,
+        )
+
+
+def test_metered_agents_land_usage_in_every_stage_receipt(
+    seed_fixture, admitted
+) -> None:
+    run = run_checkpoint_family(
+        admitted, MeteredReferenceAgent(seed_fixture), arm="evolved"
+    )
+    assert len(run.receipts) == 3
+    for receipt in run.receipts:
+        assert receipt.usage == STAGE_USAGE
+        assert isinstance(receipt.outcome, StageVerification)
+
+
+def test_unmetered_agents_leave_usage_absent(seed_fixture, admitted) -> None:
+    run = run_checkpoint_family(admitted, ReferenceAgent(seed_fixture), arm="evolved")
+    assert all(receipt.usage is None for receipt in run.receipts)
+
+
+def test_failed_stages_retain_usage_spent_before_the_fault(
+    seed_fixture, admitted
+) -> None:
+    error = BudgetError("stage reply reached its output-token limit")
+    error.stage_usage = STAGE_USAGE
+    run = run_checkpoint_family(
+        admitted, FailingAgent(seed_fixture, 2, error), arm="evolved"
+    )
+    fault = run.receipts[1]
+    assert isinstance(fault.outcome, RunFailure)
+    assert fault.outcome.failure_kind == "budget"
+    assert fault.output_workspace_digest is None
+    assert fault.usage == STAGE_USAGE
+    assert run.censored == (3,)
+
+
+def test_oversized_metered_workspaces_keep_their_usage(seed_fixture, admitted) -> None:
+    oversized = Workspace.from_files({"tally.py": "#" * 5000})
+
+    class OversizedMetered(ReferenceAgent):
+        def __call__(self, delivery: CheckpointDelivery) -> MeteredWorkspace:
+            produced = oversized if delivery.index == 2 else super().__call__(delivery)
+            return MeteredWorkspace(workspace=produced, usage=STAGE_USAGE)
+
+    run = run_checkpoint_family(admitted, OversizedMetered(seed_fixture), arm="evolved")
+    fault = run.receipts[1]
+    assert isinstance(fault.outcome, RunFailure)
+    assert fault.outcome.error_type == "WorkspaceBudgetExceeded"
+    assert fault.usage == STAGE_USAGE
