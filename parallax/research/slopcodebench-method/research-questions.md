@@ -87,7 +87,7 @@ repeated self-editing — a materially different failure mode with different
 training implications.
 
 **RQ7 — Reversibility.** *Can a declared refactor-only stage (no new
-requirements, $T_{\mathrm{new}}=\varnothing$, sealed suite unchanged)
+requirements, $`T_{\mathrm{new}}=\varnothing`$, sealed suite unchanged)
 recover subsequent verification or flatten the slope?*
 
 Estimand: $\Delta_{\mathrm{repair\text{-}scheduled},\,\mathrm{evolved}}$
