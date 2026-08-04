@@ -34,8 +34,6 @@ from .types import (
 )
 
 ARMS: tuple[Arm, Arm, Arm] = ("static", "matched", "evolved")
-Threshold = Annotated[float, Field(ge=-1, le=1, allow_inf_nan=False)]
-_THRESHOLD = TypeAdapter(Threshold)
 
 
 class RunIdentity(StrictModel):
@@ -81,7 +79,6 @@ class ArmConfig(StrictModel):
 class ManifestRecord(StrictModel):
     kind: Literal["manifest"] = "manifest"
     schema_version: Literal[1] = 1
-    threshold: Threshold
     design_digest: DesignDigest
     model_config_digest: ModelConfigDigest
     units: Annotated[tuple[ManifestUnit, ...], Field(min_length=1)]
@@ -102,7 +99,6 @@ class ManifestRecord(StrictModel):
             )
         body = {
             "schema_version": self.schema_version,
-            "threshold": self.threshold,
             "model_config_digest": self.model_config_digest,
             "units": [item.model_dump(mode="json") for item in self.units],
             "arm_config_digests": [
@@ -201,11 +197,9 @@ def _arm_digest(source_id: SourceId, script: Script) -> ArmConfigDigest:
 def _build_manifest(
     families: tuple[ScriptFamily, ...],
     trial_seeds: tuple[int, ...],
-    threshold: float,
     agent_model: str,
     model_config: Mapping[str, object],
 ) -> ManifestRecord:
-    valid_threshold = _THRESHOLD.validate_python(threshold)
     if not families or not trial_seeds:
         raise ValueError("families and trial_seeds must be non-empty")
     source_ids = [family.static.problem.record_id for family in families]
@@ -235,13 +229,11 @@ def _build_manifest(
     )
     body = {
         "schema_version": 1,
-        "threshold": valid_threshold,
         "model_config_digest": model_digest,
         "units": [unit.model_dump(mode="json") for unit in units],
         "arm_config_digests": [item.model_dump(mode="json") for item in arm_digests],
     }
     return ManifestRecord(
-        threshold=valid_threshold,
         design_digest=DesignDigest(canonical_digest(body)),
         model_config_digest=model_digest,
         units=units,
@@ -360,17 +352,10 @@ def run_experiment(
     trial_seeds: tuple[int, ...],
     agent_model: str,
     model_config: Mapping[str, object],
-    threshold: float,
     output_path: Path,
 ) -> tuple[RunResult, ...]:
     ordered = tuple(sorted(families, key=lambda item: item.static.problem.record_id))
-    manifest = _build_manifest(
-        ordered,
-        trial_seeds,
-        threshold,
-        agent_model,
-        model_config,
-    )
+    manifest = _build_manifest(ordered, trial_seeds, agent_model, model_config)
     family_by_source = {family.static.problem.record_id: family for family in ordered}
     arm_digests = {
         (item.source_id, item.arm): item.digest for item in manifest.arm_config_digests
