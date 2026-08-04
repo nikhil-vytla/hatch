@@ -36,8 +36,6 @@ from parallax.outcome import BudgetError, RunFailure
 
 
 class ReferenceAgent:
-    """Scripted agent keyed by the delivered public specification text."""
-
     def __init__(self, fixture: SeedFamilyFixture) -> None:
         self.by_spec = {
             checkpoint.public_spec: fixture.references.stages[position]
@@ -51,8 +49,6 @@ class ReferenceAgent:
 
 
 class MyopicAgent(ReferenceAgent):
-    """Breaks checkpoint 1 behavior from stage 2 onward."""
-
     def __init__(self, fixture: SeedFamilyFixture) -> None:
         super().__init__(fixture)
         for position, checkpoint in enumerate(fixture.family.checkpoints):
