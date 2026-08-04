@@ -80,7 +80,7 @@ surface). Output: a **decomposability brief** that scores the seed on:
 
 ### Stage S2 — Plan: checkpoint partition
 
-Final-state-first: draft the terminal spec \(S_n^{\mathrm{merged}}\), then
+Final-state-first: draft the terminal spec $S_n^{\mathrm{merged}}$, then
 partition backwards into stages, each labeled with its operator from the
 algorithmic model (§2.4: extension / refinement / input-source /
 re-modality), a single focus, and an out-of-scope list. Structural rules
@@ -119,12 +119,12 @@ analog. A family is admissible iff all gates pass at every stage:
 
 | Gate | Predicate | Sequence-level meaning | Automatable? |
 | --- | --- | --- | --- |
-| **G1 gold** | both references pass \(\Omega_i\) at every \(i\), built incrementally | solvable *as an evolution*, not just in the final state | yes |
-| **G2 no-op** | the stage-\((i{-}1)\) reference workspace fails \(T_i\) for every \(i\) | every checkpoint demands new work; no vacuous stages | yes |
+| **G1 gold** | both references pass $\Omega_i$ at every $i$, built incrementally | solvable *as an evolution*, not just in the final state | yes |
+| **G2 no-op** | the stage $(i{-}1)$ reference workspace fails $T_i$ for every $i$ | every checkpoint demands new work; no vacuous stages | yes |
 | **G3 mutant/ambiguity** | (a) seeded semantic mutants of the references fail the suite; (b) the two references produce identical normalized outputs on the full sealed input space of the suite | suite discriminates; spec admits one behavior ("could two correct implementations differ?" from `checklist.md`, made executable) | yes |
-| **G4 pressure** | naive-architecture reference (deliberately myopic at \(C_1\), still correct) incurs ≥ \(k\times\) the downstream churn/cost of the anticipatory reference | the sequence actually stresses design, the property upstream asserts by author judgment (Table 4) | yes, given the naive build |
+| **G4 pressure** | naive-architecture reference (deliberately myopic at $C_1$, still correct) incurs ≥ $k\times$ the downstream churn/cost of the anticipatory reference | the sequence actually stresses design, the property upstream asserts by author judgment (Table 4) | yes, given the naive build |
 | **G5 leakage/secrecy** | spec lint (structure hints, future-checkpoint mentions, exact-STDERR prescriptions) + sealed-side scan: no test content, verdicts, or measurement output reachable from the public capsule or workspace | authority separation across the whole family | partially — lint automates the checklist; residual semantic leakage needs review |
-| **G6 headroom/difficulty** | a pinned frontier agent given \(S_1\) alone does not pass the full family's suites (no one-shot); calibration runs show nonzero progress and sub-saturation strict rates | the family discriminates at the frontier, mirroring upstream's proposal-phase drop rule | yes (compute-priced) |
+| **G6 headroom/difficulty** | a pinned frontier agent given $S_1$ alone does not pass the full family's suites (no one-shot); calibration runs show nonzero progress and sub-saturation strict rates | the family discriminates at the frontier, mirroring upstream's proposal-phase drop rule | yes (compute-priced) |
 
 Gate receipts are retained as admission evidence in the frozen family.
 
@@ -236,7 +236,7 @@ sterile puzzle. That risk concentrates in exactly the two human-judgment
 points above, which is why they are gates rather than suggestions.
 
 What would settle it (the experiment is itself runnable under this
-workflow): author \(k\) families by this pipeline and take \(k\)
+workflow): author $k$ families by this pipeline and take $k$
 hand-authored SCBench problems of matched size; run the same pinned agent
 panel on both; compare (a) model *ranking* agreement between the two sets,
 (b) strict-rate headroom and per-stage discrimination, (c) degradation-slope
