@@ -1,11 +1,11 @@
 # Preregistration draft: first paid checkpoint-evolution run
 
-Status: **prerequisites met; awaiting approval — no paid inference has
-run.** Both prerequisites below are implemented and verified; the
-offline dry-run evidence in `evidence/` proves the full screening path.
-The only missing inputs are user approval and a valid `HUD_API_KEY`.
+Status: **executed 2026-08-03** with the design below, unchanged.
+Results and decision: [screening-report.md](screening-report.md).
+Evidence: `evidence/screening.jsonl` (60/60 stage calls delivered and
+validated), actual spend $0.2813 against the $5 cap.
 
-Launch command (from `parallax/`, with the key exported):
+Launch command used (from `parallax/`, with the key exported):
 
 ```bash
 uv run python research/checkpoint-evolution-slice/run_screening.py \

@@ -4,11 +4,13 @@ This investigation implemented checkpoint evolution — the
 SlopCodeBench-derived synthesis method designed in
 [`../slopcodebench-method/`](../slopcodebench-method/README.md) — as
 Parallax's second executable strategy, alongside Evolving Intent. The
-deliverable is an offline-verifiable vertical slice: typed domain model,
-black-box entrypoint verifier, executable admission gates, a
+deliverable is an offline-verifiable vertical slice — typed domain
+model, black-box entrypoint verifier, executable admission gates, a
 harness-owned checkpoint runner with two controlled arms, and a
-hand-verified seed family that runs end to end with scripted agents. No
-paid inference ran in this unit.
+hand-verified seed family — plus the first paid screening run over it:
+60 Haiku stage calls, sandboxed verification, $0.28 metered spend, and
+a complete evolved-vs-carry separation at stage 3
+([screening-report.md](screening-report.md)).
 
 The as-implemented contract lives in
 [`../../docs/methods/checkpoint-evolution.md`](../../docs/methods/checkpoint-evolution.md);
@@ -29,6 +31,7 @@ this folder records how the work got there.
 | Tests | `tests/test_checkpoint_evolution.py`, `tests/test_checkpoint_runner.py`, `tests/test_checkpoint_agent.py`, `tests/test_checkpoint_sandbox.py`, `tests/test_checkpoint_screening.py` | 73 offline tests covering every invariant above, both arms end to end, the adapter wire behaviors, sandbox lockdown and fault classification, the full screening path, and real-container integration probes |
 | Mutation gauntlet | [`mutants/run_gauntlet.py`](mutants/run_gauntlet.py) | 24 targeted semantic mutants; all killed |
 | Dry-run evidence | [`evidence/`](evidence/) | `dry-run.jsonl` (10-seed preregistered shape, 60/60 stages verified, $0) and `dry-run-sandbox.jsonl` (2 seeds through the real container sandbox, 12/12 verified) |
+| Screening evidence | [`evidence/screening.jsonl`](evidence/screening.jsonl), summarized by [`summarize_screening.py`](summarize_screening.py) | the executed preregistered live run: 60/60 stage calls, receipt chain confirmed, $0.2813 metered; report in [screening-report.md](screening-report.md) |
 
 ## The invariants that matter
 
@@ -64,6 +67,22 @@ this folder records how the work got there.
   approval and an under-cap estimate (M24 dies), refuses any stage call
   that could cross the cap mid-run, and meters every stage — failed
   stages included — into receipts (M21 dies).
+
+## Screening result (executed 2026-08-03)
+
+The preregistered 60-call run executed unchanged: 10 seeds × 2 arms × 3
+checkpoints, Claude Haiku 4.5, every sealed case verified inside the
+pinned container sandbox. Both arms passed stages 1–2 strict on all
+seeds. At stage 3 the arms separated completely: `carry-reference`
+verified strict 10/10, while `evolved` — re-serializing its own
+increasingly verbose workspace — exceeded the family's 4096-byte
+workspace budget 10/10 (replies of 4802–4864 bytes) and produced no
+verifiable stage-3 workspace. All failures are budget-classified agent
+behavior; infrastructure failures were zero, evidence completeness was
+100%, and actual spend was $0.2813, so the preregistered decision rule
+says proceed to multi-family synthesis. One family, one model,
+bounds-only language throughout — full tables and claim limits in
+[screening-report.md](screening-report.md).
 
 ## Task-family choice
 
@@ -115,9 +134,11 @@ uv run python research/checkpoint-evolution-slice/run_screening.py
 
 ## Claim limits
 
-- All runs use scripted agents or a scripted gateway transport. Nothing
-  here is evidence about real agent behavior under checkpoint
-  evolution.
+- All offline runs use scripted agents or a scripted gateway transport;
+  the single live run is one family × one model × one budget setting.
+  Its stage-3 separation is a property of the declared byte cap
+  interacting with this model's verbosity under a full-file-map reply
+  format, and is hypothesis-generating only.
 - The seed family's design pressure is asserted by construction
   reasoning, not measured by the churn-ratio gate (G4), which is not
   implemented.
