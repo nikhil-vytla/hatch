@@ -338,3 +338,37 @@
   HUD model discovery authenticated, but the first Claude Haiku 4.5
   construction request returned HTTP 403 before any response. The stop rule
   terminated screening at zero recorded tokens and $0 estimated spend.
+
+## Checkpoint-evolution slice
+
+- Implemented the second synthesis strategy as an offline vertical slice:
+  `checkpoint_evolution.py` (workspace/checkpoint/sealed-case domain model,
+  entrypoint-only subprocess verifier with strict/isolated/core verdicts,
+  five executable admission gates) and `checkpoint_runner.py`
+  (harness-owned checkpoint delivery, `evolved` and `carry-reference`
+  arms, digest-chained stage receipts, preregistered manifest, canonical
+  evidence JSONL). Design inputs: `research/slopcodebench-method/` and
+  `docs/methods/checkpoint-evolution.md`, now updated to as-implemented.
+- Obligations accumulate monotonically (Ω_i = Ω_{i-1} ∪ T_i) with
+  automatic regression reclassification; strict grading gates stage N on
+  stages 1..N-1 still passing. `include_prior_tests: false` is not
+  representable.
+- Delivery is unskippable by construction: agents are pure functions of
+  (public spec, carried workspace, budget); `FamilyRun` validators reject
+  skipped, reordered, or spec-drifted delivery, broken workspace-digest
+  chains, and censoring that is not exactly the undelivered suffix.
+  Unadmitted families are unrepresentable to the runner.
+- Seed family `ce-tally-1` (3 checkpoints, 10 sealed cases, hand-verified
+  incremental references) admits under all five gates; vacuous, broken,
+  misaligned, and leaky variants reject with recorded per-gate detail.
+- Declared interpretations: Python-track entrypoint pin, per-case fresh
+  materialization, oversized-return-as-budget-RunFailure, empty
+  dependency manifest, single reference build. Deferred: quality
+  measurement (all classes), `monolithic`/`foresight`/`repair-scheduled`
+  arms, synthesis pipeline S1–S6 with gates G3/G4/G6, CE report module,
+  real-agent sandboxing.
+- Certification: 153 tests in normal and optimized Python, Ruff lint and
+  format, `uvx ty check src`, `compileall`, source and wheel builds, and
+  a 14-mutant behavioral gauntlet fully killed (checkpoint-skip,
+  obligation-drop, role-mislabel, gate-inversion, chain-break, censoring,
+  digest-binding). No provider call or paid episode ran.

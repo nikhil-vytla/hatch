@@ -1,9 +1,16 @@
 # Checkpoint Evolution method
 
 > [!IMPORTANT]
-> This method is proposed and not implemented. No Parallax slice, admission
-> gate, or run evidence exists for it. Every definition below is a
-> specification target, not a description of executable behavior.
+> This method has an executable offline vertical slice:
+> `src/parallax/checkpoint_evolution.py` (domain model, entrypoint
+> verifier, admission gates) and `src/parallax/checkpoint_runner.py`
+> (harness-owned checkpoint delivery, `evolved` and `carry-reference`
+> arms, evidence records), exercised end to end by the hand-verified
+> `ce-tally-1` seed family in `tests/fixtures/checkpoint_family.json`.
+> All existing runs use scripted agents; no real-model evidence exists.
+> Sections marked *implemented* describe executable behavior; everything
+> else remains a specification target. The slice's scope, deferrals, and
+> divergences are listed in [Implemented slice](#implemented-slice).
 
 Checkpoint Evolution is a synthesis strategy \(\mathcal G_{\mathrm{CE}}\) in
 the [Parallax research model](../MODEL.md). It perturbs the initial workspace
@@ -158,22 +165,47 @@ controlled-arm rules in `MODEL.md`, not a property assumed by construction.
 An implementation requires Parallax-owned regression coverage for:
 
 - family compilation from an admitted plan: operator labeling, first-stage
-  core-problem immutability, non-destructive sequencing;
+  core-problem immutability, non-destructive sequencing — *implemented*:
+  `CheckpointFamily` validators (closed operator set, `core` exactly at
+  stage 1, contiguous indices, family-unique sealed case ids, per-stage
+  core case);
 - obligation accumulation and automatic regression reclassification of
-  prior-stage tests;
+  prior-stage tests — *implemented*: `CheckpointFamily.obligations` and
+  `verify_stage` reclassify every prior-stage case as `regression`
+  regardless of its authored category; stage 1 has no regression
+  obligations; a mutation gauntlet kills obligation-dropping mutants;
 - workspace carry-forward fidelity, including environment reset of
-  everything outside \(W\);
+  everything outside \(W\) — *implemented*: the agent boundary is a pure
+  function of (public spec, carried workspace, budget); `FamilyRun`
+  validators make a broken digest chain unrepresentable; each sealed case
+  executes in a fresh materialization, so nothing outside the file tree
+  persists;
 - entrypoint-only verifier execution and the strict/isolated/core verdict
-  vector;
+  vector — *implemented*: subprocess execution through the declared
+  entrypoint with pinned normalization (exact stdout bytes, exit-code
+  equality, unpinned stderr text asserted non-empty for error cases),
+  `StageVerification` self-validates its verdict vector against its case
+  results;
 - RunFailure vs Verification classification and censoring of missing
-  workspaces with worst-case bounds;
-- pinned, digest-branded static quality measurement with retained workspace
-  snapshots;
-- matched-arm construction for each declared intervention, including budget
-  matching for `monolithic` and `repair-scheduled`;
-- admission gates: dual incremental gold references, per-stage no-op
-  failure, mutant and cross-implementation ambiguity checks, churn-ratio
-  design pressure, leakage lint, and headroom calibration.
+  workspaces — *implemented*: case timeouts are Verification failures;
+  interpreter-spawn faults, agent faults, and budget faults are
+  RunFailures; a failing verdict never halts a family; a missing
+  workspace censors exactly the undelivered suffix, recorded per stage
+  (worst-case identification bounds remain report-side future work);
+- pinned, digest-branded static quality measurement with retained
+  workspace snapshots — **not implemented** (deferred with the Class B
+  panel);
+- matched-arm construction for each declared intervention — *implemented*
+  for `evolved` vs `carry-reference` (shared sealed suites, obligations,
+  per-stage budgets, contract; the control opens every stage from the
+  frozen reference); `monolithic`, `foresight`, and `repair-scheduled`
+  are **not implemented**;
+- admission gates — *implemented*: schema round-trip, completeness,
+  leakage lint, incremental gold, per-stage no-op, recorded in a
+  digest-bound `AdmissionReceipt`; an unadmitted family is
+  unrepresentable to the runner (`AdmittedFamily`). Dual references,
+  mutant/ambiguity checks, churn-ratio design pressure, and headroom
+  calibration are **deferred** (see the slice notes).
 
 These are semantic contracts. They do not require byte parity with the
 consulted repository's runner.
@@ -200,7 +232,57 @@ families synthesized under the
 are new constructions; no claim of upstream score reproduction is available
 or intended.
 
-> **TODO:** Before implementation, freeze the first-slice choices: seed
-> class, family length, probe policy, quality-measurement pinning, and the
-> initial pair of controlled arms (`evolved` vs `carry-reference` is the
-> recommended first contrast).
+## Implemented slice
+
+The first-slice choices the earlier draft left open are frozen as:
+
+- **Seed class**: one hand-verified CLI family (`ce-tally-1`, three
+  checkpoints: `core` → `extension` → `input-source`), in the upstream
+  problem shape — spec prose with examples and pinned normalization,
+  sealed argv/stdin/stdout/exit cases, black-box execution through the
+  declared entrypoint. Hand-authoring matches upstream practice (paper
+  §2.2); the agent-assisted synthesis pipeline (workflow stages S1–S6)
+  remains future work.
+- **Family length**: three (the upstream minimum).
+- **Probe policy and quality-measurement pinning**: deferred; no Class B
+  panel or probe agent is implemented, so no quality claim of any class
+  is available.
+- **Controlled arms**: `evolved` vs `carry-reference`, matched on sealed
+  suites, obligation accumulation, contract, and per-stage budgets.
+
+Interpretations and divergences declared by the slice, beyond the three
+listed above:
+
+- **Language track**: the entrypoint contract pins `python3` (resolved to
+  the running interpreter) plus a declared entry file, in place of
+  upstream's `%%%ENTRYPOINT%%%` placeholders. Determinism pins:
+  `PYTHONHASHSEED=0`, UTF-8 stdio, minimal environment.
+- **Per-case fresh materialization**: each sealed case runs against a
+  fresh copy of the workspace (upstream shares one container per
+  checkpoint across a pytest suite). Stricter about inter-case
+  independence; declared, covered by regression tests.
+- **Budget semantics**: the per-stage budget is a declared cap on
+  returned-workspace bytes. Upstream's wall-clock exhaustion grades the
+  partial working directory; a synchronous workspace-in/workspace-out
+  boundary has no partial state, so an oversized return is a budget
+  RunFailure with no workspace (censoring the evolved suffix), and an
+  agent-raised budget fault is classified the same way.
+- **Dependency manifest**: \(W_i\)'s declared manifest \(d_i\) is not
+  separately modeled; the single-file Python track has an empty manifest
+  by construction.
+- **Single incremental reference**: admission uses one hand-verified
+  incremental reference build rather than workflow stage S4's dual
+  independent references; dual references exist to catch spec ambiguity
+  in generated families and return with the synthesis pipeline.
+- **`include_prior_tests: false`** has no representation: obligation
+  accumulation is unconditional in this implementation, so dropping
+  inherited obligations is not constructible rather than merely
+  discouraged.
+
+Verification evidence for the slice: the offline suite in
+`tests/test_checkpoint_evolution.py` and `tests/test_checkpoint_runner.py`
+runs the seed family end to end under both arms with scripted agents, and
+a fourteen-mutant behavioral gauntlet (checkpoint-skip, obligation-drop,
+role-mislabel, gate-inversion, chain-break, censoring, digest-binding
+mutants) is fully killed; see
+[`../../research/checkpoint-evolution-slice/`](../../research/checkpoint-evolution-slice/README.md).
