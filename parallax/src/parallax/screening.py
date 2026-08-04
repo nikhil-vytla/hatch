@@ -10,7 +10,7 @@ from typing import Annotated, Literal, Self, TypeAlias, assert_never
 
 from pydantic import Field, TypeAdapter, ValidationError, model_validator
 
-from .admission import AdmittedSweFamily
+from .admission import AdmittedSweFamily, assert_admission_identity
 from .canonical import atomic_write, canonical_digest
 from .delivery import CompleteDeliveryReceiptV1
 from .evolving_intent import Arm
@@ -295,6 +295,8 @@ def build_admitted_screening_plan(
     admitted = tuple(admitted_families)
     if not admitted:
         raise ValueError("scheduling requires at least one admitted family")
+    for item in admitted:
+        assert_admission_identity(item)
     return build_screening_plan(
         (item.family.static.problem for item in admitted),
         model=model,
