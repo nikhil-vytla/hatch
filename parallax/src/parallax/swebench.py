@@ -120,6 +120,7 @@ class SweBenchVerifier(StrictModel):
     harness_revision: CommitSha
     image_ref: NonEmptyText
     image_digest: ImageDigest
+    gold_patch: NonEmptyText
     test_patch: NonEmptyText
     fail_to_pass: Annotated[tuple[NonEmptyText, ...], Field(min_length=1)]
     pass_to_pass: tuple[NonEmptyText, ...]
@@ -156,7 +157,7 @@ class _DatasetRow(StrictModel):
     repo: NonEmptyText
     instance_id: InstanceId
     base_commit: CommitSha
-    patch: str
+    patch: NonEmptyText
     test_patch: NonEmptyText
     problem_statement: NonEmptyText
     hints_text: str
@@ -258,6 +259,7 @@ def load_swebench_rows(
             harness_revision=harness_revision,
             image_ref=official_image_ref(instance_id),
             image_digest=runtime.image_digest,
+            gold_patch=row.patch,
             test_patch=row.test_patch,
             fail_to_pass=row.FAIL_TO_PASS,
             pass_to_pass=row.PASS_TO_PASS,
@@ -508,6 +510,8 @@ class SweScriptFamily(StrictModel):
             raise ValueError("SWE arms must have equal episode budgets")
         if len(self.matched.turns) != len(self.evolved.turns):
             raise ValueError("matched and evolved turn counts must match")
+        if self.matched.agent_steps != self.evolved.agent_steps:
+            raise ValueError("matched and evolved per-turn budgets must match")
         source = self.construction.source
         if self.evolved.turns[-1].state_after.intent != source:
             raise ValueError("evolved arm does not restore source intent")

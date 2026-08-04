@@ -20,6 +20,7 @@ SubmissionKind = Literal[
     "known_bad",
     "sealed_test_touch",
     "harness_crash",
+    "delivery_skip",
 ]
 
 
@@ -31,6 +32,7 @@ class ConformanceSubmission(StrictModel):
     kind: SubmissionKind
     model_patch: NonEmptyText
     simulate_harness_crash: bool = False
+    delivery_complete: bool = True
 
 
 CONFORMANCE_SUBMISSIONS = (
@@ -54,6 +56,11 @@ CONFORMANCE_SUBMISSIONS = (
         kind="harness_crash",
         model_patch="diff --git a/value.py b/value.py\n-    return 0\n+    return 1\n",
         simulate_harness_crash=True,
+    ),
+    ConformanceSubmission(
+        kind="delivery_skip",
+        model_patch="diff --git a/value.py b/value.py\n-    return 0\n+    return 1\n",
+        delivery_complete=False,
     ),
 )
 

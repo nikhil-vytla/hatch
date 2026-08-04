@@ -10,7 +10,9 @@ from typing import Annotated, Literal, Self, TypeAlias, assert_never
 
 from pydantic import Field, TypeAdapter, ValidationError, model_validator
 
+from .admission import AdmittedSweFamily
 from .canonical import atomic_write, canonical_digest
+from .delivery import CompleteDeliveryReceiptV1
 from .evolving_intent import Arm
 from .outcome import FailureKind, Outcome, RunFailure, Verdict, Verification
 from .swebench import SweBenchProblem
@@ -131,6 +133,7 @@ class ScreeningRun(StrictModel):
     verifier_report_digest: str | None = None
     harness_revision: str | None = None
     image_digest: str | None = None
+    delivery: CompleteDeliveryReceiptV1 | None = None
 
     @model_validator(mode="after")
     def consistent_usage(self) -> Self:
@@ -139,6 +142,12 @@ class ScreeningRun(StrictModel):
             and self.prompt_tokens + self.completion_tokens < 1
         ):
             raise ValueError("screening usage must contain at least one token")
+        if (
+            isinstance(self.outcome, Verification)
+            and self.unit.arm == "evolved"
+            and self.delivery is None
+        ):
+            raise ValueError("verified evolved run requires complete turn delivery")
         return self
 
 
@@ -151,6 +160,7 @@ class ScreeningExecution(StrictModel):
     verifier_report_digest: str | None = None
     harness_revision: str | None = None
     image_digest: str | None = None
+    delivery: CompleteDeliveryReceiptV1 | None = None
 
     @model_validator(mode="after")
     def consistent_usage(self) -> Self:
@@ -270,6 +280,28 @@ def build_screening_plan(
         sources=sources,
         units=units,
         cost=selected_cost,
+    )
+
+
+def build_admitted_screening_plan(
+    admitted_families: Iterable[AdmittedSweFamily],
+    *,
+    model: str,
+    expected_response_model: str | None = None,
+    trial_seeds: tuple[int, ...],
+    arms: tuple[Arm, ...],
+    cost: ScreeningCost | None = None,
+) -> ScreeningPlan:
+    admitted = tuple(admitted_families)
+    if not admitted:
+        raise ValueError("scheduling requires at least one admitted family")
+    return build_screening_plan(
+        (item.family.static.problem for item in admitted),
+        model=model,
+        expected_response_model=expected_response_model,
+        trial_seeds=trial_seeds,
+        arms=arms,
+        cost=cost,
     )
 
 
@@ -417,6 +449,7 @@ def run_screening(
                 verifier_report_digest=execution.verifier_report_digest,
                 harness_revision=execution.harness_revision,
                 image_digest=execution.image_digest,
+                delivery=execution.delivery,
             )
         )
         if execution.reported_model != plan.expected_response_model:
