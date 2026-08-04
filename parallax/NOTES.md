@@ -338,3 +338,63 @@
   HUD model discovery authenticated, but the first Claude Haiku 4.5
   construction request returned HTTP 403 before any response. The stop rule
   terminated screening at zero recorded tokens and $0 estimated spend.
+
+## Checkpoint-evolution slice
+
+- Implemented the second synthesis strategy as an offline vertical slice:
+  `checkpoint_evolution.py` (workspace/checkpoint/sealed-case domain model,
+  entrypoint-only subprocess verifier with strict/isolated/core verdicts,
+  five executable admission gates) and `checkpoint_runner.py`
+  (harness-owned checkpoint delivery, `evolved` and `carry-reference`
+  arms, digest-chained stage receipts, preregistered manifest, canonical
+  evidence JSONL). Design inputs: `research/slopcodebench-method/` and
+  `docs/methods/checkpoint-evolution.md`, now updated to as-implemented.
+- Obligations accumulate monotonically (Ω_i = Ω_{i-1} ∪ T_i) with
+  automatic regression reclassification; strict grading gates stage N on
+  stages 1..N-1 still passing. `include_prior_tests: false` is not
+  representable.
+- Delivery is unskippable by construction: agents are pure functions of
+  (public spec, carried workspace, budget); `FamilyRun` validators reject
+  skipped, reordered, or spec-drifted delivery, broken workspace-digest
+  chains, and censoring that is not exactly the undelivered suffix.
+  Unadmitted families are unrepresentable to the runner.
+- Seed family `ce-tally-1` (3 checkpoints, 10 sealed cases, hand-verified
+  incremental references) admits under all five gates; vacuous, broken,
+  misaligned, and leaky variants reject with recorded per-gate detail.
+- Declared interpretations: Python-track entrypoint pin, per-case fresh
+  materialization, oversized-return-as-budget-RunFailure, empty
+  dependency manifest, single reference build. Deferred: quality
+  measurement (all classes), `monolithic`/`foresight`/`repair-scheduled`
+  arms, synthesis pipeline S1–S6 with gates G3/G4/G6, CE report module,
+  real-agent sandboxing.
+- Certification: 153 tests in normal and optimized Python, Ruff lint and
+  format, `uvx ty check src`, `compileall`, source and wheel builds, and
+  a 14-mutant behavioral gauntlet fully killed (checkpoint-skip,
+  obligation-drop, role-mislabel, gate-inversion, chain-break, censoring,
+  digest-binding). No provider call or paid episode ran.
+
+## Checkpoint-evolution screening prerequisites
+
+- Implemented both preregistration blockers without touching the frozen
+  harness semantics: `checkpoint_agent.py` (provider adapter:
+  spec+workspace rendered to the existing HUD-gateway boundary, strict
+  JSON file-map parse with exact-fence tolerance, per-stage token/cost
+  metering into `StageReceipt.usage` even on post-spend failures,
+  truncation → budget RunFailure, model-drift/unmeterable replies →
+  agent RunFailures) and `checkpoint_sandbox.py` (every sealed case in a
+  disposable digest-pinned `python@sha256:57cd7c…` container,
+  `linux/amd64`, no network, read-only rootfs except the working
+  directory, non-root user, CPU/memory/pid limits, in-container case
+  timeout stays a case failure, docker faults are verifier RunFailures).
+- `checkpoint_screening.py` drives the preregistered design in two
+  modes: an offline dry run (scripted gateway transport, no key, no
+  spend — evidence committed for the full 10-seed shape and for a
+  sandbox-routed variant) and the live run (spend approval + $5 hard
+  cap enforced before and during, mandatory sandbox with no host
+  fallback, execution identity bound into the evidence digests).
+- Certification: 197 tests in normal and optimized Python (including
+  real-container integration probes for network/rootfs containment),
+  Ruff, ty, compileall, builds, and the gauntlet extended to 24 mutants
+  (sandbox-bypass, isolation-drop, timeout-reclassify, metering-drop,
+  fence-unwrap-drop, approval-drop all killed). Still no paid call: the
+  screening awaits user approval and a rotated HUD key.

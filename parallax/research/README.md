@@ -32,6 +32,11 @@ Dated folders. Each one spent money or compute and committed the receipts.
 - [`swebench-single-vs-evolved-20260803/`](swebench-single-vs-evolved-20260803/README.md)
   The 18-unit experiment. Three defective sessions before a clean run; the
   incident log is the most useful thing in the folder.
+- [`checkpoint-evolution-slice/`](checkpoint-evolution-slice/README.md) The
+  executable slice of checkpoint evolution: domain model, admission gates,
+  two-arm runner, seed family, mutation gauntlet, and the first paid screening
+  run. That run separated the arms completely at stage 3 for a reason the method
+  is not about, which the folder says plainly.
 
 ## Design and survey work
 
