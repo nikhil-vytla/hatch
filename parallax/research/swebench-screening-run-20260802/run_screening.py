@@ -39,7 +39,6 @@ SUMMARY = EVIDENCE / "screening-summary.json"
 SPEND_CAP_USD = 5.0
 CONSTRUCTION_MODEL = "claude-haiku-4-5"
 BOUNDARY_MODEL = "claude-opus-4-8"
-CONSTRUCTION_SEED = 20260802
 TRIAL_SEEDS = (2026080201, 2026080202)
 PREREGISTERED_EPISODE_UPPER_USD: float | None = None
 FETCH_BATCH_SIZE: int | None = None
@@ -195,7 +194,6 @@ def main() -> None:
         str(problem.record_id): build_swe_script_family(
             problem,
             constructions[str(problem.record_id)],
-            seed=CONSTRUCTION_SEED,
             total_agent_steps=12,
             max_output_tokens=4096,
         )

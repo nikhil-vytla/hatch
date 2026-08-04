@@ -18,9 +18,9 @@ from pydantic import (
 from .canonical import canonical_digest
 from .evolving_intent import Arm, Chat, Message
 from .types import (
-    ConstructionSeed,
     DigestText,
     NonEmptyText,
+    PositiveInt,
     SourceId,
     StrictModel,
 )
@@ -83,23 +83,9 @@ PUBLISHED_INSTANCE_IDS = (
     "sympy__sympy-15599",
 )
 
-INITIAL_SCREENING_IDS = (
-    "astropy__astropy-13236",
-    "django__django-10914",
-    "django__django-13089",
-    "matplotlib__matplotlib-20676",
-    "psf__requests-5414",
-    "pydata__xarray-6461",
-    "pylint-dev__pylint-6903",
-    "pytest-dev__pytest-6202",
-    "sphinx-doc__sphinx-9230",
-    "sympy__sympy-13091",
-)
-
 InstanceId = NewType("InstanceId", NonEmptyText)
 ImageDigest = NewType("ImageDigest", DigestText)
 CommitSha = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
-PositiveInt = Annotated[int, Field(gt=0)]
 ArgumentCategory: TypeAlias = Literal[
     "symptom",
     "context",
@@ -483,7 +469,6 @@ class SweOverlayReceipt(StrictModel):
 
 
 class SweScriptFamily(StrictModel):
-    construction_seed: ConstructionSeed
     construction: SweConstruction
     static: SweScript
     matched: SweScript
@@ -557,7 +542,6 @@ def build_swe_script_family(
     problem: SweBenchProblem,
     construction: SweConstruction,
     *,
-    seed: int,
     total_agent_steps: int,
     max_output_tokens: int,
 ) -> SweScriptFamily:
@@ -645,7 +629,6 @@ def build_swe_script_family(
         ),
     )
     return SweScriptFamily(
-        construction_seed=ConstructionSeed(seed),
         construction=construction,
         static=static,
         matched=matched,

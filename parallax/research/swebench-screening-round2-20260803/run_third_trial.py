@@ -79,7 +79,6 @@ def main() -> None:
         str(problem.record_id): build_swe_script_family(
             problem,
             constructions[str(problem.record_id)],
-            seed=20260803,
             total_agent_steps=12,
             max_output_tokens=4096,
         )

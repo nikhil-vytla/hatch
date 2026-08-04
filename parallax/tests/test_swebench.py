@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from parallax.evolving_intent import Message
 from parallax.swebench import (
-    INITIAL_SCREENING_IDS,
     PUBLISHED_INSTANCE_IDS,
     SWE_BENCH_REVISION,
     ImageDigest,
@@ -26,11 +25,9 @@ from parallax.swebench import (
 INSTANCE_ID = "astropy__astropy-13236"
 
 
-def test_published_source_set_is_exact_and_screening_is_a_subset() -> None:
+def test_published_source_set_is_exact() -> None:
     assert len(PUBLISHED_INSTANCE_IDS) == 50
     assert len(set(PUBLISHED_INSTANCE_IDS)) == 50
-    assert len(INITIAL_SCREENING_IDS) == 10
-    assert set(INITIAL_SCREENING_IDS) < set(PUBLISHED_INSTANCE_IDS)
 
 
 def row() -> dict[str, object]:
@@ -309,7 +306,6 @@ def test_swe_overlay_reinjects_symptoms_and_restores_source() -> None:
     family = build_swe_script_family(
         problem,
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
@@ -348,7 +344,6 @@ def test_public_issue_can_name_an_official_test() -> None:
     family = build_swe_script_family(
         problem,
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
@@ -367,7 +362,6 @@ def test_episode_budget_rejects_fewer_steps_than_turns() -> None:
         build_swe_script_family(
             problem,
             construction(),
-            seed=0,
             total_agent_steps=1,
             max_output_tokens=1024,
         )
@@ -382,14 +376,12 @@ def test_swe_family_rejects_budget_and_restoration_drift() -> None:
     valid = build_swe_script_family(
         problem,
         construction(),
-        seed=0,
         total_agent_steps=12,
         max_output_tokens=1024,
     )
     bad_static = valid.static.model_copy(update={"agent_steps": (1,)})
     with pytest.raises(ValidationError, match="equal episode budgets"):
         SweScriptFamily(
-            construction_seed=valid.construction_seed,
             construction=valid.construction,
             static=bad_static,
             matched=valid.matched,
@@ -404,7 +396,6 @@ def test_swe_family_rejects_budget_and_restoration_drift() -> None:
     )
     with pytest.raises(ValidationError, match="restore source intent"):
         SweScriptFamily(
-            construction_seed=valid.construction_seed,
             construction=valid.construction,
             static=valid.static,
             matched=valid.matched,

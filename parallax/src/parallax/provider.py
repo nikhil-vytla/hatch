@@ -19,10 +19,9 @@ from pydantic import (
 
 from .evolving_intent import Chat, Message
 from .outcome import BudgetError
-from .types import NonEmptyText, StrictModel
+from .types import NonEmptyText, PositiveInt, StrictModel
 
 HttpUrl = Annotated[str, StringConstraints(pattern=r"^https://")]
-PositiveInt = Annotated[int, Field(gt=0)]
 HUD_GATEWAY_ENDPOINT = "https://inference.beta.hud.ai/v1/chat/completions"
 
 

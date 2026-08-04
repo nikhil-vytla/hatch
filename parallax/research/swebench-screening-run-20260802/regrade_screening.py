@@ -101,7 +101,6 @@ def main() -> None:
         family = build_swe_script_family(
             problem,
             construction,
-            seed=20260802,
             total_agent_steps=12,
             max_output_tokens=4096,
         )

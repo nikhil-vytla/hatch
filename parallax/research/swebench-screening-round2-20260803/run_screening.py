@@ -40,7 +40,6 @@ def main() -> None:
             "SUMMARY": ROOT / "evidence" / "screening-summary.json",
             "SPEND_CAP_USD": 5.0,
             "BOUNDARY_MODEL": "claude-opus-4-8",
-            "CONSTRUCTION_SEED": 20260803,
             "TRIAL_SEEDS": (2026080301, 2026080302, 2026080303),
             "PREREGISTERED_EPISODE_UPPER_USD": 0.25,
             "INSTANCE_DIGESTS": INSTANCE_DIGESTS,

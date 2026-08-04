@@ -11,6 +11,7 @@ CanonicalIntegerText = Annotated[
     StringConstraints(pattern=r"^(?:0|-?[1-9][0-9]{0,99})$"),
 ]
 NonNegativeInt = Annotated[int, Field(ge=0)]
+PositiveInt = Annotated[int, Field(gt=0)]
 
 SourceId = NewType("SourceId", NonEmptyText)
 CanonicalInteger = NewType("CanonicalInteger", CanonicalIntegerText)

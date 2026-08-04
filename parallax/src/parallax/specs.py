@@ -14,14 +14,12 @@ from .swebench import (
     SweScriptFamily,
 )
 from .types import (
-    ConstructionSeed,
     DigestText,
     NonEmptyText,
+    PositiveInt,
     SourceId,
     StrictModel,
 )
-
-PositiveInt = Annotated[int, Field(gt=0)]
 
 
 class PublicSourceV1(StrictModel):
@@ -55,7 +53,6 @@ class PublicScriptV1(StrictModel):
 
 class PublicTaskV1(StrictModel):
     source: PublicSourceV1
-    construction_seed: ConstructionSeed
     scripts: Annotated[tuple[PublicScriptV1, ...], Field(min_length=3, max_length=3)]
 
     @model_validator(mode="after")
@@ -156,7 +153,6 @@ def freeze_swe_specs(family: SweScriptFamily) -> tuple[TaskSpecV1, EnvSpecV1]:
             dataset=problem.dataset,
             dataset_revision=problem.dataset_revision,
         ),
-        construction_seed=family.construction_seed,
         scripts=public_scripts,
     )
     task = TaskSpecV1(
