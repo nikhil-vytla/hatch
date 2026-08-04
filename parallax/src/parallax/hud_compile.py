@@ -94,36 +94,42 @@ class CompiledBundleV1(StrictModel):
             atomic_write(directory / artifact.path, artifact.content)
 
 
-def sealed_fragments(sealed: SealedAuthorityV1) -> tuple[bytes, ...]:
-    fragments = {
+def sealed_fragments(
+    sealed: SealedAuthorityV1,
+    *,
+    public: PublicTaskV1 | None = None,
+) -> tuple[bytes, ...]:
+    mandatory = {sealed.test_patch.encode()}
+    derived = {
         value.encode()
-        for value in (
-            sealed.test_patch,
-            *sealed.fail_to_pass,
-            *sealed.pass_to_pass,
-        )
+        for value in (*sealed.fail_to_pass, *sealed.pass_to_pass)
         if value
     }
     for line in sealed.test_patch.splitlines():
         if line.startswith("@@") and len(line) >= 4:
-            fragments.add(line.encode())
+            derived.add(line.encode())
         if (
             line.startswith("+")
             and not line.startswith("+++")
             and len(line[1:].strip()) >= 4
         ):
-            fragments.add(line[1:].strip().encode())
+            derived.add(line[1:].strip().encode())
         match = re.match(r"^\+\s*(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)", line)
         if match:
-            fragments.add(match.group(1).encode())
-    return tuple(sorted(fragments))
+            derived.add(match.group(1).encode())
+    if public is not None:
+        public_bytes = canonical_bytes(public)
+        derived = {fragment for fragment in derived if fragment not in public_bytes}
+    return tuple(sorted(mandatory | derived))
 
 
 def assert_agent_artifacts_clean(
     sealed: SealedAuthorityV1,
     artifacts: tuple[CompiledArtifactV1, ...],
+    *,
+    public: PublicTaskV1 | None = None,
 ) -> None:
-    fragments = sealed_fragments(sealed)
+    fragments = sealed_fragments(sealed, public=public)
     for artifact in artifacts:
         if artifact.audience != "agent":
             continue
@@ -234,7 +240,11 @@ def compile_hud(task: TaskSpecV1, environment: EnvSpecV1) -> CompiledBundleV1:
     if budgets != {expected_budget}:
         raise ValueError("environment budget differs from public task")
     agent_artifacts = _compile_agent_artifacts(task.public, environment)
-    assert_agent_artifacts_clean(task.sealed, agent_artifacts)
+    assert_agent_artifacts_clean(
+        task.sealed,
+        agent_artifacts,
+        public=task.public,
+    )
     artifacts = (
         *agent_artifacts,
         *_compile_evaluator_artifacts(task, environment),

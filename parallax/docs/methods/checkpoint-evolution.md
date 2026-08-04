@@ -12,7 +12,7 @@
 > else remains a specification target. The slice's scope, deferrals, and
 > divergences are listed in [Implemented slice](#implemented-slice).
 
-Checkpoint Evolution is a synthesis strategy \(\mathcal G_{\mathrm{CE}}\) in
+Checkpoint Evolution is a synthesis strategy $\mathcal G_{\mathrm{CE}}$ in
 the [Parallax research model](../MODEL.md). It perturbs the initial workspace
 state and the cross-episode requirement-disclosure schedule: an agent
 repeatedly extends its own prior artifact under an evolving specification,
@@ -47,51 +47,51 @@ design — lives in
 
 ## Strategy
 
-Let \(\sigma\) be an admitted seed with a checkpoint family plan of length
-\(n\).
+Let $\sigma$ be an admitted seed with a checkpoint family plan of length
+$n$.
 
 **Definition (family).** The strategy emits an ordered family of task pairs
-\([(\tau_1,\varepsilon_1),\ldots,(\tau_n,\varepsilon_n)]\) coupled through
+$[(\tau_1,\varepsilon_1),\ldots,(\tau_n,\varepsilon_n)]$ coupled through
 persistent agent state.
 
 > [!NOTE]
 > Proposed `MODEL.md` extension, not applied here: `MODEL.md` defines
-> \(\mathcal G_\theta(\tau,\varepsilon;\omega)=(\tau',\varepsilon')\) — a
+> $\mathcal G_\theta(\tau,\varepsilon;\omega)=(\tau',\varepsilon')$ — a
 > single output pair — and treats sealed evaluator information as fixed per
 > task. Checkpoint Evolution needs two method-agnostic additions: (1) a
 > family-valued strategy output whose members are coupled by cross-episode
-> persistent state (\(\mu_{0,i+1}\) a declared function of the agent's
-> terminal state under \(\tau_i\)), and (2) monotonically accumulating
-> sealed authority (\(x_{\mathrm{seal},i} \supseteq x_{\mathrm{seal},i-1}\)
+> persistent state ($\mu_{0,i+1}$ a declared function of the agent's
+> terminal state under $\tau_i$), and (2) monotonically accumulating
+> sealed authority ($x_{\mathrm{seal},i} \supseteq x_{\mathrm{seal},i-1}$
 > obligations). Both are stated locally in this document; editing `MODEL.md`
 > deserves its own review.
 
 **Definition (persistent state and obligations).** Agent-side state
-\(W_i = (y_i, d_i)\) carries the produced workspace and dependency manifest;
+$W_i = (y_i, d_i)$ carries the produced workspace and dependency manifest;
 nothing else persists between stages — no conversation, no tool state, no
 evaluator feedback. Evaluator-side obligations accumulate as
-\(\Omega_i = \Omega_{i-1} \cup T_i\), \(\Omega_0 = \varnothing\), where
-\(T_i\) is stage \(i\)'s sealed test set.
+$\Omega_i = \Omega_{i-1} \cup T_i$, $\Omega_0 = \varnothing$, where
+$T_i$ is stage $i$'s sealed test set.
 
-**Definition (stage tuple).** Stage \(i\) is
-\(\tau_i = (g_i, c, S_i, (T_i, \Omega_{i-1}, N_i), V_i, R_i)\) with \(c\)
+**Definition (stage tuple).** Stage $i$ is
+$\tau_i = (g_i, c, S_i, (T_i, \Omega_{i-1}, N_i), V_i, R_i)$ with $c$
 the fixed external-contract constraint (entrypoint-only observability, no
-prescribed internals), \(S_i\) the public specification, \(N_i\) sealed
+prescribed internals), $S_i$ the public specification, $N_i$ sealed
 normalization rules, and
 
-\[
+```math
 V_i(y_i) = \Big(\bigwedge_{t\in\Omega_i} t(y_i),\;
                \bigwedge_{t\in T_i} t(y_i),\;
                \bigwedge_{t\in T^{\mathrm{core}}_i} t(y_i)\Big)
-\]
+```
 
 the strict, isolated, and core verdicts. The environment
-\(\varepsilon_i\) is a fresh sandbox with
-\(\mu_{0,i} = \delta_{W_{i-1}}\) and a single specification delivery at
+$\varepsilon_i$ is a fresh sandbox with
+$\mu_{0,i} = \delta_{W_{i-1}}$ and a single specification delivery at
 episode start.
 
 **Definition (evolution operators).** Stage transitions
-\(S_{i-1}\mapsto S_i\) come from a closed operator set: extension (new
+$S_{i-1}\mapsto S_i$ come from a closed operator set: extension (new
 behavior on new input domain, old behavior preserved), refinement (behavior
 pinned on a previously unconstrained subdomain), input-source
 generalization, and re-modality (declared contract morphism). Refactoring
@@ -99,22 +99,22 @@ pressure is a property of the operator sequence, admitted via a measured
 churn ratio between naive and anticipatory reference builds, not an
 operator.
 
-**Invariant (non-destructive accumulation).** For all \(i<j\), every test in
-\(\Omega_i\) remains in force and semantically valid at stage \(j\). This is
+**Invariant (non-destructive accumulation).** For all $i<j$, every test in
+$\Omega_i$ remains in force and semantically valid at stage $j$. This is
 the Checkpoint Evolution counterpart of Evolving Intent's terminal
 restoration: Evolving Intent restores the source task at the end; Checkpoint
 Evolution never invalidates the past. Dropping inherited obligations is a
 declared verifier intervention, never a silent default.
 
-**Invariant (workspace fidelity).** \(\mu_{0,i+1}\) equals the agent's own
-terminal \(W_i\) exactly — no repair or reference substitution. Substituting
+**Invariant (workspace fidelity).** $\mu_{0,i+1}$ equals the agent's own
+terminal $W_i$ exactly — no repair or reference substitution. Substituting
 a reference workspace severs the causal chain from early decisions to later
 outcomes and is only permitted as the declared `carry-reference` control
 arm.
 
 **Invariant (authority separation).** Sealed suites, verdicts, and
 evaluator-side measurements never enter public inputs or observations at any
-stage. Because episodes share only \(W\), it suffices that no evaluator
+stage. Because episodes share only $W$, it suffices that no evaluator
 output is ever written into the workspace.
 
 **Definition (outcome classification).** Test failures are Verification
@@ -126,7 +126,7 @@ stages, which are recorded and bounded worst-case, not dropped.
 ## Quality measurement classes
 
 Correctness verdicts and probe outcomes (a pinned probe policy attempting
-stage \(i{+}1\) on a frozen \(y_i\)) are native sealed verification. Static
+stage $i{+}1$ on a frozen $y_i$) are native sealed verification. Static
 composites — structural erosion and verbosity per the paper's §2.3
 definitions, plus the wider deterministic panel — are sealed measurements
 when the measuring tool release and rule set are pinned and digest-branded;
@@ -150,7 +150,7 @@ sealed suites, obligation accumulation, normalization, agent configuration,
 and declared per-stage budgets. Arms differ only in the named intervention:
 initial-workspace source (`evolved` vs `carry-reference`), disclosure
 schedule (`evolved` vs `monolithic` vs `foresight`), or declared schedule
-insertions (`repair-scheduled`). A quality threshold inside \(V_i\) is a
+insertions (`repair-scheduled`). A quality threshold inside $V_i$ is a
 verifier intervention and cannot be combined silently with any other
 contrast.
 
@@ -175,7 +175,7 @@ An implementation requires Parallax-owned regression coverage for:
   regardless of its authored category; stage 1 has no regression
   obligations; a mutation gauntlet kills obligation-dropping mutants;
 - workspace carry-forward fidelity, including environment reset of
-  everything outside \(W\) — *implemented*: the agent boundary is a pure
+  everything outside $W$ — *implemented*: the agent boundary is a pure
   function of (public spec, carried workspace, budget); `FamilyRun`
   validators make a broken digest chain unrepresentable; each sealed case
   executes in a fresh materialization, so nothing outside the file tree
@@ -267,7 +267,7 @@ listed above:
   boundary has no partial state, so an oversized return is a budget
   RunFailure with no workspace (censoring the evolved suffix), and an
   agent-raised budget fault is classified the same way.
-- **Dependency manifest**: \(W_i\)'s declared manifest \(d_i\) is not
+- **Dependency manifest**: $W_i$'s declared manifest $d_i$ is not
   separately modeled; the single-file Python track has an empty manifest
   by construction.
 - **Single incremental reference**: admission uses one hand-verified

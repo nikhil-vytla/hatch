@@ -7,13 +7,14 @@ from pathlib import Path
 from pydantic import Field
 
 from parallax.canonical import atomic_write, canonical_bytes
-from parallax.hud_screening import CLAUDE_OPUS_PRICING, HudStaticExecutor
+from parallax.hud_screening import CLAUDE_HAIKU_PRICING, HudStaticExecutor
 from parallax.provider import HudGatewayProvider
 from parallax.screening import (
     ScreeningCost,
     ScreeningPlan,
     ScreeningRun,
     build_screening_plan,
+    initialize_screening_manifest,
     read_screening_jsonl,
     run_screening,
     summarize_screening,
@@ -25,6 +26,7 @@ from parallax.swebench import (
     build_swe_script_family,
     construct_swe_intent,
     fetch_swebench_verified,
+    load_swebench_rows,
 )
 from parallax.types import NonEmptyText, SourceId, StrictModel
 
@@ -37,6 +39,11 @@ SUMMARY = EVIDENCE / "screening-summary.json"
 SPEND_CAP_USD = 5.0
 CONSTRUCTION_MODEL = "claude-haiku-4-5"
 BOUNDARY_MODEL = "claude-opus-4-8"
+CONSTRUCTION_SEED = 20260802
+TRIAL_SEEDS = (2026080201, 2026080202)
+PREREGISTERED_EPISODE_UPPER_USD: float | None = None
+FETCH_BATCH_SIZE: int | None = None
+PINNED_PARQUET_PATH: Path | None = None
 INSTANCE_DIGESTS = {
     "astropy__astropy-13236": (
         "a43e166eb5ae9e477349b87d800ece7648f8c746f88d94f6f6cff0df1e2caf82"
@@ -114,8 +121,8 @@ def _construct(problems) -> tuple[dict[str, SweConstruction], float]:
         response = responses[0]
         usage = response.usage
         cost = (
-            usage.prompt_tokens * CLAUDE_OPUS_PRICING.input_usd_per_million
-            + usage.completion_tokens * CLAUDE_OPUS_PRICING.output_usd_per_million
+            usage.prompt_tokens * CLAUDE_HAIKU_PRICING.input_usd_per_million
+            + usage.completion_tokens * CLAUDE_HAIKU_PRICING.output_usd_per_million
         ) / 1_000_000
         receipt = ConstructionReceipt(
             source_id=problem.record_id,
@@ -148,29 +155,68 @@ def main() -> None:
         instance_id: VerifierRuntime(image_digest=ImageDigest(digest))
         for instance_id, digest in INSTANCE_DIGESTS.items()
     }
-    problems = fetch_swebench_verified(INSTANCE_IDS, runtimes=runtimes)
+    if PINNED_PARQUET_PATH is not None:
+        from pyarrow.parquet import read_table
+
+        rows = {
+            row["instance_id"]: row
+            for row in read_table(PINNED_PARQUET_PATH).to_pylist()
+            if row["instance_id"] in INSTANCE_IDS
+        }
+        problems = load_swebench_rows(
+            tuple(rows[instance_id] for instance_id in INSTANCE_IDS),
+            INSTANCE_IDS,
+            runtimes=runtimes,
+        )
+    elif FETCH_BATCH_SIZE is None:
+        problems = fetch_swebench_verified(INSTANCE_IDS, runtimes=runtimes)
+    else:
+        problems = tuple(
+            problem
+            for start in range(0, len(INSTANCE_IDS), FETCH_BATCH_SIZE)
+            for problem in fetch_swebench_verified(
+                INSTANCE_IDS[start : start + FETCH_BATCH_SIZE],
+                runtimes=runtimes,
+            )
+        )
+    plan = None
+    if PREREGISTERED_EPISODE_UPPER_USD is not None:
+        plan = build_screening_plan(
+            problems,
+            model=BOUNDARY_MODEL,
+            expected_response_model=BOUNDARY_MODEL,
+            trial_seeds=TRIAL_SEEDS,
+            cost=ScreeningCost(upper_per_episode_usd=PREREGISTERED_EPISODE_UPPER_USD),
+        )
+        if not SCREENING.exists():
+            initialize_screening_manifest(plan, SCREENING)
     constructions, construction_cost = _construct(problems)
     families = {
         str(problem.record_id): build_swe_script_family(
             problem,
             constructions[str(problem.record_id)],
-            seed=20260802,
+            seed=CONSTRUCTION_SEED,
             total_agent_steps=12,
             max_output_tokens=4096,
         )
         for problem in problems
     }
     remaining = SPEND_CAP_USD - construction_cost
-    upper = (remaining - 0.000001) / (len(problems) * 2)
-    if upper < 0.10:
-        raise RuntimeError("insufficient spend cap remains for preregistered screening")
-    plan = build_screening_plan(
-        problems,
-        model=BOUNDARY_MODEL,
-        expected_response_model=BOUNDARY_MODEL,
-        trial_seeds=(2026080201, 2026080202),
-        cost=ScreeningCost(upper_per_episode_usd=upper),
-    )
+    if plan is None:
+        upper = (remaining - 0.000001) / (len(problems) * len(TRIAL_SEEDS))
+        if upper < 0.10:
+            raise RuntimeError("insufficient spend cap remains for screening")
+        plan = build_screening_plan(
+            problems,
+            model=BOUNDARY_MODEL,
+            expected_response_model=BOUNDARY_MODEL,
+            trial_seeds=TRIAL_SEEDS,
+            cost=ScreeningCost(upper_per_episode_usd=upper),
+        )
+    elif plan.estimated_cost_upper_usd > remaining:
+        raise RuntimeError(
+            "construction left insufficient preregistered episode budget"
+        )
     if SCREENING.exists():
         records = read_screening_jsonl(SCREENING)
         stored_plan = records[0]

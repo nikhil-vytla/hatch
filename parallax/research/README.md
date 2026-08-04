@@ -12,6 +12,11 @@ experiment and lives only on its
 [archive branch](https://github.com/nikhil-vytla/hatch/pull/5); it must not
 be recreated on `main`.
 
+- [`admission-qc/`](admission-qc/README.md) — best-practices research and
+  gate specifications for the admission QC layer: six in-code gates plus
+  the judgment-side
+  [`review-task-admission`](../.cursor/skills/review-task-admission/SKILL.md)
+  skill.
 - [`slopcodebench-method/`](slopcodebench-method/README.md) — design of the
   checkpoint-evolution synthesis method behind
   [`../docs/methods/checkpoint-evolution.md`](../docs/methods/checkpoint-evolution.md).
