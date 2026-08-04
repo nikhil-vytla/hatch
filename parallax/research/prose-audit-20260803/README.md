@@ -47,12 +47,12 @@ python3 parallax/research/prose-audit-20260803/check_markdown.py parallax
 Two gaps in the docs are gaps in the work, and no amount of rewriting closes
 them.
 
-First, no flow has both a complete design and evidence at a scale that can
-resolve anything. GSM8K has all three arms and has never called a real provider.
-SWE-bench has real Opus episodes and no matched control arm. Checkpoint evolution
-has a real paid run on exactly one task family. Writing this down honestly in
-`FINDINGS.md` made it much harder to look at than it was when it was distributed
-across four folders.
+First, at the time of this pass no flow had both a complete design and evidence at
+a scale that could resolve anything: GSM8K had all three arms and had never called
+a real provider, SWE-bench had real Opus episodes and no matched control arm, and
+checkpoint evolution had one paid run on one task family. Writing that down in one
+table made it much harder to look at than it was distributed across four folders,
+and the live GSM8K run closed the GSM8K half of it the same night.
 
 Second, the checkpoint-evolution screening result read as a clean arm separation
 and was not one. The evolved arm failed 10/10 on a byte cap we chose, under a

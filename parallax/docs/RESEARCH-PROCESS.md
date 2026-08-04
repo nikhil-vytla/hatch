@@ -275,10 +275,10 @@ timestamped decision log, and the full adversarial review.
 
 ## Deliberately out of scope
 
-- **Real-model evidence on GSM8K.** Every GSM8K run to date uses scripted
-  agents. The SWE-bench and checkpoint-evolution paths have called real
-  providers; see [`FINDINGS.md`](FINDINGS.md). No GSM8K claim about real agent
-  behavior is supported.
+- **Reproducible trials.** Every run records a trial seed and no run can replay
+  one, because the gateway accepts a `seed` parameter and ignores it. Trials are
+  temperature-1.0 samples, which is enough for clustered intervals and not enough
+  for exact replay.
 - **Paper reproduction.** Upstream generated pools and provider transcripts
   are not published, so Parallax makes no byte-identical dataset, provider
   replay, or paper-score reproduction claims.
@@ -288,8 +288,10 @@ timestamped decision log, and the full adversarial review.
 - **A command-line interface.** The entry points are the Python API and the
   test suite.
 
-> **TODO:** Run the preregistered matched-versus-evolved contrast with one real
-> model provider over a declared GSM8K sample, and report the point estimate,
-> the interval, and the minimum detectable effect it achieved. An interval too
-> wide to separate any plausible effect, or run failures that leave the
-> identification bounds uninformative, forces a design revision before scaling.
+This loop has now closed once end to end. The preregistered contrast ran against a
+real provider over 144 declared GSM8K sources, returned evolved minus base at
+-0.109 with a 95% source-clustered interval of [-0.160, -0.060] and no run
+failures, and the matched arm split that gap into -0.086 for multi-turn
+presentation and -0.023 for intent evolution. Step 7 produced numbers a reader can
+argue with, and step 8 has its next question: whether the multi-turn cost transfers
+to a harder benchmark. See [`FINDINGS.md`](FINDINGS.md).

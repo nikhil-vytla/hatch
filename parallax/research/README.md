@@ -37,6 +37,11 @@ Dated folders. Each one spent money or compute and committed the receipts.
   two-arm runner, seed family, mutation gauntlet, and two paid screening runs. The
   first separated the arms completely at stage 3, the second raised the byte cap
   and the separation vanished. The folder carries both and says which one holds.
+- [`gsm8k-evolving-intent-live-20260803/`](https://github.com/nikhil-vytla/hatch/blob/parallax-gsm8k-live/parallax/research/gsm8k-evolving-intent-live-20260803/README.md)
+  The live three-arm GSM8K run, 1,296 episodes, and the only result in the project
+  with an interval worth quoting. Lands with
+  [#33](https://github.com/nikhil-vytla/hatch/pull/33), so the link points at that
+  branch until it merges.
 
 ## Design and survey work
 

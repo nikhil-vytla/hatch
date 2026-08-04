@@ -165,6 +165,13 @@
   episodes). Three failed construction responses did not retain usage; their
   conservative reserve is \$0.477790. The all-in conservative bound is
   \$2.147440, below the \$5 hard cap.
+- Correction, added later: every number in the bullet above is wrong. The runtime
+  priced Opus 4.8 through a retired rate card and priced Haiku construction as
+  Opus, fifteenfold over. Re-derived from retained tokens the run cost \$0.518250
+  metered and at most \$0.541029 all-in. Left the original bullet in place because
+  it is what this run believed at the time, and that is the failure worth
+  remembering: a run that computes its own cost at write time will be wrong the
+  moment a rate card retires.
 - Final evidence is `evidence/construction.jsonl`,
   `evidence/live-work/episodes/`, `evidence/screening.jsonl`, and
   `evidence/screening-summary.json`. Preflight and wheel-grader failures remain

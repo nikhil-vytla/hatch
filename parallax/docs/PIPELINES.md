@@ -10,7 +10,8 @@ something is designed but not built, it says so.
 Three flows are implemented:
 
 1. [Evolving Intent on GSM8K](#1-evolving-intent-on-gsm8k). Offline, free,
-   copy-paste runnable right now.
+   copy-paste runnable right now. The same design has since run live over 144
+   sources, which is where the project's one real result came from.
 2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified).
    Three paid stages, already run once, with the real artifacts shown.
 3. [Checkpoint evolution](#3-checkpoint-evolution-056). One family, two arms, and
@@ -118,6 +119,14 @@ which is history sensitivity in its crudest form, shown in
 `tests/test_end_to_end.py`. Nothing here is evidence about real models. What it
 demonstrates is what the harness records. Real experiments keep their evidence
 under `research/<investigation>/evidence/`.
+
+This same design has run live: 144 sources, three arms, three trials, 1,296 Haiku
+4.5 episodes for \$10.96, with evolved minus base at -0.109 [-0.160, -0.060] and
+the matched arm splitting that into -0.086 multi-turn and -0.023 evolution. The
+numbers are in [`FINDINGS.md`](FINDINGS.md#most-of-the-evolving-intent-penalty-on-gsm8k-is-just-multi-turn).
+Going live also broke three things this offline path cannot expose, the worst being
+that no prompt ever stated the `FINAL_ANSWER:` contract the grader enforces, since
+the scripted agents above already know it.
 
 ## 2. Evolving Intent on SWE-bench Verified
 
@@ -268,12 +277,14 @@ including the preregistration and the screening report.
   `run_admission.py`, `run_experiment.py`), plus resume scripts written
   mid-incident. Reproducing a paid flow means reading that folder's
   `NOTES.md`, not invoking a stable tool.
-- **GSM8K has never run against a real provider.** The full
-  static/matched/evolved design is implemented and tested offline, but all
-  GSM8K evidence uses scripted agents. Conversely, the real-model SWE-bench
-  experiment lacks the matched control (see 2c). No single flow yet has both
-  the complete design and real-model evidence. That is the current gap
-  between what the docs describe and what has been measured.
+- **Trials are not replicates.** Every run records trial seeds and the gateway
+  ignores the `seed` parameter it accepts, verified by measurement. Trials are
+  temperature-1.0 samples, so clustered intervals are sound and exact replay is
+  not available on any flow.
+- **The matched arm exists only on GSM8K.** The live GSM8K run used all three arms
+  and the matched control is what let it attribute the effect. The real-model
+  SWE-bench experiment has no matched control (see 2c), so any delta it produced
+  would be unattributable even at a sample size that could detect one.
 - **Checkpoint evolution has no report module.** Admission, two arms, evidence,
   and two paid screening runs exist. The stage-indexed and slope estimands do
   not, so every CE number so far is descriptive.

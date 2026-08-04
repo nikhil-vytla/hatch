@@ -95,30 +95,32 @@ be `FINAL_ANSWER: <integer>`, with exactly one marker and a canonical integer.
 Malformed submissions are invalid, valid non-matching answers are wrong, and
 provider, budget, or verifier faults are run failures rather than model behavior.
 
-Six runs have called a real provider, for \$6.42 of metered spend: two SWE-bench
-screening rounds and an 18-unit static-versus-evolved experiment against Claude
-Opus 4.8, plus two 60-call checkpoint-evolution screenings against Claude Haiku
-4.5. Neither contrast resolved. The SWE-bench delta is +0.111 with a 95% interval
-of [-1, 1], because three source clusters give a minimum detectable effect of
-1.568 against an estimand bounded in [-1, 1]. The checkpoint-evolution arms
-separated completely at stage 3 on the first run, then stopped separating when the
-second run raised the byte cap and changed nothing else, so that separation was
-the cap. What survives there is a cost and bloat signature, not verification
-decay. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the per-instance numbers, the
-retraction, and the design gaps.
+Seven runs have called a real provider, for \$16.23 of metered spend. The one that
+produced a result is the live GSM8K run: 144 sources, three arms, three trials,
+1,296 Claude Haiku 4.5 episodes, zero run failures. Evolved minus base accuracy is
+-0.109 with a 95% source-clustered interval of [-0.160, -0.060], and because the
+matched arm ran, that splits into -0.086 for multi-turn presentation alone and
+-0.023 for the intent evolving on top, the second spanning zero. Most of the
+apparent evolving-intent penalty on GSM8K is the price of using turns at all.
 
-GSM8K has never called a real provider. Its evidence is scripted agents against
-real-shaped rows, exercising construction, all three arms, history-sensitive
-execution, grading, manifest validation, JSONL round-trips, missing-outcome
-bounds, and source-clustered reporting. Parallax has no generated benchmark pool
-and reproduces no paper score.
+The other contrasts did not resolve. The SWE-bench delta is +0.111 with a 95%
+interval of [-1, 1], because three source clusters give a minimum detectable effect
+of 1.568 against an estimand bounded in [-1, 1]. The checkpoint-evolution arms
+separated completely at stage 3 on the first run, then stopped separating when the
+second run raised the byte cap and changed nothing else, so that separation was the
+cap. What survives there is a cost and bloat signature, not verification decay.
+[`docs/FINDINGS.md`](docs/FINDINGS.md) has the numbers, the retraction, the spend
+audit, and the design gaps.
+
+Parallax has no generated benchmark pool and reproduces no paper score.
 
 The method contracts, the implementation choices, and every deliberate divergence
 from the consulted upstream implementations live in
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) and
 [`docs/methods/checkpoint-evolution.md`](docs/methods/checkpoint-evolution.md).
 
-> **TODO:** Run the matched arm on SWE-bench, or run GSM8K against a real
-> provider. Until one of those happens, no Evolving Intent flow has both a
-> complete design and real-model evidence. Checkpoint evolution has its byte
-> budget settled and gated in code, and now needs more than one task family.
+> **TODO:** Run the matched arm on SWE-bench. GSM8K now has all three arms against
+> a real provider and a decomposition to show for it; SWE-bench has real episodes,
+> three source clusters, and no way to attribute a delta it cannot detect anyway.
+> Checkpoint evolution has its byte budget settled and gated in code, and now needs
+> more than one task family.

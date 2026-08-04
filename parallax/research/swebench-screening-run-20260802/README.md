@@ -87,9 +87,12 @@ by digest before a comparative experiment.
 - Operating points: floor, ceiling, ceiling, floor, floor respectively.
 - Statistical result: interval [0, 1], minimum detectable effect 0.607361. The
   interval spans every value the estimand can take.
-- Known metered spend: \$1.669650. Three failed construction responses have
-  unavailable usage and a \$0.477790 conservative reserve, so the all-in upper
-  bound is \$2.147440.
+- Metered spend: \$0.518250, with at most \$0.022779 unmetered from three failed
+  construction responses that did not retain usage, so \$0.541029 all-in. The
+  \$1.669650 and \$2.147440 figures this folder published are wrong: the runtime
+  priced Opus 4.8 through a retired rate card and priced the Haiku construction
+  calls as Opus, fifteenfold over. Audited in
+  [`docs/FINDINGS.md`](../../docs/FINDINGS.md#the-spend-numbers-were-wrong-and-are-now-audited).
 - HUD/API surprises: explicit null `tool_calls`, fenced construction JSON,
   scalar argument values, mandatory MCP tool descriptions, Docker Desktop
   user-namespace policy, and official empty-patch summaries without reports.
