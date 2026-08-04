@@ -103,7 +103,7 @@ Execution is a DataLoader-like object
 seed, ...)` renders conversations **at load time** through a plan-first turn
 scheduler; the scenario is inferred from the parameters. The SWE overlay is
 a `post_fill_hook` (`turn_scheduler_swe.py`). Each sample serializes its
-`ChangePlan` (the paper's $I_t$/$\Delta I_t$ formalization as frozen
+`ChangePlan` (the paper's $I_t/\Delta I_t$ formalization as frozen
 dataclasses) into metadata.
 
 The spec/execution boundary is therefore: *intent structure is data;
