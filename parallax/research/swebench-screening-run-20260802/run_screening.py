@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import Field
 
 from parallax.canonical import atomic_write, canonical_bytes
-from parallax.hud_screening import CLAUDE_HAIKU_PRICING, HudStaticExecutor
+from parallax.hud_screening import CLAUDE_HAIKU_PRICING, HudExecutor
 from parallax.provider import HudGatewayProvider
 from parallax.screening import (
     ScreeningCost,
@@ -226,7 +226,7 @@ def main() -> None:
             record for record in records[1:] if isinstance(record, ScreeningRun)
         )
     else:
-        executor = HudStaticExecutor(
+        executor = HudExecutor(
             families,
             model=BOUNDARY_MODEL,
             work_directory=WORK,
