@@ -60,7 +60,7 @@ harness:
 6. `screening.py` preregisters units and canonical outcomes before execution,
    appends and fsyncs each unit to a resumable partial file, records provider
    model, usage, and estimated cost, refuses to overwrite completed evidence, and
-   defaults to a $5 cap.
+   defaults to a \$5 cap.
 7. `admission.py` runs schema, sealed-leakage, identity-patch, gold-patch,
    budget-match, and arm-completeness gates before a family can be scheduled.
 
@@ -93,7 +93,7 @@ be `FINAL_ANSWER: <integer>`, with exactly one marker and a canonical integer.
 Malformed submissions are invalid, valid non-matching answers are wrong, and
 provider, budget, or verifier faults are run failures rather than model behavior.
 
-Five runs have called a real provider, for $6.14 of metered spend: two SWE-bench
+Five runs have called a real provider, for \$6.14 of metered spend: two SWE-bench
 screening rounds and an 18-unit static-versus-evolved experiment against Claude
 Opus 4.8, plus a 60-call checkpoint-evolution screening against Claude Haiku 4.5.
 Neither contrast resolved. The SWE-bench delta is +0.111 with a 95% interval of

@@ -30,7 +30,7 @@ Decomposed from paper §2.2 (Problem Construction) and the repo's
    checkpoint, use the runs to find ambiguous or under-specified tests; final
    pass confirms solvability and spec/test match.
 
-Two facts calibrate the bar. First, most of these steps are *procedural* —
+Two facts calibrate the bar. First, most of these steps are *procedural*,
 the repo documents them as checklists precisely because they are meant to be
 executed mechanically. Second, hand-authoring did not reach zero defects:
 `docs/KNOWN_ISSUES.md` records defective reference solutions on 5 of 36
@@ -48,13 +48,13 @@ SCOUT ──▶ PLAN ──▶ DRAFT ──▶ BUILD ──▶ ADMIT ──▶ C
 
 Every stage emits a typed artifact with a content digest; the frozen family
 records the full provenance chain (seed, plan, spec digests, suite digests,
-gate receipts, calibration evidence) — same discipline as the Evolving
+gate receipts, calibration evidence), same discipline as the Evolving
 Intent slice's preregistered manifests.
 
-### Stage S1 — Scout: checkpoint-decomposability assessment
+### Stage S1, Scout: checkpoint-decomposability assessment
 
 Input: a candidate seed (repository, CLI tool, API service, or an existing
-benchmark task family — e.g. a SWE-bench Verified repository's feature
+benchmark task family, e.g. a SWE-bench Verified repository's feature
 surface). Output: a **decomposability brief** that scores the seed on:
 
 - **Contract stability**: is there a natural external contract (CLI/API)
@@ -78,7 +78,7 @@ surface). Output: a **decomposability brief** that scores the seed on:
   familiar repositories are a distribution of constraints, not a source of
   old answers).
 
-### Stage S2 — Plan: checkpoint partition
+### Stage S2, Plan: checkpoint partition
 
 Final-state-first: draft the terminal spec $S_n^{\mathrm{merged}}$, then
 partition backwards into stages, each labeled with its operator from the
@@ -86,10 +86,10 @@ algorithmic model (§2.4: extension / refinement / input-source /
 re-modality), a single focus, and an out-of-scope list. Structural rules
 enforced at this stage: first checkpoint defines the core problem;
 no destructive steps; sizing per `checklist.md` (first checkpoint ≥ ~4 h
-equivalent; later ones ≤ ~5 h given a well-factored prior solution — sizing
+equivalent; later ones ≤ ~5 h given a well-factored prior solution, sizing
 is estimated at plan time and verified against reference-build effort at G4).
 
-### Stage S3 — Draft: specifications
+### Stage S3, Draft: specifications
 
 One spec per checkpoint under the upstream discipline, mechanically lintable
 where possible (`review-checklist.md` items: entrypoint placeholders, error
@@ -97,7 +97,7 @@ behavior as "Exit N, message to STDERR" without exact strings, no
 language-specific constructs, no design-pressure paragraphs, examples for
 happy path + edge + error).
 
-### Stage S4 — Build: dual references and sealed suite
+### Stage S4, Build: dual references and sealed suite
 
 The critical departure from upstream, motivated by their own KNOWN_ISSUES
 experience: **two independent reference implementations**, built
@@ -109,7 +109,7 @@ case where the two references agree and the suite disagrees indicts the
 suite; a case where the references disagree indicts the spec (ambiguity) and
 loops back to S3.
 
-### Stage S5 — Admit: gates G1–G6
+### Stage S5, Admit: gates G1 through G6
 
 The Evolving Intent-era admission matrix
 ([`scripts/admit.py` on the archive branch](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/scripts/admit.py))
@@ -123,12 +123,12 @@ analog. A family is admissible iff all gates pass at every stage:
 | **G2 no-op** | the stage $(i{-}1)$ reference workspace fails $T_i$ for every $i$ | every checkpoint demands new work; no vacuous stages | yes |
 | **G3 mutant/ambiguity** | (a) seeded semantic mutants of the references fail the suite; (b) the two references produce identical normalized outputs on the full sealed input space of the suite | suite discriminates; spec admits one behavior ("could two correct implementations differ?" from `checklist.md`, made executable) | yes |
 | **G4 pressure** | naive-architecture reference (deliberately myopic at $C_1$, still correct) incurs ≥ $k\times$ the downstream churn/cost of the anticipatory reference | the sequence actually stresses design, the property upstream asserts by author judgment (Table 4) | yes, given the naive build |
-| **G5 leakage/secrecy** | spec lint (structure hints, future-checkpoint mentions, exact-STDERR prescriptions) + sealed-side scan: no test content, verdicts, or measurement output reachable from the public capsule or workspace | authority separation across the whole family | partially — lint automates the checklist; residual semantic leakage needs review |
+| **G5 leakage/secrecy** | spec lint (structure hints, future-checkpoint mentions, exact-STDERR prescriptions) + sealed-side scan: no test content, verdicts, or measurement output reachable from the public capsule or workspace | authority separation across the whole family | partially, lint automates the checklist; residual semantic leakage needs review |
 | **G6 headroom/difficulty** | a pinned frontier agent given $S_1$ alone does not pass the full family's suites (no one-shot); calibration runs show nonzero progress and sub-saturation strict rates | the family discriminates at the frontier, mirroring upstream's proposal-phase drop rule | yes (compute-priced) |
 
 Gate receipts are retained as admission evidence in the frozen family.
 
-### Stage S6 — Calibrate and freeze
+### Stage S6, Calibrate and freeze
 
 Live runs across ≥ 2 pinned agents; record strict/ISO/core per stage,
 RunFailure classification, and Class B measurements. A human reviews the
@@ -136,12 +136,12 @@ calibration evidence and the S1 brief's design-pressure narrative, then
 signs the freeze. Post-freeze, specs and suites are immutable (fixes fork a
 new family version with provenance).
 
-## 3. Automatable now vs. human judgment — and why
+## 3. Automatable now versus human judgment, and why
 
 **Automatable now** (deterministic or agent-executable with a checkable
 artifact): S1 brief assembly; S2 partition against structural rules; S3
 drafting + mechanical spec lint; S4 dual-reference builds and suite
-construction; G1–G4 and G6 entirely — they are executions with pinned
+construction; G1–G4 and G6 entirely. They are executions with pinned
 inputs and byte-comparable outputs; the lint half of G5.
 
 **Requires human judgment**, with the reason each time:
@@ -151,13 +151,13 @@ inputs and byte-comparable outputs; the lint half of G5.
    undergo. Contrived pressure (arbitrary reversals dressed as refinements)
    passes every mechanical gate while measuring compliance rather than
    design skill. There is no computable oracle for "a competent engineer
-   would find this a plausible roadmap" — this is a construct-validity
+   would find this a plausible roadmap". This is a construct-validity
    judgment, the same class of judgment MODEL.md leaves to admission review.
 2. **Residual semantic leakage** (G5). The lint catches the checklist items;
    it cannot certify that no sentence *implies* the hidden decomposition
    (upstream's own example: an embedded output example that quietly fixes a
    sort order is *good* normalization, while a sentence praising "clean
-   separation between X and Y" is leakage — the difference is judgment).
+   separation between X and Y" is leakage, the difference is judgment).
 3. **Ambiguity triage** (S4). Which party is wrong when references and suite
    disagree is decidable mechanically; *what the spec should have said* is
    authorial.
@@ -171,13 +171,13 @@ lives*, and two of six gates keep a human in them.
 
 ## 4. Cursor skill specifications
 
-Specs only — none of these exist. Each skill's output is a typed artifact so
+Specs only. None of these exist. Each skill's output is a typed artifact so
 the next stage (and the gates) can validate mechanically.
 
 **Skill `assess-checkpoint-seed`** (S1)
 - *Inputs*: seed locator (repo URL + revision, tool name, or benchmark task
   family ID); constraint profile (language track, budget class).
-- *Outputs*: `decomposability-brief.json` — contract sketch, axes of
+- *Outputs*: `decomposability-brief.json`, contract sketch, axes of
   variation, named naive + anticipatory architectures, contamination notes,
   scored rubric with per-criterion evidence, accept/reject recommendation.
 - *Validation*: schema check; every score must cite evidence fields;
@@ -185,7 +185,7 @@ the next stage (and the gates) can validate mechanically.
 
 **Skill `plan-checkpoint-family`** (S2)
 - *Inputs*: accepted brief.
-- *Outputs*: `family-plan.json` — terminal spec summary; ordered checkpoints
+- *Outputs*: `family-plan.json`, terminal spec summary; ordered checkpoints
   each with operator label, single-focus statement, out-of-scope list,
   predicted churn locus for the naive architecture.
 - *Validation*: structural rules (first-checkpoint immutability, no
@@ -211,7 +211,7 @@ the next stage (and the gates) can validate mechanically.
 **Skill `admit-checkpoint-family`** (S5)
 - *Inputs*: frozen candidate family (specs, suites, references, naive
   reference).
-- *Outputs*: `admission-receipt.json` — per-gate verdicts G1–G6 with
+- *Outputs*: `admission-receipt.json`, per-gate verdicts G1–G6 with
   digests, churn/cost ratios, mutant kill lists, lint findings, and the
   open items requiring human review.
 - *Validation*: receipt schema; any gate failure blocks freeze; human-review
@@ -224,12 +224,12 @@ non-mechanical core ("does this test design decisions?") is exactly what G4
 operationalizes, arguably more rigorously than author intuition; and the
 hand-authored baseline includes a 14% reference-solution defect rate that
 G1's dual-incremental-reference requirement is specifically built to beat.
-Agent-assisted *validation* (S4/G3) also scales past what the authors did —
+Agent-assisted *validation* (S4/G3) also scales past what the authors did,
 they ran one agent per checkpoint to shake out ambiguity; dual independent
 references plus mutant kills is a strictly stronger regimen.
 
 Grounds for doubt: seed taste and roadmap naturalness are where the paper's
-problems get their credibility (EVE industry chains, ast-grep-like search —
+problems get their credibility (EVE industry chains, ast-grep-like search,
 tools the authors knew deeply), and S1 is the stage with the least
 verifiable output. A generated family can pass every gate and still be a
 sterile puzzle. That risk concentrates in exactly the two human-judgment

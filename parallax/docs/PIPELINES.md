@@ -13,8 +13,8 @@ Three flows are implemented:
    copy-paste runnable right now.
 2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified).
    Three paid stages, already run once, with the real artifacts shown.
-3. [Checkpoint evolution](#3-checkpoint-evolution-landing-in-pr-27). Offline
-   slice, still on [PR #27](https://github.com/nikhil-vytla/hatch/pull/27).
+3. [Checkpoint evolution](#3-checkpoint-evolution-028). One family, two arms,
+   one paid screening run whose result is not what it looks like.
 
 Then [what is not automated yet](#what-is-not-automated-yet), which is the part
 worth reading before you believe any of the above scales.
@@ -25,7 +25,7 @@ worth reading before you believe any of the above scales.
 `tests/fixtures/gsm8k.jsonl` holds GSM8K problem #1:
 
 > Janet's ducks lay 16 eggs per day. She eats 3 for breakfast and bakes
-> muffins with 4. She sells each remaining egg for $2. How many dollars does
+> muffins with 4. She sells each remaining egg for \$2. How many dollars does
 > she make each day?
 
 The `#### 18` answer is stripped from everything the agent sees and sealed as
@@ -123,7 +123,7 @@ The same intervention on a real benchmark, with a real model (Claude Opus
 4.8) and the official SWE-bench harness as sealed verifier. This flow has
 three stages and each costs money; the recorded spends below are actuals.
 
-### 2a. Screening: find boundary instances ($2.97)
+### 2a. Screening: find boundary instances (\$2.97)
 
 **Start with:** the pinned SWE-bench Verified dataset (medium-difficulty
 stratum). **Run:** the bespoke driver
@@ -154,14 +154,14 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 uv run --with pyarrow python \
   research/swebench-experiment-prerequisites-20260803/run_admission.py
 ```
 
-No inference — Docker only. Six gates per instance, including: the compiled
+No inference, Docker only. Six gates per instance, including: the compiled
 agent bundle contains no sealed bytes, an inert no-op patch must fail the
 official tests, and the sealed gold patch must pass them. **Out:**
 `evidence/admission-summary.json` and one `admission.json` per instance; all
 three admitted. The same folder preregisters the 18-unit experiment design
 (digest `e230043c…`) before any paid unit runs.
 
-### 2c. The experiment: single-turn vs evolved ($1.22)
+### 2c. The experiment: single-turn vs evolved (\$1.22)
 
 **Start with:** an admitted instance's public issue text plus a
 Haiku-constructed intent decomposition. Real construction record for
@@ -177,7 +177,7 @@ Haiku-constructed intent decomposition. Real construction record for
 The static arm delivers the raw issue in one 12-step phase. The evolved arm
 splits the same 12 steps into two phases: first *"Work toward this
 intermediate intent: CreateModel.reduce. … Do not implement the final issue
-yet."*, then the harness interjects *"Hold on — before you finalize, the user
+yet."*, then the harness interjects *"Hold on, before you finalize, the user
 has new information…"* and delivers the full issue. The agent cannot skip or
 reorder phases; the harness owns the schedule and grades a delivery receipt.
 
@@ -195,26 +195,26 @@ reconciliation. Real results:
 **Conclude:** point estimate +0.111 for static-minus-evolved, but with 3
 source clusters the minimum detectable effect is 1.568, so the interval is
 the trivial [-1, 1]: the data neither advances nor rejects the hypothesis.
-Unique metered spend was $1.219080. Both stages 2b and 2c land in
+Unique metered spend was \$1.219080. Both stages 2b and 2c land in
 [PR #25](https://github.com/nikhil-vytla/hatch/pull/25) under
 `research/swebench-experiment-prerequisites-20260803/` and
 `research/swebench-single-vs-evolved-20260803/`. Note one design gap stated
-plainly: this experiment compared static against evolved only — the
+plainly: this experiment compared static against evolved only. The
 turn-matched control arm that the GSM8K design treats as mandatory was not
 part of the 18-unit design, so conversation length is not yet controlled for
 on SWE-bench.
 
-## 3. Checkpoint evolution (landing in PR #27)
+## 3. Checkpoint evolution (\$0.28)
 
 The second synthesis strategy, from
 [SlopCodeBench](https://arxiv.org/abs/2603.24755): instead of one task whose
 *intent* evolves across turns, one workspace persists across separately
-scored checkpoints whose *requirements* accumulate. Everything below is on
-the [PR #27](https://github.com/nikhil-vytla/hatch/pull/27) branch and still
-in flux.
+scored checkpoints whose *requirements* accumulate. Merged in
+[PR #27](https://github.com/nikhil-vytla/hatch/pull/27), with one paid
+screening run behind it.
 
 **Start with:** a hand-authored three-checkpoint family, `ce-tally-1`, in
-`tests/fixtures/checkpoint_family.json` — a CLI tool built up in stages
+`tests/fixtures/checkpoint_family.json`, a CLI tool built up in stages
 (totals → top-name aggregation → file input) with 10 sealed
 stdin/argv/exit-code cases. Real spec excerpt from checkpoint 1:
 
@@ -222,28 +222,34 @@ stdin/argv/exit-code cases. Real spec excerpt from checkpoint 1:
 > `python3 tally.py total`. … `total` prints the sum of all counts as a
 > decimal integer followed by a single newline, then exits 0.
 
-**Run** (offline, on the PR branch, from `parallax/`):
+**Run** (from `parallax/`; the first two are offline and free, the third spends
+money):
 
 ```bash
 uv run python research/checkpoint-evolution-slice/make_seed_family.py  # rebuild fixture; 5 admission gates
 uv run python -m pytest tests/test_checkpoint_runner.py -q             # both arms end to end
+uv run python research/checkpoint-evolution-slice/run_screening.py     # offline dry run; add --live --approve-spend to pay
 ```
 
 **Out:** an `AdmissionReceipt` (five gates: schema round-trip, completeness,
 leakage, incremental gold build, per-stage no-op rejection), then evidence
-JSONL from `checkpoint_runner.run_ce_experiment` with two arms — `evolved`
+JSONL from `checkpoint_runner.run_ce_experiment` with two arms, `evolved`
 (the agent's own stage-N workspace feeds stage N+1, digest-chained) and
 `carry-reference` (each stage starts from the frozen reference build). Each
 stage is graded into a verdict vector: `strict_pass` (all accumulated
 obligations, prior checkpoints re-run as regressions), `isolated_pass` (this
 checkpoint's new cases only), `core_pass`.
 
-**Conclude:** with scripted agents only, nothing yet about real models. What
-the slice establishes is that skipped/reordered checkpoints, workspace-chain
-drift, and answer leakage are structurally unrepresentable in the evidence.
-Contract: [`methods/checkpoint-evolution.md`](methods/checkpoint-evolution.md);
-trail: `research/checkpoint-evolution-slice/` (PR #27), including a
-preregistration draft for the first paid run.
+**Conclude:** the slice establishes that skipped or reordered checkpoints,
+workspace-chain drift, and answer leakage are structurally unrepresentable in
+the evidence. The live run added 60 Haiku 4.5 stage calls for \$0.28 and split
+the arms completely at stage 3, but on the declared byte cap rather than on any
+verdict, so it says nothing yet about verification decay. Read
+[`FINDINGS.md`](FINDINGS.md#what-the-checkpoint-evolution-screening-measured-and-what-it-does-not-license)
+before quoting that number. Contract:
+[`methods/checkpoint-evolution.md`](methods/checkpoint-evolution.md); trail:
+[`../research/checkpoint-evolution-slice/`](../research/checkpoint-evolution-slice/README.md),
+including the preregistration and the screening report.
 
 ## What is NOT automated yet
 
@@ -263,8 +269,12 @@ preregistration draft for the first paid run.
   static/matched/evolved design is implemented and tested offline, but all
   GSM8K evidence uses scripted agents. Conversely, the real-model SWE-bench
   experiment lacks the matched control (see 2c). No single flow yet has both
-  the complete design and real-model evidence — that is the current gap
+  the complete design and real-model evidence. That is the current gap
   between what the docs describe and what has been measured.
-- **Checkpoint evolution has no report module or paid run.** PR #27 stops at
-  admission, two arms, and evidence; estimands and decisions are deferred to
-  its preregistration draft.
+- **Checkpoint evolution has no report module.** Admission, two arms, evidence,
+  and one paid screening run exist. The stage-indexed and slope estimands do
+  not, so every CE number so far is descriptive.
+- **The checkpoint byte budget is unsettled.** The one paid CE run failed the
+  evolved arm 10/10 on a 4096-byte reply cap we chose, which means the cap and
+  the full-file-map reply format are confounded with the effect the method is
+  about. A variant run is what fixes this, not a doc edit.

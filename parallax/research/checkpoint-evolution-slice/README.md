@@ -5,7 +5,7 @@ Checkpoint evolution is the SlopCodeBench-derived synthesis method designed in
 turned it into Parallax's second executable strategy: a typed domain model, a
 black-box entrypoint verifier, executable admission gates, a harness-owned
 runner with two controlled arms, and a hand-verified seed family. Then it ran
-the first paid screening over that slice, 60 Haiku stage calls for $0.28
+the first paid screening over that slice, 60 Haiku stage calls for \$0.28
 metered, which separated the two arms completely at stage 3 for a reason the
 method is not about.
 
@@ -32,8 +32,8 @@ This folder records how the work got there.
 | Screening driver | `src/parallax/checkpoint_screening.py`, launched by [`run_screening.py`](run_screening.py) | `run_ce_screening`: dry-run (scripted gateway, no key, no spend) and live (spend approval, hard cap, mandatory sandbox, reported-model drift check) over the preregistered design |
 | Tests | `tests/test_checkpoint_evolution.py`, `tests/test_checkpoint_runner.py`, `tests/test_checkpoint_agent.py`, `tests/test_checkpoint_sandbox.py`, `tests/test_checkpoint_screening.py` | 73 offline tests covering every invariant above, both arms end to end, the adapter wire behaviors, sandbox lockdown and fault classification, the full screening path, and real-container integration probes |
 | Mutation gauntlet | [`mutants/run_gauntlet.py`](mutants/run_gauntlet.py) | 24 targeted semantic mutants; all killed |
-| Dry-run evidence | [`evidence/`](evidence/) | `dry-run.jsonl` (10-seed preregistered shape, 60/60 stages verified, $0) and `dry-run-sandbox.jsonl` (2 seeds through the real container sandbox, 12/12 verified) |
-| Screening evidence | [`evidence/screening.jsonl`](evidence/screening.jsonl), summarized by [`summarize_screening.py`](summarize_screening.py) | the executed preregistered live run: 60/60 stage calls, receipt chain confirmed, $0.2813 metered; report in [screening-report.md](screening-report.md) |
+| Dry-run evidence | [`evidence/`](evidence/) | `dry-run.jsonl` (10-seed preregistered shape, 60/60 stages verified, \$0) and `dry-run-sandbox.jsonl` (2 seeds through the real container sandbox, 12/12 verified) |
+| Screening evidence | [`evidence/screening.jsonl`](evidence/screening.jsonl), summarized by [`summarize_screening.py`](summarize_screening.py) | the executed preregistered live run: 60/60 stage calls, receipt chain confirmed, \$0.2813 metered; report in [screening-report.md](screening-report.md) |
 
 ## The invariants that matter
 
@@ -81,7 +81,7 @@ bytes against the family's 4096-byte cap on 10/10 seeds and produced no stage-3
 workspace to verify.
 
 Every failure is budget-classified agent behavior. Zero infrastructure failures,
-100% evidence completeness, $0.2813 spent, so the harness-validation bar the
+100% evidence completeness, \$0.2813 spent, so the harness-validation bar the
 preregistration set is met and multi-family synthesis is the next step.
 
 What the separation is not: evidence of verification decay. No evolved stage-3
@@ -136,7 +136,7 @@ uv run python research/checkpoint-evolution-slice/run_screening.py
   G3/G4/G6.
 - Resumable partial evidence for the live run: `run_ce_experiment`
   writes atomically at completion, which is proportionate at the
-  preregistered ~$0.50 scale; the EI screening's append-and-resume
+  preregistered ~\$0.50 scale; the EI screening's append-and-resume
   discipline is the model if CE runs ever grow past trivial re-run
   cost.
 

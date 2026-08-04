@@ -1,7 +1,7 @@
-# NOTES — checkpoint-evolution method design (SloP Code Bench)
+# NOTES: checkpoint-evolution method design (SloP Code Bench)
 
 Goal: formalize checkpoint evolution (from SloP Code Bench, arXiv:2603.24755) as
-Parallax's second synthesis strategy — algorithmic model, code-quality
+Parallax's second synthesis strategy, algorithmic model, code-quality
 measurement audit, research questions, and a repeatable synthesis workflow.
 Documentation and formal modeling only; no implementation.
 
@@ -28,7 +28,7 @@ Documentation and formal modeling only; no implementation.
 - 36 hand-authored problems, 196 checkpoints (3-8 per problem). §2.2: task is
   y_i = π_θ(x_i, y_{i-1}), y_0 empty. Fresh context per checkpoint; only the
   working directory persists (fresh Docker container per checkpoint, §3
-  Setup). No conversation carry-over — the agent must recover design intent
+  Setup). No conversation carry-over, so the agent must recover design intent
   from the code alone.
 - §2.1 design principles: (1) no prescribed internal interfaces, (2) no
   visible test suite (spec prose + embedded examples only), (3) black-box
@@ -39,7 +39,7 @@ Documentation and formal modeling only; no implementation.
   C_1 has none). Verdicts: strict (all incl. regression), ISO (non-regression
   only), CORE. Crash/missing workspace ⇒ correctness 0 for remaining
   checkpoints; quality metrics excluded, not imputed. Infrastructure failure
-  (pytest exit 2-5) tracked separately from test failure — maps cleanly onto
+  (pytest exit 2-5) tracked separately from test failure, maps cleanly onto
   Parallax Verification vs RunFailure.
 - §2.3 quality metrics: Erosion = share of total complexity mass
   (CC × sqrt(SLOC), threshold CC>10) in high-CC callables. Verbosity =
@@ -73,7 +73,7 @@ Documentation and formal modeling only; no implementation.
 - docs/contributing-problems/checklist.md: design checks incl. "can two
   correct implementations produce different outputs?" and problem layout
   (config.yaml + checkpoint_N.md + tests/ + data/).
-- docs/contributing-problems/review-checklist.md: mechanical review items —
+- docs/contributing-problems/review-checklist.md: mechanical review items,
   entrypoint placeholders (%%%ENTRYPOINT%%%), error behavior as "Exit N,
   error to STDERR" without exact strings, language-agnosticity, leakage
   rules (no "Design Pressure" paragraphs, no decomposition hints),
@@ -83,18 +83,18 @@ Documentation and formal modeling only; no implementation.
   isolation; infra failure exit codes 2-5 set infrastructure_failure=True.
 - docs/metrics-reference.md: 41 per-checkpoint metrics, delta metrics,
   composite verbosity/erosion from pinned scb-check with
-  scb_check_version recorded per measurement. Also rubric.jsonl — LLM judge.
+  scb_check_version recorded per measurement. Also rubric.jsonl, LLM judge.
 - configs/rubrics/llm_judge.jsonl: 45 criteria (25 verbosity, 20 erosion) with
   positive/negative indicators; separate channel from deterministic metrics.
 - docs/KNOWN_ISSUES.md: 5/36 problems have defective *reference solutions*
-  (tests asserted correct). Hand-authoring baseline is not defect-free —
+  (tests asserted correct). Hand-authoring baseline is not defect-free,
   key calibration for the agent-authoring question.
 
 ### HumanLayer analyses
 
 - benchmarking-opus-5: ran 3 problems/17 checkpoints across Opus 4.8,
   Sonnet 5, Opus 5. Opus 5 best at 4/17 strict (3 were the opening
-  checkpoints of one problem). 89-98% of all lines tripped ≥1 slop rule —
+  checkpoints of one problem). 89-98% of all lines tripped ≥1 slop rule,
   argues rules are over-aggressive. Most metrics don't separate models
   (cc_max and cloned_pct do). Skeptical of static metrics as maintainability
   oracle; argues strict-pass-under-evolving-spec is the better oracle, and
@@ -102,7 +102,7 @@ Documentation and formal modeling only; no implementation.
   attempts C_{k+1}; weak-model success/cost measures maintainability of the
   strong model's code. Also proposes quality backpressure loops as untested
   variants.
-- wsff.md: thesis — RL rewards (fail-to-pass) carry no penalty for eroding
+- wsff.md thesis: RL rewards (fail-to-pass) carry no penalty for eroding
   maintainability; maintainability has no fast oracle; prompting/harness
   can't fix a training-signal gap. Front-loaded alignment artifacts
   (product review → architecture → program design → vertical slices) are
@@ -112,7 +112,7 @@ Documentation and formal modeling only; no implementation.
 ### Parallax mapping decisions
 
 - CE is a cross-episode strategy: EI perturbs the intent schedule within one
-  episode and restores the source at terminal evaluation; CE never restores —
+  episode and restores the source at terminal evaluation; CE never restores,
   it accumulates. The invariant dual to EI's terminal restoration is
   non-destructive evolution: no checkpoint invalidates a prior sealed test.
 - Persistent state W_i = terminal workspace only (plus dependency manifest).
@@ -131,11 +131,11 @@ Documentation and formal modeling only; no implementation.
 
 ## Deliverable plan
 
-1. algorithmic-model.md — formal model (deliverable 1)
-2. quality-measurement.md — deliverable 2
-3. research-questions.md — deliverable 3
-4. synthesis-workflow.md — deliverable 4
-5. checkpoint-evolution.md — draft method doc destined for
+1. algorithmic-model.md: formal model (deliverable 1)
+2. quality-measurement.md: deliverable 2
+3. research-questions.md: deliverable 3
+4. synthesis-workflow.md: deliverable 4
+5. checkpoint-evolution.md: draft method doc destined for
    parallax/docs/methods/ (deliverable 5; kept in this folder because the
    final commit includes only this folder)
 6. README.md report + _summary.md
@@ -153,7 +153,7 @@ Documentation and formal modeling only; no implementation.
     sequence dimension adds two genuinely new checks: per-stage no-op
     (every checkpoint demands new work) and churn-ratio design pressure.
   - Kept the draft method doc in this folder rather than writing into
-    parallax/docs/ — user instruction says don't touch parallax/, and
+    parallax/docs/, user instruction says don't touch parallax/, and
     AGENTS.md says the final commit includes only this folder.
 - What I'd verify first if implementing: whether G4's naive-reference build
   can be made cheap enough (it doubles reference-build cost) and whether
@@ -165,14 +165,14 @@ Documentation and formal modeling only; no implementation.
 - The no-touching-parallax constraint was lifted after the concurrent
   parallax rewrites merged. Rebased onto origin/main (picked up #12
   RESEARCH-PROCESS.md and #14 parallax/docs/decisions/; evolving-intent.md
-  unchanged) — clean, no conflicts.
+  unchanged), clean, no conflicts.
 - `git mv`'d the draft to parallax/docs/methods/checkpoint-evolution.md.
   Edits during promotion: dropped the "currently lives in" placement note,
   added a References pointer to this research folder, linked
   synthesis-workflow.md from Interpretation and limits, and added a [!NOTE]
   proposing (not applying) the MODEL.md extension: family-valued G_θ output
   coupled by cross-episode persistent state, and monotonically accumulating
-  sealed obligations. MODEL.md itself untouched — that edit deserves its own
+  sealed obligations. MODEL.md itself untouched. That edit deserves its own
   review.
 - Everything else (algorithmic model, quality audit, RQs, workflow) stays
   here as research trail; folder README and _summary now point at the
@@ -180,7 +180,7 @@ Documentation and formal modeling only; no implementation.
 
 ## Placement fix
 
-- hard-repo-tasks/ does not exist on origin/main — it is the superseded
+- hard-repo-tasks/ does not exist on origin/main. It is the superseded
   experiment's namespace, alive only on the PR #5 archive branch. New
   research committed against main must not resurrect it.
 - Established parallax/research/<topic>/ as the on-main home for research

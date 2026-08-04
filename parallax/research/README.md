@@ -59,3 +59,6 @@ implemented.
 - [`slopcodebench-method/`](slopcodebench-method/README.md) Formal model,
   quality-measurement audit, research questions, and synthesis workflow behind
   [`../docs/methods/checkpoint-evolution.md`](../docs/methods/checkpoint-evolution.md).
+- [`prose-audit-20260803/`](prose-audit-20260803/README.md) The unslop pass over
+  every markdown file here, the stale claims and unbacked certifications it
+  turned up, and a reusable markdown link, anchor, and math checker.

@@ -23,11 +23,11 @@
   ceilings and cost more.
 - Trials: three static trials per instance with seeds `2026080301`,
   `2026080302`, and `2026080303`. Boundary means exactly 1/3 or 2/3 passes.
-- Spend: fresh $5 cap. The preregistered upper reserve is $0.25 per episode,
-  or $4.50 for 18 episodes, leaving $0.50 for Haiku construction. Round 1's
-  observed Opus episode mean was about $0.153, so expected total spend is
-  approximately $2.9 including construction.
-- Stop rules: stop on HUD authentication failure, observed cost above $5, or
+- Spend: fresh \$5 cap. The preregistered upper reserve is \$0.25 per episode,
+  or \$4.50 for 18 episodes, leaving \$0.50 for Haiku construction. Round 1's
+  observed Opus episode mean was about \$0.153, so expected total spend is
+  approximately \$2.9 including construction.
+- Stop rules: stop on HUD authentication failure, observed cost above \$5, or
   when the next episode's reserved upper bound could exceed the cap.
 - Grading: evaluator-side official SWE-bench harness from detached pinned
   source revision `f7bbbb2ccdf479001d6467c9e34af59e44a840f9`.
@@ -36,11 +36,11 @@
 
 ## Preregistered tier-down extension
 
-- The first six-instance screen cost $2.926905 and found one boundary:
+- The first six-instance screen cost \$2.926905 and found one boundary:
   `astropy__astropy-14508` at 2/3. Matplotlib, Seaborn, Pylint, and SymPy were
   floors; Xarray was a ceiling.
 - Goal: find at least two additional boundaries without exceeding the same
-  round-two $5 cap.
+  round-two \$5 cap.
 - Selection rule: take the three observed Opus 4.8 ceilings available across
   rounds 1 and 2. They are `django__django-10914`,
   `django__django-13089`, and `pydata__xarray-6721`.
@@ -49,12 +49,12 @@
   Opus 4.8.
 - Trials: three static trials per instance with seeds `2026080311`,
   `2026080312`, and `2026080313`. Boundary means 1/3 or 2/3 passes.
-- Spend: no construction calls. The extension reserves $0.20 per episode, or
-  $1.80 total. With $2.926905 already spent, the aggregate reserve is
-  $4.726905.
-- Pricing evidence: Anthropic's current introductory Sonnet 4.6 rate is $2 per
-  million input tokens and $10 per million output tokens through August 31,
-  2026. The $0.20 per-episode reserve remains substantially above observed
+- Spend: no construction calls. The extension reserves \$0.20 per episode, or
+  \$1.80 total. With \$2.926905 already spent, the aggregate reserve is
+  \$4.726905.
+- Pricing evidence: Anthropic's current introductory Sonnet 4.6 rate is \$2 per
+  million input tokens and \$10 per million output tokens through August 31,
+  2026. The \$0.20 per-episode reserve remains substantially above observed
   episode costs.
 - Stop rules and official grading are unchanged.
 
@@ -62,8 +62,8 @@
 
 - Cost audit: the first screen's receipts used the retired Opus 4.1 rate for
   Opus 4.8 and Haiku construction. Repricing actual token usage at current
-  model-specific rates gives $0.881655 for the first screen. The Sonnet
-  extension cost $0.106100. Cumulative actual spend is $0.987755.
+  model-specific rates gives \$0.881655 for the first screen. The Sonnet
+  extension cost \$0.106100. Cumulative actual spend is \$0.987755.
 - The Sonnet extension produced two ceilings and one floor, with no new
   boundary. The same-model goal therefore still has only the Opus 4.8 boundary
   `astropy__astropy-14508`.
@@ -80,16 +80,16 @@
 - Model: `claude-opus-4-8`, matching the boundary already found.
 - Trials: two static trials per instance with seeds `2026080321` and
   `2026080322`. Boundary means exactly 1/2 passes.
-- Spend: $4.012245 remains under the round-two cap. The extension reserves
-  $0.12 per episode, or $3.12 for 26 episodes, leaving $0.892245 for Haiku
-  construction. Current rates are $5/$25 per million Opus input/output tokens
-  and $1/$5 per million Haiku input/output tokens.
+- Spend: \$4.012245 remains under the round-two cap. The extension reserves
+  \$0.12 per episode, or \$3.12 for 26 episodes, leaving \$0.892245 for Haiku
+  construction. Current rates are \$5/\$25 per million Opus input/output tokens
+  and \$1/\$5 per million Haiku input/output tokens.
 - Stop rules and official grading are unchanged.
 
 ## Preregistered third-trial extension
 
-- The remaining-medium extension cost $1.362807 including construction.
-  Cumulative actual round-two spend is $2.350562.
+- The remaining-medium extension cost \$1.362807 including construction.
+  Cumulative actual round-two spend is \$2.350562.
 - All 13 instances were still bimodal at two trials: eight ceilings and five
   floors. No additional Opus 4.8 boundary was found.
 - Population: the same 13 remaining-medium instances. Add one trial uniformly
@@ -97,7 +97,7 @@
 - Model: `claude-opus-4-8`.
 - Trial seed: `2026080323`. Combined classification uses the original two
   trials plus this third trial. Boundary means 1/3 or 2/3 passes.
-- Spend: $2.649438 remains. The extension reserves $0.12 per episode, or $1.56
+- Spend: \$2.649438 remains. The extension reserves \$0.12 per episode, or \$1.56
   total, with no construction calls.
 - Stop rules and official grading are unchanged.
 
@@ -115,7 +115,7 @@
   12973, Scikit-learn 14894, and Sphinx 10466 were 3/3. Astropy 8707,
   Matplotlib 14623, Pylint 6528, Scikit-learn 14087, and SymPy 15599 were
   0/3.
-- Actual token-metered spend: $2.972512. The canonical component breakdown is
+- Actual token-metered spend: \$2.972512. The canonical component breakdown is
   in `round2-report.json`.
 - Recommendation: run the first real single-vs-evolved contrast on the three
   Opus 4.8 boundary instances. Keep the preregistered small-run rule, so this

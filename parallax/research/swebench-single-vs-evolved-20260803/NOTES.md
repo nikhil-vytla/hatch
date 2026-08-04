@@ -18,8 +18,8 @@ No experiment unit had run before this unit.
 ## Execution rules
 
 - All 18 preregistered units run to completion. The user approved spend
-  beyond the $3.50 preregistration cap; the run only stops for cost if
-  spend tracks beyond ~$25 (a defect indicator), or on auth failure.
+  beyond the \$3.50 preregistration cap; the run only stops for cost if
+  spend tracks beyond ~\$25 (a defect indicator), or on auth failure.
 - Evidence is incremental and fsynced per unit through the existing
   `run_screening` partial-file machinery.
 - Every graded unit carries an official-harness receipt (report digest,
@@ -56,8 +56,8 @@ No experiment unit had run before this unit.
   18 preregistered units; screening design digest
   `175dc9521d461fb24b93ef932955976d007a9d5f34724b7ad7e7516b46f3184b` is
   linked to preregistered digest `e230043c...` in
-  `evidence/preregistration-linkage.json`. Episode cost band $0.10-$0.30
-  gives a $1.80-$5.40 plan estimate under the $25 defect-stop cap.
+  `evidence/preregistration-linkage.json`. Episode cost band \$0.10-\$0.30
+  gives a \$1.80-\$5.40 plan estimate under the \$25 defect-stop cap.
 - 2026-08-03: Launched the paid run. HUD_API_KEY was exported into the
   process environment only (never printed, logged, or written to evidence).
 - 2026-08-03: DEFECT. The first four units all failed with "HUD run omitted
@@ -73,16 +73,16 @@ No experiment unit had run before this unit.
   through JSON mode, and episode-level failures now retain the episode's
   metered usage instead of reporting zero spend (the old path raised before
   collecting token counts, which is why the three recorded failures carry
-  $0 while roughly four episodes of real Opus spend went unmetered,
-  ~$0.40-0.80 by round-2 averages). Added two regression tests; 138 tests,
+  \$0 while roughly four episodes of real Opus spend went unmetered,
+  ~\$0.40-0.80 by round-2 averages). Added two regression tests; 138 tests,
   Ruff, format, and `ty` all pass.
 - 2026-08-03: Preserved the failed attempt as
   `evidence/experiment-delivery-wire-failure.jsonl` with a summary, per the
   round-2 failure-evidence convention. Relaunching all 18 units fresh.
 - 2026-08-03: SECOND DEFECT. On the relaunch, astropy static trial-0
-  verified cleanly (wrong, $0.128 metered), but the paired evolved unit
+  verified cleanly (wrong, \$0.128 metered), but the paired evolved unit
   failed with "[cleanup] Separator is found, but chunk is longer than
-  limit" after $0.046 of metered spend (the usage-preserving fix captured
+  limit" after \$0.046 of metered spend (the usage-preserving fix captured
   it). Root cause in the pinned hud 0.6.12 SDK: control-channel frames are
   newline-delimited JSON read by `StreamReader.readline()` on
   `asyncio.open_connection` defaults, so any frame over 64 KiB (a long
@@ -105,7 +105,7 @@ No experiment unit had run before this unit.
   not kill its python child. The orphan kept working for ~4 minutes: it
   finished grading static trial-1 (pass, appended to the pre-rename
   partial, hence 4 lines in `experiment-frame-limit-failure.jsonl`), ran
-  the evolved trial-1 episode ($0.080445 metered, episode cached), and
+  the evolved trial-1 episode (\$0.080445 metered, episode cached), and
   started grading it. Removing what I believed was a stale grading
   container actually killed the orphan's live evolved-trial-1 grading; the
   orphan died at 16:26:10Z without appending. Run 3 then reused the
@@ -116,7 +116,7 @@ No experiment unit had run before this unit.
   shows no duplicate rows and a single writer from 09:27 on. Lesson: kill
   the process group, not the wrapper.
 - 2026-08-03: The full pass finalized `experiment.jsonl` with 18 recorded
-  units at $0.985275 metered. Twelve units verified. Six were
+  units at \$0.985275 metered. Twelve units verified. Six were
   infrastructure failures, not model outcomes: the astropy trial-1 evolved
   dirty-directory blemish, plus five of six xarray units killed by HUD
   gateway connection errors after 1-3 steps ("[cleanup] Connection
@@ -146,9 +146,9 @@ No experiment unit had run before this unit.
   one that ran.
 - 2026-08-03 21:18: Recovery run finalized `evidence/experiment.jsonl`:
   18/18 units verified, zero run failures. The astropy trial-1 evolved
-  unit re-graded its cached paid episode (pass, $0.080445 carried, no new
+  unit re-graded its cached paid episode (pass, \$0.080445 carried, no new
   inference). The five xarray units ran fresh paid episodes with no
-  recurrence of the gateway connection errors ($0.188335 total new
+  recurrence of the gateway connection errors (\$0.188335 total new
   inference). One benign `RuntimeError: Event loop is closed` traceback
   from httpx cleanup printed between units; it belongs to post-episode
   connection teardown after `asyncio.run` closes the loop and affected no
@@ -163,29 +163,29 @@ No experiment unit had run before this unit.
   [0.111, 0.111]; the source-clustered MDE is 1.568 (3 sources), so the
   95% interval is the trivial [-1, 1] and the report stays bounds-only.
 - 2026-08-03 21:2x: `account_spend.py` wrote
-  `evidence/cross-session-spend.json`: unique metered spend $1.219080
-  (run 2 $0.349545 including the orphan's evolved trial-1 payment, run 3
-  $0.681200, run 4 $0.188335), reconciled exactly against the final file
+  `evidence/cross-session-spend.json`: unique metered spend \$1.219080
+  (run 2 \$0.349545 including the orphan's evolved trial-1 payment, run 3
+  \$0.681200, run 4 \$0.188335), reconciled exactly against the final file
   sum plus the two destroyed-episode cost pools. Run 1's ~4 unmetered
-  episodes (est. $0.40-0.80) remain a standing accounting gap.
+  episodes (est. \$0.40-0.80) remain a standing accounting gap.
 - 2026-08-03 21:30: All 18 units verified. astropy trial-1 evolved
   re-graded to PASS from the cached episode; all five xarray retries
-  verified (gateway healthy again). Final file totals $1.105265; unique
-  metered spend across all attempts is $1.219080 (sum of fresh-episode
-  receipts and metered failure receipts), plus an estimated $0.40-0.80
+  verified (gateway healthy again). Final file totals \$1.105265; unique
+  metered spend across all attempts is \$1.219080 (sum of fresh-episode
+  receipts and metered failure receipts), plus an estimated \$0.40-0.80
   unmetered from the run-1 defect. `account_spend.py` (added during the
   21:0x recovery session) independently attributes each payment to
-  its paying session and reconstructs the same $1.21908 total;
+  its paying session and reconstructs the same \$1.21908 total;
   `evidence/cross-session-spend.json` is its output. Results: astropy static 2/3 vs evolved
   1/3; django 3/3 vs 3/3; xarray 0/3 vs 0/3. Paired single-minus-evolved
   point delta +0.111 with identification bounds [0.111, 0.111]; Hoeffding
   epsilon 1.568 over 3 source clusters, minimum detectable effect 1.57,
   underpowered, bounds-only. All 18 delivery receipts complete; all nine
   evolved episodes consumed 6+6 steps with budget_exhaustion then
-  terminal_budget_exhaustion — the harness delivered the second turn in
+  terminal_budget_exhaustion, so the harness delivered the second turn in
   every evolved episode and no early submission ever skipped a phase.
 - 2026-08-03 21:30: Surprise worth recording: the evolved condition cost
-  less than static ($0.538 vs $0.567) — the preregistered 2x evolved
+  less than static (\$0.538 vs \$0.567), so the preregistered 2x evolved
   multiplier was conservative by roughly 2x. And xarray sat at floor 0/6
   after screening at 2/3, a reminder that three-trial screening rates
   carry wide intervals.

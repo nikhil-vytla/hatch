@@ -14,8 +14,8 @@ The two arms separated completely at stage 3: `carry-reference` verified **stric
 on 10/10 seeds**, while `evolved`, carrying its own prior workspace, exceeded the
 declared 4096-byte workspace budget on **10/10 seeds** (4802 to 4864 bytes
 attempted, 17 to 19% over cap) and produced no verifiable stage-3 workspace at
-all. Metered spend was **$0.2813**, inside the preregistered $0.25 to $0.50
-estimate and far under the $5 cap.
+all. Metered spend was **\$0.2813**, inside the preregistered \$0.25 to \$0.50
+estimate and far under the \$5 cap.
 
 The separation is real and it is not the result the method predicts. It happened
 at the budget boundary, before verification, so read the
@@ -112,9 +112,9 @@ replies.
 
 | | Prompt tokens | Completion tokens | Estimated cost |
 |---|---|---|---|
-| `evolved` arm (30 calls) | 27,366 | 28,951 | $0.1721 |
-| `carry-reference` arm (30 calls) | 20,240 | 17,786 | $0.1092 |
-| **Total (60 calls)** | **47,606** | **46,737** | **$0.2813** |
+| `evolved` arm (30 calls) | 27,366 | 28,951 | \$0.1721 |
+| `carry-reference` arm (30 calls) | 20,240 | 17,786 | \$0.1092 |
+| **Total (60 calls)** | **47,606** | **46,737** | **\$0.2813** |
 
 The evolved arm costs about 1.6 times the carry arm on an identical schedule,
 because its own accumulated verbosity is billed back to it as input tokens. That

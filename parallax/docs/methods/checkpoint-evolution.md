@@ -10,7 +10,7 @@
 > `src/parallax/checkpoint_screening.py` (dry-run and live screening). The
 > hand-verified `ce-tally-1` family in `tests/fixtures/checkpoint_family.json`
 > exercises all of it end to end. One paid screening run has executed: 60 Haiku
-> 4.5 stage calls for $0.28, reported in
+> 4.5 stage calls for \$0.28, reported in
 > [`FINDINGS.md`](../FINDINGS.md#what-the-checkpoint-evolution-screening-measured-and-what-it-does-not-license).
 > Sections marked *implemented* describe executable behavior. Everything else is
 > a specification target. [Implemented slice](#implemented-slice) lists the

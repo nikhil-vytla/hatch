@@ -14,19 +14,20 @@ separation whose mechanism was our own reply format.
 
 | Run | Question | Answer | Spend | Evidence |
 |---|---|---|---|---|
-| Screening round 1, 2026-08-02 | Do any of the first 5 published SWE-bench IDs sit at a pass-rate boundary for Opus 4.8 under static single-turn prompting? | No. Two ceilings, three floors, no boundary. | $1.67 metered ($2.15 conservative all-in) | [`swebench-screening-run-20260802/`](../research/swebench-screening-run-20260802/README.md) |
-| Screening round 2, 2026-08-03 | Same question over the rest of the medium-difficulty stratum, three trials each. | Three boundary instances at 2/3: astropy 14508, django 13786, xarray 4695. A Sonnet 4.6 tier-down found none. | $2.97 metered | [`swebench-screening-round2-20260803/`](../research/swebench-screening-round2-20260803/README.md) |
+| Screening round 1, 2026-08-02 | Do any of the first 5 published SWE-bench IDs sit at a pass-rate boundary for Opus 4.8 under static single-turn prompting? | No. Two ceilings, three floors, no boundary. | \$1.67 metered (\$2.15 conservative all-in) | [`swebench-screening-run-20260802/`](../research/swebench-screening-run-20260802/README.md) |
+| Screening round 2, 2026-08-03 | Same question over the rest of the medium-difficulty stratum, three trials each. | Three boundary instances at 2/3: astropy 14508, django 13786, xarray 4695. A Sonnet 4.6 tier-down found none. | \$2.97 metered | [`swebench-screening-round2-20260803/`](../research/swebench-screening-round2-20260803/README.md) |
 | Admission, 2026-08-03 | Do those three instances pass all six admission gates against the official harness? | Yes, all three, gold patch passing on the first attempt. | Docker compute only, no inference | [`swebench-experiment-prerequisites-20260803/`](../research/swebench-experiment-prerequisites-20260803/README.md) |
-| Single vs evolved, 2026-08-03 | On those three instances, does a two-phase evolved prompt change the pass rate against a budget-matched single-turn prompt? | Unknown. Point estimate +0.111 for static, 95% interval [-1, 1]. Three source clusters cannot answer this. | $1.22 metered, plus $0.40 to $0.80 unmetered from a defective first session | [`swebench-single-vs-evolved-20260803/`](../research/swebench-single-vs-evolved-20260803/README.md) |
-| Checkpoint-evolution screening, 2026-08-03 | With sealed suites, obligations, budgets, and model matched, does an agent extending its own workspace verify differently at stage 3 than one reopening from a frozen reference? | The arms separated completely, but not on the verifier. Evolved failed 10/10 seeds by overrunning the byte cap before any test ran; carry-reference passed 10/10 strict. Mechanism unresolved. A follow-up run is in flight. | $0.28 metered | [`checkpoint-evolution-slice/`](../research/checkpoint-evolution-slice/screening-report.md) |
+| Single vs evolved, 2026-08-03 | On those three instances, does a two-phase evolved prompt change the pass rate against a budget-matched single-turn prompt? | Unknown. Point estimate +0.111 for static, 95% interval [-1, 1]. Three source clusters cannot answer this. | \$1.22 metered, plus \$0.40 to \$0.80 unmetered from a defective first session | [`swebench-single-vs-evolved-20260803/`](../research/swebench-single-vs-evolved-20260803/README.md) |
+| Checkpoint-evolution screening, 2026-08-03 | With sealed suites, obligations, budgets, and model matched, does an agent extending its own workspace verify differently at stage 3 than one reopening from a frozen reference? | The arms separated completely, but not on the verifier. Evolved failed 10/10 seeds by overrunning the byte cap before any test ran; carry-reference passed 10/10 strict. Mechanism unresolved. A follow-up run is in flight. | \$0.28 metered | [`checkpoint-evolution-slice/screening-report.md`](../research/checkpoint-evolution-slice/screening-report.md) |
 
-Metered spend across all five runs is $6.14.
+Metered spend across the four paid runs is \$6.14. Admission spent Docker compute
+and no inference.
 
 ### What the screening rounds actually bought
 
 Twenty-four Opus 4.8 instances were screened across both rounds, and the outcome
 distribution is brutally bimodal: 9 ceilings, 12 floors, 3 instances at 2/3, and
-not one at 1/3. Boundary instances are rare enough that finding three cost $4.64
+not one at 1/3. Boundary instances are rare enough that finding three cost \$4.64
 and two rounds of design revision. That is the real constraint on every paired
 experiment that follows, because a paired design needs boundary instances and
 there are only three of them.
@@ -54,8 +55,8 @@ minimum detectable effect at three clusters is 1.568 against an estimand bounded
 in [-1, 1]. The design cannot detect anything. Reporting the point estimate
 without that number would be dishonest.
 
-Two things surprised me. The evolved condition cost less than static ($0.538 vs
-$0.567), so the preregistered 2x evolved multiplier was wrong by about a factor
+Two things surprised me. The evolved condition cost less than static (\$0.538 vs
+\$0.567), so the preregistered 2x evolved multiplier was wrong by about a factor
 of two in the safe direction. And xarray 4695 screened at 2/3 then went 0/6 in
 the experiment, which is a useful reminder of how wide a three-trial pass-rate
 estimate really is.
@@ -96,7 +97,7 @@ entirely. One family is one cluster, one model, one budget setting.
 The honest version of the finding is narrower and still worth having: an agent
 carrying its own artifact forward pays for it in output size, and it pays in
 input tokens too. The evolved arm cost 1.6 times the carry arm on an identical
-schedule ($0.1721 vs $0.1092), because its own accumulated verbosity comes back
+schedule (\$0.1721 vs \$0.1092), because its own accumulated verbosity comes back
 as billed input. Whether that cost ever becomes a verification failure is exactly
 what this run could not tell us.
 

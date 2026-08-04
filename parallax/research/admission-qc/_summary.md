@@ -18,7 +18,7 @@ needs one sealed-schema addition).
 
 - The bidirectional gold/no-op pair is the field's admission bar; retries
   apply only to infrastructure failures, never to graded verdicts.
-- Byte-level leakage linting is necessary but insufficient — paraphrase,
+- Byte-level leakage linting is necessary but insufficient, paraphrase,
   grader-vocabulary, and eval-context leakage are judgment calls routed to
   the skill's rendered-turn review.
 - Rejections are recorded, not deleted, so triage can detect selective

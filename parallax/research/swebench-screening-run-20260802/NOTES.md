@@ -57,7 +57,7 @@
   discovery authenticated and advertised Claude Haiku 4.5 and Claude Opus 4.8.
 - The first construction request returned HTTP 403 before a model response.
   Stopped immediately under the authorization-failure rule. Recorded usage is
-  zero tokens and estimated spend is $0; the key value was never logged.
+  zero tokens and estimated spend is \$0; the key value was never logged.
 - Offline certification reached 106 tests and the adapted audit mutation suite
   killed all 34 active mutants.
 
@@ -117,7 +117,7 @@
   documents token usage in its platform inference logs but does not document a
   gateway-log retrieval endpoint.
 - The committed receipt records one paid request and an actual spend of
-  `null`. Its conservative upper estimate is $0.113895. The estimate charges
+  `null`. Its conservative upper estimate is \$0.113895. The estimate charges
   one token per prompt UTF-8 byte, the full 1,024-token output allowance, and
   the higher Opus rates already used by the screening cap.
 - `ProviderResponseMessage` now normalizes explicit null `tool_calls` to an
@@ -137,7 +137,7 @@
 - Two additional Haiku construction responses exposed real wire variation: an
   exact Markdown JSON fence and a boolean argument value. The construction
   boundary now strips only an exact `json` fence and canonicalizes JSON scalar
-  values to text. Five successful construction receipts total $0.143625.
+  values to text. Five successful construction receipts total \$0.143625.
 - Docker Desktop denies unprivileged user namespaces to ordinary containers.
   The HUD outer container now runs privileged inside Docker Desktop's VM so
   its inner UID-1000 `bubblewrap` namespace can start. The exact isolation
@@ -149,7 +149,7 @@
 - HUD 0.6.12 requires every MCP tool to have a description and described input
   schema. The `advance` tool now emits both.
 - Ten Opus 4.8 static episodes completed. Their candidate-patch receipts were
-  fsynced before grading; episode inference cost $1.526025.
+  fsynced before grading; episode inference cost \$1.526025.
 - Installing the pinned SWE-bench revision as a wheel omitted its
   `tokio-rs__tokio-6724.Cargo.lock` fixture, so the first grading pass produced
   ten verifier failures. The evaluator now uses a detached source checkout at
@@ -162,10 +162,10 @@
   Matplotlib 0/2, and Requests 0/2. The operating point is floor, ceiling,
   ceiling, floor, floor. The design remains underpowered: interval [0, 1],
   MDE 0.607361, no advance/reject decision.
-- Known metered spend is $1.669650 ($0.143625 construction plus $1.526025
+- Known metered spend is \$1.669650 (\$0.143625 construction plus \$1.526025
   episodes). Three failed construction responses did not retain usage; their
-  conservative reserve is $0.477790. The all-in conservative bound is
-  $2.147440, below the $5 hard cap.
+  conservative reserve is \$0.477790. The all-in conservative bound is
+  \$2.147440, below the \$5 hard cap.
 - Final evidence is `evidence/construction.jsonl`,
   `evidence/live-work/episodes/`, `evidence/screening.jsonl`, and
   `evidence/screening-summary.json`. Preflight and wheel-grader failures remain
