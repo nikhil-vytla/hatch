@@ -335,6 +335,27 @@ def test_swe_overlay_reinjects_symptoms_and_restores_source() -> None:
     )
 
 
+def test_public_issue_can_name_an_official_test() -> None:
+    source = row()
+    test_id = json.loads(str(source["FAIL_TO_PASS"]))[0]
+    source["problem_statement"] = f"Fix the behavior covered by {test_id}."
+    problem = load_swebench_rows(
+        (source,),
+        (INSTANCE_ID,),
+        runtimes={INSTANCE_ID: runtime()},
+    )[0]
+
+    family = build_swe_script_family(
+        problem,
+        construction(),
+        seed=7,
+        total_agent_steps=12,
+        max_output_tokens=4096,
+    )
+
+    assert test_id in family.static.turns[0].text
+
+
 def test_episode_budget_rejects_fewer_steps_than_turns() -> None:
     problem = load_swebench_rows(
         (row(),),

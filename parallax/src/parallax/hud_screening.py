@@ -23,8 +23,12 @@ class TokenPricing(StrictModel):
 
 
 CLAUDE_OPUS_PRICING = TokenPricing(
-    input_usd_per_million=15.0,
-    output_usd_per_million=75.0,
+    input_usd_per_million=5.0,
+    output_usd_per_million=25.0,
+)
+CLAUDE_HAIKU_PRICING = TokenPricing(
+    input_usd_per_million=1.0,
+    output_usd_per_million=5.0,
 )
 
 

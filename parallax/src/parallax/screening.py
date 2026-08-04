@@ -311,6 +311,19 @@ def _finalize_partial(partial_path: Path, output_path: Path) -> None:
         os.close(directory)
 
 
+def initialize_screening_manifest(plan: ScreeningPlan, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if output_path.exists():
+        raise FileExistsError(f"screening evidence already exists: {output_path}")
+    partial_path = _partial_path(output_path)
+    if partial_path.exists():
+        records = read_screening_jsonl(partial_path)
+        if not records or records[0] != plan:
+            raise ValueError("existing screening manifest differs from plan")
+        return
+    _append_fsync(partial_path, _canonical_line(plan), exclusive=True)
+
+
 def run_screening(
     plan: ScreeningPlan,
     executor: ScreeningExecutor,
@@ -331,19 +344,13 @@ def run_screening(
             f"screening requires approval for estimated "
             f"${plan.estimated_cost_lower_usd:.2f}-${upper:.2f}"
         )
-    if output_path.exists():
-        raise FileExistsError(f"screening evidence already exists: {output_path}")
+    initialize_screening_manifest(plan, output_path)
     partial_path = _partial_path(output_path)
     runs: list[ScreeningRun] = []
-    if partial_path.exists():
-        records = read_screening_jsonl(partial_path)
-        if not records or records[0] != plan:
-            raise ValueError("existing screening manifest differs from plan")
-        runs = [record for record in records[1:] if isinstance(record, ScreeningRun)]
-        if len(runs) != len(records) - 1:
-            raise ValueError("screening evidence contains a second manifest")
-    else:
-        _append_fsync(partial_path, _canonical_line(plan), exclusive=True)
+    records = read_screening_jsonl(partial_path)
+    runs = [record for record in records[1:] if isinstance(record, ScreeningRun)]
+    if len(runs) != len(records) - 1:
+        raise ValueError("screening evidence contains a second manifest")
     completed = {
         (run.unit.source_id, run.unit.trial_index, run.unit.arm) for run in runs
     }
