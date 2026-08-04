@@ -138,7 +138,7 @@ The strict verdict chain itself, and probe-based extensions of it:
   probe policy $\pi_p$ (a declared, pinned weaker agent) attempt stage
   $i+1$; record its strict verdict and resource use. This converts
   "maintainability of $y_i$" into an ordinary Parallax estimand — sealed
-  authority is the stage-$i{+}1$ suite; the probe is part of the
+  authority is the stage $i{+}1$ suite; the probe is part of the
   *measurement instrument*, declared like any other environment field. Probe
   nondeterminism is handled the standard way: repeated trials, clustered
   intervals. Cost: real compute, and the measurement is relative to the

@@ -120,7 +120,7 @@ analog. A family is admissible iff all gates pass at every stage:
 | Gate | Predicate | Sequence-level meaning | Automatable? |
 | --- | --- | --- | --- |
 | **G1 gold** | both references pass $\Omega_i$ at every $i$, built incrementally | solvable *as an evolution*, not just in the final state | yes |
-| **G2 no-op** | the stage-$(i{-}1)$ reference workspace fails $T_i$ for every $i$ | every checkpoint demands new work; no vacuous stages | yes |
+| **G2 no-op** | the stage $(i{-}1)$ reference workspace fails $T_i$ for every $i$ | every checkpoint demands new work; no vacuous stages | yes |
 | **G3 mutant/ambiguity** | (a) seeded semantic mutants of the references fail the suite; (b) the two references produce identical normalized outputs on the full sealed input space of the suite | suite discriminates; spec admits one behavior ("could two correct implementations differ?" from `checklist.md`, made executable) | yes |
 | **G4 pressure** | naive-architecture reference (deliberately myopic at $C_1$, still correct) incurs ≥ $k\times$ the downstream churn/cost of the anticipatory reference | the sequence actually stresses design, the property upstream asserts by author judgment (Table 4) | yes, given the naive build |
 | **G5 leakage/secrecy** | spec lint (structure hints, future-checkpoint mentions, exact-STDERR prescriptions) + sealed-side scan: no test content, verdicts, or measurement output reachable from the public capsule or workspace | authority separation across the whole family | partially — lint automates the checklist; residual semantic leakage needs review |

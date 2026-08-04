@@ -66,7 +66,7 @@ predict the behavioral price of the artifact better than chance, and better
 or worse than a probe agent does?*
 
 Design: at each stage freeze $y_i$; measure $Q_i$ (Class B) and
-$Q^{\mathrm{probe}}_i$ (pinned weaker agent attempts stage $i+1$;
+$Q_i^{\mathrm{probe}}$ (pinned weaker agent attempts stage $i+1$;
 Class A). Compare their predictive power for the treatment agent's own
 $Y_{i+1}$ and cost. The paper's own Appendix B.3 (erosion ↛ next-stage
 pass, erosion → next-stage cost) plus HumanLayer's handoff proposal make
