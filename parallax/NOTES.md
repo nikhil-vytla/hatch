@@ -400,10 +400,17 @@
 - The screening then ran, approved, on 2026-08-03: 60/60 Haiku 4.5 stage calls,
   \$0.2813 metered, receipt chain confirmed on all 60. Stages 1 and 2 verified
   strict in both arms on every seed. At stage 3 the arms split completely, but on
-  the declared 4096-byte reply cap rather than on any verdict, so the run says
-  nothing yet about verification decay. Details in
-  `research/checkpoint-evolution-slice/screening-report.md`, honest summary in
-  `docs/FINDINGS.md`.
+  the declared 4096-byte reply cap rather than on any verdict.
+- A disambiguation run the same evening settled it. Raising the ceiling to
+  escalating 4096/8192/12288 caps and 4096 output tokens, with every other input
+  byte-identical, put the evolved arm at strict 10/10 on every stage and paired
+  bounds [0, 0]. One lever moved and the whole effect moved with it, so the effect
+  was the lever. What survives is a cost and bloat signature: evolved workspaces
+  2.3x carry's, spend 1.52x. Slice total \$0.56 over 120 calls, zero
+  infrastructure failures. `budget_headroom_violations` now refuses families whose
+  caps cannot cover reference growth, and rejects the original family at stages 2
+  and 3, so the gate would have caught this before the first dollar. Retraction
+  and surviving finding in `docs/FINDINGS.md`.
 
 ## Power gate removed
 

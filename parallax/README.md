@@ -67,7 +67,7 @@ harness:
    budget-match, and arm-completeness gates before a family can be scheduled.
 
 Checkpoint evolution, the second synthesis strategy, has a narrower slice: one
-hand-verified three-checkpoint family, two arms, and one paid screening run.
+hand-verified three-checkpoint family, two arms, and two paid screening runs.
 
 1. `checkpoint_evolution.py` owns the workspace and checkpoint domain model, an
    entrypoint-only verifier that grades stage N against the accumulated
@@ -95,15 +95,17 @@ be `FINAL_ANSWER: <integer>`, with exactly one marker and a canonical integer.
 Malformed submissions are invalid, valid non-matching answers are wrong, and
 provider, budget, or verifier faults are run failures rather than model behavior.
 
-Five runs have called a real provider, for \$6.14 of metered spend: two SWE-bench
+Six runs have called a real provider, for \$6.42 of metered spend: two SWE-bench
 screening rounds and an 18-unit static-versus-evolved experiment against Claude
-Opus 4.8, plus a 60-call checkpoint-evolution screening against Claude Haiku 4.5.
-Neither contrast resolved. The SWE-bench delta is +0.111 with a 95% interval of
-[-1, 1], because three source clusters give a minimum detectable effect of 1.568
-against an estimand bounded in [-1, 1]. The checkpoint-evolution arms separated
-completely at stage 3, but on a byte-budget overrun rather than on any verdict, so
-the mechanism is unsettled. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the
-per-instance numbers and the design gaps.
+Opus 4.8, plus two 60-call checkpoint-evolution screenings against Claude Haiku
+4.5. Neither contrast resolved. The SWE-bench delta is +0.111 with a 95% interval
+of [-1, 1], because three source clusters give a minimum detectable effect of
+1.568 against an estimand bounded in [-1, 1]. The checkpoint-evolution arms
+separated completely at stage 3 on the first run, then stopped separating when the
+second run raised the byte cap and changed nothing else, so that separation was
+the cap. What survives there is a cost and bloat signature, not verification
+decay. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the per-instance numbers, the
+retraction, and the design gaps.
 
 GSM8K has never called a real provider. Its evidence is scripted agents against
 real-shaped rows, exercising construction, all three arms, history-sensitive
@@ -118,5 +120,5 @@ from the consulted upstream implementations live in
 
 > **TODO:** Run the matched arm on SWE-bench, or run GSM8K against a real
 > provider. Until one of those happens, no Evolving Intent flow has both a
-> complete design and real-model evidence. Checkpoint evolution needs the byte
-> budget and reply format settled before its stage-3 separation means anything.
+> complete design and real-model evidence. Checkpoint evolution has its byte
+> budget settled and gated in code, and now needs more than one task family.

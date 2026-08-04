@@ -9,9 +9,10 @@
 > `src/parallax/checkpoint_sandbox.py` (container verifier), and
 > `src/parallax/checkpoint_screening.py` (dry-run and live screening). The
 > hand-verified `ce-tally-1` family in `tests/fixtures/checkpoint_family.json`
-> exercises all of it end to end. One paid screening run has executed: 60 Haiku
-> 4.5 stage calls for \$0.28, reported in
-> [`FINDINGS.md`](../FINDINGS.md#what-the-checkpoint-evolution-screening-measured-and-what-it-does-not-license).
+> exercises all of it end to end. Two paid screening runs have executed, 120
+> Haiku 4.5 stage calls for \$0.56, and the second retracted the first's headline.
+> Both are reported in
+> [`FINDINGS.md`](../FINDINGS.md#the-checkpoint-evolution-separation-was-our-byte-cap).
 > Sections marked *implemented* describe executable behavior. Everything else is
 > a specification target. [Implemented slice](#implemented-slice) lists the
 > scope, the deferrals, and the divergences.
@@ -163,10 +164,13 @@ matched single-episode or reference-workspace presentations of the same
 requirements do not. The effect is an empirical estimand under the
 controlled-arm rules in `MODEL.md`, not a property assumed by construction.
 
-The one paid run to date does not speak to this hypothesis. It separated the
-arms on the declared byte cap, before any verdict, so nothing about verification
-decay was measured. See
-[`FINDINGS.md`](../FINDINGS.md#what-the-checkpoint-evolution-screening-measured-and-what-it-does-not-license).
+Neither paid run supports this hypothesis. The first separated the arms on the
+declared byte cap, before any verdict. The second raised the cap, changed nothing
+else, and the separation vanished: evolved strict 10/10 at every stage, paired
+bounds [0, 0]. So the cap was the effect, and at this scale the arms do not differ
+on verdicts. Accumulation shows up instead as 2.3x workspace growth and 1.52x
+spend. See
+[`FINDINGS.md`](../FINDINGS.md#the-checkpoint-evolution-separation-was-our-byte-cap).
 
 ## Required behavioral coverage
 
@@ -267,9 +271,11 @@ Interpretations and divergences the slice declares, beyond those four:
   working directory, but a synchronous workspace-in, workspace-out boundary has
   no partial state, so an oversized return is a budget RunFailure with no
   workspace, censoring the evolved suffix. An agent-raised budget fault is
-  classified the same way. This interpretation turned out to dominate the first
-  paid run: the evolved arm overran the cap on every seed at stage 3, so nothing
-  reached the verifier. Read it as a live design question, not a settled choice.
+  classified the same way. This interpretation dominated the first paid run: the
+  evolved arm overran the cap on every seed at stage 3, so nothing reached the
+  verifier. The cap schedule is therefore a design parameter, not an incidental
+  setting, and `budget_headroom_violations` now refuses a family whose caps cannot
+  cover reference growth.
 - **Dependency manifest**: $W_i$'s declared manifest $d_i$ is not separately
   modeled, because the single-file Python track has an empty manifest by
   construction.

@@ -54,9 +54,12 @@ has a real paid run on exactly one task family. Writing this down honestly in
 `FINDINGS.md` made it much harder to look at than it was when it was distributed
 across four folders.
 
-Second, the checkpoint-evolution screening result reads as a clean arm separation
-and is not one. The evolved arm failed 10/10 on a byte cap we chose, under a reply
-format we chose, before any test ran. That needs a variant run, not better prose.
+Second, the checkpoint-evolution screening result read as a clean arm separation
+and was not one. The evolved arm failed 10/10 on a byte cap we chose, under a
+reply format we chose, before any test ran. That needed a variant run rather than
+better prose, and it got one within the hour: raising the cap erased the
+separation, so `FINDINGS.md` now carries the retraction beside the original row.
+Writing the row honestly the first time is what made the correction cheap.
 
 ## Suggested follow-up
 

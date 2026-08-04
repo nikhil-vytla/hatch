@@ -13,8 +13,8 @@ Three flows are implemented:
    copy-paste runnable right now.
 2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified).
    Three paid stages, already run once, with the real artifacts shown.
-3. [Checkpoint evolution](#3-checkpoint-evolution-028). One family, two arms,
-   one paid screening run whose result is not what it looks like.
+3. [Checkpoint evolution](#3-checkpoint-evolution-056). One family, two arms, and
+   two paid screening runs, the second of which retracted the first.
 
 Then [what is not automated yet](#what-is-not-automated-yet), which is the part
 worth reading before you believe any of the above scales.
@@ -206,7 +206,7 @@ turn-matched control arm that the GSM8K design treats as mandatory was not
 part of the 18-unit design, so conversation length is not yet controlled for
 on SWE-bench.
 
-## 3. Checkpoint evolution (\$0.28)
+## 3. Checkpoint evolution (\$0.56)
 
 The second synthesis strategy, from
 [SlopCodeBench](https://arxiv.org/abs/2603.24755): instead of one task whose
@@ -244,11 +244,12 @@ checkpoint's new cases only), `core_pass`.
 
 **Conclude:** the slice establishes that skipped or reordered checkpoints,
 workspace-chain drift, and answer leakage are structurally unrepresentable in
-the evidence. The live run added 60 Haiku 4.5 stage calls for \$0.28 and split
-the arms completely at stage 3, but on the declared byte cap rather than on any
-verdict, so it says nothing yet about verification decay. Read
-[`FINDINGS.md`](FINDINGS.md#what-the-checkpoint-evolution-screening-measured-and-what-it-does-not-license)
-before quoting that number. Contract:
+the evidence. Two live runs added 120 Haiku 4.5 stage calls for \$0.56. The first
+split the arms completely at stage 3 on the declared byte cap; the second raised
+the cap, changed nothing else, and the split vanished. So the cap was the effect,
+and the arms do not differ on verdicts at this scale. Read
+[`FINDINGS.md`](FINDINGS.md#the-checkpoint-evolution-separation-was-our-byte-cap)
+before quoting either run. Contract:
 [`methods/checkpoint-evolution.md`](methods/checkpoint-evolution.md); trail:
 [`../research/checkpoint-evolution-slice/`](../research/checkpoint-evolution-slice/README.md),
 including the preregistration and the screening report.
@@ -274,9 +275,10 @@ including the preregistration and the screening report.
   the complete design and real-model evidence. That is the current gap
   between what the docs describe and what has been measured.
 - **Checkpoint evolution has no report module.** Admission, two arms, evidence,
-  and one paid screening run exist. The stage-indexed and slope estimands do
+  and two paid screening runs exist. The stage-indexed and slope estimands do
   not, so every CE number so far is descriptive.
-- **The checkpoint byte budget is unsettled.** The one paid CE run failed the
-  evolved arm 10/10 on a 4096-byte reply cap we chose, which means the cap and
-  the full-file-map reply format are confounded with the effect the method is
-  about. A variant run is what fixes this, not a doc edit.
+- **Checkpoint evolution has one task family.** Both paid runs used `ce-tally-1`.
+  The byte-budget confound that broke the first run is settled and now gated by
+  `budget_headroom_violations`, which refuses a family whose cap schedule cannot
+  cover reference growth. Sample size is the remaining problem, and no gate
+  fixes that.

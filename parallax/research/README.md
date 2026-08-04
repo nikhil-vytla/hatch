@@ -34,9 +34,9 @@ Dated folders. Each one spent money or compute and committed the receipts.
   incident log is the most useful thing in the folder.
 - [`checkpoint-evolution-slice/`](checkpoint-evolution-slice/README.md) The
   executable slice of checkpoint evolution: domain model, admission gates,
-  two-arm runner, seed family, mutation gauntlet, and the first paid screening
-  run. That run separated the arms completely at stage 3 for a reason the method
-  is not about, which the folder says plainly.
+  two-arm runner, seed family, mutation gauntlet, and two paid screening runs. The
+  first separated the arms completely at stage 3, the second raised the byte cap
+  and the separation vanished. The folder carries both and says which one holds.
 
 ## Design and survey work
 
