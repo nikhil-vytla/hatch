@@ -44,9 +44,9 @@ Each Parallax study follows one loop:
 1. **Observed failure mode.** A concrete, repeatable misbehavior in a real
    agent, for example losing track of the user's goal as it evolves.
 2. **Research question.** A falsifiable statement with a declared effect
-   direction and threshold, for example: presenting the same verifiable task
-   through an evolving intent trajectory changes the pass rate by at least
-   the preregistered threshold, relative to a matched multi-turn control.
+   direction and a magnitude worth caring about, for example: presenting the
+   same verifiable task through an evolving intent trajectory lowers the pass
+   rate relative to a matched multi-turn control.
 3. **Controlled intervention.** The single difference between arms is named
    as the intervention. Everything else is matched.
 4. **Task and environment construction.** A synthesis strategy transforms
@@ -60,10 +60,10 @@ Each Parallax study follows one loop:
    paired arm difference clustered by source task, treats missing outcomes
    with worst-case and best-case bounds, and wraps the result in a
    closed-form 95% confidence interval.
-7. **Bounded finding.** The report returns `advance`, `reject`, or
-   `inconclusive` against the preregistered threshold. The finding is the
-   interval and the decision, not a narrative.
-8. **Next hypothesis.** The finding, including an inconclusive one, narrows
+7. **Bounded finding.** The report states the point estimate, the interval,
+   and the smallest effect that interval could have resolved. The finding is
+   those numbers, not a narrative and not a verdict.
+8. **Next hypothesis.** The finding, including an uninformative one, narrows
    the next question. The loop repeats.
 
 ## A walked example: Evolving Intent over GSM8K
@@ -106,7 +106,7 @@ sealed answer, the verifier, and the declared output budget:
   state the agent must answer is checked for exact equality with the source
   intent, so the sealed answer remains the right grading authority.
 
-The decision contrast is matched versus evolved. Because those two arms agree
+The primary contrast is matched versus evolved. Because those two arms agree
 on turn count and budget, a difference between them is attributable to intent
 evolution rather than conversation length.
 
@@ -129,7 +129,7 @@ against it. Model pass rates use only verification outcomes as the
 denominator; run failures are reported separately and propagate into the
 identification bounds below.
 
-### The report and its decision
+### What the report states
 
 For each (source, trial) unit the report takes the paired difference in pass
 indicators, evolved minus matched, so the estimand lives in $[-1, 1]$.
@@ -138,16 +138,16 @@ tasks, so sources with more trials do not dominate. When either side of a
 pair is a run failure, that unit contributes its worst-case and best-case
 interval instead of a point value, which yields identification bounds for
 the effect. A closed-form Hoeffding interval at 95% confidence, clustered by
-source, widens those bounds for sampling error. The decision rule against
-the preregistered threshold:
+source, widens those bounds for sampling error.
 
-- `advance` when the entire interval is at or above the threshold;
-- `reject` when the entire interval is below the threshold;
-- `inconclusive` otherwise, which is the expected outcome at small sample
-  sizes or high run-failure rates.
-
-An inconclusive result is a finding: it says the design, sample size, and
-failure rate cannot support the claim yet, and it says so with numbers.
+The report stops there. It states the point estimate, the interval, and the
+interval's half-width — the minimum detectable effect, the smallest effect a
+design of this size could have resolved. It does not convert those numbers
+into a verdict. That half-width is $\sqrt{2\ln 40 / n}$ for $n$ source
+clusters, so resolving even a 0.2 effect would take 185 sources against a
+published admissible pool of 50; a verdict computed at any sample size this
+harness can reach would report its own arithmetic rather than the evidence.
+Interpreting the interval is left to the reader, who can see how wide it is.
 
 ## Run it yourself
 
@@ -163,11 +163,11 @@ python -m ruff check .       # lint; expect no findings
 
 `tests/test_end_to_end.py` is the runnable walkthrough of the whole loop: it
 builds script families, executes all three arms with scripted agents, writes
-evidence JSONL, and checks report semantics including byte stability, the
-identification bounds, and the decision gate. `tests/conftest.py` shows how a
-family is constructed from a raw GSM8K row. The programmatic entry points are
+evidence JSONL, and checks report semantics including byte stability and the
+identification bounds. `tests/conftest.py` shows how a family is constructed
+from a raw GSM8K row. The programmatic entry points are
 `runner.run_experiment` (families in, evidence JSONL out) and
-`report.report_from_jsonl` (evidence in, decision report out).
+`report.report_from_jsonl` (evidence in, report out).
 
 ## How findings are recorded and audited
 
@@ -175,9 +175,9 @@ One experiment writes one evidence JSONL file through atomic replacement,
 with canonical sorted-key JSON so identical experiments are byte-identical.
 It contains exactly three record kinds:
 
-- one **manifest**, preregistering the threshold, every (source, trial) unit
-  with its seed, and content digests of the design, model configuration, and
-  each arm configuration;
+- one **manifest**, preregistering every (source, trial) unit with its seed,
+  and content digests of the design, model configuration, and each arm
+  configuration;
 - one **family** record per source, holding the sealed answer, the extracted
   intent, all accepted and rejected construction attempts, and the three
   scripts — the sealed answer appears here exactly once and never in run
@@ -228,8 +228,8 @@ documented research phase, and each load-bearing choice has a citable origin.
   recorded in [`decisions/ADR-001.md`](decisions/ADR-001.md), and the exact
   papers and repository revisions it was checked against are pinned in
   [`decisions/LITERATURE-PINS.md`](decisions/LITERATURE-PINS.md).
-- **Preregistration before outcomes.** Freezing the threshold, units, seeds,
-  and configuration digests in the evidence manifest before any outcome is
+- **Preregistration before outcomes.** Freezing the units, seeds, and
+  configuration digests in the evidence manifest before any outcome is
   visible follows the preregistration rationale documented by the
   [Center for Open Science](https://www.cos.io/initiatives/prereg): planned
   tests must be distinguishable from later exploration, and analytical
@@ -252,7 +252,7 @@ documented research phase, and each load-bearing choice has a citable origin.
   counts, were explicit findings from the adversarial review of the earlier
   prototype, where hand-annotated failure notes and unmatched step budgets
   were caught confounding the measured effect. Both are now structural: run
-  failures are typed rows validated by the report, and the decision contrast
+  failures are typed rows validated by the report, and the primary contrast
   compares budget-matched arms only.
 - **The four-review gate generalizes that experience.** Standing adversarial
   review of the prototype caught problems that authors of the code did not,
@@ -285,7 +285,8 @@ of the superseded experiment that preceded this harness.
   test suite.
 
 > **TODO:** Run the preregistered matched-versus-evolved contrast with one
-> real model provider over a declared GSM8K sample. Pass: the report returns
-> `advance` or `reject`. Fail: the interval still spans the threshold at the
-> preregistered sample size, or run failures leave the identification bounds
-> uninformative — either result forces a design revision before scaling.
+> real model provider over a declared GSM8K sample, and report the point
+> estimate, the interval, and the minimum detectable effect it achieved. An
+> interval too wide to separate any plausible effect, or run failures that
+> leave the identification bounds uninformative, forces a design revision
+> before scaling.
