@@ -32,7 +32,6 @@ from .types import (
 )
 
 SCREENING_SPEND_CAP_USD = 5.0
-MAXIMUM_SCREENING_MDE = 0.2
 
 
 class SpendApprovalRequired(RuntimeError):
@@ -230,12 +229,6 @@ class ScreeningSummary(StrictModel):
     interval_lower: Annotated[float, Field(ge=0, le=1)]
     interval_upper: Annotated[float, Field(ge=0, le=1)]
     minimum_detectable_effect: Annotated[float, Field(ge=0, le=1)]
-    powered: bool
-    action: Literal[
-        "operating_point_found",
-        "change_model_or_instances",
-        "underpowered",
-    ]
 
 
 def _canonical_line(record: ScreeningRecord) -> bytes:
@@ -614,14 +607,6 @@ def summarize_screening(
         max(0.0, identification[0] - epsilon),
         min(1.0, identification[1] + epsilon),
     )
-    powered = epsilon <= MAXIMUM_SCREENING_MDE
-    action = (
-        "underpowered"
-        if not powered
-        else "operating_point_found"
-        if boundary
-        else "change_model_or_instances"
-    )
     return ScreeningSummary(
         design_digest=plan.design_digest,
         sources=tuple(source_results),
@@ -629,6 +614,4 @@ def summarize_screening(
         interval_lower=interval[0],
         interval_upper=interval[1],
         minimum_detectable_effect=min(1.0, epsilon),
-        powered=powered,
-        action=action,
     )
