@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from itertools import pairwise
 from pathlib import Path
 from typing import Annotated, Literal, Self, TypeAlias
@@ -296,22 +296,36 @@ class StageVerification(StrictModel):
         return self
 
 
-def _materialize(root: Path, files: tuple[WorkspaceFile, ...]) -> None:
-    for file in files:
+def materialize_case(
+    root: Path,
+    workspace: Workspace,
+    case: SealedCase,
+) -> None:
+    for file in (*workspace.files, *case.input_files):
         target = root / file.path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(file.content, encoding="utf-8")
 
 
-def _run_case(
+CaseExecution: TypeAlias = Callable[
+    [EntrypointContract, Workspace, SealedCase], CaseDetail
+]
+
+
+def run_case_trusted(
     contract: EntrypointContract,
     workspace: Workspace,
     case: SealedCase,
 ) -> CaseDetail:
+    """Host-subprocess execution for TRUSTED code only.
+
+    Reference builds and scripted-fixture workspaces may run here; anything a
+    real model wrote must go through the container path in
+    `checkpoint_sandbox`, which this module never falls back to implicitly.
+    """
     with tempfile.TemporaryDirectory() as scratch:
         root = Path(scratch)
-        _materialize(root, workspace.files)
-        _materialize(root, case.input_files)
+        materialize_case(root, workspace, case)
         try:
             completed = subprocess.run(
                 (sys.executable, contract.entry_file, *case.argv),
@@ -342,6 +356,8 @@ def verify_stage(
     family: CheckpointFamily,
     index: int,
     workspace: Workspace,
+    *,
+    execute: CaseExecution = run_case_trusted,
 ) -> StageVerification:
     results = tuple(
         CaseResult(
@@ -349,7 +365,7 @@ def verify_stage(
             origin_index=origin,
             role="new" if origin == index else "regression",
             category=case.category,
-            detail=_run_case(family.contract, workspace, case),
+            detail=execute(family.contract, workspace, case),
         )
         for origin, case in family.obligations(index)
     )

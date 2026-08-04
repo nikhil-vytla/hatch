@@ -10,12 +10,14 @@ from .canonical import atomic_write, canonical_bytes, canonical_digest
 from .checkpoint_evolution import (
     EMPTY_WORKSPACE,
     AdmissionReceipt,
+    CaseExecution,
     CheckpointFamily,
     PositiveInt,
     ReferenceBuild,
     StageVerification,
     VerifierError,
     Workspace,
+    run_case_trusted,
     verify_stage,
 )
 from .outcome import BudgetError, RunFailure
@@ -72,7 +74,20 @@ class CheckpointDelivery(StrictModel):
     max_output_bytes: PositiveInt
 
 
-CheckpointAgent: TypeAlias = Callable[[CheckpointDelivery], Workspace]
+class StageUsage(StrictModel):
+    prompt_tokens: NonNegativeInt
+    completion_tokens: NonNegativeInt
+    estimated_cost_usd: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+
+
+class MeteredWorkspace(StrictModel):
+    workspace: Workspace
+    usage: StageUsage
+
+
+CheckpointAgent: TypeAlias = Callable[
+    [CheckpointDelivery], Workspace | MeteredWorkspace
+]
 AgentFactory: TypeAlias = Callable[
     [SourceId, CheckpointArm, TrialSeed], CheckpointAgent
 ]
@@ -85,6 +100,7 @@ class StageReceipt(StrictModel):
     output_workspace_digest: DigestText | None
     max_output_bytes: PositiveInt
     output_bytes: NonNegativeInt
+    usage: StageUsage | None = None
     outcome: StageOutcome
 
     @model_validator(mode="after")
@@ -220,36 +236,45 @@ class FamilyRun(StrictModel):
             assert_never(self.arm)
 
 
+def _failure_usage(error: Exception) -> StageUsage | None:
+    usage = getattr(error, "stage_usage", None)
+    return usage if isinstance(usage, StageUsage) else None
+
+
 def _stage_attempt(
     agent: CheckpointAgent,
     delivery: CheckpointDelivery,
-) -> Workspace | RunFailure:
+) -> tuple[Workspace | RunFailure, StageUsage | None]:
     try:
         produced = agent(delivery)
-        if not isinstance(produced, Workspace):
+        if isinstance(produced, MeteredWorkspace):
+            workspace, usage = produced.workspace, produced.usage
+        elif isinstance(produced, Workspace):
+            workspace, usage = produced, None
+        else:
             raise TypeError("agent returned a non-workspace artifact")
     except BudgetError as error:
         return RunFailure(
             failure_kind="budget",
             error_type=type(error).__name__,
             message=str(error),
-        )
+        ), _failure_usage(error)
     except Exception as error:
         return RunFailure(
             failure_kind="agent",
             error_type=type(error).__name__,
             message=str(error),
-        )
-    if produced.content_bytes > delivery.max_output_bytes:
+        ), _failure_usage(error)
+    if workspace.content_bytes > delivery.max_output_bytes:
         return RunFailure(
             failure_kind="budget",
             error_type="WorkspaceBudgetExceeded",
             message=(
-                f"stage {delivery.index} returned {produced.content_bytes} bytes "
+                f"stage {delivery.index} returned {workspace.content_bytes} bytes "
                 f"over the declared {delivery.max_output_bytes}-byte budget"
             ),
-        )
-    return produced
+        ), usage
+    return workspace, usage
 
 
 def run_checkpoint_family(
@@ -257,6 +282,7 @@ def run_checkpoint_family(
     agent: CheckpointAgent,
     *,
     arm: CheckpointArm,
+    execute: CaseExecution = run_case_trusted,
 ) -> FamilyRun:
     family = admitted.family
     receipts: list[StageReceipt] = []
@@ -278,7 +304,7 @@ def run_checkpoint_family(
             workspace=opening,
             max_output_bytes=checkpoint.max_output_bytes,
         )
-        attempt = _stage_attempt(agent, delivery)
+        attempt, usage = _stage_attempt(agent, delivery)
         produced: Workspace | None
         outcome: StageVerification | RunFailure
         if isinstance(attempt, RunFailure):
@@ -287,7 +313,9 @@ def run_checkpoint_family(
         else:
             produced = attempt
             try:
-                outcome = verify_stage(family, checkpoint.index, produced)
+                outcome = verify_stage(
+                    family, checkpoint.index, produced, execute=execute
+                )
             except VerifierError as error:
                 outcome = RunFailure(
                     failure_kind="verifier",
@@ -302,6 +330,7 @@ def run_checkpoint_family(
                 output_workspace_digest=None if produced is None else produced.digest,
                 max_output_bytes=checkpoint.max_output_bytes,
                 output_bytes=0 if produced is None else produced.content_bytes,
+                usage=usage,
                 outcome=outcome,
             )
         )
@@ -525,6 +554,7 @@ def run_ce_experiment(
     agent_model: str,
     model_config: Mapping[str, object],
     output_path: Path,
+    execute: CaseExecution = run_case_trusted,
 ) -> tuple[FamilyRun, ...]:
     ordered = tuple(sorted(admitted_families, key=lambda item: item.family.family_id))
     manifest = _build_manifest(ordered, trial_seeds, agent_model, model_config)
@@ -551,7 +581,7 @@ def run_ce_experiment(
             except Exception as error:
                 run = _factory_failure(admitted, arm, error)
             else:
-                run = run_checkpoint_family(admitted, agent, arm=arm)
+                run = run_checkpoint_family(admitted, agent, arm=arm, execute=execute)
             runs.append(run)
             records.append(
                 _run_record(

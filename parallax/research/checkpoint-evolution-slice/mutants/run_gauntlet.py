@@ -17,9 +17,15 @@ from pathlib import Path
 PARALLAX = Path(__file__).resolve().parents[3]
 EVOLUTION = PARALLAX / "src" / "parallax" / "checkpoint_evolution.py"
 RUNNER = PARALLAX / "src" / "parallax" / "checkpoint_runner.py"
+AGENT = PARALLAX / "src" / "parallax" / "checkpoint_agent.py"
+SANDBOX = PARALLAX / "src" / "parallax" / "checkpoint_sandbox.py"
+SCREENING = PARALLAX / "src" / "parallax" / "checkpoint_screening.py"
 TESTS = (
     "tests/test_checkpoint_evolution.py",
     "tests/test_checkpoint_runner.py",
+    "tests/test_checkpoint_agent.py",
+    "tests/test_checkpoint_sandbox.py",
+    "tests/test_checkpoint_screening.py",
 )
 
 MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
@@ -63,15 +69,14 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
     (
         "M07 exit codes not compared",
         EVOLUTION,
-        '    if completed.returncode != case.expected_exit_code:\n'
+        "    if completed.returncode != case.expected_exit_code:\n"
         '        return "exit-code-mismatch"\n',
         "",
     ),
     (
         "M08 case timeout reclassified as infrastructure",
         EVOLUTION,
-        "        except subprocess.TimeoutExpired:\n"
-        '            return "timeout"\n',
+        '        except subprocess.TimeoutExpired:\n            return "timeout"\n',
         "        except subprocess.TimeoutExpired as error:\n"
         '            raise VerifierError("timeout") from error\n',
     ),
@@ -90,11 +95,11 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
     (
         "M11 missing workspace does not censor the evolved arm",
         RUNNER,
-        "        if arm == \"evolved\":\n"
+        '        if arm == "evolved":\n'
         "            if produced is None:\n"
         "                break\n"
         "            carried = produced\n",
-        "        if arm == \"evolved\":\n"
+        '        if arm == "evolved":\n'
         "            if produced is not None:\n"
         "                carried = produced\n",
     ),
@@ -119,6 +124,80 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
         RUNNER,
         "            if receipt.spec_digest != checkpoint.spec_digest:\n",
         "            if False:\n",
+    ),
+    (
+        "M15 live screening bypasses the sandbox for model-written code",
+        SCREENING,
+        "        execute = (\n"
+        "            SandboxCaseExecution(PINNED_SANDBOX)\n"
+        "            if sandbox_runner is None\n"
+        "            else SandboxCaseExecution(PINNED_SANDBOX, runner=sandbox_runner)\n"
+        "        )\n"
+        '        execution_identity = f"sandbox:{PINNED_SANDBOX.image}"\n'
+        "        if not math.isfinite(spend_cap_usd)",
+        "        execute = run_case_trusted\n"
+        '        execution_identity = f"sandbox:{PINNED_SANDBOX.image}"\n'
+        "        if not math.isfinite(spend_cap_usd)",
+    ),
+    (
+        "M16 sandbox network isolation dropped",
+        SANDBOX,
+        '            "--network=none",\n',
+        "",
+    ),
+    (
+        "M17 sandbox root filesystem made writable",
+        SANDBOX,
+        '            "--read-only",\n',
+        "",
+    ),
+    (
+        "M18 in-container deadline no longer a case timeout",
+        SANDBOX,
+        "        if completed.returncode == CASE_TIMEOUT_EXIT_CODE:\n"
+        '            return "timeout"\n',
+        "",
+    ),
+    (
+        "M19 docker faults regraded as case verdicts",
+        SANDBOX,
+        "        if completed.returncode in DOCKER_FAULT_EXIT_CODES and (\n"
+        '            "docker:" in completed.stderr or "OCI runtime" in '
+        "completed.stderr\n"
+        "        ):\n",
+        "        if False:\n",
+    ),
+    (
+        "M20 truncated reply no longer a budget fault",
+        AGENT,
+        '                BudgetError("stage reply reached its output-token limit"),\n',
+        "                AgentReplyError"
+        '("stage reply reached its output-token limit"),\n',
+    ),
+    (
+        "M21 stage usage dropped before the receipt",
+        RUNNER,
+        "    return workspace, usage\n",
+        "    return workspace, None\n",
+    ),
+    (
+        "M22 reported-model drift accepted",
+        AGENT,
+        "        if response.model != self._expected_response_model:\n",
+        "        if False:\n",
+    ),
+    (
+        "M23 exact-fence unwrap disabled",
+        AGENT,
+        "    if payload.startswith(JSON_FENCE_PREFIX) and payload.endswith("
+        "JSON_FENCE_SUFFIX):\n",
+        "    if False:\n",
+    ),
+    (
+        "M24 live spend approval gate removed",
+        SCREENING,
+        "        if not approve_spend:\n",
+        "        if False:\n",
     ),
 )
 

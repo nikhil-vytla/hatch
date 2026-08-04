@@ -212,3 +212,108 @@ and the judgment-side review skill (PR #22 ships it; not on main).
   censor; M12 carry-reference collapses into evolved; M13 manifest
   digest unbound; M14 spec-drift check disabled. The gauntlet re-runs
   the baseline after restoration to prove the tree is clean.
+
+## Screening prerequisites (second unit, still no paid inference)
+
+The preregistration named two blockers before the first paid call: a
+provider adapter on the `CheckpointAgent` boundary and container
+sandboxing for the verifier. Both are now implemented, plus an offline
+dry-run mode that proves the whole screening path.
+
+### Main-merge interlude
+
+PR #26 (`parallax-docs-math`) rewrote the LaTeX delimiters in
+`docs/methods/checkpoint-evolution.md` on main while this branch had
+rewritten the same file. Merged `origin/main` into the branch (merge,
+not rebase), kept the as-implemented content, converted the surviving
+`\( \)` delimiters to the GitHub-renderable `$...$` / ```math syntax
+PR #26 established, and verified no old delimiters remain in any
+markdown this branch touches. PR #27 reports `MERGEABLE`/`CLEAN`.
+
+### Provider adapter (`src/parallax/checkpoint_agent.py`)
+
+- `ProviderCheckpointAgent` maps the existing OpenAI-compatible provider
+  boundary (`provider.py`, HUD gateway; the `tool_calls: null` wire fix
+  and truncation handling already live there) onto `CheckpointAgent`.
+  The agent stays a pure function of the delivered stage: rendering
+  depends only on (public spec, carried workspace, declared budgets)
+  plus frozen construction arguments, and rendering has no access to
+  sealed material *by construction* — `render_stage_messages` takes only
+  the contract and the public `CheckpointDelivery`.
+- Reply protocol: one JSON object `{"files": {path: content}}`; the
+  carried workspace is serialized to the agent in the same shape.
+  An exact ```json fence is unwrapped (the wire variation Haiku produced
+  in the SWE-bench screening); anything else malformed is an
+  `AgentReplyError` → agent RunFailure under the runner's existing
+  classification. `finish_reason: "length"` raises `BudgetError` →
+  budget RunFailure.
+- Metering: `StageUsage` (prompt/completion tokens, conservative USD at
+  Haiku gateway rates 1.0/5.0 per million) rides back on a
+  `MeteredWorkspace`, or on the raised error's `stage_usage` when the
+  reply is rejected *after* spend, so failed stages still meter. The
+  runner records it as `StageReceipt.usage` (optional field; scripted
+  offline agents leave it null, so existing evidence still validates).
+- A gateway reply without a usage block is rejected as unmeterable
+  (agent fault) rather than silently unmetered.
+
+### Container sandboxing (`src/parallax/checkpoint_sandbox.py`)
+
+- `SandboxCaseExecution` runs every sealed case in a disposable
+  container: image pinned by immutable digest
+  (`python@sha256:57cd7c…710de`, resolved from `python:3.12-slim` for
+  `linux/amd64` per the repo's SWE-bench Docker discipline — explicit
+  `--platform=linux/amd64` on an arm64 daemon), `--network=none`,
+  `--read-only` rootfs with only the materialized working directory
+  writable, `--pull=never`, non-root `--user=1000:1000`,
+  `--cap-drop=ALL`, `no-new-privileges`, 1 CPU, 512 MB memory (swap
+  disabled), 128-pid limit, 16 MB `/tmp` tmpfs.
+- Timeout split preserves the black-box contract: the *case* deadline is
+  enforced inside the container by coreutils `timeout` (exit 124 →
+  `"timeout"`, a case failure exactly as on the host path); the outer
+  subprocess deadline only bounds container spawn/teardown, so an outer
+  expiry, a docker CLI/daemon fault (exit 125–127 with a docker/OCI
+  stderr signature), or a missing binary is a `VerifierError` →
+  verifier RunFailure.
+- `verify_stage`/`run_checkpoint_family`/`run_ce_experiment` take an
+  `execute: CaseExecution` seam. The host path was renamed
+  `run_case_trusted` and documented as trusted-code-only; admission
+  gates run reference builds (our own code) through it. The *live*
+  screening branch constructs the sandbox unconditionally — there is no
+  host-execution fallback on that path, and mutant M15 proves removing
+  it kills the suite.
+- Real-container integration tests (skipped when Docker or the pinned
+  image is absent; both present locally) run a gold stage end to end
+  and a containment probe whose sealed case passes only if the network
+  is unreachable and the rootfs is unwritable from inside.
+
+### Offline dry-run (`src/parallax/checkpoint_screening.py`)
+
+- `run_ce_screening(mode="dry-run" | "live", ...)` drives the full
+  screening path: fixture load → admission → manifest → both arms ×
+  trial seeds → delivery → adapter (through the real provider wire
+  models against a scripted HUD-gateway transport) → verification →
+  receipts → canonical evidence JSONL. The dry run needs no API key and
+  makes no network calls; even-indexed stages reply inside an exact
+  ```json fence so the fence unwrap is exercised in committed evidence.
+- Live mode adds: spend approval (`SpendApprovalRequired` unless
+  `approve_spend=True`, upper-bound estimate against the repo's $5
+  cap), a per-call affordability check in the agent factory (a stage
+  that could exceed the cap raises `BudgetError` before any request),
+  the reported-model drift check (`claude-haiku-4-5-20251001` expected,
+  drift → agent RunFailure), and the mandatory sandbox.
+- Execution identity (`trusted-fixture` vs `sandbox:<image@digest>`) is
+  bound into `model_config_digest`, so evidence records which
+  verification path produced them.
+- Committed evidence (`evidence/`): `dry-run.jsonl` — the full
+  preregistered 10-seed shape, 20 runs, 60/60 stages verified,
+  estimated cost $0; `dry-run-sandbox.jsonl` — 2 seeds routed through
+  the real pinned Docker sandbox, 12/12 stages verified (84 container
+  executions).
+
+### Gauntlet extension
+
+Ten new mutants (M15–M24) cover the new invariants: sandbox bypass on
+the live path, network isolation dropped, rootfs writable, in-container
+timeout reclassified, docker faults regraded as verdicts, truncation no
+longer a budget fault, usage dropped before the receipt, reported-model
+drift accepted, fence unwrap disabled, spend approval removed.

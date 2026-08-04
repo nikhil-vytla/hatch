@@ -1,7 +1,16 @@
 # Preregistration draft: first paid checkpoint-evolution run
 
-Status: **awaiting approval — no paid inference has run.** This is the
-experiment design required before any spend, per the slice's stop rule.
+Status: **prerequisites met; awaiting approval — no paid inference has
+run.** Both prerequisites below are implemented and verified; the
+offline dry-run evidence in `evidence/` proves the full screening path.
+The only missing inputs are user approval and a valid `HUD_API_KEY`.
+
+Launch command (from `parallax/`, with the key exported):
+
+```bash
+uv run python research/checkpoint-evolution-slice/run_screening.py \
+    --live --approve-spend
+```
 
 ## Question
 
@@ -40,14 +49,24 @@ stage calls or if any evidence-validation error occurs.
 
 ## Prerequisites before the first call
 
-1. A small provider adapter mapping the chat boundary onto
+1. **Met.** Provider adapter mapping the chat boundary onto
    `CheckpointAgent` (workspace-serialization prompt + strict JSON file
-   map parse). No harness change; the runner and receipts are frozen.
-2. Sandboxing: the verifier executes model-written Python. The whole
-   run (or at minimum every `verify_stage` call) must execute inside a
-   disposable container with no network and a non-root user — the same
-   lesson the SWE-bench screening safety audit enforced. The offline
-   slice is safe only because its agents are scripted.
+   map parse): `src/parallax/checkpoint_agent.py`
+   (`ProviderCheckpointAgent`). The runner gained only an optional
+   `StageReceipt.usage` field and an execution seam; delivery,
+   classification, and evidence semantics are unchanged.
+2. **Met.** Sandboxing: every `verify_stage` call on the live path runs
+   each sealed case in a disposable container
+   (`src/parallax/checkpoint_sandbox.py`): digest-pinned
+   `python@sha256:57cd7c…710de` under `--platform=linux/amd64`, no
+   network, read-only rootfs except the working directory, non-root
+   user, CPU/memory/pid limits, in-container case timeout. There is no
+   host fallback on the live path (gauntlet mutant M15 kills it).
+
+Dry-run evidence: `evidence/dry-run.jsonl` (preregistered 10-seed
+shape, 60/60 stages verified, scripted gateway, $0) and
+`evidence/dry-run-sandbox.jsonl` (2 seeds through the real container
+sandbox, 12/12 stages verified).
 
 ## Decision rule
 

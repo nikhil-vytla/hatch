@@ -7,10 +7,15 @@
 > (harness-owned checkpoint delivery, `evolved` and `carry-reference`
 > arms, evidence records), exercised end to end by the hand-verified
 > `ce-tally-1` seed family in `tests/fixtures/checkpoint_family.json`.
-> All existing runs use scripted agents; no real-model evidence exists.
-> Sections marked *implemented* describe executable behavior; everything
-> else remains a specification target. The slice's scope, deferrals, and
-> divergences are listed in [Implemented slice](#implemented-slice).
+> The screening prerequisites are also implemented:
+> `src/parallax/checkpoint_agent.py` (provider adapter),
+> `src/parallax/checkpoint_sandbox.py` (container verifier), and
+> `src/parallax/checkpoint_screening.py` (dry-run and live screening).
+> All existing runs use scripted agents or a scripted gateway transport;
+> no real-model evidence exists. Sections marked *implemented* describe
+> executable behavior; everything else remains a specification target.
+> The slice's scope, deferrals, and divergences are listed in
+> [Implemented slice](#implemented-slice).
 
 Checkpoint Evolution is a synthesis strategy $\mathcal G_{\mathrm{CE}}$ in
 the [Parallax research model](../MODEL.md). It perturbs the initial workspace
@@ -279,10 +284,42 @@ listed above:
   inherited obligations is not constructible rather than merely
   discouraged.
 
+The screening prerequisites extend the slice without changing its
+harness semantics:
+
+- **Provider adapter** (*implemented*): `ProviderCheckpointAgent` renders
+  (public spec, carried workspace, budget) into chat messages, parses the
+  reply's strict JSON file map back into a `Workspace` (one exact
+  ```json fence tolerated), and meters per-stage tokens and conservative
+  cost into `StageReceipt.usage` — including on stages that fail after
+  spend. Truncated replies are budget RunFailures; malformed replies,
+  reported-model drift, and unmeterable (usage-less) replies are agent
+  RunFailures. Rendering has no access to sealed material by
+  construction.
+- **Sandboxed verification** (*implemented*): on the live screening path
+  every sealed case executes in a disposable digest-pinned container
+  (`--platform=linux/amd64`, no network, read-only rootfs except the
+  working directory, non-root user, CPU/memory/pid limits). The case
+  deadline is enforced inside the container and remains a case failure;
+  container spawn or daemon faults are verifier RunFailures. The host
+  subprocess path (`run_case_trusted`) is reserved for trusted code —
+  reference builds in admission gates and clearly marked fixtures in
+  tests — and is not reachable from the live screening branch.
+- **Screening driver** (*implemented*): `run_ce_screening` produces the
+  preregistered manifest, arms, receipts, and evidence for either an
+  offline dry run (scripted gateway transport, no key, no network) or
+  the live run (spend approval and hard cap enforced before and during
+  the run; execution identity bound into the evidence digests).
+
 Verification evidence for the slice: the offline suite in
-`tests/test_checkpoint_evolution.py` and `tests/test_checkpoint_runner.py`
-runs the seed family end to end under both arms with scripted agents, and
-a fourteen-mutant behavioral gauntlet (checkpoint-skip, obligation-drop,
-role-mislabel, gate-inversion, chain-break, censoring, digest-binding
-mutants) is fully killed; see
+`tests/test_checkpoint_evolution.py`, `tests/test_checkpoint_runner.py`,
+`tests/test_checkpoint_agent.py`, `tests/test_checkpoint_sandbox.py`,
+and `tests/test_checkpoint_screening.py` runs the seed family end to end
+under both arms with scripted agents and the full screening path with a
+scripted gateway; real-container integration tests execute a gold stage
+and a containment probe inside the pinned sandbox; and a
+twenty-four-mutant behavioral gauntlet (checkpoint-skip,
+obligation-drop, role-mislabel, gate-inversion, chain-break, censoring,
+digest-binding, sandbox-bypass, isolation-drop, timeout-reclassify,
+metering-drop, approval-drop mutants) is fully killed; see
 [`../../research/checkpoint-evolution-slice/`](../../research/checkpoint-evolution-slice/README.md).
