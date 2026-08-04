@@ -4,10 +4,11 @@ Every Parallax run that spent money or compute, what it was asked, and what it
 returned. Read this before opening a research folder. The folders hold the
 chronology and the raw evidence; this page holds the answers.
 
-Nothing here supports a claim about intent evolution yet. Four runs in, we know
-which SWE-bench instances Claude Opus 4.8 sits at a boundary on, and we know the
-harness records what it says it records. The one experiment that measured an
-effect produced an interval spanning the entire range of the estimand.
+Five runs in, nothing here supports a claim about either synthesis method. We
+know which SWE-bench instances Claude Opus 4.8 sits at a boundary on, and we know
+both harnesses record what they say they record. The two runs that measured a
+contrast produced, respectively, an interval spanning the entire estimand and a
+separation whose mechanism was our own reply format.
 
 ## Runs to date
 
@@ -17,8 +18,9 @@ effect produced an interval spanning the entire range of the estimand.
 | Screening round 2, 2026-08-03 | Same question over the rest of the medium-difficulty stratum, three trials each. | Three boundary instances at 2/3: astropy 14508, django 13786, xarray 4695. A Sonnet 4.6 tier-down found none. | $2.97 metered | [`swebench-screening-round2-20260803/`](../research/swebench-screening-round2-20260803/README.md) |
 | Admission, 2026-08-03 | Do those three instances pass all six admission gates against the official harness? | Yes, all three, gold patch passing on the first attempt. | Docker compute only, no inference | [`swebench-experiment-prerequisites-20260803/`](../research/swebench-experiment-prerequisites-20260803/README.md) |
 | Single vs evolved, 2026-08-03 | On those three instances, does a two-phase evolved prompt change the pass rate against a budget-matched single-turn prompt? | Unknown. Point estimate +0.111 for static, 95% interval [-1, 1]. Three source clusters cannot answer this. | $1.22 metered, plus $0.40 to $0.80 unmetered from a defective first session | [`swebench-single-vs-evolved-20260803/`](../research/swebench-single-vs-evolved-20260803/README.md) |
+| Checkpoint-evolution screening, 2026-08-03 | With sealed suites, obligations, budgets, and model matched, does an agent extending its own workspace verify differently at stage 3 than one reopening from a frozen reference? | The arms separated completely, but not on the verifier. Evolved failed 10/10 seeds by overrunning the byte cap before any test ran; carry-reference passed 10/10 strict. Mechanism unresolved. A follow-up run is in flight. | $0.28 metered | [`checkpoint-evolution-slice/`](../research/checkpoint-evolution-slice/screening-report.md) |
 
-Metered spend across all four runs is $5.86.
+Metered spend across all five runs is $6.14.
 
 ### What the screening rounds actually bought
 
@@ -34,7 +36,7 @@ at the retired Opus 4.1 rate and priced Haiku construction as Opus. Reported
 costs before that fix are wrong. The numbers in this table are recalculated from
 retained token counts at current model-specific rates.
 
-### What the experiment did and did not show
+### What the single-vs-evolved experiment did and did not show
 
 Per-instance outcomes, static against evolved, three paired trials each:
 
@@ -63,19 +65,60 @@ it compared static against evolved with no turn-matched control arm. Conversatio
 length is not controlled for on SWE-bench. Any delta this design produced would
 be unattributable even if it were significant.
 
+### What the checkpoint-evolution screening measured, and what it does not license
+
+Sixty stage calls, ten trial seeds, two arms, three checkpoints, Claude Haiku
+4.5, every sealed case executed inside a digest-pinned container. All 60 calls
+delivered and validated, workspace-digest chain confirmed on all 60, zero
+infrastructure failures. As harness validation this run is clean.
+
+| Arm | Stage 1 | Stage 2 | Stage 3 |
+|---|---|---|---|
+| `evolved` (10 seeds) | strict | strict | budget RunFailure, 10/10 |
+| `carry-reference` (10 seeds) | strict | strict | strict, 10/10 |
+
+The separation at stage 3 is total, and it happened one level above the verifier.
+The evolved arm replies with a full file map, so at each stage it re-serializes
+everything it has accumulated. Its stage-3 replies came in at 4802 to 4864 bytes
+against the family's declared 4096-byte cap, 17 to 19 percent over, and the
+runner rejected them as budget failures before a single sealed case ran. The
+carry-reference arm reopens each stage from the lean reference workspace and
+answered stage 3 in 2077 bytes.
+
+So what got measured is that carried verbosity crosses a byte cap. That is not
+the verification decay the method is about, and it is not evidence for it. There
+is no verdict-level contrast at stage 3 at all, in either direction, because zero
+evolved stage-3 workspaces ever reached the verifier. Both the cap and the
+full-file-map reply format are our design choices, not properties of checkpoint
+evolution, and a looser cap or a diff-style reply could erase the separation
+entirely. One family is one cluster, one model, one budget setting.
+
+The honest version of the finding is narrower and still worth having: an agent
+carrying its own artifact forward pays for it in output size, and it pays in
+input tokens too. The evolved arm cost 1.6 times the carry arm on an identical
+schedule ($0.1721 vs $0.1092), because its own accumulated verbosity comes back
+as billed input. Whether that cost ever becomes a verification failure is exactly
+what this run could not tell us.
+
+A follow-up run is in flight to separate the two explanations by varying the cap
+and the reply format. When it lands, update the row above and replace this
+subsection with what it settled.
+
 ## Gaps this index makes obvious
 
-- No flow has both a complete design and real-model evidence. GSM8K has all
-  three arms and has never called a real provider. SWE-bench has real Opus
-  episodes and no matched arm.
-- Three source clusters will never clear the power gate. Either the boundary
-  pool grows or the estimand changes.
-- Checkpoint evolution has code in flight on
-  [PR #27](https://github.com/nikhil-vytla/hatch/pull/27) and no paid run.
+- No flow has both a complete design and real-model evidence at a scale that can
+  resolve anything. GSM8K has all three arms and has never called a real
+  provider. SWE-bench has real Opus episodes and no matched arm. Checkpoint
+  evolution has a real paid run on one family.
+- Three source clusters will never clear a meaningful interval on SWE-bench.
+  Either the boundary pool grows or the estimand changes.
+- Checkpoint evolution needs more than one family before any contrast it produces
+  is worth interpreting, and it needs the byte-budget question settled first.
 
 ## Adding a run
 
 One row per run in the table above, in date order, with a link to the research
 folder. If the run produced numbers that do not fit a table cell, add a
 subsection under it. Keep the answer column an answer: if the run did not settle
-its question, the cell says so and says why.
+its question, the cell says so and says why. A row that reads as a clean win when
+the mechanism is unresolved is worse than no row.

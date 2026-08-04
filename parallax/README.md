@@ -28,9 +28,10 @@ The GSM8K path is offline, deterministic, and complete:
 3. `runner.py` preregisters source-trial units and identity digests, executes
    every scheduled arm, and writes deterministic JSONL through atomic
    replacement.
-4. `report.py` validates every scheduled row before aggregating. It reports
-   source-clustered matched-versus-evolved bounds, a closed-form 95% Hoeffding
-   interval, and an `advance`, `reject`, or `inconclusive` action.
+4. `report.py` validates every scheduled row before aggregating, then reports the
+   paired matched-versus-evolved difference, its identification bounds, a
+   closed-form 95% source-clustered Hoeffding interval, and the minimum
+   detectable effect. It states what the design resolved and stops there.
 
 The SWE-bench Verified path runs against a real provider and the official
 harness:
@@ -63,6 +64,22 @@ harness:
 7. `admission.py` runs schema, sealed-leakage, identity-patch, gold-patch,
    budget-match, and arm-completeness gates before a family can be scheduled.
 
+Checkpoint evolution, the second synthesis strategy, has a narrower slice: one
+hand-verified three-checkpoint family, two arms, and one paid screening run.
+
+1. `checkpoint_evolution.py` owns the workspace and checkpoint domain model, an
+   entrypoint-only verifier that grades stage N against the accumulated
+   obligations from stages 1 through N, and five executable admission gates.
+   Dropping an inherited obligation is not constructible.
+2. `checkpoint_runner.py` owns stage delivery. The agent is a pure function of
+   public spec, carried workspace, and budget, with no advance channel. Run
+   validators reject a skipped or reordered stage, a broken workspace-digest
+   chain, and censoring that is not exactly the undelivered suffix.
+3. `checkpoint_agent.py` renders a stage to the provider boundary and parses a
+   strict JSON file map back. `checkpoint_sandbox.py` runs every sealed case in a
+   digest-pinned container with no network and a read-only rootfs. The live
+   screening path has no host-execution fallback.
+
 ## What the evidence supports
 
 All JSON boundaries parse into strict frozen Pydantic models with unknown fields
@@ -76,12 +93,15 @@ be `FINAL_ANSWER: <integer>`, with exactly one marker and a canonical integer.
 Malformed submissions are invalid, valid non-matching answers are wrong, and
 provider, budget, or verifier faults are run failures rather than model behavior.
 
-Two SWE-bench screening rounds and one 18-unit static-versus-evolved experiment
-have run against Claude Opus 4.8. Metered spend across them is $5.86. The
-experiment's paired delta is +0.111 with a 95% interval of [-1, 1], because three
-source clusters give a minimum detectable effect of 1.568 against an estimand
-bounded in [-1, 1]. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the per-instance
-numbers and the two design gaps that matter.
+Five runs have called a real provider, for $6.14 of metered spend: two SWE-bench
+screening rounds and an 18-unit static-versus-evolved experiment against Claude
+Opus 4.8, plus a 60-call checkpoint-evolution screening against Claude Haiku 4.5.
+Neither contrast resolved. The SWE-bench delta is +0.111 with a 95% interval of
+[-1, 1], because three source clusters give a minimum detectable effect of 1.568
+against an estimand bounded in [-1, 1]. The checkpoint-evolution arms separated
+completely at stage 3, but on a byte-budget overrun rather than on any verdict, so
+the mechanism is unsettled. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the
+per-instance numbers and the design gaps.
 
 GSM8K has never called a real provider. Its evidence is scripted agents against
 real-shaped rows, exercising construction, all three arms, history-sensitive
@@ -89,10 +109,12 @@ execution, grading, manifest validation, JSONL round-trips, missing-outcome
 bounds, and source-clustered reporting. Parallax has no generated benchmark pool
 and reproduces no paper score.
 
-[`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the
-method contract, the implementation choices, and every deliberate divergence from
-the consulted upstream implementation.
+The method contracts, the implementation choices, and every deliberate divergence
+from the consulted upstream implementations live in
+[`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) and
+[`docs/methods/checkpoint-evolution.md`](docs/methods/checkpoint-evolution.md).
 
 > **TODO:** Run the matched arm on SWE-bench, or run GSM8K against a real
-> provider. Until one of those happens, no implemented flow has both a complete
-> design and real-model evidence.
+> provider. Until one of those happens, no Evolving Intent flow has both a
+> complete design and real-model evidence. Checkpoint evolution needs the byte
+> budget and reply format settled before its stage-3 separation means anything.
