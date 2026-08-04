@@ -219,10 +219,10 @@
   without adding provider routing or SDK dependencies. The API key remains in
   a named environment variable and never enters request evidence.
 - `SweBenchProblem` owns public issue metadata. `SweBenchVerifier` owns the
-  sealed test patch, FAIL_TO_PASS and PASS_TO_PASS tests, harness revision,
-  official image identity, and test command. The dataset gold patch is parsed
-  at the source boundary and discarded. It is absent from every domain model,
-  prompt, environment script family, and screening row.
+  sealed gold patch, test patch, FAIL_TO_PASS and PASS_TO_PASS tests, harness
+  revision, and official image identity. The gold patch is absent from public
+  task models, prompts, agent artifacts, and run rows. Admission G4 reads it
+  only through sealed authority.
 - The loader checks the pinned Hugging Face revision before and after reading
   rows, rejects partial responses and IDs outside the published 50, and
   requires an image digest and test command for every selected source. Tests

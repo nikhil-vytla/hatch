@@ -1,15 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 from pathlib import Path
+from typing import Any, cast
 
+import mcp.types as mcp_types
 from hud.agents import create_agent
+from hud.agents.base import Agent
+from hud.agents.tool_agent import ToolAgent
+from hud.agents.types import ToolStep
 from hud.eval import DockerRuntime, Task
+from hud.types import Step
+from hud.utils.time import now_iso
 from pydantic import Field
 
 from .canonical import atomic_write, canonical_bytes
+from .delivery import CompleteDeliveryReceiptV1, TurnDeliveryController
 from .hud_compile import CompiledBundleV1, compile_hud, load_evaluator_specs
+from .outcome import FailureKind
 from .screening import ScreeningExecution, ScreeningExecutionError, ScreeningUnit
 from .specs import freeze_swe_specs
 from .swebench import SweScriptFamily
@@ -38,10 +48,110 @@ def _docker_runtime(image: str) -> DockerRuntime:
 
 class HudEpisode(StrictModel):
     model_patch: str
+    delivery: CompleteDeliveryReceiptV1
     reported_model: NonEmptyText
     prompt_tokens: int = Field(ge=0)
     completion_tokens: int = Field(ge=0)
     estimated_cost_usd: float = Field(ge=0)
+
+
+class HarnessTurnAgent(Agent):
+    def __init__(
+        self,
+        policy: ToolAgent[Any, Any],
+        *,
+        turns: tuple[NonEmptyText, ...],
+        step_budgets: tuple[int, ...],
+    ) -> None:
+        self.policy = policy
+        self.turns = turns
+        self.step_budgets = step_budgets
+
+    async def __call__(self, run) -> None:
+        connections = {}
+        manifest = run.client.manifest
+        if manifest is not None:
+            wanted = {client.protocol for client in type(self.policy).clients}
+            for capability in manifest.bindings:
+                if (
+                    capability.protocol in wanted
+                    and capability.protocol not in connections
+                ):
+                    connections[capability.protocol] = await run.client.open(
+                        capability.protocol
+                    )
+        state = await self.policy._initialize_state(prompt=run.prompt_messages)
+        state.tools, state.params = await self.policy._build_tools(connections)
+        controller = TurnDeliveryController(self.turns, self.step_budgets)
+        trace = run.trace
+        while not controller.complete:
+            started_at = now_iso()
+            step = await self.policy.get_response(
+                state,
+                system_prompt=self.policy.config.system_prompt,
+                citations_enabled=self.policy.config.citations_enabled,
+            )
+            step.started_at = step.started_at or started_at
+            step.model = step.model or self.policy.config.model
+            run.record(step)
+            if step.error:
+                raise RuntimeError(step.error)
+            stopped = self.policy._stop_condition(step)
+            if stopped is not None:
+                trace.stop_reason = stopped
+                raise RuntimeError(
+                    f"policy stopped before full turn delivery: {stopped}"
+                )
+            submitted = step.done or not step.tool_calls
+            if not submitted:
+                for call in step.tool_calls:
+                    call_started_at = now_iso()
+                    result = await self.policy._dispatch_call(call, state)
+                    run.record(
+                        ToolStep(call=call, result=result, started_at=call_started_at)
+                    )
+                    message = self.policy._format_result(call, result, state)
+                    if message is None:
+                        continue
+                    if isinstance(message, list):
+                        state.messages.extend(cast("list[Any]", message))
+                    else:
+                        state.messages.append(message)
+            follow_up = controller.observe_step(submitted=submitted)
+            if follow_up is not None:
+                state.messages.append(self.policy._format_user_text(follow_up))
+                run.record(
+                    Step(
+                        source="user",
+                        messages=[
+                            mcp_types.PromptMessage(
+                                role="user",
+                                content=mcp_types.TextContent(
+                                    type="text",
+                                    text=follow_up,
+                                ),
+                            )
+                        ],
+                    )
+                )
+        receipt = controller.receipt()
+        trace.content = receipt.as_answer()
+        trace.status = "completed"
+        trace.stop_reason = (
+            "max_steps"
+            if receipt.phases[-1].advance_trigger == "terminal_budget_exhaustion"
+            else "done"
+        )
+
+
+def parse_delivery_receipt(value: object) -> CompleteDeliveryReceiptV1:
+    """Parse a delivery receipt from HUD grade info.
+
+    The receipt crosses the HUD wire as JSON, so tuple fields arrive as
+    lists. Strict python-mode validation rejects those, so validation must
+    go through JSON mode.
+    """
+    return CompleteDeliveryReceiptV1.model_validate_json(json.dumps(value))
 
 
 def _docker_build(directory: Path, image: str) -> None:
@@ -73,17 +183,28 @@ async def _run_episode(
     *,
     image: str,
     environment_name: str,
+    arm: str,
+    turns: tuple[NonEmptyText, ...],
+    step_budgets: tuple[int, ...],
     model: str,
-    max_steps: int,
     pricing: TokenPricing,
 ) -> HudEpisode:
-    agent = create_agent(
+    policy = create_agent(
         model,
-        max_steps=max_steps,
+        max_steps=sum(step_budgets),
         max_tokens=1024,
-        auto_respond=True,
+        auto_respond=False,
     )
-    task = Task(env=environment_name, id="episode", args={"arm": "static"})
+    if not isinstance(policy, ToolAgent):
+        raise ScreeningExecutionError(
+            "agent", "HUD model did not create a tool-capable policy"
+        )
+    agent = HarnessTurnAgent(
+        policy,
+        turns=turns,
+        step_budgets=step_budgets,
+    )
+    task = Task(env=environment_name, id="episode", args={"arm": arm})
     try:
         job = await task.run(
             agent,
@@ -99,19 +220,6 @@ async def _run_episode(
     if len(job.runs) != 1:
         raise ScreeningExecutionError("agent", "HUD returned an invalid run count")
     run = job.runs[0]
-    if run.trace.stop_reason == "length":
-        raise ScreeningExecutionError("budget", "HUD model response was truncated")
-    if run.trace.is_error:
-        raise ScreeningExecutionError(
-            "agent", run.trace.error or "HUD agent run failed"
-        )
-    patch = run.grade.info.get("model_patch")
-    if not isinstance(patch, str):
-        raise ScreeningExecutionError("agent", "HUD run omitted the candidate patch")
-    if not run.grade.info.get("schedule_complete"):
-        raise ScreeningExecutionError(
-            "agent", "HUD run ended before the static task completed"
-        )
     models: list[str] = []
     prompt_tokens = 0
     completion_tokens = 0
@@ -123,14 +231,44 @@ async def _run_episode(
         if usage is not None:
             prompt_tokens += usage.prompt_tokens or 0
             completion_tokens += usage.completion_tokens or 0
-    if not models:
-        raise ScreeningExecutionError("agent", "HUD run omitted response.model")
     cost = (
         prompt_tokens * pricing.input_usd_per_million
         + completion_tokens * pricing.output_usd_per_million
     ) / 1_000_000
+
+    def episode_error(
+        failure_kind: FailureKind,
+        message: str,
+    ) -> ScreeningExecutionError:
+        # The episode already ran, so its metered usage must survive into
+        # the failure receipt instead of being reported as zero spend.
+        return ScreeningExecutionError(
+            failure_kind,
+            message,
+            reported_model=models[-1] if models else None,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            estimated_cost_usd=cost,
+        )
+
+    if run.trace.stop_reason == "length":
+        raise episode_error("budget", "HUD model response was truncated")
+    if run.trace.is_error:
+        raise episode_error("agent", run.trace.error or "HUD agent run failed")
+    patch = run.grade.info.get("model_patch")
+    if not isinstance(patch, str):
+        raise episode_error("agent", "HUD run omitted the candidate patch")
+    try:
+        delivery = parse_delivery_receipt(run.grade.info.get("delivery"))
+    except ValueError as error:
+        raise episode_error(
+            "agent", "HUD run omitted a complete delivery receipt"
+        ) from error
+    if not models:
+        raise ScreeningExecutionError("agent", "HUD run omitted response.model")
     return HudEpisode(
         model_patch=patch,
+        delivery=delivery,
         reported_model=models[-1],
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
@@ -138,7 +276,7 @@ async def _run_episode(
     )
 
 
-class HudStaticExecutor:
+class HudExecutor:
     def __init__(
         self,
         families: dict[str, SweScriptFamily],
@@ -188,8 +326,10 @@ class HudStaticExecutor:
                 _run_episode(
                     image=image,
                     environment_name=f"parallax-{problem.instance_id}",
+                    arm=str(unit.arm),
+                    turns=tuple(turn.text for turn in getattr(family, unit.arm).turns),
+                    step_budgets=getattr(family, unit.arm).agent_steps,
                     model=self.model,
-                    max_steps=sum(family.static.agent_steps),
                     pricing=self.pricing,
                 )
             )
@@ -234,4 +374,5 @@ class HudStaticExecutor:
             verifier_report_digest=evaluation.report_digest,
             harness_revision=evaluation.harness_revision,
             image_digest=evaluation.image_digest,
+            delivery=episode.delivery,
         )

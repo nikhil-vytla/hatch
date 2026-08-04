@@ -1,0 +1,6 @@
+unit	hypothesis	change	evidence	verdict
+delivery-state	A complete receipt can make skipped turns invalid by construction.	Added the typed phase receipt and controller.	tests/test_delivery.py	VERIFIED
+delivery-runtime	The harness can intercept submissions without an agent-visible turn tool.	Replaced the MCP director with HarnessTurnAgent and typed environment grading.	tests/test_delivery.py;tests/test_swebench_env.py	VERIFIED
+gold-authority	The retained source patch can stay sealed and support G4.	Threaded gold_patch through SweBenchVerifier and SealedAuthorityV1.	tests/test_swebench.py;tests/test_admission.py	VERIFIED
+admission-pipeline	Six ordered gates can admit or uniformly reject a source before scheduling.	Added AdmissionRecordV1, AdmittedSweFamily, and build_admitted_screening_plan.	tests/test_admission.py	VERIFIED
+real-g3-g4	The identity patch fails and the gold patch passes for all three boundary sources.	Ran the pinned official harness under linux/amd64.	research/swebench-experiment-prerequisites-20260803/evidence/admission-summary.json	VERIFIED

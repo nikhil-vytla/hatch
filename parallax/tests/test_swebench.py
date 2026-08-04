@@ -113,7 +113,8 @@ def test_loader_separates_public_source_from_sealed_verifier() -> None:
     assert problem.verifier.image_ref.endswith("astropy_1776_astropy-13236")
     assert "patch" not in type(problem).model_fields
     assert "sealed test patch" not in problem.problem_statement
-    assert "gold solution" not in problem.model_dump_json()
+    assert problem.verifier.gold_patch == "gold solution must be discarded"
+    assert "gold solution" not in problem.model_dump_json(exclude={"verifier"})
 
 
 def test_loader_rejects_unknown_ids_and_structural_drift() -> None:
