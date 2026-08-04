@@ -35,6 +35,12 @@ def candidate_test_expected(submission: ConformanceSubmission) -> int | None:
 
 
 def reference_grader(submission: ConformanceSubmission):
+    if not submission.delivery_complete:
+        return RunFailure(
+            failure_kind="agent",
+            error_type="IncompleteTurnDelivery",
+            message="grading requires every scripted turn",
+        )
     if submission.simulate_harness_crash:
         return RunFailure(
             failure_kind="verifier",
@@ -48,6 +54,12 @@ def reference_grader(submission: ConformanceSubmission):
 
 def compiled_grader(bundle, submission: ConformanceSubmission):
     task, _ = load_evaluator_specs(bundle)
+    if not submission.delivery_complete:
+        return RunFailure(
+            failure_kind="agent",
+            error_type="IncompleteTurnDelivery",
+            message="compiled environment rejected incomplete delivery",
+        )
     if submission.simulate_harness_crash:
         return RunFailure(
             failure_kind="verifier",
@@ -83,6 +95,7 @@ def test_red_phase_catches_returncode_only_grading() -> None:
         )
     assert "sealed_test_touch" in str(caught.value)
     assert "harness_crash" in str(caught.value)
+    assert "delivery_skip" in str(caught.value)
 
 
 def test_red_phase_catches_sealed_bytes_in_agent_context() -> None:
@@ -128,5 +141,6 @@ def test_green_phase_matches_all_conformance_vectors() -> None:
         "known_bad",
         "sealed_test_touch",
         "harness_crash",
+        "delivery_skip",
     ]
     assert all(item.expected == item.actual for item in record.vectors)

@@ -168,9 +168,10 @@ with the consulted implementation.
 
 The SWE adapter pins the paper's 50 published evaluation IDs, the Verified
 dataset revision, the official harness revision, and each official eval image
-digest. Ingestion discards the gold patch. The public issue statement, repo,
-base commit, and version remain separate from the sealed test patch,
-FAIL_TO_PASS list, PASS_TO_PASS list, test command, and verifier commitments.
+digest. Ingestion retains the source gold patch under sealed authority for the
+admission gold check. The public issue statement, repo, base commit, and version
+remain separate from the gold patch, test patch, FAIL_TO_PASS list,
+PASS_TO_PASS list, and verifier commitments.
 
 Construction returns categorized arguments. The adapter removes
 `category="symptom"` arguments from each phase's scheduled argument order, then
@@ -197,6 +198,27 @@ requires them:
 - Every arm receives the same total agent-step and output-token budget. Static
   receives that budget in one turn; matched and evolved divide it across
   turns.
+
+The evaluation loop owns turn delivery. The policy receives no turn-control
+tool. When the policy submits before the last turn, the loop discards the
+submission and injects the next scripted turn with `INTENT_UPDATE_PREFIX`.
+The prefix tells the policy to hold the submission because the user has new
+information. Exhausting a turn's step budget also injects the next turn. The
+environment rejects grading unless a typed
+receipt covers every turn in order and records the steps consumed in each
+phase. This matches the architecture at
+`evaluation/common/swe_minisweagent_scaffold.py:408-424,714-787` in the pinned
+upstream repository. Parallax keeps one deliberate difference: matched and
+evolved arms have equal per-turn allocations, while upstream resets a larger
+budget for every turn.
+
+Admission runs before scheduling. G1 round-trips the family and both frozen
+specs. G2 scans compiled agent artifacts for sealed bytes. G3 runs an applied
+identity patch and requires a real non-pass from the official harness. G4
+requires the source gold patch to pass and retries only infrastructure
+failures, at most three times. G5 checks total and per-turn budgets. G6 records
+construction failures as uniform source rejections. Admission records contain
+digests, lengths, counts, and outcomes, but no sealed patch or test text.
 
 `TaskSpecV1` separates `PublicTaskV1` from `SealedAuthorityV1`.
 `compile_hud` creates agent artifacts only from the public branch. It tags each
