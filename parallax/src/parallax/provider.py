@@ -66,6 +66,7 @@ class ProviderRequest(StrictModel):
     messages: Annotated[tuple[ProviderMessage, ...], Field(min_length=1)]
     max_output_tokens: PositiveInt
     temperature: Annotated[float, Field(ge=0, le=2, allow_inf_nan=False)] = 0.0
+    seed: int | None = None
     tools: tuple[ProviderTool, ...] = ()
 
 
@@ -163,6 +164,8 @@ class OpenAICompatibleProvider:
             "temperature": request.temperature,
             self.config.token_field: request.max_output_tokens,
         }
+        if request.seed is not None:
+            payload["seed"] = request.seed
         if request.tools:
             payload["tools"] = [tool.model_dump(mode="json") for tool in request.tools]
         body = json.dumps(
@@ -193,6 +196,9 @@ class OpenAICompatibleProvider:
         self,
         messages: tuple[Message, ...],
         max_output_tokens: int,
+        *,
+        temperature: float = 0.0,
+        seed: int | None = None,
     ) -> tuple[str, ProviderResponse]:
         response = self.complete(
             ProviderRequest(
@@ -202,6 +208,8 @@ class OpenAICompatibleProvider:
                     for message in messages
                 ),
                 max_output_tokens=max_output_tokens,
+                temperature=temperature,
+                seed=seed,
             )
         )
         if len(response.choices) != 1:
@@ -213,9 +221,12 @@ class OpenAICompatibleProvider:
             raise ProviderError("text chat requires one non-empty text response")
         return choice.message.content, response
 
-    def chat(self) -> Chat:
+    def chat(self, *, temperature: float = 0.0, seed: int | None = None) -> Chat:
         return lambda messages, max_output_tokens: self.text_completion(
-            messages, max_output_tokens
+            messages,
+            max_output_tokens,
+            temperature=temperature,
+            seed=seed,
         )[0]
 
 

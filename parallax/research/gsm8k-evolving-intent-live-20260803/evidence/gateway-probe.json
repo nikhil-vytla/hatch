@@ -1,0 +1,67 @@
+{
+  "baseline_temp0": {
+    "completion_tokens": 5,
+    "finish_reason": "stop",
+    "prompt_tokens": 20,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "4"
+  },
+  "construction_fencing": {
+    "completion_tokens": 125,
+    "finish_reason": "stop",
+    "prompt_tokens": 66,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "```json\n{\n  \"intent\": \"solve_word_problem\",\n  \"problem_type\": \"arithmetic_with_comparison\",\n  \"given_information\": {\n    \"april_friends\": 48,\n    \"may_relationship\": \"half as many as April\"\n  },\n  \"operations_needed\": [\n    \"calculate May amount (divide April by 2)\",\n    \"sum April and May totals\"\n  ],\n  \"question_asks_for\": \"total clips sold in April and May combined\"\n}\n```"
+  },
+  "endpoint": "https://inference.beta.hud.ai/v1/chat/completions",
+  "model": "claude-haiku-4-5",
+  "submission_contract_absent": {
+    "completion_tokens": 53,
+    "finish_reason": "stop",
+    "prompt_tokens": 32,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "# Total Clips Sold\n\n**April clips:** 48\n\n**May clips:** 48 \u00f7 2 = 24\n\n**Total clips sold:** 48 + 24 = **72 clips**"
+  },
+  "temp1_noseed_a": {
+    "completion_tokens": 6,
+    "finish_reason": "stop",
+    "prompt_tokens": 33,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "7382"
+  },
+  "temp1_noseed_b": {
+    "completion_tokens": 6,
+    "finish_reason": "stop",
+    "prompt_tokens": 33,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "7284"
+  },
+  "temp1_noseed_c": {
+    "completion_tokens": 6,
+    "finish_reason": "stop",
+    "prompt_tokens": 33,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "7382"
+  },
+  "temp1_seed12345_a": {
+    "completion_tokens": 6,
+    "finish_reason": "stop",
+    "prompt_tokens": 33,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "7482"
+  },
+  "temp1_seed12345_b": {
+    "completion_tokens": 6,
+    "finish_reason": "stop",
+    "prompt_tokens": 33,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "7392"
+  },
+  "temp1_seed99999": {
+    "completion_tokens": 6,
+    "finish_reason": "stop",
+    "prompt_tokens": 33,
+    "reported_model": "claude-haiku-4-5-20251001",
+    "text": "7284"
+  }
+}

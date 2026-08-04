@@ -1,0 +1,18 @@
+# SHA-256 digests of retained evidence
+#
+# main-evidence.jsonl is committed gzipped (7.8M raw, 646K compressed).
+# Recover with: gunzip -c main-evidence.jsonl.gz > main-evidence.jsonl
+# and check it against the raw digest below.
+
+364bcd463595c8ec9119c46d6e35cfd4baeb61d54fb360c3b52b41aa5ec9543b  main-evidence.jsonl
+afed86dac579ac4979b6cb7abc909a71c4b161b8fa63b80cd541ccb86d9c6df0  main-evidence.jsonl.gz
+f24f79bae20331767515342514c820ff8d1614000ce22627c3a9d9fc719a429d  main-analysis.json
+529532337b29e5efb89ca315674be2154c2d86cfc4d9117a7ce07d5a2447ba30  main-construction.jsonl
+492dffda3cd52a44bf636dcb95414c9c67dc0fff2323391b72576ece53be737a  main-spend.json
+3b51c40ba04b91fa1328853906fc008a2b65b1992e23cb4b576734f515418109  pilot-evidence.jsonl
+fefc2c8660bb3ba867b4873252522bc628f12ef4e44599f9cc2dc153dbf89c44  pilot-construction.jsonl
+03fdbdcd31d015850167a78775feb8500ed038f770ecf8e217303f7fa7e95ade  pilot-spend.json
+fa0ca8e228cd2e07c73fc314e277c409724214f776a579bc89e5754325ae3f1f  gateway-probe.json
+
+# Pinned source dataset (not committed, fetched at ingestion):
+3730d312f6e3440559ace48831e51066acaca737f6eabec99bccb9e4b3c39d14  gsm8k test.jsonl (openai/grade-school-math)

@@ -173,12 +173,48 @@ T = TypeVar("T")
 M = TypeVar("M", bound=StrictModel)
 _TEXT = TypeAdapter(str)
 
+_STAGE_SCHEMA: dict[Stage, str] = {
+    "extract-intent": (
+        'Schema: {"function": string, "arguments": [{"identifier": string, '
+        '"value": string}]}. "function" is a short imperative phrase naming '
+        "what the user wants computed, carrying no numbers. Each identifier "
+        "is lower_snake_case and each value is a JSON string holding one "
+        "quantity or fact taken from the question."
+    ),
+    "counterfactual": (
+        'Schema: {"identifier": string, "value": string, "rationale": '
+        'string}. Echo the requested identifier exactly. "value" is a '
+        "plausible alternative that differs from source_value, as a JSON "
+        "string."
+    ),
+    "predecessor": (
+        'Schema: {"function": string, "rationale": string}. "function" names '
+        "an earlier task the same user would plausibly have asked for before "
+        "successor_function, and must differ from successor_function."
+    ),
+}
+
+
+def _unfence(output: str) -> str:
+    text = output.strip()
+    if not text.startswith("```") or not text.endswith("```"):
+        return text
+    body = text[3:]
+    newline = body.find("\n")
+    if newline < 0 or body[:newline].strip().lower() not in {"", "json"}:
+        return text
+    return body[newline + 1 : -3].strip()
+
 
 def _request(chat: Chat, stage: Stage, payload: dict[str, object], budget: int) -> str:
     messages = (
         Message(
             role="system",
-            content=f"parallax-stage:{stage}\nReturn one strict JSON object.",
+            content=(
+                f"parallax-stage:{stage}\nReturn one strict JSON object.\n"
+                "Emit no Markdown fence, prose, or key beyond the schema.\n"
+                f"{_STAGE_SCHEMA[stage]}"
+            ),
         ),
         Message(
             role="user",
@@ -195,7 +231,7 @@ def _request(chat: Chat, stage: Stage, payload: dict[str, object], budget: int) 
 
 def _parse_model(model: type[M], output: str, stage: Stage) -> M:
     try:
-        return model.model_validate_json(output)
+        return model.model_validate_json(_unfence(output))
     except ValidationError as error:
         detail = error.errors(include_url=False)[0]["msg"]
         raise ConstructionError(f"{stage}: {detail}") from error

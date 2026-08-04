@@ -268,9 +268,11 @@ of the superseded experiment that preceded this harness.
 
 ## Deliberately out of scope
 
-- **Real-model evidence.** All existing runs use scripted agents. No claim
-  about real agent behavior is supported yet; the harness exists so that the
-  first real-provider run is already controlled and auditable.
+- **Broad real-model evidence.** One real-provider run exists: Claude Haiku 4.5
+  over 144 GSM8K sources, three arms, three trials, recorded in
+  [`../research/gsm8k-evolving-intent-live-20260803/`](../research/gsm8k-evolving-intent-live-20260803/README.md).
+  It supports claims about that model on that sample and nothing wider. Other
+  models and larger samples are unrun.
 - **Paper reproduction.** Upstream generated pools and provider transcripts
   are not published, so Parallax makes no byte-identical dataset, provider
   replay, or paper-score reproduction claims.
@@ -281,8 +283,24 @@ of the superseded experiment that preceded this harness.
 - **A command-line interface.** The entry points are the Python API and the
   test suite.
 
-> **TODO:** Run the preregistered matched-versus-evolved contrast with one
-> real model provider over a declared GSM8K sample. Pass: the report returns
-> `advance` or `reject`. Fail: the interval still spans the threshold at the
-> preregistered sample size, or run failures leave the identification bounds
-> uninformative — either result forces a design revision before scaling.
+The standing TODO to run this pipeline against a real provider is **done**. See
+[`../research/gsm8k-evolving-intent-live-20260803/`](../research/gsm8k-evolving-intent-live-20260803/README.md):
+1,296 graded Claude Haiku 4.5 episodes over 144 GSM8K sources, zero run
+failures, $10.96 metered. Evolved scored 10.9 accuracy points below the
+single-turn base arm (95% interval 6.0 to 16.0 points, clustered by source), of
+which 8.6 points is attributable to multi-turn presentation alone.
+
+Two follow-ups it opened:
+
+> **TODO:** The three-arm design is retired in favour of two arms, base versus
+> evolved, because the matched control cost roughly 45% of the episode budget to
+> produce the widest interval and smallest estimate in the study. Two-arm
+> designs cannot decompose the gap the way that run did; that is the accepted
+> cost.
+
+> **TODO:** `gsm8k.load_gsm8k` cannot read the official GSM8K test split — it
+> aborts on the 14 of 1,319 rows whose sealed answer carries a thousands
+> separator. Normalise separators in the sealed answer at ingestion while
+> leaving submission grading strictly canonical. Separately, the construction
+> stage budgets in `build_script_family` are hardcoded (256/128/128 tokens) and
+> cost 3 of 150 sources to truncation; make them configurable.

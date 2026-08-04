@@ -1,0 +1,9 @@
+# Fetched dataset, per-call response cache, and cached families. 37M, and the
+# dataset is a copy of an upstream file rather than anything produced here.
+# Its SHA-256 is pinned in evidence/DIGESTS.txt.
+work/
+
+# Committed gzipped instead: 7.8M raw against 646K compressed. Both digests are
+# pinned in evidence/DIGESTS.txt. Recover with:
+#   gunzip -c evidence/main-evidence.jsonl.gz > evidence/main-evidence.jsonl
+evidence/main-evidence.jsonl

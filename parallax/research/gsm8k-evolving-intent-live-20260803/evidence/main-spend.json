@@ -1,0 +1,21 @@
+{
+  "by_scope": {
+    "construction": {
+      "calls": 877,
+      "completion_tokens": 73132,
+      "prompt_tokens": 112907,
+      "usd": 0.47856699999999963
+    },
+    "episode": {
+      "calls": 7848,
+      "completion_tokens": 946438,
+      "prompt_tokens": 5648179,
+      "usd": 10.380368999999938
+    }
+  },
+  "reported_models": [
+    "claude-haiku-4-5-20251001"
+  ],
+  "total_calls": 8725,
+  "total_usd": 10.858935999999938
+}

@@ -276,8 +276,11 @@ def run_script(
     identity: RunIdentity,
     *,
     agent_model: str,
+    system_prompt: str | None = None,
 ) -> RunResult:
     transcript: list[Message] = []
+    if system_prompt is not None:
+        transcript.append(Message(role="system", content=system_prompt))
     output_characters = 0
     final_answer: str | None = None
     outcome: Outcome
@@ -362,6 +365,7 @@ def run_experiment(
     model_config: Mapping[str, object],
     threshold: float,
     output_path: Path,
+    system_prompt: str | None = None,
 ) -> tuple[RunResult, ...]:
     ordered = tuple(sorted(families, key=lambda item: item.static.problem.record_id))
     manifest = _build_manifest(
@@ -412,6 +416,7 @@ def run_experiment(
                     agent,
                     identity,
                     agent_model=agent_model,
+                    system_prompt=system_prompt,
                 )
             results.append(result)
             records.append(RunRecord.from_result(result))
