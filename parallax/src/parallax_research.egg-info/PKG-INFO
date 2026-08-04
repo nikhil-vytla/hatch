@@ -15,6 +15,10 @@ turning them into research questions about agent training and RL environments,
 synthesizing novel or harder but verifiable tasks from existing benchmarks and
 codebases, and running controlled experiments with trustworthy evidence.
 
+For a concrete start-to-finish picture — what you put in, what you run, and
+what artifacts come out of each implemented flow — read
+[`docs/PIPELINES.md`](docs/PIPELINES.md) first.
+
 The executable slice follows one complete path:
 
 1. `gsm8k.py` loads real-shaped GSM8K JSONL and retains the canonical
@@ -60,16 +64,17 @@ The second slice adds an offline-ready SWE-bench Verified path:
    never enter serialized requests. Response-side models tolerate unconsumed
    provider fields while validating every field Parallax reads.
 2. `swebench.py` pins the Verified dataset revision and the paper's 50
-   published evaluation IDs. It discards the gold patch, separates the public
-   issue from the sealed official verifier, builds budget-equal arms, and
-   records the pinned SWE symptom-overlay transformation.
+   published evaluation IDs. It keeps the gold patch under sealed authority,
+   separates the public issue from the official verifier, builds budget-equal
+   arms, and records the pinned SWE symptom-overlay transformation.
 3. `specs.py` freezes each family into versioned `TaskSpecV1` and `EnvSpecV1`
    models. `hud_compile.py` creates agent artifacts only from `PublicTaskV1`.
    It tags every output by audience, scans the agent build context for sealed
    fragments, and records artifact digests.
-4. `swebench_runtime.py` runs the agent in a probed HUD `bubblewrap` Workspace
-   and exports a candidate patch that includes untracked files. The evaluator
-   reloads its separate compiled artifact before grading.
+4. `delivery.py` and `hud_screening.py` push scripted turns from the evaluation
+   loop. Early submissions and phase-budget exhaustion deliver the next turn.
+   `swebench_runtime.py` rejects grading without a complete per-phase receipt,
+   then exports a candidate patch that includes untracked files.
 5. `swebench_harness.py` runs the pinned official SWE-bench harness
    evaluator-side against the digest-pinned official image. The harness verdict
    is authoritative; report coverage is checked against the committed
@@ -79,6 +84,9 @@ The second slice adds an offline-ready SWE-bench Verified path:
    partial file, records provider model/usage and estimated cost, refuses to
    overwrite completed evidence, defaults to a $5 upper cap, and withholds a
    decision while the design's minimum-detectable-effect is too large.
+7. `admission.py` runs schema, sealed-leakage, identity-patch, gold-patch,
+   budget-match, and arm-completeness gates before new scheduling code accepts
+   a family.
 
 The preregistered HUD screening completed five SWE-bench instances with two
 static Claude Opus 4.8 trials each. Both Django instances passed 2/2; Astropy,
@@ -93,6 +101,11 @@ Astropy 14508, Django 13786, and Xarray 4695. Actual token-metered round-two
 spend was $2.972512 under the $5 cap. These instances and model are the
 recommended operating point for the first single-vs-evolved comparison; the
 small-run power rule still withholds any advance/reject decision.
+
+The three boundary instances passed every admission gate under the official
+harness. Their identity patches applied and failed, and their gold patches
+passed on the first attempt. The first 18-unit static-versus-evolved design is
+preregistered but has not run.
 
 [`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
 [`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the

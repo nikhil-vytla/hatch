@@ -18,6 +18,7 @@ from pydantic import (
 )
 
 from .evolving_intent import Chat, Message
+from .hud_wire import wire_tuple
 from .outcome import BudgetError
 from .types import NonEmptyText, PositiveInt, StrictModel
 
@@ -84,14 +85,9 @@ class ProviderResponseMessage(ProviderResponseModel):
     content: str | None
     tool_calls: tuple[ProviderToolCall, ...] = ()
 
-    @field_validator("tool_calls", mode="before")
-    @classmethod
-    def null_tool_calls_are_empty(cls, value: object) -> object:
-        if value is None:
-            return ()
-        if isinstance(value, list):
-            return tuple(value)
-        return value
+    _null_tool_calls_are_empty = field_validator("tool_calls", mode="before")(
+        staticmethod(wire_tuple)
+    )
 
 
 class ProviderChoice(ProviderResponseModel):

@@ -85,8 +85,9 @@ resume path used the immutable pinned parquet with a verified SHA-256 digest.
 
 - Normal tests: 124 passed.
 - Optimized tests: 124 passed under `PYTHONOPTIMIZE=1`.
-- Mutation gates: 28/28 Pydantic/core mutants and 49/49 Slice 2 mutants
-  killed.
+- Mutation gates: the scores originally reported here came from gauntlets
+  that were never committed. The reproducible gauntlet is
+  `tests/test_mutation_gauntlet.py` (`pytest -m mutation`).
 - Ruff: passed for `src`, `tests`, and both screening research directories.
 - `ty`: passed for `src`.
 - Package build: source distribution and wheel succeeded.

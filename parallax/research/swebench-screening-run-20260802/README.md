@@ -101,7 +101,8 @@ by digest before a comparative experiment.
 - 120 tests passed under normal and optimized Python.
 - Ruff and format checks passed on project source, tests, and research scripts.
 - `uvx ty check src` passed.
-- Core mutation suite: 28/28 killed.
-- Adapted Slice 2 mutation suite: 44/44 killed.
+- Mutation suites: the scores originally reported here came from gauntlets
+  that were never committed. The reproducible gauntlet is
+  `tests/test_mutation_gauntlet.py` (`pytest -m mutation`).
 - Canonical construction, episode, screening, summary, and failure evidence
   contain no credential value.

@@ -338,3 +338,76 @@
   HUD model discovery authenticated, but the first Claude Haiku 4.5
   construction request returned HTTP 403 before any response. The stop rule
   terminated screening at zero recorded tokens and $0 estimated spend.
+
+## Consolidation pass, 2026-08-04
+
+Subtractions. `conformance.py` and its test went: no caller outside that test,
+and the test only compared two fakes it defined itself. `INITIAL_SCREENING_IDS`
+had one consumer, a test asserting its length. `build_swe_script_family`'s
+`seed` was recorded into `SweScriptFamily` and `PublicTaskV1` but could not
+change a deterministic construction, so it was a false reproducibility claim in
+the task spec rather than a missing feature. `PositiveInt` was defined four
+times and `StrictModel`/`NonEmptyText` twice; they live in `types.py` now.
+
+Four of the six admission gates could not fail. `arm_completeness` was the
+literal `True`. `schema` round-tripped Pydantic through its own serializer.
+`budget_match` re-checked equal arm budgets (already a `SweScriptFamily`
+validator), agreement with the environment (already `compile_hud`), and equal
+matched/evolved per-turn steps (`_allocate_steps` is a pure function of total
+and turn count). `sealed_leakage` called `find_sealed_leak` on a bundle
+`compile_hud` had just refused to return unless that same call found nothing.
+The committed receipts show it: those four rows recorded hardcoded passes and
+echoes of their inputs, while `noop` and `gold` carry harness revisions, report
+digests and test counts. `AdmittedSweFamily`'s validator recompiled the whole
+HUD bundle on every construction; the digest binding it enforced is real, so it
+moved to `assert_admission_identity`, called once per family from
+`build_admitted_screening_plan`, where spending is authorized.
+
+Encodings, strongest rung available for each:
+
+- `metering.py` is the only place a dollar figure is produced. Rates key on the
+  exact model identifier, and an unlisted model raises rather than being priced
+  at zero. `tests/test_metering.py` fails once `PRICING_AS_OF` is more than 90
+  days old, so staleness is a test failure and not a silent misprice.
+- `hud_wire.py` is the only boundary where a HUD or provider payload becomes a
+  domain model, tolerant on input and strict on consumption, with recorded
+  fixtures under `tests/fixtures/wire/` replaying each quirk offline for $0.
+- Per-unit paths in `HudExecutor` carry the whole unit identity, so the
+  cross-arm cache collision a driver worked around with one executor per arm is
+  now unrepresentable.
+- `preflight.py` holds the operational lore as code: `require_docker()` runs
+  inside `_docker_build`, so no image build can skip the platform pin, daemon
+  probe or disk headroom check; `sleepless()` and `terminate_group()` are the
+  supported ways to hold a long run open and to stop one.
+- `single_writer()` takes an exclusive flock for the whole of `run_screening`,
+  so a second session writing the same evidence file is refused by the kernel
+  rather than by a human reading a process list.
+- `paired.py` holds the source-clustered paired-bounds math that a driver had
+  reimplemented line-for-line. It decides nothing: no threshold, no action, no
+  power verdict.
+- `tests/test_mutation_gauntlet.py` is a committed gauntlet, 17 mutants over
+  delivery, admission, metering, the wire boundary, the arm cache key, the
+  evidence lock, preflight and paired bounds. Run it with `pytest -m mutation`.
+
+Two findings from doing the work:
+
+- `screening.jsonl` from the first round-two screen carries receipts priced at
+  retired Opus rates, 15/75 per million against the current 5/25, overstating
+  that component 3x. `summarize_round2.py` had always re-derived cost from
+  recorded token counts rather than summing the receipts, which is why its
+  report was right; it now re-derives through the canonical table, and the
+  comment says why summing the receipts would be wrong.
+- The drifted operating-point copy in `summarize_round2.py` (`== 0`/`== 1`
+  against the package's `<= 0.1`/`>= 0.9`) did not mis-select anything. The two
+  rules agree for every pass rate reachable in nine or fewer verified trials
+  and first disagree at ten, and round two used three. It was a latent
+  divergence, which is why it survived; `test_screening.py` now pins the
+  boundary. Re-running `summarize_round2.py`, `analyze_experiment.py` and
+  `preregister_experiment.py` after the hoist reproduces their committed
+  reports byte-for-byte.
+
+Consequence worth recording: removing `construction_seed` changed
+`PublicTaskV1`, so the committed admission receipts' spec and bundle digests no
+longer describe current specs. Re-running the single-vs-evolved experiment needs
+re-admission first. The receipts keep their recorded `noop` and `gold` rows
+verbatim.

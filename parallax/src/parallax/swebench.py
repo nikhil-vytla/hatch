@@ -17,6 +17,7 @@ from pydantic import (
 
 from .canonical import canonical_digest
 from .evolving_intent import Arm, Chat, Message
+from .hud_wire import WireFormatError, parse_wire
 from .types import (
     DigestText,
     NonEmptyText,
@@ -401,14 +402,10 @@ def construct_swe_intent(
         ),
     )
     output = chat(messages, max_output_tokens)
-    payload = output
-    if output.startswith("```json\n") and output.endswith("\n```"):
-        payload = output[8:-4]
     try:
-        construction = SweConstruction.model_validate_json(payload)
-    except ValidationError as error:
-        detail = error.errors(include_url=False)[0]["msg"]
-        raise SweBenchError(f"SWE intent construction is invalid: {detail}") from error
+        construction = parse_wire(SweConstruction, output)
+    except WireFormatError as error:
+        raise SweBenchError(f"SWE intent construction is invalid: {error}") from error
     return SweConstructionEvidence(
         model=model,
         output=output,

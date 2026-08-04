@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import functools
 import hashlib
 import json
 import os
@@ -12,6 +10,8 @@ from pyarrow.parquet import read_table
 from parallax.admission import AdmittedSweFamily, read_admission_record
 from parallax.canonical import atomic_write, canonical_bytes
 from parallax.hud_screening import HudExecutor
+from parallax.metering import total
+from parallax.preflight import sleepless
 from parallax.screening import (
     ScreeningCost,
     ScreeningExecution,
@@ -67,27 +67,6 @@ EPISODE_COST = ScreeningCost(
     lower_per_episode_usd=0.10,
     upper_per_episode_usd=0.30,
 )
-FRAME_LIMIT_BYTES = 16 * 1024 * 1024
-
-
-def raise_hud_stream_limit() -> None:
-    """hud 0.6.12 reads control-channel frames with StreamReader.readline()
-    on connections opened at asyncio's default 64 KiB limit. A frame larger
-    than that (a long shell tool result, or the grade frame embedding the
-    full candidate patch) raises LimitOverrunError and destroys an
-    otherwise complete paid episode. Raise the default limit process-wide
-    before any episode runs."""
-    original = asyncio.open_connection
-    if getattr(original, "_parallax_frame_limit", None) == FRAME_LIMIT_BYTES:
-        return
-
-    @functools.wraps(original)
-    async def patched(host=None, port=None, **kwargs):
-        kwargs.setdefault("limit", FRAME_LIMIT_BYTES)
-        return await original(host, port, **kwargs)
-
-    patched._parallax_frame_limit = FRAME_LIMIT_BYTES
-    asyncio.open_connection = patched
 
 
 def _constructions() -> dict[str, SweConstruction]:
@@ -181,24 +160,15 @@ def _check_preregistration(plan: ScreeningPlan) -> None:
     )
 
 
-class ArmDispatchExecutor:
-    """One HudExecutor per arm: the executor's episode cache and harness
-    run directories key on instance and trial only, so static and evolved
-    units of the same trial would otherwise collide."""
+class ProgressExecutor:
+    """HudExecutor with one progress line per unit for stream monitoring."""
 
     def __init__(self, families) -> None:
-        self.executors = {}
-        for arm in ARMS:
-            directory = WORK / arm
-            directory.mkdir(parents=True, exist_ok=True)
-            link = directory / "swebench-harness-source"
-            if not link.exists():
-                link.symlink_to(HARNESS_SOURCE.resolve())
-            self.executors[arm] = HudExecutor(
-                families,
-                model=MODEL,
-                work_directory=directory,
-            )
+        WORK.mkdir(parents=True, exist_ok=True)
+        link = WORK / "swebench-harness-source"
+        if not link.exists():
+            link.symlink_to(HARNESS_SOURCE.resolve())
+        self.executor = HudExecutor(families, model=MODEL, work_directory=WORK)
 
     def __call__(self, unit: ScreeningUnit) -> ScreeningExecution:
         print(
@@ -206,12 +176,12 @@ class ArmDispatchExecutor:
             f"trial={unit.trial_index} arm={unit.arm}",
             flush=True,
         )
-        execution = self.executors[str(unit.arm)](unit)
+        execution = self.executor(unit)
         print(
             f"EXPERIMENT_UNIT_DONE source={unit.source_id} "
             f"trial={unit.trial_index} arm={unit.arm} "
             f"outcome={execution.outcome.kind} "
-            f"cost_usd={execution.estimated_cost_usd:.6f}",
+            f"cost_usd={execution.usage.cost_usd:.6f}",
             flush=True,
         )
         return execution
@@ -220,8 +190,6 @@ class ArmDispatchExecutor:
 def main() -> None:
     if not os.environ.get("HUD_API_KEY"):
         raise RuntimeError("HUD_API_KEY is required")
-    os.environ.setdefault("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
-    raise_hud_stream_limit()
     admitted = _admitted_families()
     plan = build_admitted_screening_plan(
         admitted,
@@ -243,14 +211,15 @@ def main() -> None:
             record for record in records[1:] if isinstance(record, ScreeningRun)
         )
     else:
-        runs = run_screening(
-            plan,
-            ArmDispatchExecutor(families),
-            output_path=EXPERIMENT,
-            approve_spend=True,
-            spend_cap_usd=SPEND_CAP_USD,
-        )
-    total_cost = sum(run.estimated_cost_usd for run in runs)
+        with sleepless():
+            runs = run_screening(
+                plan,
+                ProgressExecutor(families),
+                output_path=EXPERIMENT,
+                approve_spend=True,
+                spend_cap_usd=SPEND_CAP_USD,
+            )
+    total_cost = total(run.usage for run in runs).cost_usd
     print(
         json.dumps(
             {

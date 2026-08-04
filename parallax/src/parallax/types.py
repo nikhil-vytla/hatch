@@ -13,6 +13,7 @@ CanonicalIntegerText = Annotated[
 NonNegativeInt = Annotated[int, Field(ge=0)]
 PositiveInt = Annotated[int, Field(gt=0)]
 Usd = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+Usd = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
 SourceId = NewType("SourceId", NonEmptyText)
 CanonicalInteger = NewType("CanonicalInteger", CanonicalIntegerText)
