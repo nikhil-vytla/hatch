@@ -12,6 +12,7 @@ All six planned sources were examined 2026-08-06; repos pinned at exact SHAs.
 | [04](04-exo-harness.md) | exoharness/exo (Rust substrate + TS executor, self-rebuilding agent) | commit `8f7886661e41957a1d4909c1538cc720c9bbd740` | done |
 | [05](05-rlm-recursive-language-models.md) | alexzhang13/rlm + RLM blog (Oct 2025) + paper arXiv:2512.24601 | commit `72d6940142ddfb84ee6be573dc999a37e633e671` (v0.1.3) | done |
 | [06](06-nemo-labs-oo-agents.md) | NVIDIA-NeMo/labs-OO-Agents (NOOA) + paper arXiv:2607.20709 | commit `bfb347bca53c1eaa0449d7acfebdefb29075fc23` | done |
+| [07](07-arxiv-2301-12987.md) | arXiv:2301.12987 "The Optimal Choice of Hypothesis Is the Weakest, Not the Shortest" (Bennett, AGI-23) — theory of hypothesis selection; weakness vs MDL | v4, 2024-04-11; appendices repo `35a2a03` | done |
 | — | [comparative-matrix.md](comparative-matrix.md) — cross-source synthesis + retain/replace/harden/generalize verdicts | synthesized from 01–06 | done |
 
 Downstream documents built on these notes: [../ARCHITECTURE.md](../ARCHITECTURE.md),
