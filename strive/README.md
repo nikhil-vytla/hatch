@@ -67,7 +67,7 @@ strive/
 │   ├── PROJECT_CHARTER.md   research questions, surfaces, quality attributes, non-goals
 │   ├── ARCHITECTURE.md      target platform design (trusted kernel, surfaces, dual loops)
 │   ├── ROADMAP.md           staged maturity targets with exit criteria
-│   ├── HANDOFF.md           conclusions, decisions D1–D13, hardening priorities
+│   ├── HANDOFF.md           conclusions, decisions D1–D14, hardening priorities
 │   └── agents/research/     research notes 01–06 (pinned SHAs) + comparative matrix
 ├── artifacts/           ledgers, per-generation strategy sources, run event streams
 ├── NOTES.md             working log

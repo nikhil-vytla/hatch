@@ -7,13 +7,26 @@ platform strive is growing into; the [ROADMAP](ROADMAP.md) sequences the work an
 
 ## Design thesis
 
-Every researched system is missing one half of the problem. Flex/GEPA validates
-candidates rigorously but keeps no durable lineage; prime-agent, Continual Harness, and
-exo persist and self-modify richly but validate nothing (and two of the three document
-the resulting drift, stalls, or admit the gap outright). strive's thesis is that the
-two halves belong together: **a small trusted kernel that owns evidence, validation,
-budgets, and history — and treats everything else, including its own strategies,
-prompts, skills, and memory, as evolvable cargo that must earn promotion empirically.**
+The researched systems occupy complementary parts of the design space. Flex/GEPA does
+rigorous budgeted candidate validation and persists logs, checkpoints, and candidate
+programs, but — as an offline optimizer rather than a deployment harness — lacks
+deployment-level activation, journaled rollback, and long-lived online generation
+semantics. prime-agent, Continual Harness, and exo persist and self-modify richly but
+place **no pre-activation, comparative behavioral promotion gate** in front of harness
+refinements; each has other quality controls, and the omission is often deliberate
+(missing ground truth, non-resettable environments, evaluation cost, delayed benefits,
+cold start, Goodhart risk, product-layer boundaries — see HANDOFF, "Why embedded
+acceptance gates are difficult").
+
+strive's thesis is a **hypothesis to be tested, not a conclusion**: that combining
+selected mechanisms from these systems — comparative promotion, durable lineage,
+bounded online refinement — inside one small trusted kernel improves long-run
+performance over any of them alone. The kernel owns evidence integrity, decision
+enforcement, budgets, and history; everything else, including strive's own strategies,
+prompts, skills, and memory, is evolvable cargo whose promotion requires **evidence
+proportional to its risk and evaluability** — trusted behavioral evidence for durable
+or broad-scope promotion; provisional, scoped, reversible, monitored, and expiring
+activation for low-risk or online changes.
 
 ## Layered model
 
@@ -66,6 +79,13 @@ degenerate case: one `strategy-code` delta.
 `(score: float, feedback: str)` per case (the GEPA metric contract, note 01) —
 feedback text is what makes model-backed proposers effective. Failure is a score, not
 an exception: unrunnable candidates receive floor scores and the loop continues.
+The kernel's role here is deliberately narrow: it enforces that every promotion
+decision is journaled with trusted-side evidence and that evidence requirements scale
+with a change's risk, scope, and evaluability — it does **not** impose one universal
+metric policy. What counts as sufficient evidence is supplied by per-surface,
+per-risk-tier Validators (L1); durable or broad-scope promotions demand trusted
+behavioral evidence, while low-risk or online changes may activate provisionally
+(scoped, reversible, monitored, expiring — see the online rules below).
 Acceptance (`decide`) gains two research-driven rules beyond v0's strict-improvement +
 no-regressions:
 - **Held-out discipline**: candidates must improve on cases never shown to
@@ -156,9 +176,11 @@ collect runs → diagnose from traces → propose candidates (algorithm-driven)
 → materialize workspace → validate (static pre-filter → sandbox suite → held-out)
 → decide (explicit rules) → promote via activation entry → journal everything
 ```
-Controlled data, resettable evaluation, full budgets. This is v0's loop generalized —
-the researched systems confirm it is the right backbone (GEPA proves model-generated
-candidates work under exactly this regime, at 35× fewer rollouts than RL).
+Controlled data, resettable evaluation, full budgets. This is v0's loop generalized.
+GEPA is the strongest evidence that this regime is workable — model-generated
+candidates validated under explicit eval budgets, reported at up to 35× fewer rollouts
+than GRPO (note 01; blog-sourced numbers, not independently reproduced) — though
+whether it is the *best* backbone for a long-lived harness is part of hypothesis H1.
 
 **Online evolution (bounded; stage 5).** During a continuing run — no resets, evidence
 arriving mid-task — the loop may refine only surfaces whose descriptors are marked
