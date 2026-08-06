@@ -13,8 +13,11 @@ strict mypy, committed demo lineage.
 
 ## Stage 2 — Foundations hardening + model-in-the-loop offline evolution
 
-The research phase moved several items *into* stage 2 that were previously later,
-because every researched failure traces to their absence.
+The research phase moved several items *into* stage 2 that were previously later:
+the documented failures in the corpus tie to specific missing mechanisms — CH's
+inheritance regression to reuse/inheritance protection, its 842-repeat stall to loud
+schema rejection and trusted stall detection — and those mechanisms are cheap now
+and structural to retrofit later.
 
 Foundations (do first, in order — these are the hardening priorities in HANDOFF):
 1. Shared typed codec for ledger + events; `schema_version` on every entry; normative

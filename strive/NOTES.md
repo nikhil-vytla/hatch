@@ -136,6 +136,37 @@ ARCHITECTURE.md, comparative-matrix.md, ROADMAP.md, and a rewritten HANDOFF.md.
   are Pokémon-only; proxy-validator fidelity untested; blog numbers not
   independently reproduced).
 
+## 2026-08-06 — phase 2.5: epistemic correction (pre-Goal-3)
+
+Narrow correction pass over the synthesis docs (no new research, no runtime code).
+The phase-2 log entries above are preserved as written; the claims they record were
+over-stated and are corrected in the docs as follows:
+
+- "everyone else built half of strive" → the systems occupy complementary parts of
+  the design space; whether combining selected mechanisms improves long-run
+  performance is strive's hypothesis (H1), not a finding.
+- "validate nothing" → the precise claim: no *pre-activation, comparative behavioral
+  promotion gate* for harness refinements (each system has other quality controls).
+- GEPA "keeps no lineage" → GEPA persists logs, checkpoints, and candidate programs;
+  what it lacks is deployment-level activation, rollback, and long-lived online
+  generation semantics.
+- Added a "Why embedded acceptance gates are difficult — or deliberately omitted"
+  section to HANDOFF (ground truth, resets, cost, delayed benefits, cold start,
+  Goodhart, product-layer boundaries).
+- "strive's gated-loop bet is validated" → reclassified as hypothesis H1.
+- CH failures re-attributed to their specific mechanisms: inheritance regression →
+  reuse/inheritance protection (D6); 842-repeat stall → loud schema rejection +
+  trusted stall detection (D9/D10).
+- D1 revised: promotion evidence proportional to risk and evaluability; provisional/
+  scoped/reversible/monitored/expiring activation allowed for low-risk or online
+  changes. New D14: kernel enforces decision + evidence integrity, not one universal
+  metric policy; validators stay per-surface, per-risk plugins.
+- Same corrections propagated to ARCHITECTURE (design thesis, acceptance-rules
+  paragraph, offline-loop claim), comparative-matrix (GEPA/prime-agent/CH/exo cells,
+  retain verdict), ROADMAP (stage-2 rationale), and _summary.md.
+
+HANDOFF now ends with the recommendation to proceed directly to Goal 3.
+
 ### Addendum: note 07 (user-requested)
 
 - Added arXiv:2301.12987 — Bennett, "The Optimal Choice of Hypothesis Is the
