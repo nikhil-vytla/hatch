@@ -1,0 +1,7 @@
+{"kind": "generation", "generation_id": "gen-0000", "parent_id": null, "origin": "seed", "surface": "strategy-code", "weakness_id": null, "created_at": "2026-08-06T11:18:44.779403+00:00", "strategy_file": "gen-0000.py", "decision": {}}
+{"kind": "activation", "generation_id": "gen-0000", "reason": "seed", "at": "2026-08-06T11:18:44.779746+00:00"}
+{"kind": "generation", "generation_id": "gen-0001", "parent_id": "gen-0000", "origin": "evolved", "surface": "strategy-code", "weakness_id": "negative-integers-dropped", "created_at": "2026-08-06T11:18:44.826861+00:00", "strategy_file": "gen-0001.py", "decision": {"accepted": true, "reason": "strict improvement 0.571 -> 1.000 with no regressions", "baseline_score": 0.5714285714285714, "candidate_score": 1.0, "regressed_case_ids": []}}
+{"kind": "activation", "generation_id": "gen-0001", "reason": "evolved", "at": "2026-08-06T11:18:44.826915+00:00"}
+{"kind": "activation", "generation_id": "gen-0000", "reason": "rollback", "at": "2026-08-06T11:18:44.975155+00:00"}
+{"kind": "generation", "generation_id": "gen-0002", "parent_id": "gen-0000", "origin": "evolved", "surface": "strategy-code", "weakness_id": "negative-integers-dropped", "created_at": "2026-08-06T11:18:45.098171+00:00", "strategy_file": "gen-0002.py", "decision": {"accepted": true, "reason": "strict improvement 0.571 -> 1.000 with no regressions", "baseline_score": 0.5714285714285714, "candidate_score": 1.0, "regressed_case_ids": []}}
+{"kind": "activation", "generation_id": "gen-0002", "reason": "evolved", "at": "2026-08-06T11:18:45.098224+00:00"}

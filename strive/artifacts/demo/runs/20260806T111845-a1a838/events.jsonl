@@ -1,0 +1,15 @@
+{"ts": "2026-08-06T11:18:45.059859+00:00", "type": "cycle_started", "run_id": "20260806T111845-a1a838", "task_id": "sum-integers-v1", "active_generation": "gen-0000"}
+{"ts": "2026-08-06T11:18:45.078482+00:00", "type": "case_executed", "case_id": "positives-pair", "output": 7, "error": null, "duration_ms": 0.019832979887723923}
+{"ts": "2026-08-06T11:18:45.078605+00:00", "type": "case_executed", "case_id": "positives-triple", "output": 60, "error": null, "duration_ms": 0.0023330794647336006}
+{"ts": "2026-08-06T11:18:45.078656+00:00", "type": "case_executed", "case_id": "embedded-punctuation", "output": 20, "error": null, "duration_ms": 0.001334003172814846}
+{"ts": "2026-08-06T11:18:45.078699+00:00", "type": "case_executed", "case_id": "no-integers", "output": 0, "error": null, "duration_ms": 0.000583939254283905}
+{"ts": "2026-08-06T11:18:45.078741+00:00", "type": "case_executed", "case_id": "negative-single", "output": 17, "error": null, "duration_ms": 0.0007080379873514175}
+{"ts": "2026-08-06T11:18:45.078781+00:00", "type": "case_executed", "case_id": "negative-all", "output": 6, "error": null, "duration_ms": 0.000625033862888813}
+{"ts": "2026-08-06T11:18:45.078824+00:00", "type": "case_executed", "case_id": "negative-mixed", "output": 140, "error": null, "duration_ms": 0.0007920898497104645}
+{"ts": "2026-08-06T11:18:45.078887+00:00", "type": "evaluated", "generation": "gen-0000", "score": 0.5714285714285714, "failing_case_ids": ["negative-single", "negative-all", "negative-mixed"]}
+{"ts": "2026-08-06T11:18:45.078942+00:00", "type": "weakness_detected", "weakness_id": "negative-integers-dropped", "description": "All failing cases contain negative integers and the strategy returned an overestimate without raising, consistent with minus signs being dropped during extraction.", "evidence_case_ids": ["negative-single", "negative-all", "negative-mixed"]}
+{"ts": "2026-08-06T11:18:45.079076+00:00", "type": "candidate_proposed", "candidate_id": "cand-89539f20", "surface": "strategy-code", "weakness_id": "negative-integers-dropped", "description": "Widen the integer regex to capture an optional leading minus sign."}
+{"ts": "2026-08-06T11:18:45.097756+00:00", "type": "validated", "candidate_id": "cand-89539f20", "sandbox_ok": true, "sandbox_failure": null, "score": 1.0, "failing_case_ids": []}
+{"ts": "2026-08-06T11:18:45.097915+00:00", "type": "decision", "candidate_id": "cand-89539f20", "accepted": true, "reason": "strict improvement 0.571 -> 1.000 with no regressions", "baseline_score": 0.5714285714285714, "candidate_score": 1.0}
+{"ts": "2026-08-06T11:18:45.098266+00:00", "type": "retained", "generation_id": "gen-0002", "parent_id": "gen-0000", "activated": true}
+{"ts": "2026-08-06T11:18:45.098308+00:00", "type": "cycle_completed", "accepted": true}
