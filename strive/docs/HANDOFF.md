@@ -1,15 +1,131 @@
 # HANDOFF — strive
 
-State as of 2026-08-06, after two phases: the vertical slice (stage 1) and the
+State as of 2026-08-06, after three phases: the vertical slice (stage 1), the
 research-and-redesign phase (notes 01–06, [comparative matrix](agents/research/comparative-matrix.md),
-[ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)).
+[ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), and the phase-3
+hardening of the core harness (roadmap stage 2a).
 
-## What works (unchanged from phase 1)
+## Phase 3 — hardened core (what was implemented)
 
-- Full gated loop end to end: execute → observe → evaluate → diagnose → propose →
-  validate → accept/reject → retain, over executable strategy code in a subprocess
-  with a hard timeout. 23 offline tests, strict mypy, committed demo lineage with
-  restart persistence and rollback (`artifacts/demo/transcript.txt`).
+The full gated loop still runs end to end, now on durable foundations:
+
+- **Contracts + codec**: every persisted record is a versioned typed dataclass
+  (`contracts.py`) serialized by one shared strict codec (`codec.py`). Unknown
+  kinds, unsupported versions, missing/extra fields, and wrong types are
+  rejected loudly; a golden v1 record is pinned by test so shape changes force
+  version bumps.
+- **Durable history**: append-only ledger with single-write+fsync appends;
+  promotion is atomic by construction (one activation line); a torn final line
+  is tolerated as a crash artifact while interior corruption is a loud
+  `LedgerError`; strategy sources live in a content-addressed object store
+  verified on every read; rollback/freeze/expiry are journal entries — nothing
+  is ever deleted.
+- **Task-owned scoring with splits**: visible / held-out / regression /
+  adversarial. Diagnosis and proposal receive a `VisibleContext` that
+  mechanically contains only the visible split (spy-tested); acceptance sees
+  everything.
+- **Failure-as-data**: crashes, hangs, output floods, malformed output,
+  schema mismatches, and budget exhaustion all become recorded evaluation
+  outcomes with floor scores. The controller never raises for candidate
+  behavior.
+- **Trusted accounting**: kernel-side `BudgetMeter` for wall time, executions,
+  model calls, tokens, output bytes, cost, recursion depth; enforcement
+  returns recorded failures. Usage attribution: every execution event names
+  the generation that served it.
+- **Trusted stall detection**: N flat failing cycles → journaled
+  `stall-freeze`; adaptation halts, evaluation continues; operator `resume`
+  lifts it. Healthy idling (score 1.0) never freezes.
+- **Pluggable policies** (no universal acceptance formula): decisions record
+  policy name+version. `paired-deterministic@1` = paired incumbent/candidate
+  evidence, zero regressions on any split, strict visible improvement,
+  held-out discipline. `provisional@1` = scoped, monitored, expiring
+  activation for low-risk changes; confirmed to durable only if the window
+  sustains baseline, else auto-revert (journaled intervention).
+- **Model seam**: provider-neutral `ModelAdapter`, deterministic
+  `FakeModelAdapter` in core, `MeteredJournalingAdapter` charging budgets and
+  journaling full request/response for replay. No evolution component calls a
+  model yet — that is deliberately the next phase.
+- **CLI**: run / status / lineage / inspect / compare / replay / promote /
+  rollback / resume / history, all with `--json` machine-readable envelopes;
+  store failures exit 1 with clean diagnostics, never tracebacks.
+
+## Verification evidence (commands + what they prove)
+
+- `uv run pytest -q` → **77 passed**, offline, deterministic. Failure-injection
+  coverage: schema mismatch rejected loudly (codec tests + runner protocol
+  test); corrupt ledger/CAS handled cleanly (`test_persistence.py`,
+  `test_cli.py::test_corrupt_ledger_yields_clean_error_envelope`); hanging /
+  crashing / flooding candidates contained (`test_sandbox.py`); budgets
+  enforced by trusted code (`test_budget.py`); holdout not exposed to
+  proposers (`test_holdout.py`); activation survives restart and promotion is
+  atomic under simulated crash (`test_persistence.py`); rollback preserves
+  history; stall freeze + resume (`test_monitors.py`); provisional confirm and
+  expiry-revert (`test_provisional.py`); phase-1 slice behavior intact
+  (`test_slice.py`).
+- `uv run mypy` → strict, no issues in 30 source files.
+- `artifacts/demo/transcript.txt` → live CLI evidence: accepted evolution
+  (0.455 → 1.000 across all splits), paired-gate refusal of a demotion,
+  journaled rollback, evidence-gated re-promotion, and an exact replay match.
+
+## Phase-3 decisions
+
+- Promotion atomicity comes from journal design (one activation line appended
+  last), not from locks or intent files; intent journaling (D13) is deferred
+  until an operation needs more than one durable write.
+- Torn-tail tolerance vs interior corruption: the crash artifact of an
+  append-only journal is recoverable by construction; anything else is loud.
+- The provisional confirmation criterion (`provisional@1`: every window cycle
+  ≥ baseline) is deliberately the simplest defensible rule; uncertainty-aware
+  comparison for stochastic behavior is specified but unimplemented (no
+  stochastic surface exists yet).
+- Candidate probes execute under a transient generation id
+  (`candidate:<id>`); only retained generations get ledger ids, keeping the
+  candidate/incumbent distinction visible in usage attribution.
+- Network denial was NOT claimed: tests enforce env scrubbing and workspace
+  privacy instead, and the docs state the gap (see below).
+
+## Remaining security and evaluation limitations
+
+- **The sandbox is fault containment, not a security boundary**: no network
+  denial, no filesystem confinement beyond cwd/env hygiene, RLIMIT_AS
+  unreliable on macOS. Adequate only while proposals come from the trusted
+  registry (and next phase, from a model whose output is validated before
+  durable promotion — but stage-3 kernel confinement should precede any
+  third-party candidate source).
+- **Evaluation is single-trial and deterministic-only**: no repeated-trial or
+  uncertainty-aware policy exists yet; the policy registry is where it plugs
+  in.
+- **Inheritance-aware thresholds (D6 second half) are not implemented**: usage
+  attribution now provides the data, but no policy consumes inherited-share
+  yet.
+- **Regression split is empty**: the mechanism exists, nothing grows it
+  automatically yet.
+- The stall detector watches score/generation flatness only; repeated
+  *invalid-action* stalls will need runner-failure-kind tracking when tool
+  use arrives.
+
+## Mechanisms vs. still-untested policy hypotheses
+
+**Mechanisms (implemented, tested):** codec strictness, append-only atomic
+promotion, CAS verification, holdout isolation, budget enforcement, stall
+freeze, provisional expiry/confirm, failure-as-data, usage attribution.
+
+**Policy hypotheses (encoded but unproven at scale):** that
+`paired-deterministic@1`'s specific bar (strict visible improvement + held-out
+discipline + zero regressions) is the right durability gate (H1 remains open);
+that `provisional@1`'s window rule catches regressions early enough; that the
+stall window of 3 balances false freezes against long stalls. These are named
+and versioned precisely so competing policies can be tested against them.
+
+## Next phase — the model-backed self-evolution engine (stage 2b)
+
+Build `ModelProposer` on the seams that now exist: it consumes
+`VisibleContext` + diagnosis + acceptance history through the `Proposer`
+protocol, calls a `ModelAdapter` through the metered journaling wrapper
+(`FakeModelAdapter` in CI), and its candidates face the same paired gate.
+Add a second task with a non-planted weakness, grow the regression split from
+recorded failures, and report per-proposer-model acceptance statistics
+(capability-floor telemetry). Exit criteria are in ROADMAP stage 2b.
 
 ## Research conclusions
 
@@ -151,7 +267,10 @@ performance is hypothesis H1.
 - **Repo snapshots age:** all three repos were inspected at single SHAs on 2026-08-06;
   conclusions about "what X lacks" may rot.
 
-## Exact hardening priorities (ordered; this is the stage-2 work queue)
+## Hardening priorities (phase-2 work queue — COMPLETED in phase 3)
+
+*All eight items below were implemented in phase 3; kept for the record with
+their original rationale. See "Phase 3" above for what each became.*
 
 1. **Typed codec + versioned schemas** for ledger and events, with normative tests
    (eliminates the phase-1 dict-drift debt; prerequisite for composite generations).
@@ -185,16 +304,10 @@ the queue requires a network or a real model.
 - **macOS sandbox ceiling** — Landlock/seccomp are Linux-only; local development rides
   tier 2 (rlimits) until containers arrive in stage 6.
 
-## Next phase
+## Phase-2 next-phase note (historical)
 
-**Recommendation: proceed directly to Goal 3.** The epistemic correction above is
-complete (synthesis claims neutralized, D1 revised to proportional evidence, D14
-added, failure attributions tied to their specific mechanisms) and required no
-runtime-code changes; nothing in the corrected synthesis invalidates the hardening
-queue — items 1–6 serve the corrected decisions exactly as they served the original
-ones.
-
-Then: execute the hardening queue (items 1–6) and stage 2's model-in-the-loop work
-(items 7–8) against ROADMAP stage-2 exit criteria: a model-backed proposer (fake model
-in CI) fixes a non-planted weakness on a second task, passes held-out validation, and
-the full cycle replays offline from the ledger alone.
+*The phase-2 recommendation ("proceed directly to Goal 3", i.e. execute the
+hardening queue) was carried out in phase 3. The current next phase is the
+model-backed self-evolution engine — see "Next phase — the model-backed
+self-evolution engine (stage 2b)" near the top of this document and ROADMAP
+stage 2b.*

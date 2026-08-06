@@ -11,7 +11,7 @@ Deterministic task, planted weakness, signature diagnosis, bounded registry patc
 subprocess isolation, append-only ledger, restart persistence, rollback. 23 tests,
 strict mypy, committed demo lineage.
 
-## Stage 2 — Foundations hardening + model-in-the-loop offline evolution
+## Stage 2a — Foundations hardening ✅ (2026-08-06, phase 3)
 
 The research phase moved several items *into* stage 2 that were previously later:
 the documented failures in the corpus tie to specific missing mechanisms — CH's
@@ -19,31 +19,41 @@ inheritance regression to reuse/inheritance protection, its 842-repeat stall to 
 schema rejection and trusted stall detection — and those mechanisms are cheap now
 and structural to retrofit later.
 
-Foundations (do first, in order — these are the hardening priorities in HANDOFF):
-1. Shared typed codec for ledger + events; `schema_version` on every entry; normative
-   schema tests (ATIF discipline, note 06).
-2. Task-owned scoring with **split declaration** (visible / held-out); `decide` requires
-   improvement on held-out.
-3. Evaluator contract → `(score, feedback_text)`; failure-as-score floor semantics
-   (note 01).
-4. Loud schema rejection in the runner + trusted mechanical stall detector
-   (note 03 §B.3).
-5. Budget accounting (tokens/cost/wall-clock/eval-runs) in the cycle contract,
-   trusted-side (notes 04/05).
-6. Usage accounting: journal which generation serves each invocation (note 03, Table 2).
+All six foundation priorities are implemented and tested (77 tests, strict mypy;
+see HANDOFF "Phase 3" for verification evidence):
+1. ✅ Shared typed codec + versioned contracts + golden-record compat tests.
+2. ✅ Task-owned scoring with visible/held-out/regression/adversarial splits;
+   `paired-deterministic@1` requires held-out discipline; holdout data is
+   mechanically absent from diagnosis/proposal inputs.
+3. ✅ Evaluations return per-split scores + structured feedback; failure-as-score.
+4. ✅ Loud schema rejection in the runner (protocol check, dedicated exit code)
+   + trusted stall detector with journaled freeze/resume.
+5. ✅ Trusted budget meter in the cycle contract (wall/executions/model calls/
+   tokens/output bytes/cost/recursion), exhaustion recorded as data.
+6. ✅ Usage attribution: every execution event names its generation.
 
-Model-in-the-loop:
-- `Proposer` protocol: registry proposer + `ModelProposer` behind a provider-neutral
-  `ModelAdapter`; deterministic `FakeModelAdapter` in core; all model I/O journaled
-  and replayable.
-- Proposer input contract: parent source + diagnosis + failing cases + **acceptance
-  history** (prime-agent feeds past refinement results back; note 02).
-- Sandbox tier 2: rlimits + network denial for candidate execution.
+Also landed early: pluggable named+versioned acceptance policies (no universal
+formula), provisional expiring activations, content-addressed artifacts, atomic
+promotion, `ModelAdapter` + `FakeModelAdapter` with journaled metered I/O, and
+the CLI suite (run/status/lineage/inspect/compare/replay/promote/rollback/
+resume/history, all with `--json`). Sandbox hardening is partial: scrubbed env,
+private workspace, rlimits, bounded output — network denial is NOT enforced
+(documented honestly in README/ARCHITECTURE).
+
+## Stage 2b — Model-in-the-loop offline evolution (next)
+
+- `ModelProposer` behind the existing `Proposer` protocol, using the existing
+  `ModelAdapter`/`FakeModelAdapter`; all proposer I/O journaled and replayable.
+- Proposer input contract: `VisibleContext` + diagnosis + **acceptance history**
+  (prime-agent feeds past refinement results back; note 02).
+- A second task with a non-planted weakness; regression split grown from failures.
+- Per-proposer-model acceptance statistics (capability-floor telemetry, note 03).
 
 **Exit criteria:** a model-backed proposer (fake model in CI) fixes a *non-planted*
 weakness on a second task; the candidate passes held-out validation; the full cycle
 replays offline from the ledger alone; a hanging/hostile candidate exhausts its budget
-and is journaled as a floor-scored rejection.
+and is journaled as a floor-scored rejection (the last is already demonstrated by
+failure-injection tests).
 
 ## Stage 3 — Composite generations + pluggable evolution algorithms + hardened sandbox
 

@@ -1,7 +1,13 @@
-"""Sandbox behavior: correct results, crash containment, hard timeout."""
+"""Sandbox containment: results, crashes, hangs, output bounds, env scrubbing."""
 
+import os
 from pathlib import Path
 
+from strive.contracts import (
+    FAILURE_CRASH,
+    FAILURE_OUTPUT_LIMIT,
+    FAILURE_TIMEOUT,
+)
 from strive.sandbox import run_strategy
 from strive.tasks import SUM_INTEGERS_TASK
 
@@ -30,46 +36,106 @@ def solve(input_text: str) -> int:
     return "not an int"  # type: ignore[return-value]
 '''
 
+FLOODING_STRATEGY = '''\
+import sys
 
-def _write(tmp_path: Path, source: str) -> Path:
-    path = tmp_path / "strategy.py"
-    path.write_text(source, encoding="utf-8")
-    return path
+def solve(input_text: str) -> int:
+    sys.stdout.write("x" * 10_000_000)
+    return 0
+'''
+
+SECRET_PROBE_STRATEGY = '''\
+import os
+
+def solve(input_text: str) -> int:
+    return 1 if os.environ.get("STRIVE_TEST_SECRET") else 0
+'''
+
+CWD_PROBE_STRATEGY = '''\
+import os
+
+def solve(input_text: str) -> int:
+    with open("probe.txt", "w") as fh:
+        fh.write("written")
+    return 1 if "strive-sandbox-" in os.getcwd() else 0
+'''
 
 
-def test_good_strategy_returns_results_per_case(tmp_path: Path) -> None:
-    result = run_strategy(_write(tmp_path, GOOD_STRATEGY), SUM_INTEGERS_TASK.cases)
-    assert result.ok
-    assert len(result.case_results) == len(SUM_INTEGERS_TASK.cases)
-    by_id = {r.case_id: r for r in result.case_results}
+def _run(source: str, **kwargs: float) -> object:
+    return run_strategy(
+        source, SUM_INTEGERS_TASK.cases, generation_id="gen-test", **kwargs  # type: ignore[arg-type]
+    )
+
+
+def test_good_strategy_returns_outcomes_per_case() -> None:
+    report = run_strategy(GOOD_STRATEGY, SUM_INTEGERS_TASK.cases, generation_id="g")
+    assert report.ok
+    assert len(report.outcomes) == len(SUM_INTEGERS_TASK.cases)
+    by_id = {o.case_id: o for o in report.outcomes}
     assert by_id["negative-all"].output == -6
-    assert by_id["no-integers"].output == 0
+    assert by_id["adv-phone-like"].output == -679
+    assert report.generation_id == "g"
+    assert report.wall_time_s > 0
 
 
-def test_raising_strategy_is_contained_per_case(tmp_path: Path) -> None:
-    result = run_strategy(_write(tmp_path, CRASHING_STRATEGY), SUM_INTEGERS_TASK.cases)
-    assert result.ok  # the child process survives; failures are per-case
-    assert all(r.output is None and r.error is not None for r in result.case_results)
-    assert "ValueError" in (result.case_results[0].error or "")
+def test_raising_strategy_is_contained_per_case() -> None:
+    report = run_strategy(CRASHING_STRATEGY, SUM_INTEGERS_TASK.cases, generation_id="g")
+    assert report.ok  # child survives; failures are per-case data
+    assert all(o.output is None and o.error is not None for o in report.outcomes)
 
 
-def test_hanging_strategy_hits_hard_timeout(tmp_path: Path) -> None:
-    result = run_strategy(
-        _write(tmp_path, HANGING_STRATEGY), SUM_INTEGERS_TASK.cases, timeout_s=1.0
+def test_hanging_strategy_hits_hard_timeout() -> None:
+    report = run_strategy(
+        HANGING_STRATEGY, SUM_INTEGERS_TASK.cases, generation_id="g", timeout_s=1.0
     )
-    assert not result.ok
-    assert result.failure is not None and "timeout" in result.failure
+    assert not report.ok
+    assert report.failure is not None and report.failure.kind == FAILURE_TIMEOUT
 
 
-def test_syntax_error_reported_as_child_failure(tmp_path: Path) -> None:
-    result = run_strategy(
-        _write(tmp_path, BROKEN_AT_IMPORT_STRATEGY), SUM_INTEGERS_TASK.cases
+def test_syntax_error_reported_as_crash() -> None:
+    report = run_strategy(
+        BROKEN_AT_IMPORT_STRATEGY, SUM_INTEGERS_TASK.cases, generation_id="g"
     )
-    assert not result.ok
-    assert result.failure is not None
+    assert not report.ok
+    assert report.failure is not None and report.failure.kind == FAILURE_CRASH
 
 
-def test_non_integer_output_flagged_as_error(tmp_path: Path) -> None:
-    result = run_strategy(_write(tmp_path, WRONG_TYPE_STRATEGY), SUM_INTEGERS_TASK.cases)
-    assert result.ok
-    assert all("non-integer output" in (r.error or "") for r in result.case_results)
+def test_non_integer_output_flagged_as_error() -> None:
+    report = run_strategy(WRONG_TYPE_STRATEGY, SUM_INTEGERS_TASK.cases, generation_id="g")
+    assert report.ok
+    assert all("non-integer output" in (o.error or "") for o in report.outcomes)
+
+
+def test_output_flood_is_bounded_and_contained() -> None:
+    report = run_strategy(
+        FLOODING_STRATEGY,
+        SUM_INTEGERS_TASK.cases,
+        generation_id="g",
+        timeout_s=10.0,
+        output_bytes_cap=100_000,
+    )
+    assert not report.ok
+    assert report.failure is not None
+    assert report.failure.kind in (FAILURE_OUTPUT_LIMIT, FAILURE_CRASH)
+    assert report.stdout_bytes <= 100_001
+
+
+def test_no_inherited_secrets(monkeypatch: object) -> None:
+    os.environ["STRIVE_TEST_SECRET"] = "s3cret"
+    try:
+        report = run_strategy(
+            SECRET_PROBE_STRATEGY, SUM_INTEGERS_TASK.cases[:1], generation_id="g"
+        )
+    finally:
+        del os.environ["STRIVE_TEST_SECRET"]
+    assert report.ok
+    assert report.outcomes[0].output == 0  # the child could not see the secret
+
+
+def test_private_workspace_cwd(tmp_path: Path) -> None:
+    report = run_strategy(
+        CWD_PROBE_STRATEGY, SUM_INTEGERS_TASK.cases[:1], generation_id="g"
+    )
+    assert report.ok
+    assert report.outcomes[0].output == 1  # cwd was a private sandbox workspace
+    assert not (Path.cwd() / "probe.txt").exists()  # nothing written to kernel cwd

@@ -101,15 +101,21 @@ untrustworthy, note 04). Budgets are hierarchical: a delegated child receives th
 parent's *remaining* budget, RLM-style (note 05), so recursion is safe by construction.
 
 **Sandbox boundary.** One interface, a registry of tiers (RLM's ladder, note 05):
-1. `subprocess` — `python -I` + timeout (v0, retained as floor);
-2. `restricted` — + rlimits (CPU, memory, file size) and network denial;
+1. `subprocess` — `python -I` + timeout (v0 floor);
+2. `restricted` — + scrubbed environment (no inherited secrets), private temp
+   workspace as cwd, bounded stdout/stderr, POSIX rlimits (CPU, file size, open
+   files). **Implemented in phase 3** as the default. Honest limits: network
+   denial is NOT enforced (no reliable unprivileged cross-platform mechanism),
+   RLIMIT_AS is unreliable on macOS, and filesystem confinement is absent — a
+   candidate that guesses absolute paths can touch anything the controller's
+   UID can. Fault containment, not a security sandbox (see README).
 3. `kernel` — Landlock + seccomp self-installed post-fork with fail-closed capability
    probing (NOOA `guards.py`, note 06; Linux-only — macOS falls back to tier 2);
 4. `container` / microVM (stage 6).
-The runner **rejects loudly on schema mismatch** — a malformed payload is an observable
-failure event, never a silent fallback (CH's 842-repetition stall was caused by exactly
-that silence, note 03 §B.3). Timeouts return partial results where possible
-(`partial_answer` pattern, note 05).
+The runner **rejects loudly on schema mismatch** (implemented: protocol-checked
+payloads, dedicated exit code, recorded `schema-mismatch` failure) — a malformed
+payload is an observable failure event, never a silent fallback (CH's
+842-repetition stall was caused by exactly that silence, note 03 §B.3).
 
 **Secrets broker.** Credentials live host-side only and cross into sandboxes never;
 model calls made on behalf of sandboxed code go through a kernel-side proxy
@@ -218,15 +224,24 @@ Rules, each traceable to a researched failure:
    execution and resolved after (exo's guardian pattern), so crashes mid-operation
    recover cleanly.
 
-## What this replaces in v0
+## Implementation status (after phase 3 hardening)
 
-| v0 element | Disposition |
+| Architecture element | Status |
 |---|---|
-| `loop.run_cycle` stage sequence | retained; stages become protocols |
-| single-file generations | replaced by composite per-surface deltas |
-| boolean evaluator | replaced by `(score, feedback)` + failure-as-score |
-| `decide` strict-improvement rule | retained, extended with held-out + inheritance-aware rules |
-| ad-hoc dict serialization | replaced by shared typed codec + versioned schema |
-| `python -I` + timeout | retained as sandbox tier 1 of 4 |
-| ledger/activation/rollback | retained; gains usage accounting + intents |
-| registry proposer | retained as one EvolutionAlgorithm; model-backed added beside it |
+| versioned typed contracts + one shared codec, loud rejection | **implemented** (`contracts.py`, `codec.py`; golden-record compat tests) |
+| append-only ledger, atomic activation, journaled rollback, lineage | **implemented** (`store.py`; torn-tail tolerance, interior corruption loud) |
+| content-addressed artifacts with read-time verification | **implemented** (`cas.py`) |
+| task-owned scoring; visible/held-out/regression/adversarial splits | **implemented** (`tasks.py`) |
+| `(score, feedback)` evaluator + failure-as-score | **implemented** (`evaluate.py`) |
+| holdout isolation (mechanical: `VisibleContext`) | **implemented** (`diagnose.py`, `loop.py`; spy-tested) |
+| trusted budget meter (wall/executions/model calls/tokens/output/cost/recursion) | **implemented** (`budget.py`) |
+| usage attribution per invocation | **implemented** (execution events carry `generation_id`) |
+| trusted stall detector + freeze/resume interventions | **implemented** (`monitors.py`) |
+| pluggable named+versioned acceptance policies, recorded per decision | **implemented** (`policy.py`: `paired-deterministic@1`, `provisional@1`) |
+| provisional activations: scoped, monitored, expiring, reverting | **implemented** (`loop.py::_resolve_provisional`) |
+| provider-neutral ModelAdapter + deterministic fake + journaled metered I/O | **implemented** (`model.py`) — not yet used by any evolution component |
+| sandbox tier 2 (scrubbed env, workspace, rlimits, bounded output) | **implemented** (`sandbox.py`) — network denial NOT enforced; see honest limits |
+| composite per-surface generations | pending (stage 3) — single `strategy-code` surface today |
+| EvolutionAlgorithm plugin (Pareto population) | pending (stage 3) |
+| inheritance-aware replace-vs-add thresholds | pending (needs usage-share history to act on) |
+| Landlock/seccomp tier, containers, secrets broker | pending (stages 3/6) |
