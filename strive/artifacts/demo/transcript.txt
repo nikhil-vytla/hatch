@@ -1,0 +1,46 @@
+$ strive run
+run:      20260806T111844-cee9a7
+active:   gen-0000 -> gen-0001
+baseline: score=0.571 failing=['negative-single', 'negative-all', 'negative-mixed']
+weakness: negative-integers-dropped (evidence: ['negative-single', 'negative-all', 'negative-mixed'])
+candidate: cand-ff91ee97 — Widen the integer regex to capture an optional leading minus sign.
+          score=1.000
+decision: ACCEPTED — strict improvement 0.571 -> 1.000 with no regressions
+
+$ strive run   # second cycle, new process (restart persistence)
+run:      20260806T111844-3ccb0e
+active:   gen-0001 -> gen-0001
+baseline: score=1.000 failing=[]
+decision: no weakness detected; nothing proposed
+
+$ strive status
+active generation: gen-0001 (origin=evolved)
+lineage (active -> seed):
+  gen-0001 origin=evolved weakness=negative-integers-dropped
+  gen-0000 origin=seed
+
+$ strive rollback
+rolled back; active generation is now gen-0000
+
+$ strive status  # after rollback, again a fresh process
+active generation: gen-0000 (origin=seed)
+lineage (active -> seed):
+  gen-0000 origin=seed
+
+$ strive run   # re-evolves from the rolled-back seed
+run:      20260806T111845-a1a838
+active:   gen-0000 -> gen-0002
+baseline: score=0.571 failing=['negative-single', 'negative-all', 'negative-mixed']
+weakness: negative-integers-dropped (evidence: ['negative-single', 'negative-all', 'negative-mixed'])
+candidate: cand-89539f20 — Widen the integer regex to capture an optional leading minus sign.
+          score=1.000
+decision: ACCEPTED — strict improvement 0.571 -> 1.000 with no regressions
+
+$ strive history
+generation gen-0000 parent=None origin=seed [seed]
+activation gen-0000 reason=seed
+generation gen-0001 parent=gen-0000 origin=evolved [accepted]
+activation gen-0001 reason=evolved
+activation gen-0000 reason=rollback
+generation gen-0002 parent=gen-0000 origin=evolved [accepted]
+activation gen-0002 reason=evolved
