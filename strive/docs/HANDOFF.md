@@ -1,96 +1,126 @@
 # HANDOFF — strive
 
-State of the project as of 2026-08-06, after the first vertical slice.
+State as of 2026-08-06, after two phases: the vertical slice (stage 1) and the
+research-and-redesign phase (notes 01–06, [comparative matrix](agents/research/comparative-matrix.md),
+[ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)).
 
-## What works
+## What works (unchanged from phase 1)
 
-- **The full loop, end to end**: `execute → observe → evaluate → diagnose →
-  propose → validate → accept/reject → retain` runs as one cycle
-  (`loop.run_cycle`), demonstrated by tests and by the committed demo ledger
-  in `artifacts/demo/` (see `transcript.txt` there).
-- **Executable-code evolution**: the evolvable surface is a real Python
-  strategy file, not a prompt. The seed strategy's planted weakness (unsigned
-  integer regex) is detected from trace evidence only, patched by a bounded
-  proposal, validated in a fresh subprocess, and accepted 0.571 → 1.000 with
-  zero regressions.
-- **Out-of-process execution with a hard timeout**: all strategy code —
-  incumbent and candidate — runs via `python -I strategy_runner.py` with
-  `subprocess` timeouts. Hangs, crashes, syntax errors, and wrong-type outputs
-  are all contained and recorded (covered in `tests/test_sandbox.py`).
-- **Durable, auditable state**: append-only JSONL ledger of `generation` and
-  `activation` entries plus one source file per generation. The active
-  generation is derived from the journal, so restart persistence needs no
-  extra machinery; rollback is a journaled activation of the parent and is
-  itself durable across restarts (covered in `tests/test_persistence.py`).
-- **Quality gates**: 23 pytest tests, all offline (no network, no
-  credentials), and `mypy --strict` clean across `src` and `tests`.
+- Full gated loop end to end: execute → observe → evaluate → diagnose → propose →
+  validate → accept/reject → retain, over executable strategy code in a subprocess
+  with a hard timeout. 23 offline tests, strict mypy, committed demo lineage with
+  restart persistence and rollback (`artifacts/demo/transcript.txt`).
 
-## Shortcuts taken (deliberate, for the slice)
+## Research conclusions
 
-- **Diagnosis is a signature registry**, currently containing exactly one
-  signature. It proves the "evidence in, weakness out" interface, not general
-  diagnosis.
-- **Proposal is a patch lookup**, not generation. One weakness ↦ one textual
-  patch that must match exactly once. There is no model anywhere in the loop.
-- **Validation reuses the same case suite** used for diagnosis, so the
-  candidate is evaluated on data that motivated it. Fine when cases are
-  exhaustive ground truth; unacceptable once proposals are learned (overfitting
-  risk). Held-out splits are the first hardening step.
-- **The sandbox is fault isolation only** (`python -I`, timeout). No memory
-  limits, no filesystem/network restriction. Adequate only because proposals
-  come from a trusted registry today.
-- **Single task, single incumbent, sequential cycles.** No population, no
-  concurrency, no task suite abstraction beyond one `Task`.
+Six sources examined at pinned provenance (three repos at exact SHAs, one paper read
+including appendices, one blog cluster, one repo+blog+paper cluster). The one-line
+synthesis: **everyone else built half of strive.** Flex/GEPA has rigorous validated
+candidate generation but no durable lineage or rollback; prime-agent, Continual
+Harness, and exo have rich persistence and self-modification but no empirical
+acceptance — and the consequences are documented, not hypothetical (CH's inherited-
+usage collapse to 6.4% with regression below baseline; CH's 842-repetition stall from
+silent schema fallback; exo's own docs admitting the missing clone-and-compare path).
+NOOA and RLM contribute infrastructure patterns (kernel-level sandboxing, versioned
+trajectory schemas, bounded recursion with budget inheritance) rather than evolution
+loops. strive's gated-loop bet is validated; its v0 mechanics are what need to grow.
 
-## Technical debt
+Highest-value single source: arXiv:2605.09998 (note 03) — the only source with
+empirical evidence on reset-free online adaptation, including the failure modes
+strive's design must prevent and the capability-floor result (harness self-improvement
+is net-negative below a model-capability threshold; a weak proposer must fail
+*rejected*, not fail *degraded*).
 
-- `store.py` re-reads and re-parses the whole ledger on every query — fine at
-  this scale, needs an index or snapshot once ledgers grow.
-- Event payloads and ledger entries are ad-hoc dicts at write time; they
-  should be serialized from the typed objects via one shared codec to prevent
-  schema drift between `types.py` and what's on disk.
-- `evaluate` hard-codes exact-integer-match scoring; scoring should be a
-  property of the `Task`.
-- The CLI prints strings; a `--json` output mode would make it scriptable.
-- No CI configuration yet (tests are one `uv run pytest` away).
+## Architectural decisions (with evidence)
 
-## Unresolved risks
+- **D1 — Validation is empirical and trusted-side; LLM judgment and static checks are
+  pre-filters only.** (prime-agent's unvalidated /refine; exo's build-success gate;
+  CH's ungated drift. Notes 02/03/04.)
+- **D2 — Trust boundaries are mechanisms, never policy/config.** Evolvable artifacts
+  never enter the kernel process. (exo RSI.md fn.2 anti-pattern; NOOA guardrails-vs-
+  boundary doctrine. Notes 04/06.)
+- **D3 — All metrics, scores, and budget accounting are computed on the trusted
+  side.** (exo cost doc: agent-reported usage is untrustworthy. Note 04.)
+- **D4 — Evaluator contract is `(score, feedback_text)` with failure-as-score floor
+  semantics.** (GEPA metric contract. Note 01.)
+- **D5 — Generations become composite: per-surface CRUD deltas with before/after
+  snapshots; per-surface activation and rollback.** (prime-agent edit schema × CH's
+  four-surface decomposition. Notes 02/03.)
+- **D6 — Acceptance gains held-out discipline and inheritance-aware thresholds
+  (replace-vs-add).** (Reward-hacking risk from phase 1 + CH bootstrap regression.
+  Note 03.)
+- **D7 — Budgets are part of the cycle contract, hierarchical (children inherit
+  remaining budget).** (RLM. Note 05.)
+- **D8 — Sandbox is a tier registry behind one interface: subprocess → rlimits/no-net
+  → Landlock+seccomp (Linux) → container.** (RLM ladder; NOOA guards. Notes 05/06.)
+- **D9 — The runner rejects loudly on schema mismatch; silent fallback is forbidden.**
+  (CH's 842-repetition stall. Note 03 §B.3.)
+- **D10 — Trusted mechanical stall/drift monitors (identical-outcome counters,
+  inherited-usage share) live in the kernel and can freeze adaptation.** (CH: self-
+  diagnosis is confidently wrong during stalls. Note 03.)
+- **D11 — All model I/O journaled and replayable; deterministic fake adapter in core;
+  tests offline forever.** (NOOA FakeLLMClient precedent. Note 06.)
+- **D12 — Online adaptation = provisional activations + proxy validators + inheritance
+  protection + offline confirmation; online-adaptable surfaces are an allowlist subset.**
+  (CH's evidence that proxies work and that ungated permanence drifts. Note 03.)
+- **D13 — Durable side effects are intent-journaled before execution.** (exo guardian
+  pattern. Note 04.)
 
-- **Evaluation overfitting / reward hacking**: with proposals validated on the
-  same cases that triggered them, a future model-backed proposer could learn
-  to satisfy the suite rather than the task. Mitigation direction: held-out
-  cases, mutation of the eval suite, independent regression corpus.
-- **Trust-boundary erosion**: as surfaces become evolvable, pressure will
-  build to evolve the evaluator or the acceptance rules. The charter forbids
-  it without an independent check; that check does not exist yet.
-- **Sandbox adequacy**: the moment proposals are model-generated, the current
-  isolation is insufficient by the charter's own standard.
-- **Lineage under multiple surfaces**: the ledger assumes one artifact per
-  generation. Evolving prompt + code + policy in one cycle needs a composite
-  generation representation and per-surface rollback semantics.
+## Evidence gaps (what the research could NOT establish)
 
-## Next phase: research and redesign for model-in-the-loop proposals (stage 2)
+- **Transfer beyond games:** CH's reset-free results are Pokémon-only; transfer to
+  coding/research/tool agents is claimed, not demonstrated. strive stage 4–5 is
+  effectively the missing experiment.
+- **Gated vs ungated head-to-head:** no source compares an acceptance-gated refiner
+  against an ungated one on the same stream (CH leaves reset-free-vs-batch open too).
+  This is strive hypothesis #1 (note 03).
+- **Proxy-validator fidelity:** CH shows oracle-relative proxies track improvement but
+  never tests whether proxy-gated acceptance agrees with full-suite acceptance.
+- **Pareto retention under lineage constraints:** GEPA's frontier retention was only
+  studied without durable lineage/rollback; whether frontier members remain useful as
+  journaled generations is untested.
+- **Blog-sourced numbers** (note 01) were extracted via fetch tooling and not
+  independently reproduced.
+- **Repo snapshots age:** all three repos were inspected at single SHAs on 2026-08-06;
+  conclusions about "what X lacks" may rot.
 
-Exact scope, in order:
+## Exact hardening priorities (ordered; this is the stage-2 work queue)
 
-1. **Research** (write up in `docs/agents/research/`): survey self-improving
-   agent systems and program-synthesis validation regimes — at minimum
-   Gödel-machine-style self-reference limits, AlphaEvolve/FunSearch-style
-   evolutionary code search, and Reflexion-style trace-driven revision — and
-   extract the acceptance-rule and held-out-validation patterns they use.
-2. **Redesign the proposer interface** so `propose()` becomes a pluggable
-   `Proposer` protocol with two implementations: the existing registry proposer
-   and a `ModelProposer` behind a `ModelAdapter` protocol (with a deterministic
-   fake for tests — the offline test guarantee must survive).
-3. **Split evaluation data** into visible (diagnosis) and held-out
-   (acceptance) case sets, and extend `decide` to require improvement on both.
-4. **Journal all proposer I/O** (prompts, completions, seeds) in the run's
-   event stream so model-backed cycles remain replayable and auditable.
-5. **Threat-model the sandbox** for model-generated code and pick the stage-3
-   isolation mechanism (likely: no-network subprocess with rlimits now,
-   container later).
+1. **Typed codec + versioned schemas** for ledger and events, with normative tests
+   (eliminates the phase-1 dict-drift debt; prerequisite for composite generations).
+2. **Task-owned scoring with visible/held-out splits**; `decide` requires held-out
+   improvement (closes the phase-1 overfitting risk before any model proposer exists).
+3. **Evaluator contract → (score, feedback) + failure-as-score** (D4).
+4. **Loud schema rejection + trusted stall detector** (D9, D10 — cheap now, structural
+   later).
+5. **Budget plumbing in the cycle contract** (D7 — retrofitting budgets later touches
+   every interface; do it while there are five).
+6. **Usage accounting in the ledger** (D5 prerequisite; one field now, drift telemetry
+   forever).
+7. **Proposer/Validator protocols + FakeModelAdapter** (the model-in-the-loop seam,
+   D1/D11).
+8. **Sandbox tier 2** (rlimits + network denial; D8).
 
-Definition of done for the phase: a model-backed proposer (with a fake model
-in tests) produces a patch for a *non-planted* weakness on a second task, the
-candidate passes held-out validation, and every artifact needed to replay the
-cycle offline is in the ledger.
+Items 1–6 are pure hardening of existing code; 7–8 open stage 2 proper. Nothing in
+the queue requires a network or a real model.
+
+## Unresolved risks (carried forward, sharpened)
+
+- **Reward hacking / eval overfitting** — now has a concrete mitigation design
+  (held-out splits, D6) but no implementation; remains the top risk once a model
+  proposer lands.
+- **Trust-boundary erosion** — the charter forbids evolving the evaluator; D2 makes
+  the boundary mechanical, but the independent-check design for ever evolving trusted
+  surfaces still does not exist.
+- **Capability floor** — stage-2 gains will be proposer-model-dependent; the danger
+  signature (rising acceptance rate with falling held-out score) must be monitored
+  from the first model-backed cycle (note 03 implication 7).
+- **macOS sandbox ceiling** — Landlock/seccomp are Linux-only; local development rides
+  tier 2 (rlimits) until containers arrive in stage 6.
+
+## Next phase
+
+Execute the hardening queue above (items 1–6), then stage 2's model-in-the-loop work
+(items 7–8) against ROADMAP stage-2 exit criteria: a model-backed proposer (fake model
+in CI) fixes a non-planted weakness on a second task, passes held-out validation, and
+the full cycle replays offline from the ledger alone.
