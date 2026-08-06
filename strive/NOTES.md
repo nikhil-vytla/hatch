@@ -135,3 +135,18 @@ ARCHITECTURE.md, comparative-matrix.md, ROADMAP.md, and a rewritten HANDOFF.md.
   could NOT establish (no gated-vs-ungated head-to-head anywhere; CH results
   are Pokémon-only; proxy-validator fidelity untested; blog numbers not
   independently reproduced).
+
+### Addendum: note 07 (user-requested)
+
+- Added arXiv:2301.12987 — Bennett, "The Optimal Choice of Hypothesis Is the
+  Weakest, Not the Shortest" (AGI-23; v4 2024). First pure-theory note in the
+  corpus: proves that among hypotheses fitting the evidence, maximising
+  *weakness* (least specificity) maximises generalisation probability, while
+  description length (MDL/Occam) is neither necessary nor sufficient.
+- Why it matters here: it's a formal account of what strive's acceptance gate
+  should optimise. Reward hacking is strength-seeking (memorising visible
+  cases = minimal extension); the "smallest patch" preference is an MDL prior
+  the paper argues is wrong for generalisation — bounded proposals remain
+  justified for *safety/auditability*, but tie-breaking among validated
+  candidates should prefer the weakest (most general) one, testable via the
+  paper's parent/child sampling protocol on held-out splits.
