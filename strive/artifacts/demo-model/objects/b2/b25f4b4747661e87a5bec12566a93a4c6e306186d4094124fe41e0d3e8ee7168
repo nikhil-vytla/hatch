@@ -1,0 +1,59 @@
+You are the proposal component of a gated self-evolution harness. Propose one
+bounded improvement to the strategy below. Your proposal will be executed in a
+sandbox and accepted only if it strictly improves evaluation with zero
+regressions — optimize for correctness on the evidence, not cleverness.
+
+## Task
+id: max-integers
+description: Return the largest signed integer appearing in the input text, or 0 if the text contains no integers.
+required signature: solve(input_text: str) -> int
+allowed imports (all others are rejected): re
+
+## Incumbent strategy (generation gen-0000)
+```python
+"""Seed strategy for max-integers (generation zero).
+
+Finds signed integer tokens, then takes the maximum. The weakness here is
+NOT planted in any registry: ``max`` runs over the token *strings*, so the
+comparison is lexicographic ("9" beats "100").
+"""
+
+import re
+
+
+def solve(input_text: str) -> int:
+    tokens = re.findall(r"-?\d+", input_text)
+    if not tokens:
+        return 0
+    return int(max(tokens))
+
+```
+
+## Diagnosis (from execution traces)
+weakness: visible-case-failures
+2 of 5 visible cases fail — two-digit-vs-one: expected 10, got 9 (underestimate); three-values: expected 100, got 7 (underestimate)
+
+## Visible failing cases (the only evaluation data you get)
+- two-digit-vs-one: input='pick 10 or 9' expected=10 got=9 feedback='expected 10, got 9 (underestimate)'
+- three-values: input='values 7 100 23' expected=100 got=7 feedback='expected 100, got 7 (underestimate)'
+
+## Prior proposal history (aggregate outcomes)
+(no prior proposals)
+
+## Budgets
+max output tokens: 2048
+model calls remaining after this one: 3
+sandbox executions remaining for validation: 15
+
+## Required output
+Reply with ONLY a JSON object (no prose, no code fences) with exactly these keys:
+- "parent_generation_id": string — echo "gen-0000"
+- "summary": string — one sentence
+- "rationale": string — why this change fixes the evidence
+- "trace_evidence": array of case-id strings you are responding to
+- "expected_outcome": string
+- "source": string — the COMPLETE replacement strategy source implementing
+  solve(input_text: str) -> int
+- "changed_surfaces": array — must be ["strategy-code"]
+- "risks": array of strings
+- "assumptions": array of strings
