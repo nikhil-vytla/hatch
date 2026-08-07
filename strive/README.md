@@ -64,9 +64,11 @@ strive/
 ├── src/strive/          typed source (py.typed, mypy --strict)
 ├── tests/               pytest suite — deterministic, offline
 ├── docs/
-│   ├── PROJECT_CHARTER.md   research questions, surfaces, quality attributes, roadmap
-│   ├── HANDOFF.md           current state, shortcuts, debt, next phase
-│   └── agents/research/     research notes index
+│   ├── PROJECT_CHARTER.md   research questions, surfaces, quality attributes, non-goals
+│   ├── ARCHITECTURE.md      target platform design (trusted kernel, surfaces, dual loops)
+│   ├── ROADMAP.md           staged maturity targets with exit criteria
+│   ├── HANDOFF.md           conclusions, decisions D1–D14, hardening priorities
+│   └── agents/research/     research notes 01–06 (pinned SHAs) + comparative matrix
 ├── artifacts/           ledgers, per-generation strategy sources, run event streams
 ├── NOTES.md             working log
 └── README.md
