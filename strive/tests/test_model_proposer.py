@@ -23,7 +23,7 @@ from strive.contracts import (
 )
 from strive.diagnose import EvidenceDiagnoser
 from strive.events import EventLog
-from strive.fakemodel import demo_adapter
+from strive.fakemodel import scripted_fixture_adapter
 from strive.loop import LoopConfig, replay_run, run_cycle
 from strive.model import FakeModelAdapter, ModelAdapter
 from strive.model_proposer import ModelProposer
@@ -73,8 +73,8 @@ def _scripted_source_adapter(source: str) -> FakeModelAdapter:
 
 
 def test_fake_model_fixes_non_planted_weakness_and_is_promoted(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
-    report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(demo_adapter()))
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
+    report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(scripted_fixture_adapter()))
 
     # the seed fails on multi-digit maxima (lexicographic max) — a weakness no
     # registry entry knows; the registry proposer could not have fixed this
@@ -98,7 +98,7 @@ def test_fake_model_fixes_non_planted_weakness_and_is_promoted(tmp_path: Path) -
 
 def test_registry_proposer_cannot_fix_the_non_planted_weakness(tmp_path: Path) -> None:
     """Control: the deterministic registry has no patch for max-integers."""
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
     config = LoopConfig(diagnoser=EvidenceDiagnoser(), proposer=RegistryProposer())
     report = run_cycle(store, MAX_INTEGERS_TASK, config)
     assert report.diagnosis is not None
@@ -111,8 +111,8 @@ def test_registry_proposer_cannot_fix_the_non_planted_weakness(tmp_path: Path) -
 
 
 def test_model_cycle_replays_offline_from_recorded_state(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
-    report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(demo_adapter()))
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
+    report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(scripted_fixture_adapter()))
     assert report.decision is not None and report.decision.accepted
 
     # the journal carries the full model exchange with content-addressed artifacts
@@ -145,7 +145,7 @@ def test_model_cycle_replays_offline_from_recorded_state(tmp_path: Path) -> None
 
 
 def test_malformed_model_response_is_rejected_without_crash(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
     adapter = FakeModelAdapter(responder=lambda request: "sorry, no JSON from me")
     report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(adapter))
 
@@ -162,8 +162,8 @@ def test_malformed_model_response_is_rejected_without_crash(tmp_path: Path) -> N
 
 
 def test_truncated_model_response_is_classified_distinctly(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
-    config = _model_config(demo_adapter(), model_max_tokens=8)  # force truncation
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
+    config = _model_config(scripted_fixture_adapter(), model_max_tokens=8)  # force truncation
     report = run_cycle(store, MAX_INTEGERS_TASK, config)
     assert report.proposal_failure is not None
     assert report.proposal_failure.kind == FAILURE_PROPOSAL_TRUNCATED
@@ -171,7 +171,7 @@ def test_truncated_model_response_is_classified_distinctly(tmp_path: Path) -> No
 
 
 def test_schema_invalid_model_response_is_classified_distinctly(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
     adapter = FakeModelAdapter(responder=lambda request: json.dumps({"summary": "hi"}))
     report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(adapter))
     assert report.proposal_failure is not None
@@ -180,7 +180,7 @@ def test_schema_invalid_model_response_is_classified_distinctly(tmp_path: Path) 
 
 
 def test_forbidden_source_is_screened_before_execution(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
     adapter = _scripted_source_adapter(
         "import os\n\ndef solve(input_text: str) -> int:\n    return 0\n"
     )
@@ -195,7 +195,7 @@ def test_forbidden_source_is_screened_before_execution(tmp_path: Path) -> None:
 
 
 def test_regressive_candidate_is_rejected_and_incumbent_stays(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
     adapter = _scripted_source_adapter("def solve(input_text: str) -> int:\n    return 0\n")
     report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(adapter))
 
@@ -230,6 +230,7 @@ class IncumbentChangingProposer:
         result = self._inner.propose(request)
         usurper = self._store.add_generation(
             "def solve(input_text: str) -> int:\n    return -999\n",
+            task_fingerprint=SUM_INTEGERS_TASK.fingerprint(),
             parent_id=request.ctx.parent_generation_id,
             origin="manual",
             surface="strategy-code",
@@ -241,7 +242,7 @@ class IncumbentChangingProposer:
 
 
 def test_stale_proposal_is_rejected_after_incumbent_changes(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     config = LoopConfig(
         proposer=IncumbentChangingProposer(store, RegistryProposer()),
     )
@@ -259,8 +260,8 @@ def test_stale_proposal_is_rejected_after_incumbent_changes(tmp_path: Path) -> N
 
 
 def test_model_call_budget_enforced_by_trusted_meter(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
-    config = _model_config(demo_adapter(), budget=BudgetSpec(model_calls=0))
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
+    config = _model_config(scripted_fixture_adapter(), budget=BudgetSpec(model_calls=0))
     report = run_cycle(store, MAX_INTEGERS_TASK, config)
 
     assert report.proposal is None

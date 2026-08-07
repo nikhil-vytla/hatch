@@ -1,11 +1,15 @@
-"""Deterministic reference responses for the fake model adapter.
+"""Scripted proposal fixtures for the deterministic fake adapter.
 
-Honesty note (see HANDOFF): a fake model demonstrates that the *pipeline* —
-prompt construction, strict schema validation, forbidden-source screening,
-sandboxed validation, gated promotion, journaling, replay — is correct. It
-does not demonstrate model capability: the "reasoning" below is a fixture
-standing in for what a real model would generate online. Real-model runs are
-opt-in via environment variables (see ``strive.model.adapter_from_env``).
+What this is, stated precisely: a SCRIPTED PROPOSAL FIXTURE. The repair below
+was written by the harness authors and is emitted by a canned responder when
+the prompt matches the demo task. It was NOT derived from the execution
+evidence by any model, and demos/tests built on it demonstrate *pipeline*
+correctness only — prompt construction, strict schema validation,
+forbidden-source screening, sandboxed validation, gated promotion,
+journaling, replay. They demonstrate nothing about model reasoning or
+capability. Real-model runs are opt-in via environment variables (see
+``strive.model.adapter_from_env``) and carry their own safety
+acknowledgement requirement in the CLI.
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ import re
 from strive.contracts import ModelRequest
 from strive.model import FakeModelAdapter
 
-MAX_INTEGERS_FIXED_SOURCE = '''\
+SCRIPTED_MAX_INTEGERS_FIX = '''\
 """Strategy for max-integers: numeric maximum over signed integer tokens."""
 
 import re
@@ -33,33 +37,32 @@ _PARENT_RE = re.compile(r"generation (gen-\d{4})")
 _EVIDENCE_RE = re.compile(r"^- ([\w-]+): input=", re.MULTILINE)
 
 
-def demo_responder(request: ModelRequest) -> str:
-    """Scripted stand-in for a real model on the demo tasks.
+def scripted_proposal_responder(request: ModelRequest) -> str:
+    """Canned stand-in for a real model on the max-integers demo task.
 
-    Reads the parent generation id and cited failing cases out of the prompt
-    (as a real model would) and answers with a structured proposal. Only the
-    max-integers lexicographic-max weakness is recognized; anything else gets
-    a deliberately honest refusal that the schema validator will reject.
+    It extracts the parent generation id and the cited failing case ids from
+    the prompt (so prompt evolution doesn't break the fixture) and returns the
+    author-written repair above wrapped in the proposal schema. Any other
+    prompt gets a refusal the schema validator will reject.
     """
     parent_match = _PARENT_RE.search(request.prompt)
     if parent_match is None or "max-integers" not in request.prompt:
-        return "I do not recognize this task, so I cannot propose a fix."
+        return "This scripted fixture only covers the max-integers demo task."
     evidence = _EVIDENCE_RE.findall(request.prompt)
     proposal = {
         "parent_generation_id": parent_match.group(1),
         "summary": "Compare integer values, not token strings, when taking the maximum.",
         "rationale": (
-            "The failing cases return a smaller number whenever a shorter token "
-            "beats a longer one (e.g. expecting 100 but getting 7): max() is "
-            "running over strings, so comparison is lexicographic. Converting "
-            "tokens to int before max() makes the comparison numeric."
+            "[scripted fixture — authored repair, not model-derived] Convert "
+            "tokens to int before max() so comparison is numeric rather than "
+            "lexicographic."
         ),
         "trace_evidence": evidence,
         "expected_outcome": (
             "Multi-digit maxima are selected correctly; single-value, empty, and "
             "negative inputs keep their current behavior."
         ),
-        "source": MAX_INTEGERS_FIXED_SOURCE,
+        "source": SCRIPTED_MAX_INTEGERS_FIX,
         "changed_surfaces": ["strategy-code"],
         "risks": ["none identified beyond normal regression risk"],
         "assumptions": ["token pattern -?\\d+ already captures all integers"],
@@ -67,7 +70,7 @@ def demo_responder(request: ModelRequest) -> str:
     return json.dumps(proposal)
 
 
-def demo_adapter() -> FakeModelAdapter:
+def scripted_fixture_adapter() -> FakeModelAdapter:
     """The fake adapter used by tests and by `strive run --proposer model`
     when no real provider is configured through the environment."""
-    return FakeModelAdapter(responder=demo_responder)
+    return FakeModelAdapter(responder=scripted_proposal_responder)

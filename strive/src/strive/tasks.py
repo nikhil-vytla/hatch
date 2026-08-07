@@ -3,10 +3,13 @@
 The task, not the evaluator, owns what "correct" means (`score_case`). Cases
 are partitioned into splits with distinct trust roles:
 
-- ``visible``     — evidence diagnosis and proposal are allowed to see.
-- ``held_out``    — acceptance-only; never shown to diagnosis/proposal.
-- ``regression``  — grown from past failures; acceptance-only.
-- ``adversarial`` — crafted to catch gaming; acceptance-only.
+- ``visible``     — evidence diagnosis and proposal are allowed to see (train).
+- ``held_out``    — development/selection data; never shown to diagnosis/proposal,
+                    used by acceptance policies on every promotion decision.
+- ``regression``  — grown from past failures; selection data.
+- ``adversarial`` — crafted to catch gaming; selection data.
+- ``audit``       — final holdout: excluded from routine cycles entirely and
+                    queried only on demand, so selection cannot overfit it.
 
 Each task also declares its strategy ``signature`` and an allowed
 ``primitive_catalog`` (importable modules) — the trusted inputs a proposer
@@ -26,7 +29,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 
-from strive.contracts import ADVERSARIAL, HELD_OUT, VISIBLE, TaskCase
+from strive.contracts import ADVERSARIAL, AUDIT, HELD_OUT, VISIBLE, TaskCase
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,17 @@ class Task:
 
     def visible_cases(self) -> tuple[TaskCase, ...]:
         return self.cases_in(VISIBLE)
+
+    def selection_cases(self) -> tuple[TaskCase, ...]:
+        """Every case that routine cycles and promotion decisions may use.
+
+        The audit split is excluded: it is a final holdout queried only on
+        demand (`strive audit`), never during candidate selection.
+        """
+        return tuple(case for case in self.cases if case.split != AUDIT)
+
+    def audit_cases(self) -> tuple[TaskCase, ...]:
+        return self.cases_in(AUDIT)
 
     def fingerprint(self) -> str:
         """Content hash of the task's cases + scoring version, for drift detection."""
@@ -83,10 +97,7 @@ class Task:
 
 
 BASELINE_STRATEGY_SOURCE = '''\
-"""Seed strategy for sum-integers (generation zero).
-
-Known-naive: matches unsigned digit runs only.
-"""
+"""Seed strategy for sum-integers (generation zero)."""
 
 import re
 
@@ -97,7 +108,7 @@ def solve(input_text: str) -> int:
 
 SUM_INTEGERS_TASK = Task(
     task_id="sum-integers",
-    version=2,
+    version=3,
     description="Return the sum of every signed integer appearing in the input text.",
     signature="solve(input_text: str) -> int",
     primitive_catalog=("re",),
@@ -118,16 +129,17 @@ SUM_INTEGERS_TASK = Task(
         TaskCase("adv-phone-like", "phone 555-1234 dialed", -679, ADVERSARIAL),
         TaskCase("adv-ranges", "ranges 1-3 and 2-4", -4, ADVERSARIAL),
         # regression split starts empty; it grows from past failures
+        # audit: final holdout, excluded from routine cycles and selection
+        TaskCase("audit-signed-mix", "audit -4 and 10 please", 6, AUDIT),
+        TaskCase("audit-negative-heavy", "audit -20 5 -1", -16, AUDIT),
     ),
 )
 
+# NOTE: the seed source must stay free of any commentary about its own
+# weaknesses — it is fed verbatim to proposers as evidence context, and an
+# explanatory comment would leak the diagnosis/repair (fixture-leak fix).
 MAX_SEED_STRATEGY_SOURCE = '''\
-"""Seed strategy for max-integers (generation zero).
-
-Finds signed integer tokens, then takes the maximum. The weakness here is
-NOT planted in any registry: ``max`` runs over the token *strings*, so the
-comparison is lexicographic ("9" beats "100").
-"""
+"""Seed strategy for max-integers (generation zero)."""
 
 import re
 
@@ -141,7 +153,7 @@ def solve(input_text: str) -> int:
 
 MAX_INTEGERS_TASK = Task(
     task_id="max-integers",
-    version=1,
+    version=2,
     description=(
         "Return the largest signed integer appearing in the input text, "
         "or 0 if the text contains no integers."
@@ -163,6 +175,9 @@ MAX_INTEGERS_TASK = Task(
         # adversarial
         TaskCase("adv-all-negative", "compare -5 with -40", -5, ADVERSARIAL),
         TaskCase("adv-mixed-signs", "mix 9 11 -22", 11, ADVERSARIAL),
+        # audit: final holdout, excluded from routine cycles and selection
+        TaskCase("audit-close-large", "audit 900 vs 1000", 1000, AUDIT),
+        TaskCase("audit-single-negative", "audit only -7", -7, AUDIT),
     ),
 )
 

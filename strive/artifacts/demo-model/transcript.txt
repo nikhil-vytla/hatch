@@ -1,31 +1,41 @@
-$ strive --task max-integers --artifacts artifacts/demo-model run --proposer model
-run:      run-20260807T045412-77b94d
-proposer: model — model adapter: fake (offline; set STRIVE_MODEL_PROVIDER for a real model)
+$ strive --task max-integers run --proposer model   # offline scripted fixture
+run:      run-20260807T062206-d0feeb
+proposer: model — model adapter: scripted fixture (offline; proves the pipeline, not model capability — set STRIVE_MODEL_PROVIDER for a real model)
 active:   gen-0000 -> gen-0001
 score:    0.500 adversarial=0.500 held_out=0.333 visible=0.600
 weakness: visible-case-failures
 proposal: Compare integer values, not token strings, when taking the maximum.
 decision: ACCEPTED [paired-deterministic@1] — strict improvement with zero regressions (visible 0.600 -> 1.000, overall 0.500 -> 1.000)
 
-$ strive --task max-integers --artifacts artifacts/demo-model run --proposer model   # healthy idle
-run:      run-20260807T045412-a55722
-proposer: model — model adapter: fake (offline; set STRIVE_MODEL_PROVIDER for a real model)
-active:   gen-0001 -> gen-0001
-score:    1.000 adversarial=1.000 held_out=1.000 visible=1.000
-decision: no weakness detected; nothing proposed
-
-$ strive --task max-integers --artifacts artifacts/demo-model replay run-20260807T045412-77b94d
-replay of run-20260807T045412-77b94d (generation gen-0000):
+$ strive --task max-integers replay run-20260807T062206-d0feeb   # execution-and-decision replay
+replay of run-20260807T062206-d0feeb (generation gen-0000):
   recorded=0.500 replayed=0.500 match=True
   candidate gen-0001: replayed=1.000 decision_reproduced=True
 
-$ strive --task max-integers --artifacts artifacts/demo-model inspect --run run-20260807T045412-77b94d --type model_call
-run run-20260807T045412-77b94d generation=gen-0000 score=0.500 accepted=True
-usage: wall=0.056s executions=2 model_calls=1 tokens=820 output=2011B
+$ strive --task max-integers inspect --run run-20260807T062206-d0feeb --type model_call
+run run-20260807T062206-d0feeb generation=gen-0000 score=0.500 accepted=True
+usage: wall=0.057s executions=2 model_calls=1 tokens=743 output=2007B
 events (type=model_call):
-  2026-08-07T04:54:12.839424+00:00 model_call adapter=fake model=fake-deterministic-v1 latency_ms=0.026 prompt_ref=b25f4b474766
+  2026-08-07T06:22:06.619105+00:00 model_call adapter=fake model=fake-deterministic-v1 latency_ms=0.025 prompt_ref=1ef599a95b56
 
-$ strive --task max-integers --artifacts artifacts/demo-model lineage
+$ strive --task max-integers audit
+audit of gen-0001 (final holdout — never used in selection):
+  score=1.000 — all cases passed
+
+# cross-task: the sum-integers task runs against the SAME artifact root without contamination
+$ strive --artifacts artifacts/demo-model run
+run:      run-20260807T062207-87a34f
+proposer: registry
+active:   gen-0000 -> gen-0001
+score:    0.455 adversarial=0.000 held_out=0.333 visible=0.667
+weakness: negative-integers-dropped
+proposal: Widen the integer regex to capture an optional leading minus sign.
+decision: ACCEPTED [paired-deterministic@1] — strict improvement with zero regressions (visible 0.667 -> 1.000, overall 0.455 -> 1.000)
+
+$ strive --artifacts artifacts/demo-model lineage && strive --artifacts artifacts/demo-model --task max-integers lineage
+lineage (active -> seed):
+  gen-0001 origin=evolved weakness=negative-integers-dropped source=6942b8617d04
+  gen-0000 origin=seed source=930bb519b3e2
 lineage (active -> seed):
   gen-0001 origin=evolved weakness=visible-case-failures source=9f0dfd17ab9a
-  gen-0000 origin=seed source=e57f06885f0e
+  gen-0000 origin=seed source=dee101d835b1

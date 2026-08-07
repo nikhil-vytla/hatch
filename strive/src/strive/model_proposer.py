@@ -27,6 +27,8 @@ from strive.contracts import (
     FAILURE_PROPOSAL_MALFORMED,
     FAILURE_PROPOSAL_SCHEMA_INVALID,
     FAILURE_PROPOSAL_TRUNCATED,
+    FINISH_LENGTH,
+    FINISH_UNKNOWN,
     FailureRecord,
     ModelRequest,
     ModelResponse,
@@ -145,12 +147,16 @@ def parse_completion(
     try:
         parsed: Any = json.loads(text)
     except json.JSONDecodeError as exc:
-        if response.output_tokens >= request.max_output_tokens:
+        truncated = response.finish_reason == FINISH_LENGTH or (
+            response.finish_reason == FINISH_UNKNOWN
+            and response.output_tokens >= request.max_output_tokens
+        )
+        if truncated:
             return FailureRecord(
                 kind=FAILURE_PROPOSAL_TRUNCATED,
                 detail=(
-                    f"completion hit the {request.max_output_tokens}-token cap "
-                    f"before parseable JSON ({exc})"
+                    f"completion stopped for length (finish_reason="
+                    f"{response.finish_reason!r}) before parseable JSON ({exc})"
                 ),
             )
         return FailureRecord(
@@ -188,6 +194,15 @@ def parse_completion(
         return invalid(
             f"proposal names parent {parsed['parent_generation_id']!r} but was "
             f"asked about {request.ctx.parent_generation_id!r}"
+        )
+    visible_failing = {
+        ce.case_id for ce in request.ctx.evaluation.case_evaluations if not ce.passed
+    }
+    uncited = [c for c in parsed["trace_evidence"] if c not in visible_failing]
+    if uncited:
+        return invalid(
+            f"trace_evidence cites case ids outside the visible failing set: "
+            f"{uncited}"
         )
     return ProposalRecord(
         parent_generation_id=parsed["parent_generation_id"],

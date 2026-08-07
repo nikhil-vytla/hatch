@@ -298,3 +298,39 @@ adaptation, no composite generations.
 - `artifacts/demo-model/transcript.txt`: model-proposer cycle accepted
   0.500 → 1.000; replay decision_reproduced=True; inspect --type model_call
   shows adapter/model/latency/prompt_ref.
+
+## 2026-08-07 — phase 4.5: stage-2b correctness and claim-precision pass
+
+Pre-merge correction of stage 2b (PR #39 branch). All eight fixes landed with
+regression tests; no isolation, evaluation, budget, or safety check was
+weakened to keep demos green.
+
+- Task-scoped state: per-task ledgers; generation@2 (+task_id, +fingerprint),
+  activation@2 (+task_id); superseded v1 records rejected loudly (migration
+  tooling explicitly deferred). Cross-task test shares one artifact root.
+- Fixture leak: the max-integers seed docstring was explaining its own
+  lexicographic bug — and seed source goes verbatim into proposer prompts.
+  Neutralized both seeds; renamed demo fakes to "scripted proposal fixture"
+  everywhere; docs no longer imply model reasoning.
+- Budgets: uniform semantics (0 = nothing allowed, -1 = accounting only);
+  tokens/cost/cumulative-output now enforced (were accounting-only while the
+  README said "trusted meter" without qualification); HTTP timeouts capped by
+  remaining wall. Every enforced limit has a test.
+- Replay renamed to what it is: execution-and-decision replay.
+- Evaluation discipline: new audit split — final holdout excluded from all
+  routine cycles, queried only by `strive audit`; history outcomes now carry
+  visible-split scores only (overall scores are hidden-influenced and were
+  leaking back to proposers via history strings).
+- Provisional activation refused for strategy-code; mechanics kept tested at
+  store level for future low-risk surfaces.
+- Real models need --unsafe-model-code; env misconfig is a clean error.
+- Fun catch #2 of the day: the sandbox "broken at import" fixture
+  "this is not python" is ALSO valid Python (`this is (not python)`) — it
+  crashed via NameError, not SyntaxError. Both fixtures now real syntax errors.
+- Store: advisory flock around mutating ops, id allocation under the lock,
+  expected_active head check on activation (loop + promote use it).
+
+Verification: 115 tests, mypy strict clean (34 files); both demos regenerated
+(registry demo now shows `strive audit` on seed vs fix: 0.000 vs 1.000;
+model demo shows scripted-fixture run, execution-and-decision replay with
+decision_reproduced=True, and cross-task runs against the same root).

@@ -34,7 +34,7 @@ class SpyProposer:
 
 
 def test_diagnosis_and_proposal_receive_visible_split_only(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     diagnoser = SpyDiagnoser()
     proposer = SpyProposer()
     config = LoopConfig(diagnoser=diagnoser, proposer=proposer)
@@ -79,8 +79,25 @@ def test_diagnosis_and_proposal_receive_visible_split_only(tmp_path: Path) -> No
 def test_acceptance_still_uses_hidden_evidence(tmp_path: Path) -> None:
     """The gate sees what proposers cannot: decisions record held-out and
     adversarial split scores."""
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     report = run_cycle(store, SUM_INTEGERS_TASK)
     assert report.decision is not None
     assert "held_out" in report.decision.baseline_split_scores
     assert "adversarial" in report.decision.candidate_split_scores
+
+
+def test_history_outcomes_carry_visible_scores_only(tmp_path: Path) -> None:
+    """Hidden-influenced overall scores must not flow back to proposers: the
+    sanitized history reports visible-split score movement only."""
+    from strive.loop import _proposal_history
+
+    store = Store(tmp_path / "artifacts2", SUM_INTEGERS_TASK.task_id)
+    report = run_cycle(store, SUM_INTEGERS_TASK)
+    assert report.decision is not None
+
+    history = _proposal_history(store, limit=5)
+    assert history  # the accepted candidate appears
+    for item in history:
+        assert "visible" in item.outcome
+        assert "overall" not in item.outcome
+        assert "held" not in item.outcome

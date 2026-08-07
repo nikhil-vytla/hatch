@@ -9,11 +9,14 @@ than any run that completed — the controller never raises for it.
 
 from __future__ import annotations
 
+from typing import Sequence
+
 from strive.contracts import (
     CaseEvaluation,
     Evaluation,
     ExecutionReport,
     FailureRecord,
+    TaskCase,
 )
 from strive.tasks import Task
 
@@ -34,7 +37,9 @@ def _aggregate(
     return overall, split_scores
 
 
-def _floor_evaluation(task: Task, failure: FailureRecord) -> Evaluation:
+def _floor_evaluation(
+    cases: Sequence[TaskCase], failure: FailureRecord
+) -> Evaluation:
     case_evaluations = tuple(
         CaseEvaluation(
             case_id=case.case_id,
@@ -46,7 +51,7 @@ def _floor_evaluation(task: Task, failure: FailureRecord) -> Evaluation:
             error=f"{failure.kind}: {failure.detail}",
             feedback=f"execution failed before this case ran ({failure.kind})",
         )
-        for case in task.cases
+        for case in cases
     )
     overall, split_scores = _aggregate(case_evaluations)
     return Evaluation(
@@ -58,14 +63,22 @@ def _floor_evaluation(task: Task, failure: FailureRecord) -> Evaluation:
     )
 
 
-def evaluate(task: Task, report: ExecutionReport) -> Evaluation:
+def evaluate(
+    task: Task,
+    report: ExecutionReport,
+    cases: Sequence[TaskCase] | None = None,
+) -> Evaluation:
+    """Score a report over the given cases (default: the task's selection
+    cases — the audit split is never evaluated in routine flows)."""
+    if cases is None:
+        cases = task.selection_cases()
     if not report.ok:
         assert report.failure is not None
-        return _floor_evaluation(task, report.failure)
+        return _floor_evaluation(cases, report.failure)
 
     by_id = {outcome.case_id: outcome for outcome in report.outcomes}
     case_evaluations: list[CaseEvaluation] = []
-    for case in task.cases:
+    for case in cases:
         outcome = by_id.get(case.case_id)
         if outcome is None:
             case_evaluations.append(

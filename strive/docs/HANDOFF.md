@@ -1,10 +1,74 @@
 # HANDOFF — strive
 
-State as of 2026-08-07, after four phases: the vertical slice (stage 1), the
-research-and-redesign phase (notes 01–06, [comparative matrix](agents/research/comparative-matrix.md),
+State as of 2026-08-07, after four phases plus a correction pass: the vertical
+slice (stage 1), the research-and-redesign phase (notes 01–06,
+[comparative matrix](agents/research/comparative-matrix.md),
 [ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), the phase-3 hardening
-of the core harness (stage 2a), and the phase-4 model-backed offline
-self-evolution loop (stage 2b).
+of the core harness (stage 2a), the phase-4 model-backed offline
+self-evolution loop (stage 2b), and the phase-4.5 correctness and
+claim-precision pass over stage 2b.
+
+## Phase 4.5 — stage-2b correction pass (completed fixes)
+
+A focused correctness pass before merging stage 2b; 115 tests, strict mypy.
+
+1. **Task-scoped state.** Stores are bound to a task (per-task ledger files);
+   generations carry `task_id` + `task_fingerprint`, activations carry
+   `task_id` (schema bumps to `generation@2`/`activation@2`; superseded v1
+   records are rejected loudly — migration tooling is deliberately deferred).
+   Cross-task tests run two tasks against one artifact root with zero
+   contamination; the loop refuses a store bound to a different task.
+2. **Fixture leak removed.** The `max-integers` seed source no longer explains
+   its own bug (seed sources are proposer-visible evidence); the fake is
+   renamed and documented as a *scripted proposal fixture*
+   (`scripted_fixture_adapter`), and no doc claims it derived the repair from
+   evidence or demonstrated model reasoning.
+3. **Budget truthfulness.** Uniform limit semantics defined and tested:
+   0 = nothing allowed, -1 = accounting only. Tokens, cost, and cumulative
+   output bytes are now genuinely enforced; per-execution output caps equal
+   the remaining cumulative allowance; model-call HTTP timeouts are capped by
+   remaining cycle wall time; wall time gates model calls as well as
+   executions. Every enforced limit has a test.
+4. **Replay precision.** The feature is now named what it is:
+   **execution-and-decision replay** (baseline + candidate re-execution and
+   recorded-policy decision check). Full-cycle replay (diagnosis, prompt
+   reconstruction, recorded completion injection, proposal parsing, screening)
+   is explicitly deferred.
+5. **Evaluation discipline.** Splits now separate visible (train),
+   held-out/regression/adversarial (development/selection, used by every
+   promotion decision), and a new **audit** split — a final holdout excluded
+   from routine cycles entirely and queried only via `strive audit`.
+   Proposer-facing history now reports visible-split score movement only
+   (overall/hidden-influenced scores no longer flow back).
+6. **Provisional safety.** Provisional activation of executable
+   `strategy-code` is refused (tested); the expiry/confirmation mechanics stay
+   tested at the store level for future explicitly low-risk non-code surfaces.
+7. **Real-model safety.** A configured real provider requires the explicit
+   `--unsafe-model-code` acknowledgement (the subprocess lacks
+   network/filesystem confinement; the AST screen is a prefilter, not a
+   security boundary). The scripted fixture remains the safe default; missing
+   or invalid env configuration is a clean `ModelConfigError`.
+8. **Claims corrected** across README/ARCHITECTURE/ROADMAP/HANDOFF and the PR
+   summary; demos regenerated under the corrected semantics (including audit
+   runs and cross-task runs against one root).
+
+Low-cost items also done: normalized model finish reasons drive truncation
+classification; proposal `trace_evidence` must cite visible failing case ids;
+`model_call` events carry compact metadata + CAS refs instead of duplicated
+contents; the syntax-error test fixture is now an actual syntax error ("this
+is not python" parses as `this is (not python)`); mutating store operations
+take an advisory writer lock, generation-id allocation happens under it, and
+activations support an `expected_active` head check (used by the loop and by
+promotion).
+
+**Deliberately deferred (explicit limits carried to stage 3+):** schema
+migration tooling for superseded record versions; full-cycle replay;
+concurrent multi-host writer support (single-writer per task remains the
+model); typed event payloads; CAS power-loss durability (objects are not
+fsynced); automatic regression-split growth; per-proposer-model acceptance
+statistics; Pareto populations; Landlock/seccomp. Candidate code still
+receives hidden case *inputs* at execution time (never expected outputs) —
+documented in README; real fix is stronger sandboxing.
 
 ## Phase 4 — model-backed offline evolution (what was implemented)
 
@@ -43,8 +107,11 @@ self-evolution loop (stage 2b).
   `max()` over token *strings* (lexicographic — "9" beats "100"). No registry
   entry knows it; a control test proves the registry proposer cannot fix it.
   The generic `EvidenceDiagnoser` (registry-free) packages visible failure
-  evidence; the model path proposes the numeric-comparison fix, which passes
-  the paired gate 0.500 → 1.000 with zero regressions.
+  evidence; the model *pipeline* carries a repair through schema validation,
+  screening, sandboxed validation, and the paired gate (0.500 → 1.000, zero
+  regressions). In CI/demos that repair comes from a scripted proposal
+  fixture authored by us — see phase 4.5: this proves the pipeline, not model
+  reasoning.
 - **Real adapter, env-only.** `STRIVE_MODEL_PROVIDER=openai-compatible` +
   `STRIVE_MODEL_BASE_URL`/`STRIVE_MODEL_API_KEY`/`STRIVE_MODEL_ID` builds a
   stdlib-only adapter. Nothing in tests or default commands touches it.
@@ -54,8 +121,9 @@ self-evolution loop (stage 2b).
 
 ## Phase-4 verification evidence
 
-- `uv run pytest -q` → **91 passed**, offline. The demonstration matrix:
-  fake-model fix of the non-planted weakness promoted through
+- `uv run pytest -q` → **91 passed** at phase 4 (now **115** after phase
+  4.5), offline. The demonstration matrix:
+  scripted-fixture fix of the non-planted weakness promoted through
   `paired-deterministic@1` on protected splits; registry control cannot fix
   it; full offline replay reproduces the decision; malformed / truncated /
   schema-invalid / forbidden responses each rejected with their distinct kind
@@ -76,19 +144,19 @@ self-evolution loop (stage 2b).
   case ids); history carries aggregate scores + policy identity only.
 - The forbidden-source screen is kernel-side and runs *after* staleness,
   *before* any sandbox execution; it is a pre-filter (D1), never the gate.
-- The fake adapter's demo responder parses the prompt (parent id, cited
-  cases) rather than being keyed to exact prompt bytes — prompt evolution
-  doesn't silently break the fixtures, and the fixture's role as a stand-in
-  is explicit (`fakemodel.py` docstring).
+- The scripted fixture responder parses the prompt (parent id, cited cases)
+  rather than being keyed to exact prompt bytes — prompt evolution doesn't
+  silently break the fixtures, and the fixture's role as an authored stand-in
+  (not model reasoning) is explicit in `fakemodel.py` and README.
 - `EvidenceDiagnoser` names no weakness (`visible-case-failures`) — the
   CH lesson about confidently-wrong self-diagnosis argues for packaging
   evidence over guessing causes when no signature matches.
 
 ## Model-dependence limitations (stated plainly)
 
-- **The CI "model" is a deterministic fake.** Every green test proves
-  pipeline correctness — validation, gating, journaling, replay — and nothing
-  about real-model proposal quality. The one honest capability claim: the
+- **The CI "model" is a scripted proposal fixture.** Every green test proves
+  pipeline correctness — validation, gating, journaling, execution-and-decision
+  replay — and nothing about real-model proposal quality or reasoning. The one honest capability claim: the
   *harness* correctly promotes good candidates and rejects bad, stale,
   malformed, forbidden, and over-budget ones, wherever they come from.
 - **Real-model behavior is untested** and expected to be sharply

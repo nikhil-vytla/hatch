@@ -32,6 +32,7 @@ from strive.budget import BudgetMeter
 from strive.contracts import (
     ACTIVATION_DURABLE,
     ACTIVATION_PROVISIONAL,
+    VISIBLE,
     Activation,
     BudgetSpec,
     Candidate,
@@ -101,11 +102,16 @@ def _new_run_id(prefix: str = "run") -> str:
 
 
 def ensure_seeded(store: Store, task: Task) -> Generation:
+    if store.task_id != task.task_id:
+        raise StoreError(
+            f"store is bound to task {store.task_id!r}, got {task.task_id!r}"
+        )
     active = store.active_generation()
     if active is not None:
         return active
     record = store.add_generation(
         task.seed_source,
+        task_fingerprint=task.fingerprint(),
         parent_id=None,
         origin="seed",
         surface=STRATEGY_CODE_SURFACE,
@@ -140,12 +146,15 @@ def _execute_and_evaluate(
             ),
         )
 
+    # routine execution covers the selection cases only; the audit split is
+    # excluded from every routine flow (see audit_generation)
+    cases = task.selection_cases()
     report = run_strategy(
         store.source_of(generation),
-        task.cases,
+        cases,
         generation_id=generation.generation_id,
         timeout_s=meter.execution_timeout_s(config.sandbox_timeout_s),
-        output_bytes_cap=config.budget.output_bytes,
+        output_bytes_cap=meter.execution_output_cap(),
     )
     meter.note_output_bytes(report.stdout_bytes)
     for outcome in report.outcomes:
@@ -160,7 +169,7 @@ def _execute_and_evaluate(
             generation_id=generation.generation_id,
             failure=codec.encode(report.failure),
         )
-    evaluation = evaluate(task, report)
+    evaluation = evaluate(task, report, cases)
     events.emit(
         "evaluated",
         generation_id=generation.generation_id,
@@ -170,15 +179,18 @@ def _execute_and_evaluate(
 
 
 def _proposal_history(store: Store, limit: int) -> tuple[ProposalHistoryItem, ...]:
-    """Sanitized accepted/rejected history: aggregate scores and policy identity
-    only. Decision *reasons* are excluded because they may cite hidden-split
-    case ids (e.g. regression lists)."""
+    """Sanitized accepted/rejected history: visible-split scores and policy
+    identity only. Decision *reasons* are excluded (they may cite hidden-split
+    case ids) and so are overall/hidden-split scores (they are influenced by
+    hidden evaluation data and must not flow back to proposers)."""
     items: list[ProposalHistoryItem] = []
     for generation in store.generations().values():
         decision = generation.decision
         if decision is None:
             continue
         verdict = "accepted" if decision.accepted else "rejected"
+        baseline_visible = decision.baseline_split_scores.get(VISIBLE, 0.0)
+        candidate_visible = decision.candidate_split_scores.get(VISIBLE, 0.0)
         items.append(
             ProposalHistoryItem(
                 generation_id=generation.generation_id,
@@ -187,8 +199,7 @@ def _proposal_history(store: Store, limit: int) -> tuple[ProposalHistoryItem, ..
                 accepted=decision.accepted,
                 outcome=(
                     f"{verdict} by {decision.policy}@{decision.policy_version}: "
-                    f"overall {decision.baseline_score:.3f} -> "
-                    f"{decision.candidate_score:.3f}"
+                    f"visible {baseline_visible:.3f} -> {candidate_visible:.3f}"
                 ),
             )
         )
@@ -394,6 +405,8 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
 
                 candidate_probe = Generation(
                     generation_id=f"candidate:{candidate.candidate_id}",
+                    task_id=task.task_id,
+                    task_fingerprint=task.fingerprint(),
                     parent_id=active.generation_id,
                     origin="candidate",
                     surface=candidate.surface,
@@ -409,6 +422,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
 
                 candidate_generation = store.add_generation(
                     store.objects.get_text(candidate.source_ref),
+                    task_fingerprint=task.fingerprint(),
                     parent_id=active.generation_id,
                     origin="evolved",
                     surface=candidate.surface,
@@ -425,6 +439,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         candidate_generation.generation_id,
                         reason="evolved",
                         policy=f"{policy.name}@{policy.version}",
+                        expected_active=active.generation_id,
                     )
                     events.emit(
                         "activated",
@@ -486,6 +501,57 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
 
 
 @dataclass(frozen=True)
+class AuditReport:
+    generation_id: str
+    evaluation: Evaluation
+
+
+def audit_generation(
+    store: Store,
+    task: Task,
+    generation_id: str | None = None,
+    config: LoopConfig | None = None,
+) -> AuditReport:
+    """Evaluate a generation on the final audit holdout, on demand.
+
+    This is deliberately NOT part of any routine cycle or promotion decision:
+    the audit split exists so there is evaluation data that candidate
+    selection has never been able to overfit. Each audit is journaled.
+    """
+    config = config or LoopConfig()
+    generation = (
+        store.generation(generation_id)
+        if generation_id is not None
+        else store.active_generation()
+    )
+    if generation is None:
+        raise StoreError("no active generation to audit")
+    cases = task.audit_cases()
+    if not cases:
+        raise StoreError(f"task {task.task_id!r} declares no audit cases")
+    run_id = _new_run_id("audit")
+    events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
+    meter = BudgetMeter(config.budget)
+    denial = meter.request_execution()
+    if denial is not None:
+        raise StoreError(f"audit denied by budget: {denial.detail}")
+    report = run_strategy(
+        store.source_of(generation),
+        cases,
+        generation_id=generation.generation_id,
+        timeout_s=meter.execution_timeout_s(config.sandbox_timeout_s),
+        output_bytes_cap=meter.execution_output_cap(),
+    )
+    evaluation = evaluate(task, report, cases)
+    events.emit(
+        "audited",
+        generation_id=generation.generation_id,
+        evaluation=codec.encode(evaluation),
+    )
+    return AuditReport(generation_id=generation.generation_id, evaluation=evaluation)
+
+
+@dataclass(frozen=True)
 class CompareReport:
     left_id: str
     right_id: str
@@ -542,6 +608,14 @@ def promote_generation(
         raise StoreError(f"{generation_id} is already active")
 
     if provisional:
+        if target.surface == STRATEGY_CODE_SURFACE:
+            raise StoreError(
+                "provisional activation is not allowed for executable "
+                "strategy-code: until risk-aware surface descriptors exist, "
+                "the provisional path is reserved for explicitly low-risk "
+                "non-code surfaces; use durable promotion (paired evidence) "
+                "instead"
+            )
         recent = store.cycles()
         baseline_score = recent[-1].overall_score if recent else 0.0
         activation = store.activate(
@@ -551,6 +625,7 @@ def promote_generation(
             expires_after_cycles=expires_after_cycles,
             baseline_score=baseline_score,
             policy=f"{PROVISIONAL_POLICY.name}@{PROVISIONAL_POLICY.version}",
+            expected_active=active.generation_id,
         )
         return activation, None
 
@@ -566,6 +641,7 @@ def promote_generation(
         generation_id,
         reason="promote",
         policy=f"{compare.decision.policy}@{compare.decision.policy_version}",
+        expected_active=active.generation_id,
     )
     return activation, compare.decision
 
@@ -587,12 +663,14 @@ class ReplayReport:
 def replay_run(
     store: Store, task: Task, run_id: str, config: LoopConfig | None = None
 ) -> ReplayReport:
-    """Re-execute a recorded cycle offline and compare against the record.
+    """Execution-and-decision replay of a recorded cycle (offline).
 
-    Replays the baseline execution; if the cycle produced a candidate, also
-    replays the candidate and re-runs the recorded acceptance policy, checking
-    that the decision reproduces. Everything comes from the ledger and object
-    store — no proposer or model is consulted.
+    Precisely scoped: re-executes the baseline (and candidate, if the cycle
+    produced one) from content-addressed sources and re-runs the *recorded*
+    acceptance policy, checking that scores and the accept/reject decision
+    reproduce. It does NOT replay diagnosis, prompt reconstruction, recorded
+    completion injection, proposal parsing, or the source screen — full-cycle
+    replay is deferred work (see HANDOFF). No proposer or model is consulted.
     """
     config = config or LoopConfig()
     cycle = store.cycle(run_id)

@@ -51,10 +51,14 @@ Implemented (see HANDOFF "Phase 4" for verification evidence):
   history (aggregate scores only) + explicit budgets; holdout contents mechanically
   absent (spy-tested down to the built prompt).
 - ✅ All model I/O journaled with adapter name, model id, params, usage, latency,
-  and content-addressed prompt/completion artifacts; the full fake-model cycle
-  replays offline and reproduces the promotion decision.
+  normalized finish reasons, and content-addressed prompt/completion artifacts
+  (compact event metadata; contents live once in the object store). The recorded
+  cycle supports *execution-and-decision replay* offline (baseline + candidate
+  re-execution and recorded-policy decision check); full-cycle replay is deferred.
 - ✅ Second task (`max-integers`) with a non-planted weakness (lexicographic max);
-  fixed by the evidence-driven path, provably not by the registry (control test).
+  the registry provably cannot fix it (control test), and the model *pipeline*
+  promotes a fix supplied by a scripted proposal fixture — pipeline proof, not
+  model reasoning.
 - ✅ Env-only real adapter (`STRIVE_MODEL_PROVIDER=openai-compatible`); no test or
   default command touches a network.
 
@@ -63,10 +67,12 @@ Carried into stage 3 (not done):
 - Aggregated per-proposer-model acceptance statistics (raw telemetry is journaled;
   no reporting command yet).
 
-**Exit criteria met with one honest caveat:** the "model" in CI is the deterministic
-fake — it proves the pipeline (validation, gating, journaling, replay), not model
-capability. Real-model capability is untested and expected to be model-dependent
-(capability floor, note 03).
+**Exit criteria met with honest caveats:** the "model" in CI is a scripted proposal
+fixture — it proves the pipeline (validation, gating, journaling, replay), not model
+reasoning or capability. Real-model capability is untested, expected to be
+model-dependent (capability floor, note 03), and gated behind an explicit
+`--unsafe-model-code` acknowledgement because the sandbox lacks network/filesystem
+confinement. Replay is execution-and-decision replay, not full-cycle replay.
 
 ## Stage 3 — Composite generations + pluggable evolution algorithms + hardened sandbox
 

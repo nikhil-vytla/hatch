@@ -18,7 +18,15 @@ VISIBLE = "visible"
 HELD_OUT = "held_out"
 REGRESSION = "regression"
 ADVERSARIAL = "adversarial"
-SPLITS = (VISIBLE, HELD_OUT, REGRESSION, ADVERSARIAL)
+AUDIT = "audit"
+SPLITS = (VISIBLE, HELD_OUT, REGRESSION, ADVERSARIAL, AUDIT)
+
+# Split roles (evaluation discipline):
+# - visible: proposer/diagnosis evidence (train)
+# - held_out / regression / adversarial: development/selection data — used by
+#   acceptance policies on every routine promotion decision
+# - audit: final holdout — excluded from routine cycles and selection; queried
+#   only on demand (`strive audit`), so selection cannot overfit it
 
 # -- failure kinds --------------------------------------------------------------
 
@@ -214,10 +222,12 @@ class Decision:
     regressed_case_ids: tuple[str, ...] = ()
 
 
-@register("generation", 1)
+@register("generation", 2)
 @dataclass(frozen=True)
 class Generation:
     generation_id: str
+    task_id: str
+    task_fingerprint: str
     parent_id: str | None
     origin: str  # "seed" | "evolved" | "manual"
     surface: str
@@ -231,10 +241,11 @@ ACTIVATION_DURABLE = "durable"
 ACTIVATION_PROVISIONAL = "provisional"
 
 
-@register("activation", 1)
+@register("activation", 2)
 @dataclass(frozen=True)
 class Activation:
     generation_id: str
+    task_id: str
     reason: str  # "seed" | "evolved" | "rollback" | "promote" | "confirmed" | "expired-reverted"
     mode: str  # "durable" | "provisional"
     at: str
@@ -249,14 +260,19 @@ class Activation:
 @register("budget-spec", 1)
 @dataclass(frozen=True)
 class BudgetSpec:
-    """Trusted resource ceilings for one cycle. Enforced kernel-side only."""
+    """Trusted resource ceilings for one cycle. Enforced kernel-side only.
+
+    Uniform limit semantics (see strive.budget): -1 = unlimited (accounting
+    only), 0 = nothing allowed, otherwise deny once accumulated usage reaches
+    the limit.
+    """
 
     wall_time_s: float = 120.0
     executions: int = 16
     model_calls: int = 0
-    tokens: int = 0
+    tokens: int = -1
     output_bytes: int = 1_000_000
-    cost: float = 0.0
+    cost: float = -1.0
     max_recursion_depth: int = 0
 
 
@@ -324,16 +340,23 @@ class Event:
 # -- model interface ---------------------------------------------------------------
 
 
-@register("model-request", 1)
+@register("model-request", 2)
 @dataclass(frozen=True)
 class ModelRequest:
     prompt: str
     max_tokens: int = 1024
     temperature: float = 0.0
     seed: int = 0
+    timeout_s: float = 60.0
 
 
-@register("model-response", 1)
+FINISH_STOP = "stop"
+FINISH_LENGTH = "length"
+FINISH_ERROR = "error"
+FINISH_UNKNOWN = "unknown"
+
+
+@register("model-response", 2)
 @dataclass(frozen=True)
 class ModelResponse:
     text: str
@@ -341,3 +364,4 @@ class ModelResponse:
     input_tokens: int
     output_tokens: int
     cost: float = 0.0
+    finish_reason: str = FINISH_UNKNOWN  # normalized: stop|length|error|unknown

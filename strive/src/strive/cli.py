@@ -27,16 +27,17 @@ from strive.contracts import (
 )
 from strive.diagnose import EvidenceDiagnoser
 from strive.events import EventLog, now_iso
-from strive.fakemodel import demo_adapter
+from strive.fakemodel import scripted_fixture_adapter
 from strive.loop import (
     LoopConfig,
+    audit_generation,
     compare_generations,
     ensure_seeded,
     promote_generation,
     replay_run,
     run_cycle,
 )
-from strive.model import adapter_from_env
+from strive.model import ModelConfigError, adapter_from_env
 from strive.model_proposer import ModelProposer
 from strive.store import Store, StoreError
 from strive.tasks import SUM_INTEGERS_TASK, TASKS, Task
@@ -71,10 +72,24 @@ def _generation_data(store: Store, generation: Generation) -> dict[str, Any]:
 def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     if args.proposer == "model":
         adapter = adapter_from_env()
-        adapter_note = "real (env-configured)"
-        if adapter is None:
-            adapter = demo_adapter()
-            adapter_note = "fake (offline; set STRIVE_MODEL_PROVIDER for a real model)"
+        if adapter is not None:
+            if not args.unsafe_model_code:
+                raise CliError(
+                    "a real model provider is configured "
+                    "(STRIVE_MODEL_PROVIDER); real-model-generated executable "
+                    "code will run in a subprocess WITHOUT network or "
+                    "filesystem confinement, and the AST screen is a "
+                    "prefilter, not a security boundary. Re-run with "
+                    "--unsafe-model-code to acknowledge this, or unset "
+                    "STRIVE_MODEL_PROVIDER to use the offline scripted fixture."
+                )
+            adapter_note = "real (env-configured; --unsafe-model-code acknowledged)"
+        else:
+            adapter = scripted_fixture_adapter()
+            adapter_note = (
+                "scripted fixture (offline; proves the pipeline, not model "
+                "capability — set STRIVE_MODEL_PROVIDER for a real model)"
+            )
         config = LoopConfig(
             sandbox_timeout_s=args.timeout,
             proposer=ModelProposer(),
@@ -303,6 +318,21 @@ def _cmd_promote(store: Store, task: Task, args: argparse.Namespace) -> dict[str
     return {"data": data, "human": human}
 
 
+def _cmd_audit(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    report = audit_generation(store, task, args.generation)
+    data = {
+        "generation_id": report.generation_id,
+        "audit_score": report.evaluation.overall_score,
+        "feedback": report.evaluation.feedback,
+        "cases": [codec.encode(ce) for ce in report.evaluation.case_evaluations],
+    }
+    lines = [
+        f"audit of {report.generation_id} (final holdout — never used in selection):",
+        f"  score={report.evaluation.overall_score:.3f} — {report.evaluation.feedback}",
+    ]
+    return {"data": data, "human": "\n".join(lines)}
+
+
 def _cmd_rollback(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     generation = store.rollback()
     return {
@@ -364,6 +394,7 @@ _COMMANDS = {
     "inspect": _cmd_inspect,
     "compare": _cmd_compare,
     "replay": _cmd_replay,
+    "audit": _cmd_audit,
     "promote": _cmd_promote,
     "rollback": _cmd_rollback,
     "resume": _cmd_resume,
@@ -385,7 +416,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("registry", "model"),
         default="registry",
         help="proposal source: deterministic registry, or model-backed "
-        "(offline fake unless STRIVE_MODEL_PROVIDER is configured)",
+        "(offline scripted fixture unless STRIVE_MODEL_PROVIDER is configured)",
+    )
+    run_parser.add_argument(
+        "--unsafe-model-code",
+        action="store_true",
+        help="required acknowledgement when a REAL model provider is "
+        "configured: model-generated code runs without network/filesystem "
+        "confinement",
     )
     sub.add_parser("status", help="active generation, freeze state, diagnostics")
     sub.add_parser("lineage", help="chain from active generation to seed")
@@ -398,8 +436,19 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser = sub.add_parser("compare", help="paired evaluation of two generations")
     compare_parser.add_argument("baseline")
     compare_parser.add_argument("candidate")
-    replay_parser = sub.add_parser("replay", help="re-execute a recorded run and diff")
+    replay_parser = sub.add_parser(
+        "replay",
+        help="execution-and-decision replay: re-execute a recorded run's "
+        "generations and re-check the recorded decision (not a full-cycle "
+        "replay of diagnosis/prompt/proposal)",
+    )
     replay_parser.add_argument("run_id")
+    audit_parser = sub.add_parser(
+        "audit",
+        help="evaluate a generation on the final audit holdout (on demand; "
+        "never part of routine selection)",
+    )
+    audit_parser.add_argument("--generation", help="default: the active generation")
     promote_parser = sub.add_parser("promote", help="activate a retained generation")
     promote_parser.add_argument("generation_id")
     promote_parser.add_argument("--provisional", action="store_true")
@@ -414,12 +463,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        store = Store(args.artifacts)
         task = _task(args.task)
+        store = Store(args.artifacts, task.task_id)
         result = _COMMANDS[args.command](store, task, args)
         _emit(args.json, args.command, result["data"], result["human"])
         return 0
-    except (StoreError, CliError, codec.SchemaError, ObjectMissing, ObjectCorruption) as exc:
+    except (
+        StoreError,
+        CliError,
+        codec.SchemaError,
+        ObjectMissing,
+        ObjectCorruption,
+        ModelConfigError,
+    ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:
             print(

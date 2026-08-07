@@ -1,28 +1,41 @@
-"""Durable, append-only store: ledger journal + content-addressed objects.
+"""Durable, append-only store: per-task ledger journals + shared
+content-addressed objects.
 
 Layout under the artifacts root:
 
-    ledger/ledger.jsonl    append-only journal (generation/activation/cycle/intervention)
-    objects/<aa>/<sha256>  content-addressed strategy sources and large outputs
+    ledger/<task_id>.jsonl   append-only journal, one per task
+    ledger/<task_id>.lock    advisory lock file for mutating operations
+    objects/<aa>/<sha256>    content-addressed sources and artifacts (shared)
     runs/<run_id>/events.jsonl
+
+Task isolation: a Store is bound to one task; every generation records its
+task id and task fingerprint, every activation records its task id, and each
+task has its own journal file — so a generation of one task can never become
+another task's incumbent, mechanically.
 
 Durability and atomicity model:
 - every append is a single ``write()`` of one complete line followed by fsync;
 - the active generation is *derived* from the last activation entry, so
-  promotion is atomic-by-construction: it becomes real exactly when its one
-  activation line is durably appended, and a crash before that line leaves the
-  previous activation in force;
+  promotion is atomic-by-construction;
 - a torn final line (crash mid-append) is tolerated on read and surfaced as a
-  diagnostic — it is the expected crash artifact of an append-only journal;
-- any *interior* corruption or schema mismatch is a loud ``LedgerError``:
-  history is append-only and validated, never guessed at;
+  diagnostic; interior corruption is a loud ``LedgerError``;
 - nothing is ever deleted: rollback, expiry-revert, and freeze are entries.
+
+Concurrency: the store is designed for a single writer. As belt-and-braces
+for same-host concurrent CLIs, mutating operations take an advisory ``flock``
+on the task's lock file, generation-id allocation happens under that lock,
+and ``activate`` accepts an ``expected_active`` head check that fails cleanly
+if the incumbent changed underneath the caller. Cross-host or adversarial
+concurrent writers are explicitly out of scope (see HANDOFF).
 """
 
 from __future__ import annotations
 
+import fcntl
 import os
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from strive import codec
 from strive.cas import ObjectStore
@@ -50,23 +63,40 @@ class LedgerError(StoreError):
 
 
 class Store:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, task_id: str) -> None:
         self.root = root
-        self.ledger_path = root / "ledger" / "ledger.jsonl"
+        self.task_id = task_id
+        self.ledger_path = root / "ledger" / f"{task_id}.jsonl"
+        self._lock_path = root / "ledger" / f"{task_id}.lock"
         self.runs_dir = root / "runs"
         self.objects = ObjectStore(root / "objects")
         for directory in (self.ledger_path.parent, self.runs_dir):
             directory.mkdir(parents=True, exist_ok=True)
         self.diagnostics: list[str] = []
 
+    # -- locking ------------------------------------------------------------------
+
+    @contextmanager
+    def _writer_lock(self) -> Iterator[None]:
+        with self._lock_path.open("a") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
     # -- journal ---------------------------------------------------------------
 
-    def append(self, entry: LedgerEntry) -> None:
+    def _append_unlocked(self, entry: LedgerEntry) -> None:
         line = (codec.dumps(entry) + "\n").encode("utf-8")
         with self.ledger_path.open("ab") as handle:
             handle.write(line)  # one complete line per write
             handle.flush()
             os.fsync(handle.fileno())
+
+    def append(self, entry: LedgerEntry) -> None:
+        with self._writer_lock():
+            self._append_unlocked(entry)
 
     def entries(self) -> list[LedgerEntry]:
         if not self.ledger_path.exists():
@@ -114,33 +144,43 @@ class Store:
     def generation(self, generation_id: str) -> Generation:
         generations = self.generations()
         if generation_id not in generations:
-            raise StoreError(f"unknown generation: {generation_id}")
-        return generations[generation_id]
-
-    def _next_generation_id(self) -> str:
-        return f"gen-{len(self.generations()):04d}"
+            raise StoreError(
+                f"unknown generation for task {self.task_id!r}: {generation_id}"
+            )
+        record = generations[generation_id]
+        if record.task_id != self.task_id:
+            raise LedgerError(
+                f"generation {generation_id} belongs to task {record.task_id!r}, "
+                f"not {self.task_id!r} — task-isolation violation in the ledger"
+            )
+        return record
 
     def add_generation(
         self,
         source: str,
         *,
+        task_fingerprint: str,
         parent_id: str | None,
         origin: str,
         surface: str,
         weakness_id: str | None,
         decision: Decision | None,
     ) -> Generation:
-        record = Generation(
-            generation_id=self._next_generation_id(),
-            parent_id=parent_id,
-            origin=origin,
-            surface=surface,
-            weakness_id=weakness_id,
-            created_at=now_iso(),
-            source_ref=self.objects.put_text(source),
-            decision=decision,
-        )
-        self.append(record)
+        with self._writer_lock():
+            generation_id = f"gen-{len(self.generations()):04d}"
+            record = Generation(
+                generation_id=generation_id,
+                task_id=self.task_id,
+                task_fingerprint=task_fingerprint,
+                parent_id=parent_id,
+                origin=origin,
+                surface=surface,
+                weakness_id=weakness_id,
+                created_at=now_iso(),
+                source_ref=self.objects.put_text(source),
+                decision=decision,
+            )
+            self._append_unlocked(record)
         return record
 
     def source_of(self, generation: Generation) -> str:
@@ -157,18 +197,35 @@ class Store:
         mode: str = ACTIVATION_DURABLE,
         expires_after_cycles: int | None = None,
         baseline_score: float | None = None,
+        expected_active: str | None = None,
     ) -> Activation:
-        self.generation(generation_id)  # must exist before activation
-        activation = Activation(
-            generation_id=generation_id,
-            reason=reason,
-            mode=mode,
-            at=now_iso(),
-            policy=policy,
-            expires_after_cycles=expires_after_cycles,
-            baseline_score=baseline_score,
-        )
-        self.append(activation)
+        """Append an activation entry (the atomic promotion step).
+
+        ``expected_active`` is a head check: when given, the activation is
+        refused if the currently active generation is not the expected one —
+        the caller's evidence was gathered against a superseded incumbent.
+        """
+        with self._writer_lock():
+            self.generation(generation_id)  # must exist, and belong to this task
+            if expected_active is not None:
+                current = self.active_generation()
+                current_id = current.generation_id if current else None
+                if current_id != expected_active:
+                    raise StoreError(
+                        f"activation head check failed: expected active "
+                        f"{expected_active}, found {current_id}"
+                    )
+            activation = Activation(
+                generation_id=generation_id,
+                task_id=self.task_id,
+                reason=reason,
+                mode=mode,
+                at=now_iso(),
+                policy=policy,
+                expires_after_cycles=expires_after_cycles,
+                baseline_score=baseline_score,
+            )
+            self._append_unlocked(activation)
         return activation
 
     def active_activation(self) -> Activation | None:
@@ -217,7 +274,7 @@ class Store:
         for record in self.cycles():
             if record.run_id == run_id:
                 return record
-        raise StoreError(f"unknown run: {run_id}")
+        raise StoreError(f"unknown run for task {self.task_id!r}: {run_id}")
 
     def interventions(self) -> list[Intervention]:
         return [e for e in self.entries() if isinstance(e, Intervention)]

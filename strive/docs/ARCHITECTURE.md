@@ -234,15 +234,18 @@ Rules, each traceable to a researched failure:
 | task-owned scoring; visible/held-out/regression/adversarial splits | **implemented** (`tasks.py`) |
 | `(score, feedback)` evaluator + failure-as-score | **implemented** (`evaluate.py`) |
 | holdout isolation (mechanical: `VisibleContext`) | **implemented** (`diagnose.py`, `loop.py`; spy-tested) |
-| trusted budget meter (wall/executions/model calls/tokens/output/cost/recursion) | **implemented** (`budget.py`) |
+| trusted budget meter, uniform semantics (0 = none, -1 = accounting-only), all limits enforced incl. cumulative output and wall-capped HTTP timeouts | **implemented** (`budget.py`; every enforced limit tested) |
 | usage attribution per invocation | **implemented** (execution events carry `generation_id`) |
 | trusted stall detector + freeze/resume interventions | **implemented** (`monitors.py`) |
 | pluggable named+versioned acceptance policies, recorded per decision | **implemented** (`policy.py`: `paired-deterministic@1`, `provisional@1`) |
-| provisional activations: scoped, monitored, expiring, reverting | **implemented** (`loop.py::_resolve_provisional`) |
+| provisional activations: scoped, monitored, expiring, reverting | **implemented** (`loop.py::_resolve_provisional`) — refused for executable strategy-code until risk-aware surface descriptors exist |
 | provider-neutral ModelAdapter + deterministic fake + journaled metered I/O | **implemented** (`model.py`; latency + content-addressed prompt/completion artifacts; env-only real adapter) |
-| model-backed proposer (stage 2b) | **implemented** (`model_proposer.py`): visible-evidence prompt, structured proposal schema, strict classification (truncated/malformed/schema-invalid/forbidden/stale/budget), kernel-side staleness + source screen; offline replay reproduces the decision |
+| model-backed proposer (stage 2b) | **implemented** (`model_proposer.py`): visible-evidence prompt, structured proposal schema, strict classification (truncated via normalized finish reasons / malformed / schema-invalid incl. trace-evidence citation checks / forbidden / stale / budget), kernel-side staleness + source screen; offline demos use a scripted proposal fixture (pipeline proof, not model reasoning) |
 | generic evidence diagnoser (registry-free) | **implemented** (`diagnose.EvidenceDiagnoser`) — packages visible failure evidence without naming a weakness |
 | sandbox tier 2 (scrubbed env, workspace, rlimits, bounded output) | **implemented** (`sandbox.py`) — network denial NOT enforced; see honest limits |
+| task-scoped state: per-task ledgers, task id + fingerprint on generations/activations, task-bound stores, advisory writer lock + activation head checks | **implemented** (`store.py`) — single-writer per task; concurrent multi-host writers out of scope |
+| evaluation discipline: visible (train) / selection (held-out, regression, adversarial) / audit (final holdout, on-demand only) | **implemented** (`tasks.py`, `loop.audit_generation`); proposer history carries visible-split scores only |
+| execution-and-decision replay (baseline + candidate re-execution, recorded-policy decision check) | **implemented** — full-cycle replay (diagnosis, prompt reconstruction, completion injection, proposal parsing, screening) is pending |
 | composite per-surface generations | pending (stage 3) — single `strategy-code` surface today |
 | EvolutionAlgorithm plugin (Pareto population) | pending (stage 3) |
 | inheritance-aware replace-vs-add thresholds | pending (needs usage-share history to act on) |
