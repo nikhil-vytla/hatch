@@ -1,46 +1,38 @@
 $ strive run
-run:      20260806T111844-cee9a7
+run:      run-20260806T230214-b57d82
 active:   gen-0000 -> gen-0001
-baseline: score=0.571 failing=['negative-single', 'negative-all', 'negative-mixed']
-weakness: negative-integers-dropped (evidence: ['negative-single', 'negative-all', 'negative-mixed'])
-candidate: cand-ff91ee97 — Widen the integer regex to capture an optional leading minus sign.
-          score=1.000
-decision: ACCEPTED — strict improvement 0.571 -> 1.000 with no regressions
+score:    0.455 adversarial=0.000 held_out=0.333 visible=0.667
+weakness: negative-integers-dropped
+decision: ACCEPTED [paired-deterministic@1] — strict improvement with zero regressions (visible 0.667 -> 1.000, overall 0.455 -> 1.000)
 
-$ strive run   # second cycle, new process (restart persistence)
-run:      20260806T111844-3ccb0e
+$ strive run   # second cycle: healthy idle
+run:      run-20260806T230214-c1c77f
 active:   gen-0001 -> gen-0001
-baseline: score=1.000 failing=[]
+score:    1.000 adversarial=1.000 held_out=1.000 visible=1.000
 decision: no weakness detected; nothing proposed
 
-$ strive status
-active generation: gen-0001 (origin=evolved)
+$ strive lineage
 lineage (active -> seed):
-  gen-0001 origin=evolved weakness=negative-integers-dropped
-  gen-0000 origin=seed
+  gen-0001 origin=evolved weakness=negative-integers-dropped source=6f5b5d9112fa
+  gen-0000 origin=seed source=82568ce1fa84
+
+$ strive compare gen-0000 gen-0001
+baseline  gen-0000: overall=0.455 adversarial=0.000 held_out=0.333 visible=0.667
+candidate gen-0001: overall=1.000 adversarial=1.000 held_out=1.000 visible=1.000
+candidate WINS [paired-deterministic@1]: strict improvement with zero regressions (visible 0.667 -> 1.000, overall 0.455 -> 1.000)
+
+$ strive promote gen-0000   # demoting to the weaker seed: refused by the paired gate
+error: StoreError: promotion refused by policy paired-deterministic@1: regressions on previously passing cases: negative-single, negative-all, held-negative-mixed, held-negative-pair, adv-phone-like, adv-ranges
 
 $ strive rollback
 rolled back; active generation is now gen-0000
 
-$ strive status  # after rollback, again a fresh process
-active generation: gen-0000 (origin=seed)
-lineage (active -> seed):
-  gen-0000 origin=seed
+$ strive promote gen-0001   # re-promotion passes the paired gate
+promoted gen-0001 with paired evidence
 
-$ strive run   # re-evolves from the rolled-back seed
-run:      20260806T111845-a1a838
-active:   gen-0000 -> gen-0002
-baseline: score=0.571 failing=['negative-single', 'negative-all', 'negative-mixed']
-weakness: negative-integers-dropped (evidence: ['negative-single', 'negative-all', 'negative-mixed'])
-candidate: cand-89539f20 — Widen the integer regex to capture an optional leading minus sign.
-          score=1.000
-decision: ACCEPTED — strict improvement 0.571 -> 1.000 with no regressions
+$ strive replay run-20260806T230214-b57d82
+replay of run-20260806T230214-b57d82 (generation gen-0000):
+  recorded=0.455 replayed=0.455 match=True
 
-$ strive history
-generation gen-0000 parent=None origin=seed [seed]
-activation gen-0000 reason=seed
-generation gen-0001 parent=gen-0000 origin=evolved [accepted]
-activation gen-0001 reason=evolved
-activation gen-0000 reason=rollback
-generation gen-0002 parent=gen-0000 origin=evolved [accepted]
-activation gen-0002 reason=evolved
+$ strive status
+active generation: gen-0001 (origin=evolved, mode=durable)

@@ -181,3 +181,69 @@ HANDOFF now ends with the recommendation to proceed directly to Goal 3.
   justified for *safety/auditability*, but tie-breaking among validated
   candidates should prefer the weakest (most general) one, testable via the
   paper's parent/child sampling protocol on held-out splits.
+
+## 2026-08-06 — phase 3: hardening the core harness (roadmap stage 2a)
+
+Goal: replace prototype shortcuts with durable foundations while preserving
+the vertical slice. No model-driven evolution yet.
+
+### What was built
+
+- `contracts.py` + `codec.py`: every persisted record is a versioned typed
+  dataclass with a `kind@version` schema tag; one strict shared codec for
+  memory and disk. Golden v1 record pinned in tests so shape changes force
+  version bumps. Deleted `types.py`/`decide.py` (superseded).
+- `cas.py`: content-addressed object store (sha256, verified on read) for
+  strategy sources; ledger entries carry refs, never source bodies.
+- `store.py` rewrite: append-only journal (single write + fsync per entry).
+  Key design call: promotion is atomic *by journal construction* — it becomes
+  real exactly when its one activation line lands; simulated-crash test shows
+  a retained-but-unactivated candidate is a consistent state. Torn final line
+  = tolerated crash artifact (diagnostic); interior corruption = loud
+  LedgerError.
+- Splits: visible/held_out/regression/adversarial on the task; diagnosis and
+  proposal now receive a `VisibleContext` that mechanically cannot contain
+  hidden evidence (spy test asserts no held-out case id or input text leaks).
+- `policy.py`: named+versioned pluggable policies recorded in every decision.
+  paired-deterministic@1 (durable code) + provisional@1 (expiring window,
+  confirm-or-revert). No universal acceptance formula.
+- `budget.py`: trusted meter; exhaustion returns FailureRecords. A budget of
+  executions=1 makes the candidate validation itself come back as a recorded
+  budget-exhausted rejection — the loop completes normally.
+- `monitors.py`: stall detector (N flat failing cycles, same generation, no
+  acceptance) → journaled freeze; frozen cycles still execute+evaluate but
+  skip adaptation; `strive resume` lifts it. Perfect-score idling never
+  freezes.
+- `sandbox.py` hardening: scrubbed env (secret-probe test), private temp
+  workspace cwd, bounded stdout via chunked reads + kill, rlimits (CPU,
+  FSIZE, NOFILE), runner protocol with loud schema rejection (exit code 3 →
+  schema-mismatch failure). Chose NOT to claim network denial — documented
+  honestly in README/ARCHITECTURE instead of pretending.
+- `model.py`: ModelAdapter protocol + FakeModelAdapter + metered journaling
+  wrapper. Deliberately unused by evolution — the seam exists for stage 2b.
+- CLI: run/status/lineage/inspect/compare/replay/promote/rollback/resume/
+  history, all with --json envelopes; errors are clean envelopes, exit 1.
+
+### Things learned along the way
+
+- Event payloads embed already-encoded contracts (dicts containing lists), so
+  the codec's encoder needed to accept lists, not just tuples — caught by the
+  first full test run.
+- Replay fell out almost for free once cycles record the task fingerprint and
+  sources are content-addressed: re-execute, diff scores, flag task drift.
+- The "demotion refused" demo needed ordering care: after rollback the seed is
+  active, so promoting it errors as "already active" rather than showing the
+  policy refusal — the transcript promotes the seed *while the fix is active*
+  to show the paired gate actually refusing on regressions.
+- Provisional mechanics compose with the loop with zero special-casing in
+  run_cycle beyond a `_resolve_provisional` step at cycle start: window
+  cycles are just cycle records since the activation entry.
+
+### Verification snapshot (2026-08-06, phase 3)
+
+- `uv run pytest -q` → 77 passed (offline; includes all 11 required
+  failure-injection scenarios).
+- `uv run mypy` → strict, clean, 30 source files.
+- Demo regenerated with the new format: accepted evolution 0.455 → 1.000,
+  paired-gate refusal, rollback, evidence-gated re-promotion, exact replay
+  match (`artifacts/demo/transcript.txt`).

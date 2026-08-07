@@ -1,55 +1,199 @@
-"""Process-isolated execution of strategy code with a hard timeout.
+"""Process-isolated execution of strategy code.
 
-This is fault isolation, not a security boundary (see the project charter's
-non-goals): a hanging or crashing strategy cannot take down the controller,
-but a malicious one is out of scope for this milestone. The interface is the
-seam where a real sandbox (container, seccomp, microVM) plugs in later.
+Isolation boundary, stated honestly (see ARCHITECTURE "Sandbox boundary" and
+README): this is FAULT CONTAINMENT, not a production-grade security sandbox.
+What is mechanically enforced here:
+
+- the child is a separate process (`python -I`: isolated mode, no user site,
+  no inherited PYTHONPATH) — evolvable code never enters the kernel process;
+- a hard wall-clock timeout (kill on expiry);
+- a scrubbed environment: the child inherits no environment variables from
+  the controller (no secrets), only a minimal PATH/HOME pointing into the
+  private workspace;
+- a private working directory (fresh temp workspace per execution);
+- bounded stdout/stderr (the parent stops reading and kills at the cap);
+- POSIX resource limits where available: CPU seconds, file size, open files.
+
+What is NOT enforced and must not be relied upon: network denial (no reliable
+unprivileged cross-platform mechanism; candidates could open sockets), address
+-space limits on macOS (RLIMIT_AS is unreliable there), and filesystem
+confinement (a candidate that guesses an absolute path outside the workspace
+can read/write wherever the controller's UID can). Real containment
+(Landlock/seccomp on Linux, containers) is roadmap stage 3/6.
 """
 
 from __future__ import annotations
 
 import json
+import resource
 import subprocess
 import sys
+import tempfile
+import threading
+import time
 from pathlib import Path
-from typing import Sequence
+from typing import IO, Sequence
 
-from strive.types import CaseResult, SandboxResult, TaskCase
+from strive.contracts import (
+    FAILURE_CRASH,
+    FAILURE_MALFORMED_OUTPUT,
+    FAILURE_OUTPUT_LIMIT,
+    FAILURE_SCHEMA_MISMATCH,
+    FAILURE_TIMEOUT,
+    CaseOutcome,
+    ExecutionReport,
+    FailureRecord,
+    TaskCase,
+)
 
 _RUNNER_PATH = Path(__file__).with_name("strategy_runner.py")
+_PROTOCOL = 1
+_EXIT_SCHEMA_MISMATCH = 3
+
+
+def _apply_rlimits(cpu_seconds: int, output_bytes: int) -> None:
+    # Runs in the child between fork and exec. CPU cap backs up the wall-clock
+    # timer; FSIZE bounds file writes; NOFILE bounds descriptor use.
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (output_bytes, output_bytes))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
+
+
+def _read_bounded(stream: IO[bytes], cap: int) -> bytes:
+    chunks: list[bytes] = []
+    remaining = cap + 1
+    while remaining > 0:
+        chunk = stream.read(min(65536, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
 
 
 def run_strategy(
-    strategy_path: Path,
+    strategy_source: str,
     cases: Sequence[TaskCase],
+    *,
+    generation_id: str,
     timeout_s: float = 10.0,
-) -> SandboxResult:
-    """Run ``solve`` from ``strategy_path`` over ``cases`` in a child process."""
+    output_bytes_cap: int = 1_000_000,
+) -> ExecutionReport:
+    """Run ``solve`` from the given source over ``cases`` in a contained child."""
+    started = time.monotonic()
+
+    def report(
+        *,
+        ok: bool,
+        outcomes: tuple[CaseOutcome, ...] = (),
+        failure: FailureRecord | None = None,
+        stdout_bytes: int = 0,
+    ) -> ExecutionReport:
+        return ExecutionReport(
+            ok=ok,
+            generation_id=generation_id,
+            outcomes=outcomes,
+            failure=failure,
+            wall_time_s=round(time.monotonic() - started, 6),
+            stdout_bytes=stdout_bytes,
+        )
+
     payload = json.dumps(
-        {"cases": [{"case_id": c.case_id, "input_text": c.input_text} for c in cases]}
-    )
-    try:
-        proc = subprocess.run(
+        {
+            "protocol": _PROTOCOL,
+            "cases": [
+                {"case_id": c.case_id, "input_text": c.input_text} for c in cases
+            ],
+        }
+    ).encode("utf-8")
+
+    with tempfile.TemporaryDirectory(prefix="strive-sandbox-") as workspace:
+        strategy_path = Path(workspace) / "strategy.py"
+        strategy_path.write_text(strategy_source, encoding="utf-8")
+        cpu_seconds = max(1, int(timeout_s) + 1)
+        proc = subprocess.Popen(
             [sys.executable, "-I", str(_RUNNER_PATH), str(strategy_path)],
-            input=payload,
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=workspace,
+            env={"HOME": workspace, "PATH": "/usr/bin:/bin"},  # no inherited secrets
+            preexec_fn=lambda: _apply_rlimits(cpu_seconds, output_bytes_cap),
         )
-    except subprocess.TimeoutExpired:
-        return SandboxResult(ok=False, failure=f"timeout after {timeout_s}s")
+        timed_out = threading.Event()
 
-    if proc.returncode != 0:
-        stderr_tail = proc.stderr.strip().splitlines()[-5:]
-        return SandboxResult(
+        def _kill() -> None:
+            timed_out.set()
+            proc.kill()
+
+        timer = threading.Timer(timeout_s, _kill)
+        timer.start()
+        try:
+            assert proc.stdin is not None and proc.stdout is not None
+            assert proc.stderr is not None
+            try:
+                proc.stdin.write(payload)
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass  # child died early; fall through to exit-code handling
+            stdout = _read_bounded(proc.stdout, output_bytes_cap)
+            if len(stdout) > output_bytes_cap and not timed_out.is_set():
+                proc.kill()
+                proc.wait()
+                return report(
+                    ok=False,
+                    failure=FailureRecord(
+                        kind=FAILURE_OUTPUT_LIMIT,
+                        detail=f"stdout exceeded {output_bytes_cap} bytes",
+                    ),
+                    stdout_bytes=len(stdout),
+                )
+            proc.wait()
+            stderr = _read_bounded(proc.stderr, 65536)
+        finally:
+            timer.cancel()
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+
+    if timed_out.is_set():
+        return report(
             ok=False,
-            failure=f"child exited {proc.returncode}: " + " | ".join(stderr_tail),
+            failure=FailureRecord(
+                kind=FAILURE_TIMEOUT, detail=f"killed after {timeout_s}s"
+            ),
+            stdout_bytes=len(stdout),
+        )
+    if proc.returncode == _EXIT_SCHEMA_MISMATCH:
+        return report(
+            ok=False,
+            failure=FailureRecord(
+                kind=FAILURE_SCHEMA_MISMATCH,
+                detail=stderr.decode("utf-8", "replace").strip() or "runner rejected payload",
+            ),
+            stdout_bytes=len(stdout),
+        )
+    if proc.returncode != 0:
+        tail = stderr.decode("utf-8", "replace").strip().splitlines()[-5:]
+        return report(
+            ok=False,
+            failure=FailureRecord(
+                kind=FAILURE_CRASH,
+                detail=f"child exited {proc.returncode}: " + " | ".join(tail),
+            ),
+            stdout_bytes=len(stdout),
         )
 
     try:
-        parsed = json.loads(proc.stdout)
-        case_results = tuple(
-            CaseResult(
+        parsed = json.loads(stdout)
+        if (
+            not isinstance(parsed, dict)
+            or parsed.get("protocol") != _PROTOCOL
+            or not isinstance(parsed.get("results"), list)
+        ):
+            raise ValueError("unexpected envelope")
+        outcomes = tuple(
+            CaseOutcome(
                 case_id=str(item["case_id"]),
                 output=item["output"],
                 error=item["error"],
@@ -58,6 +202,12 @@ def run_strategy(
             for item in parsed["results"]
         )
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
-        return SandboxResult(ok=False, failure=f"malformed runner output: {exc}")
+        return report(
+            ok=False,
+            failure=FailureRecord(
+                kind=FAILURE_MALFORMED_OUTPUT, detail=f"runner output unparseable: {exc}"
+            ),
+            stdout_bytes=len(stdout),
+        )
 
-    return SandboxResult(ok=True, case_results=case_results)
+    return report(ok=True, outcomes=outcomes, stdout_bytes=len(stdout))
