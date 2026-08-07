@@ -17,9 +17,17 @@ from typing import Any
 
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing
-from strive.contracts import Activation, CycleRecord, Generation, Intervention
+from strive.contracts import (
+    Activation,
+    BudgetSpec,
+    CycleRecord,
+    Generation,
+    Intervention,
+    INTERVENTION_RESUME,
+)
+from strive.diagnose import EvidenceDiagnoser
 from strive.events import EventLog, now_iso
-from strive.contracts import INTERVENTION_RESUME
+from strive.fakemodel import demo_adapter
 from strive.loop import (
     LoopConfig,
     compare_generations,
@@ -28,9 +36,10 @@ from strive.loop import (
     replay_run,
     run_cycle,
 )
+from strive.model import adapter_from_env
+from strive.model_proposer import ModelProposer
 from strive.store import Store, StoreError
 from strive.tasks import SUM_INTEGERS_TASK, TASKS, Task
-from strive.contracts import Intervention as InterventionRecord
 
 
 class CliError(Exception):
@@ -60,9 +69,27 @@ def _generation_data(store: Store, generation: Generation) -> dict[str, Any]:
 
 
 def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = run_cycle(store, task, LoopConfig(sandbox_timeout_s=args.timeout))
+    if args.proposer == "model":
+        adapter = adapter_from_env()
+        adapter_note = "real (env-configured)"
+        if adapter is None:
+            adapter = demo_adapter()
+            adapter_note = "fake (offline; set STRIVE_MODEL_PROVIDER for a real model)"
+        config = LoopConfig(
+            sandbox_timeout_s=args.timeout,
+            proposer=ModelProposer(),
+            diagnoser=EvidenceDiagnoser(),
+            model_adapter=adapter,
+            budget=BudgetSpec(model_calls=4),
+        )
+    else:
+        adapter_note = None
+        config = LoopConfig(sandbox_timeout_s=args.timeout)
+    report = run_cycle(store, task, config)
     data: dict[str, Any] = {
         "run_id": report.run_id,
+        "proposer": args.proposer,
+        "model_adapter": adapter_note,
         "generation_before": report.generation_before,
         "generation_after": report.generation_after,
         "frozen": report.frozen,
@@ -70,11 +97,17 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
         "split_scores": report.evaluation.split_scores,
         "feedback": report.evaluation.feedback,
         "weakness_id": report.diagnosis.weakness_id if report.diagnosis else None,
+        "proposal": codec.encode(report.proposal) if report.proposal else None,
+        "proposal_failure": (
+            codec.encode(report.proposal_failure) if report.proposal_failure else None
+        ),
         "decision": codec.encode(report.decision) if report.decision else None,
         "diagnostics": list(store.diagnostics),
     }
     lines = [
         f"run:      {report.run_id}",
+        f"proposer: {args.proposer}"
+        + (f" — model adapter: {adapter_note}" if adapter_note else ""),
         f"active:   {report.generation_before} -> {report.generation_after}",
         f"score:    {report.evaluation.overall_score:.3f} "
         + " ".join(f"{k}={v:.3f}" for k, v in sorted(report.evaluation.split_scores.items())),
@@ -83,6 +116,13 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
         lines.append("frozen:   adaptation is frozen (see `strive resume`)")
     if report.diagnosis:
         lines.append(f"weakness: {report.diagnosis.weakness_id}")
+    if report.proposal:
+        lines.append(f"proposal: {report.proposal.summary}")
+    if report.proposal_failure:
+        lines.append(
+            f"proposal: rejected [{report.proposal_failure.kind}] "
+            f"— {report.proposal_failure.detail}"
+        )
     if report.decision:
         verdict = "ACCEPTED" if report.decision.accepted else "REJECTED"
         lines.append(
@@ -95,7 +135,7 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
 
 
 def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    ensure_seeded(store)
+    ensure_seeded(store, task)
     active = store.active_generation()
     activation = store.active_activation()
     assert active is not None and activation is not None
@@ -118,7 +158,7 @@ def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
 
 
 def _cmd_lineage(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    ensure_seeded(store)
+    ensure_seeded(store, task)
     chain = store.lineage()
     data = {"lineage": [codec.encode(g) for g in chain]}
     lines = ["lineage (active -> seed):"]
@@ -156,6 +196,8 @@ def _cmd_inspect(store: Store, task: Task, args: argparse.Namespace) -> dict[str
     if args.run:
         cycle = store.cycle(args.run)
         events = EventLog(store.runs_dir / args.run / "events.jsonl", args.run).read_all()
+        if args.type:
+            events = [event for event in events if event.type == args.type]
         data = {
             "cycle": codec.encode(cycle),
             "events": [codec.encode(e) for e in events],
@@ -164,10 +206,24 @@ def _cmd_inspect(store: Store, task: Task, args: argparse.Namespace) -> dict[str
             f"run {cycle.run_id} generation={cycle.generation_id} "
             f"score={cycle.overall_score:.3f} accepted={cycle.accepted}",
             f"usage: wall={cycle.usage.wall_time_s:.3f}s "
-            f"executions={cycle.usage.executions} output={cycle.usage.output_bytes}B",
-            "events:",
+            f"executions={cycle.usage.executions} model_calls={cycle.usage.model_calls} "
+            f"tokens={cycle.usage.tokens} output={cycle.usage.output_bytes}B",
+            f"events{f' (type={args.type})' if args.type else ''}:",
         ]
-        lines.extend(f"  {event.ts} {event.type}" for event in events)
+        for event in events:
+            detail = ""
+            if event.type == "model_call":
+                detail = (
+                    f" adapter={event.payload.get('adapter')} "
+                    f"model={event.payload.get('model_id')} "
+                    f"latency_ms={event.payload.get('latency_ms')} "
+                    f"prompt_ref={str(event.payload.get('prompt_ref'))[:12]}"
+                )
+            elif event.type == "proposal_rejected":
+                failure = event.payload.get("failure")
+                if isinstance(failure, dict):
+                    detail = f" kind={failure.get('kind')}"
+            lines.append(f"  {event.ts} {event.type}{detail}")
         return {"data": data, "human": "\n".join(lines)}
     raise CliError("inspect requires --generation ID or --run ID")
 
@@ -203,12 +259,23 @@ def _cmd_replay(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
         "replayed_score": report.replayed_score,
         "matches": report.matches,
         "split_diffs": report.split_diffs,
+        "candidate_generation_id": report.candidate_generation_id,
+        "candidate_replayed_score": report.candidate_replayed_score,
+        "decision_matches": report.decision_matches,
     }
     lines = [
         f"replay of {report.run_id} (generation {report.generation_id}):",
         f"  recorded={report.recorded_score:.3f} replayed={report.replayed_score:.3f} "
         f"match={report.matches}",
     ]
+    if report.candidate_generation_id is not None:
+        lines.append(
+            f"  candidate {report.candidate_generation_id}: "
+            f"replayed={report.candidate_replayed_score:.3f} "
+            f"decision_reproduced={report.decision_matches}"
+            if report.candidate_replayed_score is not None
+            else f"  candidate {report.candidate_generation_id}: not replayed"
+        )
     if report.task_drift:
         lines.append("  WARNING: task fingerprint drifted since this run was recorded")
     return {"data": data, "human": "\n".join(lines)}
@@ -249,7 +316,7 @@ def _cmd_resume(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
     if frozen is None:
         raise CliError("adaptation is not frozen")
     store.append(
-        InterventionRecord(
+        Intervention(
             kind=INTERVENTION_RESUME,
             reason=f"operator resume (was: {frozen.reason})",
             at=now_iso(),
@@ -313,11 +380,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = sub.add_parser("run", help="run one evolution cycle")
     run_parser.add_argument("--timeout", type=float, default=10.0)
+    run_parser.add_argument(
+        "--proposer",
+        choices=("registry", "model"),
+        default="registry",
+        help="proposal source: deterministic registry, or model-backed "
+        "(offline fake unless STRIVE_MODEL_PROVIDER is configured)",
+    )
     sub.add_parser("status", help="active generation, freeze state, diagnostics")
     sub.add_parser("lineage", help="chain from active generation to seed")
     inspect_parser = sub.add_parser("inspect", help="details of a generation or run")
     inspect_parser.add_argument("--generation")
     inspect_parser.add_argument("--run")
+    inspect_parser.add_argument(
+        "--type", help="filter run events by type (e.g. model_call, proposal)"
+    )
     compare_parser = sub.add_parser("compare", help="paired evaluation of two generations")
     compare_parser.add_argument("baseline")
     compare_parser.add_argument("candidate")

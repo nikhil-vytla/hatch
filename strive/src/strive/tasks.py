@@ -8,9 +8,16 @@ are partitioned into splits with distinct trust roles:
 - ``regression``  — grown from past failures; acceptance-only.
 - ``adversarial`` — crafted to catch gaming; acceptance-only.
 
-The v0 task remains "sum every signed integer in the text" with the planted
-weakness (naive ``\\d+`` extraction drops minus signs) intact so the phase-1
-vertical slice keeps working end to end.
+Each task also declares its strategy ``signature`` and an allowed
+``primitive_catalog`` (importable modules) — the trusted inputs a proposer
+receives and the pre-filter screen candidates must pass.
+
+Two tasks exist:
+- ``sum-integers`` — the phase-1 task with its *planted* weakness (naive
+  ``\\d+`` drops minus signs), fixable by the registry proposer.
+- ``max-integers`` — a *non-planted* weakness (lexicographic ``max`` over
+  digit strings): nothing in the diagnosis registry or patch registry knows
+  it; only an evidence-driven proposer (stage 2b's model path) can fix it.
 """
 
 from __future__ import annotations
@@ -29,6 +36,9 @@ class Task:
     task_id: str
     version: int
     description: str
+    signature: str
+    primitive_catalog: tuple[str, ...]
+    seed_source: str
     cases: tuple[TaskCase, ...]
 
     def case(self, case_id: str) -> TaskCase:
@@ -72,10 +82,26 @@ class Task:
         return 0.0, False, f"expected {case.expected}, got {output} ({direction})"
 
 
+BASELINE_STRATEGY_SOURCE = '''\
+"""Seed strategy for sum-integers (generation zero).
+
+Known-naive: matches unsigned digit runs only.
+"""
+
+import re
+
+
+def solve(input_text: str) -> int:
+    return sum(int(token) for token in re.findall(r"\\d+", input_text))
+'''
+
 SUM_INTEGERS_TASK = Task(
     task_id="sum-integers",
     version=2,
     description="Return the sum of every signed integer appearing in the input text.",
+    signature="solve(input_text: str) -> int",
+    primitive_catalog=("re",),
+    seed_source=BASELINE_STRATEGY_SOURCE,
     cases=(
         # visible: what diagnosis/proposal may see (includes the planted weakness)
         TaskCase("positives-pair", "add 3 and 4 together", 7, VISIBLE),
@@ -95,17 +121,52 @@ SUM_INTEGERS_TASK = Task(
     ),
 )
 
-BASELINE_STRATEGY_SOURCE = '''\
-"""Seed strategy for sum-integers (generation zero).
+MAX_SEED_STRATEGY_SOURCE = '''\
+"""Seed strategy for max-integers (generation zero).
 
-Known-naive: matches unsigned digit runs only.
+Finds signed integer tokens, then takes the maximum. The weakness here is
+NOT planted in any registry: ``max`` runs over the token *strings*, so the
+comparison is lexicographic ("9" beats "100").
 """
 
 import re
 
 
 def solve(input_text: str) -> int:
-    return sum(int(token) for token in re.findall(r"\\d+", input_text))
+    tokens = re.findall(r"-?\\d+", input_text)
+    if not tokens:
+        return 0
+    return int(max(tokens))
 '''
 
-TASKS: dict[str, Task] = {SUM_INTEGERS_TASK.task_id: SUM_INTEGERS_TASK}
+MAX_INTEGERS_TASK = Task(
+    task_id="max-integers",
+    version=1,
+    description=(
+        "Return the largest signed integer appearing in the input text, "
+        "or 0 if the text contains no integers."
+    ),
+    signature="solve(input_text: str) -> int",
+    primitive_catalog=("re",),
+    seed_source=MAX_SEED_STRATEGY_SOURCE,
+    cases=(
+        # visible
+        TaskCase("single-value", "just 5 here", 5, VISIBLE),
+        TaskCase("single-negative", "single -3 value", -3, VISIBLE),
+        TaskCase("no-numbers", "no numbers at all", 0, VISIBLE),
+        TaskCase("two-digit-vs-one", "pick 10 or 9", 10, VISIBLE),
+        TaskCase("three-values", "values 7 100 23", 100, VISIBLE),
+        # held out
+        TaskCase("held-two-vs-one", "choose 25 vs 8", 25, HELD_OUT),
+        TaskCase("held-close-magnitudes", "big 1000 small 999", 1000, HELD_OUT),
+        TaskCase("held-single", "only 42 here", 42, HELD_OUT),
+        # adversarial
+        TaskCase("adv-all-negative", "compare -5 with -40", -5, ADVERSARIAL),
+        TaskCase("adv-mixed-signs", "mix 9 11 -22", 11, ADVERSARIAL),
+    ),
+)
+
+TASKS: dict[str, Task] = {
+    SUM_INTEGERS_TASK.task_id: SUM_INTEGERS_TASK,
+    MAX_INTEGERS_TASK.task_id: MAX_INTEGERS_TASK,
+}

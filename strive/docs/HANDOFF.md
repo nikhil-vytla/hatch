@@ -1,9 +1,120 @@
 # HANDOFF — strive
 
-State as of 2026-08-06, after three phases: the vertical slice (stage 1), the
+State as of 2026-08-07, after four phases: the vertical slice (stage 1), the
 research-and-redesign phase (notes 01–06, [comparative matrix](agents/research/comparative-matrix.md),
-[ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), and the phase-3
-hardening of the core harness (roadmap stage 2a).
+[ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), the phase-3 hardening
+of the core harness (stage 2a), and the phase-4 model-backed offline
+self-evolution loop (stage 2b).
+
+## Phase 4 — model-backed offline evolution (what was implemented)
+
+- **Pluggable proposal pipeline.** Typed `Proposer` protocol
+  (`propose(ProposalRequest) -> ProposalResult`); the deterministic
+  `RegistryProposer` retained as reference; `ModelProposer` over the
+  provider-neutral `ModelAdapter`. Proposers are side-effect free: the kernel
+  screens, retains, validates, and promotes.
+- **Trusted, visible-only proposer inputs.** `ProposalRequest` carries the
+  incumbent source, task signature + primitive catalog, visible failing cases
+  with evaluator feedback, the diagnosis, sanitized acceptance history
+  (aggregate scores and policy identity only — decision *reasons* are excluded
+  because they can cite hidden-split case ids), and explicit budgets
+  (max output tokens, model calls remaining, executions remaining). The spy
+  test asserts no hidden case id or input text reaches the request *or the
+  built prompt*.
+- **Structured proposal schema** (`proposal@1`): parent generation, summary,
+  rationale, trace evidence, expected outcome, complete candidate source,
+  changed surfaces, risks, assumptions. Completions are validated strictly and
+  rejections journaled by distinct kind: `proposal-truncated` (hit token cap),
+  `proposal-malformed` (not JSON), `proposal-schema-invalid` (wrong shape,
+  wrong parent echo, wrong surfaces), `proposal-forbidden` (kernel AST screen:
+  imports outside the task catalog, forbidden builtins, unparseable source),
+  `proposal-stale`, `budget-exhausted`, `model-error`.
+- **Staleness protection.** The kernel re-reads the active generation after
+  the proposer returns; a proposal parented on a superseded generation is
+  rejected (`proposal-stale`) — tested with a proposer that changes the
+  incumbent mid-proposal.
+- **Journaled, replayable model I/O.** `model_call` events carry adapter name,
+  model id, request parameters (max tokens, temperature, seed), token usage,
+  latency, and content-addressed prompt/completion refs in the object store.
+  `strive replay RUN_ID` re-executes baseline + candidate from recorded state
+  and re-runs the recorded policy, reporting whether the decision reproduces —
+  no proposer or model is consulted.
+- **Second task, non-planted weakness.** `max-integers`: the seed takes
+  `max()` over token *strings* (lexicographic — "9" beats "100"). No registry
+  entry knows it; a control test proves the registry proposer cannot fix it.
+  The generic `EvidenceDiagnoser` (registry-free) packages visible failure
+  evidence; the model path proposes the numeric-comparison fix, which passes
+  the paired gate 0.500 → 1.000 with zero regressions.
+- **Real adapter, env-only.** `STRIVE_MODEL_PROVIDER=openai-compatible` +
+  `STRIVE_MODEL_BASE_URL`/`STRIVE_MODEL_API_KEY`/`STRIVE_MODEL_ID` builds a
+  stdlib-only adapter. Nothing in tests or default commands touches it.
+- **CLI.** `strive run --proposer {registry,model}` (model uses the offline
+  fake unless env-configured); `strive inspect --run ID --type model_call`
+  filters journaled model/proposal events; `--json` everywhere.
+
+## Phase-4 verification evidence
+
+- `uv run pytest -q` → **91 passed**, offline. The demonstration matrix:
+  fake-model fix of the non-planted weakness promoted through
+  `paired-deterministic@1` on protected splits; registry control cannot fix
+  it; full offline replay reproduces the decision; malformed / truncated /
+  schema-invalid / forbidden responses each rejected with their distinct kind
+  and no controller crash; regressive-but-valid candidate rejected with the
+  incumbent left active and the rejection retained; stale proposal rejected
+  after incumbent change; model-call budget enforced by the trusted meter
+  (`model_call_denied` journaled, model never invoked); all stage-2a
+  failure-injection tests and the phase-1 slice intact.
+- `uv run mypy` → strict, no issues in 33 source files.
+- `artifacts/demo-model/transcript.txt` → live CLI evidence: model-proposer
+  cycle (fake adapter) accepted 0.500 → 1.000; exact replay with
+  `decision_reproduced=True`; `inspect --type model_call` showing adapter,
+  model id, latency, and the content-addressed prompt ref.
+
+## Phase-4 decisions
+
+- Decision reasons are excluded from proposer history (they may cite hidden
+  case ids); history carries aggregate scores + policy identity only.
+- The forbidden-source screen is kernel-side and runs *after* staleness,
+  *before* any sandbox execution; it is a pre-filter (D1), never the gate.
+- The fake adapter's demo responder parses the prompt (parent id, cited
+  cases) rather than being keyed to exact prompt bytes — prompt evolution
+  doesn't silently break the fixtures, and the fixture's role as a stand-in
+  is explicit (`fakemodel.py` docstring).
+- `EvidenceDiagnoser` names no weakness (`visible-case-failures`) — the
+  CH lesson about confidently-wrong self-diagnosis argues for packaging
+  evidence over guessing causes when no signature matches.
+
+## Model-dependence limitations (stated plainly)
+
+- **The CI "model" is a deterministic fake.** Every green test proves
+  pipeline correctness — validation, gating, journaling, replay — and nothing
+  about real-model proposal quality. The one honest capability claim: the
+  *harness* correctly promotes good candidates and rejects bad, stale,
+  malformed, forbidden, and over-budget ones, wherever they come from.
+- **Real-model behavior is untested** and expected to be sharply
+  capability-dependent (note 03's capability floor). The danger signature to
+  watch when real runs begin: rising acceptance rate with falling held-out
+  scores. Raw telemetry for this is journaled; the aggregated per-model
+  statistics report is stage-3 work.
+- **Single model call per cycle, no retry/repair loop:** a real model that
+  emits one malformed response simply loses the cycle. Deliberate for now —
+  retries interact with budgets and belong with evolution algorithms (stage 3).
+- The isolation caveats from phase 3 stand; kernel confinement should precede
+  any third-party candidate source.
+
+## Next phase — stage 3: composite generations, pluggable validators, competing evolution algorithms
+
+1. **Composite multi-surface generations**: per-surface CRUD deltas with
+   before/after snapshots (D5); prompts and policies become surfaces; the
+   `SurfaceDescriptor` registry.
+2. **Pluggable `Validator` contracts**: suite / held-out / static tiers become
+   registered validators chosen per surface and risk (D14); regression split
+   grown automatically from past failures.
+3. **Competing `EvolutionAlgorithm` plugins**: incumbent hill-climb (today's
+   behavior) vs GEPA-style Pareto-frontier population under equal budgets,
+   with per-algorithm and per-proposer-model acceptance statistics.
+4. Sandbox tier 3 on Linux (Landlock/seccomp) ahead of any real-model
+   candidate source used routinely.
 
 ## Phase 3 — hardened core (what was implemented)
 
@@ -117,15 +228,12 @@ that `provisional@1`'s window rule catches regressions early enough; that the
 stall window of 3 balances false freezes against long stalls. These are named
 and versioned precisely so competing policies can be tested against them.
 
-## Next phase — the model-backed self-evolution engine (stage 2b)
+## Phase-3 next-phase note (historical)
 
-Build `ModelProposer` on the seams that now exist: it consumes
-`VisibleContext` + diagnosis + acceptance history through the `Proposer`
-protocol, calls a `ModelAdapter` through the metered journaling wrapper
-(`FakeModelAdapter` in CI), and its candidates face the same paired gate.
-Add a second task with a non-planted weakness, grow the regression split from
-recorded failures, and report per-proposer-model acceptance statistics
-(capability-floor telemetry). Exit criteria are in ROADMAP stage 2b.
+*The stage-2b plan described here was carried out in phase 4 — see "Phase 4"
+at the top of this document. Two items were deliberately deferred to stage 3:
+automatic regression-split growth and aggregated per-proposer-model
+acceptance statistics.*
 
 ## Research conclusions
 

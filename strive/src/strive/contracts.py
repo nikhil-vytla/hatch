@@ -28,6 +28,15 @@ FAILURE_MALFORMED_OUTPUT = "malformed-output"
 FAILURE_OUTPUT_LIMIT = "output-limit"
 FAILURE_BUDGET_EXHAUSTED = "budget-exhausted"
 FAILURE_SCHEMA_MISMATCH = "schema-mismatch"
+FAILURE_MODEL_ERROR = "model-error"
+
+# proposal-pipeline rejection kinds, each journaled distinctly
+FAILURE_PROPOSAL_TRUNCATED = "proposal-truncated"
+FAILURE_PROPOSAL_MALFORMED = "proposal-malformed"
+FAILURE_PROPOSAL_SCHEMA_INVALID = "proposal-schema-invalid"
+FAILURE_PROPOSAL_FORBIDDEN = "proposal-forbidden"
+FAILURE_PROPOSAL_STALE = "proposal-stale"
+FAILURE_PROPOSAL_ABSTAINED = "proposal-abstained"
 
 
 @register("failure", 1)
@@ -145,6 +154,28 @@ class Diagnosis:
     weakness_id: str
     description: str
     evidence_case_ids: tuple[str, ...]
+
+
+@register("proposal", 1)
+@dataclass(frozen=True)
+class ProposalRecord:
+    """A structured proposed change, as validated from a proposer's output.
+
+    ``parent_generation_id`` names the incumbent the proposal was derived
+    from; the kernel rejects the proposal as stale if the active generation
+    has changed by the time it is applied.
+    """
+
+    parent_generation_id: str
+    surface: str
+    summary: str
+    rationale: str
+    trace_evidence: tuple[str, ...]
+    expected_outcome: str
+    source: str
+    changed_surfaces: tuple[str, ...]
+    risks: tuple[str, ...]
+    assumptions: tuple[str, ...]
 
 
 @register("candidate", 1)

@@ -40,20 +40,33 @@ resume/history, all with `--json`). Sandbox hardening is partial: scrubbed env,
 private workspace, rlimits, bounded output — network denial is NOT enforced
 (documented honestly in README/ARCHITECTURE).
 
-## Stage 2b — Model-in-the-loop offline evolution (next)
+## Stage 2b — Model-in-the-loop offline evolution ✅ (2026-08-07, phase 4)
 
-- `ModelProposer` behind the existing `Proposer` protocol, using the existing
-  `ModelAdapter`/`FakeModelAdapter`; all proposer I/O journaled and replayable.
-- Proposer input contract: `VisibleContext` + diagnosis + **acceptance history**
-  (prime-agent feeds past refinement results back; note 02).
-- A second task with a non-planted weakness; regression split grown from failures.
-- Per-proposer-model acceptance statistics (capability-floor telemetry, note 03).
+Implemented (see HANDOFF "Phase 4" for verification evidence):
+- ✅ `ModelProposer` behind a typed `Proposer` protocol (registry proposer retained
+  as the deterministic reference); structured proposal schema with strict, distinctly
+  journaled rejection classification (truncated / malformed / schema-invalid /
+  forbidden / stale / budget-exhausted).
+- ✅ Proposer input contract: visible evidence + diagnosis + sanitized acceptance
+  history (aggregate scores only) + explicit budgets; holdout contents mechanically
+  absent (spy-tested down to the built prompt).
+- ✅ All model I/O journaled with adapter name, model id, params, usage, latency,
+  and content-addressed prompt/completion artifacts; the full fake-model cycle
+  replays offline and reproduces the promotion decision.
+- ✅ Second task (`max-integers`) with a non-planted weakness (lexicographic max);
+  fixed by the evidence-driven path, provably not by the registry (control test).
+- ✅ Env-only real adapter (`STRIVE_MODEL_PROVIDER=openai-compatible`); no test or
+  default command touches a network.
 
-**Exit criteria:** a model-backed proposer (fake model in CI) fixes a *non-planted*
-weakness on a second task; the candidate passes held-out validation; the full cycle
-replays offline from the ledger alone; a hanging/hostile candidate exhausts its budget
-and is journaled as a floor-scored rejection (the last is already demonstrated by
-failure-injection tests).
+Carried into stage 3 (not done):
+- Regression split grown automatically from past failures (mechanism exists, empty).
+- Aggregated per-proposer-model acceptance statistics (raw telemetry is journaled;
+  no reporting command yet).
+
+**Exit criteria met with one honest caveat:** the "model" in CI is the deterministic
+fake — it proves the pipeline (validation, gating, journaling, replay), not model
+capability. Real-model capability is untested and expected to be model-dependent
+(capability floor, note 03).
 
 ## Stage 3 — Composite generations + pluggable evolution algorithms + hardened sandbox
 

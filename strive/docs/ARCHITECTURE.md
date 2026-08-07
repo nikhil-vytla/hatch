@@ -239,7 +239,9 @@ Rules, each traceable to a researched failure:
 | trusted stall detector + freeze/resume interventions | **implemented** (`monitors.py`) |
 | pluggable named+versioned acceptance policies, recorded per decision | **implemented** (`policy.py`: `paired-deterministic@1`, `provisional@1`) |
 | provisional activations: scoped, monitored, expiring, reverting | **implemented** (`loop.py::_resolve_provisional`) |
-| provider-neutral ModelAdapter + deterministic fake + journaled metered I/O | **implemented** (`model.py`) — not yet used by any evolution component |
+| provider-neutral ModelAdapter + deterministic fake + journaled metered I/O | **implemented** (`model.py`; latency + content-addressed prompt/completion artifacts; env-only real adapter) |
+| model-backed proposer (stage 2b) | **implemented** (`model_proposer.py`): visible-evidence prompt, structured proposal schema, strict classification (truncated/malformed/schema-invalid/forbidden/stale/budget), kernel-side staleness + source screen; offline replay reproduces the decision |
+| generic evidence diagnoser (registry-free) | **implemented** (`diagnose.EvidenceDiagnoser`) — packages visible failure evidence without naming a weakness |
 | sandbox tier 2 (scrubbed env, workspace, rlimits, bounded output) | **implemented** (`sandbox.py`) — network denial NOT enforced; see honest limits |
 | composite per-surface generations | pending (stage 3) — single `strategy-code` surface today |
 | EvolutionAlgorithm plugin (Pareto population) | pending (stage 3) |

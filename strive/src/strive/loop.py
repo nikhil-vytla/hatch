@@ -7,8 +7,13 @@ One cycle walks the loop end to end:
 
 Kernel invariants enforced here:
 - evolvable code runs only in the sandbox, never in this process;
-- diagnosis and proposal receive a ``VisibleContext`` (visible split only) —
-  held-out, regression, and adversarial evidence is mechanically absent;
+- diagnosis and proposal receive visible-split evidence only; proposal
+  history is sanitized to aggregate outcomes (no case contents or ids from
+  hidden splits);
+- model calls go through the metered journaling adapter (budgets, latency,
+  content-addressed prompt/completion artifacts);
+- proposals are validated strictly and rejections journaled by kind; a
+  proposal parented on a superseded generation is rejected as stale;
 - every execution is charged to the trusted budget meter and attributed to
   the generation that served it;
 - every failure is recorded data, never a controller exception;
@@ -35,20 +40,31 @@ from strive.contracts import (
     Diagnosis,
     Evaluation,
     ExecutionReport,
+    FAILURE_PROPOSAL_STALE,
+    FailureRecord,
     Intervention,
     INTERVENTION_EXPIRY_REVERT,
     INTERVENTION_STALL_FREEZE,
     Generation,
+    ProposalRecord,
 )
 from strive.diagnose import Diagnoser, SignatureDiagnoser, VisibleContext
 from strive.evaluate import evaluate
 from strive.events import EventLog, now_iso
+from strive.model import MeteredJournalingAdapter, ModelAdapter
 from strive.monitors import StallDetector
 from strive.policy import PROVISIONAL_POLICY, AcceptancePolicy, get_policy
-from strive.propose import STRATEGY_CODE_SURFACE, Proposer, RegistryProposer
+from strive.propose import (
+    ProposalHistoryItem,
+    ProposalRequest,
+    Proposer,
+    RegistryProposer,
+    STRATEGY_CODE_SURFACE,
+    screen_source,
+)
 from strive.sandbox import run_strategy
 from strive.store import Store, StoreError
-from strive.tasks import BASELINE_STRATEGY_SOURCE, Task
+from strive.tasks import Task
 
 
 @dataclass
@@ -58,7 +74,10 @@ class LoopConfig:
     policy_name: str = "paired-deterministic"
     diagnoser: Diagnoser = field(default_factory=SignatureDiagnoser)
     proposer: Proposer = field(default_factory=RegistryProposer)
+    model_adapter: ModelAdapter | None = None
+    model_max_tokens: int = 2048
     stall_window: int = 3
+    history_limit: int = 5
 
 
 @dataclass(frozen=True)
@@ -68,6 +87,8 @@ class CycleReport:
     evaluation: Evaluation
     frozen: bool
     diagnosis: Diagnosis | None
+    proposal: ProposalRecord | None
+    proposal_failure: FailureRecord | None
     candidate: Candidate | None
     candidate_evaluation: Evaluation | None
     decision: Decision | None
@@ -79,12 +100,12 @@ def _new_run_id(prefix: str = "run") -> str:
     return f"{prefix}-{stamp}-{uuid.uuid4().hex[:6]}"
 
 
-def ensure_seeded(store: Store) -> Generation:
+def ensure_seeded(store: Store, task: Task) -> Generation:
     active = store.active_generation()
     if active is not None:
         return active
     record = store.add_generation(
-        BASELINE_STRATEGY_SOURCE,
+        task.seed_source,
         parent_id=None,
         origin="seed",
         surface=STRATEGY_CODE_SURFACE,
@@ -148,6 +169,32 @@ def _execute_and_evaluate(
     return evaluation
 
 
+def _proposal_history(store: Store, limit: int) -> tuple[ProposalHistoryItem, ...]:
+    """Sanitized accepted/rejected history: aggregate scores and policy identity
+    only. Decision *reasons* are excluded because they may cite hidden-split
+    case ids (e.g. regression lists)."""
+    items: list[ProposalHistoryItem] = []
+    for generation in store.generations().values():
+        decision = generation.decision
+        if decision is None:
+            continue
+        verdict = "accepted" if decision.accepted else "rejected"
+        items.append(
+            ProposalHistoryItem(
+                generation_id=generation.generation_id,
+                weakness_id=generation.weakness_id,
+                description=f"candidate for weakness {generation.weakness_id or 'n/a'}",
+                accepted=decision.accepted,
+                outcome=(
+                    f"{verdict} by {decision.policy}@{decision.policy_version}: "
+                    f"overall {decision.baseline_score:.3f} -> "
+                    f"{decision.candidate_score:.3f}"
+                ),
+            )
+        )
+    return tuple(items[-limit:])
+
+
 def _resolve_provisional(store: Store, events: EventLog) -> None:
     """Expire or confirm a provisional activation whose window has elapsed."""
     activation = store.active_activation()
@@ -202,10 +249,88 @@ def _resolve_provisional(store: Store, events: EventLog) -> None:
     )
 
 
+def _proposal_stage(
+    store: Store,
+    task: Task,
+    ctx: VisibleContext,
+    diagnosis: Diagnosis,
+    meter: BudgetMeter,
+    config: LoopConfig,
+    events: EventLog,
+) -> tuple[ProposalRecord | None, FailureRecord | None]:
+    """Run the proposer, then kernel-side checks: staleness and the forbidden-
+    source screen. Every rejection is journaled with its distinct kind."""
+    model_handle = None
+    if config.model_adapter is not None:
+        model_handle = MeteredJournalingAdapter(
+            config.model_adapter, meter, events, store.objects
+        )
+    usage = meter.usage()
+    request = ProposalRequest(
+        ctx=ctx,
+        diagnosis=diagnosis,
+        task_description=task.description,
+        task_signature=task.signature,
+        primitive_catalog=task.primitive_catalog,
+        history=_proposal_history(store, config.history_limit),
+        max_output_tokens=config.model_max_tokens,
+        model_calls_remaining=max(0, config.budget.model_calls - usage.model_calls - 1),
+        executions_remaining=max(0, config.budget.executions - usage.executions),
+        model=model_handle,
+    )
+    result = config.proposer.propose(request)
+
+    if result.failure is not None:
+        events.emit(
+            "proposal_rejected",
+            proposer=config.proposer.name,
+            failure=codec.encode(result.failure),
+        )
+        return None, result.failure
+    assert result.proposal is not None
+    proposal = result.proposal
+
+    # staleness: re-read the incumbent; a slow proposal must not apply to a
+    # generation that is no longer active
+    current = store.active_generation()
+    current_id = current.generation_id if current is not None else "(none)"
+    if current_id != proposal.parent_generation_id:
+        stale = FailureRecord(
+            kind=FAILURE_PROPOSAL_STALE,
+            detail=(
+                f"proposal parented on {proposal.parent_generation_id} but the "
+                f"active generation is now {current_id}"
+            ),
+        )
+        events.emit(
+            "proposal_rejected",
+            proposer=config.proposer.name,
+            failure=codec.encode(stale),
+        )
+        return None, stale
+
+    screen = screen_source(proposal.source, task.primitive_catalog)
+    if screen is not None:
+        events.emit(
+            "proposal_rejected",
+            proposer=config.proposer.name,
+            failure=codec.encode(screen),
+        )
+        return None, screen
+
+    events.emit(
+        "proposal",
+        proposer=config.proposer.name,
+        proposal=codec.encode(proposal),
+        source_ref=store.objects.put_text(proposal.source),
+    )
+    return proposal, None
+
+
 def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> CycleReport:
     config = config or LoopConfig()
     policy: AcceptancePolicy = get_policy(config.policy_name)
-    ensure_seeded(store)
+    ensure_seeded(store, task)
 
     run_id = _new_run_id()
     events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
@@ -223,12 +348,15 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
         task_fingerprint=task.fingerprint(),
         generation_id=active.generation_id,
         policy=f"{policy.name}@{policy.version}",
+        proposer=config.proposer.name,
         frozen=frozen,
     )
 
     evaluation = _execute_and_evaluate(store, task, active, meter, config, events)
 
     diagnosis: Diagnosis | None = None
+    proposal: ProposalRecord | None = None
+    proposal_failure: FailureRecord | None = None
     candidate: Candidate | None = None
     candidate_evaluation: Evaluation | None = None
     decision: Decision | None = None
@@ -250,16 +378,16 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
             events.emit("no_weakness_detected")
         else:
             events.emit("weakness_detected", diagnosis=codec.encode(diagnosis))
-            proposal = config.proposer.propose(ctx, diagnosis)
-            if proposal is None:
-                events.emit("no_candidate_proposed", weakness_id=diagnosis.weakness_id)
-            else:
+            proposal, proposal_failure = _proposal_stage(
+                store, task, ctx, diagnosis, meter, config, events
+            )
+            if proposal is not None:
                 candidate = Candidate(
                     candidate_id=f"cand-{uuid.uuid4().hex[:8]}",
-                    parent_generation_id=active.generation_id,
+                    parent_generation_id=proposal.parent_generation_id,
                     surface=proposal.surface,
-                    weakness_id=proposal.weakness_id,
-                    description=proposal.description,
+                    weakness_id=diagnosis.weakness_id,
+                    description=proposal.summary,
                     source_ref=store.objects.put_text(proposal.source),
                 )
                 events.emit("candidate_proposed", candidate=codec.encode(candidate))
@@ -345,6 +473,8 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
         evaluation=evaluation,
         frozen=frozen,
         diagnosis=diagnosis,
+        proposal=proposal,
+        proposal_failure=proposal_failure,
         candidate=candidate,
         candidate_evaluation=candidate_evaluation,
         decision=decision,
@@ -449,12 +579,21 @@ class ReplayReport:
     replayed_score: float
     matches: bool
     split_diffs: dict[str, float]
+    candidate_generation_id: str | None
+    candidate_replayed_score: float | None
+    decision_matches: bool | None
 
 
 def replay_run(
     store: Store, task: Task, run_id: str, config: LoopConfig | None = None
 ) -> ReplayReport:
-    """Re-execute a recorded cycle's generation and compare against the record."""
+    """Re-execute a recorded cycle offline and compare against the record.
+
+    Replays the baseline execution; if the cycle produced a candidate, also
+    replays the candidate and re-runs the recorded acceptance policy, checking
+    that the decision reproduces. Everything comes from the ledger and object
+    store — no proposer or model is consulted.
+    """
     config = config or LoopConfig()
     cycle = store.cycle(run_id)
     task_drift = cycle.task_fingerprint != task.fingerprint()
@@ -468,6 +607,21 @@ def replay_run(
         for split, recorded in cycle.split_scores.items()
     }
     matches = (not task_drift) and evaluation.overall_score == cycle.overall_score
+
+    candidate_replayed_score: float | None = None
+    decision_matches: bool | None = None
+    if cycle.candidate_generation_id is not None:
+        candidate_generation = store.generation(cycle.candidate_generation_id)
+        candidate_evaluation = _execute_and_evaluate(
+            store, task, candidate_generation, meter, config, events
+        )
+        candidate_replayed_score = candidate_evaluation.overall_score
+        recorded_decision = candidate_generation.decision
+        if recorded_decision is not None:
+            policy = get_policy(recorded_decision.policy)
+            replayed_decision = policy.decide(evaluation, candidate_evaluation)
+            decision_matches = replayed_decision.accepted == recorded_decision.accepted
+
     return ReplayReport(
         run_id=run_id,
         generation_id=cycle.generation_id,
@@ -476,4 +630,7 @@ def replay_run(
         replayed_score=evaluation.overall_score,
         matches=matches,
         split_diffs=split_diffs,
+        candidate_generation_id=cycle.candidate_generation_id,
+        candidate_replayed_score=candidate_replayed_score,
+        decision_matches=decision_matches,
     )

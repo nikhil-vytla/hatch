@@ -60,7 +60,7 @@ def test_rollback_without_history_raises_cleanly(tmp_path: Path) -> None:
 
 def test_rollback_past_seed_raises_cleanly(tmp_path: Path) -> None:
     store = Store(tmp_path / "artifacts")
-    ensure_seeded(store)
+    ensure_seeded(store, SUM_INTEGERS_TASK)
     with pytest.raises(StoreError, match="has no parent"):
         store.rollback()
 
@@ -70,7 +70,7 @@ def test_promotion_is_atomic_under_crash(tmp_path: Path) -> None:
     leaves the previous activation in force — never a half-promoted state."""
     root = tmp_path / "artifacts"
     store = Store(root)
-    ensure_seeded(store)
+    ensure_seeded(store, SUM_INTEGERS_TASK)
     seed = store.active_generation()
     assert seed is not None
 

@@ -247,3 +247,54 @@ the vertical slice. No model-driven evolution yet.
 - Demo regenerated with the new format: accepted evolution 0.455 → 1.000,
   paired-gate refusal, rollback, evidence-gated re-promotion, exact replay
   match (`artifacts/demo/transcript.txt`).
+
+## 2026-08-07 — phase 4: model-backed offline evolution (stage 2b)
+
+Goal: model-driven proposal generation on the hardened seams. No online
+adaptation, no composite generations.
+
+### What was built
+
+- `Proposer` protocol reworked: `propose(ProposalRequest) -> ProposalResult`.
+  The request is kernel-built and visible-only: incumbent source, task
+  signature + primitive catalog, visible failures with evaluator feedback,
+  diagnosis, sanitized history, explicit budgets, and (for model proposers)
+  a metered journaling model handle. RegistryProposer retained as reference.
+- `model_proposer.py`: prompt from trusted inputs; strict completion
+  classification — truncated (hit token cap), malformed (not JSON),
+  schema-invalid (wrong shape / wrong parent echo / wrong surfaces),
+  plus kernel-side forbidden (AST screen vs the task's primitive catalog)
+  and stale (incumbent changed mid-proposal). Each journaled distinctly.
+- `fakemodel.py`: demo responder that parses the prompt (parent id, cited
+  case ids) instead of exact-byte matching. Honesty note in the docstring
+  and README: fakes demonstrate pipeline correctness, not model capability.
+- Second task `max-integers` with a non-planted weakness: seed takes max()
+  over token *strings* → lexicographic ("9" beats "100"). Control test
+  proves the registry proposer cannot fix it; EvidenceDiagnoser (generic,
+  registry-free) + model path fixes it, 0.500 → 1.000, zero regressions.
+- Replay extended: re-executes baseline + candidate from CAS and re-runs the
+  *recorded* policy, reporting decision_reproduced. Demo transcript shows it.
+- model_call events now carry adapter name, model id, params, usage, latency,
+  and content-addressed prompt/completion refs.
+- Env-only real adapter (openai-compatible, stdlib urllib). Never touched by
+  tests or defaults.
+
+### Things learned along the way
+
+- "this is not python" is valid Python (`this is (not python)`) — my
+  unparseable-source test fixture parsed fine. Fixture changed to a real
+  syntax error. Good reminder that "obviously invalid" inputs often aren't.
+- Sanitizing proposer history required dropping decision *reasons* entirely:
+  rejection reasons embed regressed case id lists, which can name held-out
+  cases. Aggregate scores + policy identity carry the useful signal.
+- The spy test now asserts holdout isolation down to the *built prompt* —
+  the strongest mechanical statement of the boundary so far.
+
+### Verification snapshot (2026-08-07, phase 4)
+
+- `uv run pytest -q` → 91 passed (offline; full stage-2b demonstration
+  matrix + all prior suites).
+- `uv run mypy` → strict, clean, 33 source files.
+- `artifacts/demo-model/transcript.txt`: model-proposer cycle accepted
+  0.500 → 1.000; replay decision_reproduced=True; inspect --type model_call
+  shows adapter/model/latency/prompt_ref.
