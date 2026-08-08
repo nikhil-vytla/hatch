@@ -224,7 +224,12 @@ def parse_completion(
 
 
 class ModelProposer:
-    """Evidence-driven proposer over the provider-neutral model interface."""
+    """Model-backed proposer over the provider-neutral adapter interface.
+
+    Its prompt is built from visible evidence only; what the model does with
+    that evidence is the model's business — in offline tests and demos a
+    scripted proposal fixture stands in, which exercises this pipeline but
+    demonstrates nothing about model reasoning."""
 
     name = "model"
 

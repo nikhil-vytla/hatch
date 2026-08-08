@@ -67,6 +67,13 @@ Carried into stage 3 (not done):
 - Aggregated per-proposer-model acceptance statistics (raw telemetry is journaled;
   no reporting command yet).
 
+The milestone claim, stated precisely: Strive can accept model-path
+proposals, validate and classify them, execute candidates outside the kernel
+process, compare them with an incumbent, retain decisions and lineage, and
+replay execution and selection. The deterministic fixture proves pipeline
+correctness; real-model proposal quality remains an untested capability
+question.
+
 **Exit criteria met with honest caveats:** the "model" in CI is a scripted proposal
 fixture — it proves the pipeline (validation, gating, journaling, replay), not model
 reasoning or capability. Real-model capability is untested, expected to be

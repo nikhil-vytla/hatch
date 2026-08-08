@@ -292,3 +292,73 @@ def test_budget_semantics_are_recorded_per_limit() -> None:
     assert semantics["tokens"] == "enforced-between-calls+output-cap"
     assert semantics["cost"] == "accounting-only"
     assert semantics["model_calls"] == "enforced"
+
+
+class _CostingAdapter:
+    """Reports a fixed trustworthy cost per call."""
+
+    adapter_name = "costing"
+    model_id = "costing-v1"
+    reports_cost = True
+
+    def __init__(self, cost_per_call: float) -> None:
+        self._cost = cost_per_call
+
+    def complete(self, request: ModelRequest) -> ModelResponse:
+        return ModelResponse(
+            text="{}",
+            model_id=self.model_id,
+            input_tokens=1,
+            output_tokens=1,
+            cost=self._cost,
+        )
+
+
+def test_cost_exactly_at_limit_succeeds_and_next_call_is_denied(
+    tmp_path: Path,
+) -> None:
+    meter = BudgetMeter(BudgetSpec(model_calls=5, cost=1.0))
+    events = EventLog(tmp_path / "e.jsonl", "r")
+    adapter = MeteredJournalingAdapter(
+        _CostingAdapter(1.0), meter, events, ObjectStore(tmp_path / "o")
+    )
+    first = adapter.complete(ModelRequest(prompt="p"))
+    assert isinstance(first, ModelResponse)  # reaching the limit exactly is fine
+    second = adapter.complete(ModelRequest(prompt="q"))
+    assert isinstance(second, FailureRecord)  # next call denied pre-call
+    assert "cost budget exhausted" in second.detail
+    assert meter.usage().cost == 1.0
+
+
+def test_post_call_cost_overrun_rejects_completion_and_stays_accounted(
+    tmp_path: Path,
+) -> None:
+    meter = BudgetMeter(BudgetSpec(model_calls=5, cost=1.0))
+    events = EventLog(tmp_path / "e.jsonl", "r")
+    adapter = MeteredJournalingAdapter(
+        _CostingAdapter(1.5), meter, events, ObjectStore(tmp_path / "o")
+    )
+    outcome = adapter.complete(ModelRequest(prompt="p"))
+    assert isinstance(outcome, FailureRecord)
+    assert outcome.kind == FAILURE_BUDGET_EXHAUSTED
+    assert "overrunning call's completion is rejected" in outcome.detail
+    assert meter.usage().cost == 1.5  # the spent call stays accounted
+    types = [e.type for e in events.read_all()]
+    assert "model_call" in types and "model_call_overrun" in types
+
+
+def test_unlimited_cost_is_accounting_only_even_with_reported_cost(
+    tmp_path: Path,
+) -> None:
+    from strive.budget import UNLIMITED
+
+    meter = BudgetMeter(BudgetSpec(model_calls=5, cost=UNLIMITED))
+    adapter = MeteredJournalingAdapter(
+        _CostingAdapter(100.0),
+        meter,
+        EventLog(tmp_path / "e.jsonl", "r"),
+        ObjectStore(tmp_path / "o"),
+    )
+    for _ in range(3):
+        assert isinstance(adapter.complete(ModelRequest(prompt="p")), ModelResponse)
+    assert meter.usage().cost == 300.0  # tracked, never enforced

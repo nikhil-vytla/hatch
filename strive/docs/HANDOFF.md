@@ -8,6 +8,14 @@ of the core harness (stage 2a), the phase-4 model-backed offline
 self-evolution loop (stage 2b), and the phase-4.5 correctness and
 claim-precision pass over stage 2b.
 
+## The Stage 2b claim, stated precisely
+
+> Strive can accept model-path proposals, validate and classify them, execute
+> candidates outside the kernel process, compare them with an incumbent,
+> retain decisions and lineage, and replay execution and selection. The
+> deterministic fixture proves pipeline correctness; real-model proposal
+> quality remains an untested capability question.
+
 ## Phase 4.6 — final pre-merge corrections (completed fixes)
 
 A second, final precision pass before merging PR #39; 133 tests, strict mypy.
@@ -40,7 +48,16 @@ A second, final precision pass before merging PR #39; 133 tests, strict mypy.
 5. **Proposal evidence validation**: with visible failures present,
    `trace_evidence` must be nonempty and entirely within the visible
    failing-case ids (empty / unknown / valid all tested).
-6. Low-cost cleanups: stale test names no longer imply model reasoning or
+6. **Post-call cost overrun** (final): with `reports_cost` adapters, a call
+   that crosses the cost ceiling is charged, journaled
+   (`model_call_overrun`), and its completion rejected before it can become
+   a proposal; reaching the limit exactly succeeds and the next call is
+   denied pre-call; fail-closed behavior for non-reporting adapters stands.
+7. **Centralized drift acknowledgement** (final): `guard_mutation` is the one
+   entry point for mutating operations — binding + drift validation + durable
+   `task-drift-acknowledged` journaling (written only when drift actually
+   exists). `run` and `promote` both use it; future mutations cannot forget.
+8. Low-cost cleanups: stale test names no longer imply model reasoning or
    full replay; decision replay resolves the recorded policy by name AND
    version (refusing on mismatch) and compares verdict + both scores +
    regressed ids; the metered wrapper contains *any* ordinary adapter

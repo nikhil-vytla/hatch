@@ -291,10 +291,10 @@ class MeteredJournalingAdapter:
             cost=response.cost,
             finish_reason=response.finish_reason,
         )
-        overrun = self._meter.tokens_overrun()
+        overrun = self._meter.tokens_overrun() or self._meter.cost_overrun()
         if overrun is not None:
-            # the call happened and is journaled/charged, but its completion
-            # must not become a proposal: reject before returning it
+            # the call happened and stays journaled/charged, but its
+            # completion must not become a proposal: reject before returning
             self._events.emit("model_call_overrun", failure=codec.encode(overrun))
             return overrun
         return response

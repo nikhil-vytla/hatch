@@ -158,6 +158,18 @@ class BudgetMeter:
             )
         return None
 
+    def cost_overrun(self) -> FailureRecord | None:
+        """Post-call check: did accumulated (adapter-reported) cost exceed the
+        hard limit? Reaching the limit exactly is allowed; the *next* call is
+        then denied pre-call. The overrunning spend stays accounted."""
+        if _limited(self.spec.cost) and self._cost > self.spec.cost:
+            return self._exhausted(
+                "cost",
+                f"{self.spec.cost} allowed, {self._cost} spent — the "
+                "overrunning call's completion is rejected",
+            )
+        return None
+
     def request_model_call(self) -> FailureRecord | None:
         if _limited(self.spec.model_calls) and self._model_calls >= self.spec.model_calls:
             return self._exhausted("model-call", f"{self.spec.model_calls} allowed")

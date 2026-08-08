@@ -141,6 +141,28 @@ def guard_task_binding(
     return mutating and acknowledge_drift
 
 
+def guard_mutation(store: Store, task: Task, acknowledge_drift: bool) -> None:
+    """The single entry point for mutating operations: task-binding + drift
+    validation, plus durable journaling of a drift acknowledgement whenever —
+    and only whenever — drift actually exists and was acknowledged. New
+    mutating operations must call this, so the journaling cannot be forgotten.
+    """
+    drift_acknowledged = guard_task_binding(
+        store, task, mutating=True, acknowledge_drift=acknowledge_drift
+    )
+    if drift_acknowledged:
+        store.append(
+            Intervention(
+                kind=INTERVENTION_DRIFT_ACKNOWLEDGED,
+                reason=(
+                    f"operator acknowledged task-fingerprint drift; proceeding "
+                    f"against current fingerprint {task.fingerprint()[:12]}…"
+                ),
+                at=now_iso(),
+            )
+        )
+
+
 def ensure_seeded(store: Store, task: Task) -> Generation:
     guard_task_binding(store, task, mutating=False)
     active = store.active_generation()
@@ -379,20 +401,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
     config = config or LoopConfig()
     policy: AcceptancePolicy = get_policy(config.policy_name)
     ensure_seeded(store, task)
-    drift_acknowledged = guard_task_binding(
-        store, task, mutating=True, acknowledge_drift=config.acknowledge_task_drift
-    )
-    if drift_acknowledged:
-        store.append(
-            Intervention(
-                kind=INTERVENTION_DRIFT_ACKNOWLEDGED,
-                reason=(
-                    f"operator acknowledged task-fingerprint drift; proceeding "
-                    f"against current fingerprint {task.fingerprint()[:12]}…"
-                ),
-                at=now_iso(),
-            )
-        )
+    guard_mutation(store, task, config.acknowledge_task_drift)
 
     run_id = _new_run_id()
     events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
@@ -655,9 +664,7 @@ def promote_generation(
     it must be confirmed by its observation window or it reverts.
     """
     config = config or LoopConfig()
-    guard_task_binding(
-        store, task, mutating=True, acknowledge_drift=config.acknowledge_task_drift
-    )
+    guard_mutation(store, task, config.acknowledge_task_drift)
     target = store.generation(generation_id)
     active = store.active_generation()
     if active is None:

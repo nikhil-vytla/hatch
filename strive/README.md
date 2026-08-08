@@ -126,7 +126,7 @@ strive/
 │   ├── policy.py      pluggable acceptance/promotion policies
 │   ├── monitors.py    trusted stall detection
 │   ├── model.py       provider-neutral model interface, fake + env-only real adapter
-│   ├── model_proposer.py  evidence-driven proposer + strict response classification
+│   ├── model_proposer.py  model-backed proposer (visible evidence in) + strict classification
 │   ├── fakemodel.py   deterministic reference responses for demos/tests
 │   ├── diagnose.py    visible-evidence diagnosis (signature + generic; holdout-isolated)
 │   ├── propose.py     Proposer protocol, registry reference, trusted source screen

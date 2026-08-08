@@ -188,3 +188,56 @@ def test_fingerprint_drift_blocks_mutation_until_acknowledged(tmp_path: Path) ->
     )
     assert acknowledged.run_id
     assert any(i.kind == "task-drift-acknowledged" for i in store.interventions())
+
+
+def test_promote_journals_drift_acknowledgement_like_run(tmp_path: Path) -> None:
+    import dataclasses
+
+    from strive.loop import LoopConfig, promote_generation
+
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
+    run_cycle(store, SUM_INTEGERS_TASK)  # gen-0001 active
+    store.rollback()  # gen-0000 active; gen-0001 is a promotable target
+
+    drifted_task = dataclasses.replace(SUM_INTEGERS_TASK, version=99)
+
+    # refused without acknowledgement
+    with pytest.raises(StoreError, match="task-fingerprint drift"):
+        promote_generation(store, drifted_task, "gen-0001")
+    assert not any(
+        i.kind == "task-drift-acknowledged" for i in store.interventions()
+    )
+
+    # allowed with acknowledgement, and the same durable intervention as `run`
+    activation, decision = promote_generation(
+        store,
+        drifted_task,
+        "gen-0001",
+        config=LoopConfig(acknowledge_task_drift=True),
+    )
+    assert decision is not None and decision.accepted
+    assert activation.generation_id == "gen-0001"
+    acknowledgements = [
+        i for i in store.interventions() if i.kind == "task-drift-acknowledged"
+    ]
+    assert len(acknowledgements) == 1
+
+
+def test_no_drift_acknowledgement_journaled_when_fingerprints_match(
+    tmp_path: Path,
+) -> None:
+    from strive.loop import LoopConfig, promote_generation
+
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
+    run_cycle(store, SUM_INTEGERS_TASK, LoopConfig(acknowledge_task_drift=True))
+    store.rollback()
+    promote_generation(
+        store,
+        SUM_INTEGERS_TASK,
+        "gen-0001",
+        config=LoopConfig(acknowledge_task_drift=True),
+    )
+    # the flag was set but no drift existed: nothing spurious in the journal
+    assert not any(
+        i.kind == "task-drift-acknowledged" for i in store.interventions()
+    )
