@@ -5,3 +5,7 @@ __pycache__/
 *.egg-info/
 artifacts/*
 !artifacts/demo/
+!artifacts/demo-model/
+
+# advisory writer locks are runtime artifacts, never content
+artifacts/demo*/ledger/*.lock

@@ -1,0 +1,7 @@
+"""Seed strategy for sum-integers (generation zero)."""
+
+import re
+
+
+def solve(input_text: str) -> int:
+    return sum(int(token) for token in re.findall(r"-?\d+", input_text))

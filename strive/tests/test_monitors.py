@@ -23,6 +23,7 @@ def solve(input_text: str) -> int:
 def _seed_unpatchable(store: Store) -> None:
     generation = store.add_generation(
         UNPATCHABLE_WEAK_STRATEGY,
+        task_fingerprint=SUM_INTEGERS_TASK.fingerprint(),
         parent_id=None,
         origin="seed",
         surface=STRATEGY_CODE_SURFACE,
@@ -33,7 +34,7 @@ def _seed_unpatchable(store: Store) -> None:
 
 
 def test_stall_freezes_adaptation_and_resume_lifts_it(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     _seed_unpatchable(store)
     config = LoopConfig(stall_window=3)
 
@@ -53,7 +54,7 @@ def test_stall_freezes_adaptation_and_resume_lifts_it(tmp_path: Path) -> None:
     generations_before = len(store.generations())
 
     # freeze holds across restart
-    reopened = Store(tmp_path / "artifacts")
+    reopened = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     assert reopened.adaptation_frozen() is not None
     assert len(reopened.generations()) == generations_before
 
@@ -70,7 +71,7 @@ def test_stall_freezes_adaptation_and_resume_lifts_it(tmp_path: Path) -> None:
 
 
 def test_healthy_idling_is_not_a_stall(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     config = LoopConfig(stall_window=3)
     run_cycle(store, SUM_INTEGERS_TASK, config)  # accepts the fix -> score 1.0
     for _ in range(4):

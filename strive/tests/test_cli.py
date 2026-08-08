@@ -101,9 +101,9 @@ def test_corrupt_ledger_yields_clean_error_envelope(
 ) -> None:
     artifacts = tmp_path / "artifacts"
     _run_json(capsys, "--artifacts", str(artifacts), "run")
-    ledger = artifacts / "ledger" / "ledger.jsonl"
+    ledger = artifacts / "ledger" / "sum-integers.jsonl"
     lines = ledger.read_bytes().splitlines(keepends=True)
-    lines[0] = b'{"schema":"generation@1","garbage":true}\n'
+    lines[0] = b'{"schema":"generation@2","garbage":true}\n'
     ledger.write_bytes(b"".join(lines))
 
     code, envelope = _run_json(capsys, "--artifacts", str(artifacts), "status")
@@ -132,3 +132,98 @@ def test_unknown_generation_is_a_clean_error(
     )
     assert code == 1
     assert envelope["ok"] is False and "unknown generation" in envelope["error"]
+
+
+def test_cross_task_runs_share_one_artifact_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    artifacts = str(tmp_path / "artifacts")
+    code, sum_run = _run_json(capsys, "--artifacts", artifacts, "run")
+    assert code == 0 and sum_run["data"]["decision"]["accepted"] is True
+    code, max_run = _run_json(
+        capsys, "--artifacts", artifacts, "--task", "max-integers",
+        "run", "--proposer", "model",
+    )
+    assert code == 0 and max_run["data"]["decision"]["accepted"] is True
+
+    # each task's lineage is intact and independent under the same root
+    code, sum_lineage = _run_json(capsys, "--artifacts", artifacts, "lineage")
+    code2, max_lineage = _run_json(
+        capsys, "--artifacts", artifacts, "--task", "max-integers", "lineage"
+    )
+    assert code == 0 and code2 == 0
+    assert [g["task_id"] for g in sum_lineage["data"]["lineage"]] == ["sum-integers"] * 2
+    assert [g["task_id"] for g in max_lineage["data"]["lineage"]] == ["max-integers"] * 2
+
+    # replay stays task-scoped: a sum run id is unknown to the max task
+    sum_run_id = sum_run["data"]["run_id"]
+    code, envelope = _run_json(
+        capsys, "--artifacts", artifacts, "--task", "max-integers", "replay", sum_run_id
+    )
+    assert code == 1 and "unknown run" in envelope["error"]
+
+
+def test_audit_command_reports_final_holdout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    artifacts = str(tmp_path / "artifacts")
+    _run_json(capsys, "--artifacts", artifacts, "run")
+    code, envelope = _run_json(capsys, "--artifacts", artifacts, "audit")
+    assert code == 0
+    assert envelope["data"]["audit_score"] == 1.0
+    assert all(c["split"] == "audit" for c in envelope["data"]["cases"])
+
+
+def test_real_model_requires_unsafe_acknowledgement(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STRIVE_MODEL_PROVIDER", "openai-compatible")
+    monkeypatch.setenv("STRIVE_MODEL_BASE_URL", "http://localhost:9")
+    monkeypatch.setenv("STRIVE_MODEL_API_KEY", "test-key")
+    monkeypatch.setenv("STRIVE_MODEL_ID", "test-model")
+    code, envelope = _run_json(
+        capsys, "--artifacts", str(tmp_path / "a"), "--task", "max-integers",
+        "run", "--proposer", "model",
+    )
+    assert code == 1
+    assert envelope["ok"] is False
+    assert "--unsafe-model-code" in envelope["error"]
+    assert "network or filesystem confinement" in envelope["error"]
+
+
+def test_invalid_model_env_is_a_clean_cli_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STRIVE_MODEL_PROVIDER", "openai-compatible")
+    monkeypatch.delenv("STRIVE_MODEL_BASE_URL", raising=False)
+    monkeypatch.delenv("STRIVE_MODEL_API_KEY", raising=False)
+    monkeypatch.delenv("STRIVE_MODEL_ID", raising=False)
+    code, envelope = _run_json(
+        capsys, "--artifacts", str(tmp_path / "a"), "--task", "max-integers",
+        "run", "--proposer", "model",
+    )
+    assert code == 1
+    assert envelope["ok"] is False
+    assert "ModelConfigError" in envelope["error"]
+    assert "missing:" in envelope["error"]
+
+
+def test_migrate_legacy_via_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from test_migration import _write_legacy_root
+    from strive.tasks import SUM_INTEGERS_TASK
+
+    root = _write_legacy_root(tmp_path, SUM_INTEGERS_TASK.fingerprint())
+    # any normal command refuses the unmigrated legacy root, with instructions
+    code, refused = _run_json(capsys, "--artifacts", str(root), "status")
+    assert code == 1 and "migrate-legacy" in refused["error"]
+
+    code, migrated = _run_json(capsys, "--artifacts", str(root), "migrate-legacy")
+    assert code == 0
+    assert migrated["data"]["generations"] == 2
+    assert migrated["data"]["fingerprint_drifted"] is False
+
+    code, status = _run_json(capsys, "--artifacts", str(root), "status")
+    assert code == 0
+    assert status["data"]["active_generation"]["generation_id"] == "gen-0001"

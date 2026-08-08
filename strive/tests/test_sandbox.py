@@ -29,7 +29,9 @@ def solve(input_text: str) -> int:
         pass
 '''
 
-BROKEN_AT_IMPORT_STRATEGY = "this is not python\n"
+# a genuine SyntaxError (note: "this is not python" would actually parse —
+# it's the comparison `this is (not python)`)
+BROKEN_AT_IMPORT_STRATEGY = "def solve(:\n    pass\n"
 
 WRONG_TYPE_STRATEGY = '''\
 def solve(input_text: str) -> int:

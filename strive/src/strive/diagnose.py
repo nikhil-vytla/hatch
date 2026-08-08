@@ -41,6 +41,31 @@ class Diagnoser(Protocol):
 _NEGATIVE_INTEGER = re.compile(r"-\d")
 
 NEGATIVE_INTEGERS_DROPPED = "negative-integers-dropped"
+VISIBLE_CASE_FAILURES = "visible-case-failures"
+
+
+class EvidenceDiagnoser:
+    """Generic, registry-free diagnosis for evidence-driven proposers.
+
+    It names no specific weakness: it packages the visible failure evidence
+    (which cases fail and how, per evaluator feedback) into a Diagnosis so an
+    evidence-driven proposer can reason from it. It abstains only when there
+    is nothing failing.
+    """
+
+    def diagnose(self, ctx: VisibleContext) -> Diagnosis | None:
+        failing = [ce for ce in ctx.evaluation.case_evaluations if not ce.passed]
+        if not failing:
+            return None
+        summary = "; ".join(f"{ce.case_id}: {ce.feedback}" for ce in failing[:6])
+        return Diagnosis(
+            weakness_id=VISIBLE_CASE_FAILURES,
+            description=(
+                f"{len(failing)} of {len(ctx.evaluation.case_evaluations)} visible "
+                f"cases fail — {summary}"
+            ),
+            evidence_case_ids=tuple(ce.case_id for ce in failing),
+        )
 
 
 class SignatureDiagnoser:

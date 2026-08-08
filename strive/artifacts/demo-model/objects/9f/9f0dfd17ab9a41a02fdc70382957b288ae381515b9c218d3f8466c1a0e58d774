@@ -1,0 +1,10 @@
+"""Strategy for max-integers: numeric maximum over signed integer tokens."""
+
+import re
+
+
+def solve(input_text: str) -> int:
+    tokens = re.findall(r"-?\d+", input_text)
+    if not tokens:
+        return 0
+    return max(int(token) for token in tokens)
