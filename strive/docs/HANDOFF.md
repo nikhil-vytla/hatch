@@ -8,6 +8,53 @@ of the core harness (stage 2a), the phase-4 model-backed offline
 self-evolution loop (stage 2b), and the phase-4.5 correctness and
 claim-precision pass over stage 2b.
 
+## Stage 3A — contract design (what was decided)
+
+Six accepted ADRs under [adrs/](adrs/README.md) settle Stage 3's contracts
+design-first; experimental spikes (`stage3_contracts.py` + 10 round-trip
+tests) prove the shapes serialize and enforce their structural rules. The
+live loop is untouched; the new codec kinds are additive and unused.
+
+**Key decisions** (rejected alternatives recorded in each ADR):
+- Revisions with typed per-surface CRUD deltas replace one-generation-one-file;
+  rollback is a new revision rather than partial activations (rejected:
+  per-surface activation pointers — they destroy the single-derivation
+  invariant that makes promotion atomic today).
+- Provisional is an activation mode, not a scope (rejected: a fifth scope —
+  it conflates *where* with *how much evidence*).
+- Regression growth is a `DatasetRevision` bump plus forced incumbent
+  re-baseline, never task-drift acknowledgement (fixes the phase-4.6 guard's
+  bluntness for a routine, desirable event).
+- Selection envelopes carry closed vocabularies + CAS evidence refs, not
+  policy-specific ledger fields (rejected: widening the decision record per
+  policy — endless version churn).
+- Algorithms get a narrow `KernelServices` handle under a trusted budget
+  (rejected: loop subclassing — inheritance would let algorithms override
+  gate calls).
+- JSONL journals stay authoritative; indexes are disposable caches; schema
+  changes go through a sequential migration registry (rejected: SQLite as
+  the journal; migration-on-read).
+
+**Compatibility plan**: today's `generation@2` ≙ one-delta revision
+(`revision_from_generation`, tested against live-loop output); existing
+policies keep their names/versions; the phase-4.6 legacy migration becomes
+migration-registry entry 0001 and the generation→revision rewrite entry
+0002 (Stage 3B); `FunctionTask` adapts `solve(str)->int` unchanged.
+
+**Risks carried into 3B**: the generation→revision migration touches every
+task ledger (mitigated by the registry's detect-loudly/preserve-original/
+validate-output rules, all inherited from the proven legacy migration);
+scope journals add a second writer surface (single-writer-per-journal
+stands); spike shapes may still shift while freezing `revision@1` — that is
+why the spike is explicitly unfrozen until 3B.
+
+**Exact next slice (independently mergeable)**: composite revision storage +
+the `SurfaceDescriptor` registry — freeze the three revision kinds, ship the
+migration registry with entries 0001/0002, port Store/loop/replay/CLI to
+revisions while the proposer still emits single-surface changes only. Pareto
+search, prompt/policy proposers, and scope journals come after, each as its
+own slice (ROADMAP stages 3B/3C).
+
 ## The Stage 2b claim, stated precisely
 
 > Strive can accept model-path proposals, validate and classify them, execute
