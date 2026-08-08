@@ -1,6 +1,6 @@
 # ADR-0006 — Storage backends and the migration registry
 
-Status: accepted (Stage 3A).
+Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B.
 
 ## Context
 
@@ -15,7 +15,11 @@ with one bespoke `migrate.py`; a third one-off would start a pile.
 
 **Four backend protocols, JSONL as the reference implementation.**
 
-- `LedgerBackend` — `append(entry, expected_head) -> head`, `entries()`,
+- `LedgerBackend` — `append(entry, expected_head) -> head`,
+  `append_batch(entries, expected_head) -> head` (all-or-nothing under one
+  head check: a revision + its activation land atomically or not at all),
+  `entries()`, `entries_since(cursor) -> (entries, cursor)` (cursor reads, so
+  indexes and long-running consumers never re-parse whole journals), and
   `head()`. Append-only and expected-head conflict semantics are part of the
   *protocol contract*, not the file format: any backend must refuse an append
   whose expected head is stale and must never mutate or delete. The JSONL
@@ -24,13 +28,16 @@ with one bespoke `migrate.py`; a third one-off would start a pile.
   plus planned fsync-on-publish (closing the CAS power-loss durability gap
   noted since phase 3).
 - `EventBackend` — per-run append streams; unchanged semantics.
-- `IndexBackend` — **derived, rebuildable, never authoritative.** Indexes
-  (active revision per scope, frontier membership, usage counts, acceptance
-  statistics) are caches over journals; deleting an index is always safe and
-  a rebuild is always possible from journals alone. Planned first
-  implementation: a local SQLite file per artifact root, built lazily,
-  landing *before* `pareto-population@1` (its frontier queries are the first
-  workload that hurts on JSONL).
+- `IndexBackend` — **derived, rebuildable, never authoritative**, with
+  **index-through-head semantics**: every index records the journal head
+  (per scope journal) through which it is current; a query first compares
+  the recorded head with the journal head and either serves (equal), catches
+  up incrementally via cursor reads (behind), or discards and rebuilds
+  (ahead/unknown — a corrupt or foreign index is detected, not trusted).
+  Deleting an index is always safe. Planned first implementation: a local
+  SQLite file per artifact root, built lazily, landing *before*
+  `pareto-population@1` (its frontier queries are the first workload that
+  hurts on JSONL).
 
 Rejected alternative: making SQLite the journal itself. The JSONL journal's
 greppable transparency has caught real bugs in every phase so far and is the

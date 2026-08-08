@@ -16,7 +16,10 @@ with the live Stage 1–2b system.
 | [0006](0006-storage-and-schema-evolution.md) | Storage backends and migration registry | accepted |
 
 Conventions: "accepted" means the contract shapes are settled for Stage 3
-implementation; experimental spike code lives in
+implementation. The wire schemas were marked provisional during the 3A
+revision pass (state/evidence separation, RevisionRef, typed scopes,
+computed risk, policy-neutral dispositions, resumable algorithm state) and
+are now re-validated by the spike tests and frozen for Stage 3B; experimental spike code lives in
 `src/strive/stage3_contracts.py` (registered under new codec kinds, unused by
 the live loop) with round-trip tests in `tests/test_stage3_contracts.py`.
 Nothing in these ADRs migrates the live ledger; migration sequencing is
@@ -26,9 +29,9 @@ ADR-0006's job and happens in Stage 3B.
 
 | Source | Chiefly borrowed | Chiefly rejected |
 |---|---|---|
-| Flex/GEPA (note 01) | population/Pareto retention as a *selection verdict*; evaluation budgets in manifests; objective specs feeding proposal prompts | optimizer-owned state without durable activation/rollback |
-| prime-agent (note 02) | per-edit typed CRUD deltas with before/after refs; scope tiers (local/global) as blast-radius control | LLM-judgment promotion; mutable in-place harness state |
+| Flex/GEPA (note 01) | population/Pareto retention as a kernel *disposition* (`frontier_add`); evaluation budgets in manifests; objective specs feeding proposal prompts | optimizer-owned state without durable activation/rollback |
+| prime-agent (note 02) | per-edit typed CRUD deltas with before/after refs; scope tiers (local/global) as blast-radius control | promotion on LLM judgment without behavioral evidence (its snapshots/version counters/invertible rollback are solid — the gap is the missing empirical gate, not its state handling) |
 | Continual Harness (note 03) | four-surface decomposition; provenance/usage attribution; per-surface risk | ungated in-place edits; single-lineage mutation without retention of rejected candidates |
-| exo (note 04) | append-only event log with head checks; durable intents; artifact/CAS separation | policy-only trust boundary; build-success as validation |
-| RLM (note 05) | budget inheritance in manifests; isolation-tier registry unchanged | stateless per-run design (no retention) — opposite of strive's bet |
+| exo (note 04) | append-only event log with head checks; durable intents; artifact/CAS separation; scoped secrets and conversation forking informed ADR-0002/0003 | policy-only trust boundary; build-success as validation; the single global mutable workspace for *evolvable* state |
+| RLM (note 05) | budget inheritance in manifests; isolation-tier registry unchanged | nothing rejected as such: RLM is deliberately a per-run inference engine whose improvements persist in *model weights*; that is the other side of strive's harness/weights boundary, not a competing persistence design |
 | NOOA (note 06) | versioned schema discipline + migration mindset (ATIF); typed trajectory protocol direction | ungated library self-authoring; OTel dependency (deferred, not needed yet) |

@@ -237,33 +237,47 @@ Stage 3's contracts are settled in six ADRs under [adrs/](adrs/README.md),
 written design-first with experimental spikes (`stage3_contracts.py`) proving
 the shapes round-trip before anything migrates:
 
-- **ADR-0001** `HarnessRevision` (multi-parent, per-surface typed CRUD deltas
-  with before/after refs) replaces one-generation-one-file; `SurfaceDescriptor`
-  is the trusted allowlist (strategy-code high / prompt medium / policy-params
-  low); rollback is a new revision, never a partial activation; today's
-  generation maps to a one-delta revision.
-- **ADR-0002** scopes: global → project → task → run with nearest-scope
-  shadowing; provisional is an activation *mode*, not a scope; promotion
-  across scopes is a gated selection with cross-task evidence; per-scope
-  journals keep per-task ledgers from owning reusable assets.
-- **ADR-0003** immutable `TaskSpecVersion` vs. append-friendly
-  `DatasetRevision`; `EvaluationManifest` pins spec+data+seeds+validators+
-  budgets; regression growth = new dataset revision + forced re-baseline,
-  never drift acknowledgement; `Environment`/trajectory protocols decouple
-  the kernel from `solve(str)->int`, with `FunctionTask` keeping today's tasks.
-- **ADR-0004** stable `ValidationBundle`/`SelectionDecision` envelopes with
-  closed kind/verdict vocabularies; policy detail lives in CAS artifacts, not
-  ledger scalars; Pareto retention is the `retain` verdict; policies resolve
-  by name AND version.
+- **ADR-0001** `HarnessRevision` replaces one-generation-one-file:
+  `RevisionRef(scope, id)` identity (globally unambiguous), `base_parent`
+  (deltas apply here) distinct from `provenance_parents` (merge/crossover/
+  promotion inputs), typed CRUD+mask deltas with before/after content refs,
+  and a content-addressed `state_manifest_ref` — revisions own *state*,
+  never evaluation conditions. Versioned `SurfaceDescriptor`s (artifact
+  schema, materializer, allowed scopes, required validators, base risk,
+  online policy) form the trusted allowlist; **risk is computed from
+  descriptor + scope + operation, never trusted from a delta**; rollback is
+  a new revision, never a partial activation.
+- **ADR-0002** typed `ScopeRef` + explicit `ResolutionContext` (no colon
+  parsing, no implicit default project): global → project → task → run with
+  nearest-scope shadowing; `delete` removes this scope's override
+  (inheritance resumes) while `mask` is a tombstone stopping fall-through;
+  provisional is an activation *mode*, not a scope; cross-scope promotion is
+  a gated selection with cross-task evidence.
+- **ADR-0003** environment-generic `TaskSpecVersion` (adapter, action/
+  observation schemas, scorer, config ref — `solve(str)->int` lives in the
+  FunctionTask config blob) vs. fully reconstructable `DatasetRevision`
+  (per-split CAS manifests); `EvaluationManifest` pins harness state ref,
+  objective spec, task+dataset fingerprints, environment/scorer/tool/runtime
+  versions, seeds, validators, budgets — and is owned by ValidationBundles,
+  never revisions; base `EnvironmentSession` protocol with optional
+  Resettable/Checkpointable/Forkable capabilities (reset is not assumed);
+  regression growth = new dataset revision + forced re-baseline.
+- **ADR-0004** policy-neutral `SelectionDecision`: `policy_ref`
+  (name@version) + a closed kernel disposition vocabulary
+  {promote, reject, frontier_add, provisional_activate} — **every
+  disposition requires evidence bundles**; each decision pins its
+  `objective_spec_ref`; policy detail lives in CAS evidence artifacts.
 - **ADR-0005** algorithms request propose/validate/submit through a narrow
-  `KernelServices` handle under a trusted budget — bypassing the gate is
-  structurally impossible; prompts render a versioned `ObjectiveSpec` instead
-  of a hard-coded acceptance sentence; frontiers are journaled state.
-- **ADR-0006** backend protocols (ledger/artifact/event/index) with JSONL as
-  the transparent reference and a rebuildable SQLite index planned before
-  population search; a sequential migration registry generalizes
-  `migrate-legacy`; append-only + expected-head semantics are protocol
-  contracts.
+  `KernelServices` handle under a trusted budget — bypass prevention is an
+  **API contract for trusted L1 plugins, not hostile-plugin isolation**
+  (stated honestly); search state is resumable via journaled
+  `AlgorithmRun`/`AlgorithmStep` records; prompts render a versioned
+  `ObjectiveSpec`; frontiers are journaled `frontier_add` decisions.
+- **ADR-0006** backend protocols (ledger/artifact/event/index): JSONL stays
+  the transparent authoritative journal; `append_batch` under one expected
+  head, cursor reads, and index-through-head semantics (indexes are derived,
+  rebuildable, never authoritative); a sequential migration registry
+  generalizes `migrate-legacy`.
 
 ## Implementation status (after phase 3 hardening)
 
