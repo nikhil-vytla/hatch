@@ -1,8 +1,9 @@
-"""Trusted budget enforcement: exhaustion is recorded data, never a crash."""
+"""Trusted budget enforcement: every enforced limit is tested; zero-limit
+semantics are defined (0 = nothing allowed, -1 = accounting only)."""
 
 from pathlib import Path
 
-from strive.budget import BudgetMeter
+from strive.budget import UNLIMITED, BudgetMeter
 from strive.contracts import FAILURE_BUDGET_EXHAUSTED, BudgetSpec
 from strive.loop import LoopConfig, run_cycle
 from strive.store import Store
@@ -17,27 +18,80 @@ def test_meter_denies_beyond_execution_ceiling() -> None:
     assert meter.usage().executions == 1
 
 
+def test_zero_limit_means_nothing_allowed() -> None:
+    assert BudgetMeter(BudgetSpec(executions=0)).request_execution() is not None
+    assert BudgetMeter(BudgetSpec(model_calls=0)).request_model_call() is not None
+    denial = BudgetMeter(BudgetSpec(model_calls=4, tokens=0)).request_model_call()
+    assert denial is not None and "token" in denial.detail
+    denial = BudgetMeter(BudgetSpec(model_calls=4, cost=0.0)).request_model_call()
+    assert denial is not None and "cost" in denial.detail
+
+
+def test_unlimited_means_accounting_only() -> None:
+    meter = BudgetMeter(BudgetSpec(model_calls=UNLIMITED, tokens=UNLIMITED, cost=UNLIMITED))
+    for _ in range(5):
+        assert meter.request_model_call() is None
+    meter.note_model_usage(tokens=10_000, cost=99.0)
+    assert meter.request_model_call() is None  # tracked, never enforced
+    assert meter.usage().tokens == 10_000 and meter.usage().cost == 99.0
+
+
+def test_token_ceiling_enforced_across_calls() -> None:
+    meter = BudgetMeter(BudgetSpec(model_calls=10, tokens=100))
+    assert meter.request_model_call() is None
+    meter.note_model_usage(tokens=100, cost=0.0)
+    denial = meter.request_model_call()
+    assert denial is not None and "token budget exhausted" in denial.detail
+
+
+def test_cost_ceiling_enforced_across_calls() -> None:
+    meter = BudgetMeter(BudgetSpec(model_calls=10, cost=1.0))
+    assert meter.request_model_call() is None
+    meter.note_model_usage(tokens=1, cost=1.5)
+    denial = meter.request_model_call()
+    assert denial is not None and "cost budget exhausted" in denial.detail
+
+
+def test_cumulative_output_ceiling_enforced() -> None:
+    meter = BudgetMeter(BudgetSpec(output_bytes=100))
+    assert meter.request_execution() is None
+    assert meter.execution_output_cap() == 100
+    meter.note_output_bytes(100)
+    denial = meter.request_execution()
+    assert denial is not None and "output budget exhausted" in denial.detail
+
+
+def test_per_execution_output_cap_is_remaining_allowance() -> None:
+    meter = BudgetMeter(BudgetSpec(output_bytes=100))
+    meter.note_output_bytes(60)
+    assert meter.execution_output_cap() == 40
+    unlimited = BudgetMeter(BudgetSpec(output_bytes=UNLIMITED))
+    assert unlimited.execution_output_cap() == 1_000_000  # safety default
+
+
 def test_meter_denies_when_wall_time_exhausted() -> None:
     meter = BudgetMeter(BudgetSpec(wall_time_s=0.0))
     denial = meter.request_execution()
     assert denial is not None and "wall-time" in denial.detail
+    assert meter.request_model_call() is not None  # wall gates model calls too
 
 
-def test_meter_caps_execution_timeout_to_remaining_wall() -> None:
+def test_meter_caps_execution_and_model_timeouts_to_remaining_wall() -> None:
     meter = BudgetMeter(BudgetSpec(wall_time_s=5.0))
     assert meter.execution_timeout_s(60.0) <= 5.0
+    assert meter.model_call_timeout_s(600.0) <= 5.0
 
 
-def test_meter_denies_model_calls_beyond_ceiling() -> None:
-    meter = BudgetMeter(BudgetSpec(model_calls=0))
-    denial = meter.request_model_call()
-    assert denial is not None and "model-call" in denial.detail
+def test_recursion_depth_zero_denies_any_delegation() -> None:
+    meter = BudgetMeter(BudgetSpec(max_recursion_depth=0))
+    assert meter.enter_recursion(1) is not None
+    assert meter.enter_recursion(0) is None
 
 
 def test_cycle_with_execution_budget_one_rejects_candidate_as_data(tmp_path: Path) -> None:
     """One execution allowed: the baseline runs, the candidate validation is
     denied by the trusted meter and recorded as a rejection — no exception."""
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     config = LoopConfig(budget=BudgetSpec(executions=1))
     report = run_cycle(store, SUM_INTEGERS_TASK, config)
 
@@ -54,7 +108,7 @@ def test_cycle_with_execution_budget_one_rejects_candidate_as_data(tmp_path: Pat
 
 
 def test_cycle_with_zero_wall_budget_records_floor_evaluation(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     config = LoopConfig(budget=BudgetSpec(wall_time_s=0.0))
     report = run_cycle(store, SUM_INTEGERS_TASK, config)
 

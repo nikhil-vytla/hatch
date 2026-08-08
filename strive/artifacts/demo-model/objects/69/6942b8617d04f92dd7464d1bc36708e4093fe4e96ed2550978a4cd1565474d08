@@ -1,7 +1,4 @@
-"""Seed strategy for sum-integers (generation zero).
-
-Known-naive: matches unsigned digit runs only.
-"""
+"""Seed strategy for sum-integers (generation zero)."""
 
 import re
 

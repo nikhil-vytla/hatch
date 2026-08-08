@@ -10,7 +10,7 @@ from strive.tasks import SUM_INTEGERS_TASK
 
 
 def test_first_cycle_detects_weakness_and_accepts_fix(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     report = run_cycle(store, SUM_INTEGERS_TASK)
 
     # baseline (seed) fails exactly the negative-number cases, on every split
@@ -68,7 +68,7 @@ def test_first_cycle_detects_weakness_and_accepts_fix(tmp_path: Path) -> None:
 
 
 def test_second_cycle_finds_no_weakness_and_proposes_nothing(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts")
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
     run_cycle(store, SUM_INTEGERS_TASK)
     second = run_cycle(store, SUM_INTEGERS_TASK)
 

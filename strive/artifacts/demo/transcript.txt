@@ -1,38 +1,27 @@
-$ strive run
-run:      run-20260806T230214-b57d82
+$ strive run   # registry proposer, sum-integers
+run:      run-20260807T062151-f31177
+proposer: registry
 active:   gen-0000 -> gen-0001
 score:    0.455 adversarial=0.000 held_out=0.333 visible=0.667
 weakness: negative-integers-dropped
+proposal: Widen the integer regex to capture an optional leading minus sign.
 decision: ACCEPTED [paired-deterministic@1] — strict improvement with zero regressions (visible 0.667 -> 1.000, overall 0.455 -> 1.000)
-
-$ strive run   # second cycle: healthy idle
-run:      run-20260806T230214-c1c77f
-active:   gen-0001 -> gen-0001
-score:    1.000 adversarial=1.000 held_out=1.000 visible=1.000
-decision: no weakness detected; nothing proposed
-
-$ strive lineage
-lineage (active -> seed):
-  gen-0001 origin=evolved weakness=negative-integers-dropped source=6f5b5d9112fa
-  gen-0000 origin=seed source=82568ce1fa84
 
 $ strive compare gen-0000 gen-0001
 baseline  gen-0000: overall=0.455 adversarial=0.000 held_out=0.333 visible=0.667
 candidate gen-0001: overall=1.000 adversarial=1.000 held_out=1.000 visible=1.000
 candidate WINS [paired-deterministic@1]: strict improvement with zero regressions (visible 0.667 -> 1.000, overall 0.455 -> 1.000)
 
-$ strive promote gen-0000   # demoting to the weaker seed: refused by the paired gate
-error: StoreError: promotion refused by policy paired-deterministic@1: regressions on previously passing cases: negative-single, negative-all, held-negative-mixed, held-negative-pair, adv-phone-like, adv-ranges
+$ strive audit   # final holdout, on demand only — never part of selection
+audit of gen-0001 (final holdout — never used in selection):
+  score=1.000 — all cases passed
+
+$ strive audit --generation gen-0000
+audit of gen-0000 (final holdout — never used in selection):
+  score=0.000 — audit-signed-mix: expected 6, got 14 (overestimate); audit-negative-heavy: expected -16, got 26 (overestimate)
 
 $ strive rollback
 rolled back; active generation is now gen-0000
 
-$ strive promote gen-0001   # re-promotion passes the paired gate
+$ strive promote gen-0001   # durable promotion needs paired evidence
 promoted gen-0001 with paired evidence
-
-$ strive replay run-20260806T230214-b57d82
-replay of run-20260806T230214-b57d82 (generation gen-0000):
-  recorded=0.455 replayed=0.455 match=True
-
-$ strive status
-active generation: gen-0001 (origin=evolved, mode=durable)

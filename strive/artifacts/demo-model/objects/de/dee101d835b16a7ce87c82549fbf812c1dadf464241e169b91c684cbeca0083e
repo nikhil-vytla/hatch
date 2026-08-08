@@ -1,0 +1,10 @@
+"""Seed strategy for max-integers (generation zero)."""
+
+import re
+
+
+def solve(input_text: str) -> int:
+    tokens = re.findall(r"-?\d+", input_text)
+    if not tokens:
+        return 0
+    return int(max(tokens))

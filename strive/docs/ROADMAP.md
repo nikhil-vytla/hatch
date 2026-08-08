@@ -40,20 +40,46 @@ resume/history, all with `--json`). Sandbox hardening is partial: scrubbed env,
 private workspace, rlimits, bounded output — network denial is NOT enforced
 (documented honestly in README/ARCHITECTURE).
 
-## Stage 2b — Model-in-the-loop offline evolution (next)
+## Stage 2b — Model-in-the-loop offline evolution ✅ (2026-08-07, phase 4)
 
-- `ModelProposer` behind the existing `Proposer` protocol, using the existing
-  `ModelAdapter`/`FakeModelAdapter`; all proposer I/O journaled and replayable.
-- Proposer input contract: `VisibleContext` + diagnosis + **acceptance history**
-  (prime-agent feeds past refinement results back; note 02).
-- A second task with a non-planted weakness; regression split grown from failures.
-- Per-proposer-model acceptance statistics (capability-floor telemetry, note 03).
+Implemented (see HANDOFF "Phase 4" for verification evidence):
+- ✅ `ModelProposer` behind a typed `Proposer` protocol (registry proposer retained
+  as the deterministic reference); structured proposal schema with strict, distinctly
+  journaled rejection classification (truncated / malformed / schema-invalid /
+  forbidden / stale / budget-exhausted).
+- ✅ Proposer input contract: visible evidence + diagnosis + sanitized acceptance
+  history (aggregate scores only) + explicit budgets; holdout contents mechanically
+  absent (spy-tested down to the built prompt).
+- ✅ All model I/O journaled with adapter name, model id, params, usage, latency,
+  normalized finish reasons, and content-addressed prompt/completion artifacts
+  (compact event metadata; contents live once in the object store). The recorded
+  cycle supports *execution-and-decision replay* offline (baseline + candidate
+  re-execution and recorded-policy decision check); full-cycle replay is deferred.
+- ✅ Second task (`max-integers`) with a non-planted weakness (lexicographic max);
+  the registry provably cannot fix it (control test), and the model *pipeline*
+  promotes a fix supplied by a scripted proposal fixture — pipeline proof, not
+  model reasoning.
+- ✅ Env-only real adapter (`STRIVE_MODEL_PROVIDER=openai-compatible`); no test or
+  default command touches a network.
 
-**Exit criteria:** a model-backed proposer (fake model in CI) fixes a *non-planted*
-weakness on a second task; the candidate passes held-out validation; the full cycle
-replays offline from the ledger alone; a hanging/hostile candidate exhausts its budget
-and is journaled as a floor-scored rejection (the last is already demonstrated by
-failure-injection tests).
+Carried into stage 3 (not done):
+- Regression split grown automatically from past failures (mechanism exists, empty).
+- Aggregated per-proposer-model acceptance statistics (raw telemetry is journaled;
+  no reporting command yet).
+
+The milestone claim, stated precisely: Strive can accept model-path
+proposals, validate and classify them, execute candidates outside the kernel
+process, compare them with an incumbent, retain decisions and lineage, and
+replay execution and selection. The deterministic fixture proves pipeline
+correctness; real-model proposal quality remains an untested capability
+question.
+
+**Exit criteria met with honest caveats:** the "model" in CI is a scripted proposal
+fixture — it proves the pipeline (validation, gating, journaling, replay), not model
+reasoning or capability. Real-model capability is untested, expected to be
+model-dependent (capability floor, note 03), and gated behind an explicit
+`--unsafe-model-code` acknowledgement because the sandbox lacks network/filesystem
+confinement. Replay is execution-and-decision replay, not full-cycle replay.
 
 ## Stage 3 — Composite generations + pluggable evolution algorithms + hardened sandbox
 

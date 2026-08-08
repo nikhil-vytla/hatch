@@ -1,9 +1,254 @@
 # HANDOFF — strive
 
-State as of 2026-08-06, after three phases: the vertical slice (stage 1), the
-research-and-redesign phase (notes 01–06, [comparative matrix](agents/research/comparative-matrix.md),
-[ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), and the phase-3
-hardening of the core harness (roadmap stage 2a).
+State as of 2026-08-07, after four phases plus a correction pass: the vertical
+slice (stage 1), the research-and-redesign phase (notes 01–06,
+[comparative matrix](agents/research/comparative-matrix.md),
+[ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), the phase-3 hardening
+of the core harness (stage 2a), the phase-4 model-backed offline
+self-evolution loop (stage 2b), and the phase-4.5 correctness and
+claim-precision pass over stage 2b.
+
+## The Stage 2b claim, stated precisely
+
+> Strive can accept model-path proposals, validate and classify them, execute
+> candidates outside the kernel process, compare them with an incumbent,
+> retain decisions and lineage, and replay execution and selection. The
+> deterministic fixture proves pipeline correctness; real-model proposal
+> quality remains an untested capability question.
+
+## Phase 4.6 — final pre-merge corrections (completed fixes)
+
+A second, final precision pass before merging PR #39; 133 tests, strict mypy.
+
+1. **Legacy ledger handling.** A stage-2a `ledger/ledger.jsonl` is now
+   detected loudly at store construction with the exact migration command;
+   `strive migrate-legacy` converts it to the task-scoped v2 ledger while
+   preserving generations, decisions, every activation in order (rollbacks
+   included), cycles, and the original file byte-for-byte, and journals a
+   migration marker. Mixed/foreign-task legacy history is refused (legacy
+   generations carry no task identity of their own). Tested against a real
+   v1 fixture built by downgrading current records (v1 = v2 minus task
+   fields, by construction).
+2. **Task binding everywhere.** One shared `guard_task_binding` runs in
+   run/audit/compare/promote/replay/seed; reading a task ledger rejects any
+   generation/activation/cycle whose task id conflicts; task-fingerprint
+   drift refuses mutation unless `--acknowledge-task-drift` (journaled as an
+   intervention); read-only operations proceed and report drift.
+3. **Budget semantics made exact** (see phase 4.5 item 3, now corrected in
+   place): output-token requests capped to remaining allowance; post-call
+   token overruns charged, journaled, and their completions rejected; cost
+   enforced only against `reports_cost` adapters (fail-closed
+   `cost-limit-unavailable` otherwise — the OpenAI-compatible adapter does
+   not report cost); per-limit semantics journaled with every cycle.
+4. **Trust-boundary claims corrected**: no more "no write path" / "physically
+   out of reach" — candidates are process-separated and never imported into
+   the kernel, and until Landlock/seccomp/containers exist, malicious code
+   can access anything available to the controller's OS user. Real-model
+   execution stays behind `--unsafe-model-code`.
+5. **Proposal evidence validation**: with visible failures present,
+   `trace_evidence` must be nonempty and entirely within the visible
+   failing-case ids (empty / unknown / valid all tested).
+6. **Post-call cost overrun** (final): with `reports_cost` adapters, a call
+   that crosses the cost ceiling is charged, journaled
+   (`model_call_overrun`), and its completion rejected before it can become
+   a proposal; reaching the limit exactly succeeds and the next call is
+   denied pre-call; fail-closed behavior for non-reporting adapters stands.
+7. **Centralized drift acknowledgement** (final): `guard_mutation` is the one
+   entry point for mutating operations — binding + drift validation + durable
+   `task-drift-acknowledged` journaling (written only when drift actually
+   exists). `run` and `promote` both use it; future mutations cannot forget.
+8. Low-cost cleanups: stale test names no longer imply model reasoning or
+   full replay; decision replay resolves the recorded policy by name AND
+   version (refusing on mismatch) and compares verdict + both scores +
+   regressed ids; the metered wrapper contains *any* ordinary adapter
+   exception as journaled `model-error` while KeyboardInterrupt/SystemExit
+   propagate; the audit split is documented as operationally separate, not
+   secret; historical handoff text updated (superseded v1 golden, replay
+   naming).
+
+## Phase 4.5 — stage-2b correction pass (completed fixes)
+
+A focused correctness pass before merging stage 2b; 115 tests, strict mypy.
+
+1. **Task-scoped state.** Stores are bound to a task (per-task ledger files);
+   generations carry `task_id` + `task_fingerprint`, activations carry
+   `task_id` (schema bumps to `generation@2`/`activation@2`; superseded v1
+   records are rejected loudly — migration tooling is deliberately deferred).
+   Cross-task tests run two tasks against one artifact root with zero
+   contamination; the loop refuses a store bound to a different task.
+2. **Fixture leak removed.** The `max-integers` seed source no longer explains
+   its own bug (seed sources are proposer-visible evidence); the fake is
+   renamed and documented as a *scripted proposal fixture*
+   (`scripted_fixture_adapter`), and no doc claims it derived the repair from
+   evidence or demonstrated model reasoning.
+3. **Budget truthfulness.** Uniform limit semantics defined and tested:
+   0 = nothing allowed, -1 = accounting only. Exact token semantics: requested
+   output tokens are capped to the remaining allowance and accumulated usage
+   gates the next call, but one call's *input* tokens can overshoot — such an
+   overrun is charged, journaled (`model_call_overrun`), and its completion is
+   rejected before it can produce a proposal. Cost is enforced only against
+   adapters that declare trustworthy cost reporting (`reports_cost`); the
+   metered wrapper fails closed otherwise — and the OpenAI-compatible adapter
+   does NOT report cost, so no cost enforcement is claimed for it. Cumulative
+   output bytes are hard-enforced (per-execution caps equal the remaining
+   allowance); HTTP timeouts are capped by remaining wall time; wall time
+   gates model calls as well as executions. Per-limit semantics
+   (enforced / accounting-only / adapter-dependent) are journaled with every
+   cycle. Every enforced limit has a test.
+4. **Replay precision.** The feature is now named what it is:
+   **execution-and-decision replay** (baseline + candidate re-execution and
+   recorded-policy decision check). Full-cycle replay (diagnosis, prompt
+   reconstruction, recorded completion injection, proposal parsing, screening)
+   is explicitly deferred.
+5. **Evaluation discipline.** Splits now separate visible (train),
+   held-out/regression/adversarial (development/selection, used by every
+   promotion decision), and a new **audit** split — a final holdout excluded
+   from routine cycles entirely and queried only via `strive audit`.
+   Proposer-facing history now reports visible-split score movement only
+   (overall/hidden-influenced scores no longer flow back).
+6. **Provisional safety.** Provisional activation of executable
+   `strategy-code` is refused (tested); the expiry/confirmation mechanics stay
+   tested at the store level for future explicitly low-risk non-code surfaces.
+7. **Real-model safety.** A configured real provider requires the explicit
+   `--unsafe-model-code` acknowledgement (the subprocess lacks
+   network/filesystem confinement; the AST screen is a prefilter, not a
+   security boundary). The scripted fixture remains the safe default; missing
+   or invalid env configuration is a clean `ModelConfigError`.
+8. **Claims corrected** across README/ARCHITECTURE/ROADMAP/HANDOFF and the PR
+   summary; demos regenerated under the corrected semantics (including audit
+   runs and cross-task runs against one root).
+
+Low-cost items also done: normalized model finish reasons drive truncation
+classification; proposal `trace_evidence` must cite visible failing case ids;
+`model_call` events carry compact metadata + CAS refs instead of duplicated
+contents; the syntax-error test fixture is now an actual syntax error ("this
+is not python" parses as `this is (not python)`); mutating store operations
+take an advisory writer lock, generation-id allocation happens under it, and
+activations support an `expected_active` head check (used by the loop and by
+promotion).
+
+**Deliberately deferred (explicit limits carried to stage 3+):** schema
+migration tooling for superseded record versions; full-cycle replay;
+concurrent multi-host writer support (single-writer per task remains the
+model); typed event payloads; CAS power-loss durability (objects are not
+fsynced); automatic regression-split growth; per-proposer-model acceptance
+statistics; Pareto populations; Landlock/seccomp. Candidate code still
+receives hidden case *inputs* at execution time (never expected outputs) —
+documented in README; real fix is stronger sandboxing.
+
+## Phase 4 — model-backed offline evolution (what was implemented)
+
+- **Pluggable proposal pipeline.** Typed `Proposer` protocol
+  (`propose(ProposalRequest) -> ProposalResult`); the deterministic
+  `RegistryProposer` retained as reference; `ModelProposer` over the
+  provider-neutral `ModelAdapter`. Proposers are side-effect free: the kernel
+  screens, retains, validates, and promotes.
+- **Trusted, visible-only proposer inputs.** `ProposalRequest` carries the
+  incumbent source, task signature + primitive catalog, visible failing cases
+  with evaluator feedback, the diagnosis, sanitized acceptance history
+  (aggregate scores and policy identity only — decision *reasons* are excluded
+  because they can cite hidden-split case ids), and explicit budgets
+  (max output tokens, model calls remaining, executions remaining). The spy
+  test asserts no hidden case id or input text reaches the request *or the
+  built prompt*.
+- **Structured proposal schema** (`proposal@1`): parent generation, summary,
+  rationale, trace evidence, expected outcome, complete candidate source,
+  changed surfaces, risks, assumptions. Completions are validated strictly and
+  rejections journaled by distinct kind: `proposal-truncated` (hit token cap),
+  `proposal-malformed` (not JSON), `proposal-schema-invalid` (wrong shape,
+  wrong parent echo, wrong surfaces), `proposal-forbidden` (kernel AST screen:
+  imports outside the task catalog, forbidden builtins, unparseable source),
+  `proposal-stale`, `budget-exhausted`, `model-error`.
+- **Staleness protection.** The kernel re-reads the active generation after
+  the proposer returns; a proposal parented on a superseded generation is
+  rejected (`proposal-stale`) — tested with a proposer that changes the
+  incumbent mid-proposal.
+- **Journaled, replayable model I/O.** `model_call` events carry adapter name,
+  model id, request parameters (max tokens, temperature, seed), token usage,
+  latency, and content-addressed prompt/completion refs in the object store.
+  `strive replay RUN_ID` re-executes baseline + candidate from recorded state
+  and re-runs the recorded policy, reporting whether the decision reproduces —
+  no proposer or model is consulted.
+- **Second task, non-planted weakness.** `max-integers`: the seed takes
+  `max()` over token *strings* (lexicographic — "9" beats "100"). No registry
+  entry knows it; a control test proves the registry proposer cannot fix it.
+  The generic `EvidenceDiagnoser` (registry-free) packages visible failure
+  evidence; the model *pipeline* carries a repair through schema validation,
+  screening, sandboxed validation, and the paired gate (0.500 → 1.000, zero
+  regressions). In CI/demos that repair comes from a scripted proposal
+  fixture authored by us — see phase 4.5: this proves the pipeline, not model
+  reasoning.
+- **Real adapter, env-only.** `STRIVE_MODEL_PROVIDER=openai-compatible` +
+  `STRIVE_MODEL_BASE_URL`/`STRIVE_MODEL_API_KEY`/`STRIVE_MODEL_ID` builds a
+  stdlib-only adapter. Nothing in tests or default commands touches it.
+- **CLI.** `strive run --proposer {registry,model}` (model uses the offline
+  fake unless env-configured); `strive inspect --run ID --type model_call`
+  filters journaled model/proposal events; `--json` everywhere.
+
+## Phase-4 verification evidence
+
+- `uv run pytest -q` → **91 passed** at phase 4 (now **115** after phase
+  4.5), offline. The demonstration matrix:
+  scripted-fixture fix of the non-planted weakness promoted through
+  `paired-deterministic@1` on protected splits; registry control cannot fix
+  it; execution-and-decision replay reproduces the decision; malformed / truncated /
+  schema-invalid / forbidden responses each rejected with their distinct kind
+  and no controller crash; regressive-but-valid candidate rejected with the
+  incumbent left active and the rejection retained; stale proposal rejected
+  after incumbent change; model-call budget enforced by the trusted meter
+  (`model_call_denied` journaled, model never invoked); all stage-2a
+  failure-injection tests and the phase-1 slice intact.
+- `uv run mypy` → strict, no issues in 33 source files.
+- `artifacts/demo-model/transcript.txt` → live CLI evidence: model-proposer
+  cycle (fake adapter) accepted 0.500 → 1.000; exact replay with
+  `decision_reproduced=True`; `inspect --type model_call` showing adapter,
+  model id, latency, and the content-addressed prompt ref.
+
+## Phase-4 decisions
+
+- Decision reasons are excluded from proposer history (they may cite hidden
+  case ids); history carries aggregate scores + policy identity only.
+- The forbidden-source screen is kernel-side and runs *after* staleness,
+  *before* any sandbox execution; it is a pre-filter (D1), never the gate.
+- The scripted fixture responder parses the prompt (parent id, cited cases)
+  rather than being keyed to exact prompt bytes — prompt evolution doesn't
+  silently break the fixtures, and the fixture's role as an authored stand-in
+  (not model reasoning) is explicit in `fakemodel.py` and README.
+- `EvidenceDiagnoser` names no weakness (`visible-case-failures`) — the
+  CH lesson about confidently-wrong self-diagnosis argues for packaging
+  evidence over guessing causes when no signature matches.
+
+## Model-dependence limitations (stated plainly)
+
+- **The CI "model" is a scripted proposal fixture.** Every green test proves
+  pipeline correctness — validation, gating, journaling, execution-and-decision
+  replay — and nothing about real-model proposal quality or reasoning. The one honest capability claim: the
+  *harness* correctly promotes good candidates and rejects bad, stale,
+  malformed, forbidden, and over-budget ones, wherever they come from.
+- **Real-model behavior is untested** and expected to be sharply
+  capability-dependent (note 03's capability floor). The danger signature to
+  watch when real runs begin: rising acceptance rate with falling held-out
+  scores. Raw telemetry for this is journaled; the aggregated per-model
+  statistics report is stage-3 work.
+- **Single model call per cycle, no retry/repair loop:** a real model that
+  emits one malformed response simply loses the cycle. Deliberate for now —
+  retries interact with budgets and belong with evolution algorithms (stage 3).
+- The isolation caveats from phase 3 stand; kernel confinement should precede
+  any third-party candidate source.
+
+## Next phase — stage 3: composite generations, pluggable validators, competing evolution algorithms
+
+1. **Composite multi-surface generations**: per-surface CRUD deltas with
+   before/after snapshots (D5); prompts and policies become surfaces; the
+   `SurfaceDescriptor` registry.
+2. **Pluggable `Validator` contracts**: suite / held-out / static tiers become
+   registered validators chosen per surface and risk (D14); regression split
+   grown automatically from past failures.
+3. **Competing `EvolutionAlgorithm` plugins**: incumbent hill-climb (today's
+   behavior) vs GEPA-style Pareto-frontier population under equal budgets,
+   with per-algorithm and per-proposer-model acceptance statistics.
+4. Sandbox tier 3 on Linux (Landlock/seccomp) ahead of any real-model
+   candidate source used routinely.
 
 ## Phase 3 — hardened core (what was implemented)
 
@@ -12,8 +257,9 @@ The full gated loop still runs end to end, now on durable foundations:
 - **Contracts + codec**: every persisted record is a versioned typed dataclass
   (`contracts.py`) serialized by one shared strict codec (`codec.py`). Unknown
   kinds, unsupported versions, missing/extra fields, and wrong types are
-  rejected loudly; a golden v1 record is pinned by test so shape changes force
-  version bumps.
+  rejected loudly; a golden record at the *current* versions is pinned by test
+  so shape changes force version bumps (the original v1 golden was superseded
+  by the task-scoping bump; a companion test pins that v1 now fails loudly).
 - **Durable history**: append-only ledger with single-write+fsync appends;
   promotion is atomic by construction (one activation line); a torn final line
   is tolerated as a crash artifact while interior corruption is a loud
@@ -117,15 +363,12 @@ that `provisional@1`'s window rule catches regressions early enough; that the
 stall window of 3 balances false freezes against long stalls. These are named
 and versioned precisely so competing policies can be tested against them.
 
-## Next phase — the model-backed self-evolution engine (stage 2b)
+## Phase-3 next-phase note (historical)
 
-Build `ModelProposer` on the seams that now exist: it consumes
-`VisibleContext` + diagnosis + acceptance history through the `Proposer`
-protocol, calls a `ModelAdapter` through the metered journaling wrapper
-(`FakeModelAdapter` in CI), and its candidates face the same paired gate.
-Add a second task with a non-planted weakness, grow the regression split from
-recorded failures, and report per-proposer-model acceptance statistics
-(capability-floor telemetry). Exit criteria are in ROADMAP stage 2b.
+*The stage-2b plan described here was carried out in phase 4 — see "Phase 4"
+at the top of this document. Two items were deliberately deferred to stage 3:
+automatic regression-split growth and aggregated per-proposer-model
+acceptance statistics.*
 
 ## Research conclusions
 

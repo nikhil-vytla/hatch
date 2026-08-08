@@ -33,6 +33,8 @@ def _decision() -> Decision:
 def _generation() -> Generation:
     return Generation(
         generation_id="gen-0001",
+        task_id="sum-integers",
+        task_fingerprint="fe" * 32,
         parent_id="gen-0000",
         origin="evolved",
         surface="strategy-code",
@@ -50,6 +52,7 @@ ROUND_TRIP_SAMPLES = [
     _generation(),
     Activation(
         generation_id="gen-0001",
+        task_id="sum-integers",
         reason="evolved",
         mode="durable",
         at="2026-08-06T00:00:00+00:00",
@@ -135,6 +138,27 @@ def test_expect_mismatch_rejected() -> None:
         codec.loads(line, TaskCase)
 
 
+GOLDEN_V2_GENERATION = (
+    '{"created_at":"2026-08-06T00:00:00+00:00","decision":null,'
+    '"generation_id":"gen-0000","origin":"seed","parent_id":null,'
+    '"schema":"generation@2","source_ref":"' + "ab" * 32 + '",'
+    '"task_fingerprint":"' + "fe" * 32 + '","task_id":"sum-integers",'
+    '"surface":"strategy-code","weakness_id":null}'
+)
+
+
+def test_golden_v2_generation_still_decodes() -> None:
+    """Compatibility pin: v2 records written today must decode as long as
+    generation@2 is the current version. If this test breaks, the contract
+    changed shape without a version bump.
+    """
+    generation: Generation = codec.loads(GOLDEN_V2_GENERATION, Generation)
+    assert generation.generation_id == "gen-0000"
+    assert generation.task_id == "sum-integers"
+    assert generation.decision is None
+    assert codec.loads(codec.dumps(generation), Generation) == generation
+
+
 GOLDEN_V1_GENERATION = (
     '{"created_at":"2026-08-06T00:00:00+00:00","decision":null,'
     '"generation_id":"gen-0000","origin":"seed","parent_id":null,'
@@ -143,12 +167,10 @@ GOLDEN_V1_GENERATION = (
 )
 
 
-def test_golden_v1_generation_still_decodes() -> None:
-    """Compatibility pin: v1 records written today must decode forever.
-
-    If this test breaks, a contract changed shape without a version bump.
-    """
-    generation: Generation = codec.loads(GOLDEN_V1_GENERATION, Generation)
-    assert generation.generation_id == "gen-0000"
-    assert generation.decision is None
-    assert codec.dumps(generation) == GOLDEN_V1_GENERATION
+def test_superseded_v1_generation_is_rejected_loudly() -> None:
+    """generation@1 (pre task-scoping) is a superseded schema: decoding fails
+    loudly by design — there is deliberately no migration machinery yet
+    (deferred; see HANDOFF). Old ledgers must be regenerated or migrated by
+    hand, never silently reinterpreted."""
+    with pytest.raises(codec.SchemaError, match="unsupported generation version 1"):
+        codec.loads(GOLDEN_V1_GENERATION)

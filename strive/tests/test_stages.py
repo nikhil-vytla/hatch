@@ -15,7 +15,7 @@ from strive.diagnose import (
     VisibleContext,
 )
 from strive.evaluate import evaluate
-from strive.propose import RegistryProposer
+from strive.propose import ProposalRequest, RegistryProposer, screen_source
 from strive.tasks import BASELINE_STRATEGY_SOURCE, SUM_INTEGERS_TASK
 
 
@@ -107,20 +107,66 @@ def _diagnosis() -> Diagnosis:
     return Diagnosis(NEGATIVE_INTEGERS_DROPPED, "d", ("negative-all",))
 
 
+def _request(ctx: VisibleContext, diagnosis: Diagnosis) -> ProposalRequest:
+    return ProposalRequest(
+        ctx=ctx,
+        diagnosis=diagnosis,
+        task_description=SUM_INTEGERS_TASK.description,
+        task_signature=SUM_INTEGERS_TASK.signature,
+        primitive_catalog=SUM_INTEGERS_TASK.primitive_catalog,
+        history=(),
+        max_output_tokens=1024,
+        model_calls_remaining=0,
+        executions_remaining=8,
+        model=None,
+    )
+
+
 def test_propose_patches_baseline_source() -> None:
     evaluation = evaluate(SUM_INTEGERS_TASK, _report({"negative-all": 6}))
-    proposal = RegistryProposer().propose(_visible_ctx(evaluation), _diagnosis())
-    assert proposal is not None
-    assert 'r"-?\\d+"' in proposal.source
+    result = RegistryProposer().propose(_request(_visible_ctx(evaluation), _diagnosis()))
+    assert result.proposal is not None
+    assert 'r"-?\\d+"' in result.proposal.source
+    assert result.proposal.parent_generation_id == "gen-0000"
+    assert result.proposal.changed_surfaces == ("strategy-code",)
 
 
 def test_propose_abstains_on_unknown_weakness() -> None:
     evaluation = evaluate(SUM_INTEGERS_TASK, _report({"negative-all": 6}))
     diagnosis = Diagnosis("mystery-weakness", "d", ("negative-all",))
-    assert RegistryProposer().propose(_visible_ctx(evaluation), diagnosis) is None
+    result = RegistryProposer().propose(_request(_visible_ctx(evaluation), diagnosis))
+    assert result.proposal is None
+    assert result.failure is not None
+    assert result.failure.kind == "proposal-abstained"
 
 
 def test_propose_abstains_when_patch_target_missing() -> None:
     evaluation = evaluate(SUM_INTEGERS_TASK, _report({"negative-all": 6}))
     ctx = _visible_ctx(evaluation, source="def solve(t): return 0\n")
-    assert RegistryProposer().propose(ctx, _diagnosis()) is None
+    result = RegistryProposer().propose(_request(ctx, _diagnosis()))
+    assert result.proposal is None
+    assert result.failure is not None
+
+
+# -- screen (trusted pre-filter) ---------------------------------------------
+
+
+def test_screen_rejects_imports_outside_catalog() -> None:
+    failure = screen_source("import os\n\ndef solve(t):\n    return 0\n", ("re",))
+    assert failure is not None and failure.kind == "proposal-forbidden"
+    assert "os" in failure.detail
+
+
+def test_screen_rejects_forbidden_builtins() -> None:
+    failure = screen_source("def solve(t):\n    return eval(t)\n", ("re",))
+    assert failure is not None and "eval" in failure.detail
+
+
+def test_screen_rejects_unparseable_source() -> None:
+    failure = screen_source("def solve(:\n    pass", ("re",))
+    assert failure is not None and "does not parse" in failure.detail
+
+
+def test_screen_passes_catalog_conformant_source() -> None:
+    source = "import re\n\ndef solve(t):\n    return len(re.findall(r'x', t))\n"
+    assert screen_source(source, ("re",)) is None
