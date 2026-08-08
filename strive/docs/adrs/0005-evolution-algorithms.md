@@ -1,6 +1,6 @@
 # ADR-0005 — Evolution algorithms and objective specs
 
-Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B.
+Status: accepted design; wire schemas PROVISIONAL until this ADR's implementation slice (see adrs/README freeze table).
 
 ## Context
 
@@ -70,7 +70,9 @@ trust-boundary erosion risk the charter flags).
 
 **Rejected alternatives.** (a) Algorithms as loop subclasses — inheritance
 would let an algorithm override gate calls; composition over a services
-handle makes bypass structurally impossible. (b) Letting algorithms own
+handle makes *accidental* bypass structurally awkward (and see the honest
+boundary statement above: this is an API contract for trusted plugins, not
+hostile-plugin containment). (b) Letting algorithms own
 their populations in memory/files — unjournaled frontiers can't resume,
 can't be audited, and invite exactly the drift CH documented.
 

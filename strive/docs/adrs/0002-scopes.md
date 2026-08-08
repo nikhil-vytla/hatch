@@ -1,6 +1,6 @@
 # ADR-0002 — Artifact scopes: inheritance, shadowing, promotion
 
-Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B.
+Status: core wire schemas FROZEN for Stage 3B (final pre-merge pass, 2026-08-08).
 
 ## Context
 
@@ -45,6 +45,14 @@ tombstone at this scope that *stops* the fall-through, making the artifact
 deliberately absent here while siblings and broader scopes are unaffected.
 Both are journaled deltas; both floor at medium risk (ADR-0001).
 
+**Two manifests, two owners.** A revision owns a `ScopeManifest`: the
+bindings (content and masks) at *its* scope. What a run actually executes
+under is a `ResolvedHarnessManifest`: the effective content bindings after
+walking the resolution chain, together with each contributing scope's active
+revision ref and journal head — so "what configuration produced this run" is
+one journaled, replayable record rather than a join reconstructed after the
+fact. Runs and evaluations reference resolved manifests; revisions never do.
+
 **Ownership.** Artifacts live in the shared CAS (content-addressed, already
 scope-free). *Membership and activation* live in per-scope journals:
 task journals stay as-is; project and global scopes get their own
@@ -71,9 +79,9 @@ promotion time instead.
   mechanics (constructor takes a scope, not just a task id) — Stage 3B work.
 - The CLI needs a `--scope` notion only when non-task scopes gain their first
   real artifact kind (prompts), not before.
-- Cross-scope reads make "what configuration produced this run" a resolved
-  set; the run's events must journal the resolution (which artifact version
-  won at each scope) for replayability.
+- Every run journals its `ResolvedHarnessManifest` ref, so replay
+  re-materializes the exact effective configuration including inherited
+  bindings and masks.
 
 ## Sources: borrowed / rejected / deferred
 
