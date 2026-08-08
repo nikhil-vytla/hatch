@@ -8,18 +8,32 @@ with the live Stage 1–2b system.
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-revisions-and-surfaces.md) | Harness revisions and evolvable surfaces | accepted |
-| [0002](0002-scopes.md) | Artifact scopes: inheritance, shadowing, promotion | accepted |
-| [0003](0003-tasks-and-environments.md) | Task spec versions, dataset revisions, environments | accepted |
-| [0004](0004-evidence-and-selection.md) | Validation bundles and selection decisions | accepted |
-| [0005](0005-evolution-algorithms.md) | Evolution algorithms and objective specs | accepted |
-| [0006](0006-storage-and-schema-evolution.md) | Storage backends and migration registry | accepted |
+| [0001](0001-revisions-and-surfaces.md) | Harness revisions and evolvable surfaces | core wire schemas frozen for 3B |
+| [0002](0002-scopes.md) | Artifact scopes: inheritance, shadowing, promotion | core wire schemas frozen for 3B |
+| [0003](0003-tasks-and-environments.md) | Task spec versions, dataset revisions, environments | design accepted; schemas provisional |
+| [0004](0004-evidence-and-selection.md) | Validation bundles and selection decisions | design accepted; schemas provisional |
+| [0005](0005-evolution-algorithms.md) | Evolution algorithms and objective specs | design accepted; schemas provisional |
+| [0006](0006-storage-and-schema-evolution.md) | Storage backends and migration registry | protocol semantics accepted; backend schemas provisional |
 
-Conventions: "accepted" means the contract shapes are settled for Stage 3
-implementation. The wire schemas were marked provisional during the 3A
-revision pass (state/evidence separation, RevisionRef, typed scopes,
-computed risk, policy-neutral dispositions, resumable algorithm state) and
-are now re-validated by the spike tests and frozen for Stage 3B; experimental spike code lives in
+## Freeze scope for Stage 3B
+
+**Frozen core wire types** (Stage 3B implements exactly these): `ScopeRef`,
+`RevisionRef`, `BindingState`, `SurfaceDelta` (binding transitions),
+`ManifestBinding`, `ScopeManifest`, `ScopeContribution`,
+`ResolvedHarnessManifest`, `HarnessRevision`, plus the `SurfaceDescriptor`
+registry shape and the migration-registry mechanics.
+
+**Provisional until their own slices** — TaskSpec/Dataset/EvaluationManifest
+(FunctionTask slice), ValidationBundle/SelectionDecision + frontier
+semantics (selection slice), AlgorithmRun/AlgorithmStep (algorithm slice),
+detailed backend schemas (storage slice). Recorded unresolved needs those
+slices must settle: typed object refs instead of bare ref strings; typed
+evidence roles on bundles (baseline vs candidate); policy-detail refs on
+decisions; frontier *removal* and snapshot records (frontier_add alone
+cannot express eviction); objective + RNG-state + algorithm-state refs so
+resumed searches are bit-reproducible, not merely restartable.
+
+Conventions: experimental spike code lives in
 `src/strive/stage3_contracts.py` (registered under new codec kinds, unused by
 the live loop) with round-trip tests in `tests/test_stage3_contracts.py`.
 Nothing in these ADRs migrates the live ledger; migration sequencing is

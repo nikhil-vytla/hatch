@@ -1,6 +1,6 @@
 # ADR-0004 — Validation bundles and selection decisions
 
-Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B. Refines D14.
+Status: accepted design; wire schemas PROVISIONAL until this ADR's implementation slice (see adrs/README freeze table). Refines D14.
 
 ## Context
 

@@ -104,12 +104,19 @@ No live-ledger migration; Stage 1–2b behavior unchanged (155 tests).
 
 ## Stage 3B — First implementation slice (next; independently mergeable)
 
-Exactly: **composite revision storage + the SurfaceDescriptor registry.**
-- Freeze `revision@1`, `surface-delta@1`, `surface-artifact@1` from the spike.
+Exactly: **composite revision storage + the SurfaceDescriptor registry**,
+implementing only the frozen core wire types (adrs/README freeze table):
+ScopeRef/RevisionRef/BindingState/SurfaceDelta/ScopeManifest/
+ScopeContribution/ResolvedHarnessManifest/HarnessRevision + the descriptor
+registry and migration-registry mechanics.
 - Migration registry (ADR-0006) with `migrate-legacy` as entry 0001 and the
   generation→revision rewrite as entry 0002.
 - `Store` reads/writes revisions; activation/rollback/lineage/replay operate
-  on revisions; the loop still evolves only the strategy-code surface.
+  on revisions; runs journal their ResolvedHarnessManifest ref; the loop
+  still evolves only the strategy-code surface at task scope.
+- NOT in this slice (each provisional until its own slice): task/dataset/
+  evaluation-manifest schemas, selection envelopes and frontier semantics,
+  algorithm state, backend schema details.
 - Exit: all current behavior green on revision records; a hand-authored
   composite revision can be journaled, activated, and rolled back atomically
   even though no proposer emits one yet.
@@ -154,7 +161,9 @@ held-out scores.
   write-only memory earns no acceptance.
 - Online adaptation per ARCHITECTURE's six rules: provisional activations, proxy
   validators, inheritance protection, trusted freeze switch, cadence + failure
-  triggers, physically isolated trusted state.
+  triggers, trusted state kept outside the online loop's interfaces
+  (process separation + interface discipline — not physical isolation until
+  OS-level confinement lands).
 - Recursive delegation: subagent specs as a surface; kernel-mediated spawning with
   RLM-style depth caps and remaining-budget inheritance (note 05); handoff quality
   (exit/focus rates) measured per CH C.1.3.

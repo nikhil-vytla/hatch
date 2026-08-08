@@ -1,6 +1,6 @@
 # ADR-0006 — Storage backends and the migration registry
 
-Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B.
+Status: protocol semantics accepted; detailed backend wire schemas PROVISIONAL until the storage slice (see adrs/README freeze table).
 
 ## Context
 
@@ -16,14 +16,29 @@ with one bespoke `migrate.py`; a third one-off would start a pile.
 **Four backend protocols, JSONL as the reference implementation.**
 
 - `LedgerBackend` — `append(entry, expected_head) -> head`,
-  `append_batch(entries, expected_head) -> head` (all-or-nothing under one
-  head check: a revision + its activation land atomically or not at all),
-  `entries()`, `entries_since(cursor) -> (entries, cursor)` (cursor reads, so
-  indexes and long-running consumers never re-parse whole journals), and
-  `head()`. Append-only and expected-head conflict semantics are part of the
-  *protocol contract*, not the file format: any backend must refuse an append
-  whose expected head is stale and must never mutate or delete. The JSONL
-  implementation keeps its torn-tail tolerance and advisory flock.
+  `append_batch(entries, expected_head) -> head`, `entries()`,
+  `entries_since(cursor) -> (entries, cursor)` (cursor reads, so indexes and
+  long-running consumers never re-parse whole journals), and `head()`.
+  Append-only and expected-head conflict semantics are part of the *protocol
+  contract*, not the file format: any backend must refuse an append whose
+  expected head is stale and must never mutate or delete.
+
+  **Batch atomicity, framed honestly for JSONL.** A multi-line write is not
+  crash-atomic on POSIX, so `append_batch` commits by *framing*: batch
+  entries are written carrying a shared `batch_id` and the batch becomes
+  visible only when its final commit-marker line lands; on read, a batch
+  without its marker is torn tail — ignored and reported exactly like a torn
+  single line today. Crucially, **revision + activation is NOT the canonical
+  atomic batch.** The commit ordering is: candidate revision, evidence
+  bundles, and the selection decision are appended (individually durable,
+  fsynced) *before* any activation is attempted; activation remains what it
+  is today — a single line under its own expected-head check. If activation
+  loses its head race, the revision, evidence, and decision are already
+  durable history and the promotion is retried or refused cleanly; nothing
+  is orphaned and nothing needs unwinding. `append_batch` exists for writes
+  that genuinely form one logical record group (e.g. a revision plus its
+  scope-manifest index entries), not for coupling evidence to activation.
+  The JSONL implementation keeps its torn-tail tolerance and advisory flock.
 - `ArtifactBackend` — today's CAS interface (`put_text/get_text/has`),
   plus planned fsync-on-publish (closing the CAS power-loss durability gap
   noted since phase 3).

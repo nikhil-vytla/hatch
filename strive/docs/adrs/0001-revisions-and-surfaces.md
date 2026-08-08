@@ -1,6 +1,6 @@
 # ADR-0001 — Harness revisions and evolvable surfaces
 
-Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B. Implements charter D5.
+Status: core wire schemas FROZEN for Stage 3B (final pre-merge pass, 2026-08-08). Implements charter D5.
 
 ## Context
 
@@ -9,9 +9,11 @@ The live system equates one generation with one strategy source file
 changes *several* surfaces at once — strategy code plus a prompt plus policy
 parameters — with per-surface validation, risk, and rollback. The research
 corpus shows both the need (Continual Harness evolves four surfaces per
-refinement pass, note 03) and the failure mode of doing it untyped
-(prime-agent's snapshots are the only recovery path because edits mutate
-state in place, note 02).
+refinement pass, note 03). prime-agent is the closest prior art and is
+*typed* — validated CRUD edits, version counters, invertible journaled
+rollback (note 02); the cautionary lesson it carries is different: its
+primary state is mutated in place, so historical reconstruction rests on
+snapshot discipline rather than immutable records.
 
 ## Decision
 
@@ -27,42 +29,56 @@ revision is an immutable, journaled record:
 - `provenance_parents: tuple[RevisionRef, ...]` — additional lineage inputs
   (merge/crossover, the task-scoped origin of a cross-scope promotion);
   never repeats the base parent.
-- `deltas: tuple[SurfaceDelta, ...]` — the complete change set.
-- `state_manifest_ref` — content address of the revision's `HarnessManifest`:
-  the complete resolved (kind, name, content_ref) state after the deltas
-  apply. **Revisions own state, never evaluation conditions** — the
-  `EvaluationManifest` was removed from revisions; a `ValidationBundle`
-  (ADR-0004) pins the evaluation manifest it ran under, because one revision
-  is routinely evaluated under many manifests (grown datasets, more seeds).
+- `deltas: tuple[SurfaceDelta, ...]` — the complete change set, in
+  canonical (kind, name) order; duplicates, self-referencing parents, and
+  duplicate parents are rejected.
+- `scope_manifest_ref` — content address of the revision's `ScopeManifest`:
+  the bindings (artifacts *and masks*) this revision owns **at its own
+  scope** after the deltas apply. Cross-scope resolution is deliberately not
+  a revision's business: runs and evaluations reference a
+  `ResolvedHarnessManifest` — the effective bindings after
+  run→task→project→global resolution plus, per contributing scope, the
+  active revision ref and journal head that contributed (ADR-0002).
+  **Revisions own their scope's state, never evaluation conditions** — a
+  `ValidationBundle` (ADR-0004) pins the evaluation manifest it ran under,
+  because one revision is routinely evaluated under many manifests.
 - provenance: `proposer` (name@version — always versioned, including the
-  migration's own `ledger-migration@1`), `summary`; prompt/completion CAS
-  refs travel via events as today.
+  migration's own `ledger-migration@1`), `summary`, and optional
+  `proposal_ref`/`provenance_ref` CAS pointers to the structured proposal
+  and provenance records.
 - `created_at`.
 
-**`SurfaceDelta` is typed CRUD plus mask** (per-edit schema after
-prime-agent, note 02): `op ∈ {create, update, delete, mask}`, surface
-`kind`, artifact `name`, and `before_ref`/`after_ref` content addresses.
+**`SurfaceDelta` is a complete binding transition**, not an op with
+nullable refs. Artifact state at a scope is an `ArtifactBindingState`:
+`absent | masked | content(content_ref, descriptor_ref)`; a delta stores the
+full `before` and `after` states. `create/update/delete/mask/unmask` are
+*derived labels* (`delta_label`), which makes three things representable by
+construction: **exact inversion** (swap the states — per-surface rollback is
+`invert_delta`), **unmasking** (masked→absent resumes inheritance,
+masked→content replaces the tombstone), and **conflict checks** (a delta
+applies only where the current binding equals its recorded `before`).
 Deltas carry **no risk field** — risk is computed, never trusted from a
-proposal: `effective_risk(descriptor, scope, op)` derives it from the
-descriptor's base risk, bumped one level at broad scopes (global/project)
-and floored at medium for removals. Structural rules, kernel-enforced:
-`create` has only `after_ref`, `delete` only `before_ref`, `update` both,
-`mask` neither (it changes visibility, not content — see ADR-0002); no two
-deltas may touch the same `(kind, name)`; every `kind` must be in the
-trusted registry and allowed at the revision's scope level.
+proposal: the descriptor's risk policy derives it from (artifact name,
+scope, transition label), bumped at broad scopes and floored at medium for
+removals. Every `kind` must be in the trusted registry and allowed at the
+revision's scope level; no-op transitions are rejected.
 
 **`SurfaceDescriptor` is the versioned trusted allowlist entry** (kernel
 data, never persisted as evolvable state): `kind`, `version`,
-`artifact_schema`, `materializer` (id@version), `allowed_scopes` (scope
-levels the kind may live at), `required_validators` (name@version),
-`base_risk`, and `online_policy` (`never` today; a future descriptor version
-may declare `provisional-only`). Planned kinds:
+`artifact_schema`, `materializer` (id@version), `allowed_scopes`,
+`validation_policy` (name@version), `risk_policy_ref` (name@version into the
+trusted risk-policy registry), and `online_policy`. Persisted content
+bindings **pin `descriptor_ref = kind@version`**, so history records which
+descriptor governed each binding. Risk policies see the artifact *name*, so
+one kind need not be one risk bucket — **policy parameters are explicitly
+not universally low-risk**: parameters steering budgets or the sandbox rank
+high, search/retry knobs medium, cosmetic families low. Planned kinds:
 
-| kind | base risk | allowed scopes | online policy | materialization |
+| kind | risk policy | allowed scopes | online policy | materialization |
 |---|---|---|---|---|
-| `strategy-code` | high | task only | never | file in sandbox workspace, executed out-of-process |
-| `prompt` | medium | all | never (stage 5 revisits) | text consumed by kernel-side model calls |
-| `policy-params` | low | all | never (stage 5 revisits) | typed parameter bundle read by trusted components |
+| `strategy-code` | code-risk@1 (high) | task only | never | file in sandbox workspace, executed out-of-process |
+| `prompt` | prompt-risk@1 (medium) | all | never (stage 5 revisits) | text consumed by kernel-side model calls |
+| `policy-params` | params-risk@1 (tiered by family) | all | never (stage 5 revisits) | typed parameter bundle read by trusted components |
 
 Adding a kind is a human code change to the registry — the loop cannot
 extend its own allowlist.
@@ -82,10 +98,10 @@ destroy today's single-derivation invariant; a revision DAG keeps one active
 node per scope.
 
 **Compatibility.** Today's `generation@2` is exactly a one-delta revision:
-`update strategy-code "solve"` with `before_ref` = the parent generation's
-*content* ref (`parent.source_ref` — never a synthetic id string) and
-`after_ref = source_ref`; the migration itself is a versioned proposer
-(`ledger-migration@1`). The spike ships `revision_from_generation()`
+an `update`-labeled transition on strategy-code "solve" whose `before` is
+the parent generation's *content binding* (`parent.source_ref` with the
+pinned descriptor ref) and whose `after` binds `source_ref`; the migration
+itself is a versioned proposer (`ledger-migration@1`). The spike ships `revision_from_generation()`
 (which refuses inconsistent parents) plus round-trip tests; Stage 3B's
 migration (ADR-0006) rewrites task ledgers with that mapping. Until then the
 live loop keeps writing `generation@2`.

@@ -447,3 +447,42 @@ provisional back to accepted/frozen once tests passed.
 
 155 tests, mypy strict clean. Stage 3B slice unchanged: composite revision
 storage + SurfaceDescriptor registry.
+
+## 2026-08-08 — stage 3A final pre-merge pass (PR #40)
+
+Seven corrections to the contracts before the 3B freeze:
+
+- Split revision-owned state (ScopeManifest: own-scope bindings incl.
+  masks) from run-resolved state (ResolvedHarnessManifest: effective
+  bindings + per-scope contributing revision refs and journal heads). Runs
+  and evaluations reference the resolved manifest; revisions never do.
+- Replaced op+nullable-refs deltas with complete binding transitions:
+  BindingState = absent | masked | content(ref, descriptor_ref); deltas
+  store before AND after states; create/update/delete/mask/unmask are
+  derived labels. Exact inversion is state-swap, unmasking is
+  representable in both directions, and conflict checks compare the
+  current binding to the recorded before-state.
+- descriptor_ref (kind@version) pinned in every persisted content binding;
+  descriptors now carry validation_policy + risk_policy_ref; params risk
+  is tiered by family (budget./sandbox. high, search./retry. medium) —
+  killed the "all policy params are low-risk" assumption.
+- proposal_ref/provenance_ref on revisions; canonical (kind,name) ordering
+  enforced on manifests AND deltas; self-referencing/duplicate parents
+  rejected.
+- ADR-0006 atomicity fixed honestly: JSONL batches commit by framing
+  (batch id + commit marker; unmarked batch = torn tail); the commit
+  ordering rule makes revision/evidence/decision individually durable
+  BEFORE activation, whose single-line head-checked append stays the only
+  atomic promotion primitive — revision+activation is explicitly not a
+  canonical batch.
+- Freeze narrowed: only the core wire types freeze for 3B; task/dataset/
+  evaluation, selection/frontier, algorithm state, and backend schemas are
+  provisional, with unresolved needs recorded (typed refs, evidence roles,
+  policy-detail refs, frontier removals/snapshots, objective+RNG+state
+  refs for bit-reproducible resumption).
+- Wording: prime-agent credited as typed (its lesson is in-place primary
+  state, not untyped edits); "structurally impossible" bypass softened to
+  the honest API-contract claim; ROADMAP stage 5 no longer says
+  "physically isolated"; 3B scope stated exactly.
+
+158 tests, mypy strict clean. Live loop untouched throughout.

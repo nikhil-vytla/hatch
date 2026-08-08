@@ -1,6 +1,6 @@
 # ADR-0003 — Task spec versions, dataset revisions, environments
 
-Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B.
+Status: accepted design; wire schemas PROVISIONAL until this ADR's implementation slice (see adrs/README freeze table).
 
 ## Context
 
@@ -36,7 +36,8 @@ stage-4 agentic tasks.
   compared on it (otherwise paired comparisons silently mix datasets).
 
 **`EvaluationManifest` pins everything a validation ran under**: the
-resolved harness state ref (which `HarnessManifest` was under test), the
+`ResolvedHarnessManifest` ref (the run-resolved effective bindings under
+test — never a revision's own scope manifest), the
 objective spec ref, task and dataset fingerprints, environment and scorer
 ids (name@version), tool versions, the runtime (e.g. `cpython-3.12.10`),
 the seed tuple, the validator list (name@version), and the `BudgetSpec`.

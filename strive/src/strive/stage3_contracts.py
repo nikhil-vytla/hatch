@@ -1,36 +1,42 @@
-"""EXPERIMENTAL — Stage 3A contract spike, revised (see docs/adrs/).
+"""EXPERIMENTAL — Stage 3A contract spike, final pre-merge form (see docs/adrs/).
 
-These typed contracts validate the ADR designs with round-trip tests before
-Stage 3B freezes and implements them. Nothing in the live loop imports this
-module; the registered codec kinds are additive and unused by any journal.
-Wire schemas here were provisional during the 3A revision pass and are now
-the shapes Stage 3B freezes.
+Freeze status (ADR README has the authoritative list):
+- FROZEN for Stage 3B: the core wire types — ScopeRef, RevisionRef,
+  BindingState, SurfaceDelta, ManifestBinding, ScopeManifest,
+  ScopeContribution, ResolvedHarnessManifest, HarnessRevision — plus the
+  SurfaceDescriptor registry shape.
+- PROVISIONAL until their implementation slices: TaskSpecVersion /
+  DatasetRevision / EvaluationManifest, ValidatorResult / ValidationBundle /
+  SelectionDecision (and frontier semantics), AlgorithmRun / AlgorithmStep,
+  and detailed storage-backend schemas.
 
-Revision-pass highlights (each backed by a test):
-- revision *state* (HarnessManifest / state_manifest_ref) is separated from
-  evaluation *evidence* (ValidationBundle pins the EvaluationManifest);
-- RevisionRef(scope, id) makes lineage globally unambiguous across scopes;
-  base_parent (deltas apply here) is distinct from provenance_parents;
-- ScopeRef + ResolutionContext replace colon-parsed strings and any implicit
-  default project; delete (remove own override) is distinct from mask
-  (tombstone that stops inheritance fall-through);
-- task specs are environment-generic; solve(str)->int details live in the
-  FunctionTask config blob;
-- risk is computed from descriptor + scope + operation, never trusted from a
-  delta;
-- selection decisions are policy-neutral kernel dispositions, all of which
-  require evidence.
+Nothing in the live loop imports this module; the registered codec kinds are
+additive and unused by any journal.
+
+Model summary:
+- a revision owns a `ScopeManifest` (its scope's bindings, masks included);
+  runs/evaluations reference a `ResolvedHarnessManifest` (the effective
+  bindings after run→task→project→global resolution, plus which active
+  revision and journal head each scope contributed);
+- artifact state is a complete `BindingState` (absent | masked |
+  content(ref, descriptor_ref)); a `SurfaceDelta` is a before→after state
+  transition, so exact inversion, unmasking, and conflict checks are
+  representable; create/update/delete/mask/unmask are *derived labels*;
+- persisted content bindings pin their `descriptor_ref` (kind@version);
+  risk is computed by the descriptor's risk policy from (name, scope,
+  transition label) — policy parameters are NOT one universally low-risk
+  bucket.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Callable, Protocol
 
 from strive.codec import register
 from strive.contracts import BudgetSpec, BudgetUsage, Generation
 
-# -- ADR-0002: typed scopes ---------------------------------------------------------
+# -- typed scopes (ADR-0002; frozen) -------------------------------------------------
 
 LEVEL_GLOBAL = "global"
 LEVEL_PROJECT = "project"
@@ -66,11 +72,8 @@ GLOBAL_SCOPE = ScopeRef(LEVEL_GLOBAL, "")
 
 @dataclass(frozen=True)
 class ResolutionContext:
-    """An explicit resolution chain, narrowest scope first.
-
-    Built by trusted code from what is actually known — there is no implicit
-    default project: a task with no project resolves task → global.
-    """
+    """An explicit resolution chain, narrowest scope first. There is no
+    implicit default project: a projectless task resolves task → global."""
 
     chain: tuple[ScopeRef, ...]
 
@@ -93,7 +96,16 @@ class ResolutionContext:
         return ResolutionContext(chain=tuple(scopes))
 
 
-# -- ADR-0001: surfaces ---------------------------------------------------------
+@register("revision-ref", 1)
+@dataclass(frozen=True)
+class RevisionRef:
+    """Globally unambiguous revision identity: scope + per-scope id."""
+
+    scope: ScopeRef
+    revision_id: str
+
+
+# -- surface kinds, descriptors, risk (ADR-0001/0003; registry shape frozen) ---------
 
 SURFACE_STRATEGY_CODE = "strategy-code"
 SURFACE_PROMPT = "prompt"
@@ -104,12 +116,6 @@ RISK_MEDIUM = "medium"
 RISK_HIGH = "high"
 _RISK_ORDER = (RISK_LOW, RISK_MEDIUM, RISK_HIGH)
 
-OP_CREATE = "create"
-OP_UPDATE = "update"
-OP_DELETE = "delete"  # remove this scope's own override; inheritance resumes
-OP_MASK = "mask"  # tombstone: stop inheritance fall-through at this scope
-DELTA_OPS = (OP_CREATE, OP_UPDATE, OP_DELETE, OP_MASK)
-
 ONLINE_NEVER = "never"
 ONLINE_PROVISIONAL_ONLY = "provisional-only"
 
@@ -118,19 +124,66 @@ ONLINE_PROVISIONAL_ONLY = "provisional-only"
 class SurfaceDescriptor:
     """Versioned trusted allowlist entry for an evolvable surface kind.
 
-    Kernel data, never persisted as evolvable state; the loop cannot extend
-    or edit the registry. Risk is *computed* from this descriptor plus the
-    delta's scope and operation — a delta carries no risk field to trust.
+    Kernel data, never persisted as evolvable state. Persisted content
+    bindings pin ``descriptor_ref = kind@version`` so history records which
+    descriptor governed them.
     """
 
     kind: str
     version: int
     artifact_schema: str  # schema id for artifact contents
-    materializer: str  # id@version: how the artifact lands in a workspace
+    materializer: str  # id@version
     allowed_scopes: tuple[str, ...]  # scope levels this kind may live at
-    required_validators: tuple[str, ...]  # name@version
-    base_risk: str
+    validation_policy: str  # name@version — validators this kind must pass
+    risk_policy_ref: str  # name@version into RISK_POLICIES
     online_policy: str  # never | provisional-only
+
+    @property
+    def descriptor_ref(self) -> str:
+        return f"{self.kind}@{self.version}"
+
+
+# Risk policies compute risk from (artifact name, scope, transition label) —
+# a delta carries nothing to trust, and policy parameters are explicitly NOT
+# one universally low-risk bucket (see params_risk).
+RiskPolicy = Callable[[str, "ScopeRef", str], str]
+
+
+def _bump_for_scope_and_label(risk: str, scope: ScopeRef, label: str) -> str:
+    index = _RISK_ORDER.index(risk)
+    if scope.level in (LEVEL_GLOBAL, LEVEL_PROJECT):
+        index = min(index + 1, len(_RISK_ORDER) - 1)  # broader blast radius
+    if label in ("delete", "mask"):
+        index = max(index, _RISK_ORDER.index(RISK_MEDIUM))  # removals surprise
+    return _RISK_ORDER[index]
+
+
+def _code_risk(name: str, scope: ScopeRef, label: str) -> str:
+    return _bump_for_scope_and_label(RISK_HIGH, scope, label)
+
+
+def _prompt_risk(name: str, scope: ScopeRef, label: str) -> str:
+    return _bump_for_scope_and_label(RISK_MEDIUM, scope, label)
+
+
+def _params_risk(name: str, scope: ScopeRef, label: str) -> str:
+    """Policy parameters are tiered by what they control, not uniformly low:
+    parameters steering budgets or the sandbox are as dangerous as code."""
+    family = name.split(".", 1)[0]
+    base = {
+        "sandbox": RISK_HIGH,
+        "budget": RISK_HIGH,
+        "search": RISK_MEDIUM,
+        "retry": RISK_MEDIUM,
+    }.get(family, RISK_LOW)
+    return _bump_for_scope_and_label(base, scope, label)
+
+
+RISK_POLICIES: dict[str, RiskPolicy] = {
+    "code-risk@1": _code_risk,
+    "prompt-risk@1": _prompt_risk,
+    "params-risk@1": _params_risk,
+}
 
 
 SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
@@ -140,8 +193,8 @@ SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
         artifact_schema="python-module@1",
         materializer="sandbox-file@1",
         allowed_scopes=(LEVEL_TASK,),
-        required_validators=("selection-suite@1",),
-        base_risk=RISK_HIGH,
+        validation_policy="paired-deterministic@1",
+        risk_policy_ref="code-risk@1",
         online_policy=ONLINE_NEVER,
     ),
     SURFACE_PROMPT: SurfaceDescriptor(
@@ -150,9 +203,9 @@ SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
         artifact_schema="text@1",
         materializer="kernel-text@1",
         allowed_scopes=SCOPE_LEVELS,
-        required_validators=("selection-suite@1",),
-        base_risk=RISK_MEDIUM,
-        online_policy=ONLINE_NEVER,  # stage 5 may relax via descriptor version
+        validation_policy="paired-deterministic@1",
+        risk_policy_ref="prompt-risk@1",
+        online_policy=ONLINE_NEVER,  # stage 5 revisits via a descriptor version
     ),
     SURFACE_POLICY_PARAMS: SurfaceDescriptor(
         kind=SURFACE_POLICY_PARAMS,
@@ -160,48 +213,118 @@ SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
         artifact_schema="params@1",
         materializer="kernel-params@1",
         allowed_scopes=SCOPE_LEVELS,
-        required_validators=("selection-suite@1",),
-        base_risk=RISK_LOW,
+        validation_policy="paired-deterministic@1",
+        risk_policy_ref="params-risk@1",
         online_policy=ONLINE_NEVER,
     ),
 }
 
 
-def effective_risk(kind: str, scope: ScopeRef, op: str) -> str:
-    """Risk from descriptor + scope + operation (never from the delta)."""
+def effective_risk(kind: str, name: str, scope: ScopeRef, label: str) -> str:
+    """Risk from descriptor + scope + transition label (never from a delta)."""
     descriptor = SURFACE_REGISTRY.get(kind)
     if descriptor is None:
         raise ContractViolation(f"surface kind {kind!r} is not in the trusted registry")
-    index = _RISK_ORDER.index(descriptor.base_risk)
-    if scope.level in (LEVEL_GLOBAL, LEVEL_PROJECT):
-        index = min(index + 1, len(_RISK_ORDER) - 1)  # broader blast radius
-    if op in (OP_DELETE, OP_MASK):
-        index = max(index, _RISK_ORDER.index(RISK_MEDIUM))  # removals surprise
-    return _RISK_ORDER[index]
+    return RISK_POLICIES[descriptor.risk_policy_ref](name, scope, label)
 
 
-@register("surface-artifact", 1)
+# -- binding states and deltas (ADR-0001; frozen) -------------------------------------
+
+BINDING_ABSENT = "absent"
+BINDING_MASKED = "masked"
+BINDING_CONTENT = "content"
+BINDING_STATES = (BINDING_ABSENT, BINDING_MASKED, BINDING_CONTENT)
+
+
+@register("binding-state", 1)
 @dataclass(frozen=True)
-class SurfaceArtifact:
-    kind: str
-    name: str
-    scope: ScopeRef
-    content_ref: str  # "" iff masked
-    created_at: str
-    masked: bool = False
+class BindingState:
+    """Complete artifact state at one scope: absent | masked |
+    content(content_ref, descriptor_ref)."""
+
+    state: str
+    content_ref: str | None = None
+    descriptor_ref: str | None = None  # kind@version, pinned for content
+
+
+ABSENT = BindingState(BINDING_ABSENT)
+MASKED = BindingState(BINDING_MASKED)
+
+
+def content_binding(kind: str, content_ref: str) -> BindingState:
+    descriptor = SURFACE_REGISTRY.get(kind)
+    if descriptor is None:
+        raise ContractViolation(f"surface kind {kind!r} is not in the trusted registry")
+    return BindingState(BINDING_CONTENT, content_ref, descriptor.descriptor_ref)
+
+
+def validate_binding(binding: BindingState, kind: str) -> None:
+    if binding.state not in BINDING_STATES:
+        raise ContractViolation(f"unknown binding state {binding.state!r}")
+    if binding.state == BINDING_CONTENT:
+        if not binding.content_ref or not binding.descriptor_ref:
+            raise ContractViolation(
+                "a content binding requires both content_ref and descriptor_ref"
+            )
+        expected = f"{kind}@{SURFACE_REGISTRY[kind].version}" if kind in SURFACE_REGISTRY else None
+        if expected is None:
+            raise ContractViolation(f"surface kind {kind!r} is not in the trusted registry")
+        if binding.descriptor_ref != expected:
+            raise ContractViolation(
+                f"descriptor_ref {binding.descriptor_ref!r} does not pin the "
+                f"registered descriptor {expected!r}"
+            )
+    else:
+        if binding.content_ref is not None or binding.descriptor_ref is not None:
+            raise ContractViolation(
+                f"{binding.state} bindings must carry no content or descriptor refs"
+            )
 
 
 @register("surface-delta", 1)
 @dataclass(frozen=True)
 class SurfaceDelta:
-    """Typed CRUD (+mask) over one surface artifact. No risk field: risk is
-    computed via `effective_risk` and recorded by the kernel where needed."""
+    """A complete before→after binding transition for one surface artifact.
 
-    op: str  # DELTA_OPS
+    create/update/delete/mask/unmask are *derived labels* (`delta_label`);
+    the states themselves make exact inversion (`invert_delta`) and
+    application conflict checks (`check_delta_applies`) representable."""
+
     kind: str
     name: str
-    before_ref: str | None
-    after_ref: str | None
+    before: BindingState
+    after: BindingState
+
+
+def delta_label(delta: SurfaceDelta) -> str:
+    before, after = delta.before.state, delta.after.state
+    if delta.before == delta.after:
+        raise ContractViolation(
+            f"delta for {delta.name!r} is a no-op (before == after)"
+        )
+    if after == BINDING_MASKED:
+        return "mask"
+    if before == BINDING_MASKED:
+        return "unmask"
+    if before == BINDING_ABSENT and after == BINDING_CONTENT:
+        return "create"
+    if before == BINDING_CONTENT and after == BINDING_ABSENT:
+        return "delete"
+    return "update"  # content -> content with a different ref
+
+
+def invert_delta(delta: SurfaceDelta) -> SurfaceDelta:
+    """Exact inversion: swap the states (per-surface rollback, ADR-0001)."""
+    return SurfaceDelta(delta.kind, delta.name, before=delta.after, after=delta.before)
+
+
+def check_delta_applies(delta: SurfaceDelta, current: BindingState) -> None:
+    """Conflict check: a delta applies only to the exact state it recorded."""
+    if current != delta.before:
+        raise ContractViolation(
+            f"delta for {delta.name!r} expected binding {delta.before} "
+            f"but found {current}"
+        )
 
 
 def validate_delta(delta: SurfaceDelta, scope: ScopeRef) -> None:
@@ -216,113 +339,181 @@ def validate_delta(delta: SurfaceDelta, scope: ScopeRef) -> None:
             f"surface kind {delta.kind!r} is not allowed at scope level "
             f"{scope.level!r} (allowed: {descriptor.allowed_scopes})"
         )
-    if delta.op == OP_CREATE and not (delta.before_ref is None and delta.after_ref):
-        raise ContractViolation(f"create delta {delta.name!r} must have only after_ref")
-    elif delta.op == OP_UPDATE and not (delta.before_ref and delta.after_ref):
-        raise ContractViolation(f"update delta {delta.name!r} must have both refs")
-    elif delta.op == OP_DELETE and not (delta.before_ref and delta.after_ref is None):
-        raise ContractViolation(f"delete delta {delta.name!r} must have only before_ref")
-    elif delta.op == OP_MASK and not (delta.before_ref is None and delta.after_ref is None):
-        raise ContractViolation(f"mask delta {delta.name!r} must carry no content refs")
-    elif delta.op not in DELTA_OPS:
-        raise ContractViolation(f"unknown delta op {delta.op!r}")
+    validate_binding(delta.before, delta.kind)
+    validate_binding(delta.after, delta.kind)
+    delta_label(delta)  # raises on no-op
 
 
-# -- ADR-0001: manifests, refs, revisions ----------------------------------------
+# -- manifests: revision-owned vs run-resolved (ADR-0001/0002; frozen) ----------------
 
 
-@register("manifest-entry", 1)
+@register("manifest-binding", 1)
 @dataclass(frozen=True)
-class ManifestEntry:
+class ManifestBinding:
     kind: str
     name: str
-    content_ref: str
+    binding: BindingState
 
 
-@register("harness-manifest", 1)
-@dataclass(frozen=True)
-class HarnessManifest:
-    """The complete resolved harness *state* after a revision's deltas apply.
-
-    Content-addressed into CAS; revisions carry its ref. This is state, not
-    evidence — evaluation conditions live in EvaluationManifest, owned by
-    ValidationBundle (ADR-0004)."""
-
-    entries: tuple[ManifestEntry, ...]
-
-
-def validate_manifest(manifest: HarnessManifest) -> None:
-    keys = [(e.kind, e.name) for e in manifest.entries]
+def _require_canonical(bindings: tuple[ManifestBinding, ...], where: str) -> None:
+    keys = [(b.kind, b.name) for b in bindings]
+    if keys != sorted(keys):
+        raise ContractViolation(f"{where}: bindings must be in canonical (kind, name) order")
     if len(keys) != len(set(keys)):
-        raise ContractViolation("duplicate (kind, name) artifact key in manifest")
+        raise ContractViolation(f"{where}: duplicate (kind, name) binding")
 
 
-@register("revision-ref", 1)
+@register("scope-manifest", 1)
 @dataclass(frozen=True)
-class RevisionRef:
-    """Globally unambiguous revision identity: scope + per-scope id."""
+class ScopeManifest:
+    """The artifacts and masks one revision owns at one scope. This is
+    revision-owned *state* — resolution across scopes is not its business."""
 
     scope: ScopeRef
-    revision_id: str
+    bindings: tuple[ManifestBinding, ...]  # masked or content; absent isn't stored
+
+
+def validate_scope_manifest(manifest: ScopeManifest) -> None:
+    validate_scope(manifest.scope)
+    _require_canonical(manifest.bindings, "scope manifest")
+    for entry in manifest.bindings:
+        if entry.binding.state == BINDING_ABSENT:
+            raise ContractViolation(
+                f"scope manifest must not store absent bindings ({entry.name!r})"
+            )
+        validate_binding(entry.binding, entry.kind)
+
+
+@register("scope-contribution", 1)
+@dataclass(frozen=True)
+class ScopeContribution:
+    """Which active revision (and journal head) a scope contributed to a
+    resolved manifest — the provenance of run-resolved state."""
+
+    scope: ScopeRef
+    revision: RevisionRef
+    journal_head: int
+
+
+@register("resolved-manifest", 1)
+@dataclass(frozen=True)
+class ResolvedHarnessManifest:
+    """Run-resolved effective state after run→task→project→global resolution.
+
+    Runs and evaluations reference *this*; revisions never do — a revision
+    owns only its own scope's manifest."""
+
+    contributions: tuple[ScopeContribution, ...]  # narrowest scope first
+    effective: tuple[ManifestBinding, ...]  # content bindings only, canonical
+
+
+def validate_resolved_manifest(manifest: ResolvedHarnessManifest) -> None:
+    _require_canonical(manifest.effective, "resolved manifest")
+    for entry in manifest.effective:
+        if entry.binding.state != BINDING_CONTENT:
+            raise ContractViolation(
+                "resolved manifests carry effective content bindings only "
+                f"({entry.name!r} is {entry.binding.state})"
+            )
+        validate_binding(entry.binding, entry.kind)
+    for contribution in manifest.contributions:
+        validate_scope(contribution.scope)
+
+
+def resolve_bindings(
+    scope_manifests: list[ScopeManifest], context: ResolutionContext
+) -> tuple[ManifestBinding, ...]:
+    """Nearest-scope shadowing over scope manifests: masks stop fall-through
+    (absent on purpose); a scope with no binding falls through."""
+    by_scope = {m.scope: m for m in scope_manifests}
+    keys: set[tuple[str, str]] = set()
+    for manifest in scope_manifests:
+        keys.update((b.kind, b.name) for b in manifest.bindings)
+    effective: list[ManifestBinding] = []
+    for kind, name in sorted(keys):
+        for scope in context.chain:
+            scoped = by_scope.get(scope)
+            if scoped is None:
+                continue
+            hit = next(
+                (b for b in scoped.bindings if (b.kind, b.name) == (kind, name)),
+                None,
+            )
+            if hit is not None:
+                if hit.binding.state == BINDING_CONTENT:
+                    effective.append(hit)
+                break  # masked: stop fall-through, artifact absent on purpose
+    return tuple(effective)
+
+
+# -- revisions (ADR-0001; frozen) -----------------------------------------------------
 
 
 @register("revision", 1)
 @dataclass(frozen=True)
 class HarnessRevision:
-    """The composite unit of evolution (ADR-0001, revised).
+    """The composite unit of evolution.
 
-    ``base_parent`` is where the deltas apply; ``provenance_parents`` are
-    additional lineage inputs (merge/crossover, cross-scope promotion
-    origins) that contributed content but are not the delta base.
-    ``state_manifest_ref`` addresses the resolved HarnessManifest — the
-    revision owns its state, never its evaluation conditions.
+    ``scope_manifest_ref`` addresses the revision's own ScopeManifest (its
+    scope's post-delta state); evaluation conditions live with evidence
+    (ValidationBundle), never here. ``proposal_ref``/``provenance_ref``
+    optionally point at the proposal artifact and provenance record in CAS.
     """
 
     ref: RevisionRef
     base_parent: RevisionRef | None
     provenance_parents: tuple[RevisionRef, ...]
     deltas: tuple[SurfaceDelta, ...]
-    state_manifest_ref: str
+    scope_manifest_ref: str
     proposer: str  # name@version, always versioned
     summary: str
     created_at: str
+    proposal_ref: str | None = None
+    provenance_ref: str | None = None
 
 
 def validate_revision(revision: HarnessRevision) -> None:
     validate_scope(revision.ref.scope)
     if not revision.deltas:
         raise ContractViolation("a revision must contain at least one delta")
-    if not revision.state_manifest_ref:
-        raise ContractViolation("a revision must reference its state manifest")
+    if not revision.scope_manifest_ref:
+        raise ContractViolation("a revision must reference its scope manifest")
     if "@" not in revision.proposer:
         raise ContractViolation(
             f"proposer {revision.proposer!r} must be versioned (name@version)"
         )
     if revision.base_parent is not None:
         validate_scope(revision.base_parent.scope)
+        if revision.base_parent == revision.ref:
+            raise ContractViolation("a revision cannot be its own base parent")
+    seen_parents: set[RevisionRef] = set()
     for parent in revision.provenance_parents:
         validate_scope(parent.scope)
-        if revision.base_parent is not None and parent == revision.base_parent:
+        if parent == revision.ref:
+            raise ContractViolation("a revision cannot be its own provenance parent")
+        if parent == revision.base_parent:
             raise ContractViolation("base_parent must not repeat in provenance_parents")
-    touched: set[tuple[str, str]] = set()
+        if parent in seen_parents:
+            raise ContractViolation(f"duplicate provenance parent {parent}")
+        seen_parents.add(parent)
+    keys = [(d.kind, d.name) for d in revision.deltas]
+    if keys != sorted(keys):
+        raise ContractViolation("deltas must be in canonical (kind, name) order")
+    if len(keys) != len(set(keys)):
+        raise ContractViolation(f"duplicate delta for surface {keys}")
     for delta in revision.deltas:
         validate_delta(delta, revision.ref.scope)
-        key = (delta.kind, delta.name)
-        if key in touched:
-            raise ContractViolation(f"duplicate delta for surface {key}")
-        touched.add(key)
 
 
 def revision_from_generation(
     generation: Generation,
     parent: Generation | None,
     scope: ScopeRef,
-    state_manifest_ref: str,
+    scope_manifest_ref: str,
 ) -> HarnessRevision:
     """ADR-0001 compatibility mapping: today's generation is exactly a
-    one-delta revision over the strategy-code surface. ``before_ref`` is the
-    parent's *content* ref (its source), and the migration proposer id is
-    versioned like any other."""
+    one-delta revision over the strategy-code surface, with complete binding
+    transitions (before = the parent's *content* binding)."""
     if (parent is None) != (generation.parent_id is None):
         raise ContractViolation(
             "parent generation must be supplied iff the generation has a parent id"
@@ -332,11 +523,12 @@ def revision_from_generation(
             f"parent mismatch: {parent.generation_id} != {generation.parent_id}"
         )
     delta = SurfaceDelta(
-        op=OP_CREATE if parent is None else OP_UPDATE,
         kind=SURFACE_STRATEGY_CODE,
         name="solve",
-        before_ref=None if parent is None else parent.source_ref,
-        after_ref=generation.source_ref,
+        before=ABSENT if parent is None else content_binding(
+            SURFACE_STRATEGY_CODE, parent.source_ref
+        ),
+        after=content_binding(SURFACE_STRATEGY_CODE, generation.source_ref),
     )
     return HarnessRevision(
         ref=RevisionRef(scope, generation.generation_id.replace("gen-", "rev-")),
@@ -347,100 +539,75 @@ def revision_from_generation(
         ),
         provenance_parents=(),
         deltas=(delta,),
-        state_manifest_ref=state_manifest_ref,
+        scope_manifest_ref=scope_manifest_ref,
         proposer="ledger-migration@1",
         summary=f"migrated from {generation.generation_id} ({generation.origin})",
         created_at=generation.created_at,
     )
 
 
-def resolve_artifact(
-    artifacts: list[SurfaceArtifact],
-    kind: str,
-    name: str,
-    context: ResolutionContext,
-) -> SurfaceArtifact | None:
-    """Nearest-scope shadowing with mask semantics (ADR-0002).
-
-    A *deleted* override simply isn't present, so resolution falls through to
-    broader scopes; a *mask* is present and stops the fall-through, making
-    the artifact absent at this scope on purpose."""
-    by_key = {(a.scope, a.kind, a.name): a for a in artifacts}
-    for scope in context.chain:
-        hit = by_key.get((scope, kind, name))
-        if hit is not None:
-            return None if hit.masked else hit
-    return None
-
-
-# -- ADR-0003: tasks, datasets, evaluation manifests --------------------------------
+# ======================================================================================
+# PROVISIONAL CONTRACTS — shapes below are NOT frozen for Stage 3B; each is
+# finalized by its own implementation slice. Known unresolved needs, recorded
+# per ADR README: typed object refs instead of bare strings; typed evidence
+# roles (baseline vs candidate bundles); policy-detail refs on decisions;
+# frontier removal/snapshot records; objective + RNG + algorithm-state refs
+# for resumable search.
+# ======================================================================================
 
 
 @register("task-spec", 1)
 @dataclass(frozen=True)
 class TaskSpecVersion:
-    """Immutable, environment-generic task identity.
-
-    The kernel sees an environment adapter, action/observation schemas, a
-    scorer, and a config blob — never a function signature. FunctionTask's
-    config carries today's `solve(str)->int` signature and primitive catalog.
-    """
+    """PROVISIONAL. Immutable, environment-generic task identity."""
 
     task_id: str
     version: int
     description: str
     environment: str  # adapter id@version, e.g. function-task@1
-    action_schema: str  # schema id
-    observation_schema: str  # schema id
+    action_schema: str
+    observation_schema: str
     scorer: str  # id@version
-    config_ref: str  # CAS ref of adapter-specific config
+    config_ref: str  # CAS ref of adapter-specific config (signature/catalog live here)
     fingerprint: str
 
 
 @register("dataset-revision", 1)
 @dataclass(frozen=True)
 class DatasetRevision:
-    """Append-friendly evaluation data, fully reconstructable: every split
-    points at a CAS manifest of its cases. Growing a split is a new revision
-    plus a re-evaluation requirement — never a task-drift acknowledgement."""
+    """PROVISIONAL. Append-friendly, reconstructable evaluation data."""
 
     dataset_id: str
     revision: int
     parent_revision: int | None
     reason: str
-    split_manifest_refs: dict[str, str]  # split -> CAS ref of case manifest
-    split_counts: dict[str, int]  # derivable; kept for cheap display
+    split_manifest_refs: dict[str, str]
+    split_counts: dict[str, int]
     fingerprint: str
 
 
 @register("evaluation-manifest", 1)
 @dataclass(frozen=True)
 class EvaluationManifest:
-    """Everything a validation ran under, pinned (ADR-0003, expanded).
+    """PROVISIONAL. Everything a validation ran under. References the
+    run-resolved manifest — never a revision's own scope manifest."""
 
-    Owned by ValidationBundle — never by a revision: the same revision is
-    routinely evaluated under many manifests (new dataset revisions, more
-    seeds, different validators)."""
-
-    harness_state_ref: str  # resolved HarnessManifest under test
+    resolved_manifest_ref: str
     objective_spec_ref: str
     task_fingerprint: str
     dataset_fingerprint: str
-    environment: str  # id@version
-    scorer: str  # id@version
+    environment: str
+    scorer: str
     tool_versions: dict[str, str]
-    runtime: str  # e.g. "cpython-3.12.10"
+    runtime: str
     seeds: tuple[int, ...]
-    validators: tuple[str, ...]  # name@version
+    validators: tuple[str, ...]
     budget: BudgetSpec
 
 
-# -- ADR-0003: session protocols (runtime, not wire) ---------------------------------
-
-
 class EnvironmentSession(Protocol):
-    """Base episodic session: observe, act, finish. Nothing here requires
-    reset — non-resettable environments implement only this."""
+    """PROVISIONAL. Base episodic session; reset is a capability, not a
+    requirement."""
 
     def observation(self) -> object: ...
     def act(self, action: object) -> object: ...
@@ -461,8 +628,6 @@ class Forkable(Protocol):
     def fork(self) -> EnvironmentSession: ...
 
 
-# -- ADR-0004: evidence and selection ------------------------------------------------
-
 VALIDATOR_PASSED = "passed"
 VALIDATOR_FAILED = "failed"
 VALIDATOR_INCONCLUSIVE = "inconclusive"
@@ -471,17 +636,19 @@ VALIDATOR_INCONCLUSIVE = "inconclusive"
 @register("validator-result", 1)
 @dataclass(frozen=True)
 class ValidatorResult:
-    validator: str  # name@version
-    status: str  # passed | failed | inconclusive
+    """PROVISIONAL."""
+
+    validator: str
+    status: str
     metrics: dict[str, float]
     detail: str
-    artifact_ref: str | None = None  # full payload (distributions, traces) in CAS
+    artifact_ref: str | None = None
 
 
 @register("validation-bundle", 1)
 @dataclass(frozen=True)
 class ValidationBundle:
-    """Evidence: pins the evaluation manifest it was produced under."""
+    """PROVISIONAL. Evidence pins the evaluation manifest it ran under."""
 
     evaluation_manifest_ref: str
     subject: RevisionRef
@@ -495,12 +662,12 @@ DISPOSITIONS = ("promote", "reject", "frontier_add", "provisional_activate")
 @register("selection-decision", 1)
 @dataclass(frozen=True)
 class SelectionDecision:
-    """Policy-neutral conclusion: a policy_ref plus a small kernel
-    disposition vocabulary. Every disposition requires evidence."""
+    """PROVISIONAL. Policy-neutral conclusion; every disposition requires
+    evidence."""
 
-    policy_ref: str  # name@version
+    policy_ref: str
     objective_spec_ref: str
-    disposition: str  # DISPOSITIONS
+    disposition: str
     subject: RevisionRef
     incumbent: RevisionRef | None
     evidence_refs: tuple[str, ...]
@@ -524,8 +691,6 @@ def validate_selection(decision: SelectionDecision) -> None:
     validate_scope(decision.subject.scope)
 
 
-# -- ADR-0005: resumable algorithm state ----------------------------------------------
-
 ALGORITHM_RUNNING = "running"
 ALGORITHM_COMPLETED = "completed"
 ALGORITHM_HALTED = "halted"
@@ -534,23 +699,24 @@ ALGORITHM_HALTED = "halted"
 @register("algorithm-run", 1)
 @dataclass(frozen=True)
 class AlgorithmRun:
-    """Journaled search state: a crashed algorithm resumes from its last
-    journaled step, never from in-memory population state."""
+    """PROVISIONAL. Journaled search state (resumption via journaled steps)."""
 
-    algorithm: str  # name@version
+    algorithm: str
     run_id: str
     scope: ScopeRef
     budget: BudgetSpec
-    status: str  # running | completed | halted
+    status: str
     steps_completed: int
 
 
 @register("algorithm-step", 1)
 @dataclass(frozen=True)
 class AlgorithmStep:
+    """PROVISIONAL."""
+
     run_id: str
     step_index: int
-    action: str  # propose | validate | submit
-    subject_ref: str  # revision id / bundle ref / decision ref as applicable
+    action: str
+    subject_ref: str
     detail: str
     usage: BudgetUsage

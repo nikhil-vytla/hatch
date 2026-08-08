@@ -238,19 +238,25 @@ written design-first with experimental spikes (`stage3_contracts.py`) proving
 the shapes round-trip before anything migrates:
 
 - **ADR-0001** `HarnessRevision` replaces one-generation-one-file:
-  `RevisionRef(scope, id)` identity (globally unambiguous), `base_parent`
-  (deltas apply here) distinct from `provenance_parents` (merge/crossover/
-  promotion inputs), typed CRUD+mask deltas with before/after content refs,
-  and a content-addressed `state_manifest_ref` — revisions own *state*,
-  never evaluation conditions. Versioned `SurfaceDescriptor`s (artifact
-  schema, materializer, allowed scopes, required validators, base risk,
-  online policy) form the trusted allowlist; **risk is computed from
-  descriptor + scope + operation, never trusted from a delta**; rollback is
-  a new revision, never a partial activation.
+  `RevisionRef(scope, id)` identity, `base_parent` distinct from
+  `provenance_parents`, optional `proposal_ref`/`provenance_ref`, and
+  deltas as **complete binding transitions** — `BindingState = absent |
+  masked | content(ref, descriptor_ref)` with before/after states, making
+  exact inversion, unmasking, and conflict checks representable
+  (create/update/delete/mask/unmask are derived labels). A revision owns a
+  content-addressed `ScopeManifest` (its scope's bindings incl. masks);
+  runs/evaluations reference a `ResolvedHarnessManifest` (effective bindings
+  + contributing revision refs/journal heads). Versioned
+  `SurfaceDescriptor`s (artifact schema, materializer, allowed scopes,
+  validation policy, risk-policy ref, online policy) form the trusted
+  allowlist; content bindings pin `descriptor_ref`; **risk is computed by
+  the descriptor's risk policy from name+scope+transition — policy params
+  are tiered, not uniformly low-risk**.
 - **ADR-0002** typed `ScopeRef` + explicit `ResolutionContext` (no colon
   parsing, no implicit default project): global → project → task → run with
-  nearest-scope shadowing; `delete` removes this scope's override
+  nearest-scope shadowing over scope manifests; `delete` removes this scope's override
   (inheritance resumes) while `mask` is a tombstone stopping fall-through;
+  every run journals its resolved-manifest ref for exact replay;
   provisional is an activation *mode*, not a scope; cross-scope promotion is
   a gated selection with cross-task evidence.
 - **ADR-0003** environment-generic `TaskSpecVersion` (adapter, action/
@@ -274,10 +280,16 @@ the shapes round-trip before anything migrates:
   `AlgorithmRun`/`AlgorithmStep` records; prompts render a versioned
   `ObjectiveSpec`; frontiers are journaled `frontier_add` decisions.
 - **ADR-0006** backend protocols (ledger/artifact/event/index): JSONL stays
-  the transparent authoritative journal; `append_batch` under one expected
-  head, cursor reads, and index-through-head semantics (indexes are derived,
-  rebuildable, never authoritative); a sequential migration registry
-  generalizes `migrate-legacy`.
+  the transparent authoritative journal; `append_batch` commits by *framing*
+  (batch id + commit marker; an unmarked batch is torn tail), cursor reads,
+  index-through-head semantics — and the commit ordering rule: revision,
+  evidence, and decision are individually durable *before* activation is
+  attempted, so a lost activation head-race orphans nothing; a sequential
+  migration registry generalizes `migrate-legacy`.
+
+Freeze scope: only the core wire types are frozen for 3B (adrs/README has
+the authoritative table); task/dataset/evaluation, selection/frontier,
+algorithm-state, and backend schemas stay provisional until their slices.
 
 ## Implementation status (after phase 3 hardening)
 
