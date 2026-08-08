@@ -81,7 +81,33 @@ model-dependent (capability floor, note 03), and gated behind an explicit
 `--unsafe-model-code` acknowledgement because the sandbox lacks network/filesystem
 confinement. Replay is execution-and-decision replay, not full-cycle replay.
 
-## Stage 3 — Composite generations + pluggable evolution algorithms + hardened sandbox
+## Stage 3A — Contract design for composite evolution ✅ (2026-08-08)
+
+Six accepted ADRs (docs/adrs/) covering revisions+surfaces, scopes,
+tasks/environments, evidence/selection, evolution algorithms, and
+storage/migrations — each with rejected alternatives and a
+borrowed/rejected/deferred comparison against Flex/GEPA, prime-agent,
+Continual Harness, exo, RLM, and NOOA. Experimental typed contracts
+(`stage3_contracts.py`, new additive codec kinds, unused by the live loop)
+represent all four required scenarios with round-trip tests: today's
+single strategy-code revision, a composite code+prompt+policy revision,
+task-local vs project-scoped artifacts with shadowing, and deterministic +
+Pareto-retention selection outcomes. No live-ledger migration; Stage 1–2b
+behavior unchanged (149 tests).
+
+## Stage 3B — First implementation slice (next; independently mergeable)
+
+Exactly: **composite revision storage + the SurfaceDescriptor registry.**
+- Freeze `revision@1`, `surface-delta@1`, `surface-artifact@1` from the spike.
+- Migration registry (ADR-0006) with `migrate-legacy` as entry 0001 and the
+  generation→revision rewrite as entry 0002.
+- `Store` reads/writes revisions; activation/rollback/lineage/replay operate
+  on revisions; the loop still evolves only the strategy-code surface.
+- Exit: all current behavior green on revision records; a hand-authored
+  composite revision can be journaled, activated, and rolled back atomically
+  even though no proposer emits one yet.
+
+## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 
 - Composite generation schema: per-surface CRUD deltas with before/after snapshots
   (notes 02/03); per-surface activation and rollback.

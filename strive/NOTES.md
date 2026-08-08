@@ -368,3 +368,33 @@ Five fixes + cleanups, all with regression tests; 134 tests, mypy strict.
   ANY ordinary adapter exception as model-error while
   KeyboardInterrupt/SystemExit propagate; audit documented as operationally
   separate, not secret.
+
+## 2026-08-08 — stage 3A: contract design for composite evolution
+
+Design-first phase: six ADRs + experimental contract spikes, no live changes.
+
+- ADRs 0001–0006 under docs/adrs/ (revisions+surfaces, scopes,
+  tasks/environments, evidence/selection, algorithms, storage/migrations),
+  each with rejected alternatives and borrowed/rejected/deferred vs the six
+  researched systems.
+- Design calls worth remembering:
+  - Rollback of one surface = a NEW revision with the inverse delta, not a
+    partial activation — preserves the single-derivation invariant that
+    makes promotion atomic.
+  - Provisional stays an activation mode; making it a scope would conflate
+    "where an artifact applies" with "how much evidence backs it".
+  - Regression growth becomes DatasetRevision + forced re-baseline — the
+    phase-4.6 drift guard was correctly strict for spec changes but wrong
+    for routine data growth; the spec/data split fixes it.
+  - Selection verdicts are a closed 4-word vocabulary (promote/reject/
+    retain/provisional); "retain" is what makes Pareto frontiers journaled
+    state instead of algorithm memory.
+  - KernelServices handle for algorithms: composition over inheritance so a
+    search algorithm structurally cannot bypass the gate.
+- Spike: stage3_contracts.py (new additive codec kinds, loudly experimental)
+  + 10 round-trip/structural tests covering the four required scenarios,
+  including converting a real live-loop Generation into a one-delta
+  revision.
+- 149 tests, mypy strict clean; Stage 1–2b untouched.
+- Next slice fixed in HANDOFF: composite revision storage + SurfaceDescriptor
+  registry + migration registry entries 0001/0002 — independently mergeable.

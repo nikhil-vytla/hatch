@@ -231,6 +231,40 @@ Rules, each traceable to a researched failure:
    execution and resolved after (exo's guardian pattern), so crashes mid-operation
    recover cleanly.
 
+## Stage 3A: contract design for composite evolution
+
+Stage 3's contracts are settled in six ADRs under [adrs/](adrs/README.md),
+written design-first with experimental spikes (`stage3_contracts.py`) proving
+the shapes round-trip before anything migrates:
+
+- **ADR-0001** `HarnessRevision` (multi-parent, per-surface typed CRUD deltas
+  with before/after refs) replaces one-generation-one-file; `SurfaceDescriptor`
+  is the trusted allowlist (strategy-code high / prompt medium / policy-params
+  low); rollback is a new revision, never a partial activation; today's
+  generation maps to a one-delta revision.
+- **ADR-0002** scopes: global → project → task → run with nearest-scope
+  shadowing; provisional is an activation *mode*, not a scope; promotion
+  across scopes is a gated selection with cross-task evidence; per-scope
+  journals keep per-task ledgers from owning reusable assets.
+- **ADR-0003** immutable `TaskSpecVersion` vs. append-friendly
+  `DatasetRevision`; `EvaluationManifest` pins spec+data+seeds+validators+
+  budgets; regression growth = new dataset revision + forced re-baseline,
+  never drift acknowledgement; `Environment`/trajectory protocols decouple
+  the kernel from `solve(str)->int`, with `FunctionTask` keeping today's tasks.
+- **ADR-0004** stable `ValidationBundle`/`SelectionDecision` envelopes with
+  closed kind/verdict vocabularies; policy detail lives in CAS artifacts, not
+  ledger scalars; Pareto retention is the `retain` verdict; policies resolve
+  by name AND version.
+- **ADR-0005** algorithms request propose/validate/submit through a narrow
+  `KernelServices` handle under a trusted budget — bypassing the gate is
+  structurally impossible; prompts render a versioned `ObjectiveSpec` instead
+  of a hard-coded acceptance sentence; frontiers are journaled state.
+- **ADR-0006** backend protocols (ledger/artifact/event/index) with JSONL as
+  the transparent reference and a rebuildable SQLite index planned before
+  population search; a sequential migration registry generalizes
+  `migrate-legacy`; append-only + expected-head semantics are protocol
+  contracts.
+
 ## Implementation status (after phase 3 hardening)
 
 | Architecture element | Status |
@@ -254,7 +288,7 @@ Rules, each traceable to a researched failure:
 | legacy stage-2a ledger: loud detection + `strive migrate-legacy` (history preserved, original file untouched, migration journaled) | **implemented** (`migrate.py`) |
 | evaluation discipline: visible (train) / selection (held-out, regression, adversarial) / audit (final holdout, on-demand only) | **implemented** (`tasks.py`, `loop.audit_generation`); proposer history carries visible-split scores only |
 | execution-and-decision replay (baseline + candidate re-execution, recorded-policy decision check) | **implemented** — full-cycle replay (diagnosis, prompt reconstruction, completion injection, proposal parsing, screening) is pending |
-| composite per-surface generations | pending (stage 3) — single `strategy-code` surface today |
-| EvolutionAlgorithm plugin (Pareto population) | pending (stage 3) |
+| composite per-surface generations | **designed** (ADR-0001, spike contracts + round-trip tests) — implementation is the Stage 3B slice |
+| EvolutionAlgorithm plugin (Pareto population) | **designed** (ADR-0005) — implementation stage 3C |
 | inheritance-aware replace-vs-add thresholds | pending (needs usage-share history to act on) |
 | Landlock/seccomp tier, containers, secrets broker | pending (stages 3/6) |
