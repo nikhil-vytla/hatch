@@ -206,3 +206,24 @@ def test_invalid_model_env_is_a_clean_cli_error(
     assert envelope["ok"] is False
     assert "ModelConfigError" in envelope["error"]
     assert "missing:" in envelope["error"]
+
+
+def test_migrate_legacy_via_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from test_migration import _write_legacy_root
+    from strive.tasks import SUM_INTEGERS_TASK
+
+    root = _write_legacy_root(tmp_path, SUM_INTEGERS_TASK.fingerprint())
+    # any normal command refuses the unmigrated legacy root, with instructions
+    code, refused = _run_json(capsys, "--artifacts", str(root), "status")
+    assert code == 1 and "migrate-legacy" in refused["error"]
+
+    code, migrated = _run_json(capsys, "--artifacts", str(root), "migrate-legacy")
+    assert code == 0
+    assert migrated["data"]["generations"] == 2
+    assert migrated["data"]["fingerprint_drifted"] is False
+
+    code, status = _run_json(capsys, "--artifacts", str(root), "status")
+    assert code == 0
+    assert status["data"]["active_generation"]["generation_id"] == "gen-0001"

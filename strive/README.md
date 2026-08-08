@@ -25,9 +25,9 @@ loop is gated: candidates are promoted only on trusted, journaled evidence.
 | Contracts | versioned typed dataclasses (`contracts.py`), one shared codec (`codec.py`), strict + loud rejection of malformed/unsupported records, golden-record compatibility tests |
 | History | append-only ledger (single-write + fsync appends); torn final line tolerated as a crash artifact, interior corruption is a loud error; content-addressed object store with read-time verification |
 | Promotion | atomic by construction (one activation line); paired incumbent/candidate evidence required for durable promotion; journaled rollback; complete lineage |
-| Scoring | task-owned scoring; visible (train) / held-out+regression+adversarial (development/selection) / audit (final holdout, queried only via `strive audit`, never during selection) splits; evaluations carry numeric per-split scores plus structured feedback; proposer-facing history reports visible-split movement only |
+| Scoring | task-owned scoring; visible (train) / held-out+regression+adversarial (development/selection) / audit (final holdout — an *operationally separate* split queried only via `strive audit`, never during selection; not secret or access-controlled, and like all case inputs it reaches candidate code at execution time) splits; evaluations carry numeric per-split scores plus structured feedback; proposer-facing history reports visible-split movement only |
 | Failure | failure-as-data: crashes, hangs, floods, malformed output, schema mismatches, and exhausted budgets become recorded outcomes, never controller exceptions |
-| Budgets | trusted kernel-side meter with uniform semantics (0 = nothing allowed, -1 = accounting only): wall time, executions, model calls, tokens, cost, and cumulative output bytes are all *enforced*; real-model HTTP timeouts are capped by remaining cycle wall time; recursion depth is enforced at delegation time (no delegation exists yet) |
+| Budgets | trusted kernel-side meter with uniform semantics (0 = nothing allowed, -1 = accounting only). Hard-enforced: wall time, executions, model calls, cumulative output bytes. Tokens: enforced between calls plus a requested-output cap — one call's *input* tokens can overshoot, in which case the overrun is charged, journaled, and its completion rejected before it can become a proposal. Cost: enforced only against adapters that report trustworthy cost (fail-closed otherwise; the OpenAI-compatible adapter does **not** report cost). HTTP timeouts capped by remaining wall time; per-limit semantics journaled every cycle |
 | Attribution | every execution event records the generation that served it |
 | Monitors | trusted mechanical stall detector; freeze halts adaptation (not evaluation); operator `resume` lifts it; all journaled |
 | Isolation | holdout data is mechanically absent from diagnosis/proposal inputs (`VisibleContext`) |
@@ -63,6 +63,10 @@ uv run strive promote GEN_ID --provisional --expires N
 uv run strive rollback                 # reactivate the parent (journaled)
 uv run strive resume                   # lift a stall freeze
 uv run strive history                  # full ledger journal
+uv run strive migrate-legacy           # convert a stage-2a ledger/ledger.jsonl to the
+                                       # task-scoped format (original preserved)
+# run/promote accept --acknowledge-task-drift when the task definition changed
+# since the active generation was created (refused otherwise; journaled)
 ```
 
 Every command accepts `--json` for a machine-readable envelope

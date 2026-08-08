@@ -117,3 +117,74 @@ def test_audit_runs_on_demand_and_scores_the_holdout(tmp_path: Path) -> None:
     # the weaker seed shows the difference on the same holdout
     seed_audit = audit_generation(store, SUM_INTEGERS_TASK, "gen-0000")
     assert seed_audit.evaluation.overall_score < 1.0
+
+
+def test_binding_guard_covers_every_public_operation(tmp_path: Path) -> None:
+    from strive.loop import (
+        audit_generation as audit_op,
+        compare_generations,
+        promote_generation,
+        replay_run,
+    )
+
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
+    report = run_cycle(store, SUM_INTEGERS_TASK)
+    for operation in (
+        lambda: run_cycle(store, MAX_INTEGERS_TASK),
+        lambda: audit_op(store, MAX_INTEGERS_TASK),
+        lambda: compare_generations(store, MAX_INTEGERS_TASK, "gen-0000", "gen-0001"),
+        lambda: promote_generation(store, MAX_INTEGERS_TASK, "gen-0000"),
+        lambda: replay_run(store, MAX_INTEGERS_TASK, report.run_id),
+    ):
+        with pytest.raises(StoreError, match="bound to task"):
+            operation()
+
+
+def test_foreign_records_in_a_task_ledger_are_rejected_on_read(tmp_path: Path) -> None:
+    from strive import codec
+    from strive.contracts import Activation
+    from strive.events import now_iso
+
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
+    run_cycle(store, SUM_INTEGERS_TASK)
+    foreign = Activation(
+        generation_id="gen-0000",
+        task_id="max-integers",  # wrong task smuggled into this ledger
+        reason="promote",
+        mode="durable",
+        at=now_iso(),
+        policy="manual",
+    )
+    with store.ledger_path.open("a") as handle:
+        handle.write(codec.dumps(foreign) + "\n")
+    from strive.store import LedgerError
+
+    with pytest.raises(LedgerError, match="task-isolation violation"):
+        Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id).entries()
+
+
+def test_fingerprint_drift_blocks_mutation_until_acknowledged(tmp_path: Path) -> None:
+    import dataclasses
+
+    from strive.loop import LoopConfig, audit_generation as audit_op, replay_run
+
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
+    report = run_cycle(store, SUM_INTEGERS_TASK)
+
+    drifted_task = dataclasses.replace(SUM_INTEGERS_TASK, version=99)
+    assert drifted_task.fingerprint() != SUM_INTEGERS_TASK.fingerprint()
+
+    # mutating operation refuses
+    with pytest.raises(StoreError, match="task-fingerprint drift"):
+        run_cycle(store, drifted_task)
+    # read-only operations proceed (their reports carry drift information)
+    replay = replay_run(store, drifted_task, report.run_id)
+    assert replay.task_drift
+    audit_op(store, drifted_task)
+
+    # acknowledged mutation proceeds and is journaled
+    acknowledged = run_cycle(
+        store, drifted_task, LoopConfig(acknowledge_task_drift=True)
+    )
+    assert acknowledged.run_id
+    assert any(i.kind == "task-drift-acknowledged" for i in store.interventions())

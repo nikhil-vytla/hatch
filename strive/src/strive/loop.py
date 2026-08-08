@@ -44,6 +44,7 @@ from strive.contracts import (
     FAILURE_PROPOSAL_STALE,
     FailureRecord,
     Intervention,
+    INTERVENTION_DRIFT_ACKNOWLEDGED,
     INTERVENTION_EXPIRY_REVERT,
     INTERVENTION_STALL_FREEZE,
     Generation,
@@ -79,6 +80,7 @@ class LoopConfig:
     model_max_tokens: int = 2048
     stall_window: int = 3
     history_limit: int = 5
+    acknowledge_task_drift: bool = False
 
 
 @dataclass(frozen=True)
@@ -101,11 +103,46 @@ def _new_run_id(prefix: str = "run") -> str:
     return f"{prefix}-{stamp}-{uuid.uuid4().hex[:6]}"
 
 
-def ensure_seeded(store: Store, task: Task) -> Generation:
+def guard_task_binding(
+    store: Store,
+    task: Task,
+    *,
+    mutating: bool,
+    acknowledge_drift: bool = False,
+) -> bool:
+    """The one shared task-binding guard, called by every public operation.
+
+    Verifies the store is bound to this task, and detects task-fingerprint
+    drift (the task definition changed since the active generation was
+    created). Drift blocks *mutating* operations unless explicitly
+    acknowledged; read-only operations proceed (their reports carry the drift
+    flag). Returns True when acknowledged drift was present, so callers can
+    journal the acknowledgement.
+    """
     if store.task_id != task.task_id:
         raise StoreError(
             f"store is bound to task {store.task_id!r}, got {task.task_id!r}"
         )
+    active = store.active_generation()
+    if active is None:
+        return False
+    if active.task_fingerprint == task.fingerprint():
+        return False
+    if mutating and not acknowledge_drift:
+        raise StoreError(
+            f"task-fingerprint drift: the active generation was created for "
+            f"fingerprint {active.task_fingerprint[:12]}… but the current "
+            f"definition of {task.task_id!r} fingerprints as "
+            f"{task.fingerprint()[:12]}… (the task's cases or version changed). "
+            "Refusing to mutate. Re-run with --acknowledge-task-drift to "
+            "proceed against the new definition (journaled), or restore the "
+            "original task definition."
+        )
+    return mutating and acknowledge_drift
+
+
+def ensure_seeded(store: Store, task: Task) -> Generation:
+    guard_task_binding(store, task, mutating=False)
     active = store.active_generation()
     if active is not None:
         return active
@@ -342,10 +379,25 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
     config = config or LoopConfig()
     policy: AcceptancePolicy = get_policy(config.policy_name)
     ensure_seeded(store, task)
+    drift_acknowledged = guard_task_binding(
+        store, task, mutating=True, acknowledge_drift=config.acknowledge_task_drift
+    )
+    if drift_acknowledged:
+        store.append(
+            Intervention(
+                kind=INTERVENTION_DRIFT_ACKNOWLEDGED,
+                reason=(
+                    f"operator acknowledged task-fingerprint drift; proceeding "
+                    f"against current fingerprint {task.fingerprint()[:12]}…"
+                ),
+                at=now_iso(),
+            )
+        )
 
     run_id = _new_run_id()
     events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
     meter = BudgetMeter(config.budget)
+    events_semantics = meter.semantics()
 
     _resolve_provisional(store, events)
     active = store.active_generation()
@@ -361,6 +413,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
         policy=f"{policy.name}@{policy.version}",
         proposer=config.proposer.name,
         frozen=frozen,
+        budget_semantics=events_semantics,
     )
 
     evaluation = _execute_and_evaluate(store, task, active, meter, config, events)
@@ -519,6 +572,7 @@ def audit_generation(
     selection has never been able to overfit. Each audit is journaled.
     """
     config = config or LoopConfig()
+    guard_task_binding(store, task, mutating=False)
     generation = (
         store.generation(generation_id)
         if generation_id is not None
@@ -566,6 +620,7 @@ def compare_generations(
     """Paired evaluation of two retained generations under the acceptance policy
     (left = incumbent/baseline, right = candidate)."""
     config = config or LoopConfig()
+    guard_task_binding(store, task, mutating=False)
     policy = get_policy(config.policy_name)
     run_id = _new_run_id("compare")
     events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
@@ -600,6 +655,9 @@ def promote_generation(
     it must be confirmed by its observation window or it reverts.
     """
     config = config or LoopConfig()
+    guard_task_binding(
+        store, task, mutating=True, acknowledge_drift=config.acknowledge_task_drift
+    )
     target = store.generation(generation_id)
     active = store.active_generation()
     if active is None:
@@ -673,6 +731,7 @@ def replay_run(
     replay is deferred work (see HANDOFF). No proposer or model is consulted.
     """
     config = config or LoopConfig()
+    guard_task_binding(store, task, mutating=False)
     cycle = store.cycle(run_id)
     task_drift = cycle.task_fingerprint != task.fingerprint()
     generation = store.generation(cycle.generation_id)
@@ -696,9 +755,29 @@ def replay_run(
         candidate_replayed_score = candidate_evaluation.overall_score
         recorded_decision = candidate_generation.decision
         if recorded_decision is not None:
-            policy = get_policy(recorded_decision.policy)
+            try:
+                policy = get_policy(recorded_decision.policy)
+            except KeyError:
+                raise StoreError(
+                    f"recorded policy {recorded_decision.policy!r} is unknown to "
+                    "this build; refusing decision replay"
+                ) from None
+            if policy.version != recorded_decision.policy_version:
+                raise StoreError(
+                    f"recorded policy {recorded_decision.policy}@"
+                    f"{recorded_decision.policy_version} is unavailable (this "
+                    f"build provides @{policy.version}); refusing decision "
+                    "replay rather than comparing across policy versions"
+                )
             replayed_decision = policy.decide(evaluation, candidate_evaluation)
-            decision_matches = replayed_decision.accepted == recorded_decision.accepted
+            # compare beyond the boolean: verdict, both scores, regressions
+            decision_matches = (
+                replayed_decision.accepted == recorded_decision.accepted
+                and replayed_decision.baseline_score == recorded_decision.baseline_score
+                and replayed_decision.candidate_score == recorded_decision.candidate_score
+                and replayed_decision.regressed_case_ids
+                == recorded_decision.regressed_case_ids
+            )
 
     return ReplayReport(
         run_id=run_id,

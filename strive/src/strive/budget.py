@@ -107,6 +107,57 @@ class BudgetMeter:
     def note_output_bytes(self, count: int) -> None:
         self._output_bytes += count
 
+    def semantics(self) -> dict[str, str]:
+        """How each limit behaves in this cycle, recorded for the journal.
+
+        "enforced" = trusted code denies requests at/over the limit;
+        "accounting-only" = tracked, never enforced (UNLIMITED). Tokens are
+        "enforced-between-calls+output-cap": accumulated usage gates the next
+        call and requested output tokens are capped to the remaining
+        allowance, but a single call's *input* tokens can overshoot (an
+        overrun is then rejected and journaled before its completion is
+        used). Cost enforcement additionally requires an adapter that reports
+        trustworthy cost; the metered adapter fails closed otherwise.
+        """
+
+        def basic(limit: float | int) -> str:
+            return "enforced" if _limited(limit) else "accounting-only"
+
+        return {
+            "wall_time_s": basic(self.spec.wall_time_s),
+            "executions": basic(self.spec.executions),
+            "model_calls": basic(self.spec.model_calls),
+            "tokens": (
+                "enforced-between-calls+output-cap"
+                if _limited(self.spec.tokens)
+                else "accounting-only"
+            ),
+            "output_bytes": basic(self.spec.output_bytes),
+            "cost": (
+                "enforced-if-adapter-reports-cost"
+                if _limited(self.spec.cost)
+                else "accounting-only"
+            ),
+            "recursion_depth": basic(self.spec.max_recursion_depth),
+        }
+
+    def cap_output_tokens(self, requested: int) -> int:
+        """Cap requested completion tokens to the remaining token allowance."""
+        if not _limited(self.spec.tokens):
+            return requested
+        remaining = self.spec.tokens - self._tokens
+        return max(1, min(requested, remaining))
+
+    def tokens_overrun(self) -> FailureRecord | None:
+        """Post-call check: did accumulated tokens exceed the hard limit?"""
+        if _limited(self.spec.tokens) and self._tokens > self.spec.tokens:
+            return self._exhausted(
+                "token",
+                f"{self.spec.tokens} allowed, {self._tokens} consumed — the "
+                "overrunning call's completion is rejected",
+            )
+        return None
+
     def request_model_call(self) -> FailureRecord | None:
         if _limited(self.spec.model_calls) and self._model_calls >= self.spec.model_calls:
             return self._exhausted("model-call", f"{self.spec.model_calls} allowed")

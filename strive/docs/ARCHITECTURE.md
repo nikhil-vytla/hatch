@@ -47,12 +47,17 @@ activation for low-risk or online changes.
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-The L0/L2 distinction is enforced by **mechanism, not policy**: evolvable artifacts are
-data materialized into sandboxed workspaces; they are never imported into the kernel
-process and have no write path to kernel code, the ledger, or task data. (exo's
-concession that its "immutable" harness is only protected by default config — RSI.md
-fn.2 — is the anti-pattern; NOOA's "validators are guardrails, kernel isolation is the
-boundary" doctrine is the pattern.)
+The L0/L2 distinction is enforced by **mechanism, not policy**, stated precisely:
+evolvable artifacts are data materialized into sandboxed workspaces and are never
+imported into the kernel process. That is process separation, not confinement —
+until Landlock/seccomp or containers exist (stages 3/6), malicious candidate code
+can access anything available to the controller's OS user, including the ledger
+and task files on disk. The kernel never *trusts* anything a candidate produces
+(all metrics and decisions are computed kernel-side), but tamper-resistance of
+at-rest state against a hostile candidate is future work. (exo's concession that
+its "immutable" harness is only protected by default config — RSI.md fn.2 — is
+the anti-pattern; NOOA's "validators are guardrails, kernel isolation is the
+boundary" doctrine is the pattern strive is building toward.)
 
 ## L0 — Trusted kernel
 
@@ -206,8 +211,10 @@ Rules, each traceable to a researched failure:
 5. Online refinement is cadence-triggered as well as failure-triggered (CH refines
    every F steps; hypothesis H7 in note 03 — cadence finds efficiency wins that
    failure-triggering misses).
-6. Trusted evaluation data, history, and safety constraints are physically out of reach
-   (L0 mechanism), so online adaptation cannot corrupt them even when it goes wrong.
+6. Trusted evaluation data, history, and safety constraints are outside the online
+   loop's *interfaces* — online refinement has no kernel API that reaches them. (Until
+   OS-level confinement exists this is interface discipline plus process separation,
+   not physical unreachability; see the trust-boundary statement above.)
 
 ## Cross-cutting invariants
 
@@ -234,7 +241,7 @@ Rules, each traceable to a researched failure:
 | task-owned scoring; visible/held-out/regression/adversarial splits | **implemented** (`tasks.py`) |
 | `(score, feedback)` evaluator + failure-as-score | **implemented** (`evaluate.py`) |
 | holdout isolation (mechanical: `VisibleContext`) | **implemented** (`diagnose.py`, `loop.py`; spy-tested) |
-| trusted budget meter, uniform semantics (0 = none, -1 = accounting-only), all limits enforced incl. cumulative output and wall-capped HTTP timeouts | **implemented** (`budget.py`; every enforced limit tested) |
+| trusted budget meter, uniform semantics (0 = none, -1 = accounting-only); wall/executions/model-calls/cumulative-output hard-enforced; tokens enforced between calls + requested-output cap, with post-call overruns rejected and journaled (one call's input tokens can overshoot); cost enforced only against adapters that report trustworthy cost (fail-closed otherwise — the OpenAI-compatible adapter does not) | **implemented** (`budget.py`, `model.py`; every enforced limit tested; per-limit semantics journaled each cycle) |
 | usage attribution per invocation | **implemented** (execution events carry `generation_id`) |
 | trusted stall detector + freeze/resume interventions | **implemented** (`monitors.py`) |
 | pluggable named+versioned acceptance policies, recorded per decision | **implemented** (`policy.py`: `paired-deterministic@1`, `provisional@1`) |
@@ -243,7 +250,8 @@ Rules, each traceable to a researched failure:
 | model-backed proposer (stage 2b) | **implemented** (`model_proposer.py`): visible-evidence prompt, structured proposal schema, strict classification (truncated via normalized finish reasons / malformed / schema-invalid incl. trace-evidence citation checks / forbidden / stale / budget), kernel-side staleness + source screen; offline demos use a scripted proposal fixture (pipeline proof, not model reasoning) |
 | generic evidence diagnoser (registry-free) | **implemented** (`diagnose.EvidenceDiagnoser`) — packages visible failure evidence without naming a weakness |
 | sandbox tier 2 (scrubbed env, workspace, rlimits, bounded output) | **implemented** (`sandbox.py`) — network denial NOT enforced; see honest limits |
-| task-scoped state: per-task ledgers, task id + fingerprint on generations/activations, task-bound stores, advisory writer lock + activation head checks | **implemented** (`store.py`) — single-writer per task; concurrent multi-host writers out of scope |
+| task-scoped state: per-task ledgers, task id + fingerprint on generations/activations, task-bound stores, one shared binding guard on every public operation, read-time foreign-record rejection, fingerprint-drift refusal (`--acknowledge-task-drift`), advisory writer lock + activation head checks | **implemented** (`store.py`, `loop.py`) — single-writer per task; concurrent multi-host writers out of scope |
+| legacy stage-2a ledger: loud detection + `strive migrate-legacy` (history preserved, original file untouched, migration journaled) | **implemented** (`migrate.py`) |
 | evaluation discipline: visible (train) / selection (held-out, regression, adversarial) / audit (final holdout, on-demand only) | **implemented** (`tasks.py`, `loop.audit_generation`); proposer history carries visible-split scores only |
 | execution-and-decision replay (baseline + candidate re-execution, recorded-policy decision check) | **implemented** — full-cycle replay (diagnosis, prompt reconstruction, completion injection, proposal parsing, screening) is pending |
 | composite per-surface generations | pending (stage 3) — single `strategy-code` surface today |

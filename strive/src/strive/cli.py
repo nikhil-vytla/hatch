@@ -37,6 +37,7 @@ from strive.loop import (
     replay_run,
     run_cycle,
 )
+from strive.migrate import migrate_legacy_ledger
 from strive.model import ModelConfigError, adapter_from_env
 from strive.model_proposer import ModelProposer
 from strive.store import Store, StoreError
@@ -96,10 +97,14 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
             diagnoser=EvidenceDiagnoser(),
             model_adapter=adapter,
             budget=BudgetSpec(model_calls=4),
+            acknowledge_task_drift=args.acknowledge_task_drift,
         )
     else:
         adapter_note = None
-        config = LoopConfig(sandbox_timeout_s=args.timeout)
+        config = LoopConfig(
+            sandbox_timeout_s=args.timeout,
+            acknowledge_task_drift=args.acknowledge_task_drift,
+        )
     report = run_cycle(store, task, config)
     data: dict[str, Any] = {
         "run_id": report.run_id,
@@ -303,6 +308,7 @@ def _cmd_promote(store: Store, task: Task, args: argparse.Namespace) -> dict[str
         args.generation_id,
         provisional=args.provisional,
         expires_after_cycles=args.expires,
+        config=LoopConfig(acknowledge_task_drift=args.acknowledge_task_drift),
     )
     data = {
         "activation": codec.encode(activation),
@@ -356,6 +362,33 @@ def _cmd_resume(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
         "data": {"resumed": True, "was": codec.encode(frozen)},
         "human": "adaptation resumed",
     }
+
+
+def _cmd_migrate_legacy(task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    report = migrate_legacy_ledger(args.artifacts, task)
+    data = {
+        "migrated_entries": report.migrated_entries,
+        "generations": report.generations,
+        "activations": report.activations,
+        "cycles": report.cycles,
+        "interventions": report.interventions,
+        "legacy_sha256": report.legacy_sha256,
+        "task_fingerprint_used": report.task_fingerprint_used,
+        "fingerprint_drifted": report.fingerprint_drifted,
+    }
+    lines = [
+        f"migrated {report.migrated_entries} legacy entries to the "
+        f"{task.task_id!r} ledger ({report.generations} generations, "
+        f"{report.activations} activations, {report.cycles} cycles, "
+        f"{report.interventions} interventions)",
+        f"original ledger.jsonl preserved (sha256 {report.legacy_sha256[:12]}…)",
+    ]
+    if report.fingerprint_drifted:
+        lines.append(
+            "NOTE: the task definition has drifted since the legacy ledger was "
+            "written; mutating commands will require --acknowledge-task-drift"
+        )
+    return {"data": data, "human": "\n".join(lines)}
 
 
 def _cmd_history(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
@@ -419,6 +452,12 @@ def build_parser() -> argparse.ArgumentParser:
         "(offline scripted fixture unless STRIVE_MODEL_PROVIDER is configured)",
     )
     run_parser.add_argument(
+        "--acknowledge-task-drift",
+        action="store_true",
+        help="proceed although the task definition changed since the active "
+        "generation was created (journaled)",
+    )
+    run_parser.add_argument(
         "--unsafe-model-code",
         action="store_true",
         help="required acknowledgement when a REAL model provider is "
@@ -453,9 +492,15 @@ def build_parser() -> argparse.ArgumentParser:
     promote_parser.add_argument("generation_id")
     promote_parser.add_argument("--provisional", action="store_true")
     promote_parser.add_argument("--expires", type=int, default=3)
+    promote_parser.add_argument("--acknowledge-task-drift", action="store_true")
     sub.add_parser("rollback", help="reactivate the parent of the active generation")
     sub.add_parser("resume", help="lift a stall freeze")
     sub.add_parser("history", help="dump the full ledger journal")
+    sub.add_parser(
+        "migrate-legacy",
+        help="convert a stage-2a ledger/ledger.jsonl into this task's "
+        "task-scoped ledger (original preserved)",
+    )
     return parser
 
 
@@ -464,6 +509,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         task = _task(args.task)
+        if args.command == "migrate-legacy":
+            # must run before Store construction, which refuses legacy roots
+            result = _cmd_migrate_legacy(task, args)
+            _emit(args.json, args.command, result["data"], result["human"])
+            return 0
         store = Store(args.artifacts, task.task_id)
         result = _COMMANDS[args.command](store, task, args)
         _emit(args.json, args.command, result["data"], result["human"])

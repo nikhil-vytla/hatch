@@ -1,8 +1,8 @@
 """Model-backed proposal pipeline: the stage-2b demonstration matrix.
 
-Everything here runs offline against the deterministic fake adapter; the
-fake demonstrates pipeline correctness (validation, gating, journaling,
-replay), not model capability.
+Everything here runs offline against scripted proposal fixtures; they prove
+pipeline correctness (validation, gating, journaling, execution-and-decision
+replay), not model reasoning or capability.
 """
 
 import json
@@ -46,18 +46,30 @@ def _model_config(adapter: ModelAdapter, **overrides: object) -> LoopConfig:
     return config
 
 
-def _scripted_source_adapter(source: str) -> FakeModelAdapter:
-    """A fake that answers with a schema-valid proposal carrying `source`."""
+_EVIDENCE_RE = re.compile(r"^- ([\w-]+): input=", re.MULTILINE)
+
+
+def _scripted_source_adapter(
+    source: str, evidence_override: list[str] | None = None
+) -> FakeModelAdapter:
+    """A fake that answers with a schema-valid proposal carrying `source`,
+    citing the failing cases listed in the prompt (or an override, for
+    evidence-validation tests)."""
 
     def responder(request: ModelRequest) -> str:
         match = _PARENT_RE.search(request.prompt)
         assert match is not None
+        evidence = (
+            evidence_override
+            if evidence_override is not None
+            else _EVIDENCE_RE.findall(request.prompt)
+        )
         return json.dumps(
             {
                 "parent_generation_id": match.group(1),
                 "summary": "scripted test proposal",
                 "rationale": "test fixture",
-                "trace_evidence": [],
+                "trace_evidence": evidence,
                 "expected_outcome": "test",
                 "source": source,
                 "changed_surfaces": ["strategy-code"],
@@ -69,10 +81,11 @@ def _scripted_source_adapter(source: str) -> FakeModelAdapter:
     return FakeModelAdapter(responder=responder)
 
 
-# -- demonstrations 1 + 2: non-planted weakness fixed and promoted ---------------
+# -- demonstrations 1 + 2: the scripted-fixture repair is carried through the
+# pipeline and promoted (pipeline proof — not model reasoning) ---------------
 
 
-def test_fake_model_fixes_non_planted_weakness_and_is_promoted(tmp_path: Path) -> None:
+def test_scripted_fixture_repair_is_promoted_through_the_pipeline(tmp_path: Path) -> None:
     store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
     report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(scripted_fixture_adapter()))
 
@@ -107,7 +120,7 @@ def test_registry_proposer_cannot_fix_the_non_planted_weakness(tmp_path: Path) -
     assert report.generation_after == report.generation_before
 
 
-# -- demonstration 3: full offline replay ----------------------------------------
+# -- demonstration 3: execution-and-decision replay (offline) --------------------
 
 
 def test_model_cycle_replays_offline_from_recorded_state(tmp_path: Path) -> None:
@@ -132,8 +145,8 @@ def test_model_cycle_replays_offline_from_recorded_state(tmp_path: Path) -> None
     proposal_events = [e for e in events if e.type == "proposal"]
     assert len(proposal_events) == 1
 
-    # replay re-executes baseline + candidate and reproduces the decision,
-    # consulting no proposer and no model
+    # execution-and-decision replay: re-executes baseline + candidate and
+    # reproduces the recorded decision, consulting no proposer and no model
     replay = replay_run(store, MAX_INTEGERS_TASK, report.run_id)
     assert replay.matches
     assert not replay.task_drift
@@ -274,3 +287,40 @@ def test_model_call_budget_enforced_by_trusted_meter(tmp_path: Path) -> None:
     ).read_all()
     assert any(e.type == "model_call_denied" for e in events)
     assert not any(e.type == "model_call" for e in events)  # never reached the model
+
+
+# -- proposal evidence validation ---------------------------------------------
+
+
+def test_empty_trace_evidence_with_failures_is_schema_invalid(tmp_path: Path) -> None:
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
+    adapter = _scripted_source_adapter(
+        "def solve(input_text: str) -> int:\n    return 0\n", evidence_override=[]
+    )
+    report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(adapter))
+    assert report.proposal_failure is not None
+    assert report.proposal_failure.kind == FAILURE_PROPOSAL_SCHEMA_INVALID
+    assert "trace_evidence is empty" in report.proposal_failure.detail
+
+
+def test_unknown_trace_evidence_citation_is_schema_invalid(tmp_path: Path) -> None:
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
+    adapter = _scripted_source_adapter(
+        "def solve(input_text: str) -> int:\n    return 0\n",
+        evidence_override=["held-close-magnitudes"],  # hidden-split id guessed
+    )
+    report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(adapter))
+    assert report.proposal_failure is not None
+    assert report.proposal_failure.kind == FAILURE_PROPOSAL_SCHEMA_INVALID
+    assert "outside the visible failing set" in report.proposal_failure.detail
+
+
+def test_valid_trace_evidence_passes_validation(tmp_path: Path) -> None:
+    store = Store(tmp_path / "artifacts", MAX_INTEGERS_TASK.task_id)
+    adapter = _scripted_source_adapter(
+        "def solve(input_text: str) -> int:\n    return 0\n",
+        evidence_override=["two-digit-vs-one"],  # a real visible failing case
+    )
+    report = run_cycle(store, MAX_INTEGERS_TASK, _model_config(adapter))
+    assert report.proposal is not None  # schema-valid; rejected later by the gate
+    assert report.decision is not None and not report.decision.accepted

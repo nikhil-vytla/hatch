@@ -10,6 +10,10 @@ are partitioned into splits with distinct trust roles:
 - ``adversarial`` — crafted to catch gaming; selection data.
 - ``audit``       — final holdout: excluded from routine cycles entirely and
                     queried only on demand, so selection cannot overfit it.
+                    Operationally separate, NOT secret: it is neither
+                    encrypted nor access-controlled, and (like every case
+                    input) it reaches candidate code at execution time when
+                    an audit runs.
 
 Each task also declares its strategy ``signature`` and an allowed
 ``primitive_catalog`` (importable modules) — the trusted inputs a proposer
@@ -20,7 +24,8 @@ Two tasks exist:
   ``\\d+`` drops minus signs), fixable by the registry proposer.
 - ``max-integers`` — a *non-planted* weakness (lexicographic ``max`` over
   digit strings): nothing in the diagnosis registry or patch registry knows
-  it; only an evidence-driven proposer (stage 2b's model path) can fix it.
+  it, so the registry proposer cannot fix it; an evidence-driven proposer is
+  required (in offline CI, a scripted fixture stands in for one).
 """
 
 from __future__ import annotations

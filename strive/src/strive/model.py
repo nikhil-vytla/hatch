@@ -27,9 +27,10 @@ import urllib.request
 from typing import Callable, Protocol
 
 from strive import codec
-from strive.budget import BudgetMeter
+from strive.budget import UNLIMITED, BudgetMeter
 from strive.cas import ObjectStore
 from strive.contracts import (
+    FAILURE_COST_UNAVAILABLE,
     FAILURE_MODEL_ERROR,
     FINISH_ERROR,
     FINISH_LENGTH,
@@ -47,10 +48,16 @@ class ModelConfigError(Exception):
 
 
 class ModelAdapter(Protocol):
-    """A provider-neutral completion interface."""
+    """A provider-neutral completion interface.
+
+    ``reports_cost`` declares whether ``ModelResponse.cost`` is trustworthy;
+    adapters that cannot model provider pricing must say so, and the metered
+    wrapper fails closed when a cost limit is configured against them.
+    """
 
     adapter_name: str
     model_id: str
+    reports_cost: bool
 
     def complete(self, request: ModelRequest) -> ModelResponse: ...
 
@@ -75,6 +82,7 @@ class FakeModelAdapter:
 
     adapter_name = "fake"
     model_id = "fake-deterministic-v1"
+    reports_cost = True  # its 0.0 is truthful: the fake costs nothing
 
     def __init__(
         self,
@@ -129,6 +137,7 @@ class OpenAICompatAdapter:
     """
 
     adapter_name = "openai-compatible"
+    reports_cost = False  # provider pricing is not modeled; cost is always 0.0
 
     def __init__(self, base_url: str, api_key: str, model_id: str) -> None:
         self._base_url = base_url.rstrip("/")
@@ -218,17 +227,36 @@ class MeteredJournalingAdapter:
         return self._inner.model_id
 
     def complete(self, request: ModelRequest) -> ModelResponse | FailureRecord:
+        if (
+            self._meter.spec.cost != UNLIMITED
+            and not getattr(self._inner, "reports_cost", False)
+        ):
+            # fail closed: a cost limit cannot be enforced against an adapter
+            # that does not report trustworthy cost
+            unavailable = FailureRecord(
+                kind=FAILURE_COST_UNAVAILABLE,
+                detail=(
+                    f"a cost budget is configured but adapter "
+                    f"{self._inner.adapter_name!r} does not report cost; "
+                    "enforcement is unavailable, refusing the call"
+                ),
+            )
+            self._events.emit("model_call_denied", failure=codec.encode(unavailable))
+            return unavailable
         denial = self._meter.request_model_call()
         if denial is not None:
             self._events.emit("model_call_denied", failure=codec.encode(denial))
             return denial
         request = dataclasses.replace(
-            request, timeout_s=self._meter.model_call_timeout_s(request.timeout_s)
+            request,
+            timeout_s=self._meter.model_call_timeout_s(request.timeout_s),
+            max_tokens=self._meter.cap_output_tokens(request.max_tokens),
         )
         started = time.monotonic()
         try:
             response = self._inner.complete(request)
-        except (urllib.error.URLError, OSError, KeyError, ValueError, TypeError) as exc:
+        except Exception as exc:  # noqa: BLE001 — any adapter error becomes data;
+            # KeyboardInterrupt/SystemExit are BaseException and propagate
             failure = FailureRecord(
                 kind=FAILURE_MODEL_ERROR,
                 detail=f"{type(exc).__name__}: {exc}",
@@ -263,4 +291,10 @@ class MeteredJournalingAdapter:
             cost=response.cost,
             finish_reason=response.finish_reason,
         )
+        overrun = self._meter.tokens_overrun()
+        if overrun is not None:
+            # the call happened and is journaled/charged, but its completion
+            # must not become a proposal: reject before returning it
+            self._events.emit("model_call_overrun", failure=codec.encode(overrun))
+            return overrun
         return response

@@ -37,6 +37,7 @@ FAILURE_OUTPUT_LIMIT = "output-limit"
 FAILURE_BUDGET_EXHAUSTED = "budget-exhausted"
 FAILURE_SCHEMA_MISMATCH = "schema-mismatch"
 FAILURE_MODEL_ERROR = "model-error"
+FAILURE_COST_UNAVAILABLE = "cost-limit-unavailable"
 
 # proposal-pipeline rejection kinds, each journaled distinctly
 FAILURE_PROPOSAL_TRUNCATED = "proposal-truncated"
@@ -313,6 +314,8 @@ class CycleRecord:
 INTERVENTION_STALL_FREEZE = "stall-freeze"
 INTERVENTION_RESUME = "resume"
 INTERVENTION_EXPIRY_REVERT = "expiry-revert"
+INTERVENTION_LEGACY_MIGRATION = "legacy-migration"
+INTERVENTION_DRIFT_ACKNOWLEDGED = "task-drift-acknowledged"
 
 
 @register("intervention", 1)

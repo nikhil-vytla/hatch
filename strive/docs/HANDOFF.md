@@ -8,6 +8,47 @@ of the core harness (stage 2a), the phase-4 model-backed offline
 self-evolution loop (stage 2b), and the phase-4.5 correctness and
 claim-precision pass over stage 2b.
 
+## Phase 4.6 — final pre-merge corrections (completed fixes)
+
+A second, final precision pass before merging PR #39; 133 tests, strict mypy.
+
+1. **Legacy ledger handling.** A stage-2a `ledger/ledger.jsonl` is now
+   detected loudly at store construction with the exact migration command;
+   `strive migrate-legacy` converts it to the task-scoped v2 ledger while
+   preserving generations, decisions, every activation in order (rollbacks
+   included), cycles, and the original file byte-for-byte, and journals a
+   migration marker. Mixed/foreign-task legacy history is refused (legacy
+   generations carry no task identity of their own). Tested against a real
+   v1 fixture built by downgrading current records (v1 = v2 minus task
+   fields, by construction).
+2. **Task binding everywhere.** One shared `guard_task_binding` runs in
+   run/audit/compare/promote/replay/seed; reading a task ledger rejects any
+   generation/activation/cycle whose task id conflicts; task-fingerprint
+   drift refuses mutation unless `--acknowledge-task-drift` (journaled as an
+   intervention); read-only operations proceed and report drift.
+3. **Budget semantics made exact** (see phase 4.5 item 3, now corrected in
+   place): output-token requests capped to remaining allowance; post-call
+   token overruns charged, journaled, and their completions rejected; cost
+   enforced only against `reports_cost` adapters (fail-closed
+   `cost-limit-unavailable` otherwise — the OpenAI-compatible adapter does
+   not report cost); per-limit semantics journaled with every cycle.
+4. **Trust-boundary claims corrected**: no more "no write path" / "physically
+   out of reach" — candidates are process-separated and never imported into
+   the kernel, and until Landlock/seccomp/containers exist, malicious code
+   can access anything available to the controller's OS user. Real-model
+   execution stays behind `--unsafe-model-code`.
+5. **Proposal evidence validation**: with visible failures present,
+   `trace_evidence` must be nonempty and entirely within the visible
+   failing-case ids (empty / unknown / valid all tested).
+6. Low-cost cleanups: stale test names no longer imply model reasoning or
+   full replay; decision replay resolves the recorded policy by name AND
+   version (refusing on mismatch) and compares verdict + both scores +
+   regressed ids; the metered wrapper contains *any* ordinary adapter
+   exception as journaled `model-error` while KeyboardInterrupt/SystemExit
+   propagate; the audit split is documented as operationally separate, not
+   secret; historical handoff text updated (superseded v1 golden, replay
+   naming).
+
 ## Phase 4.5 — stage-2b correction pass (completed fixes)
 
 A focused correctness pass before merging stage 2b; 115 tests, strict mypy.
@@ -24,11 +65,19 @@ A focused correctness pass before merging stage 2b; 115 tests, strict mypy.
    (`scripted_fixture_adapter`), and no doc claims it derived the repair from
    evidence or demonstrated model reasoning.
 3. **Budget truthfulness.** Uniform limit semantics defined and tested:
-   0 = nothing allowed, -1 = accounting only. Tokens, cost, and cumulative
-   output bytes are now genuinely enforced; per-execution output caps equal
-   the remaining cumulative allowance; model-call HTTP timeouts are capped by
-   remaining cycle wall time; wall time gates model calls as well as
-   executions. Every enforced limit has a test.
+   0 = nothing allowed, -1 = accounting only. Exact token semantics: requested
+   output tokens are capped to the remaining allowance and accumulated usage
+   gates the next call, but one call's *input* tokens can overshoot — such an
+   overrun is charged, journaled (`model_call_overrun`), and its completion is
+   rejected before it can produce a proposal. Cost is enforced only against
+   adapters that declare trustworthy cost reporting (`reports_cost`); the
+   metered wrapper fails closed otherwise — and the OpenAI-compatible adapter
+   does NOT report cost, so no cost enforcement is claimed for it. Cumulative
+   output bytes are hard-enforced (per-execution caps equal the remaining
+   allowance); HTTP timeouts are capped by remaining wall time; wall time
+   gates model calls as well as executions. Per-limit semantics
+   (enforced / accounting-only / adapter-dependent) are journaled with every
+   cycle. Every enforced limit has a test.
 4. **Replay precision.** The feature is now named what it is:
    **execution-and-decision replay** (baseline + candidate re-execution and
    recorded-policy decision check). Full-cycle replay (diagnosis, prompt
@@ -125,7 +174,7 @@ documented in README; real fix is stronger sandboxing.
   4.5), offline. The demonstration matrix:
   scripted-fixture fix of the non-planted weakness promoted through
   `paired-deterministic@1` on protected splits; registry control cannot fix
-  it; full offline replay reproduces the decision; malformed / truncated /
+  it; execution-and-decision replay reproduces the decision; malformed / truncated /
   schema-invalid / forbidden responses each rejected with their distinct kind
   and no controller crash; regressive-but-valid candidate rejected with the
   incumbent left active and the rejection retained; stale proposal rejected
@@ -191,8 +240,9 @@ The full gated loop still runs end to end, now on durable foundations:
 - **Contracts + codec**: every persisted record is a versioned typed dataclass
   (`contracts.py`) serialized by one shared strict codec (`codec.py`). Unknown
   kinds, unsupported versions, missing/extra fields, and wrong types are
-  rejected loudly; a golden v1 record is pinned by test so shape changes force
-  version bumps.
+  rejected loudly; a golden record at the *current* versions is pinned by test
+  so shape changes force version bumps (the original v1 golden was superseded
+  by the task-scoping bump; a companion test pins that v1 now fails loudly).
 - **Durable history**: append-only ledger with single-write+fsync appends;
   promotion is atomic by construction (one activation line); a torn final line
   is tolerated as a crash artifact while interior corruption is a loud

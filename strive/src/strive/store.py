@@ -62,6 +62,13 @@ class LedgerError(StoreError):
     """Interior ledger corruption or schema mismatch (loud, non-recoverable)."""
 
 
+class LegacyLedgerError(StoreError):
+    """A stage-2a `ledger/ledger.jsonl` exists but has not been migrated."""
+
+
+LEGACY_LEDGER_NAME = "ledger.jsonl"
+
+
 class Store:
     def __init__(self, root: Path, task_id: str) -> None:
         self.root = root
@@ -73,6 +80,22 @@ class Store:
         for directory in (self.ledger_path.parent, self.runs_dir):
             directory.mkdir(parents=True, exist_ok=True)
         self.diagnostics: list[str] = []
+        legacy = root / "ledger" / LEGACY_LEDGER_NAME
+        if legacy.exists():
+            if self.ledger_path.exists():
+                self._note_diagnostic(
+                    f"legacy ledger {legacy} is present alongside the task ledger; "
+                    "assuming it was already migrated (original preserved)"
+                )
+            else:
+                # old history must never be silently ignored
+                raise LegacyLedgerError(
+                    f"a stage-2a legacy ledger exists at {legacy} and has not "
+                    f"been migrated for task {task_id!r}. Run "
+                    f"`strive --artifacts {root} --task {task_id} migrate-legacy` "
+                    "to convert it to the task-scoped format (the original file "
+                    "is preserved), then retry."
+                )
 
     # -- locking ------------------------------------------------------------------
 
@@ -124,6 +147,13 @@ class Store:
                 raise LedgerError(
                     f"{self.ledger_path}:{line_no}: {type(decoded).__name__} "
                     "is not a ledger entry kind"
+                )
+            entry_task = getattr(decoded, "task_id", None)
+            if entry_task is not None and entry_task != self.task_id:
+                raise LedgerError(
+                    f"{self.ledger_path}:{line_no}: {type(decoded).__name__} "
+                    f"belongs to task {entry_task!r}, not {self.task_id!r} — "
+                    "task-isolation violation in the ledger"
                 )
             entries.append(decoded)
         return entries

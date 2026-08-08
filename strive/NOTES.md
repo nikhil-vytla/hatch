@@ -334,3 +334,37 @@ Verification: 115 tests, mypy strict clean (34 files); both demos regenerated
 (registry demo now shows `strive audit` on seed vs fix: 0.000 vs 1.000;
 model demo shows scripted-fixture run, execution-and-decision replay with
 decision_reproduced=True, and cross-task runs against the same root).
+
+## 2026-08-07 — phase 4.6: final pre-merge correction pass
+
+Five fixes + cleanups, all with regression tests; 134 tests, mypy strict.
+
+- Legacy ledgers: stage-2a `ledger/ledger.jsonl` roots were being silently
+  ignored by the task-scoped store (fresh seed over real history — bad).
+  Now: loud LegacyLedgerError naming the exact `strive migrate-legacy`
+  command; migration preserves generations/decisions/every activation in
+  order (rollbacks included)/cycles, journals a marker with the original's
+  sha256, and never touches the original file. The v1 test fixture is built
+  by *downgrading* current records (v1 = v2 minus task fields by
+  construction) so it can't drift from the real shape.
+- One `guard_task_binding` for run/audit/compare/promote/replay/seed;
+  read-time rejection of foreign-task records in a ledger; fingerprint drift
+  refuses mutation without --acknowledge-task-drift (journaled), read-only
+  ops proceed and report.
+- Budget claims made exact rather than rounded-up: output-token requests
+  capped to remaining allowance; a call whose *input* tokens blow the limit
+  is charged, journaled (model_call_overrun), and its completion rejected
+  before it can become a proposal; cost enforcement requires
+  reports_cost=True (fail-closed cost-limit-unavailable otherwise — the
+  OpenAI-compatible adapter reports no cost, so no cost enforcement is
+  claimed for it); per-limit semantics journaled in cycle_started.
+- Trust-boundary language: dropped "no write path"/"physically out of
+  reach". Precise statement everywhere: process separation + never imported
+  into the kernel; until Landlock/seccomp/containers, malicious candidates
+  can touch anything the controller's OS user can.
+- trace_evidence must be nonempty (when failures exist) and ⊆ visible
+  failing ids; decision replay refuses on recorded-policy version mismatch
+  and compares verdict + both scores + regressed ids; the wrapper contains
+  ANY ordinary adapter exception as model-error while
+  KeyboardInterrupt/SystemExit propagate; audit documented as operationally
+  separate, not secret.

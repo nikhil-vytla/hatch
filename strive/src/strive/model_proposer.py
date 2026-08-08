@@ -198,6 +198,11 @@ def parse_completion(
     visible_failing = {
         ce.case_id for ce in request.ctx.evaluation.case_evaluations if not ce.passed
     }
+    if visible_failing and not parsed["trace_evidence"]:
+        return invalid(
+            "trace_evidence is empty although visible cases are failing; a "
+            "proposal must cite the evidence it responds to"
+        )
     uncited = [c for c in parsed["trace_evidence"] if c not in visible_failing]
     if uncited:
         return invalid(
