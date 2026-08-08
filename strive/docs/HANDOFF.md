@@ -1,43 +1,65 @@
 # HANDOFF — strive
 
-State as of 2026-08-07, after four phases plus a correction pass: the vertical
+State as of 2026-08-08, after five phases plus correction passes: the vertical
 slice (stage 1), the research-and-redesign phase (notes 01–06,
 [comparative matrix](agents/research/comparative-matrix.md),
 [ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), the phase-3 hardening
 of the core harness (stage 2a), the phase-4 model-backed offline
-self-evolution loop (stage 2b), and the phase-4.5 correctness and
-claim-precision pass over stage 2b.
+self-evolution loop (stage 2b), the phase-4.5/4.6 correctness passes over
+stage 2b, and the stage-3A contract design with its revision pass.
 
 ## Stage 3A — contract design (what was decided)
 
 Six accepted ADRs under [adrs/](adrs/README.md) settle Stage 3's contracts
-design-first; experimental spikes (`stage3_contracts.py` + 10 round-trip
-tests) prove the shapes serialize and enforce their structural rules. The
+design-first; experimental spikes (`stage3_contracts.py` + 16 round-trip/
+structural tests) prove the shapes serialize and enforce their rules. The
 live loop is untouched; the new codec kinds are additive and unused.
 
-**Key decisions** (rejected alternatives recorded in each ADR):
-- Revisions with typed per-surface CRUD deltas replace one-generation-one-file;
-  rollback is a new revision rather than partial activations (rejected:
-  per-surface activation pointers — they destroy the single-derivation
-  invariant that makes promotion atomic today).
-- Provisional is an activation mode, not a scope (rejected: a fifth scope —
-  it conflates *where* with *how much evidence*).
-- Regression growth is a `DatasetRevision` bump plus forced incumbent
-  re-baseline, never task-drift acknowledgement (fixes the phase-4.6 guard's
-  bluntness for a routine, desirable event).
-- Selection envelopes carry closed vocabularies + CAS evidence refs, not
-  policy-specific ledger fields (rejected: widening the decision record per
-  policy — endless version churn).
-- Algorithms get a narrow `KernelServices` handle under a trusted budget
-  (rejected: loop subclassing — inheritance would let algorithms override
-  gate calls).
-- JSONL journals stay authoritative; indexes are disposable caches; schema
-  changes go through a sequential migration registry (rejected: SQLite as
-  the journal; migration-on-read).
+**Key decisions** (rejected alternatives recorded in each ADR; wire schemas
+went provisional during a revision pass, were re-validated by spike tests,
+and are now frozen for 3B):
+- Revisions with typed per-surface CRUD+mask deltas replace
+  one-generation-one-file; identity is `RevisionRef(scope, id)` with
+  `base_parent` distinct from `provenance_parents`; revisions carry a
+  content-addressed `state_manifest_ref` and **never** an evaluation
+  manifest — ValidationBundles own those, because one revision is evaluated
+  under many manifests (tested). Rollback is a new revision rather than
+  partial activations (rejected: per-surface activation pointers — they
+  destroy the single-derivation invariant that makes promotion atomic).
+- Scopes are typed (`ScopeRef` + explicit `ResolutionContext`; no colon
+  parsing, no implicit default project); `delete` (remove own override,
+  inheritance resumes) is distinct from `mask` (tombstone stopping
+  fall-through). Provisional is an activation mode, not a scope.
+- Risk is computed from descriptor + scope + operation — a delta carries no
+  risk field to trust; descriptors are versioned and declare artifact
+  schema, materializer, allowed scopes, required validators, and online
+  policy.
+- Task specs are environment-generic (adapter + schemas + scorer + config
+  ref; `solve(str)->int` lives in the FunctionTask config blob); dataset
+  revisions are reconstructable via per-split CAS manifests; regression
+  growth is a `DatasetRevision` bump plus forced incumbent re-baseline,
+  never task-drift acknowledgement. The environment base protocol does not
+  assume reset — Resettable/Checkpointable/Forkable are capabilities.
+- Selection decisions are policy-neutral: `policy_ref` + a closed kernel
+  disposition vocabulary {promote, reject, frontier_add,
+  provisional_activate}, each requiring evidence, each pinning its
+  objective spec (rejected: per-policy ledger fields — endless version
+  churn).
+- Algorithms get a narrow `KernelServices` handle under a trusted budget —
+  stated honestly as an API contract for trusted L1 plugins, not
+  hostile-plugin isolation; search state is journaled
+  (`AlgorithmRun`/`AlgorithmStep`) so a crashed search resumes from the
+  journal (rejected: loop subclassing; in-memory populations).
+- JSONL journals stay authoritative with `append_batch` under one expected
+  head and cursor reads; indexes are disposable caches with
+  index-through-head semantics; schema changes go through a sequential
+  migration registry (rejected: SQLite as the journal; migration-on-read).
 
-**Compatibility plan**: today's `generation@2` ≙ one-delta revision
-(`revision_from_generation`, tested against live-loop output); existing
-policies keep their names/versions; the phase-4.6 legacy migration becomes
+**Compatibility plan**: today's `generation@2` ≙ one-delta revision with
+`before_ref` = the parent's *content* ref and a versioned
+`ledger-migration@1` proposer (`revision_from_generation`, tested against
+live-loop output and refusing inconsistent parents); existing policies keep
+their names/versions; the phase-4.6 legacy migration becomes
 migration-registry entry 0001 and the generation→revision rewrite entry
 0002 (Stage 3B); `FunctionTask` adapts `solve(str)->int` unchanged.
 
@@ -45,8 +67,9 @@ migration-registry entry 0001 and the generation→revision rewrite entry
 task ledger (mitigated by the registry's detect-loudly/preserve-original/
 validate-output rules, all inherited from the proven legacy migration);
 scope journals add a second writer surface (single-writer-per-journal
-stands); spike shapes may still shift while freezing `revision@1` — that is
-why the spike is explicitly unfrozen until 3B.
+stands); the wire schemas are now frozen for 3B after the revision pass —
+any further shape change in 3B costs a version bump plus a migration-registry
+entry, deliberately.
 
 **Exact next slice (independently mergeable)**: composite revision storage +
 the `SurfaceDescriptor` registry — freeze the three revision kinds, ship the

@@ -1,6 +1,6 @@
 # ADR-0005 — Evolution algorithms and objective specs
 
-Status: accepted (Stage 3A).
+Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B.
 
 ## Context
 
@@ -36,15 +36,28 @@ evidence) -> SelectionDecision`, and read-only history/frontier queries.
 Every call is charged to the algorithm's budget by the trusted meter; the
 algorithm can *spend differently* (one deep lineage vs. a wide population)
 but cannot spend more, which is what makes "two algorithms under equal
-budgets" a fair experiment. `AlgorithmReport` records candidates generated,
-bundles produced, decisions received, and budget usage — per-algorithm
-acceptance statistics (deferred since 4.5) fall out of these reports.
+budgets" a fair experiment.
+
+**Honest boundary statement:** the services handle prevents bypass **by API
+contract, not by hostile-plugin isolation**. Algorithms are trusted L1
+extensions — human-reviewed Python in the kernel process, like validators
+and policies. The handle makes *accidental* gate bypass structurally
+awkward (there is no API to activate or journal directly); it does not
+contain a malicious plugin, which could import the store like any in-process
+code. Process-level isolation applies to *candidates*, not to L1 plugins;
+containing untrusted plugins is out of scope until the stage-6 threat model.
+
+**Resumable search state is journaled, not in-memory.** Two records:
+`AlgorithmRun` (algorithm name@version, run id, scope, budget, status ∈
+{running, completed, halted}, `steps_completed` as the resumption cursor)
+and `AlgorithmStep` (run id, step index, action ∈ {propose, validate,
+submit}, subject ref, budget usage). A crashed search resumes from its last
+journaled step; the frontier itself is journaled state via `frontier_add`
+decisions (ADR-0004), never algorithm memory.
 
 Planned implementations: `hill-climb@1` (exactly today's loop, extracted) and
-`pareto-population@1` (GEPA-style: maintain a frontier via `retain` verdicts,
-sample parents from it, propose mutations). The frontier is journaled state
-(ADR-0004 `retain` decisions), not algorithm memory, so a crashed search
-resumes from the journal.
+`pareto-population@1` (GEPA-style: maintain a frontier via `frontier_add`
+dispositions, sample parents from it, propose mutations).
 
 **`ObjectiveSpec` — versioned, trusted, consumed by prompts.** A named
 artifact (`objective-spec` kind, name@version) declaring `objectives`

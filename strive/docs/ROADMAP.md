@@ -87,13 +87,20 @@ Six accepted ADRs (docs/adrs/) covering revisions+surfaces, scopes,
 tasks/environments, evidence/selection, evolution algorithms, and
 storage/migrations — each with rejected alternatives and a
 borrowed/rejected/deferred comparison against Flex/GEPA, prime-agent,
-Continual Harness, exo, RLM, and NOOA. Experimental typed contracts
-(`stage3_contracts.py`, new additive codec kinds, unused by the live loop)
-represent all four required scenarios with round-trip tests: today's
-single strategy-code revision, a composite code+prompt+policy revision,
-task-local vs project-scoped artifacts with shadowing, and deterministic +
-Pareto-retention selection outcomes. No live-ledger migration; Stage 1–2b
-behavior unchanged (149 tests).
+Continual Harness, exo, RLM, and NOOA. The wire schemas went through a
+revision pass before freezing: revision *state* separated from evaluation
+*evidence* (state_manifest_ref vs ValidationBundle-owned evaluation
+manifests), globally unambiguous RevisionRef(scope, id) with base vs
+provenance parents, typed ScopeRef/ResolutionContext with mask-vs-delete
+semantics, environment-generic task specs (FunctionTask config carries
+solve(str)->int), reconstructable dataset revisions, risk computed from
+descriptor+scope+op, policy-neutral dispositions (frontier_add) each
+requiring evidence, resumable AlgorithmRun/AlgorithmStep state, and
+append_batch/cursor/index-through-head ledger semantics. Experimental typed
+contracts (`stage3_contracts.py`, additive codec kinds, unused by the live
+loop) validate every scenario with round-trip tests, including one revision
+evaluated under two manifests and cross-scope lineage without collisions.
+No live-ledger migration; Stage 1–2b behavior unchanged (155 tests).
 
 ## Stage 3B — First implementation slice (next; independently mergeable)
 

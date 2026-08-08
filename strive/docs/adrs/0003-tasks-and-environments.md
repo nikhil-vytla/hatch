@@ -1,6 +1,6 @@
 # ADR-0003 — Task spec versions, dataset revisions, environments
 
-Status: accepted (Stage 3A).
+Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B.
 
 ## Context
 
@@ -16,32 +16,55 @@ stage-4 agentic tasks.
 
 **Split immutable spec from mutable data.**
 
-- `TaskSpecVersion` — immutable: `task_id`, `version`, `description`,
-  `signature`, `primitive_catalog`, spec `fingerprint`. Changing any of these
-  is a new version and (for mutation against old-lineage state) keeps
-  requiring the explicit drift acknowledgement.
-- `DatasetRevision` — append-friendly: `dataset_id`, monotonically increasing
-  `revision`, per-split case counts, dataset `fingerprint`, `parent_revision`,
-  and a `reason` (e.g. "regression: captured failing input from run-X").
+- `TaskSpecVersion` — immutable and **environment-generic**: `task_id`,
+  `version`, `description`, `environment` (adapter id@version),
+  `action_schema`, `observation_schema`, `scorer` (id@version),
+  `config_ref` (CAS blob of adapter-specific config), spec `fingerprint`.
+  The kernel never sees a function signature: `solve(str) -> int` and the
+  primitive catalog are fields of the **FunctionTask config blob**, not the
+  spec. Changing any spec field is a new version and (for mutation against
+  old-lineage state) keeps requiring the explicit drift acknowledgement.
+- `DatasetRevision` — append-friendly and **fully reconstructable**:
+  `dataset_id`, monotonically increasing `revision`, `parent_revision`, a
+  `reason` (e.g. "regression: captured failing input from run-X"),
+  **per-split CAS manifest refs** (each split's case list is addressable, so
+  any historical evaluation re-materializes exactly), per-split counts (a
+  derivable convenience), and the dataset `fingerprint`.
   **Growing the regression split creates a new DatasetRevision and a
   re-evaluation requirement — never a task-drift acknowledgement.** The
   incumbent must be re-baselined under the new revision before candidates are
   compared on it (otherwise paired comparisons silently mix datasets).
 
-**`EvaluationManifest` pins everything a validation ran under**: task spec
-fingerprint, dataset revision fingerprint, seed tuple, environment id,
-validator list (name@version), and the `BudgetSpec`. Bundles and decisions
-(ADR-0004) reference manifests, which is what makes "re-evaluation required"
-mechanical: a decision whose manifest names an outdated dataset revision is
-visibly stale.
+**`EvaluationManifest` pins everything a validation ran under**: the
+resolved harness state ref (which `HarnessManifest` was under test), the
+objective spec ref, task and dataset fingerprints, environment and scorer
+ids (name@version), tool versions, the runtime (e.g. `cpython-3.12.10`),
+the seed tuple, the validator list (name@version), and the `BudgetSpec`.
+Evaluation manifests are **owned by ValidationBundles, never by revisions**
+(ADR-0001/0004): one revision is routinely evaluated under many manifests.
+That ownership is what makes "re-evaluation required" mechanical: a decision
+whose evidence pins an outdated dataset revision is visibly stale.
 
-**Environment protocol (future-proofing, not implemented now).** The kernel's
-long-term execution contract is episodic:
+**Session protocol with capability mix-ins (future-proofing, not
+implemented now).** Requiring `reset` in the base contract was wrong — the
+Continual Harness domain is exactly a world without free resets. The base is
+a plain episodic session, with capabilities as optional protocols the kernel
+probes for:
 
 ```python
-class Environment(Protocol):
-    def reset(self, case_ref: str, seed: int) -> Observation: ...
-    def step(self, action: Action) -> StepResult: ...   # observation, done, info
+class EnvironmentSession(Protocol):
+    def observation(self) -> object: ...
+    def act(self, action: object) -> object: ...
+    def done(self) -> bool: ...
+    def close(self) -> None: ...
+
+class Resettable(Protocol):      # paired evaluation wants this
+    def reset(self, case_ref: str, seed: int) -> None: ...
+class Checkpointable(Protocol):  # long-horizon recovery
+    def checkpoint(self) -> str: ...
+    def restore(self, checkpoint_ref: str) -> None: ...
+class Forkable(Protocol):        # counterfactual validation (exo, note 04)
+    def fork(self) -> EnvironmentSession: ...
 ```
 
 with a `Trajectory` record (ordered steps, budget usage, terminal outcome)

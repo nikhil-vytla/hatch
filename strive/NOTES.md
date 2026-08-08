@@ -398,3 +398,52 @@ Design-first phase: six ADRs + experimental contract spikes, no live changes.
 - 149 tests, mypy strict clean; Stage 1–2b untouched.
 - Next slice fixed in HANDOFF: composite revision storage + SurfaceDescriptor
   registry + migration registry entries 0001/0002 — independently mergeable.
+
+## 2026-08-08 — stage 3A revision pass (pre-freeze corrections on PR #40)
+
+Nine contract corrections before Stage 3B freezes the shapes; spike +
+tests rewritten, ADRs updated in place, statuses cycled through
+provisional back to accepted/frozen once tests passed.
+
+- State vs evidence: revisions now carry a content-addressed
+  state_manifest_ref (HarnessManifest) and NEVER an evaluation manifest —
+  ValidationBundle owns those. Test pins one revision evaluated under two
+  manifests (grown dataset, more seeds) with zero revision changes.
+- RevisionRef(scope, id) everywhere; base_parent (deltas apply here) split
+  from provenance_parents (merge/promotion inputs); cross-scope lineage
+  test uses the same numeric id at two scopes without collision.
+- ScopeRef + ResolutionContext replace colon-parsing; killed the implicit
+  project:default (projectless tasks resolve task→global). delete = remove
+  own override (inheritance resumes); mask = tombstone stopping
+  fall-through — both tested against sibling scopes.
+- TaskSpec went environment-generic; solve(str)->int + catalog now live in
+  the FunctionTask config blob. Base session protocol drops the reset
+  requirement (the CH domain is exactly a no-free-resets world);
+  Resettable/Checkpointable/Forkable are capabilities.
+- DatasetRevision now reconstructable (per-split CAS manifest refs);
+  EvaluationManifest pins harness state ref + objective spec + env/scorer/
+  tool/runtime versions + seeds + validators + budget.
+- SurfaceDescriptor versioned with allowed_scopes/required_validators/
+  online_policy; risk COMPUTED from descriptor+scope+op (broad scopes bump,
+  removals floor at medium) — the delta risk field is gone, so there is
+  nothing to trust.
+- SelectionDecision policy-neutral: policy_ref + dispositions
+  {promote, reject, frontier_add, provisional_activate}; retain →
+  frontier_add; ALL dispositions require evidence; objective_spec_ref
+  pinned.
+- AlgorithmRun/AlgorithmStep journaled for resumable search; ADR-0005 now
+  states plainly that KernelServices is an API contract for trusted
+  plugins, not hostile-plugin isolation.
+- LedgerBackend design gains append_batch under one expected head, cursor
+  reads, and index-through-head semantics.
+- Spike fixes: before_ref = parent CONTENT ref (with consistency checks);
+  migration proposer versioned (ledger-migration@1); duplicate manifest
+  keys / invalid scopes / unversioned proposers all fail loudly.
+- Research wording corrected: prime-agent's state handling credited (the
+  gap is the missing empirical gate); exo's scoped secrets/forking
+  acknowledged (rejection narrowed to the unscoped evolvable workspace);
+  RLM reframed as the weights side of the boundary, not a rejected
+  persistence design.
+
+155 tests, mypy strict clean. Stage 3B slice unchanged: composite revision
+storage + SurfaceDescriptor registry.

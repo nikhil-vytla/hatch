@@ -1,6 +1,6 @@
 # ADR-0004 — Validation bundles and selection decisions
 
-Status: accepted (Stage 3A). Refines D14.
+Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B. Refines D14.
 
 ## Context
 
@@ -17,8 +17,11 @@ for each new policy would churn versions forever.
 artifacts.**
 
 `ValidationBundle` — what the evidence *is*:
-- `manifest_ref` (ADR-0003) — everything the validation ran under;
-- `subject_revision_id`;
+- `evaluation_manifest_ref` (ADR-0003) — everything the validation ran
+  under. **Bundles own evaluation manifests; revisions never do** — one
+  revision is evaluated under many manifests over its life, and a test pins
+  exactly that scenario;
+- `subject: RevisionRef` (globally unambiguous, ADR-0001);
 - `results: tuple[ValidatorResult, ...]` where each result carries
   `validator` (name@version), `status ∈ {passed, failed, inconclusive}`,
   a flat `metrics: dict[str, float]` (means, CIs, trial counts — whatever the
@@ -26,31 +29,39 @@ artifacts.**
   for the full payload (per-trial scores, distributions, traces). The ledger
   never grows per-policy fields; it grows CAS artifacts.
 
-`SelectionDecision` — what was *concluded*:
-- `policy` + `policy_version` — resolved by name AND version, exactly as
-  replay already requires;
-- `kind ∈ {paired-deterministic, stochastic, hard-constraint, provisional,
-  pareto-retention}`;
-- `verdict ∈ {promote, reject, retain, provisional}` — `retain` is the
-  population verdict: the candidate joins/stays on the frontier without
-  becoming the incumbent (GEPA's Pareto retention as a *verdict*, note 01);
-- `subject_revision_id`, `incumbent_revision_id` (null for population-only
-  comparisons), and for Pareto kinds the comparand set travels in the
-  evidence artifact;
+`SelectionDecision` — what was *concluded*, **policy-neutral**:
+- `policy_ref` (name@version — resolved by name AND version, exactly as
+  replay already requires) — the policy's own comparison method (paired,
+  stochastic, hard-constraint, Pareto dominance…) is the policy's business
+  and lives in the evidence artifacts, not in a kernel-visible `kind` field;
+- `objective_spec_ref` — the versioned objective/constraint spec (ADR-0005)
+  the decision was made against, pinned on every decision;
+- `disposition ∈ {promote, reject, frontier_add, provisional_activate}` —
+  the small kernel vocabulary of things the kernel will *do*. `frontier_add`
+  (renamed from `retain`) is the population disposition: the candidate joins
+  the frontier without becoming the incumbent (GEPA's Pareto retention as a
+  disposition, note 01);
+- `subject: RevisionRef`, `incumbent: RevisionRef | None` (null for
+  population-only comparisons); Pareto comparand sets travel in the evidence
+  artifact;
 - `evidence_refs: tuple[str, ...]` — the bundles this conclusion rests on;
 - `rationale` — one human sentence;
 - `at`.
 
-**Invariants** (kernel-enforced, policy-independent): a `promote` verdict
-requires at least one evidence bundle whose manifest matches the current
-dataset revision; every decision is journaled whatever the verdict; verdicts
-and kinds are closed vocabularies (schema bump to extend).
+**Invariants** (kernel-enforced, policy-independent): **every disposition —
+promote, reject, frontier_add, and provisional_activate — requires evidence
+bundles** (a rejection without evidence is as unauditable as a promotion
+without it); a `promote` additionally requires evidence whose manifest
+matches the current dataset revision; every decision is journaled whatever
+the disposition; the disposition vocabulary is closed (schema bump to
+extend).
 
-**Compatibility.** Today's `Decision` maps mechanically: kind
-`paired-deterministic`, verdict `promote|reject`, one synthetic bundle with
-two `ValidatorResult`s (baseline suite, candidate suite) whose metrics carry
-the split scores, regression ids in the artifact payload. Existing policies
-(`paired-deterministic@1`, `provisional@1`) keep their names and versions.
+**Compatibility.** Today's `Decision` maps mechanically: policy_ref
+`paired-deterministic@1`, disposition `promote|reject`, one synthetic bundle
+with two `ValidatorResult`s (baseline suite, candidate suite) whose metrics
+carry the split scores, regression ids in the artifact payload. Existing
+policies keep their names and versions; today's implicit objective becomes
+the first `ObjectiveSpec` artifact.
 Stage 3B writes new envelopes alongside `decision@1` inside `generation`
 records until the revision migration lands, then replaces them.
 

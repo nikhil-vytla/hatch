@@ -1,6 +1,6 @@
 # ADR-0001 — Harness revisions and evolvable surfaces
 
-Status: accepted (Stage 3A). Implements charter D5.
+Status: accepted — wire schemas revised in the 3A revision pass (2026-08-08), re-validated by spike round-trip tests, and frozen for Stage 3B. Implements charter D5.
 
 ## Context
 
@@ -18,37 +18,51 @@ state in place, note 02).
 **`HarnessRevision` replaces "generation" as the unit of evolution.** A
 revision is an immutable, journaled record:
 
-- `revision_id` — sequential per scope journal (content addressing was
-  rejected: two revisions may carry identical deltas with different
-  provenance, and identity must survive re-proposals).
-- `parent_ids: tuple[str, ...]` — usually one; the tuple exists so future
-  population search can record crossover/merge without a schema bump.
-- `scope` — where the revision lives (ADR-0002).
+- `ref: RevisionRef(scope, revision_id)` — identity is globally unambiguous:
+  ids are sequential *per scope journal*, and the scope travels with every
+  reference, so `rev-0001` at task scope can never collide with `rev-0001`
+  at project scope (content addressing was rejected: identical deltas with
+  different provenance must remain distinct identities).
+- `base_parent: RevisionRef | None` — the revision the deltas apply to.
+- `provenance_parents: tuple[RevisionRef, ...]` — additional lineage inputs
+  (merge/crossover, the task-scoped origin of a cross-scope promotion);
+  never repeats the base parent.
 - `deltas: tuple[SurfaceDelta, ...]` — the complete change set.
-- `manifest_ref` — the `EvaluationManifest` (ADR-0003) it was validated
-  under; null only for seeds.
-- provenance: `proposer` (name@version), `summary`, and refs to the proposal
-  artifact (prompt/completion CAS refs travel via events as today).
+- `state_manifest_ref` — content address of the revision's `HarnessManifest`:
+  the complete resolved (kind, name, content_ref) state after the deltas
+  apply. **Revisions own state, never evaluation conditions** — the
+  `EvaluationManifest` was removed from revisions; a `ValidationBundle`
+  (ADR-0004) pins the evaluation manifest it ran under, because one revision
+  is routinely evaluated under many manifests (grown datasets, more seeds).
+- provenance: `proposer` (name@version — always versioned, including the
+  migration's own `ledger-migration@1`), `summary`; prompt/completion CAS
+  refs travel via events as today.
 - `created_at`.
 
-**`SurfaceDelta` is typed CRUD** (prime-agent's per-edit schema, note 02):
-`op ∈ {create, update, delete}`, surface `kind`, artifact `name`,
-`before_ref`/`after_ref` content addresses, and the surface's `risk_tier`
-copied at proposal time (so history shows the risk as assessed then).
-Structural rules, kernel-enforced: `create` has only `after_ref`, `delete`
-only `before_ref`, `update` both; no two deltas may touch the same
-`(kind, name)`; every `kind` must be in the trusted registry.
+**`SurfaceDelta` is typed CRUD plus mask** (per-edit schema after
+prime-agent, note 02): `op ∈ {create, update, delete, mask}`, surface
+`kind`, artifact `name`, and `before_ref`/`after_ref` content addresses.
+Deltas carry **no risk field** — risk is computed, never trusted from a
+proposal: `effective_risk(descriptor, scope, op)` derives it from the
+descriptor's base risk, bumped one level at broad scopes (global/project)
+and floored at medium for removals. Structural rules, kernel-enforced:
+`create` has only `after_ref`, `delete` only `before_ref`, `update` both,
+`mask` neither (it changes visibility, not content — see ADR-0002); no two
+deltas may touch the same `(kind, name)`; every `kind` must be in the
+trusted registry and allowed at the revision's scope level.
 
-**`SurfaceDescriptor` is the trusted allowlist entry** (kernel data, never
-persisted as evolvable state): `kind`, `risk_tier` (high/medium/low),
-`online_adaptable` flag, required validators, and a materializer id (how the
-artifact lands in a candidate workspace). Planned kinds and their tiers:
+**`SurfaceDescriptor` is the versioned trusted allowlist entry** (kernel
+data, never persisted as evolvable state): `kind`, `version`,
+`artifact_schema`, `materializer` (id@version), `allowed_scopes` (scope
+levels the kind may live at), `required_validators` (name@version),
+`base_risk`, and `online_policy` (`never` today; a future descriptor version
+may declare `provisional-only`). Planned kinds:
 
-| kind | risk | online adaptable | materialization |
-|---|---|---|---|
-| `strategy-code` | high | never | file in sandbox workspace, executed out-of-process |
-| `prompt` | medium | later (stage 5) | text consumed by kernel-side model calls |
-| `policy-params` | low | later (stage 5) | typed parameter bundle read by trusted components |
+| kind | base risk | allowed scopes | online policy | materialization |
+|---|---|---|---|---|
+| `strategy-code` | high | task only | never | file in sandbox workspace, executed out-of-process |
+| `prompt` | medium | all | never (stage 5 revisits) | text consumed by kernel-side model calls |
+| `policy-params` | low | all | never (stage 5 revisits) | typed parameter bundle read by trusted components |
 
 Adding a kind is a human code change to the registry — the loop cannot
 extend its own allowlist.
@@ -68,10 +82,13 @@ destroy today's single-derivation invariant; a revision DAG keeps one active
 node per scope.
 
 **Compatibility.** Today's `generation@2` is exactly a one-delta revision:
-`update strategy-code "solve"` with `before_ref = parent.source_ref`,
-`after_ref = source_ref`. The spike ships `revision_from_generation()` plus a
-round-trip test; Stage 3B's migration (ADR-0006) rewrites task ledgers with
-that mapping. Until then the live loop keeps writing `generation@2`.
+`update strategy-code "solve"` with `before_ref` = the parent generation's
+*content* ref (`parent.source_ref` — never a synthetic id string) and
+`after_ref = source_ref`; the migration itself is a versioned proposer
+(`ledger-migration@1`). The spike ships `revision_from_generation()`
+(which refuses inconsistent parents) plus round-trip tests; Stage 3B's
+migration (ADR-0006) rewrites task ledgers with that mapping. Until then the
+live loop keeps writing `generation@2`.
 
 ## Consequences
 
