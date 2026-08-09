@@ -204,57 +204,76 @@ behavior authoritative throughout:
 
 One read boundary (`StateReader`, `strive.reader`) with durable journaled
 modes — `native` (default), `shadow`, `revision-canary`:
-- Every operation reads through one coherent canonical + mirror snapshot
-  identified by tamper-evident heads (count + digest-sequence hash),
-  refreshed only after the operation's own writes; cycle, compare, replay,
-  audit, promotion, rollback, provisional resolution, proposal staleness,
-  seeding, status, lineage, and restart reads are all routed. Direct Store
-  reads remain compatibility internals. Mutations carry the reader's
-  expected head: stale activation and rollback refuse.
-- Honest evaluated subjects: an immutable, unactivated candidate revision +
-  scope manifest (with native `RevisionProvenance`, not migration
-  provenance) is created BEFORE evaluation; every execution CAS-stores an
-  ExecutionRecord pinning the base resolved harness (the active baseline
-  with its OWN bindings), the subject (active revision, retained revision,
-  or candidate overlay) with its own effective manifest, exact
-  canonical/mirror heads, run, operation, and subject. The active baseline
-  is never claimed to contain a non-active source.
-- One validator: `VerifiedRevisionSnapshot` runs parity's checks — complete
-  SourceRecordRef agreement both directions (schema, journal, ordinal,
-  digest) with type agreement, recomputed-projection equality, full
-  artifact closure, descriptor/provenance/manifest validation, bounded
-  cycle-free lineage. All revision reads use it; the weaker 3B.1 validator
-  is gone.
-- Trustworthy evidence: a locked, fsynced trusted reader journal records
-  every check (reader/projector version, burn-in epoch, operation id,
-  subject, exact heads, outcome) in `finally` — including denied, rejected,
-  stale, and failing operations; expected checks derive from the
-  centralized operations, so omitted instrumentation synthesizes `missing`
-  outcomes that block eligibility. Repair and reader/projector version
-  changes reset the epoch (old evidence preserved, excluded). Eligibility
-  = complete parity + zero divergences/errors + minimum total (20) and
-  per-subject samples + observed accepted/rejected/no-candidate/rollback/
-  re-promotion/audit/replay/restart paths.
-- Reversible canary authority: in `revision-canary`, supported reads are
-  served from the verified snapshot with native values compared before use;
-  unavailable or divergent derived state opens a durable circuit breaker
-  that blocks canary use (no per-read silent fallback); `strive reader
-  kill` returns immediately to native; mode changes and breaker state are
-  journaled; enablement requires current-epoch eligibility. Activation and
-  durable promotion remain generation-native.
-- 215 tests. Exit claim: strive can use revision-derived state as
-  authoritative for supported reads under a versioned, evidence-backed
-  canary mode, with coherent execution provenance, native comparison, a
-  durable circuit breaker, and an immediate kill switch. Activation
-  remains generation-native.
+- **Coherent snapshot.** Each operation reads the canonical entries AND the
+  bytes they were parsed from in one read (`entries_with_bytes`), and the
+  native view and `SourceSnapshot` both derive from that exact capture; the
+  mirror capture is paired through an optimistic read-recheck loop that
+  retakes BOTH captures if the canonical journal moved, so an old native
+  view is never combined with a newer mirror view. Snapshots refresh only
+  after the operation's own writes. Cycle, compare, replay, audit,
+  promotion, rollback, provisional resolution, proposal staleness, task/
+  drift guards, proposal history, seeding, status, lineage, and restart
+  reads are all routed; direct Store reads remain compatibility internals.
+  Mutations carry the reader's expected head — stale activation, rollback,
+  seeding, and both provisional confirm/revert paths refuse.
+- **Exact candidate identity.** An immutable, unactivated candidate revision
+  + manifest + provenance (native `RevisionProvenance`) is created and
+  fully validated BEFORE evaluation, in every mode; the evaluated artifact
+  is exactly that overlay. Overlay construction failure records
+  `unavailable` (canary opens the breaker before execution) — there is no
+  `derived is None → native` silent path. Retention references the exact
+  evaluated candidate via a `RetentionRecord` (overlay revision + decision
+  evidence + retained ids), and the retained mirror is verified
+  content-identical to the overlay — never a disconnected replacement.
+- **One validator.** `VerifiedRevisionSnapshot` runs parity's checks —
+  complete SourceRecordRef agreement both directions (schema, journal,
+  ordinal, digest) with type agreement, recomputed-projection equality,
+  full artifact closure, descriptor/provenance/manifest validation, bounded
+  cycle-free lineage. All revision reads use it; no weaker validator exists.
+- **Tamper-evident evidence.** A locked, fsynced, task-bound reader journal
+  written in crash-framed, hash-chained batches (a `ReaderFrame` closes each
+  batch with its payload hash and the previous frame's hash): deletion,
+  reordering, and unframed forged lines are detected and never honored.
+  Each check stores its mode and exact heads AT CHECK TIME; each expected
+  `(op_id, subject)` gets exactly one severity-merged terminal outcome; the
+  candidate-overlay and retained-candidate subjects are distinct. Outcomes
+  are recorded in `finally` (denied/rejected/stale/failing included), with
+  `missing` synthesized for uninstrumented subjects. Behavioral facts count
+  only from successfully completed shadow/canary operations; entering shadow
+  starts a new epoch. Evidence- or run-event failure in canary opens the
+  breaker; telemetry never masks the canonical result.
+- **Fail-closed control.** Repair, rebuild, and reader/projector version
+  changes atomically open the breaker (if canary) and reset the epoch —
+  never best-effort. The canary is effective only while the current epoch
+  is eligible at operation start (lost eligibility or a corrupt journal
+  fails closed). `clear-breaker` requires native/shadow mode, complete
+  parity, and a fresh epoch, and never reactivates a canary. Enable/clear/
+  mode transitions use an expected reader-journal head and persist the
+  eligibility proof they authorized. A journal-independent force-native
+  override (sentinel file / `STRIVE_FORCE_NATIVE=1`) is the emergency kill
+  path.
+- **Threat model.** The reader journal is same-UID writable while candidate
+  code runs without host-enforced filesystem confinement, so canary mode is
+  refused outright for real/unsafe model-generated code; a malicious-code
+  test confirms forged control lines are detected and fail closed.
+- 232 tests. Exit claim: strive can run a revision-derived execution/read
+  canary from a coherent snapshot, with exact candidate identity,
+  tamper-evident current-epoch evidence, fail-closed control transitions,
+  and an independent kill path. Activation remains generation-native.
 
-## Stage 3B.3 — The first empirically evaluated prompt-surface composite revision experiment (next)
+## Stage 3B.3 — Multi-surface candidate retention + activation (next)
 
-In a separate PR: a `prompt` surface delta (the proposal template) evolved
-alongside strategy code in one composite revision, validated under the
-existing paired gate with held-out discipline — the first real use of
-multi-surface revisions, and the first empirical evidence for or against
-composite prompt-surface evolution in strive.
+The retained/activated revision must be the SAME multi-surface revision that
+was evaluated — the evaluated candidate overlay (already exact under 3B.2)
+retained and, when accepted, activated as that composite revision, rather
+than a strategy-only generation with a compatibility mirror. Only once a
+composite candidate can round-trip evaluate → retain → activate as one
+revision does the first empirically evaluated **prompt-surface composite
+revision experiment** follow (in its own PR): a `prompt` surface delta (the
+proposal template) evolved alongside strategy code in one composite
+revision, validated under the existing paired gate with held-out
+discipline. Prompt/policy evolution does not begin before that round-trip
+exists.
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 

@@ -819,7 +819,7 @@ def candidate_overlay_revision(
     candidate_id: str,
     task_id: str,
     source_ref: str,
-    parent_revision: "HarnessRevision",
+    parent_revision_ref: RevisionRef,
     parent_source_ref: str,
     scope_manifest_ref: str,
     provenance_ref: str,
@@ -829,12 +829,14 @@ def candidate_overlay_revision(
 ) -> HarnessRevision:
     """The immutable, UNACTIVATED revision for a candidate under evaluation.
 
-    Built before the candidate executes, so the evaluated subject is exactly
-    this artifact: one strategy-code delta from the active baseline's binding
-    to the candidate's, with its own scope manifest. It is never written to
-    the mirror journal and never activated — it exists so execution records
-    can name the evaluated subject honestly instead of claiming the active
-    baseline revision contains a non-active source."""
+    Built and fully validated before the candidate executes — in every
+    reader mode, from native state alone — so the evaluated subject is
+    exactly this artifact: one strategy-code delta from the active
+    baseline's binding to the candidate's, with its own scope manifest. It
+    is never written to the mirror journal and never activated — it exists
+    so execution and retention records can name the evaluated subject
+    honestly instead of claiming the active baseline revision contains a
+    non-active source."""
     pinned = "strategy-code@1"
     delta = SurfaceDelta(
         kind=SURFACE_STRATEGY_CODE,
@@ -846,7 +848,7 @@ def candidate_overlay_revision(
     )
     revision = HarnessRevision(
         ref=RevisionRef(ScopeRef(LEVEL_TASK, task_id), f"rev-{candidate_id}"),
-        base_parent=parent_revision.ref,
+        base_parent=parent_revision_ref,
         provenance_parents=(),
         deltas=(delta,),
         scope_manifest_ref=scope_manifest_ref,

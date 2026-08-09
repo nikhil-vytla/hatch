@@ -2,44 +2,53 @@
 
 `StateReader` (the harness read session) is the single boundary every
 operation reads through — cycle, compare, replay, audit, promotion,
-rollback, provisional resolution, proposal staleness, seeding, status,
-lineage, and restart reads. It captures ONE coherent canonical + mirror
-snapshot per operation, identified by tamper-evident heads (record count +
-digest-sequence hash on both journals), and refreshes only after the
-operation's own writes. Direct `Store` reads remain as compatibility
-internals. Mutations receive the reader's expected head and refuse stale
-activation or rollback.
+rollback, provisional resolution, proposal staleness, task/drift guards,
+proposal history, seeding, status, lineage, and restart reads. It captures
+ONE coherent canonical + mirror snapshot per operation: the canonical
+entries and bytes come from a single read (native view and `SourceSnapshot`
+derive from that exact capture), and the mirror capture is validated by an
+optimistic read-recheck loop — an old native capture is never combined with
+a newer mirror capture. Snapshots refresh only after the operation's own
+writes. Mutations receive the reader's expected head and refuse stale
+activation, rollback, seeding, and provisional transitions.
 
 Modes (durable, journaled, default **native**):
 
 - ``native`` — generation-native values serve every read; no derived reads.
 - ``shadow`` — generation-native values serve every read; each supported
   read is compared against the verified revision snapshot and recorded.
-- ``revision-canary`` — supported reads are served from the verified
-  revision snapshot with the native value compared before use. There is no
-  per-read silent fallback: unavailable or divergent derived state opens a
-  durable circuit breaker (journaled) that blocks canary use; a kill switch
-  returns immediately to native. Activation and durable promotion remain
-  generation-native.
+  Entering shadow starts a new burn-in epoch.
+- ``revision-canary`` — the revision-derived **execution/read canary**:
+  executed sources are served from the verified revision snapshot (or the
+  candidate overlay) after comparing with the native value; identity reads
+  (active/generation/lineage/parent) are agreement-gated — the returned
+  compatibility values coincide with the native records by construction.
+  The canary is effective only while the current epoch remains eligible at
+  operation start; unavailable or divergent derived state, reader-journal
+  corruption, or lost eligibility opens a durable circuit breaker. A kill
+  switch returns immediately to native, and a force-native override
+  (sentinel file or STRIVE_FORCE_NATIVE=1) works independently of the
+  reader journal. Activation and durable promotion remain generation-native.
 
-`VerifiedRevisionSnapshot` is the ONLY revision-read validator: it runs
-parity's checks — complete `SourceRecordRef` agreement (schema, journal,
-ordinal, digest) in both directions with source/mirror type agreement,
-supported projector, recomputed-projection equality, full artifact closure,
-descriptor pinning, provenance closure, manifest validation, and bounded
-cycle-free lineage.
+Control and evidence live in the **reader journal**
+(`ledger/<task>.reader.jsonl`): locked, fsynced, task-bound, and written in
+crash-framed, hash-chained batches — every batch ends with a `ReaderFrame`
+carrying the batch payload hash and the previous frame's hash, so deletion,
+reordering, and naive appended forgeries are detected (unframed lines are
+never honored as control state). This journal is kernel-owned but NOT
+tamper-proof against candidate code under the current sandbox (same-UID
+filesystem access): canary mode is therefore refused for real/unsafe
+model-generated code until host-enforced confinement exists.
 
-Cutover evidence lives in a locked, fsynced trusted reader journal
-(`ledger/<task>.reader.jsonl`): every check records reader/projector
-version, burn-in epoch, operation id, subject, exact heads, and outcome;
-outcomes are recorded in ``finally`` including denied, rejected, stale, and
-failing operations, and expected-but-unrecorded subjects are synthesized as
-``missing`` so omitted instrumentation lowers eligibility. The epoch resets
-after reader/projector changes or repair; older evidence is preserved but
-excluded from current eligibility. Eligibility requires complete parity,
-zero divergences/errors, minimum total and per-subject samples, and
-observed accepted, rejected, no-candidate, rollback, re-promotion, audit,
-replay, and restart paths.
+Every check records its mode and exact canonical/mirror heads at check
+time; each expected `(op_id, subject)` gets exactly one terminal outcome
+(severity-merged); outcomes are recorded in ``finally`` including denied,
+rejected, stale, and failing operations, with `missing` synthesized for
+expected-but-unrecorded subjects. Behavioral facts count only from
+successfully completed shadow/canary operations. Repair, rebuild, and
+reader/projector version changes atomically disable the canary and reset
+the epoch (fail-closed, never best-effort); old evidence is preserved but
+excluded from current eligibility.
 """
 
 from __future__ import annotations
@@ -49,14 +58,16 @@ import hashlib
 import os
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from pathlib import Path
-from typing import Iterator, Sequence
+from typing import Callable, Iterator, Sequence
 
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing
 from strive.codec import register
 from strive.contracts import (
+    Decision,
     Generation,
     INTERVENTION_SHADOW_DIVERGENCE,
     Intervention,
@@ -70,8 +81,8 @@ from strive.dualwrite import (
     _check_existing_mirrors,
     _verify_closure,
     canonical_scope_manifest,
-    capture_snapshot,
     parity_status,
+    snapshot_of,
     validate_source_history,
 )
 from strive.events import EventLog, now_iso
@@ -101,7 +112,7 @@ from strive.store import (
     ledger_head,
 )
 
-READER_VERSION = "state-reader@1"
+READER_VERSION = "state-reader@2"
 
 MODE_NATIVE = "native"
 MODE_SHADOW = "shadow"
@@ -115,15 +126,29 @@ OUTCOME_NOT_APPLICABLE = "not-applicable"
 OUTCOME_NATIVE = "native"  # read served natively with comparison off (native mode)
 OUTCOME_MISSING = "missing"  # expected by the operation, never recorded
 
+# exactly one terminal outcome per (op_id, subject): repeated probes of the
+# same subject merge by severity, the worst outcome wins
+_SEVERITY = {
+    OUTCOME_NOT_APPLICABLE: 0,
+    OUTCOME_NATIVE: 1,
+    OUTCOME_AGREED: 2,
+    OUTCOME_MISSING: 3,
+    OUTCOME_UNAVAILABLE: 4,
+    OUTCOME_DIVERGED: 5,
+}
+
 _SURFACE_KEY = ("strategy-code", "solve")
 
+FORCE_NATIVE_ENV = "STRIVE_FORCE_NATIVE"
 
-# expected checks are derived from the centralized operations: an operation
-# that fails to record one of its subjects gets a synthesized `missing`
-# outcome at finish, which blocks eligibility — omitted instrumentation can
-# only ever LOWER coverage
+# expected checks derive from the centralized operations: an operation that
+# fails to record one of its subjects gets a synthesized `missing` outcome
+# at finish, which blocks eligibility — omitted instrumentation can only
+# ever LOWER coverage. The candidate-overlay (evaluated artifact) and the
+# retained candidate (mirrored revision after retention) are distinct
+# subjects.
 OPERATION_SUBJECTS: dict[str, tuple[str, ...]] = {
-    "cycle": ("cycle-baseline", "cycle-candidate"),
+    "cycle": ("cycle-baseline", "cycle-candidate-overlay", "cycle-candidate-retained"),
     "compare": ("compare-left", "compare-right"),
     "replay": ("replay-baseline", "replay-candidate"),
     "audit": ("audit-target",),
@@ -134,15 +159,13 @@ OPERATION_SUBJECTS: dict[str, tuple[str, ...]] = {
     "seed": ("seed-active",),
 }
 
-# eligibility demands per-subject evidence for every routed read kind
 REQUIRED_SUBJECTS = (
-    "cycle-baseline", "cycle-candidate", "compare-left", "compare-right",
-    "replay-baseline", "replay-candidate", "promote-incumbent",
-    "promote-target", "rollback-active", "rollback-parent", "audit-target",
-    "status-active",
+    "cycle-baseline", "cycle-candidate-overlay", "cycle-candidate-retained",
+    "compare-left", "compare-right", "replay-baseline", "replay-candidate",
+    "promote-incumbent", "promote-target", "rollback-active",
+    "rollback-parent", "audit-target", "status-active",
 )
 
-# ... and observed outcomes on every behavioral path
 REQUIRED_FACTS = (
     "decision-accepted", "decision-rejected", "no-candidate", "rollback",
     "re-promotion", "audit", "replay", "restart",
@@ -153,31 +176,35 @@ MIN_SUBJECT_CHECKS = 1  # declared minimum per required subject
 
 
 class ReaderError(Exception):
-    """Reader-journal or reader-state failure. Mode resolution degrades to
-    native with a diagnostic; it never blocks a canonical operation."""
+    """Reader-journal or reader-control failure. Mode resolution degrades to
+    native; control transitions and repair bookkeeping raise (fail closed)."""
 
 
 def _rev_id(generation_id: str) -> str:
     return generation_id.replace("gen-", "rev-")
 
 
-# -- trusted reader journal (control + evidence stream) --------------------------------------
+# -- reader journal records --------------------------------------------------------------------
 
 
-@register("reader-mode", 1)
+@register("reader-mode", 2)
 @dataclass(frozen=True)
 class ModeChange:
     mode: str
     reason: str
     at: str
+    authorized_head: str = ""  # the reader-journal head this transition saw
+    proof: str = ""  # the eligibility evidence the transition authorized
 
 
-@register("breaker-event", 1)
+@register("breaker-event", 2)
 @dataclass(frozen=True)
 class BreakerEvent:
     state: str  # "open" | "cleared"
     reason: str
     at: str
+    authorized_head: str = ""
+    proof: str = ""
 
 
 @register("epoch-reset", 1)
@@ -190,16 +217,17 @@ class EpochReset:
     at: str
 
 
-@register("read-check", 1)
+@register("read-check", 2)
 @dataclass(frozen=True)
 class ReadCheck:
-    """One durable evidence record: a read routed through the boundary."""
+    """One durable evidence record: a read routed through the boundary.
+    `mode` and both heads are captured AT CHECK TIME, not session end."""
 
     epoch: str
     op_id: str
     operation: str
     subject: str
-    mode: str  # the effective mode the read ran under
+    mode: str
     outcome: str
     detail: str
     canonical_head: str
@@ -210,30 +238,69 @@ class ReadCheck:
     run_id: str | None = None
 
 
-@register("op-summary", 1)
+@register("op-summary", 2)
 @dataclass(frozen=True)
 class OperationSummary:
     """The operation's terminal status (recorded in `finally`): ok, denied,
-    rejected, stale, or error:<Type> — plus behavioral facts observed."""
+    rejected, stale, or error:<Type> — plus behavioral facts observed.
+    Facts count toward eligibility only when status is ok and the mode is
+    shadow or canary."""
 
     epoch: str
     op_id: str
     operation: str
+    mode: str
     status: str
     facts: tuple[str, ...]
     at: str
     run_id: str | None = None
 
 
+@register("reader-frame", 1)
+@dataclass(frozen=True)
+class ReaderFrame:
+    """The crash-framing + hash-chain record closing each appended batch:
+    `payload_hash` covers the batch's exact serialized bytes, `prev` chains
+    to the previous frame — deletion, reordering, and naive appended
+    forgeries break verification, and unframed lines are never honored."""
+
+    task_id: str
+    seq: int
+    prev: str  # hash of the previous frame line ("" -> genesis)
+    payload_hash: str  # sha256 of the batch's serialized entry lines
+    count: int
+    at: str
+
+
 ReaderEntry = ModeChange | BreakerEvent | EpochReset | ReadCheck | OperationSummary
+
+_READER_ENTRY_TYPES = (
+    ModeChange, BreakerEvent, EpochReset, ReadCheck, OperationSummary
+)
+
+_GENESIS = hashlib.sha256(b"strive-reader-genesis").hexdigest()
+
+
+@dataclass(frozen=True)
+class JournalView:
+    """One verified parse of the reader journal: only correctly framed,
+    correctly chained, task-bound entries are honored."""
+
+    entries: tuple[ReaderEntry, ...]
+    frames: int
+    head: str  # f"{frames}:{last_frame_hash}"
+    errors: int  # undecodable, misframed, chain-broken, or unframed lines
+    error_detail: tuple[str, ...]
+    torn_tail: bool  # a partial final line (crash artifact; tolerated)
 
 
 class ReaderJournal:
-    """Locked, fsynced, append-only trusted stream for reader control state
-    and cutover evidence."""
+    """Locked, fsynced, append-only control + evidence stream, written in
+    crash-framed hash-chained batches (one write syscall per batch)."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, task_id: str) -> None:
         self.path = path
+        self.task_id = task_id
         self._lock_path = path.with_suffix(".lock")
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -246,81 +313,158 @@ class ReaderJournal:
             finally:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
-    def append(self, entry: ReaderEntry) -> None:
-        line = (codec.dumps(entry) + "\n").encode("utf-8")
-        with self.locked():
-            with self.path.open("ab") as handle:
-                handle.write(line)
-                handle.flush()
-                os.fsync(handle.fileno())
-
-    def append_many(self, entries: Sequence[ReaderEntry]) -> None:
-        payload = "".join(codec.dumps(e) + "\n" for e in entries).encode("utf-8")
-        if not payload:
-            return
-        with self.locked():
-            with self.path.open("ab") as handle:
-                handle.write(payload)
-                handle.flush()
-                os.fsync(handle.fileno())
-
-    def entries(self) -> tuple[list[ReaderEntry], int]:
-        """All decodable entries plus a count of undecodable lines. Errors
-        are counted (they block eligibility) but never raise: reader-journal
-        corruption must not block canonical operations."""
+    def read(self) -> JournalView:
         if not self.path.exists():
-            return [], 0
+            return JournalView((), 0, f"0:{_GENESIS}", 0, (), False)
         try:
-            raw = self.path.read_bytes().decode("utf-8", errors="replace")
+            raw = self.path.read_bytes()
         except OSError as exc:
             raise ReaderError(f"{self.path}: unreadable reader journal: {exc}") from None
-        lines = raw.split("\n")
-        complete = lines[:-1] if lines and not raw.endswith("\n") else lines
-        out: list[ReaderEntry] = []
+        torn_tail = bool(raw) and not raw.endswith(b"\n")
+        lines = raw.split(b"\n")
+        complete = lines[:-1]  # the final element is "" or a torn fragment
+        entries: list[ReaderEntry] = []
         errors = 0
+        detail: list[str] = []
+        buffer_bytes = b""
+        buffer_entries: list[ReaderEntry | None] = []
+        frames = 0
+        last_hash = _GENESIS
+        chain_ok = True
         for line in complete:
             if not line.strip():
                 continue
+            decoded: object | None
             try:
-                decoded: object = codec.loads(line)
-            except codec.SchemaError:
-                errors += 1
-                continue
-            if isinstance(
-                decoded,
-                (ModeChange, BreakerEvent, EpochReset, ReadCheck, OperationSummary),
-            ):
-                out.append(decoded)
+                decoded = codec.loads(line.decode("utf-8"))
+            except (codec.SchemaError, UnicodeDecodeError):
+                decoded = None
+            if isinstance(decoded, ReaderFrame):
+                expected = hashlib.sha256(buffer_bytes).hexdigest()
+                if (
+                    not chain_ok
+                    or decoded.task_id != self.task_id
+                    or decoded.seq != frames + 1
+                    or decoded.prev != last_hash
+                    or decoded.payload_hash != expected
+                    or decoded.count != len(buffer_entries)
+                    or any(e is None for e in buffer_entries)
+                ):
+                    errors += 1 + len(buffer_entries)
+                    detail.append(
+                        f"frame seq {decoded.seq} failed verification "
+                        "(chain/payload/task mismatch)"
+                    )
+                    chain_ok = False  # everything after a break is untrusted
+                else:
+                    entries.extend(e for e in buffer_entries if e is not None)
+                    frames += 1
+                    last_hash = hashlib.sha256(line).hexdigest()
+                buffer_bytes = b""
+                buffer_entries = []
             else:
-                errors += 1
-        return out, errors
+                buffer_bytes += line + b"\n"
+                buffer_entries.append(
+                    decoded if isinstance(decoded, _READER_ENTRY_TYPES) else None
+                )
+        if buffer_entries:
+            # complete lines with no closing frame: a crash artifact or a
+            # forged append — never honored, always counted (fail closed)
+            errors += len(buffer_entries)
+            detail.append(f"{len(buffer_entries)} unframed trailing line(s)")
+        return JournalView(
+            entries=tuple(entries),
+            frames=frames,
+            head=f"{frames}:{last_hash}",
+            errors=errors,
+            error_detail=tuple(detail),
+            torn_tail=torn_tail,
+        )
+
+    def append_batch(
+        self, batch: Sequence[ReaderEntry], expected_head: str | None = None
+    ) -> str:
+        """Append one crash-framed batch (payload + frame in a single write)
+        under the journal lock. `expected_head` refuses the append when the
+        journal advanced since the caller read it. Returns the new head."""
+        if not batch:
+            raise ReaderError("refusing to append an empty reader batch")
+        with self.locked():
+            view = self.read()
+            if expected_head is not None and view.head != expected_head:
+                raise ReaderError(
+                    f"reader journal advanced: transition authorized at head "
+                    f"{expected_head.split(':')[0]} but the journal is at "
+                    f"{view.head.split(':')[0]}; re-read and retry"
+                )
+            payload = "".join(codec.dumps(e) + "\n" for e in batch).encode("utf-8")
+            frame = ReaderFrame(
+                task_id=self.task_id,
+                seq=view.frames + 1,
+                prev=view.head.split(":", 1)[1],
+                payload_hash=hashlib.sha256(payload).hexdigest(),
+                count=len(batch),
+                at=now_iso(),
+            )
+            frame_line = (codec.dumps(frame) + "\n").encode("utf-8")
+            with self.path.open("ab") as handle:
+                handle.write(payload + frame_line)  # one write: crash-framed
+                handle.flush()
+                os.fsync(handle.fileno())
+            return f"{frame.seq}:{hashlib.sha256(frame_line).hexdigest()}"
 
 
 def reader_journal(store: Store) -> ReaderJournal:
     return ReaderJournal(
-        store.ledger_path.with_name(f"{store.task_id}.reader.jsonl")
+        store.ledger_path.with_name(f"{store.task_id}.reader.jsonl"), store.task_id
     )
 
 
-# -- durable reader state: mode, breaker, epoch -----------------------------------------------
+def _force_native_path(journal: ReaderJournal) -> Path:
+    return journal.path.with_name(journal.path.name + ".FORCE-NATIVE")
+
+
+def force_native_active(store: Store) -> bool:
+    """The emergency override, independent of the reader journal: a sentinel
+    file or STRIVE_FORCE_NATIVE=1 forces native reads unconditionally."""
+    if os.environ.get(FORCE_NATIVE_ENV, "") == "1":
+        return True
+    return _force_native_path(reader_journal(store)).exists()
+
+
+def force_native(store: Store, reason: str) -> None:
+    path = _force_native_path(reader_journal(store))
+    path.write_text(f"{now_iso()} {reason}\n")
+
+
+def lift_force_native(store: Store) -> None:
+    path = _force_native_path(reader_journal(store))
+    if path.exists():
+        path.unlink()
+
+
+# -- durable reader control state ---------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class ReaderState:
-    mode: str
+    mode: str  # the EFFECTIVE configured mode (native when forced)
+    configured_mode: str
+    forced_native: bool
     breaker_open: bool
     breaker_reason: str | None
     epoch: str | None  # current epoch for THIS reader/projector version
     journal_errors: int
+    journal_head: str
 
 
 def reader_state(store: Store) -> ReaderState:
-    entries, errors = reader_journal(store).entries()
+    view = reader_journal(store).read()
     mode = MODE_NATIVE
     breaker_open = False
     breaker_reason: str | None = None
     epoch: str | None = None
-    for entry in entries:
+    for entry in view.entries:
         if isinstance(entry, ModeChange):
             mode = entry.mode
         elif isinstance(entry, BreakerEvent):
@@ -335,117 +479,229 @@ def reader_state(store: Store) -> ReaderState:
                 )
                 else None  # version change: old epochs are not current
             )
+    forced = force_native_active(store)
     return ReaderState(
-        mode=mode,
+        mode=MODE_NATIVE if forced else mode,
+        configured_mode=mode,
+        forced_native=forced,
         breaker_open=breaker_open,
         breaker_reason=breaker_reason,
         epoch=epoch,
-        journal_errors=errors,
+        journal_errors=view.errors,
+        journal_head=view.head,
+    )
+
+
+def _new_epoch_reset(reason: str) -> EpochReset:
+    return EpochReset(
+        epoch=f"epoch-{uuid.uuid4().hex[:8]}",
+        reason=reason,
+        reader_version=READER_VERSION,
+        projector_ref=PROJECTOR_REF,
+        at=now_iso(),
     )
 
 
 def ensure_epoch(store: Store) -> str:
     """The current burn-in epoch, opening a new one when none matches this
-    build's reader/projector versions (evidence from other versions is
-    preserved but excluded from current eligibility)."""
+    build's reader/projector versions."""
     state = reader_state(store)
     if state.epoch is not None:
         return state.epoch
-    epoch = f"epoch-{uuid.uuid4().hex[:8]}"
-    reader_journal(store).append(
-        EpochReset(
-            epoch=epoch,
-            reason="opened for current reader/projector versions",
-            reader_version=READER_VERSION,
-            projector_ref=PROJECTOR_REF,
-            at=now_iso(),
-        )
-    )
-    return epoch
+    reset = _new_epoch_reset("opened for current reader/projector versions")
+    reader_journal(store).append_batch([reset])
+    return reset.epoch
 
 
 def reset_epoch(store: Store, reason: str) -> str:
-    epoch = f"epoch-{uuid.uuid4().hex[:8]}"
-    reader_journal(store).append(
-        EpochReset(
-            epoch=epoch,
-            reason=reason,
-            reader_version=READER_VERSION,
-            projector_ref=PROJECTOR_REF,
-            at=now_iso(),
-        )
-    )
-    return epoch
+    reset = _new_epoch_reset(reason)
+    reader_journal(store).append_batch([reset])
+    return reset.epoch
 
 
-def note_repair(mirror_path: Path, task_id: str, detail: str) -> None:
-    """Called by dual-write repair/rebuild operations: derived history
-    changed, so the burn-in epoch resets (old evidence preserved, excluded)."""
-    journal = ReaderJournal(mirror_path.with_name(f"{task_id}.reader.jsonl"))
-    journal.append(
-        EpochReset(
-            epoch=f"epoch-{uuid.uuid4().hex[:8]}",
-            reason=f"repair: {detail}",
-            reader_version=READER_VERSION,
-            projector_ref=PROJECTOR_REF,
-            at=now_iso(),
-        )
+def repair_control_update(mirror_path: Path, task_id: str, detail: str) -> None:
+    """Called by dual-write repair/rebuild: derived history changed, so the
+    epoch MUST reset, and an active canary MUST be disabled (breaker opened)
+    in the same atomic batch. Raises on failure — never best-effort."""
+    journal = ReaderJournal(
+        mirror_path.with_name(f"{task_id}.reader.jsonl"), task_id
     )
+    view = journal.read()
+    mode = MODE_NATIVE
+    for entry in view.entries:
+        if isinstance(entry, ModeChange):
+            mode = entry.mode
+    batch: list[ReaderEntry] = []
+    if mode == MODE_CANARY:
+        batch.append(
+            BreakerEvent(
+                state="open",
+                reason=f"derived history changed by repair: {detail}",
+                at=now_iso(),
+            )
+        )
+    batch.append(_new_epoch_reset(f"repair: {detail}"))
+    journal.append_batch(batch)  # ReaderError propagates: repair fails closed
 
 
 def set_mode(store: Store, mode: str, reason: str) -> None:
-    """Journal a mode change. `native` and `shadow` are unrestricted;
-    `revision-canary` must go through `enable_canary` (eligibility-gated)."""
+    """Journal a native/shadow mode change with an expected-head check.
+    Entering shadow starts a NEW burn-in epoch (evidence gathered under a
+    different mode never counts). Canary requires `enable_canary`."""
     if mode not in (MODE_NATIVE, MODE_SHADOW):
         raise ReaderError(
             f"set_mode accepts native|shadow; canary requires enable_canary "
             f"(got {mode!r})"
         )
-    reader_journal(store).append(ModeChange(mode=mode, reason=reason, at=now_iso()))
+    journal = reader_journal(store)
+    head = journal.read().head
+    batch: list[ReaderEntry] = []
+    if mode == MODE_SHADOW:
+        batch.append(_new_epoch_reset("shadow burn-in entered"))
+    batch.append(
+        ModeChange(mode=mode, reason=reason, at=now_iso(), authorized_head=head)
+    )
+    journal.append_batch(batch, expected_head=head)
 
 
 def kill_switch(store: Store, reason: str = "kill switch") -> None:
-    """Immediate, unconditional return to native reads (journaled)."""
-    reader_journal(store).append(
-        ModeChange(mode=MODE_NATIVE, reason=reason, at=now_iso())
-    )
+    """Immediate, unconditional return to native reads. If even the journal
+    append fails, the force-native sentinel is written — the kill path does
+    not depend on a healthy reader journal."""
+    try:
+        reader_journal(store).append_batch(
+            [ModeChange(mode=MODE_NATIVE, reason=reason, at=now_iso())]
+        )
+    except Exception:  # noqa: BLE001 — the kill path must always succeed
+        force_native(store, f"kill switch fallback: {reason}")
 
 
 def enable_canary(store: Store) -> "CutoverEligibility":
-    """Enable revision-canary mode — only with current-epoch eligibility and
-    a closed breaker."""
+    """Enable revision-canary mode: requires no force-native override, a
+    closed breaker, and current-epoch eligibility. The transition uses an
+    expected reader-journal head and persists the eligibility proof it
+    authorized."""
+    journal = reader_journal(store)
+    head = journal.read().head  # read the head FIRST; append checks it
     state = reader_state(store)
-    verdict = cutover_eligibility(store)
+    if state.forced_native:
+        raise ReaderError(
+            "force-native override is active; lift it before enabling the canary"
+        )
     if state.breaker_open:
         raise ReaderError(
             f"circuit breaker is open ({state.breaker_reason}); repair the "
             "derived state and clear the breaker before enabling the canary"
         )
+    verdict = cutover_eligibility(store)
     if not verdict.eligible:
         raise ReaderError(
             "canary enablement refused; current-epoch eligibility not met: "
             + "; ".join(verdict.reasons)
         )
-    reader_journal(store).append(
-        ModeChange(
-            mode=MODE_CANARY,
-            reason=f"eligibility met in epoch {verdict.epoch}",
-            at=now_iso(),
-        )
+    proof = (
+        f"epoch={verdict.epoch} agreed={verdict.coverage.agreed} "
+        f"diverged=0 missing=0 unavailable=0 parity=complete "
+        f"facts={len(verdict.coverage.facts)}"
+    )
+    journal.append_batch(
+        [
+            ModeChange(
+                mode=MODE_CANARY,
+                reason="eligibility met",
+                at=now_iso(),
+                authorized_head=head,
+                proof=proof,
+            )
+        ],
+        expected_head=head,
     )
     return verdict
 
 
 def open_breaker(store: Store, reason: str) -> None:
-    reader_journal(store).append(
-        BreakerEvent(state="open", reason=reason, at=now_iso())
+    reader_journal(store).append_batch(
+        [BreakerEvent(state="open", reason=reason, at=now_iso())]
     )
 
 
 def clear_breaker(store: Store, reason: str) -> None:
-    reader_journal(store).append(
-        BreakerEvent(state="cleared", reason=reason, at=now_iso())
+    """Close the breaker — only from native/shadow mode, with complete
+    parity, and a FRESH epoch (reset after the breaker opened). Clearing
+    never reactivates a canary: enablement is a separate, eligibility-gated
+    transition."""
+    journal = reader_journal(store)
+    head = journal.read().head
+    state = reader_state(store)
+    if state.configured_mode == MODE_CANARY:
+        raise ReaderError(
+            "clear-breaker requires native or shadow mode; kill the canary first"
+        )
+    if not state.breaker_open:
+        raise ReaderError("the breaker is not open")
+    try:
+        if not parity_status(store).complete:
+            raise ReaderError(
+                "clear-breaker requires complete mirror parity; repair first"
+            )
+    except ReaderError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — unverifiable parity fails closed
+        raise ReaderError(f"clear-breaker: parity cannot be verified: {exc}") from None
+    view = journal.read()
+    last_open = -1
+    last_epoch = -1
+    for index, entry in enumerate(view.entries):
+        if isinstance(entry, BreakerEvent) and entry.state == "open":
+            last_open = index
+        elif isinstance(entry, EpochReset) and (
+            entry.reader_version == READER_VERSION
+            and entry.projector_ref == PROJECTOR_REF
+        ):
+            last_epoch = index
+    if last_epoch < last_open:
+        raise ReaderError(
+            "clear-breaker requires a FRESH epoch opened after the breaker; "
+            "run the repair (which resets the epoch) or reset it explicitly"
+        )
+    journal.append_batch(
+        [
+            BreakerEvent(
+                state="cleared",
+                reason=reason,
+                at=now_iso(),
+                authorized_head=head,
+                proof=f"mode={state.configured_mode} parity=complete epoch={state.epoch}",
+            )
+        ],
+        expected_head=head,
     )
+
+
+def quarantine_reader_journal(store: Store, reason: str) -> str | None:
+    """Operator recovery for a corrupt reader journal: preserve it
+    byte-for-byte at a quarantine path and start fresh (native mode, new
+    epoch). Returns the quarantine path."""
+    journal = reader_journal(store)
+    with journal.locked():
+        quarantine: str | None = None
+        if journal.path.exists():
+            target = journal.path.with_name(
+                journal.path.name + f".quarantine-{now_iso().replace(':', '')}"
+            )
+            journal.path.rename(target)
+            quarantine = str(target)
+    journal.append_batch(
+        [
+            _new_epoch_reset(f"reader journal quarantined: {reason}"),
+            ModeChange(
+                mode=MODE_NATIVE,
+                reason=f"journal quarantined: {reason}",
+                at=now_iso(),
+            ),
+        ]
+    )
+    return quarantine
 
 
 # -- the verified revision snapshot (the ONLY revision-read validator) ------------------------
@@ -454,17 +710,13 @@ def clear_breaker(store: Store, reason: str) -> None:
 @dataclass(frozen=True)
 class VerifiedRevisionSnapshot:
     """Revision-derived state verified to parity grade, or the reason it is
-    unavailable. Built from complete SourceRecordRef agreement (schema,
-    journal, ordinal, digest — both directions, with type agreement),
-    supported projector, recomputed-projection equality, full artifact
-    closure, descriptor/provenance/manifest validation, and bounded
-    cycle-free lineage. When unavailable, no active revision is reported."""
+    unavailable. When unavailable, no active revision is reported."""
 
     available: bool
     reason: str
-    revisions: dict[str, HarnessRevision] = field(default_factory=dict)
+    revisions: dict[str, HarnessRevision] = dc_field(default_factory=dict)
     activations: tuple[RevisionActivation, ...] = ()  # source activation order
-    sources: dict[str, tuple[str, str]] = field(default_factory=dict)
+    sources: dict[str, tuple[str, str]] = dc_field(default_factory=dict)
     # revision_id -> (content_ref, text) from the revision's ScopeManifest
 
     def active_revision_id(self) -> str | None:
@@ -499,8 +751,13 @@ def verify_revision_snapshot(
 ) -> VerifiedRevisionSnapshot:
     """Build the verified snapshot fail-safe: derived corruption or an
     unexpected exception yields *unavailable with a reason*, never an
-    exception into the canonical operation."""
+    exception into the canonical operation. Callers holding a coherent
+    capture pass it in; otherwise a fresh coherent capture is taken."""
     try:
+        if source is None or mirror_entries is None:
+            raw, entries = store.entries_with_bytes()
+            source = snapshot_of(store.task_id, entries, raw)
+            mirror_entries = store.mirror.entries()
         return _verify(store, source, mirror_entries)
     except MirrorError as exc:
         return _unavailable(f"mirror journal unavailable: {exc}")
@@ -512,13 +769,10 @@ def verify_revision_snapshot(
 
 def _verify(
     store: Store,
-    source: SourceSnapshot | None,
-    mirror_entries: Sequence[object] | None,
+    snapshot: SourceSnapshot,
+    mirror_entries: Sequence[object],
 ) -> VerifiedRevisionSnapshot:
-    snapshot = source if source is not None else capture_snapshot(store)
-    entries = (
-        list(mirror_entries) if mirror_entries is not None else store.mirror.entries()
-    )
+    entries = list(mirror_entries)
     validate_source_history(snapshot)
 
     # parity-grade mirror verification: complete refs, projector, duplicates,
@@ -631,7 +885,7 @@ def _verify(
     )
 
 
-# -- execution records (honest evaluated subjects) --------------------------------------------
+# -- execution + retention provenance (honest evaluated subjects) ------------------------------
 
 SUBJECT_ACTIVE_REVISION = "active-revision"
 SUBJECT_RETAINED_REVISION = "retained-revision"
@@ -642,13 +896,9 @@ SUBJECT_CANDIDATE_OVERLAY = "candidate-overlay"
 @dataclass(frozen=True)
 class ExecutionRecord:
     """Provenance for ONE artifact execution, pinned before it runs.
-
     `base_resolved_ref` names the resolved harness the execution ran under
-    (the ACTIVE baseline revision with its OWN bindings). The evaluated
-    subject is named separately — an active revision, a retained (non-active)
-    revision, or an unactivated candidate overlay — with its own effective
-    manifest. The active baseline is never claimed to contain a non-active
-    candidate, compare, replay, or audit source."""
+    (the ACTIVE baseline revision with its OWN bindings); the evaluated
+    subject is named separately with its own effective manifest."""
 
     operation: str
     subject: str
@@ -664,13 +914,33 @@ class ExecutionRecord:
     run_id: str | None = None
 
 
+@register("retention-record", 1)
+@dataclass(frozen=True)
+class RetentionRecord:
+    """Durable linkage from retention back to the EXACT evaluated candidate:
+    the overlay revision that was evaluated, the decision evidence, and the
+    retained generation/revision ids. The retained mirror must be
+    content-identical to the overlay (same deltas, same scope manifest) —
+    verified as the retained-candidate check, never assumed."""
+
+    candidate_id: str
+    overlay_revision_ref: str  # CAS ref of the EVALUATED candidate revision
+    retained_generation_id: str
+    retained_revision_id: str
+    decision_ref: str  # CAS ref of the decision evidence
+    op_id: str
+    at: str
+    run_id: str | None = None
+
+
 @dataclass(frozen=True)
 class CandidateSubject:
-    """An immutable, unactivated candidate revision created BEFORE its
-    evaluation: the exact artifact being evaluated."""
+    """An immutable, unactivated candidate revision created and validated
+    BEFORE its evaluation, in every mode: the exact evaluated artifact."""
 
     revision_ref: str  # CAS ref of the candidate HarnessRevision
     manifest_ref: str  # CAS ref of its ScopeManifest
+    provenance_ref: str  # CAS ref of its RevisionProvenance
     source_ref: str
 
 
@@ -682,90 +952,152 @@ class _Check:
     subject: str
     outcome: str
     detail: str
+    mode: str  # effective mode AT CHECK TIME
+    canonical_head: str  # heads AT CHECK TIME (not session end)
+    mirror_head: str
 
 
 class StateReader:
     """One coherent read session per operation (the harness read session).
 
-    Captures the canonical ledger and mirror journal once, derives all
-    native values from that capture with the same pure functions the Store
-    uses, verifies the revision snapshot once, and pairs each supported read
-    per its mode. `finish` must run in ``finally``: it records every
-    attempted check — and synthesizes ``missing`` for expected checks that
-    never ran — into the trusted reader journal."""
+    `finish` must run in ``finally``: it records every attempted check —
+    synthesizing ``missing`` for expected checks that never ran — into the
+    framed reader journal, and (in canary mode) escalates evidence-recording
+    failures to the breaker. Telemetry never masks or replaces the canonical
+    result."""
+
+    # test hook: called between capture steps so deterministic concurrency
+    # tests can append records at every interleaving point
+    _on_capture_step: Callable[[str], None] = staticmethod(lambda step: None)
 
     def __init__(self, store: Store, operation: str, run_id: str | None = None) -> None:
         self.store = store
         self.operation = operation
         self.run_id = run_id
         self.op_id = f"op-{uuid.uuid4().hex[:8]}"
-        self._checks: list[_Check] = []
+        self._checks: dict[str, _Check] = {}
         self._facts: set[str] = set()
         self._finished = False
         try:
             state = reader_state(store)
             self.mode = state.mode
             self.breaker_open = state.breaker_open
+            journal_errors = state.journal_errors
         except ReaderError as exc:
             self.mode = MODE_NATIVE
             self.breaker_open = False
+            journal_errors = 0
             store._note_diagnostic(f"reader journal unavailable: {exc}; mode=native")
         if not store.mirror_enabled:
             self.mode = MODE_NATIVE  # no derived reads at all without mirrors
+        # fail-closed canary gates AT OPERATION START: journal integrity and
+        # current-epoch eligibility must hold for the canary to be effective
+        if self.mode == MODE_CANARY and not self.breaker_open:
+            if journal_errors > 0:
+                # a corrupt/tampered reader journal cannot be trusted to
+                # RECORD a breaker either (unframed lines poison later
+                # framed appends), so the fail-closed signal is the
+                # journal-INDEPENDENT force-native override; every future
+                # session recomputes journal_errors and does the same
+                force_native(
+                    store,
+                    f"reader journal integrity: {journal_errors} bad line(s)",
+                )
+                self.mode = MODE_NATIVE
+            else:
+                verdict = cutover_eligibility(store)
+                if not verdict.eligible:
+                    self._open_breaker_now(
+                        "current epoch is no longer eligible: "
+                        + "; ".join(verdict.reasons[:3])
+                    )
         self._capture()
 
-    # the effective mode: an open breaker blocks canary use durably — reads
-    # revert to native authority with comparisons still recorded (shadow)
+    # an open breaker blocks canary use durably — reads revert to native
+    # authority with comparisons still recorded (shadow), never silently
     @property
     def effective_mode(self) -> str:
         if self.mode == MODE_CANARY and self.breaker_open:
             return MODE_SHADOW
         return self.mode
 
+    def _open_breaker_now(self, reason: str) -> None:
+        try:
+            open_breaker(self.store, reason)
+        except Exception as exc:  # noqa: BLE001 — last-resort independent kill
+            force_native(self.store, f"breaker journaling failed: {exc}")
+            self.store._note_diagnostic(
+                f"breaker journaling failed ({exc}); force-native engaged"
+            )
+        self.breaker_open = True
+
     # -- coherent snapshot -----------------------------------------------------
 
     def _capture(self) -> None:
-        self._entries = self.store.entries()
-        self.canonical_head = ledger_head(self._entries)
+        """One coherent capture: canonical entries/bytes are read once (the
+        native view and SourceSnapshot derive from that exact read); the
+        mirror capture is paired via an optimistic read-recheck loop so an
+        old canonical capture is never combined with a newer mirror capture."""
+        raw, entries = self.store.entries_with_bytes()
+        self._on_capture_step("canonical")
+        self._entries = entries
+        self.canonical_head = ledger_head(entries)
         self.mirror_head = "unread"
         self._snapshot: VerifiedRevisionSnapshot = _unavailable(
             "not captured in native mode"
         )
         if self.effective_mode == MODE_NATIVE:
             return
-        try:
-            mirror_bytes = (
-                self.store.mirror.path.read_bytes()
-                if self.store.mirror.path.exists()
+        for _attempt in range(5):
+            try:
+                mirror_raw, mirror_entries = self.store.mirror.entries_with_bytes()
+            except (MirrorError, OSError) as exc:
+                self.mirror_head = "unavailable"
+                self._snapshot = _unavailable(f"mirror journal unavailable: {exc}")
+                return
+            self._on_capture_step("mirror")
+            recheck = (
+                self.store.ledger_path.read_bytes()
+                if self.store.ledger_path.exists()
                 else b""
             )
-            mirror_entries = self.store.mirror.entries()
-            self.mirror_head = (
-                f"{len(mirror_entries)}:{hashlib.sha256(mirror_bytes).hexdigest()}"
-            )
-        except (MirrorError, OSError) as exc:
-            self.mirror_head = "unavailable"
-            self._snapshot = _unavailable(f"mirror journal unavailable: {exc}")
-            return
-        source = capture_snapshot(self.store)
-        self._snapshot = verify_revision_snapshot(self.store, source, mirror_entries)
+            self._on_capture_step("recheck")
+            if recheck == raw:
+                self.mirror_head = (
+                    f"{len(mirror_entries)}:{hashlib.sha256(mirror_raw).hexdigest()}"
+                )
+                source = snapshot_of(self.store.task_id, entries, raw)
+                self._snapshot = verify_revision_snapshot(
+                    self.store, source, mirror_entries
+                )
+                return
+            # the canonical journal moved while we read the mirror: retake
+            # BOTH captures — never pair an old native view with a new mirror
+            raw, entries = self.store.entries_with_bytes()
+            self._on_capture_step("canonical")
+            self._entries = entries
+            self.canonical_head = ledger_head(entries)
+        self.mirror_head = "torn"
+        self._snapshot = _unavailable(
+            "coherent capture failed: concurrent writers kept moving the "
+            "canonical journal during the mirror read"
+        )
 
     def refresh(self) -> None:
-        """Re-capture the snapshot — legal only after this operation's own
-        writes (the one exception is the documented staleness re-read)."""
+        """Re-capture — legal only after this operation's own writes (plus
+        the one documented staleness re-read)."""
         self._capture()
 
     def recheck_active_for_staleness(self) -> Generation | None:
         """The proposal-staleness re-read: deliberately re-captures to observe
         concurrent writers before a candidate is accepted against a superseded
-        incumbent. Routed here so the exception to snapshot coherence is
-        explicit and single."""
+        incumbent."""
         self.refresh()
         return derive_active_generation(self._entries)
 
     # -- native view internals (compatibility derivations over the capture) ----
 
-    def ledger_entries(self) -> "list[LedgerEntry]":
+    def ledger_entries(self) -> list[LedgerEntry]:
         return list(self._entries)
 
     def native_active(self) -> Generation | None:
@@ -785,7 +1117,20 @@ class StateReader:
         self._add(subject, OUTCOME_NOT_APPLICABLE, detail)
 
     def _add(self, subject: str, outcome: str, detail: str) -> None:
-        self._checks.append(_Check(subject=subject, outcome=outcome, detail=detail))
+        """Exactly one terminal outcome per (op_id, subject): repeated
+        contributions merge by severity, capturing mode and heads at check
+        time."""
+        check = _Check(
+            subject=subject,
+            outcome=outcome,
+            detail=detail,
+            mode=self.effective_mode,
+            canonical_head=self.canonical_head,
+            mirror_head=self.mirror_head,
+        )
+        current = self._checks.get(subject)
+        if current is None or _SEVERITY[outcome] >= _SEVERITY[current.outcome]:
+            self._checks[subject] = check
 
     def read_active(self, subject: str) -> Generation | None:
         native = derive_active_generation(self._entries)
@@ -843,16 +1188,22 @@ class StateReader:
         generation: Generation,
         overlay: CandidateSubject | None = None,
     ) -> str:
-        """The strategy source that will actually execute. Native and shadow
-        modes serve the generation-native text; the canary serves the
-        revision-materialized text after comparing it with the native value
-        (they are verified equal before use — no silent substitution)."""
+        """The strategy source that will actually execute. Native mode serves
+        the generation-native text. Shadow compares and serves native. The
+        canary serves the revision-materialized text after comparison; a
+        missing or divergent derived source records its outcome and (in
+        canary) opens the breaker — there is NO silent derived→native path."""
         native_text = self.store.objects.get_text(generation.source_ref)
         if self.effective_mode == MODE_NATIVE:
             return native_text
         derived = self._derived_source(generation, overlay)
         if derived is None:
-            return native_text  # outcome already recorded by the caller's check
+            self._handle_unavailable(
+                subject,
+                f"revision-derived source for {generation.generation_id} is "
+                "unavailable at execution time",
+            )
+            return native_text  # loud: recorded + breaker in canary
         _ref, text = derived
         if text != native_text:
             self._handle_divergence(
@@ -894,18 +1245,30 @@ class StateReader:
     def check_candidate_overlay(
         self, subject: str, source_ref: str, overlay: CandidateSubject
     ) -> None:
-        """Pair an EPHEMERAL evaluation subject (the unactivated candidate)
-        with its overlay revision: the evaluated artifact must be exactly the
-        overlay's bound artifact."""
+        """Pair the EPHEMERAL evaluation subject (the unactivated candidate)
+        with its overlay revision: the whole revision must decode and
+        validate, and its manifest must bind the exact evaluated artifact."""
         if self.effective_mode == MODE_NATIVE:
             self._add(subject, OUTCOME_NATIVE, "comparison off")
             return
         try:
+            revision: HarnessRevision = codec.loads(
+                self.store.objects.get_text(overlay.revision_ref), HarnessRevision
+            )
+            from strive.revisions import validate_revision
+
+            validate_revision(revision)  # the WHOLE revision, not one binding
             manifest: ScopeManifest = codec.loads(
                 self.store.objects.get_text(overlay.manifest_ref), ScopeManifest
             )
-        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
-            self._handle_unavailable(subject, f"candidate overlay manifest: {exc}")
+            if revision.scope_manifest_ref != overlay.manifest_ref:
+                self._handle_divergence(
+                    subject, "candidate overlay revision names a different manifest"
+                )
+                return
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError,
+                ContractViolation) as exc:
+            self._handle_unavailable(subject, f"candidate overlay: {exc}")
             return
         binding = next(
             (b for b in manifest.bindings if (b.kind, b.name) == _SURFACE_KEY), None
@@ -918,6 +1281,49 @@ class StateReader:
             )
             return
         self._add(subject, OUTCOME_AGREED, overlay.revision_ref[:12])
+
+    def overlay_failure(self, subject: str, reason: str) -> None:
+        """Candidate-overlay construction failed: recorded, and (in canary)
+        the breaker opens BEFORE any execution — never a silent native path."""
+        self._handle_unavailable(subject, f"candidate overlay creation failed: {reason}")
+
+    def check_retained_matches_overlay(
+        self, subject: str, overlay: CandidateSubject, retained: Generation
+    ) -> None:
+        """The retained (mirrored) revision must be content-identical to the
+        EXACT evaluated candidate: same deltas, same scope manifest. The
+        retained mirror is a compatibility projection of the same artifact,
+        never a disconnected replacement."""
+        if self.effective_mode == MODE_NATIVE:
+            self._add(subject, OUTCOME_NATIVE, "comparison off")
+            return
+        try:
+            overlay_revision: HarnessRevision = codec.loads(
+                self.store.objects.get_text(overlay.revision_ref), HarnessRevision
+            )
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            self._handle_unavailable(subject, f"overlay revision: {exc}")
+            return
+        if not self._snapshot.available:
+            self._handle_unavailable(subject, self._snapshot.reason)
+            return
+        mirrored = self._snapshot.revisions.get(_rev_id(retained.generation_id))
+        if mirrored is None:
+            self._handle_divergence(
+                subject, f"no revision mirror for {retained.generation_id}"
+            )
+            return
+        if (
+            mirrored.deltas != overlay_revision.deltas
+            or mirrored.scope_manifest_ref != overlay_revision.scope_manifest_ref
+        ):
+            self._handle_divergence(
+                subject,
+                f"retained revision {mirrored.ref.revision_id} is not "
+                "content-identical to the evaluated candidate overlay",
+            )
+            return
+        self._add(subject, OUTCOME_AGREED, mirrored.ref.revision_id)
 
     def _compare_generation(
         self, subject: str, generation: Generation, *, expect_active: bool
@@ -1011,13 +1417,9 @@ class StateReader:
         silent fallback."""
         if self.mode != MODE_CANARY or self.breaker_open:
             return
-        try:
-            open_breaker(self.store, reason)
-        except Exception as exc:  # noqa: BLE001
-            self.store._note_diagnostic(f"breaker journaling failed: {exc}")
-        self.breaker_open = True  # effective mode drops to shadow immediately
+        self._open_breaker_now(reason)
 
-    # -- facts + execution provenance -------------------------------------------
+    # -- facts + execution/retention provenance -----------------------------------
 
     def add_fact(self, fact: str) -> None:
         self._facts.add(fact)
@@ -1030,7 +1432,7 @@ class StateReader:
         overlay: CandidateSubject | None = None,
     ) -> str | None:
         """CAS-store the ExecutionRecord for one artifact execution, BEFORE
-        it runs. Failure to build one is reported, never blocking."""
+        it runs."""
         try:
             snapshot = self._snapshot
             base_resolved_ref: str | None = None
@@ -1042,8 +1444,8 @@ class StateReader:
                 subject_revision_ref = overlay.revision_ref
                 effective_manifest_ref = overlay.manifest_ref
             elif generation.origin == "candidate":
-                # an ephemeral probe with no overlay available: still named
-                # honestly as a candidate, never as a retained revision
+                # an ephemeral probe with no overlay: still named honestly as
+                # a candidate, never as a retained revision
                 subject_kind = SUBJECT_CANDIDATE_OVERLAY
                 detail = "candidate overlay unavailable"
             else:
@@ -1089,8 +1491,10 @@ class StateReader:
             )
             ref = self.store.objects.put_text(codec.dumps(record))
         except Exception as exc:  # noqa: BLE001 — provenance capture never blocks
+            self._telemetry_failure(f"execution record failed: {exc}")
             if events is not None:
-                events.emit(
+                self._emit(
+                    events,
                     "execution_record",
                     subject=subject,
                     generation_id=generation.generation_id,
@@ -1099,12 +1503,50 @@ class StateReader:
                 )
             return None
         if events is not None:
-            events.emit(
+            self._emit(
+                events,
                 "execution_record",
                 subject=subject,
                 generation_id=generation.generation_id,
                 subject_kind=record.subject_kind,
                 execution_record_ref=ref,
+            )
+        return ref
+
+    def record_retention(
+        self,
+        candidate_id: str,
+        overlay: CandidateSubject,
+        retained: Generation,
+        decision: Decision,
+        events: EventLog | None,
+    ) -> str | None:
+        """Durable linkage: retention references the EXACT evaluated candidate
+        revision and its decision evidence."""
+        try:
+            decision_ref = self.store.objects.put_text(codec.dumps(decision))
+            record = RetentionRecord(
+                candidate_id=candidate_id,
+                overlay_revision_ref=overlay.revision_ref,
+                retained_generation_id=retained.generation_id,
+                retained_revision_id=_rev_id(retained.generation_id),
+                decision_ref=decision_ref,
+                op_id=self.op_id,
+                at=now_iso(),
+                run_id=self.run_id,
+            )
+            ref = self.store.objects.put_text(codec.dumps(record))
+        except Exception as exc:  # noqa: BLE001
+            self._telemetry_failure(f"retention record failed: {exc}")
+            return None
+        if events is not None:
+            self._emit(
+                events,
+                "retention_record",
+                candidate_id=candidate_id,
+                retained_generation_id=retained.generation_id,
+                overlay_revision_ref=overlay.revision_ref,
+                retention_record_ref=ref,
             )
         return ref
 
@@ -1146,21 +1588,14 @@ class StateReader:
         weakness_id: str | None,
         task_fingerprint: str,
     ) -> CandidateSubject | None:
-        """Create the immutable, unactivated candidate revision + manifest
-        BEFORE evaluation. None (with a recorded reason at the caller's
-        check) when the derived baseline is unavailable."""
+        """Create and VALIDATE the immutable, unactivated candidate revision +
+        manifest + provenance BEFORE evaluation — in every mode (construction
+        depends only on native state, not on the derived snapshot)."""
         try:
-            snapshot = self._snapshot
             active = derive_active_generation(self._entries)
             if active is None:
                 return None
-            active_revision = (
-                snapshot.revisions.get(_rev_id(active.generation_id))
-                if snapshot.available
-                else None
-            )
-            if active_revision is None:
-                return None
+            scope = ScopeRef(LEVEL_TASK, self.store.task_id)
             manifest = canonical_scope_manifest(self.store.task_id, source_ref)
             manifest_ref = self.store.objects.put_text(codec.dumps(manifest))
             provenance = RevisionProvenance(
@@ -1169,7 +1604,7 @@ class StateReader:
                 task_fingerprint=task_fingerprint,
                 surface=_SURFACE_KEY[0],
                 weakness_id=weakness_id,
-                parent_revision_id=active_revision.ref.revision_id,
+                parent_revision_id=_rev_id(active.generation_id),
                 decision_ref=None,
             )
             provenance_ref = self.store.objects.put_text(codec.dumps(provenance))
@@ -1177,18 +1612,21 @@ class StateReader:
                 candidate_id=candidate_id,
                 task_id=self.store.task_id,
                 source_ref=source_ref,
-                parent_revision=active_revision,
+                parent_revision_ref=RevisionRef(
+                    scope, _rev_id(active.generation_id)
+                ),
                 parent_source_ref=active.source_ref,
                 scope_manifest_ref=manifest_ref,
                 provenance_ref=provenance_ref,
                 proposer=proposer,
                 summary=summary,
                 created_at=now_iso(),
-            )
+            )  # validate_revision inside: the WHOLE revision is validated
             revision_ref = self.store.objects.put_text(codec.dumps(revision))
             return CandidateSubject(
                 revision_ref=revision_ref,
                 manifest_ref=manifest_ref,
+                provenance_ref=provenance_ref,
                 source_ref=source_ref,
             )
         except (ContractViolation, ObjectMissing, ObjectCorruption, OSError):
@@ -1196,11 +1634,24 @@ class StateReader:
 
     # -- durable recording (must run in `finally`) --------------------------------
 
+    def _emit(self, events: EventLog, event_type: str, **payload: object) -> None:
+        """Run-event emission with canary escalation: telemetry failure never
+        masks the canonical result, and in canary it opens the breaker."""
+        try:
+            events.emit(event_type, **payload)
+        except Exception as exc:  # noqa: BLE001
+            self._telemetry_failure(f"run-event {event_type!r} failed: {exc}")
+
+    def _telemetry_failure(self, detail: str) -> None:
+        self.store._note_diagnostic(detail)
+        if self.mode == MODE_CANARY and not self.breaker_open:
+            self._open_breaker_now(f"telemetry failure in canary: {detail}")
+
     def finish(self, events: EventLog | None = None, status: str = "ok") -> None:
-        """Record every attempted check and the operation summary. Expected
-        subjects that were never recorded — including on denied, rejected,
-        stale, and failing operations — are synthesized as ``missing``, so an
-        uninstrumented path can only lower eligibility. Idempotent."""
+        """Record every attempted check and the operation summary — one
+        terminal outcome per expected subject, with `missing` synthesized for
+        subjects that never ran (including on denied/rejected/stale/failing
+        operations). Idempotent; never raises into the caller."""
         if self._finished:
             return
         self._finished = True
@@ -1208,9 +1659,8 @@ class StateReader:
             return  # a mirror-disabled store records no derived state at all
         try:
             epoch = ensure_epoch(self.store)
-            recorded = {c.subject for c in self._checks}
             for subject in OPERATION_SUBJECTS.get(self.operation, ()):
-                if subject not in recorded:
+                if subject not in self._checks:
                     self._add(
                         subject,
                         OUTCOME_MISSING,
@@ -1224,43 +1674,45 @@ class StateReader:
                     op_id=self.op_id,
                     operation=self.operation,
                     subject=check.subject,
-                    mode=self.effective_mode,
+                    mode=check.mode,  # at check time, not session end
                     outcome=check.outcome,
                     detail=check.detail,
-                    canonical_head=self.canonical_head,
-                    mirror_head=self.mirror_head,
+                    canonical_head=check.canonical_head,
+                    mirror_head=check.mirror_head,
                     reader_version=READER_VERSION,
                     projector_ref=PROJECTOR_REF,
                     at=at,
                     run_id=self.run_id,
                 )
-                for check in self._checks
+                for check in self._checks.values()
             ]
             rows.append(
                 OperationSummary(
                     epoch=epoch,
                     op_id=self.op_id,
                     operation=self.operation,
+                    mode=self.mode,
                     status=status,
                     facts=tuple(sorted(self._facts)),
                     at=at,
                     run_id=self.run_id,
                 )
             )
-            reader_journal(self.store).append_many(rows)
-        except Exception as exc:  # noqa: BLE001 — evidence loss is a diagnostic,
-            self.store._note_diagnostic(  # never a canonical failure
+            reader_journal(self.store).append_batch(rows)
+        except Exception as exc:  # noqa: BLE001 — evidence loss is loud but
+            self._telemetry_failure(  # never a canonical failure
                 f"reader evidence recording failed: {exc}"
             )
             return
         if events is not None:
-            for check in self._checks:
-                events.emit(
+            for check in self._checks.values():
+                self._emit(
+                    events,
                     "read_check",
                     subject=check.subject,
                     outcome=check.outcome,
                     detail=check.detail,
-                    mode=self.effective_mode,
+                    mode=check.mode,
                 )
 
 
@@ -1273,8 +1725,8 @@ HarnessReadSession = StateReader
 
 @dataclass(frozen=True)
 class ReadCoverage:
-    """Current-epoch evidence: outcome totals, per-subject counts, observed
-    facts, and journal integrity."""
+    """Current-epoch evidence. Behavioral facts count only from successfully
+    completed shadow/canary operations."""
 
     epoch: str | None
     total: int
@@ -1290,7 +1742,7 @@ class ReadCoverage:
 
 
 def read_coverage(store: Store) -> ReadCoverage:
-    entries, errors = reader_journal(store).entries()
+    view = reader_journal(store).read()
     state = reader_state(store)
     counts = {
         OUTCOME_AGREED: 0,
@@ -1303,14 +1755,19 @@ def read_coverage(store: Store) -> ReadCoverage:
     by_subject: dict[str, dict[str, int]] = {}
     facts: set[str] = set()
     total = 0
-    for entry in entries:
+    for entry in view.entries:
         if isinstance(entry, ReadCheck) and entry.epoch == state.epoch:
             total += 1
             if entry.outcome in counts:
                 counts[entry.outcome] += 1
             subject = by_subject.setdefault(entry.subject, {})
             subject[entry.outcome] = subject.get(entry.outcome, 0) + 1
-        elif isinstance(entry, OperationSummary) and entry.epoch == state.epoch:
+        elif (
+            isinstance(entry, OperationSummary)
+            and entry.epoch == state.epoch
+            and entry.status == "ok"
+            and entry.mode in (MODE_SHADOW, MODE_CANARY)
+        ):
             facts.update(entry.facts)
     return ReadCoverage(
         epoch=state.epoch,
@@ -1321,7 +1778,7 @@ def read_coverage(store: Store) -> ReadCoverage:
         missing=counts[OUTCOME_MISSING],
         not_applicable=counts[OUTCOME_NOT_APPLICABLE],
         native_only=counts[OUTCOME_NATIVE],
-        journal_errors=errors,
+        journal_errors=view.errors,
         by_subject=by_subject,
         facts=tuple(sorted(facts)),
     )
@@ -1338,8 +1795,7 @@ class CutoverEligibility:
 
 def cutover_eligibility(store: Store) -> CutoverEligibility:
     """Whether canary enablement is defensible NOW, from current-epoch
-    evidence only: complete parity, zero divergences/errors, minimum total
-    and per-subject samples, and every required behavioral path observed."""
+    evidence only."""
     reasons: list[str] = []
     try:
         parity_complete = parity_status(store).complete
@@ -1353,7 +1809,8 @@ def cutover_eligibility(store: Store) -> CutoverEligibility:
         reasons.append("no current burn-in epoch for this reader/projector version")
     if coverage.journal_errors:
         reasons.append(
-            f"{coverage.journal_errors} undecodable line(s) in the reader journal"
+            f"{coverage.journal_errors} unverifiable line(s) in the reader journal "
+            "(corruption, tampering, or a crash-torn batch)"
         )
     if coverage.diverged:
         reasons.append(f"{coverage.diverged} divergence(s) in the current epoch")

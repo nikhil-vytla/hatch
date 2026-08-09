@@ -190,10 +190,16 @@ class MirrorJournal:
             os.fsync(handle.fileno())
 
     def entries(self) -> list[MirrorEntry]:
+        return self.entries_with_bytes()[1]
+
+    def entries_with_bytes(self) -> tuple[bytes, list[MirrorEntry]]:
+        """One read: the exact mirror-journal bytes AND the entries parsed
+        from those bytes (the read boundary's coherent capture)."""
         if not self.path.exists():
-            return []
+            return b"", []
         try:
-            raw = self.path.read_bytes().decode("utf-8")
+            raw_bytes = self.path.read_bytes()
+            raw = raw_bytes.decode("utf-8")
         except OSError as exc:
             raise MirrorError(f"{self.path}: unreadable mirror journal: {exc}") from None
         lines = raw.split("\n")
@@ -246,7 +252,7 @@ class MirrorJournal:
                     "task-isolation violation in the mirror journal"
                 )
             entries.append(decoded)
-        return entries
+        return raw_bytes, entries
 
 
 # -- source snapshots --------------------------------------------------------------------
@@ -286,10 +292,14 @@ class SourceSnapshot:
         }
 
 
-def capture_snapshot(store: "StoreLike") -> SourceSnapshot:
-    """Read-only capture of the source ledger with per-record refs."""
-    entries = store.entries()
-    journal = f"task:{store.task_id}"
+def snapshot_of(
+    task_id: str, entries: Sequence[object], raw_bytes: bytes
+) -> SourceSnapshot:
+    """Pure snapshot construction from ONE capture of the source journal:
+    the entries and the bytes they were parsed from. Callers that already
+    hold a coherent capture (the read boundary) build from it directly, so
+    the snapshot can never mix reads."""
+    journal = f"task:{task_id}"
     records: list[SourceRecord] = []
     entry_digests: list[str] = []
     for ordinal, entry in enumerate(entries):
@@ -309,18 +319,20 @@ def capture_snapshot(store: "StoreLike") -> SourceSnapshot:
                     activation=entry,
                 )
             )
-    journal_hash = (
-        hashlib.sha256(store.ledger_path.read_bytes()).hexdigest()
-        if store.ledger_path.exists()
-        else hashlib.sha256(b"").hexdigest()
-    )
     return SourceSnapshot(
-        task_id=store.task_id,
+        task_id=task_id,
         head=len(entries),
-        journal_hash=journal_hash,
+        journal_hash=hashlib.sha256(raw_bytes).hexdigest(),
         entry_digests=tuple(entry_digests),
         records=tuple(records),
     )
+
+
+def capture_snapshot(store: "StoreLike") -> SourceSnapshot:
+    """Read-only capture of the source ledger with per-record refs — one
+    read serves both the bytes hash and the parsed entries."""
+    raw_bytes, entries = store.entries_with_bytes()
+    return snapshot_of(store.task_id, entries, raw_bytes)
 
 
 def validate_source_history(snapshot: SourceSnapshot) -> None:
@@ -982,15 +994,14 @@ def run_backfill_operation(store: "StoreLike", migration_id: str) -> ParityRepor
 
 
 def _note_repair_epoch(store: "StoreLike", detail: str) -> None:
-    """Repair changed derived history: reset the reader burn-in epoch so
-    pre-repair evidence is excluded from cutover eligibility. Best-effort —
-    the repair itself must never fail on evidence bookkeeping."""
-    try:
-        from strive.reader import note_repair
+    """Repair changed derived history: the reader control journal MUST
+    atomically disable any active canary (open the breaker) and reset the
+    burn-in epoch. This is fail-closed, not best-effort — a repair whose
+    control update cannot be recorded raises, because completing it silently
+    would leave a canary running on invalidated evidence."""
+    from strive.reader import repair_control_update
 
-        note_repair(store.mirror.path, store.task_id, detail)
-    except Exception:  # noqa: BLE001
-        pass
+    repair_control_update(store.mirror.path, store.task_id, detail)
 
 
 # -- mirror-journal recovery -----------------------------------------------------------------
@@ -1096,4 +1107,5 @@ class StoreLike(Protocol):
     mirror: MirrorJournal
 
     def entries(self) -> Sequence[object]: ...
+    def entries_with_bytes(self) -> tuple[bytes, Sequence[object]]: ...
     def generations(self) -> dict[str, Generation]: ...
