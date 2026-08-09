@@ -81,9 +81,14 @@ migrations one at a time. The existing legacy migration becomes registry
 entry `0001`. Superseded record versions keep failing loudly when read
 without migration — no silent reinterpretation, ever.
 
-**Planned Stage 3B migration `0002`:** task ledgers gain revision records
-(`generation@2 → revision@1 + surface artifacts`) using ADR-0001's
-one-delta mapping; scope journals for `project`/`global` are created empty.
+**Planned Stage 3B migration `0002` (backfill for dual-write):** task
+ledgers gain revision records alongside the existing generation records —
+`generation@2 → revision@1` via ADR-0001's one-delta mapping with a
+`MigrationProvenance` CAS record, and `activation@2 →
+revision-activation@1` field-exactly. Generation-native records are NOT
+removed: Stage 3B dual-writes, and cycle@1/replay stay generation-native
+until a later parity slice. Scope journals for `project`/`global` are
+created empty.
 
 ## Consequences
 

@@ -33,9 +33,13 @@ from strive.stage3_contracts import (
     ScopeContribution,
     ScopeManifest,
     ScopeRef,
+    CURRENT_DESCRIPTOR,
+    DESCRIPTOR_REGISTRY,
+    JournalHeadRef,
+    MigrationProvenance,
+    RevisionActivation,
     SelectionDecision,
     SurfaceDelta,
-    SURFACE_REGISTRY,
     TaskSpecVersion,
     ValidationBundle,
     ValidatorResult,
@@ -45,8 +49,10 @@ from strive.stage3_contracts import (
     effective_risk,
     invert_delta,
     resolve_bindings,
+    revision_activation_from_activation,
     revision_from_generation,
     validate_binding,
+    validate_revision_activation,
     validate_resolved_manifest,
     validate_revision,
     validate_scope,
@@ -71,8 +77,12 @@ def test_binding_states_are_complete_and_validated() -> None:
     validate_binding(MASKED, "prompt")
     with pytest.raises(ContractViolation, match="requires both content_ref"):
         validate_binding(BindingState("content", "aa" * 32, None), "prompt")
-    with pytest.raises(ContractViolation, match="does not pin the"):
+    with pytest.raises(ContractViolation, match="not in the trusted registry"):
         validate_binding(BindingState("content", "aa" * 32, "prompt@9"), "prompt")
+    with pytest.raises(ContractViolation, match="does not describe"):
+        validate_binding(
+            BindingState("content", "aa" * 32, "strategy-code@1"), "prompt"
+        )
     with pytest.raises(ContractViolation, match="must carry no content"):
         validate_binding(BindingState("absent", "aa" * 32, None), "prompt")
     with pytest.raises(ContractViolation, match="unknown binding state"):
@@ -112,32 +122,88 @@ def test_delta_inversion_is_exact_and_conflicts_are_checkable() -> None:
 # -- frozen core: descriptors and computed risk ---------------------------------------
 
 
-def test_risk_comes_from_descriptor_policy_scope_and_label() -> None:
-    assert effective_risk("strategy-code", "solve", TASK_SCOPE, "update") == "high"
-    assert effective_risk("prompt", "tmpl", TASK_SCOPE, "update") == "medium"
-    assert effective_risk("prompt", "tmpl", GLOBAL_SCOPE, "update") == "high"
-    assert effective_risk("prompt", "tmpl", TASK_SCOPE, "mask") == "medium"
+def _delta(kind: str, name: str, before: BindingState, after: BindingState) -> SurfaceDelta:
+    return SurfaceDelta(kind, name, before, after)
+
+
+def test_risk_is_derived_from_the_delta_itself() -> None:
+    """Callers cannot supply a transition label — risk evaluation reads the
+    delta's own before/after states, so a proposal has nothing to spoof."""
+    old = content_binding("prompt", "aa" * 32)
+    new = content_binding("prompt", "bb" * 32)
+    assert effective_risk(_delta("prompt", "tmpl", old, new), TASK_SCOPE) == "medium"
+    assert effective_risk(_delta("prompt", "tmpl", old, new), GLOBAL_SCOPE) == "high"
+    # a removal is floored at medium because the delta SAYS it is a removal —
+    # there is no label argument through which to claim otherwise
+    assert effective_risk(_delta("prompt", "tmpl", old, MASKED), TASK_SCOPE) == "medium"
+    assert effective_risk(_delta("prompt", "tmpl", old, ABSENT), TASK_SCOPE) == "medium"
+    code = _delta(
+        "strategy-code", "solve",
+        content_binding("strategy-code", "aa" * 32),
+        content_binding("strategy-code", "bb" * 32),
+    )
+    assert effective_risk(code, TASK_SCOPE) == "high"
     with pytest.raises(ContractViolation, match="not in the trusted registry"):
-        effective_risk("kernel-config", "x", TASK_SCOPE, "update")
+        effective_risk(_delta("kernel-config", "x", ABSENT, MASKED), TASK_SCOPE)
 
 
-def test_policy_params_risk_is_not_uniformly_low() -> None:
-    """Parameters steering the sandbox or budgets are as dangerous as code;
-    only genuinely cosmetic families default low."""
-    assert effective_risk("policy-params", "sandbox.timeout", TASK_SCOPE, "update") == "high"
-    assert effective_risk("policy-params", "budget.model_calls", TASK_SCOPE, "update") == "high"
-    assert effective_risk("policy-params", "retry.max_attempts", TASK_SCOPE, "update") == "medium"
-    assert effective_risk("policy-params", "display.verbosity", TASK_SCOPE, "update") == "low"
-    # and scope still bumps: a project-wide retry knob is no longer medium-only
-    assert effective_risk("policy-params", "display.verbosity", PROJECT_SCOPE, "update") == "medium"
+def test_policy_params_fail_closed_and_bar_trusted_settings() -> None:
+    """Unknown families are rejected (never defaulted low); trusted kernel
+    settings are not representable as evolvable policy-params at all."""
+    def params(name: str) -> SurfaceDelta:
+        return _delta(
+            "policy-params", name, ABSENT, content_binding("policy-params", "ee" * 32)
+        )
+    # reviewed agent-behavior families, tiered, inside trusted caps
+    assert effective_risk(params("retry.max_attempts"), TASK_SCOPE) == "medium"
+    assert effective_risk(params("search.beam_width"), TASK_SCOPE) == "medium"
+    assert effective_risk(params("display.verbosity"), TASK_SCOPE) == "low"
+    assert effective_risk(params("display.verbosity"), PROJECT_SCOPE) == "medium"
+    # trusted settings: not evolvable at any risk level
+    for forbidden in (
+        "sandbox.timeout", "budget.model_calls", "evaluator.threshold",
+        "acceptance.bar", "secrets.token", "ledger.path",
+    ):
+        with pytest.raises(ContractViolation, match="trusted kernel setting"):
+            effective_risk(params(forbidden), TASK_SCOPE)
+        with pytest.raises(ContractViolation, match="trusted kernel setting"):
+            validate_delta_for_test(params(forbidden))
+    # unknown families: fail closed, no low-risk default
+    with pytest.raises(ContractViolation, match="fail-closed"):
+        effective_risk(params("mystery.knob"), TASK_SCOPE)
+    with pytest.raises(ContractViolation, match="fail-closed"):
+        validate_delta_for_test(params("mystery.knob"))
 
 
-def test_descriptors_declare_validation_and_risk_policies() -> None:
-    for descriptor in SURFACE_REGISTRY.values():
+def validate_delta_for_test(delta: SurfaceDelta) -> None:
+    from strive.stage3_contracts import validate_delta
+
+    validate_delta(delta, TASK_SCOPE)
+
+
+def test_descriptor_registry_is_historical_with_a_current_pointer() -> None:
+    for ref, descriptor in DESCRIPTOR_REGISTRY.items():
+        assert ref == descriptor.descriptor_ref
         assert "@" in descriptor.validation_policy
         assert "@" in descriptor.risk_policy_ref
         assert "@" in descriptor.materializer
-        assert descriptor.descriptor_ref == f"{descriptor.kind}@{descriptor.version}"
+    for kind, current_ref in CURRENT_DESCRIPTOR.items():
+        assert DESCRIPTOR_REGISTRY[current_ref].kind == kind
+
+
+def test_historical_binding_stays_valid_after_new_descriptor_version() -> None:
+    """prompt@2 is current, but a binding pinned to prompt@1 validates against
+    its exact pinned descriptor — history does not rot on registry upgrades."""
+    assert CURRENT_DESCRIPTOR["prompt"] == "prompt@2"
+    historical = content_binding("prompt", "aa" * 32, descriptor_ref="prompt@1")
+    assert historical.descriptor_ref == "prompt@1"
+    validate_binding(historical, "prompt")  # resolves the pinned version
+    fresh = content_binding("prompt", "bb" * 32)
+    assert fresh.descriptor_ref == "prompt@2"  # default is the current pointer
+    with pytest.raises(ContractViolation, match="not in the trusted registry"):
+        content_binding("prompt", "cc" * 32, descriptor_ref="prompt@9")
+    with pytest.raises(ContractViolation, match="does not describe kind"):
+        content_binding("prompt", "cc" * 32, descriptor_ref="strategy-code@1")
 
 
 # -- frozen core: scope manifests vs resolved manifests -------------------------------
@@ -178,9 +244,16 @@ def test_resolution_produces_a_run_resolved_manifest_distinct_from_scope_state()
 
     effective = resolve_bindings([task_manifest, project_manifest], context)
     resolved = ResolvedHarnessManifest(
+        resolution_chain=context.chain,
         contributions=(
-            ScopeContribution(TASK_SCOPE, RevisionRef(TASK_SCOPE, "rev-0003"), 41),
-            ScopeContribution(PROJECT_SCOPE, RevisionRef(PROJECT_SCOPE, "rev-0001"), 7),
+            ScopeContribution(
+                TASK_SCOPE, RevisionRef(TASK_SCOPE, "rev-0003"),
+                JournalHeadRef("jsonl@1", "41"),
+            ),
+            ScopeContribution(
+                PROJECT_SCOPE, RevisionRef(PROJECT_SCOPE, "rev-0001"),
+                JournalHeadRef("jsonl@1", "7"),
+            ),
         ),
         effective=effective,
     )
@@ -208,9 +281,76 @@ def test_mask_stops_fall_through_in_resolution() -> None:
     with pytest.raises(ContractViolation, match="content bindings only"):
         validate_resolved_manifest(
             ResolvedHarnessManifest(
+                resolution_chain=context.chain,
                 contributions=(),
                 effective=(ManifestBinding("prompt", "tmpl", MASKED),),
             )
+        )
+    # duplicate manifests for one scope are rejected during resolution
+    with pytest.raises(ContractViolation, match="duplicate scope manifest"):
+        resolve_bindings([project_manifest, project_manifest], context)
+
+
+def test_resolved_manifest_contribution_invariants() -> None:
+    context = ResolutionContext.build(task="sum-integers", project="integers")
+    head = JournalHeadRef("jsonl@1", "1")
+    ok = ScopeContribution(TASK_SCOPE, RevisionRef(TASK_SCOPE, "rev-1"), head)
+    project = ScopeContribution(PROJECT_SCOPE, RevisionRef(PROJECT_SCOPE, "rev-1"), head)
+
+    def resolved(
+        *contributions: ScopeContribution,
+        chain: tuple[ScopeRef, ...] = context.chain,
+    ) -> ResolvedHarnessManifest:
+        return ResolvedHarnessManifest(
+            resolution_chain=chain, contributions=contributions, effective=()
+        )
+
+    validate_resolved_manifest(resolved(ok, project))  # chain order: task, project
+    with pytest.raises(ContractViolation, match="must record its resolution chain"):
+        validate_resolved_manifest(resolved(chain=()))
+    with pytest.raises(ContractViolation, match="chain-order|chain order"):
+        validate_resolved_manifest(resolved(project, ok))
+    with pytest.raises(ContractViolation, match="duplicate contribution"):
+        validate_resolved_manifest(resolved(ok, ok))
+    with pytest.raises(ContractViolation, match="is not in the"):
+        validate_resolved_manifest(
+            resolved(ScopeContribution(ScopeRef("task", "other"),
+                                       RevisionRef(ScopeRef("task", "other"), "r"), head))
+        )
+    with pytest.raises(ContractViolation, match="belong to the contributing scope"):
+        validate_resolved_manifest(
+            resolved(ScopeContribution(TASK_SCOPE, RevisionRef(PROJECT_SCOPE, "r"), head))
+        )
+    with pytest.raises(ContractViolation, match="must not repeat scopes"):
+        validate_resolved_manifest(
+            ResolvedHarnessManifest(
+                resolution_chain=(TASK_SCOPE, TASK_SCOPE),
+                contributions=(), effective=(),
+            )
+        )
+
+
+def test_scope_manifest_rejects_disallowed_kinds_for_content_and_masks() -> None:
+    # strategy-code is task-only: content AND masks are rejected at project scope
+    with pytest.raises(ContractViolation, match="not allowed at scope level"):
+        validate_scope_manifest(
+            ScopeManifest(
+                PROJECT_SCOPE,
+                (ManifestBinding(
+                    "strategy-code", "solve",
+                    content_binding("strategy-code", "aa" * 32),
+                ),),
+            )
+        )
+    with pytest.raises(ContractViolation, match="not allowed at scope level"):
+        validate_scope_manifest(
+            ScopeManifest(
+                PROJECT_SCOPE, (ManifestBinding("strategy-code", "solve", MASKED),)
+            )
+        )
+    with pytest.raises(ContractViolation, match="not in the trusted registry"):
+        validate_scope_manifest(
+            ScopeManifest(TASK_SCOPE, (ManifestBinding("kernel-config", "x", MASKED),))
         )
 
 
@@ -249,7 +389,7 @@ def _composite_revision() -> HarnessRevision:
 def test_composite_revision_validates_and_round_trips() -> None:
     revision = _composite_revision()
     validate_revision(revision)
-    assert {d.kind for d in revision.deltas} == set(SURFACE_REGISTRY)
+    assert {d.kind for d in revision.deltas} == set(CURRENT_DESCRIPTOR)
     assert revision.proposal_ref is not None  # optional provenance pointers exist
     decoded: HarnessRevision = codec.loads(codec.dumps(revision), HarnessRevision)
     assert decoded == revision
@@ -282,6 +422,11 @@ def test_revision_structural_rules_are_enforced() -> None:
         validate_revision(rebuild(base_parent=base.ref))
     with pytest.raises(ContractViolation, match="own provenance parent"):
         validate_revision(rebuild(provenance_parents=(base.ref,)))
+    with pytest.raises(ContractViolation, match="belong in provenance_parents"):
+        validate_revision(  # cross-scope base parent is not lineage, it's origin
+            rebuild(base_parent=RevisionRef(PROJECT_SCOPE, "rev-0007"),
+                    provenance_parents=())
+        )
     assert base.base_parent is not None
     with pytest.raises(ContractViolation, match="must not repeat"):
         validate_revision(rebuild(provenance_parents=(base.base_parent,)))
@@ -502,3 +647,133 @@ def test_algorithm_run_and_steps_round_trip_for_resumability() -> None:
     )
     assert codec.loads(codec.dumps(run)) == run
     assert codec.loads(codec.dumps(step)) == step
+
+
+# -- frozen core: revision lifecycle seam ---------------------------------------------
+
+
+def test_revision_activation_maps_real_history_and_preserves_derivation(
+    tmp_path: Path,
+) -> None:
+    """Map a real activation@2 journal (seed → evolved → rollback → promote)
+    activation-by-activation; the append-only 'last activation wins'
+    derivation then reproduces the same active id at every prefix."""
+    from strive.contracts import Activation as LiveActivation
+    from strive.loop import promote_generation, run_cycle as _run
+
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
+    _run(store, SUM_INTEGERS_TASK)  # seed + evolved activations
+    store.rollback()  # rollback activation
+    promote_generation(store, SUM_INTEGERS_TASK, "gen-0001")  # promote activation
+
+    live = [e for e in store.entries() if isinstance(e, LiveActivation)]
+    assert [a.reason for a in live] == ["seed", "evolved", "rollback", "promote"]
+
+    decision = store.generation("gen-0001").decision
+    assert decision is not None
+    decision_ref = store.objects.put_text(codec.dumps(decision))
+    mapped = [
+        revision_activation_from_activation(
+            a, decision_ref if a.reason in ("evolved", "promote") else None
+        )
+        for a in live
+    ]
+    for activation in mapped:
+        validate_revision_activation(activation)
+        assert codec.loads(codec.dumps(activation)) == activation
+
+    # field-exact preservation
+    for original, migrated in zip(live, mapped):
+        assert migrated.revision.revision_id == original.generation_id.replace("gen-", "rev-")
+        assert migrated.revision.scope == ScopeRef("task", original.task_id)
+        assert migrated.mode == original.mode
+        assert migrated.reason == original.reason
+        assert migrated.at == original.at
+        assert migrated.expires_after_cycles == original.expires_after_cycles
+        assert migrated.baseline_score == original.baseline_score
+        assert "@" in migrated.policy_ref  # legacy markers get the @0 era
+    assert mapped[0].policy_ref == "seed@0"
+    assert mapped[1].policy_ref == "paired-deterministic@1"  # already versioned
+
+    # derivation parity: last-activation-wins yields the same active sequence
+    for i in range(1, len(live) + 1):
+        live_active = live[:i][-1].generation_id.replace("gen-", "rev-")
+        assert mapped[:i][-1].revision.revision_id == live_active
+
+    # decision evidence is preserved and recoverable from CAS
+    assert mapped[1].decision_ref is not None
+    recovered: object = codec.loads(store.objects.get_text(mapped[1].decision_ref))
+    assert recovered == decision
+
+
+def test_provisional_activation_mapping_requires_expiry() -> None:
+    activation = RevisionActivation(
+        revision=RevisionRef(TASK_SCOPE, "rev-0002"),
+        mode="provisional",
+        reason="promote",
+        at="t",
+        policy_ref="provisional@1",
+        expires_after_cycles=2,
+        baseline_score=1.0,
+    )
+    validate_revision_activation(activation)
+    with pytest.raises(ContractViolation, match="must carry its expiry"):
+        validate_revision_activation(
+            RevisionActivation(
+                revision=RevisionRef(TASK_SCOPE, "rev-0002"),
+                mode="provisional", reason="promote", at="t",
+                policy_ref="provisional@1",
+            )
+        )
+    with pytest.raises(ContractViolation, match="unknown activation reason"):
+        validate_revision_activation(
+            RevisionActivation(
+                revision=RevisionRef(TASK_SCOPE, "rev-0002"),
+                mode="durable", reason="vibes", at="t", policy_ref="p@1",
+            )
+        )
+
+
+def test_migration_provenance_preserves_every_generation_field(tmp_path: Path) -> None:
+    """task_fingerprint, origin, weakness, and the embedded decision evidence
+    all survive migration losslessly via the provenance record; cycle@1
+    records are untouched (Stage 3B is dual-write) and stay replayable."""
+    from strive.loop import replay_run, run_cycle as _run
+
+    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
+    report = _run(store, SUM_INTEGERS_TASK)
+    generation = store.generation("gen-0001")
+    assert generation.decision is not None
+
+    decision_ref = store.objects.put_text(codec.dumps(generation.decision))
+    provenance = MigrationProvenance(
+        source="generation@2",
+        generation_id=generation.generation_id,
+        task_id=generation.task_id,
+        task_fingerprint=generation.task_fingerprint,
+        origin=generation.origin,
+        weakness_id=generation.weakness_id,
+        decision_ref=decision_ref,
+    )
+    provenance_ref = store.objects.put_text(codec.dumps(provenance))
+    assert codec.loads(store.objects.get_text(provenance_ref)) == provenance
+
+    recovered_decision: object = codec.loads(store.objects.get_text(decision_ref))
+    assert recovered_decision == generation.decision  # acceptance evidence intact
+    assert provenance.task_fingerprint == SUM_INTEGERS_TASK.fingerprint()
+
+    # the revision points at its provenance; nothing is lost in the mapping
+    parent = store.generation("gen-0000")
+    revision = revision_from_generation(generation, parent, TASK_SCOPE, "aa" * 32)
+    enriched = HarnessRevision(
+        ref=revision.ref, base_parent=revision.base_parent,
+        provenance_parents=revision.provenance_parents, deltas=revision.deltas,
+        scope_manifest_ref=revision.scope_manifest_ref, proposer=revision.proposer,
+        summary=revision.summary, created_at=revision.created_at,
+        provenance_ref=provenance_ref,
+    )
+    validate_revision(enriched)
+
+    # dual-write means the live cycle record still replays as-is
+    replay = replay_run(store, SUM_INTEGERS_TASK, report.run_id)
+    assert replay.matches and replay.decision_matches is True

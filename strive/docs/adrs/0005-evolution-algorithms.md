@@ -51,9 +51,12 @@ containing untrusted plugins is out of scope until the stage-6 threat model.
 `AlgorithmRun` (algorithm name@version, run id, scope, budget, status ∈
 {running, completed, halted}, `steps_completed` as the resumption cursor)
 and `AlgorithmStep` (run id, step index, action ∈ {propose, validate,
-submit}, subject ref, budget usage). A crashed search resumes from its last
-journaled step; the frontier itself is journaled state via `frontier_add`
-decisions (ADR-0004), never algorithm memory.
+submit}, subject ref, budget usage). These provisional records are enough
+to *restart* a crashed search from its last journaled step; bit-reproducible
+resumption additionally requires objective, RNG-state, and algorithm-state
+refs — an unresolved need the algorithm slice must settle (adrs/README).
+The frontier itself is journaled state via `frontier_add` decisions
+(ADR-0004), never algorithm memory.
 
 Planned implementations: `hill-climb@1` (exactly today's loop, extracted) and
 `pareto-population@1` (GEPA-style: maintain a frontier via `frontier_add`

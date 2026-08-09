@@ -88,9 +88,10 @@ tasks/environments, evidence/selection, evolution algorithms, and
 storage/migrations — each with rejected alternatives and a
 borrowed/rejected/deferred comparison against Flex/GEPA, prime-agent,
 Continual Harness, exo, RLM, and NOOA. The wire schemas went through a
-revision pass before freezing: revision *state* separated from evaluation
-*evidence* (state_manifest_ref vs ValidationBundle-owned evaluation
-manifests), globally unambiguous RevisionRef(scope, id) with base vs
+revision passes before freezing: revision *state* separated from evaluation
+*evidence* (revision-owned ScopeManifest + run-resolved
+ResolvedHarnessManifest vs ValidationBundle-owned evaluation manifests),
+globally unambiguous RevisionRef(scope, id) with base vs
 provenance parents, typed ScopeRef/ResolutionContext with mask-vs-delete
 semantics, environment-generic task specs (FunctionTask config carries
 solve(str)->int), reconstructable dataset revisions, risk computed from
@@ -100,26 +101,36 @@ append_batch/cursor/index-through-head ledger semantics. Experimental typed
 contracts (`stage3_contracts.py`, additive codec kinds, unused by the live
 loop) validate every scenario with round-trip tests, including one revision
 evaluated under two manifests and cross-scope lineage without collisions.
-No live-ledger migration; Stage 1–2b behavior unchanged (155 tests).
+The final consistency pass added the frozen RevisionActivation@1 lifecycle
+seam (field-exact activation@2 mapping incl. rollback history and derivation
+parity), historical descriptor pinning (registry keyed by kind@version +
+current pointer), fail-closed policy-param families with trusted settings
+barred, and stronger manifest invariants (same-scope base parents, explicit
+resolution chains, opaque journal-head refs). No live-ledger migration;
+Stage 1–2b behavior unchanged (164 tests, 25 in the spike).
 
 ## Stage 3B — First implementation slice (next; independently mergeable)
 
-Exactly: **composite revision storage + the SurfaceDescriptor registry**,
+Exactly: **dual-write revision storage + the SurfaceDescriptor registry**,
 implementing only the frozen core wire types (adrs/README freeze table):
-ScopeRef/RevisionRef/BindingState/SurfaceDelta/ScopeManifest/
-ScopeContribution/ResolvedHarnessManifest/HarnessRevision + the descriptor
-registry and migration-registry mechanics.
+ScopeRef/RevisionRef/BindingState/SurfaceDelta/ManifestBinding/
+ScopeManifest/JournalHeadRef/ScopeContribution/ResolvedHarnessManifest/
+HarnessRevision/RevisionActivation/MigrationProvenance + the historical
+descriptor registry and migration-registry mechanics.
 - Migration registry (ADR-0006) with `migrate-legacy` as entry 0001 and the
-  generation→revision rewrite as entry 0002.
-- `Store` reads/writes revisions; activation/rollback/lineage/replay operate
-  on revisions; runs journal their ResolvedHarnessManifest ref; the loop
-  still evolves only the strategy-code surface at task scope.
+  generation→revision **backfill** as entry 0002 (field-exact, with
+  MigrationProvenance and CAS-encoded decision evidence).
+- **Dual-write**: the loop keeps writing generation-native records
+  (activation/replay/cycles unchanged and generation-native) while writing
+  revision@1 + revision-activation@1 alongside; revision-native
+  loop/activation/replay is a later parity slice, not 3B.
 - NOT in this slice (each provisional until its own slice): task/dataset/
   evaluation-manifest schemas, selection envelopes and frontier semantics,
   algorithm state, backend schema details.
-- Exit: all current behavior green on revision records; a hand-authored
-  composite revision can be journaled, activated, and rolled back atomically
-  even though no proposer emits one yet.
+- Exit: every cycle produces matching generation and revision records
+  (parity checked by test); a hand-authored composite revision can be
+  journaled and validated even though no proposer emits one yet; all
+  current behavior green.
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 

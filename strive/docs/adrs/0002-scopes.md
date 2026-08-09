@@ -14,7 +14,8 @@ that cross-run/cross-task reuse is where compounding improvement comes from.
 
 ## Decision
 
-**Five scopes, ordered from broadest to narrowest:**
+**Four scope levels, ordered from broadest to narrowest — plus one
+activation mode:**
 
 1. `ScopeRef(global)` — org-wide defaults (e.g., the proposal prompt template).
 2. `ScopeRef(project, family)` — a task family sharing conventions and assets.

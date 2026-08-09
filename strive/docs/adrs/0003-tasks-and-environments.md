@@ -83,9 +83,11 @@ load-bearing.
 
 ## Consequences
 
-- The `Task` dataclass splits in Stage 3B; `TASKS` becomes a registry of
+- The `Task` dataclass splits in the FunctionTask slice (after Stage 3B,
+  which is dual-write revision storage only); `TASKS` becomes a registry of
   (spec version, current dataset revision) pairs; `fingerprint()` splits into
-  spec and dataset fingerprints. Drift guard narrows to spec fingerprints.
+  spec and dataset fingerprints; the drift guard narrows to spec
+  fingerprints. None of this lands in Stage 3B.
 - Automatic regression growth (deferred since 4.5) gets its mechanism:
   append case → new DatasetRevision → forced incumbent re-baseline.
 - Seeds enter manifests now so stochastic validation (ADR-0004) does not need
