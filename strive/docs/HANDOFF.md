@@ -1,6 +1,91 @@
 # HANDOFF — strive
 
-## Stage 3B.1 — derived integrity + revision shadow reads (current)
+## Stage 3B.2 — centralized reads + reversible revision-read canary (current)
+
+1. **One read boundary.** `strive.reader.StateReader` (alias
+   `HarnessReadSession`) is the single boundary every operation reads
+   through: cycle, compare, replay, audit, promotion, rollback, provisional
+   resolution, proposal staleness (an explicit, single re-read method),
+   activation-head checks, seeding, status, lineage, and restart reads. It
+   captures ONE coherent canonical + mirror snapshot per operation,
+   identified by tamper-evident heads (record count + digest-sequence hash
+   on both journals) and refreshed only after the operation's own writes;
+   native values derive from the capture with the SAME pure functions the
+   Store uses (`store.derive_*`), so reader and store cannot disagree about
+   the same entries. Direct Store reads remain compatibility internals.
+   `Store.activate`/`rollback` accept `expected_head` and refuse stale
+   mutations (any intervening append, not just activations).
+2. **Honest evaluated subjects.** Before a candidate is evaluated, an
+   immutable, UNACTIVATED candidate overlay revision + scope manifest is
+   CAS-stored, carrying native `RevisionProvenance`
+   (`origin="candidate-overlay"`) rather than migration provenance — the
+   evaluated subject is exactly that artifact. Every execution CAS-stores an
+   `ExecutionRecord` before running: base resolved harness (the ACTIVE
+   baseline revision with its OWN bindings), the subject (active revision |
+   retained revision | candidate overlay) with its own effective manifest,
+   exact canonical/mirror heads, run, operation, and subject. Compare,
+   replay, and audit of non-active generations are named
+   `retained-revision`; the baseline is never claimed to contain a
+   non-active source. Generation records remain the compatibility mirrors.
+3. **One validator.** `VerifiedRevisionSnapshot`
+   (`verify_revision_snapshot`) is the only revision-read validator: it
+   runs parity's checks — complete `SourceRecordRef` agreement in BOTH
+   directions including schema and journal identity, source/mirror type
+   agreement, supported projector, RECOMPUTED-projection equality, full
+   artifact closure, descriptor/provenance/manifest validation, and
+   bounded cycle-free lineage. The weaker 3B.1 validator (`shadow.py`) was
+   removed, not maintained alongside. A consequence worth knowing: journal
+   tampering now surfaces as *unavailable* (blocking canary via the
+   breaker); *diverged* outcomes catch derivation bugs — both open the
+   breaker in canary mode.
+4. **Trustworthy cutover evidence.** A locked, fsynced trusted reader
+   journal (`ledger/<task>.reader.jsonl`) records every check with
+   reader/projector version, burn-in epoch, operation id, subject, exact
+   heads, and outcome; outcomes are recorded in `finally` — denied,
+   rejected, stale, and failing operations included — and expected checks
+   derive from the centralized `OPERATION_SUBJECTS`, so an uninstrumented
+   path synthesizes `missing` outcomes that block eligibility. Repair
+   (backfill completion, rebuild) and reader/projector version changes
+   reset the epoch; old evidence is preserved but excluded from current
+   eligibility. Eligibility requires complete parity, zero
+   divergences/errors/missing/unavailable, ≥20 agreed samples with ≥1 per
+   required subject, and observed accepted, rejected, no-candidate,
+   rollback, re-promotion, audit, replay, and restart paths.
+5. **Reversible canary authority.** Modes are durable and journaled
+   (default `native`; `shadow` for burn-in). In `revision-canary`,
+   supported reads are served from the verified snapshot with the native
+   value compared before use; agreement is a precondition of serving —
+   executed sources come from the revision-materialized artifact.
+   Unavailable or divergent derived state opens a durable circuit breaker
+   (journaled `BreakerEvent`) that blocks canary use — reads drop to
+   shadow (native authority, comparisons still recorded), never a silent
+   per-read fallback. `strive reader kill` returns immediately to native;
+   `enable_canary` requires current-epoch eligibility and a closed
+   breaker; recovery = kill → repair (epoch resets) → clear-breaker →
+   re-earn eligibility → re-enable. **Activation and durable promotion
+   remain generation-native.**
+
+**Verification:** 215 tests pass; `mypy --strict` clean over 45 files.
+Live CLI smoke: full burn-in through `strive reader shadow` + run ×3 /
+compare / replay / audit / rollback / promote / status / lineage reached
+25 checks (22 agreed, 0 diverged/missing/unavailable) and cutover
+ELIGIBLE; `reader canary` enabled; a canary run and status served;
+deleting a mirror line opened the durable breaker while `status` and
+`run` kept working; `reader kill` returned to native.
+
+**The Stage 3B.2 claim, stated precisely:** strive can use
+revision-derived state as authoritative for supported reads under a
+versioned, evidence-backed canary mode, with coherent execution
+provenance, native comparison, a durable circuit breaker, and an
+immediate kill switch. Activation remains generation-native.
+
+**Next phase (exact):** the first empirically evaluated prompt-surface
+composite revision experiment, in a separate PR — a `prompt` surface
+delta (the proposal template) evolved alongside strategy code in one
+composite revision, validated under the existing paired gate with
+held-out discipline.
+
+## Stage 3B.1 — derived integrity + revision shadow reads (historical)
 
 Hardened the derived side of the dual-write and proved shadow parity.
 Generation-native records remain authoritative for every behavior.

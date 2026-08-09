@@ -793,3 +793,69 @@ class MigrationProvenance:
     decision_ref: str | None
 
 
+@register("revision-provenance", 1)
+@dataclass(frozen=True)
+class RevisionProvenance:
+    """Native provenance for revisions created AS revisions (Stage 3B.2+),
+    rather than migrated from generation records. Future composite revisions
+    carry this instead of depending permanently on ``MigrationProvenance``
+    (which exists only for the generation→revision migration era).
+
+    ``origin`` names how the revision came to exist (e.g.
+    ``candidate-overlay`` for an unactivated evaluation subject); the
+    remaining fields mirror what the drift guard and audit trail need."""
+
+    origin: str  # e.g. "candidate-overlay"
+    task_id: str
+    task_fingerprint: str
+    surface: str
+    weakness_id: str | None
+    parent_revision_id: str | None
+    decision_ref: str | None  # evidence attached by the recording operation
+
+
+def candidate_overlay_revision(
+    *,
+    candidate_id: str,
+    task_id: str,
+    source_ref: str,
+    parent_revision: "HarnessRevision",
+    parent_source_ref: str,
+    scope_manifest_ref: str,
+    provenance_ref: str,
+    proposer: str,
+    summary: str,
+    created_at: str,
+) -> HarnessRevision:
+    """The immutable, UNACTIVATED revision for a candidate under evaluation.
+
+    Built before the candidate executes, so the evaluated subject is exactly
+    this artifact: one strategy-code delta from the active baseline's binding
+    to the candidate's, with its own scope manifest. It is never written to
+    the mirror journal and never activated — it exists so execution records
+    can name the evaluated subject honestly instead of claiming the active
+    baseline revision contains a non-active source."""
+    pinned = "strategy-code@1"
+    delta = SurfaceDelta(
+        kind=SURFACE_STRATEGY_CODE,
+        name="solve",
+        before=content_binding(
+            SURFACE_STRATEGY_CODE, parent_source_ref, descriptor_ref=pinned
+        ),
+        after=content_binding(SURFACE_STRATEGY_CODE, source_ref, descriptor_ref=pinned),
+    )
+    revision = HarnessRevision(
+        ref=RevisionRef(ScopeRef(LEVEL_TASK, task_id), f"rev-{candidate_id}"),
+        base_parent=parent_revision.ref,
+        provenance_parents=(),
+        deltas=(delta,),
+        scope_manifest_ref=scope_manifest_ref,
+        proposer=proposer,
+        summary=summary,
+        created_at=created_at,
+        provenance_ref=provenance_ref,
+    )
+    validate_revision(revision)
+    return revision
+
+

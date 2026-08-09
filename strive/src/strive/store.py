@@ -68,6 +68,126 @@ from strive.events import now_iso
 LedgerEntry = Generation | Activation | CycleRecord | Intervention
 
 
+# -- pure derivations over an entries list ----------------------------------------------
+#
+# The Stage-3B.2 read boundary (strive.reader.StateReader) captures one
+# coherent entries snapshot per operation and derives state from it with the
+# SAME functions the Store uses, so a reader value can never disagree with a
+# store value for the same entries. Store methods delegate here and remain
+# available as compatibility internals.
+
+
+def entry_digest(entry: LedgerEntry) -> str:
+    """The canonical per-record digest (identical to the dual-write mirror's
+    SourceRecordRef digest)."""
+    return hashlib.sha256(codec.dumps(entry).encode("utf-8")).hexdigest()
+
+
+def ledger_head(entries: list[LedgerEntry]) -> str:
+    """Tamper-evident head token: complete-record count + the hash of the
+    canonical per-record digest sequence. Appends change the count; altering
+    any covered record changes the digest."""
+    h = hashlib.sha256()
+    for entry in entries:
+        h.update(bytes.fromhex(entry_digest(entry)))
+    return f"{len(entries)}:{h.hexdigest()}"
+
+
+def derive_generations(entries: list[LedgerEntry]) -> dict[str, Generation]:
+    return {e.generation_id: e for e in entries if isinstance(e, Generation)}
+
+
+def derive_activations(entries: list[LedgerEntry]) -> list[Activation]:
+    return [e for e in entries if isinstance(e, Activation)]
+
+
+def derive_active_activation(entries: list[LedgerEntry]) -> Activation | None:
+    activation: Activation | None = None
+    for entry in entries:
+        if isinstance(entry, Activation):
+            activation = entry
+    return activation
+
+
+def derive_active_generation(entries: list[LedgerEntry]) -> Generation | None:
+    activation = derive_active_activation(entries)
+    if activation is None:
+        return None
+    generation = derive_generations(entries).get(activation.generation_id)
+    if generation is None:
+        raise LedgerError(
+            f"activation targets unknown generation {activation.generation_id}"
+        )
+    return generation
+
+
+def derive_lineage(entries: list[LedgerEntry]) -> list[Generation]:
+    generations = derive_generations(entries)
+    chain: list[Generation] = []
+    current = derive_active_generation(entries)
+    while current is not None:
+        chain.append(current)
+        current = (
+            generations[current.parent_id]
+            if current.parent_id is not None
+            else None
+        )
+    return chain
+
+
+def derive_cycles(entries: list[LedgerEntry]) -> list[CycleRecord]:
+    return [e for e in entries if isinstance(e, CycleRecord)]
+
+
+def derive_interventions(entries: list[LedgerEntry]) -> list[Intervention]:
+    return [e for e in entries if isinstance(e, Intervention)]
+
+
+def derive_adaptation_frozen(entries: list[LedgerEntry]) -> Intervention | None:
+    current: Intervention | None = None
+    for entry in derive_interventions(entries):
+        if entry.kind == INTERVENTION_STALL_FREEZE:
+            current = entry
+        elif entry.kind == INTERVENTION_RESUME:
+            current = None
+    return current
+
+
+def derive_activation_before(
+    entries: list[LedgerEntry], activation: Activation
+) -> Activation | None:
+    previous: Activation | None = None
+    for entry in entries:
+        if isinstance(entry, Activation):
+            if (
+                entry.at == activation.at
+                and entry.generation_id == activation.generation_id
+                and entry.mode == activation.mode
+            ):
+                return previous
+            previous = entry
+    return None
+
+
+def derive_cycles_since_activation(
+    entries: list[LedgerEntry], activation: Activation
+) -> list[CycleRecord]:
+    result: list[CycleRecord] = []
+    seen_activation = False
+    for entry in entries:
+        if entry is activation or (
+            isinstance(entry, Activation)
+            and entry.at == activation.at
+            and entry.generation_id == activation.generation_id
+        ):
+            seen_activation = True
+            result = []
+            continue
+        if seen_activation and isinstance(entry, CycleRecord):
+            result.append(entry)
+    return result
+
+
 class StoreError(Exception):
     """A store-level failure the CLI can render as a clean diagnostic."""
 
@@ -188,11 +308,7 @@ class Store:
     # -- generations -------------------------------------------------------------
 
     def generations(self) -> dict[str, Generation]:
-        return {
-            entry.generation_id: entry
-            for entry in self.entries()
-            if isinstance(entry, Generation)
-        }
+        return derive_generations(self.entries())
 
     def generation(self, generation_id: str) -> Generation:
         generations = self.generations()
@@ -253,15 +369,30 @@ class Store:
         expires_after_cycles: int | None = None,
         baseline_score: float | None = None,
         expected_active: str | None = None,
+        expected_head: str | None = None,
     ) -> Activation:
         """Append an activation entry (the atomic promotion step).
 
-        ``expected_active`` is a head check: when given, the activation is
-        refused if the currently active generation is not the expected one —
-        the caller's evidence was gathered against a superseded incumbent.
+        ``expected_active`` is an incumbent check: when given, the activation
+        is refused if the currently active generation is not the expected one
+        — the caller's evidence was gathered against a superseded incumbent.
+        ``expected_head`` is the stronger read-boundary check: the exact
+        tamper-evident ledger head the caller's read snapshot was captured at;
+        ANY intervening append (not only an activation) refuses the mutation
+        as stale.
         """
         with self._writer_lock():
             self.generation(generation_id)  # must exist, and belong to this task
+            if expected_head is not None:
+                current_head = ledger_head(self.entries())
+                if current_head != expected_head:
+                    raise StoreError(
+                        f"stale read head: the mutation was decided at head "
+                        f"{expected_head.split(':')[0]} "
+                        f"({expected_head.split(':')[1][:12]}…) but the ledger "
+                        f"is now at head {current_head.split(':')[0]} "
+                        f"({current_head.split(':')[1][:12]}…); re-read and retry"
+                    )
             if expected_active is not None:
                 current = self.active_generation()
                 current_id = current.generation_id if current else None
@@ -328,7 +459,11 @@ class Store:
             )
 
     def activations(self) -> list[Activation]:
-        return [e for e in self.entries() if isinstance(e, Activation)]
+        return derive_activations(self.entries())
+
+    def head(self) -> str:
+        """Tamper-evident head of the task ledger (count + prefix digest)."""
+        return ledger_head(self.entries())
 
     def revisions(self) -> list[HarnessRevision]:
         """Mirrored revisions, in source order (derived; may lag the ledger)."""
@@ -346,11 +481,7 @@ class Store:
         return [m.activation for m in sorted(mirrors, key=lambda m: m.source.ordinal)]
 
     def active_activation(self) -> Activation | None:
-        activation: Activation | None = None
-        for entry in self.entries():
-            if isinstance(entry, Activation):
-                activation = entry
-        return activation
+        return derive_active_activation(self.entries())
 
     def active_generation(self) -> Generation | None:
         activation = self.active_activation()
@@ -358,34 +489,30 @@ class Store:
             return None
         return self.generation(activation.generation_id)
 
-    def rollback(self) -> Generation:
-        """Reactivate the parent of the currently active generation (journaled)."""
+    def rollback(self, *, expected_head: str | None = None) -> Generation:
+        """Reactivate the parent of the currently active generation (journaled).
+        ``expected_head`` refuses a rollback decided against a stale read."""
         active = self.active_generation()
         if active is None:
             raise StoreError("nothing to roll back: no active generation")
         if active.parent_id is None:
             raise StoreError(f"cannot roll back: {active.generation_id} has no parent")
         parent = self.generation(active.parent_id)
-        self.activate(parent.generation_id, reason="rollback", policy="manual")
+        self.activate(
+            parent.generation_id,
+            reason="rollback",
+            policy="manual",
+            expected_head=expected_head,
+        )
         return parent
 
     def lineage(self) -> list[Generation]:
-        generations = self.generations()
-        chain: list[Generation] = []
-        current = self.active_generation()
-        while current is not None:
-            chain.append(current)
-            current = (
-                generations[current.parent_id]
-                if current.parent_id is not None
-                else None
-            )
-        return chain
+        return derive_lineage(self.entries())
 
     # -- cycles / interventions -----------------------------------------------------
 
     def cycles(self) -> list[CycleRecord]:
-        return [e for e in self.entries() if isinstance(e, CycleRecord)]
+        return derive_cycles(self.entries())
 
     def cycle(self, run_id: str) -> CycleRecord:
         for record in self.cycles():
@@ -394,45 +521,16 @@ class Store:
         raise StoreError(f"unknown run for task {self.task_id!r}: {run_id}")
 
     def interventions(self) -> list[Intervention]:
-        return [e for e in self.entries() if isinstance(e, Intervention)]
+        return derive_interventions(self.entries())
 
     def adaptation_frozen(self) -> Intervention | None:
         """The freeze in force, if any: last stall-freeze not followed by resume."""
-        current: Intervention | None = None
-        for entry in self.interventions():
-            if entry.kind == INTERVENTION_STALL_FREEZE:
-                current = entry
-            elif entry.kind == INTERVENTION_RESUME:
-                current = None
-        return current
+        return derive_adaptation_frozen(self.entries())
 
     def activation_before(self, activation: Activation) -> Activation | None:
         """The activation entry immediately preceding the given one, if any."""
-        previous: Activation | None = None
-        for entry in self.entries():
-            if isinstance(entry, Activation):
-                if (
-                    entry.at == activation.at
-                    and entry.generation_id == activation.generation_id
-                    and entry.mode == activation.mode
-                ):
-                    return previous
-                previous = entry
-        return None
+        return derive_activation_before(self.entries(), activation)
 
     def cycles_since_activation(self, activation: Activation) -> list[CycleRecord]:
         """Cycle records executed under the given activation (by time order)."""
-        result: list[CycleRecord] = []
-        seen_activation = False
-        for entry in self.entries():
-            if entry is activation or (
-                isinstance(entry, Activation)
-                and entry.at == activation.at
-                and entry.generation_id == activation.generation_id
-            ):
-                seen_activation = True
-                result = []
-                continue
-            if seen_activation and isinstance(entry, CycleRecord):
-                result.append(entry)
-        return result
+        return derive_cycles_since_activation(self.entries(), activation)

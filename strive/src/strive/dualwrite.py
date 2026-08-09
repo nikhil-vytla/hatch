@@ -977,7 +977,20 @@ def run_backfill_operation(store: "StoreLike", migration_id: str) -> ParityRepor
                 ),
             )
         )
+    _note_repair_epoch(store, f"{migration_id} completed ({intent.op_id})")
     return parity_status(store)
+
+
+def _note_repair_epoch(store: "StoreLike", detail: str) -> None:
+    """Repair changed derived history: reset the reader burn-in epoch so
+    pre-repair evidence is excluded from cutover eligibility. Best-effort —
+    the repair itself must never fail on evidence bookkeeping."""
+    try:
+        from strive.reader import note_repair
+
+        note_repair(store.mirror.path, store.task_id, detail)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 # -- mirror-journal recovery -----------------------------------------------------------------
@@ -1066,6 +1079,7 @@ def rebuild_mirror(store: "StoreLike") -> RebuildReport:
                 f"closure={list(candidate_report.closure_issues)}"
             )
         os.replace(temporary.path, journal.path)  # atomic install
+    _note_repair_epoch(store, f"mirror rebuild ({intent.op_id})")
     return RebuildReport(
         quarantine_path=quarantine_path,
         prior_mirror_sha256=prior_sha,

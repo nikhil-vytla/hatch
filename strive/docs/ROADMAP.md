@@ -200,18 +200,61 @@ behavior authoritative throughout:
   records exact execution manifests and coverage, and remains safe under
   derived corruption. Revisions still do not control behavior.
 
-## Stage 3B.2 — Revision-read cutover (next)
+## Stage 3B.2 — Centralized reads + reversible revision-read canary ✅ (2026-08-09)
 
-A **narrowly reversible revision-read cutover with a kill switch**: a
-cutover flag makes the revision-derived value authoritative for reads while
-the generation-native value becomes the shadow (divergence semantics
-unchanged); the kill switch reverts to generation-native reads instantly;
-cutover is gated on `cutover_eligibility` (complete parity, zero
-divergences, declared minimum coverage). The prompt-surface composite
-evolution experiment follows separately: a `prompt` surface delta (proposal
-template) evolved alongside strategy code in one composite revision,
-validated under the existing paired gate with held-out discipline — the
-first real use of multi-surface revisions.
+One read boundary (`StateReader`, `strive.reader`) with durable journaled
+modes — `native` (default), `shadow`, `revision-canary`:
+- Every operation reads through one coherent canonical + mirror snapshot
+  identified by tamper-evident heads (count + digest-sequence hash),
+  refreshed only after the operation's own writes; cycle, compare, replay,
+  audit, promotion, rollback, provisional resolution, proposal staleness,
+  seeding, status, lineage, and restart reads are all routed. Direct Store
+  reads remain compatibility internals. Mutations carry the reader's
+  expected head: stale activation and rollback refuse.
+- Honest evaluated subjects: an immutable, unactivated candidate revision +
+  scope manifest (with native `RevisionProvenance`, not migration
+  provenance) is created BEFORE evaluation; every execution CAS-stores an
+  ExecutionRecord pinning the base resolved harness (the active baseline
+  with its OWN bindings), the subject (active revision, retained revision,
+  or candidate overlay) with its own effective manifest, exact
+  canonical/mirror heads, run, operation, and subject. The active baseline
+  is never claimed to contain a non-active source.
+- One validator: `VerifiedRevisionSnapshot` runs parity's checks — complete
+  SourceRecordRef agreement both directions (schema, journal, ordinal,
+  digest) with type agreement, recomputed-projection equality, full
+  artifact closure, descriptor/provenance/manifest validation, bounded
+  cycle-free lineage. All revision reads use it; the weaker 3B.1 validator
+  is gone.
+- Trustworthy evidence: a locked, fsynced trusted reader journal records
+  every check (reader/projector version, burn-in epoch, operation id,
+  subject, exact heads, outcome) in `finally` — including denied, rejected,
+  stale, and failing operations; expected checks derive from the
+  centralized operations, so omitted instrumentation synthesizes `missing`
+  outcomes that block eligibility. Repair and reader/projector version
+  changes reset the epoch (old evidence preserved, excluded). Eligibility
+  = complete parity + zero divergences/errors + minimum total (20) and
+  per-subject samples + observed accepted/rejected/no-candidate/rollback/
+  re-promotion/audit/replay/restart paths.
+- Reversible canary authority: in `revision-canary`, supported reads are
+  served from the verified snapshot with native values compared before use;
+  unavailable or divergent derived state opens a durable circuit breaker
+  that blocks canary use (no per-read silent fallback); `strive reader
+  kill` returns immediately to native; mode changes and breaker state are
+  journaled; enablement requires current-epoch eligibility. Activation and
+  durable promotion remain generation-native.
+- 215 tests. Exit claim: strive can use revision-derived state as
+  authoritative for supported reads under a versioned, evidence-backed
+  canary mode, with coherent execution provenance, native comparison, a
+  durable circuit breaker, and an immediate kill switch. Activation
+  remains generation-native.
+
+## Stage 3B.3 — The first empirically evaluated prompt-surface composite revision experiment (next)
+
+In a separate PR: a `prompt` surface delta (the proposal template) evolved
+alongside strategy code in one composite revision, validated under the
+existing paired gate with held-out discipline — the first real use of
+multi-surface revisions, and the first empirical evidence for or against
+composite prompt-surface evolution in strive.
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 
