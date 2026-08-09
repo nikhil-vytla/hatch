@@ -11,7 +11,7 @@ stage 2b, and the stage-3A contract design with its revision pass.
 ## Stage 3A — contract design (what was decided)
 
 Six accepted ADRs under [adrs/](adrs/README.md) settle Stage 3's contracts
-design-first; experimental spikes (`stage3_contracts.py` + 16 round-trip/
+design-first; experimental spikes (`stage3_contracts.py` + 25 round-trip/
 structural tests) prove the shapes serialize and enforce their rules. The
 live loop is untouched; the new codec kinds are additive and unused.
 
@@ -72,8 +72,17 @@ migration-registry entry 0001 and the generation→revision rewrite entry
 0002 (Stage 3B); `FunctionTask` adapts `solve(str)->int` unchanged.
 
 **Freeze scope**: only the core wire types are frozen for 3B (ScopeRef,
-RevisionRef, BindingState, SurfaceDelta, ScopeManifest, ScopeContribution,
-ResolvedHarnessManifest, HarnessRevision + the descriptor registry shape);
+RevisionRef, BindingState, SurfaceDelta, ManifestBinding, ScopeManifest,
+JournalHeadRef, ScopeContribution, ResolvedHarnessManifest, HarnessRevision,
+RevisionActivation, MigrationProvenance + the historical descriptor
+registry shape). The lifecycle seam is complete: RevisionActivation@1 maps
+activation@2 field-exactly (legacy policy markers → the reserved name@0
+era; rollback history and last-activation-wins derivation verified against
+a real journal), MigrationProvenance preserves task fingerprint, origin,
+weakness, and CAS-encoded decision evidence, and descriptor pinning is
+historical (a prompt@1 binding stays valid after prompt@2 becomes current;
+risk derives from the delta itself, param families fail closed, trusted
+settings are not evolvable);
 task/dataset/evaluation, selection/frontier, algorithm-state, and backend
 schemas remain provisional until their slices, with the unresolved needs
 recorded in adrs/README (typed object refs, typed evidence roles,
@@ -88,12 +97,14 @@ stands); the wire schemas are now frozen for 3B after the revision pass —
 any further shape change in 3B costs a version bump plus a migration-registry
 entry, deliberately.
 
-**Exact next slice (independently mergeable)**: composite revision storage +
-the `SurfaceDescriptor` registry — freeze the three revision kinds, ship the
-migration registry with entries 0001/0002, port Store/loop/replay/CLI to
-revisions while the proposer still emits single-surface changes only. Pareto
-search, prompt/policy proposers, and scope journals come after, each as its
-own slice (ROADMAP stages 3B/3C).
+**Exact next slice (independently mergeable)**: **dual-write revision
+storage + the SurfaceDescriptor registry** — implement the frozen core wire
+types, ship migration-registry entries 0001/0002 (the 0002 backfill is
+field-exact with MigrationProvenance + CAS decision evidence), and write
+revision@1/revision-activation@1 alongside the generation-native records
+the loop keeps producing. Loop/activation/replay stay generation-native
+until a later parity slice; Pareto search, prompt/policy proposers, and
+scope journals come after, each as its own slice (ROADMAP stages 3B/3C).
 
 ## The Stage 2b claim, stated precisely
 

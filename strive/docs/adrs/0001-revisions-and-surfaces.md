@@ -83,10 +83,15 @@ high, search/retry knobs medium, cosmetic families low. Planned kinds:
 Adding a kind is a human code change to the registry — the loop cannot
 extend its own allowlist.
 
-**`SurfaceArtifact`** is the persisted unit an activation points at:
-`(kind, name, scope, content_ref)`. Activation of a revision atomically
-activates all artifacts its deltas produce (one journal line, same
-atomic-by-construction property as today's activation).
+**Activation is `RevisionActivation@1`** (frozen): the revision's
+`RevisionRef`, durable/provisional mode, reason, timestamp, a versioned
+`policy_ref` (legacy unversioned markers map to the reserved `name@0` era),
+an optional `decision_ref` into CAS, and the provisional monitoring data
+(`expires_after_cycles`, `baseline_score`) — preserving every `activation@2`
+field. Active-state derivation is unchanged: the last activation line in a
+scope's append-only journal names the active revision, so activating a
+revision atomically activates all bindings in its scope manifest (one
+journal line, the same atomic-by-construction property as today).
 
 **Rollback is a new revision, not a partial activation.** Whole-revision
 rollback re-activates the parent (today's semantics). *Per-surface* rollback
@@ -102,9 +107,17 @@ an `update`-labeled transition on strategy-code "solve" whose `before` is
 the parent generation's *content binding* (`parent.source_ref` with the
 pinned descriptor ref) and whose `after` binds `source_ref`; the migration
 itself is a versioned proposer (`ledger-migration@1`). The spike ships `revision_from_generation()`
-(which refuses inconsistent parents) plus round-trip tests; Stage 3B's
-migration (ADR-0006) rewrites task ledgers with that mapping. Until then the
-live loop keeps writing `generation@2`.
+(which refuses inconsistent parents) plus round-trip tests. Fields with no
+direct revision slot — task fingerprint, origin, weakness id, and the
+embedded `decision@1` acceptance/rejection evidence — are preserved
+losslessly in a CAS `MigrationProvenance` record referenced from
+`provenance_ref`, with the decision itself codec-encoded into CAS
+(`decision_ref`). **Stage 3B is dual-write, not a rewrite**: the loop keeps
+writing generation-native records (so `cycle@1` records and
+execution-and-decision replay are untouched) while revisions and revision
+activations are written alongside and backfilled by migration entry 0002;
+the loop/activation/replay become revision-native only in a later slice
+after dual-write parity is proven.
 
 ## Consequences
 

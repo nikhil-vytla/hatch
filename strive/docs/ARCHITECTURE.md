@@ -249,9 +249,15 @@ the shapes round-trip before anything migrates:
   + contributing revision refs/journal heads). Versioned
   `SurfaceDescriptor`s (artifact schema, materializer, allowed scopes,
   validation policy, risk-policy ref, online policy) form the trusted
-  allowlist; content bindings pin `descriptor_ref`; **risk is computed by
-  the descriptor's risk policy from name+scope+transition — policy params
-  are tiered, not uniformly low-risk**.
+  allowlist (historical: registry keyed by kind@version + a current
+  pointer, so old bindings stay valid across upgrades); content bindings
+  pin `descriptor_ref`; **risk is computed from the delta itself (no label
+  argument to spoof); policy-param families fail closed, and trusted
+  settings (sandbox/budget/evaluator/acceptance/secrets/ledger) are not
+  representable as evolvable params**. The lifecycle seam is frozen too:
+  RevisionActivation@1 preserves every activation@2 field with derivation
+  parity, and MigrationProvenance keeps task fingerprint/origin/weakness/
+  decision evidence lossless.
 - **ADR-0002** typed `ScopeRef` + explicit `ResolutionContext` (no colon
   parsing, no implicit default project): global → project → task → run with
   nearest-scope shadowing over scope manifests; `delete` removes this scope's override
@@ -290,6 +296,9 @@ the shapes round-trip before anything migrates:
 Freeze scope: only the core wire types are frozen for 3B (adrs/README has
 the authoritative table); task/dataset/evaluation, selection/frontier,
 algorithm-state, and backend schemas stay provisional until their slices.
+Stage 3B itself is deliberately narrow: **dual-write revision storage** —
+the loop, activation, and replay remain generation-native until a later
+parity slice.
 
 ## Implementation status (after phase 3 hardening)
 

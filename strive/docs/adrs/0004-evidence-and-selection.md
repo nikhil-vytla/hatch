@@ -61,9 +61,11 @@ extend).
 with two `ValidatorResult`s (baseline suite, candidate suite) whose metrics
 carry the split scores, regression ids in the artifact payload. Existing
 policies keep their names and versions; today's implicit objective becomes
-the first `ObjectiveSpec` artifact.
-Stage 3B writes new envelopes alongside `decision@1` inside `generation`
-records until the revision migration lands, then replaces them.
+the first `ObjectiveSpec` artifact. These envelopes land in the selection
+slice — Stage 3B (dual-write revision storage) does not touch them;
+meanwhile migrated decision evidence travels as CAS-encoded `decision@1`
+referenced from `RevisionActivation.decision_ref` and
+`MigrationProvenance.decision_ref`.
 
 ## Consequences
 

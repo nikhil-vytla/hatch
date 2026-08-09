@@ -486,3 +486,37 @@ Seven corrections to the contracts before the 3B freeze:
   "physically isolated"; 3B scope stated exactly.
 
 158 tests, mypy strict clean. Live loop untouched throughout.
+
+## 2026-08-08 — stage 3A core-consistency pass (final, pre-merge on PR #40)
+
+- Lifecycle seam completed: RevisionActivation@1 frozen with field-exact
+  activation@2 mapping (legacy unversioned policy markers map to the
+  reserved name@0 era; rollback history maps activation-by-activation and
+  the last-activation-wins derivation is verified against a real journal at
+  every prefix). MigrationProvenance@1 preserves task fingerprint, origin,
+  weakness, and CAS-encoded decision@1 evidence losslessly. Consequence
+  honestly drawn: Stage 3B is narrowed to DUAL-WRITE revision storage —
+  loop/activation/replay stay generation-native until a parity slice, so
+  cycle@1 replay is untouched by construction.
+- Descriptor pinning made historical: registry keyed by kind@version plus a
+  current-version pointer; validation resolves the exact pinned version;
+  prompt@1 binding proven valid while prompt@2 is current.
+- Risk hardened: effective_risk takes the actual delta and derives the
+  transition internally (no label argument to spoof); policy-param families
+  fail closed (unknown → rejected, never low); sandbox/budget/evaluator/
+  acceptance/secrets/ledger families are not representable as evolvable
+  params at all.
+- Manifest invariants: base_parent must share the revision's scope
+  (cross-scope origins are provenance only); scope manifests reject unknown
+  and scope-disallowed kinds for content AND masks; duplicate manifests per
+  scope rejected in resolution; ResolvedHarnessManifest records its exact
+  resolution_chain; journal heads are opaque versioned JournalHeadRefs;
+  contributions must be unique, chain-ordered, and scope-consistent.
+- Wording: RLM described accurately (inference-time recursive/context-
+  decomposition harness; persists nothing at runtime — the paper's training
+  is upstream of the harness); ADR-0003/0004 no longer claim their schemas
+  land in 3B; "five scopes" → four levels + a mode; stale SurfaceArtifact
+  paragraph replaced by the RevisionActivation one; algorithm records claim
+  restartability, not bit-reproducible resumption.
+
+164 tests (25 spike), mypy strict clean. Live loop untouched.

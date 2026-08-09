@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from strive.codec import register
+from strive.contracts import Activation as LegacyActivation
 from strive.contracts import BudgetSpec, BudgetUsage, Generation
 
 # -- typed scopes (ADR-0002; frozen) -------------------------------------------------
@@ -166,17 +167,43 @@ def _prompt_risk(name: str, scope: ScopeRef, label: str) -> str:
     return _bump_for_scope_and_label(RISK_MEDIUM, scope, label)
 
 
-def _params_risk(name: str, scope: ScopeRef, label: str) -> str:
-    """Policy parameters are tiered by what they control, not uniformly low:
-    parameters steering budgets or the sandbox are as dangerous as code."""
+# Trusted settings must not be representable as evolvable policy-params at
+# all: sandbox controls, hard budget ceilings, evaluator/acceptance settings,
+# secret permissions, and ledger settings are kernel configuration, not
+# evolvable surface. Only reviewed agent-behavior families are admissible,
+# and they operate inside trusted caps.
+FORBIDDEN_PARAM_FAMILIES = frozenset(
+    {"sandbox", "budget", "evaluator", "acceptance", "secrets", "ledger"}
+)
+ALLOWED_PARAM_FAMILIES: dict[str, str] = {
+    "search": RISK_MEDIUM,
+    "retry": RISK_MEDIUM,
+    "proposal": RISK_MEDIUM,
+    "display": RISK_LOW,
+}
+
+
+def validate_param_name(name: str) -> str:
+    """Fail closed: unknown families are rejected, never defaulted to low;
+    trusted-setting families are not evolvable at any risk level."""
     family = name.split(".", 1)[0]
-    base = {
-        "sandbox": RISK_HIGH,
-        "budget": RISK_HIGH,
-        "search": RISK_MEDIUM,
-        "retry": RISK_MEDIUM,
-    }.get(family, RISK_LOW)
-    return _bump_for_scope_and_label(base, scope, label)
+    if family in FORBIDDEN_PARAM_FAMILIES:
+        raise ContractViolation(
+            f"policy-param family {family!r} is a trusted kernel setting and "
+            "is not representable as an evolvable surface"
+        )
+    if family not in ALLOWED_PARAM_FAMILIES:
+        raise ContractViolation(
+            f"unknown policy-param family {family!r}; admissible families are "
+            f"{sorted(ALLOWED_PARAM_FAMILIES)} (fail-closed, no low-risk default)"
+        )
+    return ALLOWED_PARAM_FAMILIES[family]
+
+
+def _params_risk(name: str, scope: ScopeRef, label: str) -> str:
+    """Reviewed agent-behavior parameter families only, tiered — and fail
+    closed on anything unrecognized."""
+    return _bump_for_scope_and_label(validate_param_name(name), scope, label)
 
 
 RISK_POLICIES: dict[str, RiskPolicy] = {
@@ -186,8 +213,15 @@ RISK_POLICIES: dict[str, RiskPolicy] = {
 }
 
 
-SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
-    SURFACE_STRATEGY_CODE: SurfaceDescriptor(
+def _descriptor(**kwargs: object) -> SurfaceDescriptor:
+    return SurfaceDescriptor(**kwargs)  # type: ignore[arg-type]
+
+
+# Descriptors are stored historically: the registry is keyed by descriptor_ref
+# (kind@version) and a separate pointer names each kind's *current* version.
+# Old bindings stay valid against the exact descriptor they pinned.
+DESCRIPTOR_REGISTRY: dict[str, SurfaceDescriptor] = {
+    "strategy-code@1": _descriptor(
         kind=SURFACE_STRATEGY_CODE,
         version=1,
         artifact_schema="python-module@1",
@@ -197,7 +231,7 @@ SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
         risk_policy_ref="code-risk@1",
         online_policy=ONLINE_NEVER,
     ),
-    SURFACE_PROMPT: SurfaceDescriptor(
+    "prompt@1": _descriptor(
         kind=SURFACE_PROMPT,
         version=1,
         artifact_schema="text@1",
@@ -205,9 +239,21 @@ SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
         allowed_scopes=SCOPE_LEVELS,
         validation_policy="paired-deterministic@1",
         risk_policy_ref="prompt-risk@1",
+        online_policy=ONLINE_NEVER,
+    ),
+    # prompt@2 exists to prove historical pinning: prompt@1 bindings remain
+    # valid after prompt@2 becomes current.
+    "prompt@2": _descriptor(
+        kind=SURFACE_PROMPT,
+        version=2,
+        artifact_schema="text@1",
+        materializer="kernel-text@1",
+        allowed_scopes=SCOPE_LEVELS,
+        validation_policy="paired-deterministic@1",
+        risk_policy_ref="prompt-risk@1",
         online_policy=ONLINE_NEVER,  # stage 5 revisits via a descriptor version
     ),
-    SURFACE_POLICY_PARAMS: SurfaceDescriptor(
+    "policy-params@1": _descriptor(
         kind=SURFACE_POLICY_PARAMS,
         version=1,
         artifact_schema="params@1",
@@ -219,13 +265,40 @@ SURFACE_REGISTRY: dict[str, SurfaceDescriptor] = {
     ),
 }
 
+CURRENT_DESCRIPTOR: dict[str, str] = {
+    SURFACE_STRATEGY_CODE: "strategy-code@1",
+    SURFACE_PROMPT: "prompt@2",
+    SURFACE_POLICY_PARAMS: "policy-params@1",
+}
 
-def effective_risk(kind: str, name: str, scope: ScopeRef, label: str) -> str:
-    """Risk from descriptor + scope + transition label (never from a delta)."""
-    descriptor = SURFACE_REGISTRY.get(kind)
+SURFACE_KINDS = tuple(CURRENT_DESCRIPTOR)
+
+
+def descriptor_for(descriptor_ref: str) -> SurfaceDescriptor:
+    descriptor = DESCRIPTOR_REGISTRY.get(descriptor_ref)
     if descriptor is None:
+        raise ContractViolation(
+            f"descriptor {descriptor_ref!r} is not in the trusted registry"
+        )
+    return descriptor
+
+
+def current_descriptor(kind: str) -> SurfaceDescriptor:
+    ref = CURRENT_DESCRIPTOR.get(kind)
+    if ref is None:
         raise ContractViolation(f"surface kind {kind!r} is not in the trusted registry")
-    return RISK_POLICIES[descriptor.risk_policy_ref](name, scope, label)
+    return DESCRIPTOR_REGISTRY[ref]
+
+
+def effective_risk(delta: "SurfaceDelta", scope: ScopeRef) -> str:
+    """Risk from descriptor + scope + the delta's own transition.
+
+    Callers cannot supply a label: it is derived from the delta's before/after
+    states, so a proposal has nothing to spoof."""
+    descriptor = current_descriptor(delta.kind)
+    return RISK_POLICIES[descriptor.risk_policy_ref](
+        delta.name, scope, delta_label(delta)
+    )
 
 
 # -- binding states and deltas (ADR-0001; frozen) -------------------------------------
@@ -251,14 +324,24 @@ ABSENT = BindingState(BINDING_ABSENT)
 MASKED = BindingState(BINDING_MASKED)
 
 
-def content_binding(kind: str, content_ref: str) -> BindingState:
-    descriptor = SURFACE_REGISTRY.get(kind)
-    if descriptor is None:
-        raise ContractViolation(f"surface kind {kind!r} is not in the trusted registry")
-    return BindingState(BINDING_CONTENT, content_ref, descriptor.descriptor_ref)
+def content_binding(
+    kind: str, content_ref: str, descriptor_ref: str | None = None
+) -> BindingState:
+    """A content binding pinned to a descriptor: the kind's *current*
+    descriptor by default, or an explicit historical descriptor_ref."""
+    if descriptor_ref is None:
+        descriptor_ref = current_descriptor(kind).descriptor_ref
+    descriptor = descriptor_for(descriptor_ref)
+    if descriptor.kind != kind:
+        raise ContractViolation(
+            f"descriptor {descriptor_ref!r} does not describe kind {kind!r}"
+        )
+    return BindingState(BINDING_CONTENT, content_ref, descriptor_ref)
 
 
 def validate_binding(binding: BindingState, kind: str) -> None:
+    """Validation resolves the binding's exact *pinned* descriptor — a
+    historical version stays valid after a newer one becomes current."""
     if binding.state not in BINDING_STATES:
         raise ContractViolation(f"unknown binding state {binding.state!r}")
     if binding.state == BINDING_CONTENT:
@@ -266,13 +349,11 @@ def validate_binding(binding: BindingState, kind: str) -> None:
             raise ContractViolation(
                 "a content binding requires both content_ref and descriptor_ref"
             )
-        expected = f"{kind}@{SURFACE_REGISTRY[kind].version}" if kind in SURFACE_REGISTRY else None
-        if expected is None:
-            raise ContractViolation(f"surface kind {kind!r} is not in the trusted registry")
-        if binding.descriptor_ref != expected:
+        pinned = descriptor_for(binding.descriptor_ref)  # exact version, not current
+        if pinned.kind != kind:
             raise ContractViolation(
-                f"descriptor_ref {binding.descriptor_ref!r} does not pin the "
-                f"registered descriptor {expected!r}"
+                f"descriptor_ref {binding.descriptor_ref!r} does not describe "
+                f"kind {kind!r}"
             )
     else:
         if binding.content_ref is not None or binding.descriptor_ref is not None:
@@ -328,12 +409,9 @@ def check_delta_applies(delta: SurfaceDelta, current: BindingState) -> None:
 
 
 def validate_delta(delta: SurfaceDelta, scope: ScopeRef) -> None:
-    descriptor = SURFACE_REGISTRY.get(delta.kind)
-    if descriptor is None:
-        raise ContractViolation(
-            f"surface kind {delta.kind!r} is not in the trusted registry "
-            f"{sorted(SURFACE_REGISTRY)}"
-        )
+    descriptor = current_descriptor(delta.kind)  # raises on unknown kinds
+    if delta.kind == SURFACE_POLICY_PARAMS:
+        validate_param_name(delta.name)  # fail closed; trusted settings barred
     if scope.level not in descriptor.allowed_scopes:
         raise ContractViolation(
             f"surface kind {delta.kind!r} is not allowed at scope level "
@@ -381,7 +459,27 @@ def validate_scope_manifest(manifest: ScopeManifest) -> None:
             raise ContractViolation(
                 f"scope manifest must not store absent bindings ({entry.name!r})"
             )
+        # unknown or scope-disallowed kinds are rejected for content AND masks
+        descriptor = current_descriptor(entry.kind)
+        if manifest.scope.level not in descriptor.allowed_scopes:
+            raise ContractViolation(
+                f"surface kind {entry.kind!r} is not allowed at scope level "
+                f"{manifest.scope.level!r}"
+            )
+        if entry.kind == SURFACE_POLICY_PARAMS:
+            validate_param_name(entry.name)
         validate_binding(entry.binding, entry.kind)
+
+
+@register("journal-head", 1)
+@dataclass(frozen=True)
+class JournalHeadRef:
+    """Opaque, backend-versioned journal position — never a bare int, so a
+    backend change (JSONL byte offset today, an indexed sequence tomorrow)
+    does not change this contract's meaning."""
+
+    backend: str  # e.g. "jsonl@1"
+    value: str  # backend-interpreted position token
 
 
 @register("scope-contribution", 1)
@@ -392,22 +490,29 @@ class ScopeContribution:
 
     scope: ScopeRef
     revision: RevisionRef
-    journal_head: int
+    journal_head: JournalHeadRef
 
 
 @register("resolved-manifest", 1)
 @dataclass(frozen=True)
 class ResolvedHarnessManifest:
-    """Run-resolved effective state after run→task→project→global resolution.
+    """Run-resolved effective state after resolution over an explicit chain.
 
     Runs and evaluations reference *this*; revisions never do — a revision
     owns only its own scope's manifest."""
 
-    contributions: tuple[ScopeContribution, ...]  # narrowest scope first
+    resolution_chain: tuple[ScopeRef, ...]  # the exact chain, narrowest first
+    contributions: tuple[ScopeContribution, ...]  # unique, in chain order
     effective: tuple[ManifestBinding, ...]  # content bindings only, canonical
 
 
 def validate_resolved_manifest(manifest: ResolvedHarnessManifest) -> None:
+    if not manifest.resolution_chain:
+        raise ContractViolation("a resolved manifest must record its resolution chain")
+    for scope in manifest.resolution_chain:
+        validate_scope(scope)
+    if len(set(manifest.resolution_chain)) != len(manifest.resolution_chain):
+        raise ContractViolation("resolution chain must not repeat scopes")
     _require_canonical(manifest.effective, "resolved manifest")
     for entry in manifest.effective:
         if entry.binding.state != BINDING_CONTENT:
@@ -416,8 +521,29 @@ def validate_resolved_manifest(manifest: ResolvedHarnessManifest) -> None:
                 f"({entry.name!r} is {entry.binding.state})"
             )
         validate_binding(entry.binding, entry.kind)
+    chain_index = {scope: i for i, scope in enumerate(manifest.resolution_chain)}
+    last_index = -1
+    seen: set[ScopeRef] = set()
     for contribution in manifest.contributions:
         validate_scope(contribution.scope)
+        if contribution.scope not in chain_index:
+            raise ContractViolation(
+                f"contribution scope {contribution.scope} is not in the "
+                "resolution chain"
+            )
+        if contribution.scope in seen:
+            raise ContractViolation(
+                f"duplicate contribution for scope {contribution.scope}"
+            )
+        seen.add(contribution.scope)
+        index = chain_index[contribution.scope]
+        if index <= last_index:
+            raise ContractViolation("contributions must follow resolution-chain order")
+        last_index = index
+        if contribution.revision.scope != contribution.scope:
+            raise ContractViolation(
+                "a contribution's revision must belong to the contributing scope"
+            )
 
 
 def resolve_bindings(
@@ -425,7 +551,13 @@ def resolve_bindings(
 ) -> tuple[ManifestBinding, ...]:
     """Nearest-scope shadowing over scope manifests: masks stop fall-through
     (absent on purpose); a scope with no binding falls through."""
-    by_scope = {m.scope: m for m in scope_manifests}
+    by_scope: dict[ScopeRef, ScopeManifest] = {}
+    for manifest in scope_manifests:
+        if manifest.scope in by_scope:
+            raise ContractViolation(
+                f"duplicate scope manifest for {manifest.scope}"
+            )
+        by_scope[manifest.scope] = manifest
     keys: set[tuple[str, str]] = set()
     for manifest in scope_manifests:
         keys.update((b.kind, b.name) for b in manifest.bindings)
@@ -486,6 +618,11 @@ def validate_revision(revision: HarnessRevision) -> None:
         validate_scope(revision.base_parent.scope)
         if revision.base_parent == revision.ref:
             raise ContractViolation("a revision cannot be its own base parent")
+        if revision.base_parent.scope != revision.ref.scope:
+            raise ContractViolation(
+                "base_parent must live at the revision's own scope; cross-scope "
+                "origins belong in provenance_parents"
+            )
     seen_parents: set[RevisionRef] = set()
     for parent in revision.provenance_parents:
         validate_scope(parent.scope)
@@ -544,6 +681,119 @@ def revision_from_generation(
         summary=f"migrated from {generation.generation_id} ({generation.origin})",
         created_at=generation.created_at,
     )
+
+
+# -- revision lifecycle (ADR-0001; frozen) --------------------------------------------
+
+ACTIVATION_DURABLE = "durable"
+ACTIVATION_PROVISIONAL = "provisional"
+ACTIVATION_REASONS = (
+    "seed", "evolved", "rollback", "promote", "confirmed", "expired-reverted",
+    "migrated",
+)
+
+
+@register("revision-activation", 1)
+@dataclass(frozen=True)
+class RevisionActivation:
+    """The activation record for revisions — the frozen lifecycle seam.
+
+    Active-state derivation is unchanged from today: the last activation
+    entry in a scope's append-only journal names the active revision; nothing
+    is ever mutated, and rollback/expiry are just further activations.
+
+    Exact mapping from the live ``activation@2``:
+    - ``generation_id`` + ``task_id``  → ``revision = RevisionRef(task scope,
+      gen→rev id)``;
+    - ``mode``/``reason``/``at``       → verbatim (same vocabularies);
+    - ``policy``                       → ``policy_ref`` (already-versioned
+      strings pass through; legacy unversioned markers like "seed"/"manual"
+      map to ``name@0`` — version 0 is the reserved pre-versioned era);
+    - ``expires_after_cycles`` and ``baseline_score`` (the provisional
+      monitoring data) are preserved verbatim;
+    - ``decision_ref`` is new: for accepted evolved generations the migration
+      encodes the generation's embedded ``decision@1`` into CAS and points
+      here; seeds and rollbacks carry None.
+    Rollback history maps activation-by-activation in journal order, so the
+    derived active revision at every historical prefix is identical.
+    """
+
+    revision: RevisionRef
+    mode: str  # durable | provisional
+    reason: str  # ACTIVATION_REASONS
+    at: str
+    policy_ref: str  # name@version (version 0 = legacy pre-versioned marker)
+    decision_ref: str | None = None  # CAS ref of the decision/evidence record
+    expires_after_cycles: int | None = None
+    baseline_score: float | None = None
+
+
+def validate_revision_activation(activation: RevisionActivation) -> None:
+    validate_scope(activation.revision.scope)
+    if activation.mode not in (ACTIVATION_DURABLE, ACTIVATION_PROVISIONAL):
+        raise ContractViolation(f"unknown activation mode {activation.mode!r}")
+    if activation.reason not in ACTIVATION_REASONS:
+        raise ContractViolation(f"unknown activation reason {activation.reason!r}")
+    if "@" not in activation.policy_ref:
+        raise ContractViolation(
+            f"policy_ref {activation.policy_ref!r} must be versioned (name@version)"
+        )
+    if activation.mode == ACTIVATION_PROVISIONAL and activation.expires_after_cycles is None:
+        raise ContractViolation("a provisional activation must carry its expiry")
+
+
+def _legacy_policy_ref(policy: str) -> str:
+    return policy if "@" in policy else f"{policy}@0"
+
+
+def revision_activation_from_activation(
+    activation: "LegacyActivation", decision_ref: str | None
+) -> RevisionActivation:
+    """Field-exact mapping from the live activation@2 record (see the
+    RevisionActivation docstring for the rules)."""
+    scope = ScopeRef(LEVEL_TASK, activation.task_id)
+    return RevisionActivation(
+        revision=RevisionRef(
+            scope, activation.generation_id.replace("gen-", "rev-")
+        ),
+        mode=activation.mode,
+        reason=activation.reason,
+        at=activation.at,
+        policy_ref=_legacy_policy_ref(activation.policy),
+        decision_ref=decision_ref,
+        expires_after_cycles=activation.expires_after_cycles,
+        baseline_score=activation.baseline_score,
+    )
+
+
+@register("migration-provenance", 1)
+@dataclass(frozen=True)
+class MigrationProvenance:
+    """Everything a migrated ``generation@2`` carried that has no direct
+    revision field, preserved losslessly in CAS and referenced from the
+    revision's ``provenance_ref``:
+
+    - ``task_fingerprint`` — the task definition the generation was created
+      against (drives the drift guard exactly as before);
+    - ``origin`` (seed/evolved/manual) and ``weakness_id``;
+    - ``decision_ref`` — the embedded ``decision@1`` (acceptance/rejection
+      evidence: policy identity, scores, regressed case ids) codec-encoded
+      into CAS, or None for seeds.
+
+    Existing ``cycle@1`` records are untouched by migration and stay
+    replayable as-is: they reference generation ids and task fingerprints,
+    and Stage 3B is *dual-write* — the loop keeps writing generation-native
+    records while revisions are written alongside, so execution-and-decision
+    replay continues to run against the generation records it was built for.
+    """
+
+    source: str  # e.g. "generation@2"
+    generation_id: str
+    task_id: str
+    task_fingerprint: str
+    origin: str
+    weakness_id: str | None
+    decision_ref: str | None
 
 
 # ======================================================================================
@@ -699,7 +949,10 @@ ALGORITHM_HALTED = "halted"
 @register("algorithm-run", 1)
 @dataclass(frozen=True)
 class AlgorithmRun:
-    """PROVISIONAL. Journaled search state (resumption via journaled steps)."""
+    """PROVISIONAL. Journaled search state: enough to *restart* from the last
+    journaled step. Bit-reproducible resumption additionally needs objective,
+    RNG-state, and algorithm-state refs — an unresolved need recorded in the
+    adrs/README freeze table, settled by the algorithm slice."""
 
     algorithm: str
     run_id: str
