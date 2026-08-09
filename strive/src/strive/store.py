@@ -265,9 +265,19 @@ class Store:
             self._append_unlocked(entry)
 
     def entries(self) -> list[LedgerEntry]:
+        return self.entries_with_bytes()[1]
+
+    def entries_with_bytes(self) -> tuple[bytes, list[LedgerEntry]]:
+        """One read: the exact ledger bytes AND the entries parsed from those
+        bytes. The Stage-3B.2 read boundary derives the native view and the
+        SourceSnapshot from this single capture, so they cannot disagree."""
         if not self.ledger_path.exists():
-            return []
-        raw = self.ledger_path.read_bytes().decode("utf-8")
+            return b"", []
+        raw_bytes = self.ledger_path.read_bytes()
+        return raw_bytes, self._parse_entries(raw_bytes)
+
+    def _parse_entries(self, raw_bytes: bytes) -> list[LedgerEntry]:
+        raw = raw_bytes.decode("utf-8")
         lines = raw.split("\n")
         # A final fragment without newline is a torn append from a crash:
         # tolerated, reported, ignored. Everything else must validate.

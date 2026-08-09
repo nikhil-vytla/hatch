@@ -54,7 +54,10 @@ from strive.reader import (
     clear_breaker,
     cutover_eligibility,
     enable_canary,
+    force_native,
     kill_switch,
+    lift_force_native,
+    quarantine_reader_journal,
     read_coverage,
     reader_state,
     set_mode,
@@ -110,12 +113,14 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
                     "STRIVE_MODEL_PROVIDER to use the offline scripted fixture."
                 )
             adapter_note = "real (env-configured; --unsafe-model-code acknowledged)"
+            unsafe = True
         else:
             adapter = scripted_fixture_adapter()
             adapter_note = (
                 "scripted fixture (offline; proves the pipeline, not model "
                 "capability — set STRIVE_MODEL_PROVIDER for a real model)"
             )
+            unsafe = False
         config = LoopConfig(
             sandbox_timeout_s=args.timeout,
             proposer=ModelProposer(),
@@ -123,6 +128,7 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
             model_adapter=adapter,
             budget=BudgetSpec(model_calls=4),
             acknowledge_task_drift=args.acknowledge_task_drift,
+            unsafe_model_code=unsafe,
         )
     else:
         adapter_note = None
@@ -181,17 +187,19 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
 
 def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     ensure_seeded(store, task)
-    active = store.active_generation()
-    activation = store.active_activation()
-    assert active is not None and activation is not None
-    # the status/restart read, routed through the read boundary
+    # the status/restart read, routed through the read boundary; the output
+    # itself derives from the reader's coherent capture
+    from strive.store import derive_active_activation, derive_adaptation_frozen
+
     reader = StateReader(store, "status")
     try:
-        reader.read_active("status-active")
+        active = reader.read_active("status-active")
+        activation = derive_active_activation(reader.ledger_entries())
+        frozen = derive_adaptation_frozen(reader.ledger_entries())
         reader.add_fact("restart")  # a fresh process's first state read
     finally:
         reader.finish(None)
-    frozen = store.adaptation_frozen()
+    assert active is not None and activation is not None
     data = {
         "active_generation": codec.encode(active),
         "activation": codec.encode(activation),
@@ -510,6 +518,7 @@ def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[s
 
 def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     action = args.action
+    quarantined: str | None = None
     if action == "shadow":
         set_mode(store, MODE_SHADOW, reason="operator: begin shadow burn-in")
     elif action == "native":
@@ -520,6 +529,15 @@ def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
         enable_canary(store)  # raises ReaderError with reasons when ineligible
     elif action == "clear-breaker":
         clear_breaker(store, reason="operator: breaker cleared after repair")
+    elif action == "force-native":
+        # the emergency override: independent of the reader journal
+        force_native(store, "operator force-native override")
+    elif action == "lift-force":
+        lift_force_native(store)
+    elif action == "reset-journal":
+        quarantined = quarantine_reader_journal(
+            store, "operator reset after journal corruption"
+        )
     elif action != "status":
         raise CliError(f"unknown reader action {action!r}")
 
@@ -528,6 +546,10 @@ def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
     coverage = verdict.coverage
     data = {
         "mode": state.mode,
+        "configured_mode": state.configured_mode,
+        "forced_native": state.forced_native,
+        "journal_head": state.journal_head,
+        "quarantined": quarantined,
         "breaker_open": state.breaker_open,
         "breaker_reason": state.breaker_reason,
         "epoch": state.epoch,
@@ -551,6 +573,7 @@ def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
     }
     lines = [
         f"reader mode: {state.mode}"
+        + (" [FORCE-NATIVE OVERRIDE]" if state.forced_native else "")
         + (f" (BREAKER OPEN: {state.breaker_reason})" if state.breaker_open else ""),
         f"epoch: {state.epoch or '(none for this reader/projector version)'}",
         f"current-epoch checks: total={coverage.total} agreed={coverage.agreed} "
@@ -700,10 +723,16 @@ def build_parser() -> argparse.ArgumentParser:
         "action",
         nargs="?",
         default="status",
-        choices=("status", "native", "shadow", "canary", "kill", "clear-breaker"),
+        choices=(
+            "status", "native", "shadow", "canary", "kill", "clear-breaker",
+            "force-native", "lift-force", "reset-journal",
+        ),
         help="status (default) | native | shadow | canary (requires "
         "current-epoch eligibility) | kill (immediate return to native) | "
-        "clear-breaker",
+        "clear-breaker (requires native/shadow mode, complete parity, and a "
+        "fresh epoch) | force-native (emergency override independent of the "
+        "reader journal) | lift-force | reset-journal (quarantine a corrupt "
+        "reader journal and start fresh in native mode)",
     )
     sub.add_parser(
         "migrate",

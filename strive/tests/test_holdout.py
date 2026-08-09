@@ -90,12 +90,13 @@ def test_history_outcomes_carry_visible_scores_only(tmp_path: Path) -> None:
     """Hidden-influenced overall scores must not flow back to proposers: the
     sanitized history reports visible-split score movement only."""
     from strive.loop import _proposal_history
+    from strive.reader import StateReader
 
     store = Store(tmp_path / "artifacts2", SUM_INTEGERS_TASK.task_id)
     report = run_cycle(store, SUM_INTEGERS_TASK)
     assert report.decision is not None
 
-    history = _proposal_history(store, limit=5)
+    history = _proposal_history(StateReader(store, "cycle"), limit=5)
     assert history  # the accepted candidate appears
     for item in history:
         assert "visible" in item.outcome

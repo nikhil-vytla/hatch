@@ -64,9 +64,10 @@ from strive.propose import (
     STRATEGY_CODE_SURFACE,
     screen_source,
 )
-from strive.reader import CandidateSubject, StateReader
+from strive.reader import MODE_CANARY, CandidateSubject, StateReader
 from strive.sandbox import run_strategy
 from strive.store import (
+    LedgerEntry,
     Store,
     StoreError,
     derive_activation_before,
@@ -75,6 +76,7 @@ from strive.store import (
     derive_adaptation_frozen,
     derive_cycles,
     derive_cycles_since_activation,
+    derive_generations,
 )
 from strive.tasks import Task
 
@@ -91,6 +93,9 @@ class LoopConfig:
     stall_window: int = 3
     history_limit: int = 5
     acknowledge_task_drift: bool = False
+    # set when the proposer runs REAL model-generated code without host
+    # confinement: canary mode is refused for such runs (threat model)
+    unsafe_model_code: bool = False
 
 
 @dataclass(frozen=True)
@@ -119,6 +124,7 @@ def guard_task_binding(
     *,
     mutating: bool,
     acknowledge_drift: bool = False,
+    entries: "list[LedgerEntry] | None" = None,
 ) -> bool:
     """The one shared task-binding guard, called by every public operation.
 
@@ -133,7 +139,7 @@ def guard_task_binding(
         raise StoreError(
             f"store is bound to task {store.task_id!r}, got {task.task_id!r}"
         )
-    active = store.active_generation()
+    active = derive_active_generation(entries if entries is not None else store.entries())
     if active is None:
         return False
     if active.task_fingerprint == task.fingerprint():
@@ -151,14 +157,20 @@ def guard_task_binding(
     return mutating and acknowledge_drift
 
 
-def guard_mutation(store: Store, task: Task, acknowledge_drift: bool) -> None:
+def guard_mutation(
+    store: Store,
+    task: Task,
+    acknowledge_drift: bool,
+    entries: "list[LedgerEntry] | None" = None,
+) -> None:
     """The single entry point for mutating operations: task-binding + drift
     validation, plus durable journaling of a drift acknowledgement whenever —
     and only whenever — drift actually exists and was acknowledged. New
     mutating operations must call this, so the journaling cannot be forgotten.
     """
     drift_acknowledged = guard_task_binding(
-        store, task, mutating=True, acknowledge_drift=acknowledge_drift
+        store, task, mutating=True, acknowledge_drift=acknowledge_drift,
+        entries=entries,
     )
     if drift_acknowledged:
         store.append(
@@ -174,9 +186,11 @@ def guard_mutation(store: Store, task: Task, acknowledge_drift: bool) -> None:
 
 
 def ensure_seeded(store: Store, task: Task) -> Generation:
-    guard_task_binding(store, task, mutating=False)
     reader = StateReader(store, "seed")
     try:
+        guard_task_binding(
+            store, task, mutating=False, entries=reader.ledger_entries()
+        )
         active = reader.read_active("seed-active")
         if active is not None:
             return active
@@ -189,7 +203,13 @@ def ensure_seeded(store: Store, task: Task) -> Generation:
             weakness_id=None,
             decision=None,
         )
-        store.activate(record.generation_id, reason="seed", policy="seed")
+        reader.refresh()  # our own write; the activation carries its head
+        store.activate(
+            record.generation_id,
+            reason="seed",
+            policy="seed",
+            expected_head=reader.canonical_head,
+        )
         reader.refresh()
         return record
     finally:
@@ -263,13 +283,13 @@ def _execute_and_evaluate(
     return evaluation
 
 
-def _proposal_history(store: Store, limit: int) -> tuple[ProposalHistoryItem, ...]:
+def _proposal_history(reader: StateReader, limit: int) -> tuple[ProposalHistoryItem, ...]:
     """Sanitized accepted/rejected history: visible-split scores and policy
     identity only. Decision *reasons* are excluded (they may cite hidden-split
     case ids) and so are overall/hidden-split scores (they are influenced by
     hidden evaluation data and must not flow back to proposers)."""
     items: list[ProposalHistoryItem] = []
-    for generation in store.generations().values():
+    for generation in derive_generations(reader.ledger_entries()).values():
         decision = generation.decision
         if decision is None:
             continue
@@ -336,10 +356,12 @@ def _resolve_provisional(store: Store, reader: StateReader, events: EventLog) ->
             at=now_iso(),
         )
     )
+    reader.refresh()  # our own write; the revert activation carries its head
     store.activate(
         previous.generation_id,
         reason="expired-reverted",
         policy=f"{PROVISIONAL_POLICY.name}@{PROVISIONAL_POLICY.version}",
+        expected_head=reader.canonical_head,
     )
     reader.refresh()
     events.emit(
@@ -375,7 +397,7 @@ def _proposal_stage(
         task_description=task.description,
         task_signature=task.signature,
         primitive_catalog=task.primitive_catalog,
-        history=_proposal_history(store, config.history_limit),
+        history=_proposal_history(reader, config.history_limit),
         max_output_tokens=config.model_max_tokens,
         model_calls_remaining=max(0, config.budget.model_calls - usage.model_calls - 1),
         executions_remaining=max(0, config.budget.executions - usage.executions),
@@ -435,7 +457,6 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
     config = config or LoopConfig()
     policy: AcceptancePolicy = get_policy(config.policy_name)
     ensure_seeded(store, task)
-    guard_mutation(store, task, config.acknowledge_task_drift)
 
     run_id = _new_run_id()
     events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
@@ -445,6 +466,24 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
     reader = StateReader(store, "cycle", run_id=run_id)
     status = "ok"
     try:
+        # threat model: candidate code runs without host-enforced filesystem
+        # confinement, so real model-generated code could tamper with the
+        # reader control/evidence journal — canary mode is refused outright
+        if config.unsafe_model_code and reader.mode == MODE_CANARY:
+            status = "rejected"
+            raise StoreError(
+                "revision-canary mode is refused for real model-generated "
+                "code: the sandbox does not confine filesystem access, so "
+                "candidate code could tamper with reader control and "
+                "evidence. Run `strive reader kill` first, or use the "
+                "offline scripted fixture."
+            )
+        guard_mutation(
+            store, task, config.acknowledge_task_drift,
+            entries=reader.ledger_entries(),
+        )
+        if config.acknowledge_task_drift:
+            reader.refresh()  # the guard may have journaled an acknowledgement
         _resolve_provisional(store, reader, events)
         # the exact native read, paired through the read boundary before use
         active = reader.read_active("cycle-baseline")
@@ -478,7 +517,8 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
         if frozen:
             assert freeze is not None
             events.emit("adaptation_frozen", reason=freeze.reason)
-            reader.note_not_applicable("cycle-candidate", "adaptation frozen")
+            reader.note_not_applicable("cycle-candidate-overlay", "adaptation frozen")
+            reader.note_not_applicable("cycle-candidate-retained", "adaptation frozen")
         else:
             ctx = VisibleContext(
                 task_id=task.task_id,
@@ -493,7 +533,12 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
             if diagnosis is None:
                 events.emit("no_weakness_detected")
                 reader.add_fact("no-candidate")
-                reader.note_not_applicable("cycle-candidate", "no weakness detected")
+                reader.note_not_applicable(
+                    "cycle-candidate-overlay", "no weakness detected"
+                )
+                reader.note_not_applicable(
+                    "cycle-candidate-retained", "no weakness detected"
+                )
             else:
                 events.emit("weakness_detected", diagnosis=codec.encode(diagnosis))
                 proposal, proposal_failure = _proposal_stage(
@@ -502,7 +547,11 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                 if proposal is None:
                     assert proposal_failure is not None
                     reader.note_not_applicable(
-                        "cycle-candidate",
+                        "cycle-candidate-overlay",
+                        f"proposal rejected: {proposal_failure.kind}",
+                    )
+                    reader.note_not_applicable(
+                        "cycle-candidate-retained",
                         f"proposal rejected: {proposal_failure.kind}",
                     )
                 else:
@@ -533,9 +582,16 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         weakness_id=diagnosis.weakness_id,
                         task_fingerprint=task.fingerprint(),
                     )
-                    if overlay is not None:
+                    if overlay is None:
+                        # no silent derived->native path: recorded, and in
+                        # canary the breaker opens BEFORE any execution
+                        reader.overlay_failure(
+                            "cycle-candidate-overlay",
+                            "candidate revision/manifest construction failed",
+                        )
+                    else:
                         reader.check_candidate_overlay(
-                            "cycle-candidate", candidate.source_ref, overlay
+                            "cycle-candidate-overlay", candidate.source_ref, overlay
                         )
                         events.emit(
                             "candidate_overlay",
@@ -557,7 +613,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                     )
                     candidate_evaluation = _execute_and_evaluate(
                         store, task, candidate_probe, meter, config, events,
-                        reader, "cycle-candidate", overlay=overlay,
+                        reader, "cycle-candidate-overlay", overlay=overlay,
                     )
                     decision = policy.decide(evaluation, candidate_evaluation)
                     events.emit("decision", decision=codec.encode(decision))
@@ -573,10 +629,23 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                     )
                     reader.refresh()  # our own write
                     # the retained candidate, paired with its just-mirrored
-                    # revision before it can be activated
+                    # revision before it can be activated — AND verified
+                    # content-identical to the exact evaluated overlay
                     reader.read_generation(
-                        "cycle-candidate", candidate_generation.generation_id
+                        "cycle-candidate-retained",
+                        candidate_generation.generation_id,
                     )
+                    if overlay is not None:
+                        reader.check_retained_matches_overlay(
+                            "cycle-candidate-retained", overlay, candidate_generation
+                        )
+                        reader.record_retention(
+                            candidate.candidate_id,
+                            overlay,
+                            candidate_generation,
+                            decision,
+                            events,
+                        )
                     reader.add_fact(
                         "decision-accepted" if decision.accepted else "decision-rejected"
                     )
