@@ -37,7 +37,13 @@ from strive.loop import (
     replay_run,
     run_cycle,
 )
-from strive.dualwrite import ParityError, parity_status, repair_parity
+from strive.dualwrite import (
+    MirrorError,
+    ParityError,
+    active_revision_id,
+    parity_status,
+    run_backfill_operation,
+)
 from strive.migrate import migrate_legacy_ledger
 from strive.migrations import apply_pending, pending_migrations
 from strive.revisions import delta_label
@@ -396,31 +402,31 @@ def _cmd_migrate_legacy(task: Task, args: argparse.Namespace) -> dict[str, Any]:
 
 def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     if args.repair:
-        report = repair_parity(store)
+        report = run_backfill_operation(store, "parity-repair")
         action = "repaired"
     else:
-        report = parity_status(store)
+        report = parity_status(store)  # read-only
         action = "checked"
     data = {
         "complete": report.complete,
         "generations": report.generations,
-        "revisions": report.revisions,
         "activations": report.activations,
-        "revision_activations": report.revision_activations,
-        "missing_revision_ids": list(report.missing_revision_ids),
-        "missing_activation_indices": list(report.missing_activation_indices),
+        "revision_mirrors": report.revision_mirrors,
+        "activation_mirrors": report.activation_mirrors,
+        "missing_source_ordinals": list(report.missing_source_ordinals),
         "mismatched": list(report.mismatched),
+        "diagnostics": list(store.diagnostics),
     }
     lines = [
         f"parity {action}: {'COMPLETE' if report.complete else 'INCOMPLETE'}",
-        f"  generations={report.generations} revisions={report.revisions} "
-        f"activations={report.activations} revision_activations={report.revision_activations}",
+        f"  generations={report.generations} activations={report.activations} "
+        f"revision_mirrors={report.revision_mirrors} "
+        f"activation_mirrors={report.activation_mirrors}",
     ]
-    if report.missing_revision_ids:
-        lines.append(f"  missing revisions: {', '.join(report.missing_revision_ids)}")
-    if report.missing_activation_indices:
+    if report.missing_source_ordinals:
         lines.append(
-            f"  missing activation mirrors at: {report.missing_activation_indices}"
+            f"  missing mirrors for source ordinals: "
+            f"{list(report.missing_source_ordinals)}"
         )
     for issue in report.mismatched:
         lines.append(f"  AMBIGUOUS: {issue}")
@@ -430,7 +436,7 @@ def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
 def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     revisions = store.revisions()
     activations = store.revision_activations()
-    active_revision = activations[-1].revision.revision_id if activations else None
+    active_revision = active_revision_id(store)  # by SOURCE activation order
     data = {
         "active_revision": active_revision,
         "revisions": [codec.encode(r) for r in revisions],
@@ -473,19 +479,6 @@ def _cmd_history(store: Store, task: Task, args: argparse.Namespace) -> dict[str
             )
         elif isinstance(entry, Intervention):
             lines.append(f"intervention {entry.kind}: {entry.reason}")
-        else:
-            from strive.revisions import HarnessRevision, RevisionActivation
-
-            if isinstance(entry, HarnessRevision):
-                lines.append(
-                    f"revision {entry.ref.revision_id} (mirror, "
-                    f"proposer={entry.proposer})"
-                )
-            elif isinstance(entry, RevisionActivation):
-                lines.append(
-                    f"revision-activation {entry.revision.revision_id} "
-                    f"reason={entry.reason} mode={entry.mode} (mirror)"
-                )
     return {"data": data, "human": "\n".join(lines) if lines else "(empty ledger)"}
 
 
@@ -630,6 +623,7 @@ def main(argv: list[str] | None = None) -> int:
         ObjectCorruption,
         ModelConfigError,
         ParityError,
+        MirrorError,
     ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:

@@ -547,3 +547,36 @@ built from updated main.
   live smoke included strip-mirrors → detect → repair.
 - 176 tests, mypy strict clean. One pre-existing assertion updated
   (rollback +1 → +2 entries for the mirror); everything else untouched.
+
+## 2026-08-09 — stage 3B crash-consistency correction (pre-merge, PR #41)
+
+Reworked the dual-write around an explicit crash model before merging:
+
+- Mirrors moved OUT of the task ledger into <task>.mirror.jsonl. The single
+  most important property: a corrupt mirror journal cannot block any
+  generation-native operation (tested by corrupting it and then running
+  run/rollback/promote/replay — all fine, with the live publication
+  failures surfacing as source-committed-parity-incomplete diagnostics).
+- SourceRecordRef (schema, journal, ordinal, digest) on every mirror;
+  matching/repair by ref, never position. The middle-gap test is the one
+  that would have caught the old positional design's failure mode: drop the
+  2nd activation mirror with 4 activations — positional matching would
+  misalign mirrors 3 and 4; ref matching finds exactly the gap.
+- Durable op state machine (intent → progress → completed) in the mirror
+  journal; pending = completion, not parity — so crash-after-parity-
+  before-completion correctly stays pending and resumes the SAME intent
+  with its original source head/hash.
+- Pure planning vs locked application with stale-plan refusal; parity and
+  discovery are provably read-only (test asserts zero CAS/journal writes).
+  cas.hash_text was the enabling primitive.
+- Evidence made operation-specific: legacy activation mirrors carry
+  decision_ref=None (the old design inferred the activated generation's
+  decision — wrong: promote-time evidence is not the generation's original
+  acceptance decision). MigrationProvenance gained the surface field.
+- Projector pinned (generation-to-revision@1 + strategy-code@1 explicit);
+  fail-closed source validation with structured errors; unsupported
+  projector refs refuse repair.
+- Permanent control: mirror-on vs mirror-off seeded runs are generation-
+  identical (structure, scores, decisions, active, replay).
+
+182 tests, mypy strict clean.

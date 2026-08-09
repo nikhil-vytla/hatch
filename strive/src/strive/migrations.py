@@ -17,14 +17,11 @@ Registry:
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from strive.contracts import INTERVENTION_REVISION_BACKFILL, Intervention
-from strive.dualwrite import ParityReport, parity_status, repair_parity
-from strive.events import now_iso
+from strive.dualwrite import open_intent, parity_status, run_backfill_operation
 from strive.migrate import migrate_legacy_ledger
 from strive.store import LEGACY_LEDGER_NAME, LegacyLedgerError, Store, StoreError
 from strive.tasks import Task
@@ -70,45 +67,34 @@ def _legacy_apply(root: Path, task: Task) -> MigrationReport:
 
 
 def _backfill_needed(root: Path, task: Task) -> bool:
+    """Read-only discovery. Pending status rests on COMPLETION, not parity
+    alone: an open (uncompleted) intent keeps the migration pending even if
+    parity already looks complete — the crash-after-parity-before-completion
+    case resumes here and journals its completion record."""
     ledger = root / "ledger" / f"{task.task_id}.jsonl"
     if not ledger.exists():
         return False
-    return not parity_status(Store(root, task.task_id)).complete
+    store = Store(root, task.task_id)
+    if open_intent(store.mirror) is not None:
+        return True
+    return not parity_status(store).complete
 
 
 def _backfill_apply(root: Path, task: Task) -> MigrationReport:
     store = Store(root, task.task_id)
     before = parity_status(store)
-    if before.complete:
-        return MigrationReport(
-            migration_id="0002-revision-backfill",
-            applied=False,
-            detail="parity already complete; nothing to backfill (no-op)",
-        )
-    source_sha = hashlib.sha256(store.ledger_path.read_bytes()).hexdigest()
-    after: ParityReport = repair_parity(store)  # refuses ambiguous history
-    if not after.complete:
+    resumed = open_intent(store.mirror) is not None
+    report = run_backfill_operation(store, "0002-revision-backfill")
+    if not report.complete:
         raise StoreError("backfill did not reach parity; investigate before retrying")
-    store.append(
-        Intervention(
-            kind=INTERVENTION_REVISION_BACKFILL,
-            reason=(
-                f"backfilled {len(before.missing_revision_ids)} revisions and "
-                f"{len(before.missing_activation_indices)} revision-activations "
-                f"from generation-native history (pre-backfill journal sha256 "
-                f"{source_sha}); source records untouched"
-            ),
-            at=now_iso(),
-        )
-    )
-    store.entries()  # end-to-end validation of the resulting journal
     return MigrationReport(
         migration_id="0002-revision-backfill",
         applied=True,
         detail=(
-            f"backfilled {len(before.missing_revision_ids)} revisions, "
-            f"{len(before.missing_activation_indices)} revision-activations "
-            f"(pre-backfill sha256 {source_sha[:12]}…)"
+            f"{'resumed and ' if resumed else ''}mirrored "
+            f"{len(before.missing_source_ordinals)} source records "
+            "(intent/progress/completed journaled in the mirror journal; "
+            "source ledger untouched)"
         ),
     )
 
