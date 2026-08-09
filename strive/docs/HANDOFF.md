@@ -1,5 +1,104 @@
 # HANDOFF — strive
 
+## Stage 3B — crash-consistency correction (final pre-merge)
+
+The dual-write was reworked before merge around an explicit crash model:
+1. **Canonical vs derived, physically separated.** The task ledger holds
+   only generation-native records; mirrors live in `<task>.mirror.jsonl`.
+   A corrupt mirror journal cannot block run, activation, rollback, replay,
+   or inspection (tested); parity reports the corruption cleanly.
+2. **Source refs, never positions.** Every mirror carries a deterministic
+   `SourceRecordRef` (source schema, journal identity, complete-record
+   ordinal, canonical digest). A missing mirror in the *middle* of history
+   is found and filled by ref while later mirrors stay matched; the derived
+   active revision follows source activation order even when a repaired
+   mirror is appended last.
+3. **Durable operations.** Backfill/repair persist `MigrationIntent`
+   (op id, migration id, source head/hash, projector ref) before any work,
+   `MigrationProgress` checkpoints, and `MigrationCompleted` only after
+   parity validation over the intent's declared history. Pending status is
+   completion-based: crash-after-parity-but-before-completion stays pending
+   and resumes the SAME intent (source head/hash preserved across retries).
+   Every crash point is tested.
+4. **Plan/apply split.** `ProjectionPlan` is pure (mirror records + CAS
+   payload texts/hashes via `hash_text`, publishing nothing); application
+   re-reads the source head under the mirror writer lock and refuses stale
+   plans; `parity` and migration discovery are read-only (tested: no CAS or
+   journal writes). A source commit whose live mirror publication fails
+   yields the explicit `source-committed-parity-incomplete` diagnostic —
+   the operation is committed, its mirror is repairable.
+5. **Operation-specific evidence.** Legacy `activation@2` maps to
+   `decision_ref=None`; the generation's original decision lives only in
+   `MigrationProvenance` (which now also preserves `Generation.surface`).
+   Explicit evidence on a future revision-native activation is representable
+   and tested as distinct from the generation's original decision.
+6. **Fail-closed projector.** Pinned `generation-to-revision@1` with the
+   explicit historical descriptor `strategy-code@1` (never current
+   pointers); pre-work source validation (unique ids, parent-precedes-child
+   acyclic lineage, activations target existing generations, task identity,
+   supported surfaces, injective id mapping) with structured errors;
+   unsupported projector refs are flagged and repair refuses.
+7. **Permanent control.** Mirror-enabled vs mirror-disabled runs produce
+   identical generation-native records, cycle results, active generation,
+   and replay (tested).
+
+## Stage 3B — dual-write revision storage (what was implemented)
+
+The exact narrow slice ROADMAP fixed, nothing more:
+- **`revisions.py`** — the frozen core wire types moved verbatim from the
+  spike to their permanent home (same kinds/versions); `stage3_contracts.py`
+  keeps only the provisional contracts and re-exports the core so the spike
+  tests validate it unchanged.
+- **`dualwrite.py`** — deterministic, field-preserving mirrors: every
+  retained `generation@2` gets a `revision@1` (canonical single-binding
+  task-scope manifest; task fingerprint/origin/weakness/decision@1 evidence
+  preserved via a CAS `MigrationProvenance` referenced from
+  `provenance_ref`; the delta's before-binding is the parent's content ref)
+  and every `activation@2` gets a `revision-activation@1` (mode, reason,
+  timestamp, expiry/monitoring data verbatim; legacy policy markers →
+  `name@0`). Mirrors are appended after their source records — explicitly
+  NOT one atomic transaction; the generation ledger stays the source of
+  truth. `parity_status` recomputes mirrors (determinism makes this exact)
+  and `repair_parity` reconstructs missing ones without duplicates,
+  refusing ambiguous history (`ParityError`) rather than papering over it.
+- **`migrations.py`** — the sequential registry: `0001-legacy-unscoped-
+  ledger` (wraps the proven phase-4.6 migration) and `0002-revision-
+  backfill` (append-only; preserves the source journal byte-for-byte as a
+  prefix; journals a `revision-backfill` marker with the pre-backfill
+  sha256; validates output; no-ops when parity is already complete; refuses
+  corrupt history loudly). `strive migrate` applies pending entries in
+  order — a legacy root chains 0001 then 0002 in one pass.
+- **CLI additions only** (`parity [--repair]`, `revisions`, `migrate`);
+  every existing command is unchanged. `history` renders the mirror kinds.
+- Store accepts the two new ledger-entry kinds with read-time task-isolation
+  checks on their scopes; the loop, activation, cycles, and
+  execution-and-decision replay remain generation-native.
+
+**Verification** (`uv run pytest` → 182, mypy strict clean, 42 files;
+see the crash-consistency section above for the failure-injection matrix):
+exact generation/revision and activation/mirror field mapping; accepted AND
+rejected decision evidence recovered from CAS provenance; active
+generation/revision parity at every activation-history prefix; rollback and
+provisional metadata equivalence (incl. `seed@0` legacy-policy mapping);
+backfill idempotence and corrupt/ambiguous-history refusal; partial
+dual-write detected and repaired (also demonstrated live via
+`strive parity --repair`); historical descriptor validity (prompt@1 under
+prompt@2, spike tests); scope/mask/parent/manifest and cross-task isolation
+invariants; all Stage 1–2b tests and replay behavior green (one entry-count
+assertion updated for the extra mirror line; semantics unchanged).
+
+**The Stage 3B claim, stated precisely:** strive mirrors generation-native
+history into field-preserving composite revision records and can backfill,
+inspect, verify, and repair revision parity. Revision-native execution,
+selection, activation, and replay remain future work.
+
+**Next slice options** (each independently mergeable): (a) the parity slice
+— make the loop read revisions as the derivation source behind a verified
+dual-read comparison, the step toward revision-native activation; or (b)
+the selection slice — ValidationBundle/SelectionDecision envelopes with
+typed evidence roles (unresolved needs in adrs/README). HANDOFF recommends
+(a): it retires dual-write soonest and unblocks composite candidates.
+
 State as of 2026-08-08, after five phases plus correction passes: the vertical
 slice (stage 1), the research-and-redesign phase (notes 01–06,
 [comparative matrix](agents/research/comparative-matrix.md),

@@ -24,6 +24,12 @@ def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def hash_text(text: str) -> str:
+    """The content address a text WOULD have — pure, no store access. Lets
+    read-only planners/verifiers compute expected refs without publishing."""
+    return _digest(text.encode("utf-8"))
+
+
 class ObjectStore:
     def __init__(self, root: Path) -> None:
         self.root = root

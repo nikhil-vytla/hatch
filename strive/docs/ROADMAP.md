@@ -109,7 +109,7 @@ barred, and stronger manifest invariants (same-scope base parents, explicit
 resolution chains, opaque journal-head refs). No live-ledger migration;
 Stage 1–2b behavior unchanged (164 tests, 25 in the spike).
 
-## Stage 3B — First implementation slice (next; independently mergeable)
+## Stage 3B — Dual-write revision storage ✅ (2026-08-09)
 
 Exactly: **dual-write revision storage + the SurfaceDescriptor registry**,
 implementing only the frozen core wire types (adrs/README freeze table):
@@ -127,10 +127,25 @@ descriptor registry and migration-registry mechanics.
 - NOT in this slice (each provisional until its own slice): task/dataset/
   evaluation-manifest schemas, selection envelopes and frontier semantics,
   algorithm state, backend schema details.
-- Exit: every cycle produces matching generation and revision records
-  (parity checked by test); a hand-authored composite revision can be
-  journaled and validated even though no proposer emits one yet; all
-  current behavior green.
+- Exit criteria met, with a crash-consistency correction applied before
+  merge: mirrors moved to a separate append-only journal (corruption can
+  never block generation-native operations — tested); mirrors matched and
+  repaired by SourceRecordRef, never list position, with active-revision
+  derivation following source activation order; backfill/repair run a
+  durable intent→progress→completed state machine resumable at every crash
+  point, with pending status based on completion rather than parity alone;
+  projection planning is pure (parity and discovery are read-only) and
+  stale plans are refused under the writer lock; the projector is pinned
+  (`generation-to-revision@1`, explicit historical descriptors) and source
+  history is validated fail-closed; evidence is operation-specific (legacy
+  activations carry no inferred decision_ref); a mirror-publication failure
+  after a source commit reports `source-committed-parity-incomplete`. A
+  permanent control run proves mirror-disabled and mirror-enabled runs are
+  generation-identical. 182 tests. The precise claim: strive mirrors
+  generation-native history into field-preserving composite revision records
+  and can backfill, inspect, verify, and repair revision parity —
+  revision-native execution, selection, activation, and replay remain
+  future work.
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 

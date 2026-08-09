@@ -37,8 +37,22 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+import hashlib
+
 from strive import codec
 from strive.cas import ObjectStore
+from strive.dualwrite import (
+    CONDITION_PARITY_INCOMPLETE,
+    ActivationMirror,
+    MirrorJournal,
+    RevisionMirror,
+    SOURCE_ACTIVATION,
+    SOURCE_GENERATION,
+    SourceRecordRef,
+    _project_activation,
+    _project_generation,
+)
+from strive.revisions import HarnessRevision, RevisionActivation
 from strive.contracts import (
     ACTIVATION_DURABLE,
     Activation,
@@ -70,13 +84,19 @@ LEGACY_LEDGER_NAME = "ledger.jsonl"
 
 
 class Store:
-    def __init__(self, root: Path, task_id: str) -> None:
+    def __init__(self, root: Path, task_id: str, *, mirror_enabled: bool = True) -> None:
         self.root = root
         self.task_id = task_id
         self.ledger_path = root / "ledger" / f"{task_id}.jsonl"
         self._lock_path = root / "ledger" / f"{task_id}.lock"
         self.runs_dir = root / "runs"
         self.objects = ObjectStore(root / "objects")
+        # derived, isolated mirror journal (Stage 3B); its corruption can
+        # never block generation-native operations
+        self.mirror = MirrorJournal(
+            root / "ledger" / f"{task_id}.mirror.jsonl", task_id
+        )
+        self.mirror_enabled = mirror_enabled
         for directory in (self.ledger_path.parent, self.runs_dir):
             directory.mkdir(parents=True, exist_ok=True)
         self.diagnostics: list[str] = []
@@ -210,7 +230,9 @@ class Store:
                 source_ref=self.objects.put_text(source),
                 decision=decision,
             )
+            ordinal = len(self.entries())
             self._append_unlocked(record)
+            self._publish_live_mirror(record, ordinal)
         return record
 
     def source_of(self, generation: Generation) -> str:
@@ -255,8 +277,70 @@ class Store:
                 expires_after_cycles=expires_after_cycles,
                 baseline_score=baseline_score,
             )
+            ordinal = len(self.entries())
             self._append_unlocked(activation)
+            self._publish_live_mirror(activation, ordinal)
         return activation
+
+    def _publish_live_mirror(
+        self, entry: Generation | Activation, ordinal: int
+    ) -> None:
+        """Stage-3B dual-write: publish the derived mirror AFTER its source
+        record commits. Deliberately not atomic with the source append — and
+        deliberately unable to fail the source operation: a publication
+        failure is journaled as the explicit
+        `source-committed-parity-incomplete` condition (store diagnostic,
+        detectable and repairable via `strive parity`)."""
+        if not self.mirror_enabled:
+            return
+        try:
+            digest = hashlib.sha256(codec.dumps(entry).encode("utf-8")).hexdigest()
+            journal = f"task:{self.task_id}"
+            mirror: RevisionMirror | ActivationMirror
+            if isinstance(entry, Generation):
+                source = SourceRecordRef(SOURCE_GENERATION, journal, ordinal, digest)
+                parent = (
+                    self.generations().get(entry.parent_id)
+                    if entry.parent_id is not None
+                    else None
+                )
+                mirror, payloads = _project_generation(entry, parent, source)
+                for text, _ref in payloads:
+                    self.objects.put_text(text)
+            else:
+                source = SourceRecordRef(SOURCE_ACTIVATION, journal, ordinal, digest)
+                mirror = _project_activation(entry, source)
+            with self.mirror.writer_lock():
+                existing = {
+                    (m.source.ordinal, m.source.digest)
+                    for m in self.mirror.entries()
+                    if isinstance(m, (RevisionMirror, ActivationMirror))
+                }
+                if (ordinal, digest) not in existing:
+                    self.mirror.append(mirror)
+        except Exception as exc:  # noqa: BLE001 — derived-side failure is data
+            self._note_diagnostic(
+                f"{CONDITION_PARITY_INCOMPLETE}: mirror publication failed for "
+                f"ordinal {ordinal}: {type(exc).__name__}: {exc}"
+            )
+
+    def activations(self) -> list[Activation]:
+        return [e for e in self.entries() if isinstance(e, Activation)]
+
+    def revisions(self) -> list[HarnessRevision]:
+        """Mirrored revisions, in source order (derived; may lag the ledger)."""
+        mirrors = [
+            m for m in self.mirror.entries() if isinstance(m, RevisionMirror)
+        ]
+        return [m.revision for m in sorted(mirrors, key=lambda m: m.source.ordinal)]
+
+    def revision_activations(self) -> list[RevisionActivation]:
+        """Mirrored activations, in SOURCE activation order (never mirror
+        append order)."""
+        mirrors = [
+            m for m in self.mirror.entries() if isinstance(m, ActivationMirror)
+        ]
+        return [m.activation for m in sorted(mirrors, key=lambda m: m.source.ordinal)]
 
     def active_activation(self) -> Activation | None:
         activation: Activation | None = None
