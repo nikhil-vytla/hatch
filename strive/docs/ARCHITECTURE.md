@@ -231,6 +231,75 @@ Rules, each traceable to a researched failure:
    execution and resolved after (exo's guardian pattern), so crashes mid-operation
    recover cleanly.
 
+## Stage 3A: contract design for composite evolution
+
+Stage 3's contracts are settled in six ADRs under [adrs/](adrs/README.md),
+written design-first with experimental spikes (`stage3_contracts.py`) proving
+the shapes round-trip before anything migrates:
+
+- **ADR-0001** `HarnessRevision` replaces one-generation-one-file:
+  `RevisionRef(scope, id)` identity, `base_parent` distinct from
+  `provenance_parents`, optional `proposal_ref`/`provenance_ref`, and
+  deltas as **complete binding transitions** — `BindingState = absent |
+  masked | content(ref, descriptor_ref)` with before/after states, making
+  exact inversion, unmasking, and conflict checks representable
+  (create/update/delete/mask/unmask are derived labels). A revision owns a
+  content-addressed `ScopeManifest` (its scope's bindings incl. masks);
+  runs/evaluations reference a `ResolvedHarnessManifest` (effective bindings
+  + contributing revision refs/journal heads). Versioned
+  `SurfaceDescriptor`s (artifact schema, materializer, allowed scopes,
+  validation policy, risk-policy ref, online policy) form the trusted
+  allowlist (historical: registry keyed by kind@version + a current
+  pointer, so old bindings stay valid across upgrades); content bindings
+  pin `descriptor_ref`; **risk is computed from the delta itself (no label
+  argument to spoof); policy-param families fail closed, and trusted
+  settings (sandbox/budget/evaluator/acceptance/secrets/ledger) are not
+  representable as evolvable params**. The lifecycle seam is frozen too:
+  RevisionActivation@1 preserves every activation@2 field with derivation
+  parity, and MigrationProvenance keeps task fingerprint/origin/weakness/
+  decision evidence lossless.
+- **ADR-0002** typed `ScopeRef` + explicit `ResolutionContext` (no colon
+  parsing, no implicit default project): global → project → task → run with
+  nearest-scope shadowing over scope manifests; `delete` removes this scope's override
+  (inheritance resumes) while `mask` is a tombstone stopping fall-through;
+  every run journals its resolved-manifest ref for exact replay;
+  provisional is an activation *mode*, not a scope; cross-scope promotion is
+  a gated selection with cross-task evidence.
+- **ADR-0003** environment-generic `TaskSpecVersion` (adapter, action/
+  observation schemas, scorer, config ref — `solve(str)->int` lives in the
+  FunctionTask config blob) vs. fully reconstructable `DatasetRevision`
+  (per-split CAS manifests); `EvaluationManifest` pins harness state ref,
+  objective spec, task+dataset fingerprints, environment/scorer/tool/runtime
+  versions, seeds, validators, budgets — and is owned by ValidationBundles,
+  never revisions; base `EnvironmentSession` protocol with optional
+  Resettable/Checkpointable/Forkable capabilities (reset is not assumed);
+  regression growth = new dataset revision + forced re-baseline.
+- **ADR-0004** policy-neutral `SelectionDecision`: `policy_ref`
+  (name@version) + a closed kernel disposition vocabulary
+  {promote, reject, frontier_add, provisional_activate} — **every
+  disposition requires evidence bundles**; each decision pins its
+  `objective_spec_ref`; policy detail lives in CAS evidence artifacts.
+- **ADR-0005** algorithms request propose/validate/submit through a narrow
+  `KernelServices` handle under a trusted budget — bypass prevention is an
+  **API contract for trusted L1 plugins, not hostile-plugin isolation**
+  (stated honestly); search state is resumable via journaled
+  `AlgorithmRun`/`AlgorithmStep` records; prompts render a versioned
+  `ObjectiveSpec`; frontiers are journaled `frontier_add` decisions.
+- **ADR-0006** backend protocols (ledger/artifact/event/index): JSONL stays
+  the transparent authoritative journal; `append_batch` commits by *framing*
+  (batch id + commit marker; an unmarked batch is torn tail), cursor reads,
+  index-through-head semantics — and the commit ordering rule: revision,
+  evidence, and decision are individually durable *before* activation is
+  attempted, so a lost activation head-race orphans nothing; a sequential
+  migration registry generalizes `migrate-legacy`.
+
+Freeze scope: only the core wire types are frozen for 3B (adrs/README has
+the authoritative table); task/dataset/evaluation, selection/frontier,
+algorithm-state, and backend schemas stay provisional until their slices.
+Stage 3B itself is deliberately narrow: **dual-write revision storage** —
+the loop, activation, and replay remain generation-native until a later
+parity slice.
+
 ## Implementation status (after phase 3 hardening)
 
 | Architecture element | Status |
@@ -254,7 +323,7 @@ Rules, each traceable to a researched failure:
 | legacy stage-2a ledger: loud detection + `strive migrate-legacy` (history preserved, original file untouched, migration journaled) | **implemented** (`migrate.py`) |
 | evaluation discipline: visible (train) / selection (held-out, regression, adversarial) / audit (final holdout, on-demand only) | **implemented** (`tasks.py`, `loop.audit_generation`); proposer history carries visible-split scores only |
 | execution-and-decision replay (baseline + candidate re-execution, recorded-policy decision check) | **implemented** — full-cycle replay (diagnosis, prompt reconstruction, completion injection, proposal parsing, screening) is pending |
-| composite per-surface generations | pending (stage 3) — single `strategy-code` surface today |
-| EvolutionAlgorithm plugin (Pareto population) | pending (stage 3) |
+| composite per-surface generations | **designed** (ADR-0001, spike contracts + round-trip tests) — implementation is the Stage 3B slice |
+| EvolutionAlgorithm plugin (Pareto population) | **designed** (ADR-0005) — implementation stage 3C |
 | inheritance-aware replace-vs-add thresholds | pending (needs usage-share history to act on) |
 | Landlock/seccomp tier, containers, secrets broker | pending (stages 3/6) |
