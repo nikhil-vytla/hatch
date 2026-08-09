@@ -81,7 +81,58 @@ model-dependent (capability floor, note 03), and gated behind an explicit
 `--unsafe-model-code` acknowledgement because the sandbox lacks network/filesystem
 confinement. Replay is execution-and-decision replay, not full-cycle replay.
 
-## Stage 3 — Composite generations + pluggable evolution algorithms + hardened sandbox
+## Stage 3A — Contract design for composite evolution ✅ (2026-08-08)
+
+Six accepted ADRs (docs/adrs/) covering revisions+surfaces, scopes,
+tasks/environments, evidence/selection, evolution algorithms, and
+storage/migrations — each with rejected alternatives and a
+borrowed/rejected/deferred comparison against Flex/GEPA, prime-agent,
+Continual Harness, exo, RLM, and NOOA. The wire schemas went through a
+revision passes before freezing: revision *state* separated from evaluation
+*evidence* (revision-owned ScopeManifest + run-resolved
+ResolvedHarnessManifest vs ValidationBundle-owned evaluation manifests),
+globally unambiguous RevisionRef(scope, id) with base vs
+provenance parents, typed ScopeRef/ResolutionContext with mask-vs-delete
+semantics, environment-generic task specs (FunctionTask config carries
+solve(str)->int), reconstructable dataset revisions, risk computed from
+descriptor+scope+op, policy-neutral dispositions (frontier_add) each
+requiring evidence, resumable AlgorithmRun/AlgorithmStep state, and
+append_batch/cursor/index-through-head ledger semantics. Experimental typed
+contracts (`stage3_contracts.py`, additive codec kinds, unused by the live
+loop) validate every scenario with round-trip tests, including one revision
+evaluated under two manifests and cross-scope lineage without collisions.
+The final consistency pass added the frozen RevisionActivation@1 lifecycle
+seam (field-exact activation@2 mapping incl. rollback history and derivation
+parity), historical descriptor pinning (registry keyed by kind@version +
+current pointer), fail-closed policy-param families with trusted settings
+barred, and stronger manifest invariants (same-scope base parents, explicit
+resolution chains, opaque journal-head refs). No live-ledger migration;
+Stage 1–2b behavior unchanged (164 tests, 25 in the spike).
+
+## Stage 3B — First implementation slice (next; independently mergeable)
+
+Exactly: **dual-write revision storage + the SurfaceDescriptor registry**,
+implementing only the frozen core wire types (adrs/README freeze table):
+ScopeRef/RevisionRef/BindingState/SurfaceDelta/ManifestBinding/
+ScopeManifest/JournalHeadRef/ScopeContribution/ResolvedHarnessManifest/
+HarnessRevision/RevisionActivation/MigrationProvenance + the historical
+descriptor registry and migration-registry mechanics.
+- Migration registry (ADR-0006) with `migrate-legacy` as entry 0001 and the
+  generation→revision **backfill** as entry 0002 (field-exact, with
+  MigrationProvenance and CAS-encoded decision evidence).
+- **Dual-write**: the loop keeps writing generation-native records
+  (activation/replay/cycles unchanged and generation-native) while writing
+  revision@1 + revision-activation@1 alongside; revision-native
+  loop/activation/replay is a later parity slice, not 3B.
+- NOT in this slice (each provisional until its own slice): task/dataset/
+  evaluation-manifest schemas, selection envelopes and frontier semantics,
+  algorithm state, backend schema details.
+- Exit: every cycle produces matching generation and revision records
+  (parity checked by test); a hand-authored composite revision can be
+  journaled and validated even though no proposer emits one yet; all
+  current behavior green.
+
+## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 
 - Composite generation schema: per-surface CRUD deltas with before/after snapshots
   (notes 02/03); per-surface activation and rollback.
@@ -121,7 +172,9 @@ held-out scores.
   write-only memory earns no acceptance.
 - Online adaptation per ARCHITECTURE's six rules: provisional activations, proxy
   validators, inheritance protection, trusted freeze switch, cadence + failure
-  triggers, physically isolated trusted state.
+  triggers, trusted state kept outside the online loop's interfaces
+  (process separation + interface discipline — not physical isolation until
+  OS-level confinement lands).
 - Recursive delegation: subagent specs as a surface; kernel-mediated spawning with
   RLM-style depth caps and remaining-budget inheritance (note 05); handoff quality
   (exit/focus rates) measured per CH C.1.3.

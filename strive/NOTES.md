@@ -368,3 +368,155 @@ Five fixes + cleanups, all with regression tests; 134 tests, mypy strict.
   ANY ordinary adapter exception as model-error while
   KeyboardInterrupt/SystemExit propagate; audit documented as operationally
   separate, not secret.
+
+## 2026-08-08 — stage 3A: contract design for composite evolution
+
+Design-first phase: six ADRs + experimental contract spikes, no live changes.
+
+- ADRs 0001–0006 under docs/adrs/ (revisions+surfaces, scopes,
+  tasks/environments, evidence/selection, algorithms, storage/migrations),
+  each with rejected alternatives and borrowed/rejected/deferred vs the six
+  researched systems.
+- Design calls worth remembering:
+  - Rollback of one surface = a NEW revision with the inverse delta, not a
+    partial activation — preserves the single-derivation invariant that
+    makes promotion atomic.
+  - Provisional stays an activation mode; making it a scope would conflate
+    "where an artifact applies" with "how much evidence backs it".
+  - Regression growth becomes DatasetRevision + forced re-baseline — the
+    phase-4.6 drift guard was correctly strict for spec changes but wrong
+    for routine data growth; the spec/data split fixes it.
+  - Selection verdicts are a closed 4-word vocabulary (promote/reject/
+    retain/provisional); "retain" is what makes Pareto frontiers journaled
+    state instead of algorithm memory.
+  - KernelServices handle for algorithms: composition over inheritance so a
+    search algorithm structurally cannot bypass the gate.
+- Spike: stage3_contracts.py (new additive codec kinds, loudly experimental)
+  + 10 round-trip/structural tests covering the four required scenarios,
+  including converting a real live-loop Generation into a one-delta
+  revision.
+- 149 tests, mypy strict clean; Stage 1–2b untouched.
+- Next slice fixed in HANDOFF: composite revision storage + SurfaceDescriptor
+  registry + migration registry entries 0001/0002 — independently mergeable.
+
+## 2026-08-08 — stage 3A revision pass (pre-freeze corrections on PR #40)
+
+Nine contract corrections before Stage 3B freezes the shapes; spike +
+tests rewritten, ADRs updated in place, statuses cycled through
+provisional back to accepted/frozen once tests passed.
+
+- State vs evidence: revisions now carry a content-addressed
+  state_manifest_ref (HarnessManifest) and NEVER an evaluation manifest —
+  ValidationBundle owns those. Test pins one revision evaluated under two
+  manifests (grown dataset, more seeds) with zero revision changes.
+- RevisionRef(scope, id) everywhere; base_parent (deltas apply here) split
+  from provenance_parents (merge/promotion inputs); cross-scope lineage
+  test uses the same numeric id at two scopes without collision.
+- ScopeRef + ResolutionContext replace colon-parsing; killed the implicit
+  project:default (projectless tasks resolve task→global). delete = remove
+  own override (inheritance resumes); mask = tombstone stopping
+  fall-through — both tested against sibling scopes.
+- TaskSpec went environment-generic; solve(str)->int + catalog now live in
+  the FunctionTask config blob. Base session protocol drops the reset
+  requirement (the CH domain is exactly a no-free-resets world);
+  Resettable/Checkpointable/Forkable are capabilities.
+- DatasetRevision now reconstructable (per-split CAS manifest refs);
+  EvaluationManifest pins harness state ref + objective spec + env/scorer/
+  tool/runtime versions + seeds + validators + budget.
+- SurfaceDescriptor versioned with allowed_scopes/required_validators/
+  online_policy; risk COMPUTED from descriptor+scope+op (broad scopes bump,
+  removals floor at medium) — the delta risk field is gone, so there is
+  nothing to trust.
+- SelectionDecision policy-neutral: policy_ref + dispositions
+  {promote, reject, frontier_add, provisional_activate}; retain →
+  frontier_add; ALL dispositions require evidence; objective_spec_ref
+  pinned.
+- AlgorithmRun/AlgorithmStep journaled for resumable search; ADR-0005 now
+  states plainly that KernelServices is an API contract for trusted
+  plugins, not hostile-plugin isolation.
+- LedgerBackend design gains append_batch under one expected head, cursor
+  reads, and index-through-head semantics.
+- Spike fixes: before_ref = parent CONTENT ref (with consistency checks);
+  migration proposer versioned (ledger-migration@1); duplicate manifest
+  keys / invalid scopes / unversioned proposers all fail loudly.
+- Research wording corrected: prime-agent's state handling credited (the
+  gap is the missing empirical gate); exo's scoped secrets/forking
+  acknowledged (rejection narrowed to the unscoped evolvable workspace);
+  RLM reframed as the weights side of the boundary, not a rejected
+  persistence design.
+
+155 tests, mypy strict clean. Stage 3B slice unchanged: composite revision
+storage + SurfaceDescriptor registry.
+
+## 2026-08-08 — stage 3A final pre-merge pass (PR #40)
+
+Seven corrections to the contracts before the 3B freeze:
+
+- Split revision-owned state (ScopeManifest: own-scope bindings incl.
+  masks) from run-resolved state (ResolvedHarnessManifest: effective
+  bindings + per-scope contributing revision refs and journal heads). Runs
+  and evaluations reference the resolved manifest; revisions never do.
+- Replaced op+nullable-refs deltas with complete binding transitions:
+  BindingState = absent | masked | content(ref, descriptor_ref); deltas
+  store before AND after states; create/update/delete/mask/unmask are
+  derived labels. Exact inversion is state-swap, unmasking is
+  representable in both directions, and conflict checks compare the
+  current binding to the recorded before-state.
+- descriptor_ref (kind@version) pinned in every persisted content binding;
+  descriptors now carry validation_policy + risk_policy_ref; params risk
+  is tiered by family (budget./sandbox. high, search./retry. medium) —
+  killed the "all policy params are low-risk" assumption.
+- proposal_ref/provenance_ref on revisions; canonical (kind,name) ordering
+  enforced on manifests AND deltas; self-referencing/duplicate parents
+  rejected.
+- ADR-0006 atomicity fixed honestly: JSONL batches commit by framing
+  (batch id + commit marker; unmarked batch = torn tail); the commit
+  ordering rule makes revision/evidence/decision individually durable
+  BEFORE activation, whose single-line head-checked append stays the only
+  atomic promotion primitive — revision+activation is explicitly not a
+  canonical batch.
+- Freeze narrowed: only the core wire types freeze for 3B; task/dataset/
+  evaluation, selection/frontier, algorithm state, and backend schemas are
+  provisional, with unresolved needs recorded (typed refs, evidence roles,
+  policy-detail refs, frontier removals/snapshots, objective+RNG+state
+  refs for bit-reproducible resumption).
+- Wording: prime-agent credited as typed (its lesson is in-place primary
+  state, not untyped edits); "structurally impossible" bypass softened to
+  the honest API-contract claim; ROADMAP stage 5 no longer says
+  "physically isolated"; 3B scope stated exactly.
+
+158 tests, mypy strict clean. Live loop untouched throughout.
+
+## 2026-08-08 — stage 3A core-consistency pass (final, pre-merge on PR #40)
+
+- Lifecycle seam completed: RevisionActivation@1 frozen with field-exact
+  activation@2 mapping (legacy unversioned policy markers map to the
+  reserved name@0 era; rollback history maps activation-by-activation and
+  the last-activation-wins derivation is verified against a real journal at
+  every prefix). MigrationProvenance@1 preserves task fingerprint, origin,
+  weakness, and CAS-encoded decision@1 evidence losslessly. Consequence
+  honestly drawn: Stage 3B is narrowed to DUAL-WRITE revision storage —
+  loop/activation/replay stay generation-native until a parity slice, so
+  cycle@1 replay is untouched by construction.
+- Descriptor pinning made historical: registry keyed by kind@version plus a
+  current-version pointer; validation resolves the exact pinned version;
+  prompt@1 binding proven valid while prompt@2 is current.
+- Risk hardened: effective_risk takes the actual delta and derives the
+  transition internally (no label argument to spoof); policy-param families
+  fail closed (unknown → rejected, never low); sandbox/budget/evaluator/
+  acceptance/secrets/ledger families are not representable as evolvable
+  params at all.
+- Manifest invariants: base_parent must share the revision's scope
+  (cross-scope origins are provenance only); scope manifests reject unknown
+  and scope-disallowed kinds for content AND masks; duplicate manifests per
+  scope rejected in resolution; ResolvedHarnessManifest records its exact
+  resolution_chain; journal heads are opaque versioned JournalHeadRefs;
+  contributions must be unique, chain-ordered, and scope-consistent.
+- Wording: RLM described accurately (inference-time recursive/context-
+  decomposition harness; persists nothing at runtime — the paper's training
+  is upstream of the harness); ADR-0003/0004 no longer claim their schemas
+  land in 3B; "five scopes" → four levels + a mode; stale SurfaceArtifact
+  paragraph replaced by the RevisionActivation one; algorithm records claim
+  restartability, not bit-reproducible resumption.
+
+164 tests (25 spike), mypy strict clean. Live loop untouched.
