@@ -542,6 +542,10 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
             )
             events.emit("stall_freeze", reason=verdict.reason)
 
+    from strive.shadow import record_shadow_check
+
+    record_shadow_check(store, events)  # revision shadow read; never alters behavior
+
     after = store.active_generation()
     assert after is not None
     return CycleReport(
@@ -642,6 +646,9 @@ def compare_generations(
     )
     decision = policy.decide(left_eval, right_eval)
     events.emit("decision", decision=codec.encode(decision))
+    from strive.shadow import record_shadow_check
+
+    record_shadow_check(store, events)
     return CompareReport(
         left_id=left_id, right_id=right_id, left=left_eval, right=right_eval, decision=decision
     )
@@ -708,6 +715,9 @@ def promote_generation(
         policy=f"{compare.decision.policy}@{compare.decision.policy_version}",
         expected_active=active.generation_id,
     )
+    from strive.shadow import record_shadow_check
+
+    record_shadow_check(store, None)
     return activation, compare.decision
 
 
@@ -786,6 +796,9 @@ def replay_run(
                 == recorded_decision.regressed_case_ids
             )
 
+    from strive.shadow import record_shadow_check
+
+    record_shadow_check(store, events)
     return ReplayReport(
         run_id=run_id,
         generation_id=cycle.generation_id,

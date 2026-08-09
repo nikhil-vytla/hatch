@@ -40,10 +40,11 @@ from strive.loop import (
 from strive.dualwrite import (
     MirrorError,
     ParityError,
-    active_revision_id,
     parity_status,
+    rebuild_mirror,
     run_backfill_operation,
 )
+from strive.shadow import compute_shadow
 from strive.migrate import migrate_legacy_ledger
 from strive.migrations import apply_pending, pending_migrations
 from strive.revisions import delta_label
@@ -350,6 +351,9 @@ def _cmd_audit(store: Store, task: Task, args: argparse.Namespace) -> dict[str, 
 
 def _cmd_rollback(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     generation = store.rollback()
+    from strive.shadow import record_shadow_check
+
+    record_shadow_check(store, None)
     return {
         "data": {"active_generation": codec.encode(generation)},
         "human": f"rolled back; active generation is now {generation.generation_id}",
@@ -401,7 +405,16 @@ def _cmd_migrate_legacy(task: Task, args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    if args.repair:
+    rebuild_info: dict[str, Any] | None = None
+    if args.rebuild:
+        rebuilt = rebuild_mirror(store)
+        report = rebuilt.report
+        action = "rebuilt"
+        rebuild_info = {
+            "quarantine_path": rebuilt.quarantine_path,
+            "prior_mirror_sha256": rebuilt.prior_mirror_sha256,
+        }
+    elif args.repair:
         report = run_backfill_operation(store, "parity-repair")
         action = "repaired"
     else:
@@ -415,6 +428,9 @@ def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
         "activation_mirrors": report.activation_mirrors,
         "missing_source_ordinals": list(report.missing_source_ordinals),
         "mismatched": list(report.mismatched),
+        "missing_objects": list(report.missing_objects),
+        "closure_issues": list(report.closure_issues),
+        "rebuild": rebuild_info,
         "diagnostics": list(store.diagnostics),
     }
     lines = [
@@ -428,21 +444,37 @@ def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
             f"  missing mirrors for source ordinals: "
             f"{list(report.missing_source_ordinals)}"
         )
+    for ref in report.missing_objects:
+        lines.append(f"  missing derived object (repairable): {ref}")
+    for issue in report.closure_issues:
+        lines.append(f"  CLOSURE: {issue}")
     for issue in report.mismatched:
         lines.append(f"  AMBIGUOUS: {issue}")
+    if rebuild_info:
+        lines.append(
+            f"  quarantined prior mirror: {rebuild_info['quarantine_path']} "
+            f"(sha256 {rebuild_info['prior_mirror_sha256'][:12]}…)"
+        )
     return {"data": data, "human": "\n".join(lines)}
 
 
 def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     revisions = store.revisions()
     activations = store.revision_activations()
-    active_revision = active_revision_id(store)  # by SOURCE activation order
+    shadow = compute_shadow(store)
+    # never report an active revision while activation parity is incomplete
+    active_revision = shadow.active_revision_id if shadow.available else None
     data = {
         "active_revision": active_revision,
         "revisions": [codec.encode(r) for r in revisions],
         "revision_activations": [codec.encode(a) for a in activations],
     }
-    lines = [f"revision mirrors (active: {active_revision}):"]
+    header = (
+        f"revision mirrors (active: {active_revision}):"
+        if shadow.available
+        else f"revision mirrors (active: unavailable — {shadow.reason}):"
+    )
+    lines = [header]
     for revision in revisions:
         labels = ",".join(delta_label(d) for d in revision.deltas)
         base = revision.base_parent.revision_id if revision.base_parent else None
@@ -565,6 +597,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="check (or --repair) generation/revision mirror parity",
     )
     parity_parser.add_argument("--repair", action="store_true")
+    parity_parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="quarantine the mirror journal byte-for-byte and rebuild it from "
+        "canonical history (never touches the task ledger)",
+    )
     sub.add_parser(
         "revisions",
         help="inspect the stage-3B revision mirrors and active revision",

@@ -580,3 +580,47 @@ Reworked the dual-write around an explicit crash model before merging:
   identical (structure, scores, decisions, active, replay).
 
 182 tests, mypy strict clean.
+
+## 2026-08-08 — Stage 3B.1: derived integrity + revision shadow reads
+
+- MigrationIntent@2 pins the exact canonical source prefix: record count,
+  whole-prefix hash, and a digest-sequence prefix hash. Resume verifies
+  the prefix exactly — appends after intent creation are fine; an altered
+  prefix record refuses resume. This closed the gap where an intent could
+  resume over silently rewritten history that happened to keep its length.
+- run_backfill_operation now holds ONE mirror writer lock across intent
+  selection/creation, projection, and every state transition; needed the
+  earlier unlocked-core split (_apply_projection_unlocked) to avoid flock
+  reentrancy. Multiple unfinished intents refuse; resume validates
+  migration_id + projector_ref against the persisted intent.
+- plan_projection fails closed before publishing on mismatched/duplicated/
+  foreign/unsupported existing mirrors, and now plans payloads for ALL
+  generations so closure repair can refill any missing derived object.
+- _verify_closure checks the full artifact graph per mirror: scope
+  manifest, provenance, decision evidence, pinned descriptor, source
+  artifact — exist, hash, decode, agree. Missing derived objects are
+  repairable; corrupt ones fail closed, never overwritten; a missing
+  canonical source artifact is data loss, reported not repaired.
+- `strive parity --rebuild` quarantines the corrupt mirror journal
+  byte-for-byte (prior sha recorded), rebuilds purely from canonical
+  history into a temp journal, validates, atomically os.replace-installs.
+  Canonical ledger untouched by construction.
+- shadow.py: compute_shadow derives active/lineage/rollback-target/source
+  from mirrors + CAS only — source text materialized from the ScopeManifest
+  binding under registry-validated pinned descriptors, never from
+  generation records. record_shadow_check hooks run/compare/replay/
+  promote/rollback (+ restart via reopen); divergence = durable
+  `shadow-divergence` intervention + run event, never silent fallback;
+  parity-incomplete or unreadable mirror ⇒ unavailable with reason and
+  NO active revision reported.
+- Gotcha found by test: record_shadow_check on an unreadable mirror path
+  leaked IsADirectoryError — MirrorJournal.entries now wraps OSError as
+  MirrorError so shadow degrades to "unavailable" instead of crashing a run.
+- Differential control extended: mirror-off, mirror-on, and shadowed runs
+  produce identical canonical results; shadow-materialized source
+  evaluates identically to the generation-native source.
+- Live smoke: run → corrupt mirror → `revisions` clean error while
+  generation-native `status` works → `parity --rebuild` recovers →
+  `revisions` active again.
+
+198 tests, mypy strict clean (44 files).
