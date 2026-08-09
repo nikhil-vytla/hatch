@@ -199,6 +199,7 @@ def test_backfill_resumes_at_every_crash_point(tmp_path: Path) -> None:
     intent = MigrationIntent(
         op_id="op-crash", migration_id="0002-revision-backfill",
         source_head=snapshot.head, source_hash=snapshot.journal_hash,
+        prefix_digest=snapshot.prefix_digest(snapshot.head),
         projector_ref=PROJECTOR_REF, started_at=now_iso(),
     )
     store.mirror.append(intent)

@@ -147,6 +147,52 @@ descriptor registry and migration-registry mechanics.
   revision-native execution, selection, activation, and replay remain
   future work.
 
+## Stage 3B.1 — Derived integrity + revision shadow reads ✅ (2026-08-09)
+
+Hardened the derived side and proved shadow parity, generation-native
+behavior authoritative throughout:
+- Intents pin the exact canonical source prefix (count + digest-sequence
+  hash); resume verifies it exactly — appended records allowed, altered
+  prefix records refused. One operation-level mirror lock spans intent
+  selection/creation and all state transitions; multiple unfinished intents
+  and mismatched migration_id/projector_ref refuse resume.
+- Planning fails closed before publishing on mismatched/duplicated/foreign/
+  unsupported mirrors; parity verifies the full artifact closure (scope
+  manifests, provenance, decision evidence, pinned descriptors, source
+  artifacts): missing derived objects are repairable from the pure plan,
+  corrupt objects fail closed and are never silently overwritten, and a
+  missing canonical source artifact is reported as data loss.
+- `strive parity --rebuild` quarantines the prior mirror journal
+  byte-for-byte, rebuilds mirrors + CAS closure purely from canonical
+  history, validates fully, then atomically installs — recording intent,
+  source prefix, outcome, and the prior mirror hash. The task ledger is
+  never touched.
+- Revision shadow reads: active state (by source activation order), lineage,
+  rollback target, and strategy source materialized from the ScopeManifest
+  under pinned descriptors; each shadowed run CAS-stores a task-only
+  ResolvedHarnessManifest. Shadow checks run in run/compare/replay/promote/
+  rollback/restart flows; divergences are durable `shadow-divergence`
+  interventions plus run events, never silent fallbacks; no active revision
+  is reported while activation parity is incomplete. Differential control:
+  mirror-off, mirror-on, and shadow runs are canonically identical.
+- 198 tests. Exit claim: strive can reconstruct and verify the complete
+  revision artifact graph, recover derived history from canonical state, and
+  shadow every generation-native read with an equivalent revision-derived
+  read. Revisions still do not control execution or activation.
+
+## Stage 3B.2 — Revision-native read/activation cutover (next)
+
+Flip reads (then activation derivation) from generation-native to
+revision-native behind the proven shadow comparison: a cutover flag makes
+the revision-derived value authoritative while the generation-native value
+becomes the shadow, divergence semantics unchanged; retire dual-write for
+reads once a burn-in period records zero divergences. Immediately followed
+by **the first empirically evaluated prompt-surface composite evolution
+experiment**: a `prompt` surface delta (proposal template) evolved alongside
+strategy code in one composite revision, validated under the existing paired
+gate with held-out discipline — the first real use of multi-surface
+revisions.
+
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 
 - Composite generation schema: per-surface CRUD deltas with before/after snapshots

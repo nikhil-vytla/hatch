@@ -1,5 +1,72 @@
 # HANDOFF — strive
 
+## Stage 3B.1 — derived integrity + revision shadow reads (current)
+
+Hardened the derived side of the dual-write and proved shadow parity.
+Generation-native records remain authoritative for every behavior.
+
+1. **Prefix-pinned resumable operations.** `MigrationIntent@2` captures the
+   exact canonical source prefix: complete-record count, whole-prefix hash,
+   and a digest-sequence prefix hash (`SourceSnapshot.prefix_digest`).
+   Resume verifies the prefix exactly — canonical records appended after
+   intent creation are allowed; any altered prefix record refuses resume
+   with a structured error. One operation-level mirror writer lock spans
+   intent selection/creation, projection, and every state transition
+   (`run_backfill_operation`); multiple unfinished intents refuse (repair
+   the journal first); resume validates `migration_id` and `projector_ref`
+   against the persisted intent.
+2. **Fail-closed planning + full artifact closure.** `plan_projection`
+   fails before publishing anything when existing mirrors are mismatched,
+   duplicated, foreign, or carry unsupported projector refs. Parity
+   verifies the complete closure per mirror: scope manifest, provenance,
+   decision evidence, pinned descriptor, and canonical source artifact all
+   exist, hash, decode, and agree. Missing *derived* objects are repairable
+   from the pure plan; corrupt/mismatched objects fail closed and are never
+   silently overwritten; a missing canonical source artifact is reported as
+   data loss, not repaired around.
+3. **Quarantine + rebuild.** `strive parity --rebuild` (`rebuild_mirror`)
+   moves the corrupt mirror journal aside byte-for-byte (quarantine file,
+   prior sha recorded), rebuilds mirrors and CAS closure purely from
+   canonical history, validates fully, then atomically installs via
+   `os.replace`. The canonical task ledger is never modified; the rebuild
+   records intent, source prefix, outcome, and prior mirror hash.
+4. **Revision shadow reads** ([shadow.py](../src/strive/shadow.py)).
+   `compute_shadow` derives active revision (by source activation order),
+   lineage, rollback target, and the strategy source materialized from the
+   active revision's ScopeManifest under registry-validated pinned
+   descriptors — never from generation records. Each shadowed run
+   CAS-stores a task-only `ResolvedHarnessManifest`. `record_shadow_check`
+   runs in run, compare, replay, promote, rollback, and restart flows;
+   a divergence is a durable `shadow-divergence` intervention in the task
+   ledger plus a run event — never a silent fallback. While activation
+   parity is incomplete or the mirror journal is unreadable, the shadow
+   view reports itself unavailable with a reason and **no active revision
+   is reported**.
+5. **Failure injection + differential controls** (test_shadow.py, 16
+   tests): altered prefix, appended records, double intents, wrong
+   migration/projector on resume, plan-fails-before-publish, missing vs
+   corrupt derived objects, corrupt decision evidence, missing source
+   artifact, quarantine+rebuild round-trip, shadow agreement across all
+   six flows, shadow-materialized source evaluating identically, true
+   divergence producing the durable event, and mirror-off / mirror-on /
+   shadowed runs yielding identical canonical results.
+
+**Verification:** 198 tests pass; `mypy --strict` clean over 44 files.
+Live CLI smoke: run → corrupt mirror byte → `strive revisions` reports a
+clean mirror error while generation-native `status` still works →
+`strive parity --rebuild` quarantines and recovers → `revisions` shows
+the active revision again.
+
+**The Stage 3B.1 claim, stated precisely:** strive can reconstruct and
+verify the complete revision artifact graph, recover derived history from
+canonical state, and shadow every generation-native read with an
+equivalent revision-derived read. Revisions still do not control
+execution or activation.
+
+**Next phase (exact):** revision-native read/activation cutover, followed
+immediately by the first empirically evaluated prompt-surface composite
+evolution experiment.
+
 ## Stage 3B — crash-consistency correction (final pre-merge)
 
 The dual-write was reworked before merge around an explicit crash model:
@@ -92,20 +159,18 @@ history into field-preserving composite revision records and can backfill,
 inspect, verify, and repair revision parity. Revision-native execution,
 selection, activation, and replay remain future work.
 
-**Next slice options** (each independently mergeable): (a) the parity slice
-— make the loop read revisions as the derivation source behind a verified
-dual-read comparison, the step toward revision-native activation; or (b)
-the selection slice — ValidationBundle/SelectionDecision envelopes with
-typed evidence roles (unresolved needs in adrs/README). HANDOFF recommends
-(a): it retires dual-write soonest and unblocks composite candidates.
+**Next slice options** (historical — Stage 3B.1 took option (a), the
+parity slice, and delivered its verified dual-read comparison as shadow
+reads; the cutover to revision-native reads is the next phase above).
 
-State as of 2026-08-08, after five phases plus correction passes: the vertical
+State as of 2026-08-08, after six phases plus correction passes: the vertical
 slice (stage 1), the research-and-redesign phase (notes 01–06,
 [comparative matrix](agents/research/comparative-matrix.md),
 [ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md)), the phase-3 hardening
 of the core harness (stage 2a), the phase-4 model-backed offline
 self-evolution loop (stage 2b), the phase-4.5/4.6 correctness passes over
-stage 2b, and the stage-3A contract design with its revision pass.
+stage 2b, the stage-3A contract design with its revision pass, and the
+stage-3B dual-write with its 3B.1 integrity/shadow-read hardening.
 
 ## Stage 3A — contract design (what was decided)
 
