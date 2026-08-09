@@ -13,7 +13,7 @@ with the live Stage 1–2b system.
 | [0003](0003-tasks-and-environments.md) | Task spec versions, dataset revisions, environments | design accepted; schemas provisional |
 | [0004](0004-evidence-and-selection.md) | Validation bundles and selection decisions | design accepted; schemas provisional |
 | [0005](0005-evolution-algorithms.md) | Evolution algorithms and objective specs | design accepted; schemas provisional |
-| [0006](0006-storage-and-schema-evolution.md) | Storage backends and migration registry | migration registry implemented in 3B (`migrations.py`, entries 0001/0002) with durable intent→progress→completed operations per the ADR's durable-intent rule; backend schemas provisional |
+| [0006](0006-storage-and-schema-evolution.md) | Storage backends and migration registry | migration registry implemented in 3B (`migrations.py`, entries 0001/0002) with durable intent→progress→completed operations; 3B.1 added prefix-pinned intents with prefix-scoped completion, operation-level locking, artifact-closure verification, quarantine+rebuild recovery, and precise detection of stage-3B-era journal schemas; backend schemas provisional |
 
 ## Freeze scope for Stage 3B
 
