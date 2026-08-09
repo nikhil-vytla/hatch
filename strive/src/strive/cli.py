@@ -45,7 +45,24 @@ from strive.dualwrite import (
     rebuild_mirror,
     run_backfill_operation,
 )
-from strive.shadow import ShadowSession, build_shadow_view, cutover_eligibility, shadow_coverage
+from strive.reader import (
+    MODE_CANARY,
+    MODE_NATIVE,
+    MODE_SHADOW,
+    ReaderError,
+    StateReader,
+    clear_breaker,
+    cutover_eligibility,
+    enable_canary,
+    force_native,
+    kill_switch,
+    lift_force_native,
+    quarantine_reader_journal,
+    read_coverage,
+    reader_state,
+    set_mode,
+    verify_revision_snapshot,
+)
 from strive.migrate import migrate_legacy_ledger
 from strive.migrations import apply_pending, pending_migrations
 from strive.revisions import delta_label
@@ -96,12 +113,14 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
                     "STRIVE_MODEL_PROVIDER to use the offline scripted fixture."
                 )
             adapter_note = "real (env-configured; --unsafe-model-code acknowledged)"
+            unsafe = True
         else:
             adapter = scripted_fixture_adapter()
             adapter_note = (
                 "scripted fixture (offline; proves the pipeline, not model "
                 "capability — set STRIVE_MODEL_PROVIDER for a real model)"
             )
+            unsafe = False
         config = LoopConfig(
             sandbox_timeout_s=args.timeout,
             proposer=ModelProposer(),
@@ -109,6 +128,7 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
             model_adapter=adapter,
             budget=BudgetSpec(model_calls=4),
             acknowledge_task_drift=args.acknowledge_task_drift,
+            unsafe_model_code=unsafe,
         )
     else:
         adapter_note = None
@@ -167,14 +187,19 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
 
 def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     ensure_seeded(store, task)
-    active = store.active_generation()
-    activation = store.active_activation()
+    # the status/restart read, routed through the read boundary; the output
+    # itself derives from the reader's coherent capture
+    from strive.store import derive_active_activation, derive_adaptation_frozen
+
+    reader = StateReader(store, "status")
+    try:
+        active = reader.read_active("status-active")
+        activation = derive_active_activation(reader.ledger_entries())
+        frozen = derive_adaptation_frozen(reader.ledger_entries())
+        reader.add_fact("restart")  # a fresh process's first state read
+    finally:
+        reader.finish(None)
     assert active is not None and activation is not None
-    # the status/restart read, paired with its revision-derived counterpart
-    session = ShadowSession(store)
-    session.check_active("status-active", active)
-    session.finish(None)
-    frozen = store.adaptation_frozen()
     data = {
         "active_generation": codec.encode(active),
         "activation": codec.encode(activation),
@@ -194,10 +219,11 @@ def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
 
 def _cmd_lineage(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     ensure_seeded(store, task)
-    chain = store.lineage()
-    session = ShadowSession(store)
-    session.check_lineage("status-lineage", chain)
-    session.finish(None)
+    reader = StateReader(store, "lineage")
+    try:
+        chain = reader.read_lineage("status-lineage")
+    finally:
+        reader.finish(None)
     data = {"lineage": [codec.encode(g) for g in chain]}
     lines = ["lineage (active -> seed):"]
     for generation in chain:
@@ -466,8 +492,8 @@ def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
 def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     revisions = store.revisions()
     activations = store.revision_activations()
-    view = build_shadow_view(store)
-    # never report an active revision while the derived view is unavailable
+    view = verify_revision_snapshot(store)
+    # never report an active revision while the verified snapshot is unavailable
     active_revision = view.active_revision_id()
     data = {
         "active_revision": active_revision,
@@ -490,44 +516,73 @@ def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[s
     return {"data": data, "human": "\n".join(lines)}
 
 
-def _cmd_shadow(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    action = args.action
+    quarantined: str | None = None
+    if action == "shadow":
+        set_mode(store, MODE_SHADOW, reason="operator: begin shadow burn-in")
+    elif action == "native":
+        set_mode(store, MODE_NATIVE, reason="operator: return to native reads")
+    elif action == "kill":
+        kill_switch(store, reason="operator kill switch")
+    elif action == "canary":
+        enable_canary(store)  # raises ReaderError with reasons when ineligible
+    elif action == "clear-breaker":
+        clear_breaker(store, reason="operator: breaker cleared after repair")
+    elif action == "force-native":
+        # the emergency override: independent of the reader journal
+        force_native(store, "operator force-native override")
+    elif action == "lift-force":
+        lift_force_native(store)
+    elif action == "reset-journal":
+        quarantined = quarantine_reader_journal(
+            store, "operator reset after journal corruption"
+        )
+    elif action != "status":
+        raise CliError(f"unknown reader action {action!r}")
+
+    state = reader_state(store)
     verdict = cutover_eligibility(store)
     coverage = verdict.coverage
     data = {
-        "eligible_reads": coverage.eligible,
-        "checked_reads": coverage.checked,
-        "unavailable_reads": coverage.unavailable,
-        "agreed": coverage.agreed,
-        "diverged": coverage.diverged,
-        "not_applicable": coverage.not_applicable,
+        "mode": state.mode,
+        "configured_mode": state.configured_mode,
+        "forced_native": state.forced_native,
+        "journal_head": state.journal_head,
+        "quarantined": quarantined,
+        "breaker_open": state.breaker_open,
+        "breaker_reason": state.breaker_reason,
+        "epoch": state.epoch,
         "journal_errors": coverage.journal_errors,
-        "divergence_rate": coverage.divergence_rate,
-        "coverage_ratio": coverage.coverage_ratio,
-        "by_subject": coverage.by_subject,
+        "coverage": {
+            "total": coverage.total,
+            "agreed": coverage.agreed,
+            "diverged": coverage.diverged,
+            "unavailable": coverage.unavailable,
+            "missing": coverage.missing,
+            "not_applicable": coverage.not_applicable,
+            "native_only": coverage.native_only,
+            "by_subject": coverage.by_subject,
+            "facts": list(coverage.facts),
+        },
         "cutover": {
             "eligible": verdict.eligible,
             "parity_complete": verdict.parity_complete,
-            "min_coverage": verdict.min_coverage,
             "reasons": list(verdict.reasons),
         },
     }
     lines = [
-        "shadow read-parity coverage:",
-        f"  eligible={coverage.eligible} checked={coverage.checked} "
-        f"unavailable={coverage.unavailable} not_applicable={coverage.not_applicable}",
-        f"  agreed={coverage.agreed} diverged={coverage.diverged} "
-        f"divergence_rate={coverage.divergence_rate:.3f} "
-        f"coverage={coverage.coverage_ratio:.3f}",
+        f"reader mode: {state.mode}"
+        + (" [FORCE-NATIVE OVERRIDE]" if state.forced_native else "")
+        + (f" (BREAKER OPEN: {state.breaker_reason})" if state.breaker_open else ""),
+        f"epoch: {state.epoch or '(none for this reader/projector version)'}",
+        f"current-epoch checks: total={coverage.total} agreed={coverage.agreed} "
+        f"diverged={coverage.diverged} unavailable={coverage.unavailable} "
+        f"missing={coverage.missing} not_applicable={coverage.not_applicable}",
+        f"observed paths: {', '.join(coverage.facts) if coverage.facts else '(none)'}",
     ]
-    for subject in sorted(coverage.by_subject):
-        statuses = coverage.by_subject[subject]
-        summary = " ".join(f"{k}={v}" for k, v in sorted(statuses.items()))
-        lines.append(f"  {subject}: {summary}")
     if verdict.eligible:
-        lines.append(
-            f"cutover: ELIGIBLE (parity complete, zero divergences, coverage "
-            f">= {verdict.min_coverage:.2f})"
-        )
+        lines.append("cutover: ELIGIBLE (current epoch)")
     else:
         lines.append("cutover: NOT ELIGIBLE")
         for reason in verdict.reasons:
@@ -578,7 +633,7 @@ _COMMANDS = {
     "history": _cmd_history,
     "parity": _cmd_parity,
     "revisions": _cmd_revisions,
-    "shadow": _cmd_shadow,
+    "reader": _cmd_reader,
 }
 
 
@@ -658,10 +713,26 @@ def build_parser() -> argparse.ArgumentParser:
         "revisions",
         help="inspect the stage-3B revision mirrors and active revision",
     )
-    sub.add_parser(
-        "shadow",
-        help="shadow read-parity coverage report and revision-read cutover "
-        "eligibility (complete parity + zero divergences + minimum coverage)",
+    reader_parser = sub.add_parser(
+        "reader",
+        help="the read boundary: status, mode changes (native/shadow), "
+        "eligibility-gated canary enablement, the kill switch, and breaker "
+        "recovery",
+    )
+    reader_parser.add_argument(
+        "action",
+        nargs="?",
+        default="status",
+        choices=(
+            "status", "native", "shadow", "canary", "kill", "clear-breaker",
+            "force-native", "lift-force", "reset-journal",
+        ),
+        help="status (default) | native | shadow | canary (requires "
+        "current-epoch eligibility) | kill (immediate return to native) | "
+        "clear-breaker (requires native/shadow mode, complete parity, and a "
+        "fresh epoch) | force-native (emergency override independent of the "
+        "reader journal) | lift-force | reset-journal (quarantine a corrupt "
+        "reader journal and start fresh in native mode)",
     )
     sub.add_parser(
         "migrate",
@@ -718,6 +789,7 @@ def main(argv: list[str] | None = None) -> int:
         ModelConfigError,
         ParityError,
         MirrorError,
+        ReaderError,
     ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:

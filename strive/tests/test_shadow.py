@@ -1,10 +1,7 @@
-"""Stage-3B.1: derived integrity + subject-specific revision shadow reads.
-
-Failure injection for prefix pinning, intent exclusivity, fail-closed
-planning, artifact closure, quarantine/rebuild, prefix-scoped completion,
-and stage-3B journal upgrades — plus per-use-site read-parity checks with
-durable coverage across run/compare/replay/promote/rollback/audit/status
-flows, execution-provenance manifests, and cutover eligibility.
+"""Derived integrity: prefix pinning, intent exclusivity, fail-closed
+planning, artifact closure, quarantine/rebuild, stage-3B journal upgrades —
+and the ONE verified revision snapshot (parity-grade) that all revision
+reads use.
 """
 
 import hashlib
@@ -15,13 +12,11 @@ import pytest
 
 from strive import codec
 from strive.dualwrite import (
-    ActivationMirror,
     MigrationCompleted,
     MigrationIntent,
     MirrorError,
     PROJECTOR_REF,
     ParityError,
-    RevisionMirror,
     capture_snapshot,
     open_intent,
     parity_status,
@@ -29,31 +24,10 @@ from strive.dualwrite import (
     rebuild_mirror,
     run_backfill_operation,
 )
-from strive.contracts import INTERVENTION_SHADOW_DIVERGENCE
 from strive.evaluate import evaluate
-from strive.contracts import Event
-from strive.events import EventLog
-from strive.loop import (
-    audit_generation,
-    compare_generations,
-    promote_generation,
-    replay_run,
-    rollback_generation,
-    run_cycle,
-)
-from strive.revisions import ResolvedHarnessManifest
+from strive.loop import run_cycle
+from strive.reader import verify_revision_snapshot
 from strive.sandbox import run_strategy
-from strive.shadow import (
-    CHECK_AGREED,
-    CHECK_DIVERGED,
-    CHECK_NOT_APPLICABLE,
-    CHECK_UNAVAILABLE,
-    ShadowSession,
-    build_shadow_view,
-    cutover_eligibility,
-    read_shadow_records,
-    shadow_coverage,
-)
 from strive.store import Store
 from strive.tasks import SUM_INTEGERS_TASK
 
@@ -113,8 +87,6 @@ def test_appended_records_after_intent_are_allowed(tmp_path: Path) -> None:
     store.mirror.append(_intent_at_head(store, "0002-revision-backfill", "op-append"))
     run_cycle(store, SUM_INTEGERS_TASK)  # append-only growth is fine
     report = run_backfill_operation(store, "0002-revision-backfill")
-    # the resumed op completed its declared prefix; the live dual-write
-    # already mirrored the appended records, so parity is fully complete
     assert report.complete
     assert open_intent(store.mirror) is None
 
@@ -165,7 +137,6 @@ def test_plan_projection_fails_before_publishing_on_bad_mirrors(
     )
     with pytest.raises(ParityError, match="refusing to plan"):
         plan_projection(snapshot, store.mirror.entries())
-    # nothing was published on the failure path
     objects_after = sorted(
         p.name for p in store.objects.root.rglob("*") if p.is_file()
     )
@@ -175,7 +146,6 @@ def test_plan_projection_fails_before_publishing_on_bad_mirrors(
 def test_mismatched_mirror_plus_missing_records_fails_closed(tmp_path: Path) -> None:
     store = _evolved_store(tmp_path)
     lines = _mirror_lines(store)
-    # corrupt one mirror's revision content AND drop another mirror entirely
     record = json.loads(lines[0])
     record["revision"]["summary"] = "tampered"
     mangled = [json.dumps(record, sort_keys=True, separators=(",", ":"))] + lines[2:]
@@ -190,11 +160,8 @@ def test_mismatched_mirror_plus_missing_records_fails_closed(tmp_path: Path) -> 
 
 def test_open_intent_permits_later_activation_mirrors(tmp_path: Path) -> None:
     """Prefix-scoped completion: an intent is open, then a rollback creates a
-    LATER activation + live mirror before resume. Resume must validate,
-    repair, and complete only the intent's declared prefix; the newer mirror
-    is out of scope and left untouched — never treated as foreign."""
+    LATER activation + live mirror before resume."""
     store = _evolved_store(tmp_path)
-    # simulate an incomplete backfill: drop one mirror WITHIN the prefix
     lines = _mirror_lines(store)
     revision_indexes = [
         i for i, l in enumerate(lines)
@@ -213,16 +180,14 @@ def test_open_intent_permits_later_activation_mirrors(tmp_path: Path) -> None:
     report = run_backfill_operation(store, "parity-repair")  # resume
     assert report.complete
     assert open_intent(store.mirror) is None
-    # the later activation mirror survived, exactly once
     survivors = [
         l for l in _mirror_lines(store)
         if json.loads(l)["schema"] == "activation-mirror@1"
     ]
     assert sorted(survivors) == sorted(set(later_mirrors))
-    # the repaired prefix mirror is back and the derived view agrees
-    view = build_shadow_view(store)
-    assert view.available, view.reason
-    assert view.active_revision_id() == "rev-0000"  # post-rollback
+    snapshot = verify_revision_snapshot(store)
+    assert snapshot.available, snapshot.reason
+    assert snapshot.active_revision_id() == "rev-0000"  # post-rollback
 
 
 # -- 2. artifact closure --------------------------------------------------------------------
@@ -236,7 +201,6 @@ def test_missing_derived_objects_are_detected_and_repaired(tmp_path: Path) -> No
     store = _evolved_store(tmp_path)
     revision = store.revisions()[-1]
     assert revision.provenance_ref is not None
-    # delete derived CAS objects (manifest + provenance)
     _object_path(store, revision.scope_manifest_ref).unlink()
     _object_path(store, revision.provenance_ref).unlink()
 
@@ -244,12 +208,12 @@ def test_missing_derived_objects_are_detected_and_repaired(tmp_path: Path) -> No
     assert not report.complete
     assert len(report.missing_objects) == 2
     assert not report.closure_issues
-    # the derived view is unavailable — closure is an availability requirement
-    assert not build_shadow_view(store).available
+    # closure is an availability requirement of the verified snapshot
+    assert not verify_revision_snapshot(store).available
 
     repaired = run_backfill_operation(store, "parity-repair")
-    assert repaired.complete  # republished from the pure projection plan
-    assert build_shadow_view(store).available
+    assert repaired.complete
+    assert verify_revision_snapshot(store).available
 
 
 def test_corrupt_derived_objects_fail_closed_never_overwritten(
@@ -264,7 +228,6 @@ def test_corrupt_derived_objects_fail_closed_never_overwritten(
     assert any("corrupt" in issue for issue in report.closure_issues)
     with pytest.raises(ParityError):
         run_backfill_operation(store, "parity-repair")
-    # fail closed: the corrupt object was NOT silently overwritten
     assert manifest_path.read_text() == "corrupted bytes"
 
 
@@ -284,7 +247,6 @@ def test_corrupt_decision_and_source_objects_are_closure_issues(
     report = parity_status(store)
     assert any("decision" in i and "corrupt" in i for i in report.closure_issues)
 
-    # a MISSING canonical source artifact is data loss, not repairable
     generation = store.generations()["gen-0001"]
     _object_path(store, generation.source_ref).unlink()
     report = parity_status(store)
@@ -303,35 +265,28 @@ def test_corrupt_mirror_quarantine_and_rebuild(tmp_path: Path) -> None:
 
     with pytest.raises(MirrorError):
         parity_status(store)
-    # the derived view degrades to unavailable; it never raises
-    view = build_shadow_view(store)
-    assert not view.available and view.active_revision_id() is None
+    snapshot = verify_revision_snapshot(store)
+    assert not snapshot.available and snapshot.active_revision_id() is None
 
     rebuilt = rebuild_mirror(store)
     assert rebuilt.report.complete
-    # prior journal preserved byte-for-byte in quarantine
     assert rebuilt.quarantine_path is not None
     assert Path(rebuilt.quarantine_path).read_bytes() == corrupt_bytes
     assert rebuilt.prior_mirror_sha256 == hashlib.sha256(corrupt_bytes).hexdigest()
-    # canonical ledger untouched; rebuild is journaled with intent + completion
     assert store.ledger_path.read_bytes() == ledger_before
     kinds = [type(e).__name__ for e in store.mirror.entries()]
     assert kinds[0] == "MigrationIntent" and kinds[-1] == "MigrationCompleted"
     completed = store.mirror.entries()[-1]
     assert isinstance(completed, MigrationCompleted)
     assert rebuilt.prior_mirror_sha256 in completed.detail
-    # the derived view works again and matches generation-native state
-    view = build_shadow_view(store)
-    assert view.available
-    assert view.active_revision_id() == "rev-0000"  # post-rollback
+    snapshot = verify_revision_snapshot(store)
+    assert snapshot.available
+    assert snapshot.active_revision_id() == "rev-0000"  # post-rollback
 
 
 def test_stage3b_intent_journal_is_detected_with_rebuild_guidance(
     tmp_path: Path,
 ) -> None:
-    """A journal written in the exact stage-3B format (migration-intent@1,
-    no prefix_digest) is detected precisely and directed to
-    `strive parity --rebuild`; the rebuild recovers it with quarantine."""
     store = _evolved_store(tmp_path)
     snapshot = capture_snapshot(store)
     legacy_intent = json.dumps(
@@ -348,148 +303,47 @@ def test_stage3b_intent_journal_is_detected_with_rebuild_guidance(
 
     with pytest.raises(MirrorError, match="parity --rebuild"):
         store.mirror.entries()
-    assert not build_shadow_view(store).available  # degraded, not crashed
+    assert not verify_revision_snapshot(store).available  # degraded, not crashed
 
     rebuilt = rebuild_mirror(store)
     assert rebuilt.report.complete
     assert rebuilt.quarantine_path is not None
     assert legacy_intent in Path(rebuilt.quarantine_path).read_text()
-    assert build_shadow_view(store).available
+    assert verify_revision_snapshot(store).available
 
 
-# -- 4. subject-specific read parity across every flow ----------------------------------------
+# -- 4. the verified revision snapshot ----------------------------------------------------------
 
 
-def _statuses(store: Store) -> dict[str, set[str]]:
-    records, errors = read_shadow_records(store)
-    assert errors == 0
-    out: dict[str, set[str]] = {}
-    for record in records:
-        out.setdefault(record.subject, set()).add(record.status)
-    return out
-
-
-def test_every_use_site_records_an_agreed_check(tmp_path: Path) -> None:
-    store = _evolved_store(tmp_path)  # cycle-baseline + cycle-candidate
-    compare_generations(store, SUM_INTEGERS_TASK, "gen-0000", "gen-0001")
-    run_cycle(store, SUM_INTEGERS_TASK)
-    # replay the FIRST cycle: it retained a candidate, so the replay pairs
-    # both its baseline and candidate reads
-    replay_run(store, SUM_INTEGERS_TASK, store.cycles()[0].run_id)
-    audit_generation(store, SUM_INTEGERS_TASK)
-    rollback_generation(store)
-    promote_generation(store, SUM_INTEGERS_TASK, "gen-0001")
-    session = ShadowSession(store)  # the status/restart read
-    assert session.check_active("status-active", store.active_generation()).status \
-        == CHECK_AGREED
-    session.check_lineage("status-lineage", store.lineage())
-    session.finish(None)
-
-    statuses = _statuses(store)
-    for subject in (
-        "cycle-baseline", "cycle-candidate", "compare-left", "compare-right",
-        "replay-baseline", "replay-candidate", "promote-incumbent",
-        "promote-target", "rollback-active", "rollback-parent", "audit-target",
-        "status-active", "status-lineage",
-    ):
-        recorded = statuses[subject]
-        # every use site was checked and agreed; a cycle without a candidate
-        # legitimately records its candidate read as not-applicable
-        assert recorded <= {CHECK_AGREED, CHECK_NOT_APPLICABLE}, (subject, recorded)
-        assert CHECK_AGREED in recorded, (subject, recorded)
-    # no divergences anywhere in this healthy history
-    assert not any(
-        i.kind == INTERVENTION_SHADOW_DIVERGENCE for i in store.interventions()
-    )
-
-
-def test_restart_read_shadows_identically(tmp_path: Path) -> None:
+def test_tampered_source_identity_is_unavailable(tmp_path: Path) -> None:
+    """A mirror whose SourceRecordRef journal or schema identity is wrong —
+    even with a matching ordinal and digest — must make the snapshot
+    unavailable (complete-ref comparison, not positional)."""
     store = _evolved_store(tmp_path)
-    reopened = Store(store.root, SUM_INTEGERS_TASK.task_id)  # restart
-    session = ShadowSession(reopened)
-    check = session.check_active("status-active", reopened.active_generation())
-    session.finish(None)
-    assert check.status == CHECK_AGREED
-    view = build_shadow_view(reopened)
-    assert view.active_revision_id() == "rev-0001"
-    assert view.lineage_of("rev-0001") == ("rev-0001", "rev-0000")
-    assert view.parent_of("rev-0001") == "rev-0000"
+    for tamper_field, value in (("journal", "task:other"), ("source_schema", "activation@2")):
+        lines = _mirror_lines(store)
+        for index, line in enumerate(lines):
+            record = json.loads(line)
+            if record["schema"] == "revision-mirror@1":
+                record["source"][tamper_field] = value
+                lines[index] = json.dumps(record, sort_keys=True, separators=(",", ":"))
+                break
+        tampered = "\n".join(lines) + "\n"
+        original = store.mirror.path.read_bytes()
+        store.mirror.path.write_bytes(tampered.encode())
+        snapshot = verify_revision_snapshot(store)
+        assert not snapshot.available, tamper_field
+        assert snapshot.active_revision_id() is None
+        store.mirror.path.write_bytes(original)  # restore for the next case
+    assert verify_revision_snapshot(store).available
 
 
-def test_shadow_materialized_source_evaluates_identically(tmp_path: Path) -> None:
-    """The revision-derived strategy source (materialized from the scope
-    manifest by (kind, name) under pinned descriptors) produces the same
-    evaluation result as the generation-native source."""
-    store = _evolved_store(tmp_path)
-    view = build_shadow_view(store)
-    active_id = view.active_revision_id()
-    assert view.available and active_id is not None
-    _, shadow_source = view.sources[active_id]
-
-    active = store.active_generation()
-    assert active is not None
-    native_report = run_strategy(
-        store.source_of(active), SUM_INTEGERS_TASK.selection_cases(),
-        generation_id=active.generation_id,
-    )
-    shadow_report = run_strategy(
-        shadow_source, SUM_INTEGERS_TASK.selection_cases(),
-        generation_id="shadow",
-    )
-    native_eval = evaluate(SUM_INTEGERS_TASK, native_report)
-    shadow_eval = evaluate(SUM_INTEGERS_TASK, shadow_report)
-    assert native_eval.overall_score == shadow_eval.overall_score == 1.0
-    assert native_eval.split_scores == shadow_eval.split_scores
-
-
-def test_incomplete_parity_is_unavailable_never_divergent(tmp_path: Path) -> None:
-    store = _evolved_store(tmp_path)
-    # drop the LATEST activation mirror
-    lines = _mirror_lines(store)
-    activation_lines = [
-        i for i, l in enumerate(lines)
-        if json.loads(l)["schema"] == "activation-mirror@1"
-    ]
-    del lines[activation_lines[-1]]
-    store.mirror.path.write_text("\n".join(lines) + "\n")
-
-    view = build_shadow_view(store)
-    assert not view.available
-    assert view.active_revision_id() is None  # no active revision reported
-    assert "no mirror" in view.reason
-
-    session = ShadowSession(store)
-    check = session.check_active("status-active", store.active_generation())
-    session.finish(None)
-    assert check.status == CHECK_UNAVAILABLE  # unavailable ≠ divergent
-    assert not any(
-        i.kind == INTERVENTION_SHADOW_DIVERGENCE for i in store.interventions()
-    )
-    # canonical behavior untouched; repair restores the derived view
-    assert store.active_generation() is not None
-    run_backfill_operation(store, "parity-repair")
-    assert build_shadow_view(store).available
-
-
-def test_derived_corruption_never_fails_the_canonical_operation(
+def test_doctored_mirror_content_is_unavailable_via_recomputed_projection(
     tmp_path: Path,
 ) -> None:
-    """With the mirror journal replaced by a directory (an unexpected OS-level
-    failure), every canonical flow still commits; shadow checks degrade to
-    unavailable statuses."""
-    store = _evolved_store(tmp_path)
-    store.mirror.path.unlink()
-    store.mirror.path.mkdir()  # reads now raise IsADirectoryError inside
-
-    report = run_cycle(store, SUM_INTEGERS_TASK)  # must not raise
-    assert report.run_id
-    statuses = _statuses(store)
-    assert CHECK_UNAVAILABLE in statuses["cycle-baseline"]
-    view = build_shadow_view(store)
-    assert not view.available and view.active_revision_id() is None
-
-
-def test_lineage_cycle_is_detected_and_bounded(tmp_path: Path) -> None:
+    """The verified snapshot recomputes projections: mirror content edits
+    that would pass a structural check (e.g. a doctored base_parent) fail
+    projection equality and make the snapshot unavailable."""
     store = _evolved_store(tmp_path)
     lines = _mirror_lines(store)
     for index, line in enumerate(lines):
@@ -498,7 +352,6 @@ def test_lineage_cycle_is_detected_and_bounded(tmp_path: Path) -> None:
             record["schema"] == "revision-mirror@1"
             and record["revision"]["ref"]["revision_id"] == "rev-0000"
         ):
-            # doctor rev-0000 to claim rev-0001 as its base parent: a cycle
             record["revision"]["base_parent"] = {
                 "schema": "revision-ref@1",
                 "scope": record["revision"]["ref"]["scope"],
@@ -508,198 +361,38 @@ def test_lineage_cycle_is_detected_and_bounded(tmp_path: Path) -> None:
             break
     store.mirror.path.write_text("\n".join(lines) + "\n")
 
-    view = build_shadow_view(store)
-    assert not view.available
-    assert "lineage cycle" in view.reason
+    snapshot = verify_revision_snapshot(store)
+    assert not snapshot.available
+    assert "mirror verification failed" in snapshot.reason
 
 
-def test_true_divergence_is_durable_and_deduplicated(tmp_path: Path) -> None:
-    """A genuinely divergent mirror is recorded durably with its subject;
-    repeating the identical incident does not duplicate the intervention;
-    behavior stays generation-native."""
+def test_verified_snapshot_source_evaluates_identically(tmp_path: Path) -> None:
     store = _evolved_store(tmp_path)
-    lines = _mirror_lines(store)
-    # tamper the LAST activation mirror to point at rev-0000
-    for index in range(len(lines) - 1, -1, -1):
-        record = json.loads(lines[index])
-        if record["schema"] == "activation-mirror@1":
-            record["activation"]["revision"]["revision_id"] = "rev-0000"
-            lines[index] = json.dumps(record, sort_keys=True, separators=(",", ":"))
-            break
-    store.mirror.path.write_text("\n".join(lines) + "\n")
+    snapshot = verify_revision_snapshot(store)
+    active_id = snapshot.active_revision_id()
+    assert snapshot.available and active_id is not None
+    _, derived_source = snapshot.sources[active_id]
 
-    for _ in range(2):  # the identical incident, twice
-        session = ShadowSession(store)
-        check = session.check_active("status-active", store.active_generation())
-        session.finish(None)
-        assert check.status == CHECK_DIVERGED
-
-    divergences = [
-        i for i in store.interventions()
-        if i.kind == INTERVENTION_SHADOW_DIVERGENCE
-    ]
-    assert len(divergences) == 1  # deduplicated
-    assert divergences[0].reason.startswith("status-active: ")
-    assert "rev-0000" in divergences[0].reason
-    # ... but EVERY attempted check is in the coverage journal
-    records, _ = read_shadow_records(store)
-    assert sum(1 for r in records if r.status == CHECK_DIVERGED) == 2
-    # generation-native behavior unaffected
     active = store.active_generation()
-    assert active is not None and active.generation_id == "gen-0001"
-
-
-# -- 5. execution provenance ------------------------------------------------------------------
-
-
-def _events(store: Store, run_id: str) -> "list[Event]":
-    return EventLog(store.runs_dir / run_id / "events.jsonl", run_id).read_all()
-
-
-def test_each_execution_pins_a_resolved_manifest(tmp_path: Path) -> None:
-    store = _evolved_store(tmp_path)
-    run_id = store.cycles()[-1].run_id
-    manifests = [
-        e for e in _events(store, run_id)
-        if e.type == "execution_manifest"
-    ]
-    by_subject = {e.payload["subject"]: e.payload for e in manifests}
-    assert set(by_subject) == {"cycle-baseline", "cycle-candidate"}
-    # separate refs per subject: different executed artifacts
-    baseline_ref = str(by_subject["cycle-baseline"]["resolved_manifest_ref"])
-    candidate_ref = str(by_subject["cycle-candidate"]["resolved_manifest_ref"])
-    assert baseline_ref != candidate_ref
-    # the run activated the candidate, yet BOTH manifests identify the
-    # baseline revision that produced the evaluation
-    assert by_subject["cycle-baseline"]["baseline_revision"] == "rev-0000"
-    assert by_subject["cycle-candidate"]["baseline_revision"] == "rev-0000"
-    assert build_shadow_view(store).active_revision_id() == "rev-0001"
-
-    resolved: ResolvedHarnessManifest = codec.loads(
-        store.objects.get_text(candidate_ref), ResolvedHarnessManifest
+    assert active is not None
+    native_report = run_strategy(
+        store.source_of(active), SUM_INTEGERS_TASK.selection_cases(),
+        generation_id=active.generation_id,
     )
-    assert resolved.contributions[0].revision.revision_id == "rev-0000"
-    # tamper-evident journal head: record count AND source-prefix digest
-    head_value = resolved.contributions[0].journal_head.value
-    count, _, digest = head_value.partition(":")
-    assert count.isdigit() and len(digest) == 64
-    snapshot = capture_snapshot(store)
-    assert digest == snapshot.prefix_digest(int(count))
-    # the executed artifact is the candidate's source
-    candidate = store.generations()["gen-0001"]
-    assert resolved.effective[0].binding.content_ref == candidate.source_ref
-
-
-def test_compare_and_replay_emit_per_subject_manifests(tmp_path: Path) -> None:
-    store = _evolved_store(tmp_path)
-    compare_generations(store, SUM_INTEGERS_TASK, "gen-0000", "gen-0001")
-    compare_run = sorted(
-        p.name for p in store.runs_dir.iterdir() if p.name.startswith("compare-")
-    )[-1]
-    subjects = {
-        e.payload["subject"]
-        for e in _events(store, compare_run)
-        if e.type == "execution_manifest"
-    }
-    assert subjects == {"compare-left", "compare-right"}
-
-    replay_run(store, SUM_INTEGERS_TASK, store.cycles()[-1].run_id)
-    replay_id = sorted(
-        p.name for p in store.runs_dir.iterdir() if p.name.startswith("replay-")
-    )[-1]
-    subjects = {
-        e.payload["subject"]
-        for e in _events(store, replay_id)
-        if e.type == "execution_manifest"
-    }
-    assert subjects == {"replay-baseline", "replay-candidate"}
-
-
-# -- 6. coverage + cutover eligibility ---------------------------------------------------------
-
-
-def test_cutover_requires_coverage_not_just_no_divergence(tmp_path: Path) -> None:
-    """A store with complete parity but NO recorded shadow checks must not be
-    cutover-eligible: absence of divergence records is not evidence."""
-    from strive.loop import ensure_seeded
-
-    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
-    ensure_seeded(store, SUM_INTEGERS_TASK)
-    assert parity_status(store).complete
-    verdict = cutover_eligibility(store)
-    assert not verdict.eligible
-    assert any("no eligible shadowed reads" in r for r in verdict.reasons)
-
-
-def test_cutover_eligibility_on_healthy_history(tmp_path: Path) -> None:
-    store = _evolved_store(tmp_path)
-    compare_generations(store, SUM_INTEGERS_TASK, "gen-0000", "gen-0001")
-    rollback_generation(store)
-    promote_generation(store, SUM_INTEGERS_TASK, "gen-0001")
-    coverage = shadow_coverage(store)
-    assert coverage.diverged == 0 and coverage.unavailable == 0
-    assert coverage.eligible == coverage.checked > 0
-    assert coverage.divergence_rate == 0.0 and coverage.coverage_ratio == 1.0
-    verdict = cutover_eligibility(store)
-    assert verdict.eligible and verdict.parity_complete
-
-
-def test_divergence_or_low_coverage_blocks_cutover(tmp_path: Path) -> None:
-    store = _evolved_store(tmp_path)
-    # make the derived side unavailable: subsequent checks are eligible-but-
-    # unchecked, so coverage drops below the declared minimum
-    lines = _mirror_lines(store)
-    del lines[-1]
-    store.mirror.path.write_text("\n".join(lines) + "\n")
-    for _ in range(20):
-        session = ShadowSession(store)
-        session.check_active("status-active", store.active_generation())
-        session.finish(None)
-
-    coverage = shadow_coverage(store)
-    assert coverage.unavailable >= 20
-    verdict = cutover_eligibility(store)
-    assert not verdict.eligible
-    assert any("coverage" in r or "parity" in r for r in verdict.reasons)
-
-
-# -- 7. differential control ------------------------------------------------------------------
-
-
-def test_mirror_off_on_and_shadow_runs_are_canonically_identical(
-    tmp_path: Path,
-) -> None:
-    stores = {
-        "off": Store(tmp_path / "off", SUM_INTEGERS_TASK.task_id, mirror_enabled=False),
-        "on": Store(tmp_path / "on", SUM_INTEGERS_TASK.task_id),
-    }
-    results = {}
-    for name, store in stores.items():
-        report = run_cycle(store, SUM_INTEGERS_TASK)
-        results[name] = report
-
-    def canonical(store: Store) -> list[tuple[str, ...]]:
-        out: list[tuple[str, ...]] = []
-        for line in store.ledger_path.read_text().splitlines():
-            record = json.loads(line)
-            out.append(
-                (record["schema"], str(record.get("generation_id", "")),
-                 str(record.get("reason", "")), str(record.get("accepted", "")),
-                 str(record.get("overall_score", "")))
-            )
-        return out
-
-    assert canonical(stores["off"]) == canonical(stores["on"])
-    assert (
-        results["off"].evaluation.overall_score
-        == results["on"].evaluation.overall_score
+    derived_report = run_strategy(
+        derived_source, SUM_INTEGERS_TASK.selection_cases(), generation_id="derived"
     )
-    # the mirror-off run records no derived state at all; the mirror-on run
-    # IS the shadowed run: agreed checks, zero divergences
-    assert not stores["off"].shadow_path.exists()
-    coverage = shadow_coverage(stores["on"])
-    assert coverage.agreed > 0 and coverage.diverged == 0
-    assert not any(
-        i.kind == INTERVENTION_SHADOW_DIVERGENCE
-        for i in stores["on"].interventions()
-    )
+    native_eval = evaluate(SUM_INTEGERS_TASK, native_report)
+    derived_eval = evaluate(SUM_INTEGERS_TASK, derived_report)
+    assert native_eval.overall_score == derived_eval.overall_score == 1.0
+    assert native_eval.split_scores == derived_eval.split_scores
+
+
+def test_lineage_and_parents_from_verified_snapshot(tmp_path: Path) -> None:
+    store = _evolved_store(tmp_path)
+    snapshot = verify_revision_snapshot(store)
+    assert snapshot.available
+    assert snapshot.active_revision_id() == "rev-0001"
+    assert snapshot.lineage_of("rev-0001") == ("rev-0001", "rev-0000")
+    assert snapshot.parent_of("rev-0001") == "rev-0000"
+    assert snapshot.parent_of("rev-0000") is None
