@@ -1,5 +1,61 @@
 # HANDOFF — strive
 
+## Stage 3B — dual-write revision storage (what was implemented)
+
+The exact narrow slice ROADMAP fixed, nothing more:
+- **`revisions.py`** — the frozen core wire types moved verbatim from the
+  spike to their permanent home (same kinds/versions); `stage3_contracts.py`
+  keeps only the provisional contracts and re-exports the core so the spike
+  tests validate it unchanged.
+- **`dualwrite.py`** — deterministic, field-preserving mirrors: every
+  retained `generation@2` gets a `revision@1` (canonical single-binding
+  task-scope manifest; task fingerprint/origin/weakness/decision@1 evidence
+  preserved via a CAS `MigrationProvenance` referenced from
+  `provenance_ref`; the delta's before-binding is the parent's content ref)
+  and every `activation@2` gets a `revision-activation@1` (mode, reason,
+  timestamp, expiry/monitoring data verbatim; legacy policy markers →
+  `name@0`). Mirrors are appended after their source records — explicitly
+  NOT one atomic transaction; the generation ledger stays the source of
+  truth. `parity_status` recomputes mirrors (determinism makes this exact)
+  and `repair_parity` reconstructs missing ones without duplicates,
+  refusing ambiguous history (`ParityError`) rather than papering over it.
+- **`migrations.py`** — the sequential registry: `0001-legacy-unscoped-
+  ledger` (wraps the proven phase-4.6 migration) and `0002-revision-
+  backfill` (append-only; preserves the source journal byte-for-byte as a
+  prefix; journals a `revision-backfill` marker with the pre-backfill
+  sha256; validates output; no-ops when parity is already complete; refuses
+  corrupt history loudly). `strive migrate` applies pending entries in
+  order — a legacy root chains 0001 then 0002 in one pass.
+- **CLI additions only** (`parity [--repair]`, `revisions`, `migrate`);
+  every existing command is unchanged. `history` renders the mirror kinds.
+- Store accepts the two new ledger-entry kinds with read-time task-isolation
+  checks on their scopes; the loop, activation, cycles, and
+  execution-and-decision replay remain generation-native.
+
+**Verification** (`uv run pytest` → 176, mypy strict clean, 42 files):
+exact generation/revision and activation/mirror field mapping; accepted AND
+rejected decision evidence recovered from CAS provenance; active
+generation/revision parity at every activation-history prefix; rollback and
+provisional metadata equivalence (incl. `seed@0` legacy-policy mapping);
+backfill idempotence and corrupt/ambiguous-history refusal; partial
+dual-write detected and repaired (also demonstrated live via
+`strive parity --repair`); historical descriptor validity (prompt@1 under
+prompt@2, spike tests); scope/mask/parent/manifest and cross-task isolation
+invariants; all Stage 1–2b tests and replay behavior green (one entry-count
+assertion updated for the extra mirror line; semantics unchanged).
+
+**The Stage 3B claim, stated precisely:** strive mirrors generation-native
+history into field-preserving composite revision records and can backfill,
+inspect, verify, and repair revision parity. Revision-native execution,
+selection, activation, and replay remain future work.
+
+**Next slice options** (each independently mergeable): (a) the parity slice
+— make the loop read revisions as the derivation source behind a verified
+dual-read comparison, the step toward revision-native activation; or (b)
+the selection slice — ValidationBundle/SelectionDecision envelopes with
+typed evidence roles (unresolved needs in adrs/README). HANDOFF recommends
+(a): it retires dual-write soonest and unblocks composite candidates.
+
 State as of 2026-08-08, after five phases plus correction passes: the vertical
 slice (stage 1), the research-and-redesign phase (notes 01–06,
 [comparative matrix](agents/research/comparative-matrix.md),

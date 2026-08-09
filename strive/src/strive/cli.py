@@ -37,7 +37,10 @@ from strive.loop import (
     replay_run,
     run_cycle,
 )
+from strive.dualwrite import ParityError, parity_status, repair_parity
 from strive.migrate import migrate_legacy_ledger
+from strive.migrations import apply_pending, pending_migrations
+from strive.revisions import delta_label
 from strive.model import ModelConfigError, adapter_from_env
 from strive.model_proposer import ModelProposer
 from strive.store import Store, StoreError
@@ -391,6 +394,59 @@ def _cmd_migrate_legacy(task: Task, args: argparse.Namespace) -> dict[str, Any]:
     return {"data": data, "human": "\n".join(lines)}
 
 
+def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    if args.repair:
+        report = repair_parity(store)
+        action = "repaired"
+    else:
+        report = parity_status(store)
+        action = "checked"
+    data = {
+        "complete": report.complete,
+        "generations": report.generations,
+        "revisions": report.revisions,
+        "activations": report.activations,
+        "revision_activations": report.revision_activations,
+        "missing_revision_ids": list(report.missing_revision_ids),
+        "missing_activation_indices": list(report.missing_activation_indices),
+        "mismatched": list(report.mismatched),
+    }
+    lines = [
+        f"parity {action}: {'COMPLETE' if report.complete else 'INCOMPLETE'}",
+        f"  generations={report.generations} revisions={report.revisions} "
+        f"activations={report.activations} revision_activations={report.revision_activations}",
+    ]
+    if report.missing_revision_ids:
+        lines.append(f"  missing revisions: {', '.join(report.missing_revision_ids)}")
+    if report.missing_activation_indices:
+        lines.append(
+            f"  missing activation mirrors at: {report.missing_activation_indices}"
+        )
+    for issue in report.mismatched:
+        lines.append(f"  AMBIGUOUS: {issue}")
+    return {"data": data, "human": "\n".join(lines)}
+
+
+def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    revisions = store.revisions()
+    activations = store.revision_activations()
+    active_revision = activations[-1].revision.revision_id if activations else None
+    data = {
+        "active_revision": active_revision,
+        "revisions": [codec.encode(r) for r in revisions],
+        "revision_activations": [codec.encode(a) for a in activations],
+    }
+    lines = [f"revision mirrors (active: {active_revision}):"]
+    for revision in revisions:
+        labels = ",".join(delta_label(d) for d in revision.deltas)
+        base = revision.base_parent.revision_id if revision.base_parent else None
+        lines.append(
+            f"  {revision.ref.revision_id} base={base} deltas=[{labels}] "
+            f"proposer={revision.proposer}"
+        )
+    return {"data": data, "human": "\n".join(lines)}
+
+
 def _cmd_history(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     entries = store.entries()
     data = {"entries": [codec.encode(e) for e in entries]}
@@ -417,6 +473,19 @@ def _cmd_history(store: Store, task: Task, args: argparse.Namespace) -> dict[str
             )
         elif isinstance(entry, Intervention):
             lines.append(f"intervention {entry.kind}: {entry.reason}")
+        else:
+            from strive.revisions import HarnessRevision, RevisionActivation
+
+            if isinstance(entry, HarnessRevision):
+                lines.append(
+                    f"revision {entry.ref.revision_id} (mirror, "
+                    f"proposer={entry.proposer})"
+                )
+            elif isinstance(entry, RevisionActivation):
+                lines.append(
+                    f"revision-activation {entry.revision.revision_id} "
+                    f"reason={entry.reason} mode={entry.mode} (mirror)"
+                )
     return {"data": data, "human": "\n".join(lines) if lines else "(empty ledger)"}
 
 
@@ -432,6 +501,8 @@ _COMMANDS = {
     "rollback": _cmd_rollback,
     "resume": _cmd_resume,
     "history": _cmd_history,
+    "parity": _cmd_parity,
+    "revisions": _cmd_revisions,
 }
 
 
@@ -496,6 +567,20 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("rollback", help="reactivate the parent of the active generation")
     sub.add_parser("resume", help="lift a stall freeze")
     sub.add_parser("history", help="dump the full ledger journal")
+    parity_parser = sub.add_parser(
+        "parity",
+        help="check (or --repair) generation/revision mirror parity",
+    )
+    parity_parser.add_argument("--repair", action="store_true")
+    sub.add_parser(
+        "revisions",
+        help="inspect the stage-3B revision mirrors and active revision",
+    )
+    sub.add_parser(
+        "migrate",
+        help="apply pending registry migrations in order (0001 legacy ledger, "
+        "0002 revision backfill)",
+    )
     sub.add_parser(
         "migrate-legacy",
         help="convert a stage-2a ledger/ledger.jsonl into this task's "
@@ -514,6 +599,25 @@ def main(argv: list[str] | None = None) -> int:
             result = _cmd_migrate_legacy(task, args)
             _emit(args.json, args.command, result["data"], result["human"])
             return 0
+        if args.command == "migrate":
+            reports = apply_pending(args.artifacts, task)
+            data = {
+                "applied": [
+                    {"migration_id": r.migration_id, "applied": r.applied,
+                     "detail": r.detail}
+                    for r in reports
+                ],
+                "pending_after": [
+                    m.migration_id for m in pending_migrations(args.artifacts, task)
+                ],
+            }
+            human = (
+                "\n".join(f"{r.migration_id}: {r.detail}" for r in reports)
+                if reports
+                else "no pending migrations"
+            )
+            _emit(args.json, args.command, data, human)
+            return 0
         store = Store(args.artifacts, task.task_id)
         result = _COMMANDS[args.command](store, task, args)
         _emit(args.json, args.command, result["data"], result["human"])
@@ -525,6 +629,7 @@ def main(argv: list[str] | None = None) -> int:
         ObjectMissing,
         ObjectCorruption,
         ModelConfigError,
+        ParityError,
     ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:

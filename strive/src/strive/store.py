@@ -39,6 +39,12 @@ from typing import Iterator
 
 from strive import codec
 from strive.cas import ObjectStore
+from strive.dualwrite import build_activation_mirror, build_generation_mirror
+from strive.revisions import (
+    LEVEL_TASK,
+    HarnessRevision,
+    RevisionActivation,
+)
 from strive.contracts import (
     ACTIVATION_DURABLE,
     Activation,
@@ -51,7 +57,14 @@ from strive.contracts import (
 )
 from strive.events import now_iso
 
-LedgerEntry = Generation | Activation | CycleRecord | Intervention
+LedgerEntry = (
+    Generation
+    | Activation
+    | CycleRecord
+    | Intervention
+    | HarnessRevision
+    | RevisionActivation
+)
 
 
 class StoreError(Exception):
@@ -143,12 +156,22 @@ class Store:
                 decoded: object = codec.loads(line)
             except codec.SchemaError as exc:
                 raise LedgerError(f"{self.ledger_path}:{line_no}: {exc}") from None
-            if not isinstance(decoded, (Generation, Activation, CycleRecord, Intervention)):
+            if not isinstance(
+                decoded,
+                (Generation, Activation, CycleRecord, Intervention,
+                 HarnessRevision, RevisionActivation),
+            ):
                 raise LedgerError(
                     f"{self.ledger_path}:{line_no}: {type(decoded).__name__} "
                     "is not a ledger entry kind"
                 )
             entry_task = getattr(decoded, "task_id", None)
+            if isinstance(decoded, HarnessRevision):
+                scope = decoded.ref.scope
+                entry_task = scope.name if scope.level == LEVEL_TASK else f"<{scope.level}>"
+            elif isinstance(decoded, RevisionActivation):
+                scope = decoded.revision.scope
+                entry_task = scope.name if scope.level == LEVEL_TASK else f"<{scope.level}>"
             if entry_task is not None and entry_task != self.task_id:
                 raise LedgerError(
                     f"{self.ledger_path}:{line_no}: {type(decoded).__name__} "
@@ -211,6 +234,15 @@ class Store:
                 decision=decision,
             )
             self._append_unlocked(record)
+            # Stage-3B dual-write: the revision mirror follows its source
+            # record. NOT atomic with it — a crash in between is a detectable
+            # parity gap repaired by `strive parity --repair`.
+            parent_record = (
+                self.generations().get(parent_id) if parent_id is not None else None
+            )
+            self._append_unlocked(
+                build_generation_mirror(self.objects, record, parent_record)
+            )
         return record
 
     def source_of(self, generation: Generation) -> str:
@@ -256,7 +288,27 @@ class Store:
                 baseline_score=baseline_score,
             )
             self._append_unlocked(activation)
+            # Stage-3B dual-write mirror (see add_generation note)
+            self._append_unlocked(
+                build_activation_mirror(self.objects, activation, self.generations())
+            )
         return activation
+
+    def activations(self) -> list[Activation]:
+        return [e for e in self.entries() if isinstance(e, Activation)]
+
+    def revisions(self) -> list[HarnessRevision]:
+        return [e for e in self.entries() if isinstance(e, HarnessRevision)]
+
+    def revision_activations(self) -> list[RevisionActivation]:
+        return [e for e in self.entries() if isinstance(e, RevisionActivation)]
+
+    def append_revision(self, revision: HarnessRevision) -> None:
+        """Direct mirror append (parity repair path — no re-mirroring)."""
+        self.append(revision)
+
+    def append_revision_activation(self, activation: RevisionActivation) -> None:
+        self.append(activation)
 
     def active_activation(self) -> Activation | None:
         activation: Activation | None = None
