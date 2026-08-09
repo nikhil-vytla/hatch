@@ -580,3 +580,88 @@ Reworked the dual-write around an explicit crash model before merging:
   identical (structure, scores, decisions, active, replay).
 
 182 tests, mypy strict clean.
+
+## 2026-08-08 — Stage 3B.1: derived integrity + revision shadow reads
+
+- MigrationIntent@2 pins the exact canonical source prefix: record count,
+  whole-prefix hash, and a digest-sequence prefix hash. Resume verifies
+  the prefix exactly — appends after intent creation are fine; an altered
+  prefix record refuses resume. This closed the gap where an intent could
+  resume over silently rewritten history that happened to keep its length.
+- run_backfill_operation now holds ONE mirror writer lock across intent
+  selection/creation, projection, and every state transition; needed the
+  earlier unlocked-core split (_apply_projection_unlocked) to avoid flock
+  reentrancy. Multiple unfinished intents refuse; resume validates
+  migration_id + projector_ref against the persisted intent.
+- plan_projection fails closed before publishing on mismatched/duplicated/
+  foreign/unsupported existing mirrors, and now plans payloads for ALL
+  generations so closure repair can refill any missing derived object.
+- _verify_closure checks the full artifact graph per mirror: scope
+  manifest, provenance, decision evidence, pinned descriptor, source
+  artifact — exist, hash, decode, agree. Missing derived objects are
+  repairable; corrupt ones fail closed, never overwritten; a missing
+  canonical source artifact is data loss, reported not repaired.
+- `strive parity --rebuild` quarantines the corrupt mirror journal
+  byte-for-byte (prior sha recorded), rebuilds purely from canonical
+  history into a temp journal, validates, atomically os.replace-installs.
+  Canonical ledger untouched by construction.
+- shadow.py: compute_shadow derives active/lineage/rollback-target/source
+  from mirrors + CAS only — source text materialized from the ScopeManifest
+  binding under registry-validated pinned descriptors, never from
+  generation records. record_shadow_check hooks run/compare/replay/
+  promote/rollback (+ restart via reopen); divergence = durable
+  `shadow-divergence` intervention + run event, never silent fallback;
+  parity-incomplete or unreadable mirror ⇒ unavailable with reason and
+  NO active revision reported.
+- Gotcha found by test: record_shadow_check on an unreadable mirror path
+  leaked IsADirectoryError — MirrorJournal.entries now wraps OSError as
+  MirrorError so shadow degrades to "unavailable" instead of crashing a run.
+- Differential control extended: mirror-off, mirror-on, and shadowed runs
+  produce identical canonical results; shadow-materialized source
+  evaluates identically to the generation-native source.
+- Live smoke: run → corrupt mirror → `revisions` clean error while
+  generation-native `status` works → `parity --rebuild` recovers →
+  `revisions` active again.
+
+198 tests, mypy strict clean (44 files).
+
+## 2026-08-09 — Stage 3B.1 correction pass: subject-specific read parity
+
+- Replaced the post-operation snapshot comparison with per-use-site checks:
+  ShadowSession pairs the exact native read with its revision-derived read
+  before use (cycle baseline/candidate, compare left/right, replay
+  baseline/candidate, promote incumbent/target, rollback active/parent,
+  audit target, status/restart + lineage). A mismatch is recorded, never
+  substituted.
+- build_shadow_view now demands exact SourceRecordRef coverage BOTH ways,
+  supported projector, no duplicates, full derived closure (manifest/
+  provenance/decision decode + registry descriptors + source artifact),
+  semantic validation, and bounded cycle-free lineage. Manifests searched
+  by (kind, name); every deltas[0] assumption removed. Any derived
+  corruption or unexpected exception -> unavailable-with-reason; tested
+  with the mirror journal replaced by a directory mid-flight — run_cycle
+  still commits.
+- Execution provenance: per-subject ResolvedHarnessManifest CAS-stored
+  BEFORE each execution, pinning the baseline (shadow-active) revision at
+  a tamper-evident journal head "count:prefix_digest" (JournalHeadRef
+  value is backend-interpreted, so no frozen-type change). A cycle that
+  activates its candidate still records rev-N-1 as the evaluating
+  baseline.
+- Intent completion is now prefix-scoped (_entries_within_prefix): an open
+  intent + a later rollback's live activation mirror no longer refuses as
+  "foreign history" — validated, repaired, completed over the declared
+  prefix only; the later mirror survives untouched.
+- Stage-3B migration-intent@1 journals: precise MirrorError naming
+  `strive parity --rebuild` (peek at the raw schema field on SchemaError);
+  rebuild quarantines byte-for-byte and recovers.
+- Coverage: every attempted check recorded (agreed/diverged/unavailable/
+  not-applicable) in ledger/<task>.shadow.jsonl; identical divergences
+  deduplicated in the canonical ledger; `strive shadow` + cutover gate
+  (parity complete + zero divergences + coverage >= 0.9 — absence of
+  divergence records is NOT enough).
+- Gotcha: the healthy-flows test initially demanded {agreed} for
+  cycle-candidate/replay-candidate — a weakness-free second cycle
+  legitimately records not-applicable; replay the FIRST cycle for a real
+  candidate pairing.
+
+207 tests, mypy strict clean (44 files).

@@ -147,6 +147,72 @@ descriptor registry and migration-registry mechanics.
   revision-native execution, selection, activation, and replay remain
   future work.
 
+## Stage 3B.1 — Derived integrity + revision shadow reads ✅ (2026-08-09)
+
+Hardened the derived side and proved shadow parity, generation-native
+behavior authoritative throughout:
+- Intents pin the exact canonical source prefix (count + digest-sequence
+  hash); resume verifies it exactly — appended records allowed, altered
+  prefix records refused. One operation-level mirror lock spans intent
+  selection/creation and all state transitions; multiple unfinished intents
+  and mismatched migration_id/projector_ref refuse resume.
+- Planning fails closed before publishing on mismatched/duplicated/foreign/
+  unsupported mirrors; parity verifies the full artifact closure (scope
+  manifests, provenance, decision evidence, pinned descriptors, source
+  artifacts): missing derived objects are repairable from the pure plan,
+  corrupt objects fail closed and are never silently overwritten, and a
+  missing canonical source artifact is reported as data loss.
+- `strive parity --rebuild` quarantines the prior mirror journal
+  byte-for-byte, rebuilds mirrors + CAS closure purely from canonical
+  history, validates fully, then atomically installs — recording intent,
+  source prefix, outcome, and the prior mirror hash. The task ledger is
+  never touched.
+- Completion is prefix-scoped: an open intent tolerates later canonical
+  records and their live mirrors (e.g. a rollback before resume); it
+  validates, repairs, and completes only its declared source prefix. A
+  stage-3B-era mirror journal (`migration-intent@1`) is detected precisely
+  and directed to `strive parity --rebuild`.
+- **Subject-specific revision shadow reads**: each concrete generation-native
+  read is paired at its point of use with the revision-derived read — cycle
+  baseline/candidate, compare left/right, replay baseline/candidate,
+  promotion incumbent/target, rollback active/parent, audit target, and
+  status/restart reads. The derived view demands exact SourceRecordRef
+  coverage, the supported projector, no duplicates, full artifact closure,
+  semantic validation, and bounded cycle-free lineage; derived corruption or
+  unexpected exceptions degrade to *unavailable with a reason* and never
+  fail a committed canonical operation. Divergences are deduplicated durable
+  `shadow-divergence` interventions, never silent fallbacks; no active
+  revision is reported while the view is unavailable.
+- Execution provenance: every artifact execution CAS-stores a per-subject
+  ResolvedHarnessManifest *before* running, naming the baseline
+  (shadow-active) revision at a tamper-evident journal head (record count +
+  source-prefix digest) — a run that activates a candidate still identifies
+  the baseline revision that produced its evaluation.
+- Shadow coverage accounting: every attempted check is durably recorded as
+  agreed/diverged/unavailable/not-applicable in a derived coverage journal;
+  `strive shadow` reports eligible/checked/unavailable reads and divergence
+  rate. Cutover eligibility requires complete parity, zero divergences, AND
+  the declared minimum coverage (0.90) — not merely the absence of
+  divergence records. Differential control: mirror-off, mirror-on, and
+  shadowed runs are canonically identical.
+- 207 tests. Exit claim: strive shadows each concrete generation-native
+  read with the corresponding revision-derived read at the point of use,
+  records exact execution manifests and coverage, and remains safe under
+  derived corruption. Revisions still do not control behavior.
+
+## Stage 3B.2 — Revision-read cutover (next)
+
+A **narrowly reversible revision-read cutover with a kill switch**: a
+cutover flag makes the revision-derived value authoritative for reads while
+the generation-native value becomes the shadow (divergence semantics
+unchanged); the kill switch reverts to generation-native reads instantly;
+cutover is gated on `cutover_eligibility` (complete parity, zero
+divergences, declared minimum coverage). The prompt-surface composite
+evolution experiment follows separately: a `prompt` surface delta (proposal
+template) evolved alongside strategy code in one composite revision,
+validated under the existing paired gate with held-out discipline — the
+first real use of multi-surface revisions.
+
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 
 - Composite generation schema: per-surface CRUD deltas with before/after snapshots

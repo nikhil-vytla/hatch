@@ -97,6 +97,9 @@ class Store:
             root / "ledger" / f"{task_id}.mirror.jsonl", task_id
         )
         self.mirror_enabled = mirror_enabled
+        # derived shadow-check coverage journal (Stage 3B.1) — telemetry for
+        # the read-parity coverage report; never blocks canonical operations
+        self.shadow_path = root / "ledger" / f"{task_id}.shadow.jsonl"
         for directory in (self.ledger_path.parent, self.runs_dir):
             directory.mkdir(parents=True, exist_ok=True)
         self.diagnostics: list[str] = []

@@ -65,6 +65,7 @@ from strive.propose import (
     screen_source,
 )
 from strive.sandbox import run_strategy
+from strive.shadow import ShadowSession
 from strive.store import Store, StoreError
 from strive.tasks import Task
 
@@ -188,9 +189,16 @@ def _execute_and_evaluate(
     meter: BudgetMeter,
     config: LoopConfig,
     events: EventLog,
+    session: ShadowSession,
+    subject: str,
 ) -> Evaluation:
     """Charge, execute, attribute, and evaluate one generation. Never raises
-    for candidate behavior: failures come back inside the Evaluation."""
+    for candidate behavior: failures come back inside the Evaluation.
+
+    Execution provenance is pinned BEFORE the artifacts run: the session
+    CAS-stores a per-subject ResolvedHarnessManifest naming the baseline
+    (shadow-active) revision and the executed artifact (never blocking)."""
+    session.execution_manifest(subject, generation, events)
     denial = meter.request_execution()
     if denial is not None:
         events.emit(
@@ -411,6 +419,9 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
     _resolve_provisional(store, events)
     active = store.active_generation()
     assert active is not None
+    session = ShadowSession(store, run_id=run_id)
+    # the exact native read paired with its revision read, before use
+    session.check_active("cycle-baseline", active)
     freeze = store.adaptation_frozen()
     frozen = freeze is not None
 
@@ -425,7 +436,9 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
         budget_semantics=events_semantics,
     )
 
-    evaluation = _execute_and_evaluate(store, task, active, meter, config, events)
+    evaluation = _execute_and_evaluate(
+        store, task, active, meter, config, events, session, "cycle-baseline"
+    )
 
     diagnosis: Diagnosis | None = None
     proposal: ProposalRecord | None = None
@@ -477,7 +490,8 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                     source_ref=candidate.source_ref,
                 )
                 candidate_evaluation = _execute_and_evaluate(
-                    store, task, candidate_probe, meter, config, events
+                    store, task, candidate_probe, meter, config, events,
+                    session, "cycle-candidate",
                 )
                 decision = policy.decide(evaluation, candidate_evaluation)
                 events.emit("decision", decision=codec.encode(decision))
@@ -491,6 +505,9 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                     weakness_id=candidate.weakness_id,
                     decision=decision,
                 )
+                # the retained candidate, paired with its just-mirrored
+                # revision before it can be activated
+                session.check_generation("cycle-candidate", candidate_generation)
                 events.emit(
                     "retained",
                     generation_id=candidate_generation.generation_id,
@@ -541,6 +558,10 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                 )
             )
             events.emit("stall_freeze", reason=verdict.reason)
+
+    if candidate_generation is None:
+        session.note_not_applicable("cycle-candidate", "no candidate this cycle")
+    session.finish(events)  # durable coverage + deduplicated divergences
 
     after = store.active_generation()
     assert after is not None
@@ -594,10 +615,13 @@ def audit_generation(
         raise StoreError(f"task {task.task_id!r} declares no audit cases")
     run_id = _new_run_id("audit")
     events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
+    session = ShadowSession(store, run_id=run_id)
+    session.check_generation("audit-target", generation)  # before use
     meter = BudgetMeter(config.budget)
     denial = meter.request_execution()
     if denial is not None:
         raise StoreError(f"audit denied by budget: {denial.detail}")
+    session.execution_manifest("audit-target", generation, events)
     report = run_strategy(
         store.source_of(generation),
         cases,
@@ -611,6 +635,7 @@ def audit_generation(
         generation_id=generation.generation_id,
         evaluation=codec.encode(evaluation),
     )
+    session.finish(events)
     return AuditReport(generation_id=generation.generation_id, evaluation=evaluation)
 
 
@@ -634,14 +659,20 @@ def compare_generations(
     run_id = _new_run_id("compare")
     events = EventLog(store.runs_dir / run_id / "events.jsonl", run_id)
     meter = BudgetMeter(config.budget)
+    session = ShadowSession(store, run_id=run_id)
+    left = store.generation(left_id)  # the exact native reads, paired before use
+    session.check_generation("compare-left", left)
+    right = store.generation(right_id)
+    session.check_generation("compare-right", right)
     left_eval = _execute_and_evaluate(
-        store, task, store.generation(left_id), meter, config, events
+        store, task, left, meter, config, events, session, "compare-left"
     )
     right_eval = _execute_and_evaluate(
-        store, task, store.generation(right_id), meter, config, events
+        store, task, right, meter, config, events, session, "compare-right"
     )
     decision = policy.decide(left_eval, right_eval)
     events.emit("decision", decision=codec.encode(decision))
+    session.finish(events)
     return CompareReport(
         left_id=left_id, right_id=right_id, left=left_eval, right=right_eval, decision=decision
     )
@@ -665,8 +696,11 @@ def promote_generation(
     """
     config = config or LoopConfig()
     guard_mutation(store, task, config.acknowledge_task_drift)
-    target = store.generation(generation_id)
+    session = ShadowSession(store)
+    target = store.generation(generation_id)  # native reads, paired before use
+    session.check_generation("promote-target", target)
     active = store.active_generation()
+    session.check_active("promote-incumbent", active)
     if active is None:
         raise StoreError("no active generation; run a cycle first")
     if target.generation_id == active.generation_id:
@@ -692,12 +726,14 @@ def promote_generation(
             policy=f"{PROVISIONAL_POLICY.name}@{PROVISIONAL_POLICY.version}",
             expected_active=active.generation_id,
         )
+        session.finish(None)
         return activation, None
 
     compare = compare_generations(
         store, task, active.generation_id, generation_id, config
     )
     if not compare.decision.accepted:
+        session.finish(None)
         raise StoreError(
             f"promotion refused by policy {compare.decision.policy}@"
             f"{compare.decision.policy_version}: {compare.decision.reason}"
@@ -708,7 +744,26 @@ def promote_generation(
         policy=f"{compare.decision.policy}@{compare.decision.policy_version}",
         expected_active=active.generation_id,
     )
+    session.finish(None)
     return activation, compare.decision
+
+
+def rollback_generation(store: Store) -> Generation:
+    """Roll back to the active generation's parent, with the exact native
+    reads (the active generation and the parent being restored) paired with
+    their revision-derived reads before use."""
+    session = ShadowSession(store)
+    active = store.active_generation()  # native read, paired before use
+    session.check_active("rollback-active", active)
+    parent = (
+        store.generation(active.parent_id)
+        if active is not None and active.parent_id is not None
+        else None
+    )
+    session.check_generation("rollback-parent", parent)
+    restored = store.rollback()  # raises cleanly when there is nothing to restore
+    session.finish(None)
+    return restored
 
 
 @dataclass(frozen=True)
@@ -741,11 +796,15 @@ def replay_run(
     guard_task_binding(store, task, mutating=False)
     cycle = store.cycle(run_id)
     task_drift = cycle.task_fingerprint != task.fingerprint()
-    generation = store.generation(cycle.generation_id)
     replay_id = _new_run_id("replay")
     events = EventLog(store.runs_dir / replay_id / "events.jsonl", replay_id)
+    session = ShadowSession(store, run_id=replay_id)
+    generation = store.generation(cycle.generation_id)  # native read, paired
+    session.check_generation("replay-baseline", generation)
     meter = BudgetMeter(config.budget)
-    evaluation = _execute_and_evaluate(store, task, generation, meter, config, events)
+    evaluation = _execute_and_evaluate(
+        store, task, generation, meter, config, events, session, "replay-baseline"
+    )
     split_diffs = {
         split: round(evaluation.split_scores.get(split, 0.0) - recorded, 6)
         for split, recorded in cycle.split_scores.items()
@@ -754,10 +813,14 @@ def replay_run(
 
     candidate_replayed_score: float | None = None
     decision_matches: bool | None = None
-    if cycle.candidate_generation_id is not None:
+    if cycle.candidate_generation_id is None:
+        session.note_not_applicable("replay-candidate", "cycle had no candidate")
+    else:
         candidate_generation = store.generation(cycle.candidate_generation_id)
+        session.check_generation("replay-candidate", candidate_generation)
         candidate_evaluation = _execute_and_evaluate(
-            store, task, candidate_generation, meter, config, events
+            store, task, candidate_generation, meter, config, events,
+            session, "replay-candidate",
         )
         candidate_replayed_score = candidate_evaluation.overall_score
         recorded_decision = candidate_generation.decision
@@ -786,6 +849,7 @@ def replay_run(
                 == recorded_decision.regressed_case_ids
             )
 
+    session.finish(events)
     return ReplayReport(
         run_id=run_id,
         generation_id=cycle.generation_id,
