@@ -520,3 +520,30 @@ Seven corrections to the contracts before the 3B freeze:
   restartability, not bit-reproducible resumption.
 
 164 tests (25 spike), mypy strict clean. Live loop untouched.
+
+## 2026-08-09 — stage 3B: dual-write revision storage
+
+PR #40 merged first (merge commit, main verified 164/mypy-clean), then 3B
+built from updated main.
+
+- Frozen core moved spike → revisions.py verbatim (same kinds); spike keeps
+  provisional contracts + re-exports so its tests validate the core
+  unchanged. mypy no_implicit_reexport needed an explicit __all__.
+- dualwrite.py: mirrors are pure functions of source records — that's the
+  load-bearing design choice, because content-addressed provenance/manifest
+  refs make recomputation exact, which makes parity checking exact, which
+  makes repair safe (recompute-and-compare; ambiguity → ParityError, never
+  auto-patch).
+- Store appends the mirror right after its source inside the same writer
+  lock — deliberately not atomic across crash; the gap is the parity
+  surface. Entry-kind allowlist + task-isolation checks extended to the
+  mirror kinds.
+- Migration registry: 0001 wraps the legacy migration; 0002 backfill is
+  append-only (source journal preserved byte-for-byte as a prefix —
+  asserted with startswith in the test), journals the pre-backfill sha,
+  no-ops on complete parity, refuses corrupt history. Legacy root chains
+  0001→0002 in one `strive migrate` pass.
+- CLI: parity [--repair], revisions, migrate; existing commands untouched;
+  live smoke included strip-mirrors → detect → repair.
+- 176 tests, mypy strict clean. One pre-existing assertion updated
+  (rollback +1 → +2 entries for the mirror); everything else untouched.

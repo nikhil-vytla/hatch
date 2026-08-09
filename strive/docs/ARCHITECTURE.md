@@ -296,9 +296,11 @@ the shapes round-trip before anything migrates:
 Freeze scope: only the core wire types are frozen for 3B (adrs/README has
 the authoritative table); task/dataset/evaluation, selection/frontier,
 algorithm-state, and backend schemas stay provisional until their slices.
-Stage 3B itself is deliberately narrow: **dual-write revision storage** —
-the loop, activation, and replay remain generation-native until a later
-parity slice.
+Stage 3B landed exactly that narrow slice: **dual-write revision storage**
+(`revisions.py` frozen core, `dualwrite.py` deterministic mirrors + parity
+status/repair, `migrations.py` sequential registry with the 0002 backfill).
+The loop, activation, cycles, and replay remain generation-native until a
+later parity slice.
 
 ## Implementation status (after phase 3 hardening)
 
@@ -323,7 +325,7 @@ parity slice.
 | legacy stage-2a ledger: loud detection + `strive migrate-legacy` (history preserved, original file untouched, migration journaled) | **implemented** (`migrate.py`) |
 | evaluation discipline: visible (train) / selection (held-out, regression, adversarial) / audit (final holdout, on-demand only) | **implemented** (`tasks.py`, `loop.audit_generation`); proposer history carries visible-split scores only |
 | execution-and-decision replay (baseline + candidate re-execution, recorded-policy decision check) | **implemented** — full-cycle replay (diagnosis, prompt reconstruction, completion injection, proposal parsing, screening) is pending |
-| composite per-surface generations | **designed** (ADR-0001, spike contracts + round-trip tests) — implementation is the Stage 3B slice |
+| composite per-surface generations | **frozen core implemented as a dual-write mirror** (`revisions.py`, `dualwrite.py`): revision records journaled alongside authoritative generation-native history with checkable/repairable parity and a backfill migration; revision-native execution/selection/activation/replay remain future work |
 | EvolutionAlgorithm plugin (Pareto population) | **designed** (ADR-0005) — implementation stage 3C |
 | inheritance-aware replace-vs-add thresholds | pending (needs usage-share history to act on) |
 | Landlock/seccomp tier, containers, secrets broker | pending (stages 3/6) |

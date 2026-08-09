@@ -33,6 +33,7 @@ loop is gated: candidates are promoted only on trusted, journaled evidence.
 | Isolation | holdout data is mechanically absent from diagnosis/proposal inputs (`VisibleContext`) |
 | Policies | pluggable, named, versioned acceptance policies recorded in every decision — `paired-deterministic@1` (durable code promotion) and `provisional@1` (scoped, monitored, expiring — refused for executable strategy-code; reserved for future explicitly low-risk non-code surfaces) |
 | Models | provider-neutral `ModelAdapter` + deterministic `FakeModelAdapter`; all I/O journaled with latency and content-addressed prompt/completion artifacts, budget-metered; real adapter only via env vars (`STRIVE_MODEL_PROVIDER=openai-compatible` + base URL/key/model id) |
+| Revisions (stage 3B) | dual-write mirror: every `generation@2`/`activation@2` gets a deterministic, field-preserving `revision@1`/`revision-activation@1` mirror (task fingerprint/origin/weakness/decision evidence preserved via CAS `MigrationProvenance`); generation-native records stay authoritative and the loop/activation/cycles/replay stay generation-native; parity is checkable and repairable (`strive parity [--repair]`), history backfillable (`strive migrate`, registry entries 0001/0002) |
 | Proposals (stage 2b) | pluggable `Proposer` protocol: deterministic `registry` reference + `ModelProposer` over the provider-neutral adapter (offline demos/tests use a *scripted proposal fixture*, not model reasoning); structured proposal schema (parent, rationale, trace evidence, expected outcome, full source, risks, assumptions); strict classification of bad responses (truncated / malformed / schema-invalid / forbidden / stale / budget-exhausted), each journaled distinctly; stale proposals rejected when the incumbent changed mid-proposal |
 
 ## Quick start
@@ -65,6 +66,10 @@ uv run strive resume                   # lift a stall freeze
 uv run strive history                  # full ledger journal
 uv run strive migrate-legacy           # convert a stage-2a ledger/ledger.jsonl to the
                                        # task-scoped format (original preserved)
+uv run strive migrate                  # apply pending registry migrations in order
+                                       # (0001 legacy ledger, 0002 revision backfill)
+uv run strive parity [--repair]        # check/repair generation<->revision mirror parity
+uv run strive revisions                # inspect stage-3B revision mirrors
 # run/promote accept --acknowledge-task-drift when the task definition changed
 # since the active generation was created (refused otherwise; journaled)
 ```
@@ -120,6 +125,9 @@ strive/
 │   ├── codec.py       one shared strict codec for memory + disk
 │   ├── cas.py         content-addressed object store
 │   ├── store.py       task-scoped append-only ledgers, activation, lineage
+│   ├── revisions.py   frozen stage-3B core wire types (ADR-0001/0002)
+│   ├── dualwrite.py   deterministic generation->revision mirroring + parity
+│   ├── migrations.py  sequential migration registry (0001 legacy, 0002 backfill)
 │   ├── tasks.py       task-owned scoring + case splits
 │   ├── sandbox.py     out-of-process execution (see isolation note)
 │   ├── budget.py      trusted budget meter
