@@ -665,3 +665,101 @@ Reworked the dual-write around an explicit crash model before merging:
   candidate pairing.
 
 207 tests, mypy strict clean (44 files).
+
+## 2026-08-09 — Stage 3B.2: centralized reads + reversible revision-read canary
+
+- New `strive.reader`: StateReader/HarnessReadSession is now THE read
+  boundary. One coherent canonical+mirror snapshot per operation at
+  tamper-evident heads; native derivations extracted to pure store helpers
+  (derive_*) shared by Store and reader so they cannot disagree. Mutations
+  take expected_head; stale activation/rollback refuse on ANY intervening
+  append (stronger than expected_active).
+- Honest subjects: candidate overlay revisions (immutable, unactivated,
+  native RevisionProvenance origin=candidate-overlay) created BEFORE
+  evaluation; ExecutionRecord pins base resolved harness vs subject
+  (active-revision | retained-revision | candidate-overlay) with its own
+  effective manifest + exact heads. This corrected 3B.1's dishonest
+  resolved manifests that bound candidate sources under the baseline
+  contribution.
+- One validator: VerifiedRevisionSnapshot = parity-grade
+  (_check_existing_mirrors recomputed projections + _verify_closure +
+  complete-ref both-direction coverage + type agreement + bounded
+  cycle-free lineage). shadow.py deleted. Design consequence: journal
+  tampering now manifests as UNAVAILABLE (recomputed-projection equality
+  makes a "plausible but wrong" mirror unrepresentable); DIVERGED catches
+  derivation bugs (tested via snapshot fault injection). Both open the
+  canary breaker.
+- Evidence: locked+fsynced reader journal (mode changes, breaker events,
+  epoch resets, per-check ReadCheck rows with reader/projector version +
+  epoch + op id + heads + outcome, OperationSummary with status + facts).
+  finish() runs in `finally` on every operation; expected subjects derive
+  from OPERATION_SUBJECTS so uninstrumented paths synthesize `missing`.
+  Repair resets the epoch (old evidence preserved, excluded).
+- Eligibility: parity complete + zero diverged/missing/unavailable/journal
+  errors + >=20 agreed + >=1 per required subject + observed facts
+  {accepted, rejected, no-candidate, rollback, re-promotion, audit,
+  replay, restart}. Default mode is native: no divergence records alone
+  can never qualify.
+- Canary: supported reads served from the verified snapshot after native
+  comparison; breaker (durable) on unavailable/divergent, blocking canary
+  (effective mode drops to shadow — loud, journaled, not a per-read
+  fallback); kill switch -> native immediately; enable requires
+  current-epoch eligibility + closed breaker. Activation and durable
+  promotion remain generation-native (canary/shadow ledgers are
+  canonically identical, tested deterministically).
+- Gotchas: (a) test helper had to roll back before re-earning eligibility
+  on an evolved store (no weakness -> no accepted-decision fact);
+  (b) stale-rollback test's concurrent write must not remove the rollback
+  target (activating the seed made "no parent" fire before the head
+  check); (c) probe generations without an overlay are still labeled
+  candidate-overlay in execution records, never retained-revision.
+
+215 tests, mypy strict clean (45 files).
+
+## 2026-08-09 — Stage 3B.2 correction pass (PR #43 hardening)
+
+Six areas, all before merge:
+- Coherent snapshot: Store.entries_with_bytes() reads bytes+entries once;
+  snapshot_of() builds SourceSnapshot from that exact pair. Reader capture
+  is canonical->mirror->recheck with retake-both on canonical movement, so
+  an old native view is never paired with a newer mirror. Deterministic
+  interleaving tests via a _on_capture_step hook append between every step.
+- Fail-closed control: canary eligibility re-checked at StateReader init;
+  repair_control_update (called by dualwrite repair/rebuild) atomically
+  opens breaker + resets epoch and RAISES on failure (not best-effort);
+  clear_breaker requires native/shadow + parity + fresh-epoch-after-breaker;
+  enable/set_mode/clear use expected_head and persist the eligibility proof;
+  force-native sentinel (STRIVE_FORCE_NATIVE / .FORCE-NATIVE file) is the
+  journal-independent kill.
+- Exact candidate identity: overlay revision+manifest+provenance built and
+  validate_revision'd before eval in every mode; overlay_failure records
+  unavailable + breaker-in-canary (no derived->native silent path);
+  RetentionRecord links the exact overlay + decision; retained mirror
+  verified content-identical (deltas + scope manifest). Split subjects
+  cycle-candidate-overlay / cycle-candidate-retained.
+- Tamper-evident evidence: reader journal now task-bound, crash-framed,
+  hash-chained (ReaderFrame closes each batch: payload_hash + prev). Only
+  framed+chained entries honored; unframed/forged/reordered/deleted lines
+  counted as errors, never honored. ReadCheck stores mode+heads AT CHECK
+  TIME; _add keeps one severity-merged terminal outcome per subject.
+  Facts counted only from status==ok shadow/canary OperationSummary rows.
+  Telemetry failure -> breaker in canary, never masks canonical result.
+- Finished routing: status/lineage output, guard_task_binding(entries=),
+  _proposal_history(reader), provisional confirm+revert, seeding all via the
+  reader capture; expected_head on seed + both provisional transitions.
+  Claim narrowed to "revision-derived execution/read canary" (identity reads
+  agreement-gated, execution source revision-materialized).
+- Threat model: canary refused for unsafe_model_code (same-UID sandbox);
+  malicious-candidate test writes forged control lines from inside solve() —
+  detected as errors, never honored, fails closed via force-native.
+
+Key design realization: forged UNFRAMED lines poison subsequent framed
+appends (the frame's payload_hash covers the accumulated buffer, so the
+next legitimate frame fails to verify). So a corrupt reader journal cannot
+be trusted to record its own breaker — the fail-closed signal for
+journal_errors>0 is the journal-INDEPENDENT force-native override, which
+every subsequent session recomputes. reset-journal quarantines byte-for-byte
+and starts a fresh epoch in native mode.
+
+232 tests, mypy strict clean (45 files). Reader version bumped to
+state-reader@2 (framing + schema change); old epochs are not current.
