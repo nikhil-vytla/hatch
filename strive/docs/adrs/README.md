@@ -8,12 +8,12 @@ with the live Stage 1–2b system.
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-revisions-and-surfaces.md) | Harness revisions and evolvable surfaces | core wire schemas frozen for 3B |
-| [0002](0002-scopes.md) | Artifact scopes: inheritance, shadowing, promotion | core wire schemas frozen for 3B |
+| [0001](0001-revisions-and-surfaces.md) | Harness revisions and evolvable surfaces | core frozen; implemented in 3B as dual-write mirror (`revisions.py`) |
+| [0002](0002-scopes.md) | Artifact scopes: inheritance, shadowing, promotion | core frozen; typed scopes/manifests implemented in 3B (task scope live; project/global journals future) |
 | [0003](0003-tasks-and-environments.md) | Task spec versions, dataset revisions, environments | design accepted; schemas provisional |
 | [0004](0004-evidence-and-selection.md) | Validation bundles and selection decisions | design accepted; schemas provisional |
 | [0005](0005-evolution-algorithms.md) | Evolution algorithms and objective specs | design accepted; schemas provisional |
-| [0006](0006-storage-and-schema-evolution.md) | Storage backends and migration registry | protocol semantics accepted; backend schemas provisional |
+| [0006](0006-storage-and-schema-evolution.md) | Storage backends and migration registry | migration registry implemented in 3B (`migrations.py`, entries 0001/0002) with durable intent→progress→completed operations per the ADR's durable-intent rule; backend schemas provisional |
 
 ## Freeze scope for Stage 3B
 

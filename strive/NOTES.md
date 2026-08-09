@@ -520,3 +520,63 @@ Seven corrections to the contracts before the 3B freeze:
   restartability, not bit-reproducible resumption.
 
 164 tests (25 spike), mypy strict clean. Live loop untouched.
+
+## 2026-08-09 — stage 3B: dual-write revision storage
+
+PR #40 merged first (merge commit, main verified 164/mypy-clean), then 3B
+built from updated main.
+
+- Frozen core moved spike → revisions.py verbatim (same kinds); spike keeps
+  provisional contracts + re-exports so its tests validate the core
+  unchanged. mypy no_implicit_reexport needed an explicit __all__.
+- dualwrite.py: mirrors are pure functions of source records — that's the
+  load-bearing design choice, because content-addressed provenance/manifest
+  refs make recomputation exact, which makes parity checking exact, which
+  makes repair safe (recompute-and-compare; ambiguity → ParityError, never
+  auto-patch).
+- Store appends the mirror right after its source inside the same writer
+  lock — deliberately not atomic across crash; the gap is the parity
+  surface. Entry-kind allowlist + task-isolation checks extended to the
+  mirror kinds.
+- Migration registry: 0001 wraps the legacy migration; 0002 backfill is
+  append-only (source journal preserved byte-for-byte as a prefix —
+  asserted with startswith in the test), journals the pre-backfill sha,
+  no-ops on complete parity, refuses corrupt history. Legacy root chains
+  0001→0002 in one `strive migrate` pass.
+- CLI: parity [--repair], revisions, migrate; existing commands untouched;
+  live smoke included strip-mirrors → detect → repair.
+- 176 tests, mypy strict clean. One pre-existing assertion updated
+  (rollback +1 → +2 entries for the mirror); everything else untouched.
+
+## 2026-08-09 — stage 3B crash-consistency correction (pre-merge, PR #41)
+
+Reworked the dual-write around an explicit crash model before merging:
+
+- Mirrors moved OUT of the task ledger into <task>.mirror.jsonl. The single
+  most important property: a corrupt mirror journal cannot block any
+  generation-native operation (tested by corrupting it and then running
+  run/rollback/promote/replay — all fine, with the live publication
+  failures surfacing as source-committed-parity-incomplete diagnostics).
+- SourceRecordRef (schema, journal, ordinal, digest) on every mirror;
+  matching/repair by ref, never position. The middle-gap test is the one
+  that would have caught the old positional design's failure mode: drop the
+  2nd activation mirror with 4 activations — positional matching would
+  misalign mirrors 3 and 4; ref matching finds exactly the gap.
+- Durable op state machine (intent → progress → completed) in the mirror
+  journal; pending = completion, not parity — so crash-after-parity-
+  before-completion correctly stays pending and resumes the SAME intent
+  with its original source head/hash.
+- Pure planning vs locked application with stale-plan refusal; parity and
+  discovery are provably read-only (test asserts zero CAS/journal writes).
+  cas.hash_text was the enabling primitive.
+- Evidence made operation-specific: legacy activation mirrors carry
+  decision_ref=None (the old design inferred the activated generation's
+  decision — wrong: promote-time evidence is not the generation's original
+  acceptance decision). MigrationProvenance gained the surface field.
+- Projector pinned (generation-to-revision@1 + strategy-code@1 explicit);
+  fail-closed source validation with structured errors; unsupported
+  projector refs refuse repair.
+- Permanent control: mirror-on vs mirror-off seeded runs are generation-
+  identical (structure, scores, decisions, active, replay).
+
+182 tests, mypy strict clean.

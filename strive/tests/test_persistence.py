@@ -47,7 +47,8 @@ def test_rollback_restores_parent_without_deleting_history(tmp_path: Path) -> No
     reopened = Store(root, SUM_INTEGERS_TASK.task_id)
     active = reopened.active_generation()
     assert active is not None and active.generation_id == restored.generation_id
-    # append-only: rollback added history, deleted none
+    # append-only: rollback added history, deleted none (the stage-3B mirror
+    # lives in its own journal, not the authoritative ledger)
     assert len(reopened.entries()) == entries_before + 1
     assert evolved.generation_id in reopened.generations()
 
