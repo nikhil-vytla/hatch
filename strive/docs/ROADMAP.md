@@ -167,31 +167,51 @@ behavior authoritative throughout:
   history, validates fully, then atomically installs — recording intent,
   source prefix, outcome, and the prior mirror hash. The task ledger is
   never touched.
-- Revision shadow reads: active state (by source activation order), lineage,
-  rollback target, and strategy source materialized from the ScopeManifest
-  under pinned descriptors; each shadowed run CAS-stores a task-only
-  ResolvedHarnessManifest. Shadow checks run in run/compare/replay/promote/
-  rollback/restart flows; divergences are durable `shadow-divergence`
-  interventions plus run events, never silent fallbacks; no active revision
-  is reported while activation parity is incomplete. Differential control:
-  mirror-off, mirror-on, and shadow runs are canonically identical.
-- 198 tests. Exit claim: strive can reconstruct and verify the complete
-  revision artifact graph, recover derived history from canonical state, and
-  shadow every generation-native read with an equivalent revision-derived
-  read. Revisions still do not control execution or activation.
+- Completion is prefix-scoped: an open intent tolerates later canonical
+  records and their live mirrors (e.g. a rollback before resume); it
+  validates, repairs, and completes only its declared source prefix. A
+  stage-3B-era mirror journal (`migration-intent@1`) is detected precisely
+  and directed to `strive parity --rebuild`.
+- **Subject-specific revision shadow reads**: each concrete generation-native
+  read is paired at its point of use with the revision-derived read — cycle
+  baseline/candidate, compare left/right, replay baseline/candidate,
+  promotion incumbent/target, rollback active/parent, audit target, and
+  status/restart reads. The derived view demands exact SourceRecordRef
+  coverage, the supported projector, no duplicates, full artifact closure,
+  semantic validation, and bounded cycle-free lineage; derived corruption or
+  unexpected exceptions degrade to *unavailable with a reason* and never
+  fail a committed canonical operation. Divergences are deduplicated durable
+  `shadow-divergence` interventions, never silent fallbacks; no active
+  revision is reported while the view is unavailable.
+- Execution provenance: every artifact execution CAS-stores a per-subject
+  ResolvedHarnessManifest *before* running, naming the baseline
+  (shadow-active) revision at a tamper-evident journal head (record count +
+  source-prefix digest) — a run that activates a candidate still identifies
+  the baseline revision that produced its evaluation.
+- Shadow coverage accounting: every attempted check is durably recorded as
+  agreed/diverged/unavailable/not-applicable in a derived coverage journal;
+  `strive shadow` reports eligible/checked/unavailable reads and divergence
+  rate. Cutover eligibility requires complete parity, zero divergences, AND
+  the declared minimum coverage (0.90) — not merely the absence of
+  divergence records. Differential control: mirror-off, mirror-on, and
+  shadowed runs are canonically identical.
+- 207 tests. Exit claim: strive shadows each concrete generation-native
+  read with the corresponding revision-derived read at the point of use,
+  records exact execution manifests and coverage, and remains safe under
+  derived corruption. Revisions still do not control behavior.
 
-## Stage 3B.2 — Revision-native read/activation cutover (next)
+## Stage 3B.2 — Revision-read cutover (next)
 
-Flip reads (then activation derivation) from generation-native to
-revision-native behind the proven shadow comparison: a cutover flag makes
-the revision-derived value authoritative while the generation-native value
-becomes the shadow, divergence semantics unchanged; retire dual-write for
-reads once a burn-in period records zero divergences. Immediately followed
-by **the first empirically evaluated prompt-surface composite evolution
-experiment**: a `prompt` surface delta (proposal template) evolved alongside
-strategy code in one composite revision, validated under the existing paired
-gate with held-out discipline — the first real use of multi-surface
-revisions.
+A **narrowly reversible revision-read cutover with a kill switch**: a
+cutover flag makes the revision-derived value authoritative for reads while
+the generation-native value becomes the shadow (divergence semantics
+unchanged); the kill switch reverts to generation-native reads instantly;
+cutover is gated on `cutover_eligibility` (complete parity, zero
+divergences, declared minimum coverage). The prompt-surface composite
+evolution experiment follows separately: a `prompt` surface delta (proposal
+template) evolved alongside strategy code in one composite revision,
+validated under the existing paired gate with held-out discipline — the
+first real use of multi-surface revisions.
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 

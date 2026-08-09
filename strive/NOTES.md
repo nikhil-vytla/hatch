@@ -624,3 +624,44 @@ Reworked the dual-write around an explicit crash model before merging:
   `revisions` active again.
 
 198 tests, mypy strict clean (44 files).
+
+## 2026-08-09 — Stage 3B.1 correction pass: subject-specific read parity
+
+- Replaced the post-operation snapshot comparison with per-use-site checks:
+  ShadowSession pairs the exact native read with its revision-derived read
+  before use (cycle baseline/candidate, compare left/right, replay
+  baseline/candidate, promote incumbent/target, rollback active/parent,
+  audit target, status/restart + lineage). A mismatch is recorded, never
+  substituted.
+- build_shadow_view now demands exact SourceRecordRef coverage BOTH ways,
+  supported projector, no duplicates, full derived closure (manifest/
+  provenance/decision decode + registry descriptors + source artifact),
+  semantic validation, and bounded cycle-free lineage. Manifests searched
+  by (kind, name); every deltas[0] assumption removed. Any derived
+  corruption or unexpected exception -> unavailable-with-reason; tested
+  with the mirror journal replaced by a directory mid-flight — run_cycle
+  still commits.
+- Execution provenance: per-subject ResolvedHarnessManifest CAS-stored
+  BEFORE each execution, pinning the baseline (shadow-active) revision at
+  a tamper-evident journal head "count:prefix_digest" (JournalHeadRef
+  value is backend-interpreted, so no frozen-type change). A cycle that
+  activates its candidate still records rev-N-1 as the evaluating
+  baseline.
+- Intent completion is now prefix-scoped (_entries_within_prefix): an open
+  intent + a later rollback's live activation mirror no longer refuses as
+  "foreign history" — validated, repaired, completed over the declared
+  prefix only; the later mirror survives untouched.
+- Stage-3B migration-intent@1 journals: precise MirrorError naming
+  `strive parity --rebuild` (peek at the raw schema field on SchemaError);
+  rebuild quarantines byte-for-byte and recovers.
+- Coverage: every attempted check recorded (agreed/diverged/unavailable/
+  not-applicable) in ledger/<task>.shadow.jsonl; identical divergences
+  deduplicated in the canonical ledger; `strive shadow` + cutover gate
+  (parity complete + zero divergences + coverage >= 0.9 — absence of
+  divergence records is NOT enough).
+- Gotcha: the healthy-flows test initially demanded {agreed} for
+  cycle-candidate/replay-candidate — a weakness-free second cycle
+  legitimately records not-applicable; replay the FIRST cycle for a real
+  candidate pairing.
+
+207 tests, mypy strict clean (44 files).
