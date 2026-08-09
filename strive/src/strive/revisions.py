@@ -643,13 +643,22 @@ def revision_from_generation(
         raise ContractViolation(
             f"parent mismatch: {parent.generation_id} != {generation.parent_id}"
         )
+    if generation.surface != SURFACE_STRATEGY_CODE:
+        raise ContractViolation(
+            f"projector generation-to-revision@1 supports surface "
+            f"'strategy-code' only, got {generation.surface!r}"
+        )
+    # pinned historical descriptor — never the mutable current pointer
+    pinned = "strategy-code@1"
     delta = SurfaceDelta(
         kind=SURFACE_STRATEGY_CODE,
         name="solve",
         before=ABSENT if parent is None else content_binding(
-            SURFACE_STRATEGY_CODE, parent.source_ref
+            SURFACE_STRATEGY_CODE, parent.source_ref, descriptor_ref=pinned
         ),
-        after=content_binding(SURFACE_STRATEGY_CODE, generation.source_ref),
+        after=content_binding(
+            SURFACE_STRATEGY_CODE, generation.source_ref, descriptor_ref=pinned
+        ),
     )
     return HarnessRevision(
         ref=RevisionRef(scope, generation.generation_id.replace("gen-", "rev-")),
@@ -695,9 +704,12 @@ class RevisionActivation:
       map to ``name@0`` — version 0 is the reserved pre-versioned era);
     - ``expires_after_cycles`` and ``baseline_score`` (the provisional
       monitoring data) are preserved verbatim;
-    - ``decision_ref`` is new: for accepted evolved generations the migration
-      encodes the generation's embedded ``decision@1`` into CAS and points
-      here; seeds and rollbacks carry None.
+    - ``decision_ref`` is **operation-specific evidence**: a legacy
+      ``activation@2`` maps to ``decision_ref=None`` — the generation's
+      original decision remains only in its ``MigrationProvenance``. A future
+      revision-native activation may carry evidence here only when that exact
+      activation operation explicitly supplies it; it is never inferred from
+      the activated generation.
     Rollback history maps activation-by-activation in journal order, so the
     derived active revision at every historical prefix is identical.
     """
@@ -731,7 +743,7 @@ def _legacy_policy_ref(policy: str) -> str:
 
 
 def revision_activation_from_activation(
-    activation: "LegacyActivation", decision_ref: str | None
+    activation: "LegacyActivation", decision_ref: str | None = None
 ) -> RevisionActivation:
     """Field-exact mapping from the live activation@2 record (see the
     RevisionActivation docstring for the rules)."""
@@ -776,6 +788,7 @@ class MigrationProvenance:
     task_id: str
     task_fingerprint: str
     origin: str
+    surface: str  # Generation.surface, preserved verbatim
     weakness_id: str | None
     decision_ref: str | None
 

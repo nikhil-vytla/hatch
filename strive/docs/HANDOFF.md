@@ -1,5 +1,47 @@
 # HANDOFF — strive
 
+## Stage 3B — crash-consistency correction (final pre-merge)
+
+The dual-write was reworked before merge around an explicit crash model:
+1. **Canonical vs derived, physically separated.** The task ledger holds
+   only generation-native records; mirrors live in `<task>.mirror.jsonl`.
+   A corrupt mirror journal cannot block run, activation, rollback, replay,
+   or inspection (tested); parity reports the corruption cleanly.
+2. **Source refs, never positions.** Every mirror carries a deterministic
+   `SourceRecordRef` (source schema, journal identity, complete-record
+   ordinal, canonical digest). A missing mirror in the *middle* of history
+   is found and filled by ref while later mirrors stay matched; the derived
+   active revision follows source activation order even when a repaired
+   mirror is appended last.
+3. **Durable operations.** Backfill/repair persist `MigrationIntent`
+   (op id, migration id, source head/hash, projector ref) before any work,
+   `MigrationProgress` checkpoints, and `MigrationCompleted` only after
+   parity validation over the intent's declared history. Pending status is
+   completion-based: crash-after-parity-but-before-completion stays pending
+   and resumes the SAME intent (source head/hash preserved across retries).
+   Every crash point is tested.
+4. **Plan/apply split.** `ProjectionPlan` is pure (mirror records + CAS
+   payload texts/hashes via `hash_text`, publishing nothing); application
+   re-reads the source head under the mirror writer lock and refuses stale
+   plans; `parity` and migration discovery are read-only (tested: no CAS or
+   journal writes). A source commit whose live mirror publication fails
+   yields the explicit `source-committed-parity-incomplete` diagnostic —
+   the operation is committed, its mirror is repairable.
+5. **Operation-specific evidence.** Legacy `activation@2` maps to
+   `decision_ref=None`; the generation's original decision lives only in
+   `MigrationProvenance` (which now also preserves `Generation.surface`).
+   Explicit evidence on a future revision-native activation is representable
+   and tested as distinct from the generation's original decision.
+6. **Fail-closed projector.** Pinned `generation-to-revision@1` with the
+   explicit historical descriptor `strategy-code@1` (never current
+   pointers); pre-work source validation (unique ids, parent-precedes-child
+   acyclic lineage, activations target existing generations, task identity,
+   supported surfaces, injective id mapping) with structured errors;
+   unsupported projector refs are flagged and repair refuses.
+7. **Permanent control.** Mirror-enabled vs mirror-disabled runs produce
+   identical generation-native records, cycle results, active generation,
+   and replay (tested).
+
 ## Stage 3B — dual-write revision storage (what was implemented)
 
 The exact narrow slice ROADMAP fixed, nothing more:
@@ -32,7 +74,8 @@ The exact narrow slice ROADMAP fixed, nothing more:
   checks on their scopes; the loop, activation, cycles, and
   execution-and-decision replay remain generation-native.
 
-**Verification** (`uv run pytest` → 176, mypy strict clean, 42 files):
+**Verification** (`uv run pytest` → 182, mypy strict clean, 42 files;
+see the crash-consistency section above for the failure-injection matrix):
 exact generation/revision and activation/mirror field mapping; accepted AND
 rejected decision evidence recovered from CAS provenance; active
 generation/revision parity at every activation-history prefix; rollback and

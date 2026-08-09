@@ -669,15 +669,10 @@ def test_revision_activation_maps_real_history_and_preserves_derivation(
     live = [e for e in store.entries() if isinstance(e, LiveActivation)]
     assert [a.reason for a in live] == ["seed", "evolved", "rollback", "promote"]
 
-    decision = store.generation("gen-0001").decision
-    assert decision is not None
-    decision_ref = store.objects.put_text(codec.dumps(decision))
-    mapped = [
-        revision_activation_from_activation(
-            a, decision_ref if a.reason in ("evolved", "promote") else None
-        )
-        for a in live
-    ]
+    # evidence is operation-specific: legacy activation@2 maps to
+    # decision_ref=None across the board (the generation's original decision
+    # lives only in MigrationProvenance)
+    mapped = [revision_activation_from_activation(a) for a in live]
     for activation in mapped:
         validate_revision_activation(activation)
         assert codec.loads(codec.dumps(activation)) == activation
@@ -700,10 +695,8 @@ def test_revision_activation_maps_real_history_and_preserves_derivation(
         live_active = live[:i][-1].generation_id.replace("gen-", "rev-")
         assert mapped[:i][-1].revision.revision_id == live_active
 
-    # decision evidence is preserved and recoverable from CAS
-    assert mapped[1].decision_ref is not None
-    recovered: object = codec.loads(store.objects.get_text(mapped[1].decision_ref))
-    assert recovered == decision
+    # no inferred evidence anywhere in the legacy mapping
+    assert all(m.decision_ref is None for m in mapped)
 
 
 def test_provisional_activation_mapping_requires_expiry() -> None:
@@ -752,6 +745,7 @@ def test_migration_provenance_preserves_every_generation_field(tmp_path: Path) -
         task_id=generation.task_id,
         task_fingerprint=generation.task_fingerprint,
         origin=generation.origin,
+        surface=generation.surface,
         weakness_id=generation.weakness_id,
         decision_ref=decision_ref,
     )
