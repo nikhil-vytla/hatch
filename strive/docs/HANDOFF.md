@@ -30,42 +30,75 @@ Generation-native records remain authoritative for every behavior.
    canonical history, validates fully, then atomically installs via
    `os.replace`. The canonical task ledger is never modified; the rebuild
    records intent, source prefix, outcome, and prior mirror hash.
-4. **Revision shadow reads** ([shadow.py](../src/strive/shadow.py)).
-   `compute_shadow` derives active revision (by source activation order),
-   lineage, rollback target, and the strategy source materialized from the
-   active revision's ScopeManifest under registry-validated pinned
-   descriptors — never from generation records. Each shadowed run
-   CAS-stores a task-only `ResolvedHarnessManifest`. `record_shadow_check`
-   runs in run, compare, replay, promote, rollback, and restart flows;
-   a divergence is a durable `shadow-divergence` intervention in the task
-   ledger plus a run event — never a silent fallback. While activation
-   parity is incomplete or the mirror journal is unreadable, the shadow
-   view reports itself unavailable with a reason and **no active revision
-   is reported**.
-5. **Failure injection + differential controls** (test_shadow.py, 16
+4. **Prefix-scoped intent completion + schema-upgrade detection.** An open
+   intent tolerates later canonical records and their live dual-write
+   mirrors (e.g. a rollback or promotion before resume): the operation
+   validates, repairs, and completes only its declared source prefix
+   (`_entries_within_prefix`); newer records remain a subsequent
+   operation's work and are never treated as foreign. A journal written in
+   the exact stage-3B format (`migration-intent@1`) is detected precisely
+   and directed to `strive parity --rebuild` (quarantine + rebuild from
+   canonical history).
+5. **Subject-specific revision shadow reads**
+   ([shadow.py](../src/strive/shadow.py)). Each concrete generation-native
+   read is paired at its point of use with the corresponding
+   revision-derived read via `ShadowSession`: cycle baseline/candidate,
+   compare left/right, replay baseline/candidate, promotion
+   incumbent/target, rollback active/parent, audit target, and
+   status/restart reads. The derived view (`build_shadow_view`) requires
+   exact `SourceRecordRef` coverage in both directions, the supported
+   projector, no duplicates, full artifact closure (manifests searched by
+   `(kind, name)`, no positional delta assumptions), semantic
+   revision/manifest/activation validation, and bounded cycle-free lineage
+   traversal. Derived corruption or unexpected exceptions return
+   *unavailable with a reason* — they never raise into (or hang) a
+   committed canonical operation, and no active revision is reported while
+   unavailable. A mismatch is recorded, never substituted.
+6. **Execution provenance.** Before each artifact execution the session
+   CAS-stores a per-subject `ResolvedHarnessManifest` whose contribution
+   names the baseline (shadow-active) revision at a **tamper-evident
+   journal head** (complete-record count + digest-sequence prefix hash,
+   not a bare count) and whose effective binding names the executed
+   artifact — so a run that activates a candidate still identifies the
+   baseline revision that produced its evaluation. Separate refs per
+   subject (baseline, candidate, compare-left/right, replay subjects).
+7. **Shadow coverage + cutover gate.** Every attempted check is durably
+   recorded — agreed, diverged, unavailable, or not-applicable — in a
+   derived coverage journal (`ledger/<task>.shadow.jsonl`) plus a run
+   event; identical divergence incidents are deduplicated in the canonical
+   ledger. `strive shadow` reports eligible/checked/unavailable reads and
+   the divergence rate; `cutover_eligibility` demands complete parity,
+   zero divergences, AND the declared minimum coverage
+   (`MIN_CUTOVER_COVERAGE = 0.9`) — the mere absence of divergence records
+   is explicitly insufficient.
+8. **Failure injection + differential controls** (test_shadow.py, 25
    tests): altered prefix, appended records, double intents, wrong
    migration/projector on resume, plan-fails-before-publish, missing vs
    corrupt derived objects, corrupt decision evidence, missing source
-   artifact, quarantine+rebuild round-trip, shadow agreement across all
-   six flows, shadow-materialized source evaluating identically, true
-   divergence producing the durable event, and mirror-off / mirror-on /
-   shadowed runs yielding identical canonical results.
+   artifact, quarantine+rebuild round-trip, open-intent-then-rollback
+   resume, stage-3B journal upgrade, agreed checks at every use site,
+   restart reads, shadow-materialized source evaluating identically,
+   unavailable ≠ divergent, mirror-journal-as-directory never failing a
+   cycle, lineage-cycle detection, divergence durability + deduplication,
+   per-subject execution manifests, coverage-gated cutover, and
+   mirror-off / mirror-on / shadowed runs yielding identical canonical
+   results.
 
-**Verification:** 198 tests pass; `mypy --strict` clean over 44 files.
-Live CLI smoke: run → corrupt mirror byte → `strive revisions` reports a
-clean mirror error while generation-native `status` still works →
-`strive parity --rebuild` quarantines and recovers → `revisions` shows
-the active revision again.
+**Verification:** 207 tests pass; `mypy --strict` clean over 44 files.
+Live CLI smoke: run → `status`/`lineage` → `strive shadow` shows 4/4
+agreed checks, cutover ELIGIBLE → a stage-3B `migration-intent@1` line
+appended → `revisions` reports the precise unsupported-schema error naming
+`parity --rebuild` → rebuild quarantines and recovers → `shadow` eligible
+again.
 
-**The Stage 3B.1 claim, stated precisely:** strive can reconstruct and
-verify the complete revision artifact graph, recover derived history from
-canonical state, and shadow every generation-native read with an
-equivalent revision-derived read. Revisions still do not control
-execution or activation.
+**The Stage 3B.1 claim, stated precisely:** strive shadows each concrete
+generation-native read with the corresponding revision-derived read at the
+point of use, records exact execution manifests and coverage, and remains
+safe under derived corruption. Revisions still do not control behavior.
 
-**Next phase (exact):** revision-native read/activation cutover, followed
-immediately by the first empirically evaluated prompt-surface composite
-evolution experiment.
+**Next phase (exact):** a narrowly reversible revision-read cutover with a
+kill switch (gated on `cutover_eligibility`); the prompt-surface composite
+evolution experiment follows separately.
 
 ## Stage 3B — crash-consistency correction (final pre-merge)
 

@@ -35,6 +35,7 @@ from strive.loop import (
     ensure_seeded,
     promote_generation,
     replay_run,
+    rollback_generation,
     run_cycle,
 )
 from strive.dualwrite import (
@@ -44,7 +45,7 @@ from strive.dualwrite import (
     rebuild_mirror,
     run_backfill_operation,
 )
-from strive.shadow import compute_shadow
+from strive.shadow import ShadowSession, build_shadow_view, cutover_eligibility, shadow_coverage
 from strive.migrate import migrate_legacy_ledger
 from strive.migrations import apply_pending, pending_migrations
 from strive.revisions import delta_label
@@ -169,6 +170,10 @@ def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
     active = store.active_generation()
     activation = store.active_activation()
     assert active is not None and activation is not None
+    # the status/restart read, paired with its revision-derived counterpart
+    session = ShadowSession(store)
+    session.check_active("status-active", active)
+    session.finish(None)
     frozen = store.adaptation_frozen()
     data = {
         "active_generation": codec.encode(active),
@@ -190,6 +195,9 @@ def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
 def _cmd_lineage(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     ensure_seeded(store, task)
     chain = store.lineage()
+    session = ShadowSession(store)
+    session.check_lineage("status-lineage", chain)
+    session.finish(None)
     data = {"lineage": [codec.encode(g) for g in chain]}
     lines = ["lineage (active -> seed):"]
     for generation in chain:
@@ -350,10 +358,7 @@ def _cmd_audit(store: Store, task: Task, args: argparse.Namespace) -> dict[str, 
 
 
 def _cmd_rollback(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    generation = store.rollback()
-    from strive.shadow import record_shadow_check
-
-    record_shadow_check(store, None)
+    generation = rollback_generation(store)
     return {
         "data": {"active_generation": codec.encode(generation)},
         "human": f"rolled back; active generation is now {generation.generation_id}",
@@ -461,9 +466,9 @@ def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
 def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     revisions = store.revisions()
     activations = store.revision_activations()
-    shadow = compute_shadow(store)
-    # never report an active revision while activation parity is incomplete
-    active_revision = shadow.active_revision_id if shadow.available else None
+    view = build_shadow_view(store)
+    # never report an active revision while the derived view is unavailable
+    active_revision = view.active_revision_id()
     data = {
         "active_revision": active_revision,
         "revisions": [codec.encode(r) for r in revisions],
@@ -471,8 +476,8 @@ def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[s
     }
     header = (
         f"revision mirrors (active: {active_revision}):"
-        if shadow.available
-        else f"revision mirrors (active: unavailable — {shadow.reason}):"
+        if view.available
+        else f"revision mirrors (active: unavailable — {view.reason}):"
     )
     lines = [header]
     for revision in revisions:
@@ -482,6 +487,51 @@ def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[s
             f"  {revision.ref.revision_id} base={base} deltas=[{labels}] "
             f"proposer={revision.proposer}"
         )
+    return {"data": data, "human": "\n".join(lines)}
+
+
+def _cmd_shadow(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    verdict = cutover_eligibility(store)
+    coverage = verdict.coverage
+    data = {
+        "eligible_reads": coverage.eligible,
+        "checked_reads": coverage.checked,
+        "unavailable_reads": coverage.unavailable,
+        "agreed": coverage.agreed,
+        "diverged": coverage.diverged,
+        "not_applicable": coverage.not_applicable,
+        "journal_errors": coverage.journal_errors,
+        "divergence_rate": coverage.divergence_rate,
+        "coverage_ratio": coverage.coverage_ratio,
+        "by_subject": coverage.by_subject,
+        "cutover": {
+            "eligible": verdict.eligible,
+            "parity_complete": verdict.parity_complete,
+            "min_coverage": verdict.min_coverage,
+            "reasons": list(verdict.reasons),
+        },
+    }
+    lines = [
+        "shadow read-parity coverage:",
+        f"  eligible={coverage.eligible} checked={coverage.checked} "
+        f"unavailable={coverage.unavailable} not_applicable={coverage.not_applicable}",
+        f"  agreed={coverage.agreed} diverged={coverage.diverged} "
+        f"divergence_rate={coverage.divergence_rate:.3f} "
+        f"coverage={coverage.coverage_ratio:.3f}",
+    ]
+    for subject in sorted(coverage.by_subject):
+        statuses = coverage.by_subject[subject]
+        summary = " ".join(f"{k}={v}" for k, v in sorted(statuses.items()))
+        lines.append(f"  {subject}: {summary}")
+    if verdict.eligible:
+        lines.append(
+            f"cutover: ELIGIBLE (parity complete, zero divergences, coverage "
+            f">= {verdict.min_coverage:.2f})"
+        )
+    else:
+        lines.append("cutover: NOT ELIGIBLE")
+        for reason in verdict.reasons:
+            lines.append(f"  - {reason}")
     return {"data": data, "human": "\n".join(lines)}
 
 
@@ -528,6 +578,7 @@ _COMMANDS = {
     "history": _cmd_history,
     "parity": _cmd_parity,
     "revisions": _cmd_revisions,
+    "shadow": _cmd_shadow,
 }
 
 
@@ -606,6 +657,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "revisions",
         help="inspect the stage-3B revision mirrors and active revision",
+    )
+    sub.add_parser(
+        "shadow",
+        help="shadow read-parity coverage report and revision-read cutover "
+        "eligibility (complete parity + zero divergences + minimum coverage)",
     )
     sub.add_parser(
         "migrate",

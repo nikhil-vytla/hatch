@@ -40,6 +40,7 @@ from __future__ import annotations
 import dataclasses
 import fcntl
 import hashlib
+import json
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -152,6 +153,16 @@ MirrorEntry = (
     RevisionMirror | ActivationMirror | MigrationIntent | MigrationProgress | MigrationCompleted
 )
 
+_MIRROR_KINDS = frozenset(
+    {
+        "revision-mirror",
+        "activation-mirror",
+        "migration-intent",
+        "migration-progress",
+        "migration-completed",
+    }
+)
+
 
 class MirrorJournal:
     """Append-only derived journal, isolated from the authoritative ledger."""
@@ -194,6 +205,24 @@ class MirrorJournal:
             try:
                 decoded: object = codec.loads(line)
             except codec.SchemaError as exc:
+                schema = ""
+                try:
+                    parsed = json.loads(line)
+                    if isinstance(parsed, dict):
+                        schema = str(parsed.get("schema", ""))
+                except ValueError:
+                    pass
+                # a *known mirror kind at an unsupported version* is a journal
+                # written by a different build (e.g. the stage-3B
+                # migration-intent@1 format) — name the exact recovery path
+                if schema.split("@", 1)[0] in _MIRROR_KINDS:
+                    raise MirrorError(
+                        f"{self.path}:{line_no}: mirror schema {schema!r} is not "
+                        "supported by this build (a stage-3B-era or foreign "
+                        "journal format); run `strive parity --rebuild` to "
+                        "quarantine this journal byte-for-byte and rebuild it "
+                        "from canonical history"
+                    ) from None
                 raise MirrorError(f"{self.path}:{line_no}: {exc}") from None
             if not isinstance(
                 decoded,
@@ -736,6 +765,14 @@ def parity_status(
     validate_source_history(snapshot)
     mirror_journal = journal if journal is not None else store.mirror
     existing = mirror_journal.entries()  # MirrorError on corruption, contained here
+    return _parity_over(store, snapshot, existing)
+
+
+def _parity_over(
+    store: "StoreLike", snapshot: SourceSnapshot, existing: list[MirrorEntry]
+) -> ParityReport:
+    """Parity computed over an explicit snapshot + mirror-entry view — the
+    common core of full parity and an intent's prefix-scoped parity."""
     issues = _check_existing_mirrors(snapshot, existing)
     missing_objects, closure_issues = _verify_closure(store, snapshot, existing)
     mirrored = {
@@ -779,6 +816,20 @@ def active_revision_id(store: "StoreLike") -> str | None:
 # -- durable operations (intent -> progress -> completed) ------------------------------------
 
 
+def _entries_within_prefix(
+    entries: list[MirrorEntry], source_head: int
+) -> list[MirrorEntry]:
+    """The mirror-journal view scoped to an intent's declared source prefix:
+    mirrors for source ordinals at or past the head are excluded (they belong
+    to a later operation); operation-state records pass through."""
+    return [
+        e
+        for e in entries
+        if not isinstance(e, (RevisionMirror, ActivationMirror))
+        or e.source.ordinal < source_head
+    ]
+
+
 def open_intents(journal: MirrorJournal) -> list[MigrationIntent]:
     """All unfinished operations (intents without completions), journal order."""
     intents: dict[str, MigrationIntent] = {}
@@ -814,8 +865,14 @@ def run_backfill_operation(store: "StoreLike", migration_id: str) -> ParityRepor
     head/hash/prefix preserved; resume verifies the current source prefix
     matches the intent exactly (appended records allowed, altered prefix
     refused) and that the intent's migration_id and projector_ref match what
-    is being resumed. Mirrors are idempotent by source ref; completion is
-    journaled only after parity validation over the intent's history.
+    is being resumed.
+
+    Completion is **prefix-scoped**: the operation validates, repairs, and
+    completes only the intent's declared source prefix. Source records — and
+    their live-dual-write mirrors — appended after the intent was created are
+    permitted and left untouched; they are a subsequent operation's work.
+    Mirrors are idempotent by source ref; completion is journaled only after
+    parity validation (including artifact closure) over the intent's prefix.
     """
     from strive.events import now_iso
     import uuid
@@ -873,7 +930,12 @@ def run_backfill_operation(store: "StoreLike", migration_id: str) -> ParityRepor
                 r for r in full.records if r.ref.ordinal < intent.source_head
             ),
         )
-        plan = plan_projection(snapshot, journal.entries())  # fails closed
+        # mirrors for records appended AFTER the intent (live dual-write
+        # keeps publishing while an intent is open) are out of this
+        # operation's scope: excluded from planning and validation, never
+        # treated as foreign, never touched
+        scoped_entries = _entries_within_prefix(journal.entries(), intent.source_head)
+        plan = plan_projection(snapshot, scoped_entries)  # fails closed
         # rebase the staleness check onto the current head: the source may
         # legitimately have advanced past the intent
         current_plan = dataclasses.replace(
@@ -892,13 +954,15 @@ def run_backfill_operation(store: "StoreLike", migration_id: str) -> ParityRepor
                 )
             )
 
-        # validate parity (incl. artifact closure) over the intent's history
-        report = parity_status(store)
-        covered = [o for o in report.missing_source_ordinals if o < intent.source_head]
-        if report.mismatched or report.closure_issues or report.missing_objects or covered:
+        # validate parity (incl. artifact closure) over the intent's prefix
+        report = _parity_over(
+            store, snapshot, _entries_within_prefix(journal.entries(), intent.source_head)
+        )
+        if not report.complete:
             raise ParityError(
-                "backfill did not reach parity over the intent's history; "
-                f"mismatched={list(report.mismatched)} missing={covered} "
+                "backfill did not reach parity over the intent's prefix; "
+                f"mismatched={list(report.mismatched)} "
+                f"missing={list(report.missing_source_ordinals)} "
                 f"missing_objects={list(report.missing_objects)} "
                 f"closure_issues={list(report.closure_issues)}"
             )
