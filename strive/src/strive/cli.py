@@ -517,32 +517,57 @@ def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[s
 
 
 def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    """Inspect (or roll back) the canonical native-revision lifecycle: the
-    retained revisions, their evidence, the active revision, and the derived
-    strategy-only compatibility projection."""
-    ensure_seeded(store, task)  # seeds the lifecycle from the root generation
+    """Inspect, roll back, or repair the canonical native-revision lifecycle:
+    retained revisions, their evidence records, the active revision, the
+    compatibility projection, and lifecycle/compatibility parity."""
+    repaired: str | None = None
+    if args.action == "repair":
+        repaired = lifecycle.lifecycle(store).journal.repair_to_verified(
+            "operator repair"
+        )
+    ensure_seeded(store, task)  # reconciles + syncs the lifecycle
     if args.action == "rollback":
         lifecycle.rollback(store)
 
     st = lifecycle.state(store)
-    resolved = lifecycle.materialize_active(store)
-    projection = lifecycle.compatibility_projection(store)
+    resolved = lifecycle.materialize_active(store) if not st.journal_errors else None
+    projection = (
+        lifecycle.compatibility_projection(store) if not st.journal_errors else None
+    )
+    parity = lifecycle.compat_parity(store)
     retained = [st.retained[rid] for rid in sorted(st.retained)]
     data = {
         "active_revision": st.active_revision_id,
         "breaker_open": st.breaker_open,
         "breaker_reason": st.breaker_reason,
         "journal_errors": st.journal_errors,
+        "open_intents": [i.op_id for i in st.open_intents],
+        "repaired_quarantine": repaired,
         "lineage": list(lifecycle.lineage(store)),
+        "compat_parity": {
+            "ok": parity.ok,
+            "lifecycle_active": parity.lifecycle_active,
+            "linked_generation": parity.linked_generation,
+            "generation_active": parity.generation_active,
+            "reason": parity.reason,
+        },
         "retained": [
             {
                 "revision_id": r.revision_id,
                 "revision_ref": r.revision_ref,
                 "base_parent_id": r.base_parent_id,
-                "accepted": r.accepted,
-                "baseline_revision_id": r.baseline_revision_id,
-                "evaluation_ref": r.evaluation_ref,
-                "decision_ref": r.decision_ref,
+                "generation": st.links.get(r.revision_id),
+                "evaluations": len(st.evaluations.get(r.revision_id, ())),
+                "selections": [
+                    {
+                        "accepted": s.accepted,
+                        "baseline": s.baseline_revision_id,
+                        "policy_ref": s.policy_ref,
+                        "decision_ref": s.decision_ref,
+                    }
+                    for s in st.selections.get(r.revision_id, ())
+                ],
+                "overrides": len(st.overrides.get(r.revision_id, ())),
             }
             for r in retained
         ],
@@ -568,11 +593,19 @@ def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[s
     lines = [header]
     for r in retained:
         star = "*" if r.revision_id == st.active_revision_id else " "
-        verdict = "accepted" if r.accepted else "rejected"
+        selections = st.selections.get(r.revision_id, ())
+        if selections:
+            latest = selections[-1]
+            verdict = (
+                f"{'accepted' if latest.accepted else 'rejected'} vs "
+                f"{latest.baseline_revision_id} by {latest.policy_ref}"
+            )
+        else:
+            verdict = "no selection evidence"
         lines.append(
-            f" {star}{r.revision_id} base={r.base_parent_id} [{verdict}] "
-            f"eval={(r.evaluation_ref or '-')[:12]} "
-            f"decision={(r.decision_ref or '-')[:12]}"
+            f" {star}{r.revision_id} base={r.base_parent_id} "
+            f"gen={st.links.get(r.revision_id) or '-'} "
+            f"evals={len(st.evaluations.get(r.revision_id, ()))} [{verdict}]"
         )
     if resolved is not None:
         surfaces = ", ".join(f"{b.kind}/{b.name}" for b in resolved.effective)
@@ -586,6 +619,11 @@ def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[s
             f"source={projection.strategy_source_ref[:12]} "
             f"non-projected surfaces={others}"
         )
+    lines.append(
+        f"  compat parity: {'OK' if parity.ok else 'DIVERGED'} — {parity.reason}"
+    )
+    if repaired:
+        lines.append(f"  repaired: quarantined unverified region at {repaired}")
     return {"data": data, "human": "\n".join(lines)}
 
 
@@ -797,9 +835,10 @@ def build_parser() -> argparse.ArgumentParser:
         "action",
         nargs="?",
         default="status",
-        choices=("status", "rollback"),
-        help="status (default) | rollback (whole-revision, to the prior "
-        "known-good revision)",
+        choices=("status", "rollback", "repair"),
+        help="status (default) | rollback (whole-revision, drives BOTH the "
+        "lifecycle and served compatibility behavior) | repair (quarantine "
+        "and truncate an unverified journal region)",
     )
     reader_parser = sub.add_parser(
         "reader",

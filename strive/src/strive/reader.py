@@ -266,7 +266,11 @@ class ReaderJournal(FramedJournal):
     """The reader control + evidence stream: a framed journal over the
     reader entry kinds (see strive.framing for the durability contract).
     Framing failures surface as ``ReaderError`` so the reader-control
-    contract is unchanged by the shared implementation."""
+    contract is unchanged by the shared implementation. A PR#43-era journal
+    (frame schema ``reader-frame@1``, pre-shared-framing genesis) fails
+    loudly with migration guidance — it is never parsed as corruption."""
+
+    legacy_frame_schemas = ("reader-frame@1",)
 
     def __init__(self, path: Path, task_id: str) -> None:
         super().__init__(path, task_id, "reader@2", _READER_ENTRY_TYPES)
@@ -289,6 +293,119 @@ class ReaderJournal(FramedJournal):
 def reader_journal(store: Store) -> ReaderJournal:
     return ReaderJournal(
         store.ledger_path.with_name(f"{store.task_id}.reader.jsonl"), store.task_id
+    )
+
+
+# -- PR#43-format journal migration -------------------------------------------------------------
+
+_LEGACY_READER_GENESIS = hashlib.sha256(b"strive-reader-genesis").hexdigest()
+
+
+@dataclass(frozen=True)
+class ReaderUpgradeReport:
+    quarantine_path: str
+    original_sha256: str
+    batches: int
+    entries: int
+
+
+def reader_journal_needs_upgrade(store: Store) -> bool:
+    journal = reader_journal(store)
+    if not journal.path.exists():
+        return False
+    return b'"schema":"reader-frame@1"' in journal.path.read_bytes()
+
+
+def upgrade_reader_journal(store: Store) -> ReaderUpgradeReport:
+    """Migrate the exact PR#43 reader journal (frame schema ``reader-frame@1``
+    with the old fixed genesis) to the shared framing format.
+
+    The original file is preserved byte-for-byte at a quarantine path (with
+    its sha256 recorded); every batch is re-framed in the SAME order with the
+    SAME entries and batch boundaries, so mode, breaker, epoch, checks, and
+    summaries all carry over exactly. Any verification failure in the old
+    chain fails loudly — an ambiguous journal is never partially migrated."""
+    import json
+
+    journal = reader_journal(store)
+    if not journal.path.exists():
+        raise ReaderError(f"{journal.path}: no reader journal to upgrade")
+    raw = journal.path.read_bytes()
+    if b'"schema":"reader-frame@1"' not in raw:
+        raise ReaderError(
+            f"{journal.path}: not a PR#43-format journal (no reader-frame@1 "
+            "frames); nothing to upgrade"
+        )
+    if raw and not raw.endswith(b"\n"):
+        raise ReaderError(
+            f"{journal.path}: legacy journal has a torn final line; refusing "
+            "an ambiguous migration — repair or quarantine it manually first"
+        )
+    # parse + verify with the OLD rules (old genesis; frame without `stream`)
+    batches: list[list[ReaderEntry]] = []
+    buffer_bytes = b""
+    buffer_entries: list[ReaderEntry] = []
+    frames = 0
+    last_hash = _LEGACY_READER_GENESIS
+    for line_no, line in enumerate(raw.split(b"\n")[:-1], start=1):
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            raise ReaderError(
+                f"{journal.path}:{line_no}: undecodable line in the legacy "
+                "journal; refusing an ambiguous migration"
+            ) from None
+        if isinstance(parsed, dict) and parsed.get("schema") == "reader-frame@1":
+            expected = hashlib.sha256(buffer_bytes).hexdigest()
+            if (
+                parsed.get("task_id") != store.task_id
+                or parsed.get("seq") != frames + 1
+                or parsed.get("prev") != last_hash
+                or parsed.get("payload_hash") != expected
+                or parsed.get("count") != len(buffer_entries)
+            ):
+                raise ReaderError(
+                    f"{journal.path}:{line_no}: legacy frame seq "
+                    f"{parsed.get('seq')} failed verification; refusing an "
+                    "ambiguous migration"
+                )
+            batches.append(buffer_entries)
+            frames += 1
+            last_hash = hashlib.sha256(line).hexdigest()
+            buffer_bytes = b""
+            buffer_entries = []
+        else:
+            decoded: object = codec.loads(line.decode("utf-8"))
+            if not isinstance(decoded, _READER_ENTRY_TYPES):
+                raise ReaderError(
+                    f"{journal.path}:{line_no}: {type(decoded).__name__} is not "
+                    "a reader entry; refusing an ambiguous migration"
+                )
+            buffer_bytes += line + b"\n"
+            buffer_entries.append(decoded)
+    if buffer_entries:
+        raise ReaderError(
+            f"{journal.path}: legacy journal has unframed trailing lines; "
+            "refusing an ambiguous migration"
+        )
+    # preserve, then rewrite in the shared format (same batches, same order)
+    original_sha = hashlib.sha256(raw).hexdigest()
+    quarantine = journal.path.with_name(
+        journal.path.name + f".pre-upgrade-{now_iso().replace(':', '')}"
+    )
+    quarantine.write_bytes(raw)
+    journal.path.unlink()
+    total = 0
+    for batch in batches:
+        journal.append_batch(batch)
+        total += len(batch)
+    return ReaderUpgradeReport(
+        quarantine_path=str(quarantine),
+        original_sha256=original_sha,
+        batches=len(batches),
+        entries=total,
     )
 
 

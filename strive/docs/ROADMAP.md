@@ -274,14 +274,19 @@ its own append-only lifecycle, not a strategy-only generation:
   `LifecycleBreaker`. Active state is the latest valid activation; lineage
   is the base-parent chain. Legacy generations stay readable; the mirror
   remains derived compatibility, never the owner of native revisions.
-- **Exact candidate identity.** The candidate overlay created before
-  evaluation (3B.2) is retained unchanged — same `RevisionRef`, manifest,
-  deltas, provenance, descriptor refs, artifacts — for both rejected and
-  accepted candidates, with evaluation and decision evidence linked by
-  versioned CAS ref (no evidence schema frozen). On acceptance the SAME
-  revision is activated; no equivalent replacement is ever built after
-  evaluation. The loop threads the lifecycle's active revision as the
-  overlay's base parent, so evaluated id == retained id == activated id.
+- **Exact candidate identity, separated from evidence.** The candidate
+  overlay created before evaluation (3B.2) is retained unchanged — same
+  `RevisionRef`, manifest, deltas, provenance, descriptor refs, artifacts —
+  for both rejected and accepted candidates. `RevisionRetained` records
+  immutable IDENTITY only; `RevisionEvaluated`/`RevisionSelected` records
+  are appended per assessment (one revision can be evaluated repeatedly
+  under different manifests, policies, and baselines), with every evidence
+  ref validated and candidate/baseline agreement enforced. Promote-like
+  activation requires the CURRENT accepted selection against the active
+  baseline; rejected or evidence-free revisions activate only through a
+  distinct durable `TrustedOverride`. On acceptance the SAME revision is
+  activated — evaluated id == retained id == activated id; an accepted
+  candidate whose identity cannot be retained is refused promotion.
 - **Lossless composite state.** Active state materializes from the
   complete `ScopeManifest` (every surface), never one source field. A
   deterministic code+prompt fixture (`compose_revision`) round-trips
@@ -289,25 +294,49 @@ its own append-only lifecycle, not a strategy-only generation:
   prompt is lifecycle-only, with no behavioral claim). The strategy-only
   generation is an explicitly-derived compatibility projection that lists,
   but never flattens, non-code surfaces.
-- **Safe activation and rollback.** Retention and activation validate the
-  whole revision, scope, descriptors, manifest closure, provenance, parent
-  head, and artifact hashes; the revision + evidence are persisted before
-  activation; activation requires the expected lifecycle head and expected
-  active revision. Whole-revision rollback appends an activation of the
-  prior known-good revision (nothing deleted; per-surface rollback is later
-  work). Invalid composite activation opens a durable breaker and refuses —
-  no lossy generation fallback. Partial writes recover idempotently (a torn
-  final batch is ignored; re-retention of the same id is a no-op; forged
-  unframed entries are never honored).
-- **Compatibility + inspection.** `strive lifecycle [status|rollback]` shows
-  the retained revisions, their evidence, the active revision, the active
-  manifest surfaces, and the derived compatibility projection. Stage 1–2b
-  commands, replay, parity, migrations, canary controls, and cross-task
-  isolation are unchanged.
-- Exit claim: strive retains and activates the exact composite revision it
-  evaluated, with append-only evidence, lossless multi-surface state,
-  expected-head safety, restart recovery, and whole-revision rollback.
-  Prompt/policy evolution remains unimplemented.
+- **Parent-manifest state replay.** Validation loads the parent's
+  ScopeManifest, requires every `delta.before` to equal the parent's exact
+  binding, applies all content/mask/delete/unmask transitions, carries
+  unchanged bindings over, and requires exact equality with the stored
+  child manifest — undeclared changes, stale before-states, mask/absent
+  confusion, and dropped surfaces all fail closed (a code-only child of a
+  code+prompt parent preserves the prompt, verified).
+- **One recoverable activation operation.** Identity + evidence persist
+  BEFORE served behavior changes; `ActivationIntent`/`ActivationProgress`/
+  `ActivationCompleted` span the generation compatibility activation and
+  the lifecycle activation; every crash point resumes or reconciles
+  (abandoned before behavior changed; resumed after; reverted + breaker
+  when the revision no longer validates). A lifecycle failure after the
+  generation activation is never swallowed — the generation activation is
+  reverted and the outcome recorded. Whole-revision rollback drives BOTH
+  journals (served strategy changes too), and lifecycle/compatibility
+  parity is exposed (`compat_parity`). Framed journals refuse appends over
+  unverified regions (errors, unframed lines, torn tails); recovery goes
+  through durable quarantine + truncation to the last verified boundary.
+- **Upgrade history preserved.** Migration `0003-lifecycle-backfill`
+  converges the lifecycle with existing generation/mirror history — an
+  identity for every generation and the full activation history replayed,
+  preserving the ACTUAL active revision (never just the seed); migration
+  `0004-reader-journal-upgrade` migrates the exact PR#43 reader journal
+  (`reader-frame@1`, old genesis) to shared framing, preserving original
+  bytes (quarantined + hashed), mode, breaker, epoch, checks, summaries,
+  and ordering, and failing loudly on ambiguity. Ongoing convergence runs
+  at every seeding pass, so generation-native operations (promote,
+  rollback) are mirrored into the lifecycle afterwards.
+- **Threat model.** The hash chains are tamper-EVIDENT, not same-UID
+  secure: candidate code can read and rewrite journals under the current
+  sandbox. Lifecycle authority is therefore refused for unsafe
+  model-generated code (generation-native evolution only, with the gap
+  visible via compat parity until kernel-side convergence backfills it).
+- **Compatibility + inspection.** `strive lifecycle [status|rollback|repair]`
+  shows retained revisions, per-revision evidence (evaluations, selections,
+  overrides), the active revision, manifest surfaces, the compatibility
+  projection, and lifecycle/compat parity. Stage 1–2b commands, replay,
+  parity, migrations, canary controls, and cross-task isolation are
+  unchanged.
+- Exit claim: strive migrates existing history and atomically retains,
+  evaluates, selects, activates, recovers, and rolls back the exact
+  composite revision without losing surfaces or bypassing evidence.
 
 ## Stage 3C — The prompt-surface composite evolution experiment (next)
 

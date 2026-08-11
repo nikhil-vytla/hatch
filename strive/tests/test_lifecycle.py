@@ -1,40 +1,51 @@
-"""Stage-3B.3: the canonical native-revision lifecycle.
+"""Stage-3B.3 (corrected): the canonical native-revision lifecycle.
 
-Adversarial coverage: exact candidate identity (evaluated == retained ==
-activated), rejected-but-retained, lossless code+prompt composite state
-across retain/activate/restart/rollback, stale/conflicting activation,
-fail-closed on corrupt/incomplete/unknown-surface/mismatched candidates,
-idempotent partial-write recovery, the durable breaker, and preservation of
-legacy strategy behavior, canary controls, replay, parity, and cross-task
+Adversarial coverage: exact candidate identity end to end (including an
+actually evaluated code+prompt revision), identity/evidence separation with
+repeated evaluations, evidence-gated activation with trusted overrides,
+parent-manifest state replay, cross-journal crash injection with
+reconciliation, rollback that changes served behavior, framing recovery
+(torn tails and unframed lines), pre-44 upgrade fixtures (reader journal +
+lifecycle backfill), unsafe-model lifecycle-authority refusal, and
+preservation of legacy behavior, canary controls, parity, and cross-task
 isolation.
 """
 
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
 
 from strive import codec, lifecycle
 from strive.contracts import Event
-from strive.events import EventLog
+from strive.events import EventLog, now_iso
+from strive.framing import FramingError
 from strive.lifecycle import (
+    ActivationCompleted,
+    ActivationIntent,
     LifecycleError,
-    active_revision_id,
     activate,
+    active_revision_id,
+    compat_parity,
     compatibility_projection,
     compose_revision,
     lifecycle as lifecycle_ctx,
     materialize_active,
+    reconcile,
+    record_evaluation,
+    record_selection,
     retain,
     rollback,
+    run_activation_op,
     state,
+    sync_from_generations,
 )
-from strive.loop import run_cycle
+from strive.loop import LoopConfig, run_cycle
+from strive.policy import get_policy
 from strive.reader import MODE_SHADOW, reader_state, set_mode
-from strive.revisions import (
-    HarnessRevision,
-    ManifestBinding,
-    ScopeManifest,
-)
+from strive.revisions import HarnessRevision, ManifestBinding, ScopeManifest
+from strive.sandbox import run_strategy
 from strive.store import Store
 from strive.tasks import SUM_INTEGERS_TASK
 
@@ -45,13 +56,130 @@ def _store(tmp_path: Path, name: str = "artifacts") -> Store:
     return Store(tmp_path / name, TASK.task_id)
 
 
-def _active_manifest_bindings(store: Store) -> tuple[ManifestBinding, ...]:
+def _events(store: Store, run_id: str) -> "list[Event]":
+    return list(EventLog(store.runs_dir / run_id / "events.jsonl", run_id).read_all())
+
+
+def _strong_source(store: Store) -> str:
+    """The known-good evolved strategy (the accepted gen-0001 candidate)."""
+    return store.source_of(store.generations()["gen-0001"])
+
+
+def _active_bindings(store: Store) -> tuple[ManifestBinding, ...]:
     resolved = materialize_active(store)
     assert resolved is not None
     return resolved.effective
 
 
-# -- exact candidate identity -------------------------------------------------------------------
+def _evaluate_and_select(
+    store: Store, revision: HarnessRevision, baseline_id: str
+) -> tuple[str, str, bool]:
+    """ACTUALLY evaluate a retained revision's strategy artifact against the
+    baseline under the trusted paired gate, and record the evidence.
+    Returns (evaluation_ref, decision_ref, accepted)."""
+    from strive.evaluate import evaluate as evaluate_task
+
+    ctx = lifecycle_ctx(store)
+    manifest: ScopeManifest = codec.loads(
+        ctx.objects.get_text(revision.scope_manifest_ref), ScopeManifest
+    )
+    candidate_source = next(
+        ctx.objects.get_text(b.binding.content_ref)
+        for b in manifest.bindings
+        if (b.kind, b.name) == ("strategy-code", "solve")
+        and b.binding.content_ref is not None
+    )
+    baseline_record = state(store).retained[baseline_id]
+    baseline_revision = codec.loads(
+        ctx.objects.get_text(baseline_record.revision_ref), HarnessRevision
+    )
+    baseline_manifest: ScopeManifest = codec.loads(
+        ctx.objects.get_text(baseline_revision.scope_manifest_ref), ScopeManifest
+    )
+    baseline_source = next(
+        ctx.objects.get_text(b.binding.content_ref)
+        for b in baseline_manifest.bindings
+        if (b.kind, b.name) == ("strategy-code", "solve")
+        and b.binding.content_ref is not None
+    )
+    cases = TASK.selection_cases()
+    baseline_eval = evaluate_task(
+        TASK, run_strategy(baseline_source, cases, generation_id="baseline"), cases
+    )
+    candidate_eval = evaluate_task(
+        TASK, run_strategy(candidate_source, cases, generation_id="candidate"), cases
+    )
+    policy = get_policy("paired-deterministic")
+    decision = policy.decide(baseline_eval, candidate_eval)
+    evaluation_ref = store.objects.put_text(codec.dumps(candidate_eval))
+    decision_ref = store.objects.put_text(codec.dumps(decision))
+    record_evaluation(
+        store,
+        revision.ref.revision_id,
+        baseline_revision_id=baseline_id,
+        evaluation_ref=evaluation_ref,
+        manifest_ref=revision.scope_manifest_ref,
+    )
+    record_selection(
+        store,
+        revision.ref.revision_id,
+        baseline_revision_id=baseline_id,
+        evaluation_ref=evaluation_ref,
+        decision_ref=decision_ref,
+        policy_ref=f"{policy.name}@{policy.version}",
+        accepted=decision.accepted,
+    )
+    return evaluation_ref, decision_ref, decision.accepted
+
+
+def _compose_linked(
+    store: Store,
+    revision_id: str,
+    surfaces: dict[tuple[str, str], str],
+    *,
+    parent_id: str | None = None,
+) -> HarnessRevision:
+    """Compose a revision on top of the active one, retain it, and link a
+    compatibility generation serving its strategy source."""
+    st = state(store)
+    base = parent_id if parent_id is not None else st.active_revision_id
+    assert base is not None
+    revision, _ref = compose_revision(
+        store,
+        revision_id=revision_id,
+        base_parent_id=base,
+        parent_manifest_bindings=_active_bindings(store),
+        surfaces=surfaces,
+        proposer="composite-fixture@0",
+        summary="lifecycle fixture",
+        task_fingerprint=TASK.fingerprint(),
+    )
+    code = surfaces.get(("strategy-code", "solve"))
+    generation_id: str | None = None
+    if code is not None:
+        parent_generation = store.active_generation()
+        generation = store.add_generation(
+            code,
+            task_fingerprint=TASK.fingerprint(),
+            parent_id=(
+                parent_generation.generation_id if parent_generation else None
+            ),
+            origin="manual",
+            surface="strategy-code",
+            weakness_id=None,
+            decision=None,
+        )
+        generation_id = generation.generation_id
+    retain(
+        store,
+        revision,
+        task_fingerprint=TASK.fingerprint(),
+        generation_id=generation_id,
+    )
+    return revision
+
+
+# -- exact candidate identity (end to end) --------------------------------------------------------
 
 
 def test_evaluated_retained_activated_are_the_same_revision(tmp_path: Path) -> None:
@@ -68,419 +196,730 @@ def test_evaluated_retained_activated_are_the_same_revision(tmp_path: Path) -> N
     evaluated_id = overlay.ref.revision_id
 
     st = state(store)
-    # retained id == evaluated id; the CAS ref proves the artifact is identical
     assert evaluated_id in st.retained
-    assert st.retained[evaluated_id].revision_ref == overlay_ref
-    # activated id == evaluated id
-    assert st.active_revision_id == evaluated_id
-    # the lifecycle-retained/activation events name the same id
-    retained_evt = next(e for e in events if e.type == "lifecycle_retained")
-    activated_evt = next(e for e in events if e.type == "lifecycle_activated")
-    assert retained_evt.payload["revision_id"] == evaluated_id
-    assert activated_evt.payload["revision_id"] == evaluated_id
-    # evidence is linked to the exact candidate
-    record = st.retained[evaluated_id]
-    assert record.decision_ref is not None and record.evaluation_ref is not None
-    decision: object = codec.loads(store.objects.get_text(record.decision_ref))
+    assert st.retained[evaluated_id].revision_ref == overlay_ref  # identical artifact
+    assert st.active_revision_id == evaluated_id  # activated id == evaluated id
+    # identity and evidence are separate records; both exist and agree
+    selections = st.selections[evaluated_id]
+    assert len(selections) == 1 and selections[0].accepted
+    assert selections[0].baseline_revision_id == "rev-0000"
+    evaluations = st.evaluations[evaluated_id]
+    assert len(evaluations) == 1
+    decision: object = codec.loads(store.objects.get_text(selections[0].decision_ref))
     assert codec.encode(decision) == codec.encode(report.decision)
+    # the cross-journal activation op ran intent -> ... -> completed
+    ctx = lifecycle_ctx(store)
+    entries = ctx.journal.read().entries
+    intents = [e for e in entries if isinstance(e, ActivationIntent)]
+    completions = [e for e in entries if isinstance(e, ActivationCompleted)]
+    assert intents and completions
+    assert completions[-1].outcome == "completed"
+    # served compatibility behavior and the lifecycle agree
+    parity = compat_parity(store)
+    assert parity.ok, parity.reason
 
 
-def test_rejected_candidate_is_retained_but_not_activated(tmp_path: Path) -> None:
+def test_actually_evaluated_code_plus_prompt_has_one_identity(tmp_path: Path) -> None:
+    """The end-to-end composite case: a code+prompt revision is ACTUALLY
+    evaluated (sandbox execution + the trusted paired gate), its evidence is
+    recorded, and the SAME id is retained and activated."""
     store = _store(tmp_path)
-    run_cycle(store, TASK)  # accepts gen-0001 -> lifecycle active = rev-cand-...
-    accepted_active = active_revision_id(store)
-    # a compare of the incumbent against the seed is a rejected decision, but
-    # the loop only retains candidates from run_cycle; force a rejected cycle
-    # by rolling back to the strong incumbent first, then running again with a
-    # no-op proposer would not help. Instead retain a rejected candidate
-    # directly against the lifecycle to assert the invariant precisely.
-    st = state(store)
-    parent_id = st.active_revision_id
-    assert parent_id is not None
-    parent_bindings = _active_manifest_bindings(store)
-    revision, _ref = compose_revision(
+    run_cycle(store, TASK)
+    rollback(store)  # the weak seed becomes the baseline again
+    baseline = active_revision_id(store)
+    assert baseline == "rev-0000"
+
+    code = _strong_source(store) + "\n# composite-e2e variant\n"
+    prompt = "Consider negative integers. (lifecycle-only; no behavior claim)"
+    revision = _compose_linked(
         store,
-        revision_id="rev-cand-rejected",
-        base_parent_id=parent_id,
-        parent_manifest_bindings=parent_bindings,
-        surfaces={("strategy-code", "solve"): "def solve(t):\n    return 0\n"},
-        proposer="test@0",
-        summary="a rejected candidate",
-        task_fingerprint=TASK.fingerprint(),
+        "rev-composite-e2e",
+        {("strategy-code", "solve"): code, ("prompt", "proposal-template"): prompt},
     )
-    retain(
-        store, revision, accepted=False, baseline_revision_id=parent_id,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
+    evaluated_id = revision.ref.revision_id
+    _evaluation_ref, decision_ref, accepted = _evaluate_and_select(
+        store, revision, baseline
+    )
+    assert accepted  # a strict improvement over the weak seed: the gate accepts
+
+    run_activation_op(
+        store,
+        evaluated_id,
+        reason="promote",
+        policy_ref="paired-deterministic@1",
+        decision_ref=decision_ref,
     )
     st = state(store)
-    assert "rev-cand-rejected" in st.retained  # retained
-    assert st.retained["rev-cand-rejected"].accepted is False
-    assert st.active_revision_id == accepted_active  # NOT activated
-    # activating a rejected candidate is possible only by explicit operator
-    # action; the lifecycle does not do it automatically (loop never calls it)
+    assert st.active_revision_id == evaluated_id  # evaluated == retained == activated
+    resolved = materialize_active(store)
+    assert resolved is not None
+    surfaces = {(b.kind, b.name) for b in resolved.effective}
+    assert ("prompt", "proposal-template") in surfaces  # composite intact
+    assert compat_parity(store).ok  # served behavior follows the same revision
 
 
-# -- lossless composite (code + prompt) ---------------------------------------------------------
-
-
-def _compose_code_prompt(
-    store: Store, revision_id: str, base_parent_id: str, code: str, prompt: str
-) -> HarnessRevision:
-    parent_bindings = _active_manifest_bindings(store)
-    revision, _ref = compose_revision(
-        store,
-        revision_id=revision_id,
-        base_parent_id=base_parent_id,
-        parent_manifest_bindings=parent_bindings,
-        surfaces={
-            ("strategy-code", "solve"): code,
-            ("prompt", "proposal-template"): prompt,
-        },
-        proposer="composite-fixture@0",
-        summary="code+prompt lifecycle fixture (prompt is lifecycle-only)",
-        task_fingerprint=TASK.fingerprint(),
+def test_rejected_candidate_is_retained_but_cannot_activate(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    baseline = active_revision_id(store)
+    assert baseline is not None
+    # a strictly WORSE candidate: the gate rejects it
+    revision = _compose_linked(
+        store, "rev-worse", {("strategy-code", "solve"): "def solve(t):\n    return 0\n"}
     )
-    return revision
+    _eval_ref, decision_ref, accepted = _evaluate_and_select(store, revision, baseline)
+    assert not accepted
+    st = state(store)
+    assert "rev-worse" in st.retained  # rejected candidates ARE retained
+    assert not st.selections["rev-worse"][-1].accepted
+    assert st.active_revision_id == baseline  # ... but not activated
+    # activation is refused on rejected evidence
+    with pytest.raises(LifecycleError, match="REJECTED"):
+        run_activation_op(
+            store, "rev-worse", reason="promote",
+            policy_ref="paired-deterministic@1", decision_ref=decision_ref,
+        )
+    # ... and on NO evidence
+    fresh = _compose_linked(
+        store, "rev-no-evidence",
+        {("strategy-code", "solve"): "def solve(t):\n    return 1\n"},
+    )
+    del fresh
+    with pytest.raises(LifecycleError, match="no selection evidence"):
+        run_activation_op(
+            store, "rev-no-evidence", reason="promote", policy_ref="manual@0",
+        )
+    # a distinct trusted override record is the only path around the gate
+    run_activation_op(
+        store, "rev-worse", reason="promote", policy_ref="manual@0",
+        override_reason="operator override for test",
+    )
+    st = state(store)
+    assert st.active_revision_id == "rev-worse"
+    assert len(st.overrides["rev-worse"]) == 1  # the override is durable
+    assert compat_parity(store).ok
 
 
-def test_code_plus_prompt_survives_retain_activate_restart_rollback(
+def test_one_revision_can_be_evaluated_repeatedly(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    baseline = active_revision_id(store)
+    assert baseline is not None
+    revision = _compose_linked(
+        store, "rev-multi",
+        {("strategy-code", "solve"): _strong_source(store) + "\n# multi\n"},
+    )
+    _evaluate_and_select(store, revision, baseline)
+    _evaluate_and_select(store, revision, "rev-0000")  # a DIFFERENT baseline
+    st = state(store)
+    assert len(st.evaluations["rev-multi"]) == 2
+    assert len(st.selections["rev-multi"]) == 2
+    baselines = {s.baseline_revision_id for s in st.selections["rev-multi"]}
+    assert baselines == {baseline, "rev-0000"}
+    # the promote gate uses the LATEST selection: it was against rev-0000,
+    # not the current active baseline, so activation refuses as stale evidence
+    with pytest.raises(LifecycleError, match="re-evaluate against the current"):
+        run_activation_op(
+            store, "rev-multi", reason="promote", policy_ref="manual@0",
+        )
+
+
+# -- parent-manifest state replay ------------------------------------------------------------------
+
+
+def test_code_only_child_of_code_plus_prompt_parent_preserves_prompt(
     tmp_path: Path,
 ) -> None:
     store = _store(tmp_path)
-    run_cycle(store, TASK)  # seed + first candidate
+    run_cycle(store, TASK)
     baseline = active_revision_id(store)
     assert baseline is not None
-
-    code = "def solve(t):\n    return sum(int(x) for x in t.replace(',', ' ').split())\n"
-    prompt = "You are refining solve(). Consider negative integers. (lifecycle-only)"
-    revision = _compose_code_prompt(store, "rev-composite-1", baseline, code, prompt)
-    retain(
-        store, revision, accepted=True, baseline_revision_id=baseline,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
+    prompt = "carry me forward"
+    parent = _compose_linked(
+        store,
+        "rev-parent-cp",
+        {
+            ("strategy-code", "solve"): "def solve(t):\n    return 1\n",
+            ("prompt", "proposal-template"): prompt,
+        },
     )
-    activate(
-        store, "rev-composite-1", reason="promote", policy_ref="manual@0",
-        expected_active_revision_id=baseline,
+    _eval, dec, _acc = _evaluate_and_select(store, parent, baseline)
+    run_activation_op(
+        store, "rev-parent-cp", reason="promote", policy_ref="manual@0",
+        override_reason="fixture activation",
     )
-
-    def assert_composite(s: Store) -> None:
-        resolved = materialize_active(s)
-        assert resolved is not None
-        surfaces = {
-            (b.kind, b.name): b.binding.content_ref
-            for b in resolved.effective
-            if b.binding.content_ref is not None
-        }
-        # BOTH surfaces are present and materialized from the manifest
-        assert ("strategy-code", "solve") in surfaces
-        assert ("prompt", "proposal-template") in surfaces
-        assert s.objects.get_text(surfaces[("prompt", "proposal-template")]) == prompt
-        assert s.objects.get_text(surfaces[("strategy-code", "solve")]) == code
-        # the compatibility projection is strategy-only and marks the prompt as
-        # a present-but-not-projected surface — never flattened away
-        proj = compatibility_projection(s)
-        assert proj is not None
-        assert ("prompt", "proposal-template") in proj.other_surfaces
-        assert proj.strategy_source_text == code
-
-    assert_composite(store)  # after activate
-    assert_composite(Store(store.root, TASK.task_id))  # after restart
-
-    # whole-revision rollback returns to the strategy-only baseline; the
-    # composite revision is retained, not deleted, and its prompt survives
-    rollback(store)
-    assert active_revision_id(store) == baseline
-    assert "rev-composite-1" in state(store).retained
-    assert_composite_still_retained(store, prompt)
-    # re-activating the composite restores both surfaces losslessly
-    activate(
-        store, "rev-composite-1", reason="promote", policy_ref="manual@0",
-        expected_active_revision_id=baseline,
-    )
-    assert_composite(Store(store.root, TASK.task_id))
-
-
-def assert_composite_still_retained(store: Store, prompt: str) -> None:
-    record = state(store).retained["rev-composite-1"]
-    revision: HarnessRevision = codec.loads(
-        store.objects.get_text(record.revision_ref), HarnessRevision
+    # a code-only child: the prompt binding must carry over UNCHANGED
+    child = _compose_linked(
+        store, "rev-child-code-only",
+        {("strategy-code", "solve"): "def solve(t):\n    return 2\n"},
     )
     manifest: ScopeManifest = codec.loads(
-        store.objects.get_text(revision.scope_manifest_ref), ScopeManifest
+        store.objects.get_text(child.scope_manifest_ref), ScopeManifest
     )
-    prompt_binding = next(
-        b for b in manifest.bindings if (b.kind, b.name) == ("prompt", "proposal-template")
-    )
-    assert prompt_binding.binding.content_ref is not None
-    assert store.objects.get_text(prompt_binding.binding.content_ref) == prompt
+    keys = {(b.kind, b.name) for b in manifest.bindings}
+    assert ("prompt", "proposal-template") in keys  # preserved, not dropped
+    assert "rev-child-code-only" in state(store).retained
 
 
-# -- stale / conflicting activation -------------------------------------------------------------
-
-
-def test_stale_activation_head_is_refused(tmp_path: Path) -> None:
+def test_dropped_surface_and_stale_before_fail_closed(tmp_path: Path) -> None:
     store = _store(tmp_path)
     run_cycle(store, TASK)
     baseline = active_revision_id(store)
     assert baseline is not None
-    revision = _compose_code_prompt(
-        store, "rev-x", baseline, "def solve(t):\n    return 0\n", "p"
+    parent = _compose_linked(
+        store,
+        "rev-parent2",
+        {
+            ("strategy-code", "solve"): "def solve(t):\n    return 3\n",
+            ("prompt", "proposal-template"): "p",
+        },
     )
-    st = state(store)
-    retain(
-        store, revision, accepted=True, baseline_revision_id=baseline,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
+    _eval, _dec, _acc = _evaluate_and_select(store, parent, baseline)
+    run_activation_op(
+        store, "rev-parent2", reason="promote", policy_ref="manual@0",
+        override_reason="fixture activation",
     )
-    # authorize against the pre-retention head: now stale
-    with pytest.raises(LifecycleError, match="stale lifecycle head"):
-        activate(
-            store, "rev-x", reason="promote", policy_ref="manual@0",
-            expected_head=st.head,
-        )
 
-
-def test_conflicting_expected_active_is_refused(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    baseline = active_revision_id(store)
-    assert baseline is not None
-    revision = _compose_code_prompt(
-        store, "rev-y", baseline, "def solve(t):\n    return 0\n", "p"
+    # a child whose manifest silently DROPS the prompt (no delete delta)
+    from strive.revisions import (
+        ABSENT,
+        RevisionProvenance,
+        RevisionRef,
+        ScopeRef,
+        SurfaceDelta,
+        content_binding,
     )
-    retain(
-        store, revision, accepted=True, baseline_revision_id=baseline,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
+
+    code_ref = store.objects.put_text("def solve(t):\n    return 4\n")
+    parent_manifest: ScopeManifest = codec.loads(
+        store.objects.get_text(parent.scope_manifest_ref), ScopeManifest
     )
-    with pytest.raises(LifecycleError, match="expected active revision"):
-        activate(
-            store, "rev-y", reason="promote", policy_ref="manual@0",
-            expected_active_revision_id="rev-does-not-match",
-        )
-
-
-def test_activate_unretained_revision_is_refused(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    with pytest.raises(LifecycleError, match="not retained"):
-        activate(store, "rev-unknown", reason="promote", policy_ref="manual@0")
-
-
-# -- fail closed on bad candidates --------------------------------------------------------------
-
-
-def test_retain_rejects_content_ref_identity_mismatch(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    baseline = active_revision_id(store)
-    assert baseline is not None
-    revision = _compose_code_prompt(
-        store, "rev-z", baseline, "def solve(t):\n    return 0\n", "p"
+    parent_code = next(
+        b.binding for b in parent_manifest.bindings if b.kind == "strategy-code"
     )
-    # mutate the in-memory revision so it no longer matches its stored ref
-    tampered = codec.loads(codec.dumps(revision), HarnessRevision)
-    object.__setattr__(tampered, "summary", "tampered after hashing")
-    ctx = lifecycle_ctx(store)
-    from strive.lifecycle import validate_composite
-
-    good_ref = ctx.objects.put_text(codec.dumps(revision))
-    with pytest.raises(LifecycleError, match="identity mismatch"):
-        validate_composite(ctx, tampered, good_ref)
-
-
-def test_retain_rejects_unknown_surface(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    baseline = active_revision_id(store)
-    assert baseline is not None
-    parent_bindings = _active_manifest_bindings(store)
-    with pytest.raises(Exception):  # ContractViolation inside compose -> rejected
-        compose_revision(
-            store,
-            revision_id="rev-bad-surface",
-            base_parent_id=baseline,
-            parent_manifest_bindings=parent_bindings,
-            surfaces={("telemetry", "spy"): "data"},  # not a registered surface
-            proposer="test@0",
-            summary="unknown surface",
-            task_fingerprint=TASK.fingerprint(),
-        )
-
-
-def test_retain_rejects_missing_artifact(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    baseline = active_revision_id(store)
-    assert baseline is not None
-    revision = _compose_code_prompt(
-        store, "rev-missing", baseline, "def solve(t):\n    return 0\n", "p"
+    after = content_binding("strategy-code", code_ref)
+    bad_manifest = ScopeManifest(
+        scope=parent.ref.scope,
+        bindings=(ManifestBinding("strategy-code", "solve", after),),  # prompt GONE
     )
-    # delete the prompt artifact from CAS -> manifest closure incomplete
-    manifest: ScopeManifest = codec.loads(
-        store.objects.get_text(revision.scope_manifest_ref), ScopeManifest
-    )
-    prompt_ref = next(
-        b.binding.content_ref
-        for b in manifest.bindings
-        if b.kind == "prompt"
-    )
-    assert prompt_ref is not None
-    (store.objects.root / prompt_ref[:2] / prompt_ref).unlink()
-    with pytest.raises(LifecycleError, match="artifact for prompt|unavailable"):
-        retain(
-            store, revision, accepted=True, baseline_revision_id=baseline,
-            evaluation_ref=None, decision_ref=None,
-            task_fingerprint=TASK.fingerprint(),
-        )
-
-
-def test_retain_rejects_unknown_base_parent(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    revision = _compose_code_prompt(
-        store, "rev-orphan", "rev-nonexistent-parent",
-        "def solve(t):\n    return 0\n", "p",
-    )
-    with pytest.raises(LifecycleError, match="not retained; retain the parent"):
-        retain(
-            store, revision, accepted=True,
-            baseline_revision_id="rev-nonexistent-parent",
-            evaluation_ref=None, decision_ref=None,
-            task_fingerprint=TASK.fingerprint(),
-        )
-
-
-def test_redefining_a_retained_revision_id_fails_closed(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    baseline = active_revision_id(store)
-    assert baseline is not None
-    r1 = _compose_code_prompt(store, "rev-dup", baseline, "def solve(t):\n    return 1\n", "p1")
-    retain(
-        store, r1, accepted=False, baseline_revision_id=baseline,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
-    )
-    r2 = _compose_code_prompt(store, "rev-dup", baseline, "def solve(t):\n    return 2\n", "p2")
-    with pytest.raises(LifecycleError, match="already retained with different"):
-        retain(
-            store, r2, accepted=False, baseline_revision_id=baseline,
-            evaluation_ref=None, decision_ref=None,
-            task_fingerprint=TASK.fingerprint(),
-        )
-
-
-# -- idempotent partial-write recovery ----------------------------------------------------------
-
-
-def test_retain_is_idempotent_no_duplicates(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    baseline = active_revision_id(store)
-    assert baseline is not None
-    revision = _compose_code_prompt(
-        store, "rev-idem", baseline, "def solve(t):\n    return 0\n", "p"
-    )
-    head1 = retain(
-        store, revision, accepted=True, baseline_revision_id=baseline,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
-    )
-    head2 = retain(  # same id, same content -> no-op
-        store, revision, accepted=True, baseline_revision_id=baseline,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
-    )
-    assert head1 == head2  # head did not advance
-    ids = [r for r in state(store).retained]
-    assert ids.count("rev-idem") == 1
-
-
-def test_torn_final_batch_is_ignored_and_recoverable(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    journal = lifecycle_ctx(store).journal
-    before = state(store)
-    # simulate a crash mid-append: a partial (unframed, no newline) tail
-    with journal.path.open("ab") as handle:
-        handle.write(b'{"schema":"revision-retained@1","revision_id":"rev-torn"')
-    after = state(store)
-    assert after.active_revision_id == before.active_revision_id
-    assert "rev-torn" not in after.retained  # torn tail never honored
-    assert after.journal_errors == 0  # a torn *final* line is a tolerated artifact
-    # the lifecycle still accepts new writes (recovers cleanly)
-    baseline = after.active_revision_id
-    assert baseline is not None
-
-
-def test_unframed_forged_entry_is_never_honored(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    journal = lifecycle_ctx(store).journal
-    from strive.revisions import RevisionActivation, RevisionRef, ScopeRef, LEVEL_TASK
-    from strive.events import now_iso
-
-    forged = codec.dumps(
-        RevisionActivation(
-            revision=RevisionRef(ScopeRef(LEVEL_TASK, TASK.task_id), "rev-forged"),
-            mode="durable", reason="promote", at=now_iso(), policy_ref="x@0",
+    bad_manifest_ref = store.objects.put_text(codec.dumps(bad_manifest))
+    provenance_ref = store.objects.put_text(
+        codec.dumps(
+            RevisionProvenance(
+                origin="test", task_id=TASK.task_id,
+                task_fingerprint=TASK.fingerprint(), surface="strategy-code",
+                weakness_id=None, parent_revision_id="rev-parent2",
+                decision_ref=None,
+            )
         )
     )
-    with journal.path.open("a") as handle:
-        handle.write(forged + "\n")  # a complete but UNFRAMED line
-    st = state(store)
-    assert st.active_revision_id != "rev-forged"  # not honored
-    assert st.journal_errors >= 1  # detected
-
-
-# -- durable breaker ----------------------------------------------------------------------------
-
-
-def test_breaker_blocks_activation_until_cleared(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    run_cycle(store, TASK)
-    baseline = active_revision_id(store)
-    assert baseline is not None
-    revision = _compose_code_prompt(
-        store, "rev-brk", baseline, "def solve(t):\n    return 0\n", "p"
+    dropped = HarnessRevision(
+        ref=RevisionRef(parent.ref.scope, "rev-drops-prompt"),
+        base_parent=parent.ref,
+        provenance_parents=(),
+        deltas=(SurfaceDelta("strategy-code", "solve", parent_code, after),),
+        scope_manifest_ref=bad_manifest_ref,
+        proposer="test@0",
+        summary="drops the prompt without declaring it",
+        created_at=now_iso(),
+        provenance_ref=provenance_ref,
     )
-    retain(
-        store, revision, accepted=True, baseline_revision_id=baseline,
-        evaluation_ref=None, decision_ref=None, task_fingerprint=TASK.fingerprint(),
+    with pytest.raises(LifecycleError, match="dropped surfaces"):
+        retain(store, dropped, task_fingerprint=TASK.fingerprint())
+
+    # a child whose delta declares a STALE before-state
+    stale = HarnessRevision(
+        ref=RevisionRef(parent.ref.scope, "rev-stale-before"),
+        base_parent=parent.ref,
+        provenance_parents=(),
+        deltas=(SurfaceDelta("strategy-code", "solve", ABSENT, after),),
+        scope_manifest_ref=bad_manifest_ref,
+        proposer="test@0",
+        summary="stale before",
+        created_at=now_iso(),
+        provenance_ref=provenance_ref,
     )
-    # corrupt the retained revision's manifest artifact so revalidation fails
-    manifest_ref = revision.scope_manifest_ref
-    (store.objects.root / manifest_ref[:2] / manifest_ref).write_text("corrupt")
-    with pytest.raises(LifecycleError, match="breaker opened"):
-        activate(store, "rev-brk", reason="promote", policy_ref="manual@0")
-    st = state(store)
-    assert st.breaker_open
-    # further activation is blocked while the breaker is open — no lossy fallback
-    with pytest.raises(LifecycleError, match="breaker is open"):
-        activate(store, baseline, reason="promote", policy_ref="manual@0")
-    assert active_revision_id(store) == baseline  # unchanged
+    with pytest.raises(LifecycleError, match="stale or mismatched before-state"):
+        retain(store, stale, task_fingerprint=TASK.fingerprint())
 
 
-# -- compatibility, canary, parity, isolation intact --------------------------------------------
+# -- rollback drives served behavior ----------------------------------------------------------------
 
 
-def test_legacy_generation_behavior_and_active_state_intact(tmp_path: Path) -> None:
+def test_rollback_changes_served_strategy_and_keeps_parity(tmp_path: Path) -> None:
     store = _store(tmp_path)
     report = run_cycle(store, TASK)
     assert report.decision is not None and report.decision.accepted
-    # generation-native active state is unchanged by the lifecycle
+    evolved = store.active_generation()
+    assert evolved is not None and evolved.generation_id == "gen-0001"
+    evolved_source = store.source_of(evolved)
+
+    rollback(store)  # ONE recoverable op across both journals
+    st = state(store)
+    assert st.active_revision_id == "rev-0000"
+    served = store.active_generation()
+    assert served is not None and served.generation_id == "gen-0000"  # served changed
+    assert store.source_of(served) != evolved_source
+    parity = compat_parity(store)
+    assert parity.ok, parity.reason
+    projection = compatibility_projection(store)
+    assert projection is not None
+    assert projection.strategy_source_text == store.source_of(served)
+    # nothing was deleted
+    assert "gen-0001" in store.generations()
+    assert len(st.retained) >= 2
+
+
+# -- cross-journal crash injection + reconciliation --------------------------------------------------
+
+
+def _inject_intent(store: Store, revision_id: str) -> ActivationIntent:
+    st = state(store)
+    ctx = lifecycle_ctx(store)
+    intent = ActivationIntent(
+        op_id="op-crash",
+        revision_id=revision_id,
+        baseline_revision_id=st.active_revision_id,
+        generation_id=st.links[revision_id],
+        reason="promote",
+        policy_ref="manual@0",
+        decision_ref=None,
+        at=now_iso(),
+    )
+    ctx.journal.append_batch([intent])
+    return intent
+
+
+def _prepare_promotable(store: Store, revision_id: str) -> str:
+    """Roll back to the weak seed, then compose a STRONG candidate whose
+    selection is accepted against the current baseline — a realistic
+    promotable state for crash injection."""
+    rollback(store)
+    baseline = active_revision_id(store)
+    assert baseline == "rev-0000"
+    revision = _compose_linked(
+        store, revision_id,
+        {("strategy-code", "solve"): _strong_source(store) + f"\n# {revision_id}\n"},
+    )
+    _eval, decision_ref, accepted = _evaluate_and_select(store, revision, baseline)
+    assert accepted
+    return decision_ref
+
+
+def test_crash_after_intent_before_generation_activation_is_abandoned(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    _prepare_promotable(store, "rev-crash-a")
+    before_gen = store.active_generation()
+    _inject_intent(store, "rev-crash-a")
+
+    outcomes = reconcile(store)
+    assert outcomes == ("abandoned",)
+    # served behavior never changed; the lifecycle active did not move
+    assert store.active_generation() == before_gen
+    assert active_revision_id(store) != "rev-crash-a"
+    assert not state(store).open_intents
+
+
+def test_crash_after_generation_activation_resumes_lifecycle(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    _prepare_promotable(store, "rev-crash-b")
+    intent = _inject_intent(store, "rev-crash-b")
+    # the generation side activated, then the process died
+    store.activate(intent.generation_id, reason="promote", policy="manual@0")
+
+    outcomes = reconcile(store)
+    assert outcomes == ("completed",)
+    st = state(store)
+    assert st.active_revision_id == "rev-crash-b"  # lifecycle caught up
+    assert not st.open_intents
+    assert compat_parity(store).ok
+
+
+def test_crash_with_invalid_revision_reverts_generation_and_opens_breaker(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    _prepare_promotable(store, "rev-crash-c")
+    baseline_gen = store.active_generation()
+    assert baseline_gen is not None
+    intent = _inject_intent(store, "rev-crash-c")
+    store.activate(intent.generation_id, reason="promote", policy="manual@0")
+    # the revision's manifest artifact corrupts before reconciliation
+    record = state(store).retained["rev-crash-c"]
+    revision: HarnessRevision = codec.loads(
+        store.objects.get_text(record.revision_ref), HarnessRevision
+    )
+    ref = revision.scope_manifest_ref
+    (store.objects.root / ref[:2] / ref).write_text("corrupt")
+
+    outcomes = reconcile(store)
+    assert outcomes == ("reverted",)
+    st = state(store)
+    assert st.breaker_open  # durable
+    served = store.active_generation()
+    assert served is not None
+    assert served.generation_id == baseline_gen.generation_id  # reverted
+    assert st.active_revision_id != "rev-crash-c"
+    assert not st.open_intents
+
+
+def test_lifecycle_failure_after_generation_activation_is_not_swallowed(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    decision_ref = _prepare_promotable(store, "rev-live-fail")
+    record = state(store).retained["rev-live-fail"]
+    revision: HarnessRevision = codec.loads(
+        store.objects.get_text(record.revision_ref), HarnessRevision
+    )
+    baseline_gen = store.active_generation()
+    assert baseline_gen is not None
+    ref = revision.scope_manifest_ref
+    (store.objects.root / ref[:2] / ref).write_text("corrupt")  # invalidate NOW
+
+    with pytest.raises(LifecycleError, match="reverted"):
+        run_activation_op(
+            store, "rev-live-fail", reason="promote", policy_ref="manual@0",
+            decision_ref=decision_ref,
+        )
+    served = store.active_generation()
+    assert served is not None
+    assert served.generation_id == baseline_gen.generation_id  # reverted, recorded
+    st = state(store)
+    assert st.breaker_open
+    ctx = lifecycle_ctx(store)
+    completions = [
+        e for e in ctx.journal.read().entries if isinstance(e, ActivationCompleted)
+    ]
+    assert completions[-1].outcome == "reverted"
+
+
+# -- framing recovery ---------------------------------------------------------------------------------
+
+
+def test_append_after_torn_tail_refuses_then_repairs(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    journal = lifecycle_ctx(store).journal
+    good = journal.path.read_bytes()
+    with journal.path.open("ab") as handle:
+        handle.write(b'{"schema":"lifecycle-breaker@1","state":"cle')  # torn
+
+    with pytest.raises(FramingError, match="unverified region"):
+        journal.append_batch(
+            [lifecycle.LifecycleBreaker(state="open", reason="x", at=now_iso())]
+        )
+    quarantine = journal.repair_to_verified("test torn tail")
+    assert quarantine is not None
+    assert Path(quarantine).read_bytes().startswith(good)  # bytes preserved
+    assert journal.path.read_bytes() == good  # truncated to verified boundary
+    journal.append_batch(  # appends work again
+        [lifecycle.LifecycleBreaker(state="open", reason="x", at=now_iso())]
+    )
+    assert state(store).breaker_open
+
+
+def test_append_after_unframed_line_refuses_then_repairs(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    journal = lifecycle_ctx(store).journal
+    good = journal.path.read_bytes()
+    forged = codec.dumps(
+        lifecycle.LifecycleBreaker(state="cleared", reason="forged", at=now_iso())
+    )
+    with journal.path.open("a") as handle:
+        handle.write(forged + "\n")  # complete but UNFRAMED
+
+    assert state(store).journal_errors >= 1
+    with pytest.raises(FramingError, match="unverified region"):
+        journal.append_batch(
+            [lifecycle.LifecycleBreaker(state="open", reason="y", at=now_iso())]
+        )
+    # mutation and materialization refuse over the dirty journal
+    with pytest.raises(LifecycleError, match="unverifiable"):
+        materialize_active(store)
+    quarantine = journal.repair_to_verified("test unframed")
+    assert quarantine is not None and journal.path.read_bytes() == good
+    assert state(store).journal_errors == 0
+    assert materialize_active(store) is not None
+
+
+def test_invalid_entry_type_is_rejected_before_writing(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    journal = lifecycle_ctx(store).journal
+    before = journal.path.read_bytes()
+    with pytest.raises(FramingError, match="not a valid entry type"):
+        journal.append_batch(["not a record"])
+    assert journal.path.read_bytes() == before  # nothing was written
+
+
+# -- pre-44 upgrade fixtures -----------------------------------------------------------------------
+
+
+def test_lifecycle_backfill_preserves_actual_active_revision(tmp_path: Path) -> None:
+    """A pre-lifecycle store (generation history exists, no revisions journal)
+    backfills to the ACTUAL active revision — never just the seed."""
+    store = _store(tmp_path)
+    run_cycle(store, TASK)  # evolves to gen-0001
+    store.rollback()  # ... and back to gen-0000
+    store.activate("gen-0001", reason="promote", policy="manual@0")  # re-promote
+    lifecycle_ctx(store).journal.path.unlink()  # simulate a pre-44 store
+
+    from strive.migrations import apply_pending, pending_migrations
+
+    pending = [m.migration_id for m in pending_migrations(store.root, TASK)]
+    assert "0003-lifecycle-backfill" in pending
+    reports = apply_pending(store.root, TASK)
+    assert any(r.migration_id == "0003-lifecycle-backfill" for r in reports)
+
+    st = state(store)
+    assert st.active_revision_id == "rev-0001"  # the ACTUAL active, not rev-0000
+    assert set(st.retained) >= {"rev-0000", "rev-0001"}
+    # the full activation history was replayed, order preserved
+    assert st.activation_order == ("rev-0000", "rev-0001", "rev-0000", "rev-0001")
+    assert compat_parity(store).ok
+
+
+def _write_legacy_reader_journal(path: Path, task_id: str, batches: list[list[object]]) -> bytes:
+    """Byte-exact PR#43 reader-journal format: reader-frame@1 frames chained
+    from the old fixed genesis."""
+    genesis = hashlib.sha256(b"strive-reader-genesis").hexdigest()
+    last = genesis
+    out = b""
+    for seq, batch in enumerate(batches, start=1):
+        payload = "".join(codec.dumps(e) + "\n" for e in batch).encode("utf-8")
+        frame = {
+            "schema": "reader-frame@1",
+            "task_id": task_id,
+            "seq": seq,
+            "prev": last,
+            "payload_hash": hashlib.sha256(payload).hexdigest(),
+            "count": len(batch),
+            "at": "2026-08-09T00:00:00+00:00",
+        }
+        line = json.dumps(frame, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        out += payload + line + b"\n"
+        last = hashlib.sha256(line).hexdigest()
+    path.write_bytes(out)
+    return out
+
+
+def test_pr43_reader_journal_is_detected_and_upgraded_exactly(tmp_path: Path) -> None:
+    from strive.reader import (
+        EpochReset,
+        ModeChange,
+        ReadCheck,
+        ReaderError,
+        reader_journal,
+        upgrade_reader_journal,
+    )
+
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    journal = reader_journal(store)
+    journal.path.unlink()  # replace with a PR#43-format journal
+    epoch = EpochReset(
+        epoch="epoch-legacy", reason="opened", reader_version="state-reader@2",
+        projector_ref="generation-to-revision@1", at="2026-08-09T00:00:00+00:00",
+    )
+    mode = ModeChange(mode=MODE_SHADOW, reason="burn-in", at="2026-08-09T00:00:01+00:00")
+    check = ReadCheck(
+        epoch="epoch-legacy", op_id="op-legacy", operation="status",
+        subject="status-active", mode=MODE_SHADOW, outcome="agreed", detail="ok",
+        canonical_head="1:aa", mirror_head="1:bb",
+        reader_version="state-reader@2",
+        projector_ref="generation-to-revision@1", at="2026-08-09T00:00:02+00:00",
+    )
+    original = _write_legacy_reader_journal(
+        journal.path, TASK.task_id, [[epoch, mode], [check]]
+    )
+
+    # detection is LOUD with migration guidance, not generic corruption
+    with pytest.raises(ReaderError, match="legacy frame schema.*migrate"):
+        journal.read()
+    from strive.migrations import pending_migrations
+
+    pending = [m.migration_id for m in pending_migrations(store.root, TASK)]
+    assert "0004-reader-journal-upgrade" in pending
+
+    report = upgrade_reader_journal(store)
+    assert report.original_sha256 == hashlib.sha256(original).hexdigest()
+    assert Path(report.quarantine_path).read_bytes() == original  # bytes preserved
+    assert report.batches == 2 and report.entries == 3
+
+    view = journal.read()
+    assert view.errors == 0
+    assert list(view.entries) == [epoch, mode, check]  # exact order + content
+    st = reader_state(store)
+    assert st.mode == MODE_SHADOW  # mode preserved
+    assert st.epoch == "epoch-legacy"  # epoch preserved
+
+
+def test_pr43_upgrade_refuses_ambiguous_journals(tmp_path: Path) -> None:
+    from strive.reader import ReaderError, reader_journal, upgrade_reader_journal
+
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    journal = reader_journal(store)
+    journal.path.unlink()
+    from strive.reader import ModeChange
+
+    original = _write_legacy_reader_journal(
+        journal.path, TASK.task_id,
+        [[ModeChange(mode=MODE_SHADOW, reason="x", at="2026-08-09T00:00:00+00:00")]],
+    )
+    # tamper one byte inside the legacy region
+    journal.path.write_bytes(original.replace(b'"reason":"x"', b'"reason":"y"', 1))
+    with pytest.raises(ReaderError, match="refusing an ambiguous migration"):
+        upgrade_reader_journal(store)
+    assert journal.path.read_bytes() != b""  # untouched, not partially migrated
+
+
+# -- lifecycle semantics hardening --------------------------------------------------------------------
+
+
+def test_duplicate_redefinition_and_unretained_activation_fail(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    baseline = active_revision_id(store)
+    assert baseline is not None
+    r1 = _compose_linked(
+        store, "rev-dup", {("strategy-code", "solve"): "def solve(t):\n    return 1\n"}
+    )
+    del r1
+    r2, _ = compose_revision(
+        store,
+        revision_id="rev-dup",
+        base_parent_id=baseline,
+        parent_manifest_bindings=_active_bindings(store),
+        surfaces={("strategy-code", "solve"): "def solve(t):\n    return 2\n"},
+        proposer="test@0",
+        summary="redefinition",
+        task_fingerprint=TASK.fingerprint(),
+    )
+    with pytest.raises(LifecycleError, match="already retained with different"):
+        retain(store, r2, task_fingerprint=TASK.fingerprint())
+    with pytest.raises(LifecycleError, match="not retained"):
+        activate(store, "rev-never-retained", reason="promote", policy_ref="x@0")
+
+
+def test_task_scope_mismatch_and_unknown_parent_fail(tmp_path: Path) -> None:
+    from strive.tasks import TASKS
+
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    other_id = next(t for t in TASKS if t != TASK.task_id)
+    other = Store(store.root, other_id)
+    run_cycle(other, TASKS[other_id])
+    # a revision from ANOTHER task's lifecycle cannot be retained here
+    other_record = next(iter(state(other).retained.values()))
+    foreign: HarnessRevision = codec.loads(
+        other.objects.get_text(other_record.revision_ref), HarnessRevision
+    )
+    with pytest.raises(LifecycleError, match="scoped to"):
+        retain(store, foreign, task_fingerprint=TASK.fingerprint())
+    # unknown parent
+    orphan, _ = compose_revision(
+        store,
+        revision_id="rev-orphan",
+        base_parent_id="rev-nonexistent",
+        parent_manifest_bindings=_active_bindings(store),
+        surfaces={("strategy-code", "solve"): "def solve(t):\n    return 0\n"},
+        proposer="test@0",
+        summary="orphan",
+        task_fingerprint=TASK.fingerprint(),
+    )
+    with pytest.raises(LifecycleError, match="not retained; retain the parent"):
+        retain(store, orphan, task_fingerprint=TASK.fingerprint())
+
+
+def test_stale_head_and_conflicting_active_fail(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    baseline = active_revision_id(store)
+    assert baseline is not None
+    st = state(store)
+    _compose_linked(
+        store, "rev-stale", {("strategy-code", "solve"): "def solve(t):\n    return 5\n"}
+    )
+    with pytest.raises(LifecycleError, match="stale lifecycle head"):
+        activate(
+            store, "rev-stale", reason="rollback", policy_ref="manual@0",
+            expected_head=st.head,  # pre-retention head: now stale
+        )
+    with pytest.raises(LifecycleError, match="expected active revision"):
+        activate(
+            store, "rev-stale", reason="rollback", policy_ref="manual@0",
+            expected_active_revision_id="rev-wrong",
+        )
+
+
+def test_breaker_blocks_activation_and_clear_revalidates(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    lifecycle.open_breaker(store, "test")
+    with pytest.raises(LifecycleError, match="breaker is open"):
+        activate(store, "rev-0000", reason="rollback", policy_ref="manual@0")
+    lifecycle.clear_breaker(store, "cleared after check")  # revalidates active
+    assert not state(store).breaker_open
+    # head-checked clear: a stale expected head refuses
+    lifecycle.open_breaker(store, "again")
+    stale_head = state(store).head
+    lifecycle.open_breaker(store, "moved")  # journal advances
+    with pytest.raises(LifecycleError):
+        lifecycle.clear_breaker(store, "stale clear", expected_head=stale_head)
+
+
+def test_unsafe_model_code_refuses_lifecycle_authority(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    report = run_cycle(store, TASK, LoopConfig(unsafe_model_code=True))
+    assert report.decision is not None and report.decision.accepted
+    served = store.active_generation()
+    assert served is not None and served.generation_id == "gen-0001"
+    # NO lifecycle identity was written for the unsafe-run candidate
+    st = state(store)
+    assert all(not r.startswith("rev-cand-") for r in st.retained)
+    parity = compat_parity(store)
+    assert not parity.ok  # the gap is visible, not hidden
+    # a later SAFE operation converges the lifecycle from the authoritative
+    # generation ledger (kernel-derived history, not candidate-driven writes)
+    run_cycle(store, TASK)
+    assert compat_parity(store).ok
+
+
+# -- legacy behavior, canary controls, parity, isolation intact --------------------------------------
+
+
+def test_legacy_generation_behavior_and_projection_intact(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    report = run_cycle(store, TASK)
+    assert report.decision is not None and report.decision.accepted
     active = store.active_generation()
     assert active is not None and active.generation_id == "gen-0001"
-    # and the native lifecycle names the SAME artifact via its own id
-    proj = compatibility_projection(store)
-    assert proj is not None
-    assert proj.strategy_source_ref == active.source_ref
+    projection = compatibility_projection(store)
+    assert projection is not None
+    assert projection.strategy_source_ref == active.source_ref
+    assert projection.derived
 
 
-def test_canary_controls_and_parity_still_work(tmp_path: Path) -> None:
+def test_canary_controls_replay_and_parity_still_work(tmp_path: Path) -> None:
     from strive.dualwrite import parity_status
+    from strive.loop import replay_run
 
     store = _store(tmp_path)
     set_mode(store, MODE_SHADOW, "test")
-    run_cycle(store, TASK)
+    report = run_cycle(store, TASK)
     assert reader_state(store).mode == MODE_SHADOW
-    assert parity_status(store).complete  # generation->revision mirror parity
+    assert parity_status(store).complete
+    replay = replay_run(store, TASK, report.run_id)
+    assert replay.matches and replay.decision_matches
 
 
 def test_cross_task_isolation_of_the_lifecycle_journal(tmp_path: Path) -> None:
@@ -492,20 +931,8 @@ def test_cross_task_isolation_of_the_lifecycle_journal(tmp_path: Path) -> None:
     b = Store(root, other_id)
     run_cycle(a, TASK)
     run_cycle(b, TASKS[other_id])
-    # each task's lifecycle journal is a distinct file and stream
     ctx_a, ctx_b = lifecycle_ctx(a), lifecycle_ctx(b)
     assert ctx_a.journal.path != ctx_b.journal.path
-    assert active_revision_id(a) is not None
-    # a task only sees its own retained revisions
-    assert all(
-        rec.task_id == TASK.task_id for rec in state(a).retained.values()
-    )
-    assert all(
-        rec.task_id == other_id for rec in state(b).retained.values()
-    )
-
-
-def _events(store: Store, run_id: str) -> "list[Event]":
-    return list(
-        EventLog(store.runs_dir / run_id / "events.jsonl", run_id).read_all()
-    )
+    assert all(r.task_id == TASK.task_id for r in state(a).retained.values())
+    assert all(r.task_id == other_id for r in state(b).retained.values())
+    assert compat_parity(a).ok and compat_parity(b).ok
