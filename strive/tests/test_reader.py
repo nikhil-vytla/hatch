@@ -583,11 +583,17 @@ def test_overlay_failure_has_no_silent_native_path(tmp_path: Path) -> None:
     original = StateReader.candidate_subject
     StateReader.candidate_subject = lambda self, **kwargs: None  # type: ignore[method-assign]
     try:
-        report = run_cycle(store, TASK)
-        assert report.decision is not None  # the canonical operation committed
+        # under 3B.3, an ACCEPTED candidate whose evaluated identity cannot
+        # be retained is refused promotion outright — stronger than the old
+        # record-and-continue behavior, and never a silent native path
+        with pytest.raises(StoreError, match="evaluated identity"):
+            run_cycle(store, TASK)
         rows = [c for c in _checks(store) if c.subject == "cycle-candidate-overlay"]
         assert rows[-1].outcome == OUTCOME_UNAVAILABLE
         assert not cutover_eligibility(store).eligible
+        # served behavior did NOT change
+        active = store.active_generation()
+        assert active is not None and active.generation_id == "gen-0000"
 
         # canary: the breaker opens BEFORE execution
         canary = Store(tmp_path / "canary", TASK.task_id)
@@ -596,8 +602,8 @@ def test_overlay_failure_has_no_silent_native_path(tmp_path: Path) -> None:
         enable_canary(canary)
         rollback_generation(canary)  # make the next cycle evolve
         StateReader.candidate_subject = lambda self, **kwargs: None  # type: ignore[method-assign]
-        report = run_cycle(canary, TASK)
-        assert report.decision is not None  # canonical result stands
+        with pytest.raises(StoreError, match="evaluated identity"):
+            run_cycle(canary, TASK)
         assert reader_state(canary).breaker_open
     finally:
         StateReader.candidate_subject = original  # type: ignore[method-assign]

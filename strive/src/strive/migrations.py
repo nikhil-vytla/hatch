@@ -13,6 +13,14 @@ Registry:
 - ``0002-revision-backfill`` — mirrors generation/activation history into
   revision/revision-activation records (Stage-3B dual-write backfill),
   built on the deterministic parity-repair path.
+- ``0003-lifecycle-backfill`` — backfills the native revision lifecycle
+  (`<task>.revisions.jsonl`) from generation history: an identity for every
+  generation, compatibility links, and the full activation history replayed
+  so the ACTUAL active revision is preserved — never just the seed.
+- ``0004-reader-journal-upgrade`` — migrates a PR#43-format reader journal
+  (frame schema `reader-frame@1`, old genesis) to the shared framing,
+  preserving original bytes (quarantined + hashed), mode, breaker, epoch,
+  checks, summaries, and ordering; fails loudly on ambiguity.
 """
 
 from __future__ import annotations
@@ -99,6 +107,74 @@ def _backfill_apply(root: Path, task: Task) -> MigrationReport:
     )
 
 
+# -- 0003: native lifecycle backfill ----------------------------------------------------
+
+
+def _lifecycle_needed(root: Path, task: Task) -> bool:
+    from strive import lifecycle
+
+    ledger = root / "ledger" / f"{task.task_id}.jsonl"
+    if not ledger.exists():
+        return False
+    store = Store(root, task.task_id)
+    if lifecycle.state(store).open_intents:
+        return True
+    return lifecycle.sync_needed(store)
+
+
+def _lifecycle_apply(root: Path, task: Task) -> MigrationReport:
+    from strive import lifecycle
+
+    store = Store(root, task.task_id)
+    before = lifecycle.state(store)
+    outcomes = lifecycle.reconcile(store)
+    lifecycle.sync_from_generations(store)
+    after = lifecycle.state(store)
+    parity = lifecycle.compat_parity(store)
+    if not parity.ok:
+        raise StoreError(
+            f"lifecycle backfill did not reach compatibility parity: {parity.reason}"
+        )
+    return MigrationReport(
+        migration_id="0003-lifecycle-backfill",
+        applied=True,
+        detail=(
+            f"backfilled {len(after.retained) - len(before.retained)} revision "
+            f"identit(ies), replayed "
+            f"{len(after.activation_order) - len(before.activation_order)} "
+            f"activation(s); active revision {after.active_revision_id}"
+            + (f"; reconciled: {', '.join(outcomes)}" if outcomes else "")
+        ),
+    )
+
+
+# -- 0004: reader journal upgrade --------------------------------------------------------
+
+
+def _reader_upgrade_needed(root: Path, task: Task) -> bool:
+    from strive.reader import reader_journal_needs_upgrade
+
+    ledger = root / "ledger" / f"{task.task_id}.jsonl"
+    if not ledger.exists():
+        return False
+    return reader_journal_needs_upgrade(Store(root, task.task_id))
+
+
+def _reader_upgrade_apply(root: Path, task: Task) -> MigrationReport:
+    from strive.reader import upgrade_reader_journal
+
+    report = upgrade_reader_journal(Store(root, task.task_id))
+    return MigrationReport(
+        migration_id="0004-reader-journal-upgrade",
+        applied=True,
+        detail=(
+            f"re-framed {report.batches} batch(es) / {report.entries} entr(ies); "
+            f"original preserved at {report.quarantine_path} "
+            f"(sha256 {report.original_sha256[:12]}…)"
+        ),
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(
         migration_id="0001-legacy-unscoped-ledger",
@@ -111,6 +187,20 @@ MIGRATIONS: tuple[Migration, ...] = (
         description="generation/activation history -> revision mirrors (dual-write backfill)",
         is_needed=_backfill_needed,
         apply=_backfill_apply,
+    ),
+    Migration(
+        migration_id="0003-lifecycle-backfill",
+        description="generation history -> native revision lifecycle (identities, "
+        "links, activation replay; preserves the actual active revision)",
+        is_needed=_lifecycle_needed,
+        apply=_lifecycle_apply,
+    ),
+    Migration(
+        migration_id="0004-reader-journal-upgrade",
+        description="PR#43 reader-frame@1 journal -> shared framed-batch format "
+        "(bytes preserved; mode/breaker/epoch/evidence carried over exactly)",
+        is_needed=_reader_upgrade_needed,
+        apply=_reader_upgrade_apply,
     ),
 )
 

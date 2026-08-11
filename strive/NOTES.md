@@ -801,3 +801,52 @@ state-reader@2 (framing + schema change); old epochs are not current.
 
 250 tests, mypy strict clean (48 files). Generations/mirror are now
 explicitly derived compatibility; the lifecycle is the native-revision owner.
+
+## 2026-08-11 — Stage 3B.3 correction pass (PR #44 hardening)
+
+Six areas before merge:
+- Upgrade history: 0004-reader-journal-upgrade migrates the exact PR#43
+  reader journal (reader-frame@1 + old genesis) — old chain fully verified
+  with OLD rules first, refuses ambiguity, original bytes quarantined+hashed,
+  batches re-framed in order (mode/breaker/epoch/checks/summaries exact).
+  FramedJournal.legacy_frame_schemas makes pre-migration journals fail LOUDLY
+  with `strive migrate` guidance instead of parsing as corruption.
+  0003-lifecycle-backfill replaces the naive seed-only path: identity for
+  every generation (generation-backfill@1) + full activation replay so the
+  ACTUAL active revision is preserved. sync_from_generations runs at every
+  seeding pass — generation-native promote/rollback and unsafe-run gaps
+  converge afterwards from the authoritative ledger.
+- Framing: append_batch validates entry types BEFORE writing and refuses
+  unverified regions (errors/unframed/torn tail); repair_to_verified =
+  durable quarantine (fsynced first) + truncate to last verified boundary,
+  idempotent across a crash between the steps. Real append-after-torn-tail
+  and append-after-unframed-line tests.
+- One recoverable activation op: retain + RevisionEvaluated +
+  RevisionSelected persist BEFORE store.activate; ActivationIntent/Progress/
+  Completed span both journals; reconcile handles every crash point
+  (abandoned / resumed / reverted+breaker); lifecycle failure after
+  generation activation reverts the generation and raises (never swallowed).
+  lifecycle.rollback drives BOTH journals — served strategy changes;
+  compat_parity exposes agreement.
+- Parent-manifest replay in validate_composite: before-state equality,
+  transition application, carry-over, exact child-manifest equality.
+  compose_revision now carries untouched parent bindings (code-only child of
+  code+prompt parent preserves the prompt — the key lossless test).
+- Identity vs evidence: RevisionRetained@2 is identity-only; evidence gate =
+  latest selection accepted against the CURRENT active baseline (stale-
+  baseline evidence refuses with "re-evaluate"); rejected/evidence-free
+  activation only via durable TrustedOverride; accepted candidate whose
+  overlay could not be built is REFUSED promotion (no identity-less
+  replacements).
+- Threat model stated: chains tamper-evident, not same-UID secure; unsafe
+  model code gets NO lifecycle authority in-run (generation-native only,
+  parity-visible gap, kernel convergence backfills after).
+
+Gotchas: naive `int(x) for x in split()` fixture code fails the task's
+natural-language inputs — fixtures now reuse the known-good evolved gen-0001
+source; scope check had to precede the redefinition check in retain (cross-
+task rev-0000 collision); crash-injection promotables must be prepared
+against the weak rolled-back baseline so their selection evidence is
+accepted-and-current at resume time.
+
+257 tests, mypy strict clean (48 files).
