@@ -1,6 +1,90 @@
 # HANDOFF — strive
 
-## Stage 3B.2 — centralized reads + reversible revision-read canary (current)
+## Stage 3B.3 — native composite revision lifecycle (current)
+
+The correction pass over the first 3B.3 cut. Six areas:
+
+1. **Upgrade history preserved.** `0004-reader-journal-upgrade` migrates the
+   exact PR#43 reader journal (frame schema `reader-frame@1`, old fixed
+   genesis) to the shared framing: the old chain is fully verified with the
+   OLD rules first (any failure refuses an ambiguous migration), the
+   original bytes are quarantined and hashed, and every batch is re-framed
+   in the same order with the same entries — mode, breaker, epoch, checks,
+   and summaries carry over exactly. A pre-migration journal fails LOUDLY
+   with `strive migrate` guidance (`LegacyFramingError`), never parsing as
+   generic corruption. `0003-lifecycle-backfill` converges the lifecycle
+   with generation/mirror history: an identity for every generation
+   (`generation-backfill@1` revisions, parents first) and the full
+   activation history replayed — the ACTUAL active revision is preserved,
+   never just `rev-0000`. The same convergence
+   (`lifecycle.sync_from_generations`) runs at every seeding pass, so
+   generation-native promote/rollback and lifecycle-refused unsafe runs are
+   mirrored afterwards from the authoritative ledger.
+2. **Framed journals are crash-recoverable.** `append_batch` validates entry
+   types BEFORE writing and REFUSES to append over an unverified region
+   (errors, unframed lines, or a torn tail); recovery goes through
+   `repair_to_verified`, which quarantines the FULL original bytes (the
+   durable intent, fsynced first) and truncates to the last verified frame
+   boundary — idempotent across a crash between the two steps. Tested with
+   actual append-after-torn-tail and append-after-unframed-line sequences.
+3. **Activation is one recoverable operation.** Identity
+   (`RevisionRetained`), evaluation (`RevisionEvaluated`), and selection
+   (`RevisionSelected`) persist BEFORE served behavior changes.
+   `ActivationIntent` → generation activation → `ActivationProgress` →
+   lifecycle activation → `ActivationCompleted` spans both journals; every
+   crash point reconciles (`lifecycle.reconcile`): before the generation
+   activation → abandoned (behavior never changed); after it → the
+   lifecycle activation resumes; if the revision no longer validates → the
+   generation activation is REVERTED, the outcome recorded, and the breaker
+   opens. A lifecycle failure after generation activation is never
+   swallowed. `lifecycle.rollback` drives BOTH journals (the served
+   strategy changes too), and `compat_parity` exposes lifecycle vs served
+   agreement.
+4. **Parent-manifest state replay.** `validate_composite` loads the parent
+   ScopeManifest, requires every `delta.before` to equal the parent's exact
+   binding, applies all transitions, carries unchanged bindings, and
+   requires exact equality with the stored child manifest — undeclared
+   changes, stale before-states, mask/absent confusion, and dropped
+   surfaces fail closed. `compose_revision` carries untouched parent
+   bindings forward (a code-only child of a code+prompt parent preserves
+   the prompt, verified).
+5. **Identity separated from evidence.** `RevisionRetained` is identity
+   only; evaluations and selections are appended per assessment (one
+   revision assessed repeatedly under different baselines, verified); all
+   evidence refs decode and candidate/baseline agreement is enforced.
+   Promote-like activation requires the CURRENT accepted selection against
+   the active baseline; rejected or evidence-free revisions activate only
+   through a durable `TrustedOverride`. An accepted candidate whose
+   evaluated identity cannot be retained is refused promotion outright.
+6. **Hardened semantics + threat model.** Duplicate/redefined retention,
+   activation-before-retention, task/scope mismatch, unknown parents, and
+   journal errors refuse before mutation OR materialization; breaker
+   open/clear are head-checked and clear revalidates the active revision
+   against its parent. The hash chains are stated plainly as
+   tamper-EVIDENT, not same-UID secure; lifecycle authority is refused for
+   unsafe model-generated code (`LoopConfig.unsafe_model_code`) until host
+   confinement or mediation exists — generation-native evolution continues,
+   the gap stays visible via compat parity, and kernel-side convergence
+   backfills it from the authoritative ledger afterwards.
+
+**Verification:** 257 tests pass; `mypy --strict` clean over 48 files. The
+e2e composite test ACTUALLY evaluates a code+prompt revision (sandbox
+execution + the trusted paired gate), records its evidence, and shows the
+same id evaluated, retained, and activated, with parity OK and both
+surfaces intact.
+
+**The Stage 3B.3 claim, stated precisely:** strive migrates existing
+history and atomically retains, evaluates, selects, activates, recovers,
+and rolls back the exact composite revision without losing surfaces or
+bypassing evidence.
+
+**Next phase (exact):** a separate empirically evaluated prompt-surface
+composite evolution experiment under the trusted paired gate — a `prompt`
+surface delta proposed and evolved alongside strategy code in one composite
+revision, validated with held-out discipline. This is where prompt
+evolution begins.
+
+## Stage 3B.2 — centralized reads + reversible revision-read canary (historical)
 
 The correction pass over the first 3B.2 cut. Six areas:
 
