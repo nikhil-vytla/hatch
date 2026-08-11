@@ -64,7 +64,9 @@ from strive.propose import (
     STRATEGY_CODE_SURFACE,
     screen_source,
 )
+from strive import lifecycle
 from strive.reader import MODE_CANARY, CandidateSubject, StateReader
+from strive.revisions import HarnessRevision
 from strive.sandbox import run_strategy
 from strive.store import (
     LedgerEntry,
@@ -192,28 +194,112 @@ def ensure_seeded(store: Store, task: Task) -> Generation:
             store, task, mutating=False, entries=reader.ledger_entries()
         )
         active = reader.read_active("seed-active")
-        if active is not None:
-            return active
-        record = store.add_generation(
-            task.seed_source,
-            task_fingerprint=task.fingerprint(),
-            parent_id=None,
-            origin="seed",
-            surface=STRATEGY_CODE_SURFACE,
-            weakness_id=None,
-            decision=None,
-        )
-        reader.refresh()  # our own write; the activation carries its head
-        store.activate(
-            record.generation_id,
-            reason="seed",
-            policy="seed",
-            expected_head=reader.canonical_head,
-        )
-        reader.refresh()
-        return record
+        if active is None:
+            record = store.add_generation(
+                task.seed_source,
+                task_fingerprint=task.fingerprint(),
+                parent_id=None,
+                origin="seed",
+                surface=STRATEGY_CODE_SURFACE,
+                weakness_id=None,
+                decision=None,
+            )
+            reader.refresh()  # our own write; the activation carries its head
+            store.activate(
+                record.generation_id,
+                reason="seed",
+                policy="seed",
+                expected_head=reader.canonical_head,
+            )
+            reader.refresh()
+            active = record
+        _converge_lifecycle(store)  # reconcile crash points + sync identities
+        return active
     finally:
         reader.finish(None)
+
+
+def _converge_lifecycle(store: Store) -> None:
+    """Reconcile unfinished activation operations and converge the lifecycle
+    with generation-native history (backfilling identities and replaying the
+    activation tail — never seeding only the root when the actual active
+    state is later). Failures are loud diagnostics here so a wedged lifecycle
+    never blocks generation-native reads; the divergence stays visible via
+    `lifecycle.compat_parity`, and lifecycle MUTATIONS still fail closed."""
+    try:
+        lifecycle.reconcile(store)
+        if lifecycle.sync_needed(store):
+            lifecycle.sync_from_generations(store)
+    except lifecycle.LifecycleError as exc:
+        store._note_diagnostic(f"lifecycle convergence failed: {exc}")
+
+
+def _record_candidate_evidence(
+    store: Store,
+    overlay: CandidateSubject,
+    baseline_revision_id: str | None,
+    candidate_generation_id: str,
+    candidate_evaluation: Evaluation,
+    decision: Decision,
+    policy_ref: str,
+    run_id: str,
+    events: EventLog,
+) -> tuple[str, str]:
+    """Persist the evaluated candidate's IDENTITY and EVIDENCE into the
+    lifecycle BEFORE any served behavior changes: retain the exact evaluated
+    revision (accepted or rejected), link its compatibility generation, and
+    append the evaluation + selection records. Returns
+    (revision_id, decision_ref). Raises on failure — retention or evidence
+    problems must surface before activation, not after."""
+    revision: HarnessRevision = codec.loads(
+        store.objects.get_text(overlay.revision_ref), HarnessRevision
+    )
+    evaluation_ref = store.objects.put_text(codec.dumps(candidate_evaluation))
+    decision_ref = store.objects.put_text(codec.dumps(decision))
+    lifecycle.retain(
+        store,
+        revision,
+        task_fingerprint=_provenance_fingerprint(store, revision),
+        generation_id=candidate_generation_id,
+    )
+    lifecycle.record_evaluation(
+        store,
+        revision.ref.revision_id,
+        baseline_revision_id=baseline_revision_id,
+        evaluation_ref=evaluation_ref,
+        manifest_ref=overlay.manifest_ref,
+        run_id=run_id,
+    )
+    lifecycle.record_selection(
+        store,
+        revision.ref.revision_id,
+        baseline_revision_id=baseline_revision_id,
+        evaluation_ref=evaluation_ref,
+        decision_ref=decision_ref,
+        policy_ref=policy_ref,
+        accepted=decision.accepted,
+        run_id=run_id,
+    )
+    events.emit(
+        "lifecycle_retained",
+        revision_id=revision.ref.revision_id,
+        accepted=decision.accepted,
+        baseline_revision_id=baseline_revision_id,
+    )
+    return revision.ref.revision_id, decision_ref
+
+
+def _provenance_fingerprint(store: Store, revision: "HarnessRevision") -> str:
+    """Read the task fingerprint the revision's provenance recorded, so the
+    lifecycle retention carries the same fingerprint as the artifact."""
+    from strive.revisions import RevisionProvenance
+
+    if revision.provenance_ref is None:
+        return ""
+    provenance = codec.loads(
+        store.objects.get_text(revision.provenance_ref), RevisionProvenance
+    )
+    return provenance.task_fingerprint
 
 
 def _execute_and_evaluate(
@@ -574,6 +660,10 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         if "@" in config.proposer.name
                         else f"{config.proposer.name}@0"
                     )
+                    # the native lifecycle's active revision is the overlay's
+                    # base parent, so the evaluated revision's lineage is the
+                    # canonical one (not the generation-derived id)
+                    lifecycle_baseline = lifecycle.active_revision_id(store)
                     overlay = reader.candidate_subject(
                         candidate_id=candidate.candidate_id,
                         source_ref=candidate.source_ref,
@@ -581,6 +671,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         summary=proposal.summary,
                         weakness_id=diagnosis.weakness_id,
                         task_fingerprint=task.fingerprint(),
+                        parent_revision_id=lifecycle_baseline,
                     )
                     if overlay is None:
                         # no silent derived->native path: recorded, and in
@@ -654,20 +745,85 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         generation_id=candidate_generation.generation_id,
                         accepted=decision.accepted,
                     )
-                    if decision.accepted:
-                        store.activate(
+                    policy_ref = f"{policy.name}@{policy.version}"
+                    if config.unsafe_model_code:
+                        # threat model: candidate code can write the lifecycle
+                        # journal (same UID, no confinement), so lifecycle
+                        # AUTHORITY is refused for unsafe model-generated code
+                        # — served behavior evolves generation-native only,
+                        # and the gap stays visible via compat_parity until a
+                        # later safe run's convergence backfills it
+                        store._note_diagnostic(
+                            "lifecycle authority refused for unsafe "
+                            "model-generated code; generation-native only"
+                        )
+                        if decision.accepted:
+                            store.activate(
+                                candidate_generation.generation_id,
+                                reason="evolved",
+                                policy=policy_ref,
+                                expected_active=active.generation_id,
+                                expected_head=reader.canonical_head,
+                            )
+                            reader.refresh()
+                            events.emit(
+                                "activated",
+                                generation_id=candidate_generation.generation_id,
+                                mode=ACTIVATION_DURABLE,
+                            )
+                    elif overlay is None:
+                        # the evaluated identity cannot be retained: an
+                        # accepted candidate must NOT be promoted as an
+                        # identity-less replacement; a rejected one just
+                        # leaves a loud, parity-visible gap
+                        if decision.accepted:
+                            raise StoreError(
+                                "candidate overlay unavailable; refusing to "
+                                "promote a candidate whose evaluated identity "
+                                "cannot be retained"
+                            )
+                        store._note_diagnostic(
+                            "candidate overlay unavailable; the rejected "
+                            "candidate has no lifecycle identity"
+                        )
+                    else:
+                        # native lifecycle: persist the EXACT evaluated
+                        # revision's identity + evidence BEFORE any served
+                        # behavior changes; the accepted candidate is then
+                        # activated as that same revision through one
+                        # recoverable cross-journal operation — never a
+                        # replacement built after evaluation
+                        assert candidate_evaluation is not None
+                        revision_id, decision_ref = _record_candidate_evidence(
+                            store,
+                            overlay,
+                            lifecycle_baseline,
                             candidate_generation.generation_id,
-                            reason="evolved",
-                            policy=f"{policy.name}@{policy.version}",
-                            expected_active=active.generation_id,
-                            expected_head=reader.canonical_head,
+                            candidate_evaluation,
+                            decision,
+                            policy_ref,
+                            run_id,
+                            events,
                         )
-                        reader.refresh()
-                        events.emit(
-                            "activated",
-                            generation_id=candidate_generation.generation_id,
-                            mode=ACTIVATION_DURABLE,
-                        )
+                        if decision.accepted:
+                            lifecycle.run_activation_op(
+                                store,
+                                revision_id,
+                                reason="evolved",
+                                policy_ref=policy_ref,
+                                decision_ref=decision_ref,
+                                gen_expected_active=active.generation_id,
+                                gen_expected_head=reader.canonical_head,
+                            )
+                            reader.refresh()
+                            events.emit(
+                                "activated",
+                                generation_id=candidate_generation.generation_id,
+                                mode=ACTIVATION_DURABLE,
+                            )
+                            events.emit(
+                                "lifecycle_activated", revision_id=revision_id
+                            )
 
         usage = meter.usage()
         cycle = CycleRecord(

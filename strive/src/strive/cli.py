@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from strive import codec
+from strive import codec, lifecycle
 from strive.cas import ObjectCorruption, ObjectMissing
 from strive.contracts import (
     Activation,
@@ -516,6 +516,117 @@ def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[s
     return {"data": data, "human": "\n".join(lines)}
 
 
+def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    """Inspect, roll back, or repair the canonical native-revision lifecycle:
+    retained revisions, their evidence records, the active revision, the
+    compatibility projection, and lifecycle/compatibility parity."""
+    repaired: str | None = None
+    if args.action == "repair":
+        repaired = lifecycle.lifecycle(store).journal.repair_to_verified(
+            "operator repair"
+        )
+    ensure_seeded(store, task)  # reconciles + syncs the lifecycle
+    if args.action == "rollback":
+        lifecycle.rollback(store)
+
+    st = lifecycle.state(store)
+    resolved = lifecycle.materialize_active(store) if not st.journal_errors else None
+    projection = (
+        lifecycle.compatibility_projection(store) if not st.journal_errors else None
+    )
+    parity = lifecycle.compat_parity(store)
+    retained = [st.retained[rid] for rid in sorted(st.retained)]
+    data = {
+        "active_revision": st.active_revision_id,
+        "breaker_open": st.breaker_open,
+        "breaker_reason": st.breaker_reason,
+        "journal_errors": st.journal_errors,
+        "open_intents": [i.op_id for i in st.open_intents],
+        "repaired_quarantine": repaired,
+        "lineage": list(lifecycle.lineage(store)),
+        "compat_parity": {
+            "ok": parity.ok,
+            "lifecycle_active": parity.lifecycle_active,
+            "linked_generation": parity.linked_generation,
+            "generation_active": parity.generation_active,
+            "reason": parity.reason,
+        },
+        "retained": [
+            {
+                "revision_id": r.revision_id,
+                "revision_ref": r.revision_ref,
+                "base_parent_id": r.base_parent_id,
+                "generation": st.links.get(r.revision_id),
+                "evaluations": len(st.evaluations.get(r.revision_id, ())),
+                "selections": [
+                    {
+                        "accepted": s.accepted,
+                        "baseline": s.baseline_revision_id,
+                        "policy_ref": s.policy_ref,
+                        "decision_ref": s.decision_ref,
+                    }
+                    for s in st.selections.get(r.revision_id, ())
+                ],
+                "overrides": len(st.overrides.get(r.revision_id, ())),
+            }
+            for r in retained
+        ],
+        "effective_surfaces": (
+            [[b.kind, b.name] for b in resolved.effective] if resolved else []
+        ),
+        "compatibility_projection": (
+            {
+                "active_revision_id": projection.active_revision_id,
+                "strategy_source_ref": projection.strategy_source_ref,
+                "other_surfaces": [list(s) for s in projection.other_surfaces],
+                "derived": projection.derived,
+            }
+            if projection
+            else None
+        ),
+    }
+    header = (
+        f"native revision lifecycle (active: {st.active_revision_id}"
+        + (f", BREAKER OPEN: {st.breaker_reason}" if st.breaker_open else "")
+        + "):"
+    )
+    lines = [header]
+    for r in retained:
+        star = "*" if r.revision_id == st.active_revision_id else " "
+        selections = st.selections.get(r.revision_id, ())
+        if selections:
+            latest = selections[-1]
+            verdict = (
+                f"{'accepted' if latest.accepted else 'rejected'} vs "
+                f"{latest.baseline_revision_id} by {latest.policy_ref}"
+            )
+        else:
+            verdict = "no selection evidence"
+        lines.append(
+            f" {star}{r.revision_id} base={r.base_parent_id} "
+            f"gen={st.links.get(r.revision_id) or '-'} "
+            f"evals={len(st.evaluations.get(r.revision_id, ()))} [{verdict}]"
+        )
+    if resolved is not None:
+        surfaces = ", ".join(f"{b.kind}/{b.name}" for b in resolved.effective)
+        lines.append(f"  active manifest surfaces: {surfaces}")
+    if projection is not None:
+        others = (
+            ", ".join(f"{k}/{n}" for k, n in projection.other_surfaces) or "(none)"
+        )
+        lines.append(
+            f"  compatibility projection (derived, strategy-only): "
+            f"source={projection.strategy_source_ref[:12]} "
+            f"non-projected surfaces={others}"
+        )
+    lines.append(
+        f"  compat parity: {'OK' if parity.ok else 'DIVERGED'} — {parity.reason}"
+    )
+    if repaired:
+        lines.append(f"  repaired: quarantined unverified region at {repaired}")
+    return {"data": data, "human": "\n".join(lines)}
+
+
 def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     action = args.action
     quarantined: str | None = None
@@ -633,6 +744,7 @@ _COMMANDS = {
     "history": _cmd_history,
     "parity": _cmd_parity,
     "revisions": _cmd_revisions,
+    "lifecycle": _cmd_lifecycle,
     "reader": _cmd_reader,
 }
 
@@ -713,6 +825,21 @@ def build_parser() -> argparse.ArgumentParser:
         "revisions",
         help="inspect the stage-3B revision mirrors and active revision",
     )
+    lifecycle_parser = sub.add_parser(
+        "lifecycle",
+        help="the canonical native-revision lifecycle: retained revisions, "
+        "evidence, active revision, compatibility projection, and "
+        "whole-revision rollback",
+    )
+    lifecycle_parser.add_argument(
+        "action",
+        nargs="?",
+        default="status",
+        choices=("status", "rollback", "repair"),
+        help="status (default) | rollback (whole-revision, drives BOTH the "
+        "lifecycle and served compatibility behavior) | repair (quarantine "
+        "and truncate an unverified journal region)",
+    )
     reader_parser = sub.add_parser(
         "reader",
         help="the read boundary: status, mode changes (native/shadow), "
@@ -790,6 +917,7 @@ def main(argv: list[str] | None = None) -> int:
         ParityError,
         MirrorError,
         ReaderError,
+        lifecycle.LifecycleError,
     ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:

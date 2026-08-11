@@ -457,15 +457,23 @@ def test_migration_registry_chain_from_legacy(tmp_path: Path) -> None:
     assert [m.migration_id for m in MIGRATIONS] == [
         "0001-legacy-unscoped-ledger",
         "0002-revision-backfill",
+        "0003-lifecycle-backfill",
+        "0004-reader-journal-upgrade",
     ]
     reports = apply_pending(root, SUM_INTEGERS_TASK)
     assert [r.migration_id for r in reports] == [
         "0001-legacy-unscoped-ledger",
         "0002-revision-backfill",
+        "0003-lifecycle-backfill",
     ]
     store = Store(root, SUM_INTEGERS_TASK.task_id)
     assert parity_status(store).complete
     assert active_revision_id(store) == "rev-0001"
+    # the lifecycle backfilled to the ACTUAL active revision as well
+    from strive import lifecycle as native_lifecycle
+
+    assert native_lifecycle.active_revision_id(store) == "rev-0001"
+    assert native_lifecycle.compat_parity(store).ok
     # idempotent: nothing pending, re-apply is a no-op
     assert pending_migrations(root, SUM_INTEGERS_TASK) == []
     assert apply_pending(root, SUM_INTEGERS_TASK) == []

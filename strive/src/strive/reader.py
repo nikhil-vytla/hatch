@@ -53,19 +53,18 @@ excluded from current eligibility.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
 import uuid
-from contextlib import contextmanager
 from dataclasses import dataclass
 from dataclasses import field as dc_field
 from pathlib import Path
-from typing import Callable, Iterator, Sequence
+from typing import Callable, Sequence
 
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing
 from strive.codec import register
+from strive.framing import FramedJournal, FramedView, FramingError
 from strive.contracts import (
     Decision,
     Generation,
@@ -256,167 +255,157 @@ class OperationSummary:
     run_id: str | None = None
 
 
-@register("reader-frame", 1)
-@dataclass(frozen=True)
-class ReaderFrame:
-    """The crash-framing + hash-chain record closing each appended batch:
-    `payload_hash` covers the batch's exact serialized bytes, `prev` chains
-    to the previous frame — deletion, reordering, and naive appended
-    forgeries break verification, and unframed lines are never honored."""
-
-    task_id: str
-    seq: int
-    prev: str  # hash of the previous frame line ("" -> genesis)
-    payload_hash: str  # sha256 of the batch's serialized entry lines
-    count: int
-    at: str
-
-
 ReaderEntry = ModeChange | BreakerEvent | EpochReset | ReadCheck | OperationSummary
 
 _READER_ENTRY_TYPES = (
     ModeChange, BreakerEvent, EpochReset, ReadCheck, OperationSummary
 )
 
-_GENESIS = hashlib.sha256(b"strive-reader-genesis").hexdigest()
 
+class ReaderJournal(FramedJournal):
+    """The reader control + evidence stream: a framed journal over the
+    reader entry kinds (see strive.framing for the durability contract).
+    Framing failures surface as ``ReaderError`` so the reader-control
+    contract is unchanged by the shared implementation. A PR#43-era journal
+    (frame schema ``reader-frame@1``, pre-shared-framing genesis) fails
+    loudly with migration guidance — it is never parsed as corruption."""
 
-@dataclass(frozen=True)
-class JournalView:
-    """One verified parse of the reader journal: only correctly framed,
-    correctly chained, task-bound entries are honored."""
-
-    entries: tuple[ReaderEntry, ...]
-    frames: int
-    head: str  # f"{frames}:{last_frame_hash}"
-    errors: int  # undecodable, misframed, chain-broken, or unframed lines
-    error_detail: tuple[str, ...]
-    torn_tail: bool  # a partial final line (crash artifact; tolerated)
-
-
-class ReaderJournal:
-    """Locked, fsynced, append-only control + evidence stream, written in
-    crash-framed hash-chained batches (one write syscall per batch)."""
+    legacy_frame_schemas = ("reader-frame@1",)
 
     def __init__(self, path: Path, task_id: str) -> None:
-        self.path = path
-        self.task_id = task_id
-        self._lock_path = path.with_suffix(".lock")
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        super().__init__(path, task_id, "reader@2", _READER_ENTRY_TYPES)
 
-    @contextmanager
-    def locked(self) -> Iterator[None]:
-        with self._lock_path.open("a") as handle:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-    def read(self) -> JournalView:
-        if not self.path.exists():
-            return JournalView((), 0, f"0:{_GENESIS}", 0, (), False)
+    def read(self) -> FramedView:
         try:
-            raw = self.path.read_bytes()
-        except OSError as exc:
-            raise ReaderError(f"{self.path}: unreadable reader journal: {exc}") from None
-        torn_tail = bool(raw) and not raw.endswith(b"\n")
-        lines = raw.split(b"\n")
-        complete = lines[:-1]  # the final element is "" or a torn fragment
-        entries: list[ReaderEntry] = []
-        errors = 0
-        detail: list[str] = []
-        buffer_bytes = b""
-        buffer_entries: list[ReaderEntry | None] = []
-        frames = 0
-        last_hash = _GENESIS
-        chain_ok = True
-        for line in complete:
-            if not line.strip():
-                continue
-            decoded: object | None
-            try:
-                decoded = codec.loads(line.decode("utf-8"))
-            except (codec.SchemaError, UnicodeDecodeError):
-                decoded = None
-            if isinstance(decoded, ReaderFrame):
-                expected = hashlib.sha256(buffer_bytes).hexdigest()
-                if (
-                    not chain_ok
-                    or decoded.task_id != self.task_id
-                    or decoded.seq != frames + 1
-                    or decoded.prev != last_hash
-                    or decoded.payload_hash != expected
-                    or decoded.count != len(buffer_entries)
-                    or any(e is None for e in buffer_entries)
-                ):
-                    errors += 1 + len(buffer_entries)
-                    detail.append(
-                        f"frame seq {decoded.seq} failed verification "
-                        "(chain/payload/task mismatch)"
-                    )
-                    chain_ok = False  # everything after a break is untrusted
-                else:
-                    entries.extend(e for e in buffer_entries if e is not None)
-                    frames += 1
-                    last_hash = hashlib.sha256(line).hexdigest()
-                buffer_bytes = b""
-                buffer_entries = []
-            else:
-                buffer_bytes += line + b"\n"
-                buffer_entries.append(
-                    decoded if isinstance(decoded, _READER_ENTRY_TYPES) else None
-                )
-        if buffer_entries:
-            # complete lines with no closing frame: a crash artifact or a
-            # forged append — never honored, always counted (fail closed)
-            errors += len(buffer_entries)
-            detail.append(f"{len(buffer_entries)} unframed trailing line(s)")
-        return JournalView(
-            entries=tuple(entries),
-            frames=frames,
-            head=f"{frames}:{last_hash}",
-            errors=errors,
-            error_detail=tuple(detail),
-            torn_tail=torn_tail,
-        )
+            return super().read()
+        except FramingError as exc:
+            raise ReaderError(str(exc)) from None
 
     def append_batch(
-        self, batch: Sequence[ReaderEntry], expected_head: str | None = None
+        self, batch: Sequence[object], expected_head: str | None = None
     ) -> str:
-        """Append one crash-framed batch (payload + frame in a single write)
-        under the journal lock. `expected_head` refuses the append when the
-        journal advanced since the caller read it. Returns the new head."""
-        if not batch:
-            raise ReaderError("refusing to append an empty reader batch")
-        with self.locked():
-            view = self.read()
-            if expected_head is not None and view.head != expected_head:
-                raise ReaderError(
-                    f"reader journal advanced: transition authorized at head "
-                    f"{expected_head.split(':')[0]} but the journal is at "
-                    f"{view.head.split(':')[0]}; re-read and retry"
-                )
-            payload = "".join(codec.dumps(e) + "\n" for e in batch).encode("utf-8")
-            frame = ReaderFrame(
-                task_id=self.task_id,
-                seq=view.frames + 1,
-                prev=view.head.split(":", 1)[1],
-                payload_hash=hashlib.sha256(payload).hexdigest(),
-                count=len(batch),
-                at=now_iso(),
-            )
-            frame_line = (codec.dumps(frame) + "\n").encode("utf-8")
-            with self.path.open("ab") as handle:
-                handle.write(payload + frame_line)  # one write: crash-framed
-                handle.flush()
-                os.fsync(handle.fileno())
-            return f"{frame.seq}:{hashlib.sha256(frame_line).hexdigest()}"
+        try:
+            return super().append_batch(batch, expected_head)
+        except FramingError as exc:
+            raise ReaderError(str(exc)) from None
 
 
 def reader_journal(store: Store) -> ReaderJournal:
     return ReaderJournal(
         store.ledger_path.with_name(f"{store.task_id}.reader.jsonl"), store.task_id
+    )
+
+
+# -- PR#43-format journal migration -------------------------------------------------------------
+
+_LEGACY_READER_GENESIS = hashlib.sha256(b"strive-reader-genesis").hexdigest()
+
+
+@dataclass(frozen=True)
+class ReaderUpgradeReport:
+    quarantine_path: str
+    original_sha256: str
+    batches: int
+    entries: int
+
+
+def reader_journal_needs_upgrade(store: Store) -> bool:
+    journal = reader_journal(store)
+    if not journal.path.exists():
+        return False
+    return b'"schema":"reader-frame@1"' in journal.path.read_bytes()
+
+
+def upgrade_reader_journal(store: Store) -> ReaderUpgradeReport:
+    """Migrate the exact PR#43 reader journal (frame schema ``reader-frame@1``
+    with the old fixed genesis) to the shared framing format.
+
+    The original file is preserved byte-for-byte at a quarantine path (with
+    its sha256 recorded); every batch is re-framed in the SAME order with the
+    SAME entries and batch boundaries, so mode, breaker, epoch, checks, and
+    summaries all carry over exactly. Any verification failure in the old
+    chain fails loudly — an ambiguous journal is never partially migrated."""
+    import json
+
+    journal = reader_journal(store)
+    if not journal.path.exists():
+        raise ReaderError(f"{journal.path}: no reader journal to upgrade")
+    raw = journal.path.read_bytes()
+    if b'"schema":"reader-frame@1"' not in raw:
+        raise ReaderError(
+            f"{journal.path}: not a PR#43-format journal (no reader-frame@1 "
+            "frames); nothing to upgrade"
+        )
+    if raw and not raw.endswith(b"\n"):
+        raise ReaderError(
+            f"{journal.path}: legacy journal has a torn final line; refusing "
+            "an ambiguous migration — repair or quarantine it manually first"
+        )
+    # parse + verify with the OLD rules (old genesis; frame without `stream`)
+    batches: list[list[ReaderEntry]] = []
+    buffer_bytes = b""
+    buffer_entries: list[ReaderEntry] = []
+    frames = 0
+    last_hash = _LEGACY_READER_GENESIS
+    for line_no, line in enumerate(raw.split(b"\n")[:-1], start=1):
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            raise ReaderError(
+                f"{journal.path}:{line_no}: undecodable line in the legacy "
+                "journal; refusing an ambiguous migration"
+            ) from None
+        if isinstance(parsed, dict) and parsed.get("schema") == "reader-frame@1":
+            expected = hashlib.sha256(buffer_bytes).hexdigest()
+            if (
+                parsed.get("task_id") != store.task_id
+                or parsed.get("seq") != frames + 1
+                or parsed.get("prev") != last_hash
+                or parsed.get("payload_hash") != expected
+                or parsed.get("count") != len(buffer_entries)
+            ):
+                raise ReaderError(
+                    f"{journal.path}:{line_no}: legacy frame seq "
+                    f"{parsed.get('seq')} failed verification; refusing an "
+                    "ambiguous migration"
+                )
+            batches.append(buffer_entries)
+            frames += 1
+            last_hash = hashlib.sha256(line).hexdigest()
+            buffer_bytes = b""
+            buffer_entries = []
+        else:
+            decoded: object = codec.loads(line.decode("utf-8"))
+            if not isinstance(decoded, _READER_ENTRY_TYPES):
+                raise ReaderError(
+                    f"{journal.path}:{line_no}: {type(decoded).__name__} is not "
+                    "a reader entry; refusing an ambiguous migration"
+                )
+            buffer_bytes += line + b"\n"
+            buffer_entries.append(decoded)
+    if buffer_entries:
+        raise ReaderError(
+            f"{journal.path}: legacy journal has unframed trailing lines; "
+            "refusing an ambiguous migration"
+        )
+    # preserve, then rewrite in the shared format (same batches, same order)
+    original_sha = hashlib.sha256(raw).hexdigest()
+    quarantine = journal.path.with_name(
+        journal.path.name + f".pre-upgrade-{now_iso().replace(':', '')}"
+    )
+    quarantine.write_bytes(raw)
+    journal.path.unlink()
+    total = 0
+    for batch in batches:
+        journal.append_batch(batch)
+        total += len(batch)
+    return ReaderUpgradeReport(
+        quarantine_path=str(quarantine),
+        original_sha256=original_sha,
+        batches=len(batches),
+        entries=total,
     )
 
 
@@ -1587,14 +1576,24 @@ class StateReader:
         summary: str,
         weakness_id: str | None,
         task_fingerprint: str,
+        parent_revision_id: str | None = None,
     ) -> CandidateSubject | None:
         """Create and VALIDATE the immutable, unactivated candidate revision +
         manifest + provenance BEFORE evaluation — in every mode (construction
-        depends only on native state, not on the derived snapshot)."""
+        depends only on native state, not on the derived snapshot).
+
+        ``parent_revision_id`` pins the base parent explicitly (the native
+        lifecycle's active revision id); when omitted it defaults to the
+        generation-derived id, so callers without the lifecycle keep working."""
         try:
             active = derive_active_generation(self._entries)
             if active is None:
                 return None
+            parent_id = (
+                parent_revision_id
+                if parent_revision_id is not None
+                else _rev_id(active.generation_id)
+            )
             scope = ScopeRef(LEVEL_TASK, self.store.task_id)
             manifest = canonical_scope_manifest(self.store.task_id, source_ref)
             manifest_ref = self.store.objects.put_text(codec.dumps(manifest))
@@ -1604,7 +1603,7 @@ class StateReader:
                 task_fingerprint=task_fingerprint,
                 surface=_SURFACE_KEY[0],
                 weakness_id=weakness_id,
-                parent_revision_id=_rev_id(active.generation_id),
+                parent_revision_id=parent_id,
                 decision_ref=None,
             )
             provenance_ref = self.store.objects.put_text(codec.dumps(provenance))
@@ -1612,9 +1611,7 @@ class StateReader:
                 candidate_id=candidate_id,
                 task_id=self.store.task_id,
                 source_ref=source_ref,
-                parent_revision_ref=RevisionRef(
-                    scope, _rev_id(active.generation_id)
-                ),
+                parent_revision_ref=RevisionRef(scope, parent_id),
                 parent_source_ref=active.source_ref,
                 scope_manifest_ref=manifest_ref,
                 provenance_ref=provenance_ref,
