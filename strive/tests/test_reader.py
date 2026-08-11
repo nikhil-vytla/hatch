@@ -751,7 +751,7 @@ def test_control_transitions_use_expected_journal_head(tmp_path: Path) -> None:
     journal.append_batch(
         [ModeChange(mode=MODE_SHADOW, reason="concurrent", at=now_iso())]
     )
-    with pytest.raises(ReaderError, match="reader journal advanced"):
+    with pytest.raises(ReaderError, match="journal advanced"):
         journal.append_batch(
             [ModeChange(mode=MODE_NATIVE, reason="stale", at=now_iso())],
             expected_head=head_before,

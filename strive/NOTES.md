@@ -763,3 +763,41 @@ and starts a fresh epoch in native mode.
 
 232 tests, mypy strict clean (45 files). Reader version bumped to
 state-reader@2 (framing + schema change); old epochs are not current.
+
+## 2026-08-10 — Stage 3B.3: native composite revision lifecycle
+
+- Extracted the 3B.2 reader journal's crash-framing/hash-chain into
+  strive.framing.FramedJournal (shared FramedBatch "framed-batch@1", per-
+  stream genesis label). ReaderJournal now subclasses it (translating
+  FramingError->ReaderError). Fixed a latent head-hash inconsistency: the
+  writer's returned head hashed the frame line WITH its trailing newline
+  while read() hashed it WITHOUT — so a writer head never equaled a
+  subsequent reader head. Now both hash the frame line without newline;
+  expected-head threading across write->read is exact.
+- New strive.lifecycle: <task>.revisions.jsonl owns native composite
+  revisions. Records: RevisionRetained (exact HarnessRevision by CAS ref +
+  evidence refs), RevisionActivation (reused frozen record; active = latest
+  valid activation), LifecycleBreaker. retain() is idempotent by (id, ref),
+  refuses redefinition; validate_composite checks identity/whole-revision/
+  scope/descriptors/manifest-closure/provenance/parent-head/artifact-hashes;
+  activate() revalidates + expected head + expected active, opens the
+  breaker on invalid activation (no lossy fallback); rollback() re-activates
+  the base parent; materialize_active() resolves the COMPLETE ScopeManifest;
+  compatibility_projection() is the derived strategy-only view.
+- Deadlock caught in smoke: retain/activate wrapped journal.locked() then
+  called append_batch which re-locks the same flock (not reentrant across
+  fds) -> self-deadlock. Fixed to optimistic read-then-append with
+  expected_head (append_batch holds the only lock).
+- Loop wiring: ensure_seeded seeds the lifecycle from the ROOT (parent-less)
+  generation exactly once (id rev-0000); run_cycle threads the lifecycle
+  active id as the overlay base parent so evaluated==retained==activated,
+  retains the overlay (accepted+rejected) and activates the same revision on
+  accept via _drive_lifecycle. Lifecycle failures are additive diagnostics,
+  never break the generation-native cycle (the 232 pre-existing tests stayed
+  green throughout).
+- compose_revision: deterministic multi-surface fixture builder (code+prompt)
+  used by tests; prompt surface is lifecycle-only, no behavior claim.
+- CLI: `strive lifecycle [status|rollback]`.
+
+250 tests, mypy strict clean (48 files). Generations/mirror are now
+explicitly derived compatibility; the lifecycle is the native-revision owner.
