@@ -261,19 +261,62 @@ modes — `native` (default), `shadow`, `revision-canary`:
   tamper-evident current-epoch evidence, fail-closed control transitions,
   and an independent kill path. Activation remains generation-native.
 
-## Stage 3B.3 — Multi-surface candidate retention + activation (next)
+## Stage 3B.3 — Native composite revision lifecycle ✅ (2026-08-10)
 
-The retained/activated revision must be the SAME multi-surface revision that
-was evaluated — the evaluated candidate overlay (already exact under 3B.2)
-retained and, when accepted, activated as that composite revision, rather
-than a strategy-only generation with a compatibility mirror. Only once a
-composite candidate can round-trip evaluate → retain → activate as one
-revision does the first empirically evaluated **prompt-surface composite
-revision experiment** follow (in its own PR): a `prompt` surface delta (the
-proposal template) evolved alongside strategy code in one composite
-revision, validated under the existing paired gate with held-out
-discipline. Prompt/policy evolution does not begin before that round-trip
-exists.
+The evaluated composite revision is now retained and activated as itself —
+its own append-only lifecycle, not a strategy-only generation:
+- **Canonical lifecycle journal** (`strive.lifecycle`, `ledger/<task>.revisions.jsonl`),
+  separate from the generation ledger and the generation→revision mirror,
+  written in crash-framed, hash-chained, expected-head batches over the
+  shared `strive.framing.FramedJournal`. It records native revisions
+  (`RevisionRetained`, pinning the exact `HarnessRevision` by CAS ref),
+  activations (the frozen `RevisionActivation`), and a durable
+  `LifecycleBreaker`. Active state is the latest valid activation; lineage
+  is the base-parent chain. Legacy generations stay readable; the mirror
+  remains derived compatibility, never the owner of native revisions.
+- **Exact candidate identity.** The candidate overlay created before
+  evaluation (3B.2) is retained unchanged — same `RevisionRef`, manifest,
+  deltas, provenance, descriptor refs, artifacts — for both rejected and
+  accepted candidates, with evaluation and decision evidence linked by
+  versioned CAS ref (no evidence schema frozen). On acceptance the SAME
+  revision is activated; no equivalent replacement is ever built after
+  evaluation. The loop threads the lifecycle's active revision as the
+  overlay's base parent, so evaluated id == retained id == activated id.
+- **Lossless composite state.** Active state materializes from the
+  complete `ScopeManifest` (every surface), never one source field. A
+  deterministic code+prompt fixture (`compose_revision`) round-trips
+  retain → activate → restart → rollback with both surfaces intact (the
+  prompt is lifecycle-only, with no behavioral claim). The strategy-only
+  generation is an explicitly-derived compatibility projection that lists,
+  but never flattens, non-code surfaces.
+- **Safe activation and rollback.** Retention and activation validate the
+  whole revision, scope, descriptors, manifest closure, provenance, parent
+  head, and artifact hashes; the revision + evidence are persisted before
+  activation; activation requires the expected lifecycle head and expected
+  active revision. Whole-revision rollback appends an activation of the
+  prior known-good revision (nothing deleted; per-surface rollback is later
+  work). Invalid composite activation opens a durable breaker and refuses —
+  no lossy generation fallback. Partial writes recover idempotently (a torn
+  final batch is ignored; re-retention of the same id is a no-op; forged
+  unframed entries are never honored).
+- **Compatibility + inspection.** `strive lifecycle [status|rollback]` shows
+  the retained revisions, their evidence, the active revision, the active
+  manifest surfaces, and the derived compatibility projection. Stage 1–2b
+  commands, replay, parity, migrations, canary controls, and cross-task
+  isolation are unchanged.
+- Exit claim: strive retains and activates the exact composite revision it
+  evaluated, with append-only evidence, lossless multi-surface state,
+  expected-head safety, restart recovery, and whole-revision rollback.
+  Prompt/policy evolution remains unimplemented.
+
+## Stage 3C — The prompt-surface composite evolution experiment (next)
+
+In a separate PR, and only now that the evaluate → retain → activate
+round-trip exists for a multi-surface revision: the first empirically
+evaluated prompt-surface composite evolution experiment — a `prompt` surface
+delta (the proposal template) proposed and evolved alongside strategy code
+in one composite revision, validated under the trusted paired gate with
+held-out discipline. This is where prompt evolution begins.
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 

@@ -1,6 +1,69 @@
 # HANDOFF — strive
 
-## Stage 3B.2 — centralized reads + reversible revision-read canary (current)
+## Stage 3B.3 — native composite revision lifecycle (current)
+
+Makes the evaluated composite revision retainable and activatable as
+itself. Five areas:
+
+1. **Canonical lifecycle journal.** `strive.lifecycle` +
+   `strive.framing.FramedJournal` (extracted from the 3B.2 reader journal;
+   the reader now subclasses it). `ledger/<task>.revisions.jsonl` is a
+   task-scoped, crash-framed, hash-chained, expected-head stream — separate
+   from the generation ledger and the generation→revision mirror — recording
+   `RevisionRetained` (the exact `HarnessRevision` pinned by CAS ref),
+   `RevisionActivation` (the frozen ADR-0001 record; active state is the
+   latest valid activation), and `LifecycleBreaker`. Legacy generations
+   stay readable; the mirror stays derived compatibility, never the owner.
+2. **Exact candidate identity.** The loop threads the lifecycle's active
+   revision id as the candidate overlay's base parent
+   (`candidate_subject(parent_revision_id=…)`), then retains the overlay
+   unchanged for BOTH rejected and accepted candidates (`_drive_lifecycle`),
+   linking the candidate evaluation and decision by CAS ref. On acceptance
+   the SAME revision id is activated — evaluated id == retained id ==
+   activated id (tested). No replacement is ever built after evaluation;
+   `retain` is idempotent by (id, content) and refuses a redefinition.
+3. **Lossless composite state.** `materialize_active` resolves the active
+   revision's COMPLETE `ScopeManifest` (every surface). `compose_revision`
+   is the deterministic fixture builder for multi-surface revisions; the
+   code+prompt test round-trips retain → activate → restart → rollback with
+   both surfaces intact (the prompt is lifecycle-only, no behavior claim).
+   `compatibility_projection` is the explicitly-derived strategy-only view
+   that lists — never flattens — other surfaces.
+4. **Safe activation + rollback.** `validate_composite` checks identity
+   (revision_ref == content hash), whole-revision structure, scope,
+   descriptors, manifest closure (every delta's post-state is in the
+   manifest; every content binding's artifact hashes), provenance, and
+   parent head. Retention persists revision + evidence before activation;
+   `activate` requires the expected lifecycle head and expected active
+   revision, and REVALIDATES the revision — on failure it opens the durable
+   breaker and refuses (no lossy generation fallback). `rollback`
+   re-activates the base parent (nothing deleted). Crash recovery is
+   automatic: a torn final batch is ignored, unframed forgeries are never
+   honored, re-retention is a no-op.
+5. **Compatibility + inspection.** `strive lifecycle [status|rollback]`
+   shows retained revisions, evidence refs, the active revision, active
+   manifest surfaces, and the compatibility projection. Stage 1–2b
+   commands, replay, parity, migrations, the reader/canary controls, and
+   cross-task isolation are unchanged.
+
+**Verification:** 250 tests pass (18 new lifecycle tests + the framing
+refactor); `mypy --strict` clean over 48 files. Live CLI smoke: `run` →
+`strive lifecycle` shows seed `rev-0000` and the evaluated
+`rev-cand-…` retained+active with evidence refs → `lifecycle rollback`
+returns to `rev-0000` with both revisions still retained.
+
+**The Stage 3B.3 claim, stated precisely:** strive retains and activates
+the exact composite revision it evaluated, with append-only evidence,
+lossless multi-surface state, expected-head safety, restart recovery, and
+whole-revision rollback. Prompt/policy evolution remains unimplemented.
+
+**Next phase (exact):** a separate empirically evaluated prompt-surface
+composite evolution experiment under the trusted paired gate — a `prompt`
+surface delta proposed and evolved alongside strategy code in one composite
+revision, validated with held-out discipline. This is where prompt
+evolution begins.
+
+## Stage 3B.2 — centralized reads + reversible revision-read canary (historical)
 
 The correction pass over the first 3B.2 cut. Six areas:
 

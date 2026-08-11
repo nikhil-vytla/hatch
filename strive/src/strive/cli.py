@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from strive import codec
+from strive import codec, lifecycle
 from strive.cas import ObjectCorruption, ObjectMissing
 from strive.contracts import (
     Activation,
@@ -516,6 +516,79 @@ def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[s
     return {"data": data, "human": "\n".join(lines)}
 
 
+def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    """Inspect (or roll back) the canonical native-revision lifecycle: the
+    retained revisions, their evidence, the active revision, and the derived
+    strategy-only compatibility projection."""
+    ensure_seeded(store, task)  # seeds the lifecycle from the root generation
+    if args.action == "rollback":
+        lifecycle.rollback(store)
+
+    st = lifecycle.state(store)
+    resolved = lifecycle.materialize_active(store)
+    projection = lifecycle.compatibility_projection(store)
+    retained = [st.retained[rid] for rid in sorted(st.retained)]
+    data = {
+        "active_revision": st.active_revision_id,
+        "breaker_open": st.breaker_open,
+        "breaker_reason": st.breaker_reason,
+        "journal_errors": st.journal_errors,
+        "lineage": list(lifecycle.lineage(store)),
+        "retained": [
+            {
+                "revision_id": r.revision_id,
+                "revision_ref": r.revision_ref,
+                "base_parent_id": r.base_parent_id,
+                "accepted": r.accepted,
+                "baseline_revision_id": r.baseline_revision_id,
+                "evaluation_ref": r.evaluation_ref,
+                "decision_ref": r.decision_ref,
+            }
+            for r in retained
+        ],
+        "effective_surfaces": (
+            [[b.kind, b.name] for b in resolved.effective] if resolved else []
+        ),
+        "compatibility_projection": (
+            {
+                "active_revision_id": projection.active_revision_id,
+                "strategy_source_ref": projection.strategy_source_ref,
+                "other_surfaces": [list(s) for s in projection.other_surfaces],
+                "derived": projection.derived,
+            }
+            if projection
+            else None
+        ),
+    }
+    header = (
+        f"native revision lifecycle (active: {st.active_revision_id}"
+        + (f", BREAKER OPEN: {st.breaker_reason}" if st.breaker_open else "")
+        + "):"
+    )
+    lines = [header]
+    for r in retained:
+        star = "*" if r.revision_id == st.active_revision_id else " "
+        verdict = "accepted" if r.accepted else "rejected"
+        lines.append(
+            f" {star}{r.revision_id} base={r.base_parent_id} [{verdict}] "
+            f"eval={(r.evaluation_ref or '-')[:12]} "
+            f"decision={(r.decision_ref or '-')[:12]}"
+        )
+    if resolved is not None:
+        surfaces = ", ".join(f"{b.kind}/{b.name}" for b in resolved.effective)
+        lines.append(f"  active manifest surfaces: {surfaces}")
+    if projection is not None:
+        others = (
+            ", ".join(f"{k}/{n}" for k, n in projection.other_surfaces) or "(none)"
+        )
+        lines.append(
+            f"  compatibility projection (derived, strategy-only): "
+            f"source={projection.strategy_source_ref[:12]} "
+            f"non-projected surfaces={others}"
+        )
+    return {"data": data, "human": "\n".join(lines)}
+
+
 def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     action = args.action
     quarantined: str | None = None
@@ -633,6 +706,7 @@ _COMMANDS = {
     "history": _cmd_history,
     "parity": _cmd_parity,
     "revisions": _cmd_revisions,
+    "lifecycle": _cmd_lifecycle,
     "reader": _cmd_reader,
 }
 
@@ -713,6 +787,20 @@ def build_parser() -> argparse.ArgumentParser:
         "revisions",
         help="inspect the stage-3B revision mirrors and active revision",
     )
+    lifecycle_parser = sub.add_parser(
+        "lifecycle",
+        help="the canonical native-revision lifecycle: retained revisions, "
+        "evidence, active revision, compatibility projection, and "
+        "whole-revision rollback",
+    )
+    lifecycle_parser.add_argument(
+        "action",
+        nargs="?",
+        default="status",
+        choices=("status", "rollback"),
+        help="status (default) | rollback (whole-revision, to the prior "
+        "known-good revision)",
+    )
     reader_parser = sub.add_parser(
         "reader",
         help="the read boundary: status, mode changes (native/shadow), "
@@ -790,6 +878,7 @@ def main(argv: list[str] | None = None) -> int:
         ParityError,
         MirrorError,
         ReaderError,
+        lifecycle.LifecycleError,
     ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:

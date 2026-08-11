@@ -64,7 +64,9 @@ from strive.propose import (
     STRATEGY_CODE_SURFACE,
     screen_source,
 )
+from strive import lifecycle
 from strive.reader import MODE_CANARY, CandidateSubject, StateReader
+from strive.revisions import HarnessRevision
 from strive.sandbox import run_strategy
 from strive.store import (
     LedgerEntry,
@@ -192,28 +194,121 @@ def ensure_seeded(store: Store, task: Task) -> Generation:
             store, task, mutating=False, entries=reader.ledger_entries()
         )
         active = reader.read_active("seed-active")
-        if active is not None:
-            return active
-        record = store.add_generation(
-            task.seed_source,
-            task_fingerprint=task.fingerprint(),
-            parent_id=None,
-            origin="seed",
-            surface=STRATEGY_CODE_SURFACE,
-            weakness_id=None,
-            decision=None,
-        )
-        reader.refresh()  # our own write; the activation carries its head
-        store.activate(
-            record.generation_id,
-            reason="seed",
-            policy="seed",
-            expected_head=reader.canonical_head,
-        )
-        reader.refresh()
-        return record
+        if active is None:
+            record = store.add_generation(
+                task.seed_source,
+                task_fingerprint=task.fingerprint(),
+                parent_id=None,
+                origin="seed",
+                surface=STRATEGY_CODE_SURFACE,
+                weakness_id=None,
+                decision=None,
+            )
+            reader.refresh()  # our own write; the activation carries its head
+            store.activate(
+                record.generation_id,
+                reason="seed",
+                policy="seed",
+                expected_head=reader.canonical_head,
+            )
+            reader.refresh()
+            active = record
+        _seed_lifecycle(store)  # idempotent; native lifecycle from the root
+        return active
     finally:
         reader.finish(None)
+
+
+def _seed_lifecycle(store: Store) -> None:
+    """Seed the native revision lifecycle from the ROOT (parent-less) seed
+    generation, exactly once. The lifecycle owns native revisions going
+    forward; pre-lifecycle generation history is not reconstructed."""
+    if lifecycle.state(store).active_revision_id is not None:
+        return
+    root = next(
+        (g for g in store.generations().values() if g.parent_id is None), None
+    )
+    if root is None:
+        return
+    try:
+        lifecycle.seed_lifecycle(
+            store,
+            seed_revision_id=root.generation_id.replace("gen-", "rev-"),
+            seed_source=store.source_of(root),
+            task_fingerprint=root.task_fingerprint,
+        )
+    except lifecycle.LifecycleError as exc:  # additive; never breaks seeding
+        store._note_diagnostic(f"lifecycle seed failed: {exc}")
+
+
+def _drive_lifecycle(
+    store: Store,
+    overlay: CandidateSubject,
+    baseline_revision_id: str | None,
+    candidate_evaluation: Evaluation | None,
+    decision: Decision,
+    policy_ref: str,
+    events: EventLog,
+) -> None:
+    """Retain the exact evaluated composite revision into the native
+    lifecycle (accepted or rejected) and, on acceptance, activate that same
+    revision. Evidence (evaluation + decision) is linked by CAS ref. A
+    lifecycle failure never breaks the generation-native cycle: it is
+    diagnosed and (inside `activate`) opens the lifecycle breaker."""
+
+
+    try:
+        revision: HarnessRevision = codec.loads(
+            store.objects.get_text(overlay.revision_ref), HarnessRevision
+        )
+        evaluation_ref = (
+            store.objects.put_text(codec.dumps(candidate_evaluation))
+            if candidate_evaluation is not None
+            else None
+        )
+        decision_ref = store.objects.put_text(codec.dumps(decision))
+        lifecycle.retain(
+            store,
+            revision,
+            accepted=decision.accepted,
+            baseline_revision_id=baseline_revision_id,
+            evaluation_ref=evaluation_ref,
+            decision_ref=decision_ref,
+            task_fingerprint=_provenance_fingerprint(store, revision),
+        )
+        events.emit(
+            "lifecycle_retained",
+            revision_id=revision.ref.revision_id,
+            accepted=decision.accepted,
+            baseline_revision_id=baseline_revision_id,
+        )
+        if decision.accepted:
+            lifecycle.activate(
+                store,
+                revision.ref.revision_id,
+                reason="evolved",
+                policy_ref=policy_ref,
+                decision_ref=decision_ref,
+                expected_active_revision_id=baseline_revision_id,
+            )
+            events.emit(
+                "lifecycle_activated", revision_id=revision.ref.revision_id
+            )
+    except lifecycle.LifecycleError as exc:
+        store._note_diagnostic(f"lifecycle retain/activate failed: {exc}")
+
+
+def _provenance_fingerprint(store: Store, revision: "HarnessRevision") -> str:
+    """Read the task fingerprint the revision's provenance recorded, so the
+    lifecycle retention carries the same fingerprint as the artifact."""
+    from strive.revisions import RevisionProvenance
+
+    if revision.provenance_ref is None:
+        return ""
+    provenance = codec.loads(
+        store.objects.get_text(revision.provenance_ref), RevisionProvenance
+    )
+    return provenance.task_fingerprint
 
 
 def _execute_and_evaluate(
@@ -574,6 +669,10 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         if "@" in config.proposer.name
                         else f"{config.proposer.name}@0"
                     )
+                    # the native lifecycle's active revision is the overlay's
+                    # base parent, so the evaluated revision's lineage is the
+                    # canonical one (not the generation-derived id)
+                    lifecycle_baseline = lifecycle.active_revision_id(store)
                     overlay = reader.candidate_subject(
                         candidate_id=candidate.candidate_id,
                         source_ref=candidate.source_ref,
@@ -581,6 +680,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         summary=proposal.summary,
                         weakness_id=diagnosis.weakness_id,
                         task_fingerprint=task.fingerprint(),
+                        parent_revision_id=lifecycle_baseline,
                     )
                     if overlay is None:
                         # no silent derived->native path: recorded, and in
@@ -667,6 +767,19 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                             "activated",
                             generation_id=candidate_generation.generation_id,
                             mode=ACTIVATION_DURABLE,
+                        )
+                    # native lifecycle: retain the EXACT evaluated revision
+                    # (accepted or rejected) and, if accepted, activate that
+                    # same revision — never a replacement built afterwards
+                    if overlay is not None:
+                        _drive_lifecycle(
+                            store,
+                            overlay,
+                            lifecycle_baseline,
+                            candidate_evaluation,
+                            decision,
+                            f"{policy.name}@{policy.version}",
+                            events,
                         )
 
         usage = meter.usage()
