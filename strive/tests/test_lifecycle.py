@@ -51,6 +51,14 @@ from strive.tasks import SUM_INTEGERS_TASK
 
 TASK = SUM_INTEGERS_TASK
 
+# a minimal VALID prompt template for composite fixtures (the prompt@3
+# descriptor's validator now runs at retention/activation)
+def _fixture_prompt(marker: str) -> str:
+    return (
+        f"[fixture:{marker}] Reply with ONLY a JSON object for "
+        "{parent_generation_id}."
+    )
+
 
 def _store(tmp_path: Path, name: str = "artifacts") -> Store:
     return Store(tmp_path / name, TASK.task_id)
@@ -202,7 +210,7 @@ def test_evaluated_retained_activated_are_the_same_revision(tmp_path: Path) -> N
     # identity and evidence are separate records; both exist and agree
     selections = st.selections[evaluated_id]
     assert len(selections) == 1 and selections[0].accepted
-    assert selections[0].baseline_revision_id == "rev-0000"
+    assert selections[0].baseline_revision_id == "rev-prompt-default"
     evaluations = st.evaluations[evaluated_id]
     assert len(evaluations) == 1
     decision: object = codec.loads(store.objects.get_text(selections[0].decision_ref))
@@ -225,12 +233,12 @@ def test_actually_evaluated_code_plus_prompt_has_one_identity(tmp_path: Path) ->
     recorded, and the SAME id is retained and activated."""
     store = _store(tmp_path)
     run_cycle(store, TASK)
-    rollback(store)  # the weak seed becomes the baseline again
+    rollback(store)  # back to the pre-candidate baseline (the prompt pin)
     baseline = active_revision_id(store)
-    assert baseline == "rev-0000"
+    assert baseline == "rev-prompt-default"
 
     code = _strong_source(store) + "\n# composite-e2e variant\n"
-    prompt = "Consider negative integers. (lifecycle-only; no behavior claim)"
+    prompt = _fixture_prompt("e2e")
     revision = _compose_linked(
         store,
         "rev-composite-e2e",
@@ -334,7 +342,7 @@ def test_code_only_child_of_code_plus_prompt_parent_preserves_prompt(
     run_cycle(store, TASK)
     baseline = active_revision_id(store)
     assert baseline is not None
-    prompt = "carry me forward"
+    prompt = _fixture_prompt("carry-forward")
     parent = _compose_linked(
         store,
         "rev-parent-cp",
@@ -371,7 +379,7 @@ def test_dropped_surface_and_stale_before_fail_closed(tmp_path: Path) -> None:
         "rev-parent2",
         {
             ("strategy-code", "solve"): "def solve(t):\n    return 3\n",
-            ("prompt", "proposal-template"): "p",
+            ("prompt", "proposal-template"): _fixture_prompt("p2"),
         },
     )
     _eval, _dec, _acc = _evaluate_and_select(store, parent, baseline)
@@ -456,7 +464,7 @@ def test_rollback_changes_served_strategy_and_keeps_parity(tmp_path: Path) -> No
 
     rollback(store)  # ONE recoverable op across both journals
     st = state(store)
-    assert st.active_revision_id == "rev-0000"
+    assert st.active_revision_id == "rev-prompt-default"
     served = store.active_generation()
     assert served is not None and served.generation_id == "gen-0000"  # served changed
     assert store.source_of(served) != evolved_source
@@ -496,7 +504,7 @@ def _prepare_promotable(store: Store, revision_id: str) -> str:
     promotable state for crash injection."""
     rollback(store)
     baseline = active_revision_id(store)
-    assert baseline == "rev-0000"
+    assert baseline == "rev-prompt-default"
     revision = _compose_linked(
         store, revision_id,
         {("strategy-code", "solve"): _strong_source(store) + f"\n# {revision_id}\n"},
@@ -683,7 +691,12 @@ def test_lifecycle_backfill_preserves_actual_active_revision(tmp_path: Path) -> 
     assert st.active_revision_id == "rev-0001"  # the ACTUAL active, not rev-0000
     assert set(st.retained) >= {"rev-0000", "rev-0001"}
     # the full activation history was replayed, order preserved
-    assert st.activation_order == ("rev-0000", "rev-0001", "rev-0000", "rev-0001")
+    # the native history includes the prompt-pin re-activation of gen-0000;
+    # after the journal was deleted, gen-0000's single backfilled identity is
+    # rev-0000, so BOTH its activations map there — order preserved exactly
+    assert st.activation_order == (
+        "rev-0000", "rev-0000", "rev-0001", "rev-0000", "rev-0001"
+    )
     assert compat_parity(store).ok
 
 

@@ -24,6 +24,7 @@ import json
 from typing import Any
 
 from strive.contracts import (
+    FAILURE_BUDGET_EXHAUSTED,
     FAILURE_PROPOSAL_MALFORMED,
     FAILURE_PROPOSAL_SCHEMA_INVALID,
     FAILURE_PROPOSAL_TRUNCATED,
@@ -33,6 +34,7 @@ from strive.contracts import (
     ModelRequest,
     ModelResponse,
     ProposalRecord,
+    SurfaceUpdate,
 )
 from strive.propose import (
     STRATEGY_CODE_SURFACE,
@@ -105,13 +107,23 @@ TEMPLATE_PLACEHOLDERS: tuple[str, ...] = (
 )
 
 PROMPT_TEMPLATE_MAX_CHARS = 8000
+PROMPT_PLACEHOLDER_MAX_USES = 4  # any single placeholder repeated more often
+PROMPT_FIELD_MAX_TOTAL = 48  # total replacement fields in one template
+RENDERED_PROMPT_MAX_CHARS = 24000  # enforced BEFORE any provider call
+
+# the versioned prompt-template validator: descriptor `prompt@3` pins
+# validation_policy `prompt-template@1` = this function; invoked at
+# retention, activation, resolution, and replay (see strive.lifecycle)
+PROMPT_TEMPLATE_VALIDATOR = "prompt-template@1"
 
 
 def validate_prompt_template(text: str) -> str | None:
-    """The prompt surface's versioned validator (descriptor `prompt@2`,
-    materializer kernel-text@1): non-empty, bounded, formats cleanly against
-    the known placeholder set, and demands the structured-output contract.
-    Returns a rejection reason, or None when valid."""
+    """`prompt-template@1`: parse with string.Formatter and allow EXACT
+    placeholder names only — no attribute/index traversal, no conversions,
+    no format specs, bounded repetition and size — plus the required output
+    fields. Returns a rejection reason, or None when valid."""
+    import string
+
     if not text.strip():
         return "prompt template is empty"
     if len(text) > PROMPT_TEMPLATE_MAX_CHARS:
@@ -119,10 +131,44 @@ def validate_prompt_template(text: str) -> str | None:
             f"prompt template is {len(text)} chars; the bound is "
             f"{PROMPT_TEMPLATE_MAX_CHARS}"
         )
+    allowed = set(TEMPLATE_PLACEHOLDERS)
+    uses: dict[str, int] = {}
+    total = 0
     try:
-        text.format(**{name: "x" for name in TEMPLATE_PLACEHOLDERS})
-    except (KeyError, IndexError, ValueError) as exc:
-        return f"prompt template does not format against the placeholder set: {exc}"
+        parsed = list(string.Formatter().parse(text))
+    except ValueError as exc:
+        return f"prompt template does not parse: {exc}"
+    for _literal, field_name, format_spec, conversion in parsed:
+        if field_name is None:
+            continue
+        total += 1
+        if total > PROMPT_FIELD_MAX_TOTAL:
+            return (
+                f"prompt template has more than {PROMPT_FIELD_MAX_TOTAL} "
+                "replacement fields"
+            )
+        if conversion is not None:
+            return f"conversion {'!' + conversion!r} is not allowed in templates"
+        if format_spec:
+            return f"format spec {format_spec!r} is not allowed in templates"
+        if field_name == "":
+            return "positional replacement fields are not allowed"
+        if "." in field_name or "[" in field_name:
+            return (
+                f"field {field_name!r} uses attribute/index traversal, which "
+                "is not allowed"
+            )
+        if field_name not in allowed:
+            return (
+                f"unknown placeholder {field_name!r}; allowed: "
+                f"{sorted(allowed)}"
+            )
+        uses[field_name] = uses.get(field_name, 0) + 1
+        if uses[field_name] > PROMPT_PLACEHOLDER_MAX_USES:
+            return (
+                f"placeholder {field_name!r} repeats more than "
+                f"{PROMPT_PLACEHOLDER_MAX_USES} times"
+            )
     if "{parent_generation_id}" not in text:
         return "prompt template must include {parent_generation_id}"
     if "JSON" not in text:
@@ -274,6 +320,17 @@ def parse_completion(
             f"trace_evidence cites case ids outside the visible failing set: "
             f"{uncited}"
         )
+    from strive.revisions import current_descriptor
+
+    surface_updates: tuple[SurfaceUpdate, ...] = ()
+    if prompt_update is not None:
+        surface_updates = (
+            SurfaceUpdate(
+                descriptor_ref=current_descriptor("prompt").descriptor_ref,
+                name="proposal-template",
+                content=prompt_update,
+            ),
+        )
     return ProposalRecord(
         parent_generation_id=parsed["parent_generation_id"],
         surface=STRATEGY_CODE_SURFACE,
@@ -285,8 +342,23 @@ def parse_completion(
         changed_surfaces=tuple(parsed["changed_surfaces"]),
         risks=tuple(parsed["risks"]),
         assumptions=tuple(parsed["assumptions"]),
-        prompt_update=prompt_update,
+        surface_updates=surface_updates,
     )
+
+
+def rendered_prompt_overflow(prompt: str) -> FailureRecord | None:
+    """Enforce the rendered-prompt bound BEFORE any provider call: the
+    template can be valid while its rendered form (with real evidence
+    substituted) explodes past what the budget or provider tolerates."""
+    if len(prompt) > RENDERED_PROMPT_MAX_CHARS:
+        return FailureRecord(
+            kind=FAILURE_BUDGET_EXHAUSTED,
+            detail=(
+                f"rendered prompt is {len(prompt)} chars; the bound is "
+                f"{RENDERED_PROMPT_MAX_CHARS} — refusing the provider call"
+            ),
+        )
+    return None
 
 
 class ModelProposer:
@@ -303,6 +375,9 @@ class ModelProposer:
         if request.model is None:
             return ProposalResult.abstain("no model handle provided to ModelProposer")
         prompt = build_prompt(request)
+        overflow = rendered_prompt_overflow(prompt)
+        if overflow is not None:
+            return ProposalResult(failure=overflow)
         outcome = request.model.complete(
             ModelRequest(prompt=prompt, max_tokens=request.max_output_tokens)
         )

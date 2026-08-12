@@ -200,6 +200,22 @@ class LifecycleBreaker:
     at: str
 
 
+@register("surface-evidence", 1)
+@dataclass(frozen=True)
+class SurfaceEvidence:
+    """Per-surface evidence linked to the exact retained revision — e.g. the
+    trusted prompt-comparison evidence for a composite's prompt delta, kept
+    separate from the task-execution evidence so neither surface can
+    piggyback on the other's record."""
+
+    revision_id: str
+    surface: str  # e.g. "prompt"
+    evidence_ref: str  # CAS ref of the evidence record
+    improved: bool  # the surface-specific verdict
+    at: str
+    run_id: str | None = None
+
+
 LifecycleEntry = (
     RevisionRetained
     | RevisionEvaluated
@@ -211,6 +227,7 @@ LifecycleEntry = (
     | ActivationCompleted
     | RevisionActivation
     | LifecycleBreaker
+    | SurfaceEvidence
 )
 
 _ENTRY_TYPES = (
@@ -224,6 +241,7 @@ _ENTRY_TYPES = (
     ActivationCompleted,
     RevisionActivation,
     LifecycleBreaker,
+    SurfaceEvidence,
 )
 
 
@@ -268,6 +286,7 @@ class LifecycleState:
     evaluations: dict[str, tuple[RevisionEvaluated, ...]]
     selections: dict[str, tuple[RevisionSelected, ...]]
     overrides: dict[str, tuple[TrustedOverride, ...]]
+    surface_evidence: dict[str, tuple[SurfaceEvidence, ...]]
     activation_order: tuple[str, ...]  # revision ids, activation order
     active_revision_id: str | None
     open_intents: tuple[ActivationIntent, ...]
@@ -282,6 +301,7 @@ def _state_from(view: FramedView) -> LifecycleState:
     evaluations: dict[str, list[RevisionEvaluated]] = {}
     selections: dict[str, list[RevisionSelected]] = {}
     overrides: dict[str, list[TrustedOverride]] = {}
+    surface_evidence: dict[str, list[SurfaceEvidence]] = {}
     order: list[str] = []
     active: str | None = None
     intents: dict[str, ActivationIntent] = {}
@@ -299,6 +319,8 @@ def _state_from(view: FramedView) -> LifecycleState:
             selections.setdefault(entry.revision_id, []).append(entry)
         elif isinstance(entry, TrustedOverride):
             overrides.setdefault(entry.revision_id, []).append(entry)
+        elif isinstance(entry, SurfaceEvidence):
+            surface_evidence.setdefault(entry.revision_id, []).append(entry)
         elif isinstance(entry, RevisionActivation):
             revision_id = entry.revision.revision_id
             order.append(revision_id)
@@ -318,6 +340,7 @@ def _state_from(view: FramedView) -> LifecycleState:
         evaluations={k: tuple(v) for k, v in evaluations.items()},
         selections={k: tuple(v) for k, v in selections.items()},
         overrides={k: tuple(v) for k, v in overrides.items()},
+        surface_evidence={k: tuple(v) for k, v in surface_evidence.items()},
         activation_order=tuple(order),
         active_revision_id=active,
         open_intents=tuple(
@@ -466,11 +489,22 @@ def validate_composite(
             )
         assert binding.content_ref is not None
         try:
-            ctx.objects.get_text(binding.content_ref)  # verifies content==hash
+            artifact_text = ctx.objects.get_text(binding.content_ref)
         except (ObjectMissing, ObjectCorruption) as exc:
             raise LifecycleError(
                 f"artifact for {kind}/{name} unavailable: {exc}"
             ) from None
+        # the descriptor's versioned surface validator (e.g.
+        # prompt-template@1 on prompt@3) runs at retention, activation, and
+        # every other validate_composite call site
+        rejection = validate_surface_artifact(
+            binding.descriptor_ref, artifact_text
+        )
+        if rejection is not None:
+            raise LifecycleError(
+                f"artifact for {kind}/{name} fails its descriptor's "
+                f"validator ({binding.descriptor_ref}): {rejection}"
+            )
     if revision.provenance_ref is not None:
         try:
             text = ctx.objects.get_text(revision.provenance_ref)
@@ -481,6 +515,55 @@ def validate_composite(
         except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
             raise LifecycleError(f"provenance unavailable/invalid: {exc}") from None
     return manifest
+
+
+def validate_surface_artifact(descriptor_ref: str, text: str) -> str | None:
+    """Dispatch to the descriptor's pinned, versioned validation policy.
+    Policies that validate through empirical evaluation (paired-deterministic)
+    have no static artifact check here."""
+    descriptor = DESCRIPTOR_REGISTRY[descriptor_ref]
+    if descriptor.validation_policy == "prompt-template@1":
+        from strive.model_proposer import validate_prompt_template
+
+        return validate_prompt_template(text)
+    return None
+
+
+def record_surface_evidence(
+    store: object,
+    revision_id: str,
+    *,
+    surface: str,
+    evidence_ref: str,
+    improved: bool,
+    run_id: str | None = None,
+) -> str:
+    ctx = lifecycle(store)
+    st = _state_from(ctx.journal.read())
+    _require_clean(st, "surface-evidence recording")
+    if revision_id not in st.retained:
+        raise LifecycleError(
+            f"cannot record surface evidence: {revision_id} not retained"
+        )
+    try:
+        codec.loads(ctx.objects.get_text(evidence_ref))  # must decode
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+        raise LifecycleError(f"surface evidence invalid: {exc}") from None
+    try:
+        return ctx.journal.append_batch(
+            [
+                SurfaceEvidence(
+                    revision_id=revision_id,
+                    surface=surface,
+                    evidence_ref=evidence_ref,
+                    improved=improved,
+                    at=now_iso(),
+                    run_id=run_id,
+                )
+            ]
+        )
+    except FramingError as exc:
+        raise LifecycleError(str(exc)) from None
 
 
 # -- retention (identity only) ------------------------------------------------------------------
@@ -1139,62 +1222,6 @@ def compat_parity(store: object) -> CompatParity:
 # -- generation-history sync (migration 0003 + ongoing convergence) ------------------------------
 
 
-def _backfill_revision(
-    ctx: _Ctx,
-    generation: object,
-    parent_revision_id: str | None,
-    parent_source_ref: str | None,
-) -> HarnessRevision:
-    """A strategy-only revision for a generation with no lifecycle identity
-    (pre-lifecycle history, or runs where lifecycle authority was refused)."""
-    from strive.contracts import Generation
-
-    assert isinstance(generation, Generation)
-    pinned = "strategy-code@1"
-    scope = ScopeRef(LEVEL_TASK, ctx.task_id)
-    before = (
-        ABSENT
-        if parent_source_ref is None
-        else content_binding("strategy-code", parent_source_ref, descriptor_ref=pinned)
-    )
-    after = content_binding(
-        "strategy-code", generation.source_ref, descriptor_ref=pinned
-    )
-    manifest = ScopeManifest(
-        scope=scope,
-        bindings=(ManifestBinding("strategy-code", "solve", after),),
-    )
-    validate_scope_manifest(manifest)
-    manifest_ref = ctx.objects.put_text(codec.dumps(manifest))
-    provenance = RevisionProvenance(
-        origin="generation-backfill",
-        task_id=ctx.task_id,
-        task_fingerprint=generation.task_fingerprint,
-        surface=generation.surface,
-        weakness_id=generation.weakness_id,
-        parent_revision_id=parent_revision_id,
-        decision_ref=None,
-    )
-    provenance_ref = ctx.objects.put_text(codec.dumps(provenance))
-    revision = HarnessRevision(
-        ref=RevisionRef(scope, generation.generation_id.replace("gen-", "rev-")),
-        base_parent=(
-            RevisionRef(scope, parent_revision_id)
-            if parent_revision_id is not None
-            else None
-        ),
-        provenance_parents=(),
-        deltas=(SurfaceDelta("strategy-code", "solve", before, after),),
-        scope_manifest_ref=manifest_ref,
-        proposer="generation-backfill@1",
-        summary=f"backfilled from {generation.generation_id} ({generation.origin})",
-        created_at=generation.created_at,
-        provenance_ref=provenance_ref,
-    )
-    validate_revision(revision)
-    return revision
-
-
 def sync_needed(store: object) -> bool:
     from strive.store import Store
 
@@ -1228,14 +1255,20 @@ def sync_from_generations(store: object) -> None:
     if st.open_intents:
         raise LifecycleError("unfinished activation operation; reconcile first")
 
-    generation_to_revision = {g: r for r, g in st.links.items()}
+    # last-wins: a generation's lifecycle identity is the LATEST revision
+    # linked to it (e.g. the prompt pin supersedes the bare seed identity as
+    # gen-0000's current state), so backfilled children carry every surface
+    # of the actual parent state forward
+    generation_to_revision: dict[str, str] = {}
+    for revision_id_, generation_id_ in st.links.items():
+        generation_to_revision[generation_id_] = revision_id_
     generations = store.generations()
     # 1. identities: backfill unlinked generations, parents first (ledger order)
     for generation_id, generation in generations.items():
         if generation_id in generation_to_revision:
             continue
         parent_revision_id: str | None = None
-        parent_source_ref: str | None = None
+        parent_bindings: tuple[ManifestBinding, ...] = ()
         if generation.parent_id is not None:
             parent_revision_id = generation_to_revision.get(generation.parent_id)
             if parent_revision_id is None:
@@ -1243,9 +1276,30 @@ def sync_from_generations(store: object) -> None:
                     f"cannot backfill {generation_id}: its parent "
                     f"{generation.parent_id} has no lifecycle identity"
                 )
-            parent_source_ref = generations[generation.parent_id].source_ref
-        revision = _backfill_revision(
-            ctx, generation, parent_revision_id, parent_source_ref
+            parent_record = st.retained[parent_revision_id]
+            parent_revision = load_revision(ctx, parent_record.revision_ref)
+            parent_bindings = _load_manifest(
+                ctx, parent_revision.scope_manifest_ref
+            ).bindings
+        revision, _rref = compose_revision(
+            store,
+            revision_id=generation.generation_id.replace("gen-", "rev-"),
+            base_parent_id=parent_revision_id,
+            parent_manifest_bindings=parent_bindings,
+            surfaces={
+                ("strategy-code", "solve"): store.objects.get_text(
+                    generation.source_ref
+                )
+            },
+            proposer="generation-backfill@1",
+            summary=(
+                f"backfilled from {generation.generation_id} "
+                f"({generation.origin}); non-code surfaces carried from "
+                f"{parent_revision_id or 'none'}"
+            ),
+            task_fingerprint=generation.task_fingerprint,
+            weakness_id=generation.weakness_id,
+            origin="generation-backfill",
         )
         retain(
             store,

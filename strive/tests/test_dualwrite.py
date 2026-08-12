@@ -82,8 +82,9 @@ def test_mirrors_carry_source_refs_and_parity_is_complete(tmp_path: Path) -> Non
     store = _evolved_store(tmp_path)
     report = parity_status(store)
     assert report.complete
-    assert report.generations == 2 and report.activations == 2
-    assert report.revision_mirrors == 2 and report.activation_mirrors == 2
+    # 3 activations: seed, the default-prompt pin's re-activation, evolved
+    assert report.generations == 2 and report.activations == 3
+    assert report.revision_mirrors == 2 and report.activation_mirrors == 3
 
     snapshot = capture_snapshot(store)
     by_ordinal = {r.ref.ordinal: r for r in snapshot.records}
@@ -143,7 +144,10 @@ def test_missing_middle_activation_mirror_repaired_by_source_ref(
     # was appended last in the mirror journal
     assert active_revision_id(store) == "rev-0001"
     activations = store.revision_activations()
-    assert [a.reason for a in activations] == ["seed", "evolved", "rollback", "promote"]
+    # the default-prompt pin re-activates the seed generation ("promote")
+    assert [a.reason for a in activations] == [
+        "seed", "promote", "evolved", "rollback", "promote"
+    ]
 
 
 def test_active_revision_follows_source_order_not_append_order(tmp_path: Path) -> None:

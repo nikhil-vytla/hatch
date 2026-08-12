@@ -891,3 +891,55 @@ accepted-and-current at resume time.
   honestly; no capability claim from the fixture.
 
 266 tests, mypy strict clean (50 files).
+
+## Stage 3C.1 correction pass (pre-merge, PR #45)
+
+- No piggybacking: strive/promptgate.py is the trusted prompt validator —
+  candidate vs incumbent templates under matched adapter/context/budgets,
+  each template's proposed strategy task-gated, verdict = strict dominance
+  on (gate_accepted, proposal_valid, -regressions). run_cycle activates a
+  prompt-carrying composite only when code passes AND prompt improves;
+  otherwise _activate_code_only_sibling activates rev-<cand>-code and the
+  composite is retained REJECTED with SurfaceEvidence(improved=False).
+  Adversarial test: harmful prompt riding on good code is demoted; a
+  beneficial prompt on failing code is retained (improved=True) but
+  nothing activates.
+- Two-stage self-produced composite (arm E): incumbent proposer proposes
+  p1 (screened), p1 generates s1 in a fresh fixed-budget call, immutable
+  p1+s1 revision built BEFORE evaluation; the SAME rev-cand-two-stage id
+  is proposed/evaluated/retained/selected/activated/restarted/replayed/
+  rolled back. Override-installed prompts are initial conditions, not
+  evolution.
+- Stale-safe complete prompt state: _pin_default_prompt pins the build's
+  default template as rev-prompt-default at seeding (journaled structural
+  override); resolve_active_prompt reads history (CAS), never the current
+  build string — rollback-to-historical-default tested against a mutated
+  build default. ProposalRequest pins parent_revision_id/lifecycle_head/
+  prompt_ref/prompt_descriptor_ref; post-call re-resolution rejects STALE
+  even with an unchanged generation id (concurrent-activation test).
+  Backfill now composes revisions carrying parent manifest bindings
+  (last-wins generation→revision map) so non-code surfaces survive
+  lifecycle-refused runs. Fallout: the pin adds one "promote" activation
+  to every fresh store's history (test count updates in test_dualwrite/
+  test_lifecycle/test_reader/test_stage3_contracts).
+- Hardened descriptor prompt@3 (validation_policy prompt-template@1):
+  string.Formatter parse, exact placeholder names, no traversal/
+  conversions/format-specs/positional fields, bounded repetition/size,
+  required output fields; invoked by validate_composite at retention/
+  activation and by resolution/replay. RENDERED_PROMPT_MAX_CHARS enforced
+  before any provider call (rendered_prompt_overflow, adapter not
+  invoked — tested with a counting responder).
+- Reproducible experiment: BudgetMeter discard removed — all arms run over
+  normal metered paths; ExperimentManifest (fingerprints/refs/params/
+  seeds/budgets/arm order/journal heads/outcomes) persisted in a unique
+  run dir (reuse refused); `passed` = valid A/B + A rejected + B accepted
+  + matched CONFIGURED budgets (consumption legitimately differs: arm A's
+  gate calls) + journaled consumption proof + exact two-stage identity.
+  Real-model runs labeled SINGLE-TRIAL with tokens/latency/cost.
+- Generic schema: proposal@2 carries typed surface_updates keyed by
+  descriptor ref (SurfaceUpdate@1); model-facing "prompt_update" JSON key
+  converted by parse_completion. proposal@1 proven event-payload-only —
+  never codec-decoded from disk — so no v1 migration exists by design
+  (test asserts the strict refusal).
+
+271 tests, mypy strict clean (51 files).

@@ -8,7 +8,7 @@ with the live Stage 1–2b system.
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-revisions-and-surfaces.md) | Harness revisions and evolvable surfaces | core frozen; implemented in 3B (dual-write mirror) and 3B.3 (native lifecycle); 3C.1 made the second surface operational — `prompt/proposal-template` resolved from the active manifest, evolved in composite candidates, and empirically exercised end to end |
+| [0001](0001-revisions-and-surfaces.md) | Harness revisions and evolvable surfaces | core frozen; implemented in 3B (dual-write mirror) and 3B.3 (native lifecycle); 3C.1 made the second surface operational — `prompt/proposal-template` (`prompt@3`, Formatter-validated, pinned into lifecycle state) evolved in composite candidates with surface-specific promotion evidence (`strive.promptgate`) and empirically exercised end to end |
 | [0002](0002-scopes.md) | Artifact scopes: inheritance, shadowing, promotion | core frozen; typed scopes/manifests implemented in 3B (task scope live; project/global journals future) |
 | [0003](0003-tasks-and-environments.md) | Task spec versions, dataset revisions, environments | design accepted; schemas provisional |
 | [0004](0004-evidence-and-selection.md) | Validation bundles and selection decisions | design accepted; schemas provisional — NEXT SLICE (3C.2): versioned envelopes with typed evidence roles replacing the lifecycle's bare CAS evidence refs |

@@ -641,29 +641,46 @@ def _cmd_experiment(store: Store, task: Task, args: argparse.Namespace) -> dict[
                 "acknowledge with --unsafe-model-code (lifecycle/canary "
                 "authority stays refused for these runs regardless)"
             )
-        reports = experiment.run_real_model_arms(root)
+        from datetime import datetime, timezone
+
+        reports = experiment.run_real_model_arms(
+            root / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        )
         real_data: dict[str, Any] = {
             "real_model": [
                 {
-                    "arm": rm.arm, "model_id": rm.model_id,
+                    "arm": rm.arm, "model_id": rm.model_id, "trials": rm.trials,
                     "proposal_valid": rm.proposal_valid,
                     "failure_kind": rm.failure_kind, "accepted": rm.accepted,
-                    "notes": rm.notes,
+                    "model_calls": rm.model_calls, "tokens": rm.tokens,
+                    "latency_ms": rm.latency_ms, "cost": rm.cost,
+                    "parameters": rm.parameters, "notes": rm.notes,
                 }
                 for rm in reports
             ]
         }
-        lines = ["real-model proposer arms (honest outcomes; gate unchanged):"]
+        lines = [
+            "real-model proposer arms (SINGLE-TRIAL, honest outcomes; the "
+            "gate is unchanged):"
+        ]
         for rm in reports:
             lines.append(
-                f"  arm {rm.arm} [{rm.model_id}]: proposal_valid={rm.proposal_valid} "
-                f"failure={rm.failure_kind or '-'} accepted={rm.accepted}"
+                f"  arm {rm.arm} [{rm.model_id}] n={rm.trials}: "
+                f"proposal_valid={rm.proposal_valid} "
+                f"failure={rm.failure_kind or '-'} accepted={rm.accepted} "
+                f"calls={rm.model_calls} tokens={rm.tokens} "
+                f"latency_ms={rm.latency_ms} cost={rm.cost} [{rm.parameters}]"
             )
             lines.append(f"    {rm.notes}")
         return {"data": real_data, "human": "\n".join(lines)}
 
-    report = experiment.run_prompt_experiment(root)
+    from datetime import datetime, timezone
+
+    run_dir = root / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    report = experiment.run_prompt_experiment(run_dir)
+    two = report.two_stage
     data: dict[str, Any] = {
+        "run_dir": str(run_dir),
         "arms": {
             arm: {
                 "description": r.description,
@@ -684,17 +701,31 @@ def _cmd_experiment(store: Store, task: Task, args: argparse.Namespace) -> dict[
             }
             for arm, r in report.arms.items()
         },
+        "two_stage": (
+            {
+                "proposed_revision_id": two.proposed_revision_id,
+                "retained_revision_id": two.retained_revision_id,
+                "activated_revision_id": two.activated_revision_id,
+                "task_accepted": two.task_accepted,
+                "prompt_improved": two.prompt_improved,
+                "composite_accepted": two.composite_accepted,
+                "restart_serves_p1": two.restart_serves_p1,
+                "replay_matches": two.replay_matches,
+                "rollback_restores_incumbent": two.rollback_restores_incumbent,
+            }
+            if two
+            else None
+        ),
         "causal_prompt_effect": report.causal_prompt_effect,
-        "composite_gate_passed": report.composite_gate_passed,
         "prompt_consumed": report.prompt_consumed,
-        "restart_serves_candidate_prompt": report.restart_serves_candidate_prompt,
-        "rollback_restores_incumbent": report.rollback_restores_incumbent,
+        "matched_configuration": report.matched_configuration,
         "offline_fixture": report.offline,
         "passed": report.passed,
     }
     lines = [
         "prompt-surface composite experiment (deterministic offline fixture —",
         "proves causal pipeline wiring, NOT model capability):",
+        f"run dir: {run_dir}",
     ]
     for arm, r in report.arms.items():
         overall = f"{r.candidate_overall:.3f}" if r.candidate_overall is not None else "-"
@@ -706,10 +737,18 @@ def _cmd_experiment(store: Store, task: Task, args: argparse.Namespace) -> dict[
     lines.append(
         f"causal prompt effect (A fails, B passes): {report.causal_prompt_effect}"
     )
-    lines.append(f"composite gate passed + activated (E): {report.composite_gate_passed}")
+    if two:
+        lines.append(
+            "two-stage self-produced composite: "
+            f"task_gate={two.task_accepted} prompt_gate={two.prompt_improved} "
+            f"composite={two.composite_accepted}; identity "
+            f"{two.proposed_revision_id} == retained == "
+            f"activated({two.activated_revision_id}); "
+            f"restart={two.restart_serves_p1} replay={two.replay_matches} "
+            f"rollback={two.rollback_restores_incumbent}"
+        )
     lines.append(f"prompt artifact consumption proven: {report.prompt_consumed}")
-    lines.append(f"restart serves candidate prompt: {report.restart_serves_candidate_prompt}")
-    lines.append(f"rollback restores incumbent prompt+code: {report.rollback_restores_incumbent}")
+    lines.append(f"matched configuration: {report.matched_configuration}")
     lines.append(f"OVERALL: {'PASSED' if report.passed else 'FAILED'}")
     return {"data": data, "human": "\n".join(lines)}
 
