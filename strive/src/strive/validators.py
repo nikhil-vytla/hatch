@@ -199,8 +199,16 @@ def source_screen_result(rejection_kind: str | None, detail: str) -> ValidatorRe
 
 
 def budget_result(usage: BudgetUsage | None, spec: BudgetSpec) -> ValidatorResult:
-    """Hard budget constraint. Unknown usage is INCONCLUSIVE — and an
-    inconclusive hard constraint blocks activation (fail closed)."""
+    """Hard budget constraint over EVERY metered dimension — wall time,
+    executions, model calls, tokens, output bytes, cost, and recursion
+    depth — with the meter's exact limit semantics (strive.budget):
+    ``-1`` = accounting only (never a violation); ``0`` = nothing allowed
+    (any usage violates); otherwise recorded usage must not EXCEED the
+    limit (the meter's pre-request gates keep counted dimensions at or
+    under their ceilings, and post-call token/cost overruns reject the
+    overrunning completion — so usage above a limit is evidence of an
+    unmetered or overrunning assessment). Unknown usage is INCONCLUSIVE —
+    and an inconclusive hard constraint blocks activation (fail closed)."""
     if usage is None:
         return ValidatorResult(
             validator=BUDGET_WITHIN_SPEC.ref,
@@ -209,32 +217,41 @@ def budget_result(usage: BudgetUsage | None, spec: BudgetSpec) -> ValidatorResul
             metrics={},
             detail="no metered usage recorded for this assessment",
         )
-    def within_limit(used: float, limit: float) -> bool:
-        return limit < 0 or used <= limit  # -1 = unlimited (accounting only)
-
-    within = (
-        within_limit(usage.model_calls, spec.model_calls)
-        and within_limit(usage.executions, spec.executions)
-        and within_limit(usage.tokens, spec.tokens)
-        and within_limit(usage.cost, spec.cost)
+    dimensions: tuple[tuple[str, float, float], ...] = (
+        ("wall_time_s", usage.wall_time_s, spec.wall_time_s),
+        ("executions", float(usage.executions), float(spec.executions)),
+        ("model_calls", float(usage.model_calls), float(spec.model_calls)),
+        ("tokens", float(usage.tokens), float(spec.tokens)),
+        ("output_bytes", float(usage.output_bytes), float(spec.output_bytes)),
+        ("cost", usage.cost, spec.cost),
+        (
+            "recursion_depth",
+            float(usage.recursion_depth),
+            float(spec.max_recursion_depth),
+        ),
     )
+
+    def violated(used: float, limit: float) -> bool:
+        if limit == -1:  # UNLIMITED: accounting only
+            return False
+        if limit == 0:  # nothing allowed
+            return used > 0
+        return used > limit
+
+    violations = [name for name, used, limit in dimensions if violated(used, limit)]
+    metrics: dict[str, float] = {}
+    for name, used, limit in dimensions:
+        metrics[name] = used
+        metrics[f"{name}_limit"] = limit
     return ValidatorResult(
         validator=BUDGET_WITHIN_SPEC.ref,
         subject_role="constraint",
-        status=VALIDATOR_PASSED if within else VALIDATOR_FAILED,
-        metrics={
-            "model_calls": float(usage.model_calls),
-            "executions": float(usage.executions),
-            "tokens": float(usage.tokens),
-            "cost": usage.cost,
-            "model_calls_limit": float(spec.model_calls),
-            "executions_limit": float(spec.executions),
-            "tokens_limit": float(spec.tokens),
-        },
+        status=VALIDATOR_PASSED if not violations else VALIDATOR_FAILED,
+        metrics=metrics,
         detail=(
-            "usage within the cycle budget"
-            if within
-            else "usage exceeded the cycle budget"
+            "usage within every budget dimension"
+            if not violations
+            else "budget exceeded on: " + ", ".join(violations)
         ),
     )
 

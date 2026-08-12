@@ -58,8 +58,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from strive import codec, lifecycle
+from strive import selection as selection_mod
 from strive.budget import BudgetMeter
-from strive.contracts import BudgetSpec, Decision, Event
+from strive.contracts import BudgetSpec, Decision, Evaluation, Event
 from strive.diagnose import EvidenceDiagnoser
 from strive.evaluate import evaluate
 from strive.events import EventLog, now_iso
@@ -350,9 +351,10 @@ def _cycle_arm(
 
 def _metered_gate(
     store: Store, meter: BudgetMeter, baseline_source: str, candidate_source: str
-) -> tuple[Decision, float, dict[str, float], int]:
+) -> tuple[Decision, Evaluation, Evaluation, int]:
     """Task-gate evaluation through the normal metered execution path.
-    Returns (decision, candidate_overall, split_scores, executions_used)."""
+    Returns (decision, baseline_evaluation, candidate_evaluation,
+    executions_used)."""
     cases = TASK.selection_cases()
     executions = 0
     evaluations = []
@@ -372,12 +374,7 @@ def _metered_gate(
         evaluations.append(evaluate(TASK, report, cases))
     policy = get_policy("paired-deterministic")
     decision = policy.decide(evaluations[0], evaluations[1])
-    return (
-        decision,
-        evaluations[1].overall_score,
-        dict(evaluations[1].split_scores),
-        executions,
-    )
+    return decision, evaluations[0], evaluations[1], executions
 
 
 def _ablation_arm(
@@ -436,35 +433,29 @@ def _ablation_arm(
         if (b.kind, b.name) == ("strategy-code", "solve")
         and b.binding.content_ref is not None
     )
-    decision, overall, splits, executions = _metered_gate(
+    decision, baseline_eval, candidate_eval, executions = _metered_gate(
         store, meter, store.source_of(active_generation), candidate_source
     )
-    evaluation_ref = store.objects.put_text(
-        codec.dumps(
-            evaluate(
-                TASK,
-                run_strategy(
-                    candidate_source, TASK.selection_cases(), generation_id="record"
-                ),
-                TASK.selection_cases(),
-            )
-        )
+    overall = candidate_eval.overall_score
+    splits = dict(candidate_eval.split_scores)
+    provenance = selection_mod.pin_execution_provenance(
+        store,
+        subject_revision_id=revision.ref.revision_id,
+        operation="experiment-arm",
+        detail="experiment ablation arm (metered gate)",
     )
-    decision_ref = store.objects.put_text(codec.dumps(decision))
-    lifecycle.record_evaluation(
-        store, revision.ref.revision_id,
+    recorded = selection_mod.record_assessment(
+        store, TASK,
+        revision_id=revision.ref.revision_id,
         baseline_revision_id=baseline,
-        evaluation_ref=evaluation_ref,
-        manifest_ref=revision.scope_manifest_ref,
-    )
-    lifecycle.record_selection(
-        store, revision.ref.revision_id,
-        baseline_revision_id=baseline,
-        evaluation_ref=evaluation_ref,
-        decision_ref=decision_ref,
+        baseline_evaluation=baseline_eval,
+        candidate_evaluation=candidate_eval,
+        decision=decision,
         policy_ref="paired-deterministic@1",
-        accepted=decision.accepted,
-        task=TASK,
+        scope_manifest_ref=revision.scope_manifest_ref,
+        provenance=provenance,
+        usage=meter.usage(),
+        budget=EXPERIMENT_BUDGET,
     )
     result = ArmResult(
         arm=arm,
@@ -488,7 +479,7 @@ def _ablation_arm(
         budget_model_calls=EXPERIMENT_BUDGET.model_calls,
         budget_max_tokens=EXPERIMENT_MAX_TOKENS,
     )
-    return result, store, revision.ref.revision_id, decision_ref
+    return result, store, revision.ref.revision_id, recorded.decision_ref
 
 
 def _two_stage_arm(
@@ -598,9 +589,11 @@ def _two_stage_arm(
     )
 
     # -- evidence: the task gate (code) AND the prompt gate (prompt) --------
-    task_decision, overall, splits, executions = _metered_gate(
+    task_decision, baseline_eval, candidate_eval, executions = _metered_gate(
         store, meter, store.source_of(active_generation), s1
     )
+    overall = candidate_eval.overall_score
+    splits = dict(candidate_eval.split_scores)
     prompt_evidence, prompt_evidence_ref = compare_templates(
         store, TASK,
         incumbent_template=incumbent_text,
@@ -610,38 +603,33 @@ def _two_stage_arm(
         adapter_name=type(adapter).__name__,
     )
     composite_decision = prompt_gate_decision(task_decision, prompt_evidence)
-    evaluation_ref = store.objects.put_text(
-        codec.dumps(
-            evaluate(
-                TASK,
-                run_strategy(s1, TASK.selection_cases(), generation_id="record"),
-                TASK.selection_cases(),
-            )
-        )
+    provenance = selection_mod.pin_execution_provenance(
+        store,
+        subject_revision_id=proposed_id,
+        operation="experiment-two-stage",
+        detail="two-stage self-produced composite (metered gate)",
     )
-    decision_ref = store.objects.put_text(codec.dumps(composite_decision))
-    lifecycle.record_evaluation(
-        store, proposed_id,
+    recorded = selection_mod.record_assessment(
+        store, TASK,
+        revision_id=proposed_id,
         baseline_revision_id=baseline,
-        evaluation_ref=evaluation_ref,
-        manifest_ref=revision.scope_manifest_ref,
+        baseline_evaluation=baseline_eval,
+        candidate_evaluation=candidate_eval,
+        decision=composite_decision,
+        policy_ref="prompt-comparison@1",
+        scope_manifest_ref=revision.scope_manifest_ref,
+        provenance=provenance,
+        usage=meter.usage(),
+        budget=EXPERIMENT_BUDGET,
+        prompt_evidence_ref=prompt_evidence_ref,
+        prompt_improved=prompt_evidence.improved,
     )
-    # surface evidence FIRST so the selection's synthesized envelope carries
-    # the prompt-role bundle (the composite's prompt delta requires it)
     lifecycle.record_surface_evidence(
         store, proposed_id,
         surface="prompt",
         evidence_ref=prompt_evidence_ref,
         improved=prompt_evidence.improved,
-    )
-    lifecycle.record_selection(
-        store, proposed_id,
-        baseline_revision_id=baseline,
-        evaluation_ref=evaluation_ref,
-        decision_ref=decision_ref,
-        policy_ref="prompt-comparison@1",
-        accepted=composite_decision.accepted,
-        task=TASK,
+        bundle_ref=recorded.prompt_bundle_ref,
     )
 
     activated: str | None = None
@@ -650,18 +638,11 @@ def _two_stage_arm(
     rollback_ok = False
     if composite_decision.accepted:
         # activation cites the exact SelectionDecision envelope
-        selection_link = next(
-            link
-            for link in reversed(
-                lifecycle.state(store).evidence_links.get(proposed_id, ())
-            )
-            if link.kind == "selection"
-        )
         lifecycle.run_activation_op(
             store, proposed_id,
             reason="promote",
             policy_ref="prompt-comparison@1",
-            decision_ref=selection_link.envelope_ref,
+            decision_ref=recorded.selection_ref,
         )
         activated = lifecycle.active_revision_id(store)
         # restart: a fresh process resolves p1 from the manifest
@@ -670,7 +651,7 @@ def _two_stage_arm(
         restart_ok = source == "revision" and ref == p1_ref and text == p1
         # replay: re-evaluate the EXACT retained artifacts and re-check the
         # recorded composite decision
-        replay_ok = _replay_composite(reopened, proposed_id, decision_ref)
+        replay_ok = _replay_composite(reopened, proposed_id, recorded.decision_ref)
         # rollback: the incumbent prompt AND baseline code come back together
         lifecycle.rollback(reopened)
         text_after, _r2, _rev2, source_after = resolve_active_prompt(reopened)
