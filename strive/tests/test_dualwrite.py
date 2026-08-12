@@ -463,12 +463,14 @@ def test_migration_registry_chain_from_legacy(tmp_path: Path) -> None:
         "0002-revision-backfill",
         "0003-lifecycle-backfill",
         "0004-reader-journal-upgrade",
+        "0005-evidence-backfill",
     ]
     reports = apply_pending(root, SUM_INTEGERS_TASK)
     assert [r.migration_id for r in reports] == [
         "0001-legacy-unscoped-ledger",
         "0002-revision-backfill",
         "0003-lifecycle-backfill",
+        "0005-evidence-backfill",
     ]
     store = Store(root, SUM_INTEGERS_TASK.task_id)
     assert parity_status(store).complete

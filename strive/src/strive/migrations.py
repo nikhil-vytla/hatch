@@ -148,6 +148,36 @@ def _lifecycle_apply(root: Path, task: Task) -> MigrationReport:
     )
 
 
+# -- 0005: evidence-envelope backfill -----------------------------------------------------
+
+
+def _evidence_needed(root: Path, task: Task) -> bool:
+    from strive import lifecycle
+
+    ledger = root / "ledger" / f"{task.task_id}.jsonl"
+    if not ledger.exists():
+        return False
+    return lifecycle.evidence_links_needed(Store(root, task.task_id))
+
+
+def _evidence_apply(root: Path, task: Task) -> MigrationReport:
+    from strive import lifecycle
+    from strive.datasets import ensure_dataset_revision
+
+    store = Store(root, task.task_id)
+    dataset = ensure_dataset_revision(store, task)
+    appended = lifecycle.ensure_evidence_links(store, task)
+    return MigrationReport(
+        migration_id="0005-evidence-backfill",
+        applied=True,
+        detail=(
+            f"linked {appended} assessment record(s) to synthetic-but-lossless "
+            f"evidence envelopes (originals untouched); dataset revision "
+            f"r{dataset.revision} ({dataset.fingerprint[:12]}…)"
+        ),
+    )
+
+
 # -- 0004: reader journal upgrade --------------------------------------------------------
 
 
@@ -201,6 +231,14 @@ MIGRATIONS: tuple[Migration, ...] = (
         "(bytes preserved; mode/breaker/epoch/evidence carried over exactly)",
         is_needed=_reader_upgrade_needed,
         apply=_reader_upgrade_apply,
+    ),
+    Migration(
+        migration_id="0005-evidence-backfill",
+        description="pre-envelope evaluations/selections/surface evidence -> "
+        "EvidenceLinks to synthetic-but-lossless ValidationBundles / "
+        "SelectionDecisions (originals preserved byte-for-byte)",
+        is_needed=_evidence_needed,
+        apply=_evidence_apply,
     ),
 )
 

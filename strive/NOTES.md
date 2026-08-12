@@ -943,3 +943,46 @@ accepted-and-current at resume time.
   (test asserts the strict refusal).
 
 271 tests, mypy strict clean (51 files).
+
+## Stage 3C.2A — versioned validation evidence + policy-neutral selection
+
+- strive/evidence.py freezes the ADR-0003/0004 envelopes (moved out of the
+  stage3_contracts spike, which now re-exports): DatasetRevision@1,
+  EvaluationManifest@1, ValidatorResult@1 (+subject_role), role-bound
+  ValidationBundle@1 (task/prompt/constraint), DecisionEvidence@1,
+  SelectionDecision@1 (closed dispositions; EVERY disposition requires
+  evidence), ObjectiveSpec@1, TaskSpecVersion + function-task@1 adapter
+  (spec fingerprint EXCLUDES cases — data growth is not spec drift).
+- strive/validators.py: registry keyed name@version, resolved exactly;
+  converters wrap existing trusted mechanisms (task-suite, paired-
+  comparison, prompt-comparison, source-screen, budget-within-spec).
+  budget_result(None, spec) is INCONCLUSIVE, and inconclusive hard
+  constraints block activation.
+- strive/datasets.py: ledger/<task>.datasets.jsonl (append-only, strictly
+  parsed, monotonic lineage); ensure_dataset_revision idempotent;
+  materialize_split re-materializes any historical split exactly.
+- strive/selection.py: manifest/bundle/decision builders + the
+  synthetic-but-lossless legacy mapping (the ORIGINAL evaluation/decision
+  refs become the bundle artifacts).
+- Lifecycle: EvidenceLink@1; record_selection refuses envelope-less
+  selections (selection_ref or task-synthesis); activation_readiness is
+  the promote gate — roles per changed surface (no borrowing across
+  subjects, no relabeling across roles), current-dataset manifests
+  (stale ⇒ re-baseline, never drift ack), exact validator resolution,
+  decodable artifacts, constraint verdicts. run_activation_op cites the
+  SelectionDecision ref. Migration 0005 + seeding convergence backfill.
+- Gotchas hit: the codec supports ONE version per kind, so RevisionSelected
+  could not be bumped — EvidenceLink is additive instead (originals never
+  rewritten, old journals stay readable). ensure_dataset_revision compares
+  only the LATEST fingerprint, so tests that grow the dataset must keep
+  using the grown task (monkeypatch test_lifecycle.TASK) or synthesis
+  re-appends the old data as a new revision. The CLI reconverges datasets
+  from the build's task, so CLI tests can't fake growth with a modified
+  task — use a missing-prompt-role block instead.
+- Replay now recomputes the recorded task bundle's candidate metrics and
+  diffs them (bundle_checked/bundle_metric_diffs/bundle_matches); compare
+  prints the RECORDED disposition/roles from the selection envelope;
+  `strive evidence` prints dataset revision, bundles (roles, validators,
+  staleness), selections, and readiness with every blocking reason.
+
+288 tests, mypy strict clean (56 files).

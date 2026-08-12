@@ -464,6 +464,7 @@ def _ablation_arm(
         decision_ref=decision_ref,
         policy_ref="paired-deterministic@1",
         accepted=decision.accepted,
+        task=TASK,
     )
     result = ArmResult(
         arm=arm,
@@ -625,6 +626,14 @@ def _two_stage_arm(
         evaluation_ref=evaluation_ref,
         manifest_ref=revision.scope_manifest_ref,
     )
+    # surface evidence FIRST so the selection's synthesized envelope carries
+    # the prompt-role bundle (the composite's prompt delta requires it)
+    lifecycle.record_surface_evidence(
+        store, proposed_id,
+        surface="prompt",
+        evidence_ref=prompt_evidence_ref,
+        improved=prompt_evidence.improved,
+    )
     lifecycle.record_selection(
         store, proposed_id,
         baseline_revision_id=baseline,
@@ -632,12 +641,7 @@ def _two_stage_arm(
         decision_ref=decision_ref,
         policy_ref="prompt-comparison@1",
         accepted=composite_decision.accepted,
-    )
-    lifecycle.record_surface_evidence(
-        store, proposed_id,
-        surface="prompt",
-        evidence_ref=prompt_evidence_ref,
-        improved=prompt_evidence.improved,
+        task=TASK,
     )
 
     activated: str | None = None
@@ -645,11 +649,19 @@ def _two_stage_arm(
     replay_ok = False
     rollback_ok = False
     if composite_decision.accepted:
+        # activation cites the exact SelectionDecision envelope
+        selection_link = next(
+            link
+            for link in reversed(
+                lifecycle.state(store).evidence_links.get(proposed_id, ())
+            )
+            if link.kind == "selection"
+        )
         lifecycle.run_activation_op(
             store, proposed_id,
             reason="promote",
             policy_ref="prompt-comparison@1",
-            decision_ref=decision_ref,
+            decision_ref=selection_link.envelope_ref,
         )
         activated = lifecycle.active_revision_id(store)
         # restart: a fresh process resolves p1 from the manifest

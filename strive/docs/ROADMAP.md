@@ -415,14 +415,56 @@ new sandbox tier):
   causal pipeline wiring; genuine model-driven prompt improvement is
   claimed only with recorded (single-trial-labeled) real-model evidence.
 
-## Stage 3C.2 — Validation/selection envelopes, then algorithm comparison (next)
+## Stage 3C.2A — Versioned validation evidence and policy-neutral selection (done)
 
-First: versioned `ValidationBundle`/`SelectionDecision` envelopes with typed
-evidence roles (the ADR-0004 selection slice — the provisional schemas the
-lifecycle currently references by bare CAS ref). Then: a budget-matched
-comparison of incumbent hill-climb versus a GEPA-style Pareto-population
-algorithm over the same task set — the first pluggable-evolution-algorithm
-experiment (ADR-0005).
+The ADR-0003/0004 evidence slice, frozen and integrated:
+
+- Frozen envelopes in `strive.evidence`: `DatasetRevision@1` (per-split CAS
+  manifests, parent, reason, counts, fingerprint — persisted per task in
+  `ledger/<task>.datasets.jsonl`), `EvaluationManifest@1` (resolved harness
+  ref, task/dataset fingerprints, environment/scorer ids, tool versions,
+  runtime, seeds, validator refs, budgets, objective spec),
+  `ValidatorResult@1`/`ValidationBundle@1` (role-bound: task / prompt /
+  constraint; flat metrics; per-case payloads as CAS artifacts), typed
+  `DecisionEvidence@1`, policy-neutral `SelectionDecision@1` (closed
+  disposition vocabulary: promote / reject / frontier_add /
+  provisional_activate — every disposition requires evidence), and the
+  minimal trusted `ObjectiveSpec@1`. Current tasks adapted as
+  `function-task@1` (`TaskSpecVersion` with the signature/catalog in the
+  config blob; spec fingerprint excludes cases).
+- Trusted validator registry (`strive.validators`) resolved by name AND
+  version — unknown names and unknown versions of known names both fail
+  closed; task evaluation, the paired comparison, promptgate, source
+  screening, and budget ceilings converted into validator results.
+- The activation-evidence gate (`lifecycle.activation_readiness`): promote
+  requires the latest accepted selection against the CURRENT active
+  baseline, a decodable SelectionDecision naming the exact
+  subject/incumbent, every changed surface's required evidence role (task +
+  constraint always; prompt for prompt deltas — surfaces cannot borrow or
+  relabel evidence), current-dataset manifests (stale evidence forces
+  incumbent RE-BASELINING, never a task-drift acknowledgement), and all
+  hard constraints passed (failed or INCONCLUSIVE blocks). Activation cites
+  the exact SelectionDecision; overrides remain distinct journaled records.
+- Migration `0005-evidence-backfill` (idempotent, also run by seeding
+  convergence): pre-envelope evaluations/selections/surface evidence gain
+  `EvidenceLink`s to synthetic-but-lossless envelopes — the ORIGINAL
+  evaluation/decision refs become the bundle artifacts; nothing rewritten.
+- `strive evidence` inspects manifests, bundles, decisions, roles, and
+  blocking/stale reasons; `strive compare` derives the recorded verdict
+  from the selection envelope; replay recomputes bundle metrics and diffs
+  them against the recorded envelope.
+- Exit claim: strive records reconstructable, versioned validation evidence
+  and policy-neutral selection decisions for every composite candidate;
+  activation is authorized only by complete current evidence for the exact
+  revision and active baseline.
+
+## Stage 3C.2B — Budget-matched algorithm comparison (next)
+
+A separate experiment using the 3C.2A envelopes UNCHANGED: `hill-climb@1`
+(today's loop, extracted behind the `EvolutionAlgorithm` protocol) versus a
+GEPA-style `pareto-population@1` (frontier maintained via journaled
+`frontier_add` dispositions) under equal trusted budgets over the same task
+set — the first pluggable-evolution-algorithm experiment (ADR-0005).
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 
