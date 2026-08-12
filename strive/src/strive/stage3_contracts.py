@@ -2,12 +2,14 @@
 
 The frozen core wire types moved to their permanent home in
 ``strive.revisions`` when Stage 3B landed; they are re-exported here so the
-Stage-3A spike tests keep validating them unchanged. Everything defined
-*below* is PROVISIONAL until its own implementation slice: TaskSpecVersion /
-DatasetRevision / EvaluationManifest, ValidatorResult / ValidationBundle /
-SelectionDecision (and frontier semantics), AlgorithmRun / AlgorithmStep,
-and detailed storage-backend schemas. Known unresolved needs are recorded in
-docs/adrs/README.md.
+Stage-3A spike tests keep validating them unchanged. The evidence and
+selection envelopes (DatasetRevision / EvaluationManifest / ValidatorResult /
+ValidationBundle / DecisionEvidence / SelectionDecision / ObjectiveSpec /
+TaskSpecVersion) were FROZEN by the Stage-3C.2A slice and moved to their
+permanent home in ``strive.evidence`` (re-exported here). Still PROVISIONAL
+until their own slices: the Environment session protocols, AlgorithmRun /
+AlgorithmStep, and detailed storage-backend schemas. Known unresolved needs
+are recorded in docs/adrs/README.md.
 """
 
 from __future__ import annotations
@@ -17,6 +19,22 @@ from typing import Protocol
 
 from strive.codec import register
 from strive.contracts import BudgetSpec, BudgetUsage
+
+from strive.evidence import (  # noqa: F401 — re-exported frozen envelopes
+    DISPOSITIONS,
+    DatasetRevision,
+    DecisionEvidence,
+    EvaluationManifest,
+    ObjectiveSpec,
+    SelectionDecision,
+    TaskSpecVersion,
+    VALIDATOR_FAILED,
+    VALIDATOR_INCONCLUSIVE,
+    VALIDATOR_PASSED,
+    ValidationBundle,
+    ValidatorResult,
+    validate_selection,
+)
 
 __all__ = [  # re-exported frozen core + the provisional contracts below
     "ABSENT",
@@ -40,6 +58,7 @@ __all__ = [  # re-exported frozen core + the provisional contracts below
     "DESCRIPTOR_REGISTRY",
     "DISPOSITIONS",
     "DatasetRevision",
+    "DecisionEvidence",
     "EnvironmentSession",
     "EvaluationManifest",
     "FORBIDDEN_PARAM_FAMILIES",
@@ -54,6 +73,7 @@ __all__ = [  # re-exported frozen core + the provisional contracts below
     "MASKED",
     "ManifestBinding",
     "MigrationProvenance",
+    "ObjectiveSpec",
     "RISK_HIGH",
     "RISK_LOW",
     "RISK_MEDIUM",
@@ -165,62 +185,13 @@ from strive.revisions import (  # noqa: F401 — re-exported frozen core
 )
 
 # ======================================================================================
-# PROVISIONAL CONTRACTS — shapes below are NOT frozen for Stage 3B; each is
-# finalized by its own implementation slice. Known unresolved needs, recorded
-# per ADR README: typed object refs instead of bare strings; typed evidence
-# roles (baseline vs candidate bundles); policy-detail refs on decisions;
-# frontier removal/snapshot records; objective + RNG + algorithm-state refs
-# for resumable search.
+# PROVISIONAL CONTRACTS — the shapes below are NOT yet frozen; each is
+# finalized by its own implementation slice. (Typed evidence roles and
+# policy-neutral decisions were settled by Stage 3C.2A in strive.evidence.)
+# Remaining unresolved needs, per ADR README: typed object refs instead of
+# bare strings; frontier removal/snapshot records; objective + RNG +
+# algorithm-state refs for bit-reproducible resumable search.
 # ======================================================================================
-
-
-@register("task-spec", 1)
-@dataclass(frozen=True)
-class TaskSpecVersion:
-    """PROVISIONAL. Immutable, environment-generic task identity."""
-
-    task_id: str
-    version: int
-    description: str
-    environment: str  # adapter id@version, e.g. function-task@1
-    action_schema: str
-    observation_schema: str
-    scorer: str  # id@version
-    config_ref: str  # CAS ref of adapter-specific config (signature/catalog live here)
-    fingerprint: str
-
-
-@register("dataset-revision", 1)
-@dataclass(frozen=True)
-class DatasetRevision:
-    """PROVISIONAL. Append-friendly, reconstructable evaluation data."""
-
-    dataset_id: str
-    revision: int
-    parent_revision: int | None
-    reason: str
-    split_manifest_refs: dict[str, str]
-    split_counts: dict[str, int]
-    fingerprint: str
-
-
-@register("evaluation-manifest", 1)
-@dataclass(frozen=True)
-class EvaluationManifest:
-    """PROVISIONAL. Everything a validation ran under. References the
-    run-resolved manifest — never a revision's own scope manifest."""
-
-    resolved_manifest_ref: str
-    objective_spec_ref: str
-    task_fingerprint: str
-    dataset_fingerprint: str
-    environment: str
-    scorer: str
-    tool_versions: dict[str, str]
-    runtime: str
-    seeds: tuple[int, ...]
-    validators: tuple[str, ...]
-    budget: BudgetSpec
 
 
 class EnvironmentSession(Protocol):
@@ -244,69 +215,6 @@ class Checkpointable(Protocol):
 
 class Forkable(Protocol):
     def fork(self) -> EnvironmentSession: ...
-
-
-VALIDATOR_PASSED = "passed"
-VALIDATOR_FAILED = "failed"
-VALIDATOR_INCONCLUSIVE = "inconclusive"
-
-
-@register("validator-result", 1)
-@dataclass(frozen=True)
-class ValidatorResult:
-    """PROVISIONAL."""
-
-    validator: str
-    status: str
-    metrics: dict[str, float]
-    detail: str
-    artifact_ref: str | None = None
-
-
-@register("validation-bundle", 1)
-@dataclass(frozen=True)
-class ValidationBundle:
-    """PROVISIONAL. Evidence pins the evaluation manifest it ran under."""
-
-    evaluation_manifest_ref: str
-    subject: RevisionRef
-    results: tuple[ValidatorResult, ...]
-    feedback: str
-
-
-DISPOSITIONS = ("promote", "reject", "frontier_add", "provisional_activate")
-
-
-@register("selection-decision", 1)
-@dataclass(frozen=True)
-class SelectionDecision:
-    """PROVISIONAL. Policy-neutral conclusion; every disposition requires
-    evidence."""
-
-    policy_ref: str
-    objective_spec_ref: str
-    disposition: str
-    subject: RevisionRef
-    incumbent: RevisionRef | None
-    evidence_refs: tuple[str, ...]
-    rationale: str
-    at: str
-
-
-def validate_selection(decision: SelectionDecision) -> None:
-    if decision.disposition not in DISPOSITIONS:
-        raise ContractViolation(f"unknown disposition {decision.disposition!r}")
-    if "@" not in decision.policy_ref:
-        raise ContractViolation(
-            f"policy_ref {decision.policy_ref!r} must be versioned (name@version)"
-        )
-    if not decision.objective_spec_ref:
-        raise ContractViolation("a decision must pin its objective spec")
-    if not decision.evidence_refs:
-        raise ContractViolation(
-            f"disposition {decision.disposition!r} requires evidence bundles"
-        )
-    validate_scope(decision.subject.scope)
 
 
 ALGORITHM_RUNNING = "running"

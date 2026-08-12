@@ -45,7 +45,7 @@ from pathlib import Path
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
-from strive.contracts import Decision, Evaluation
+from strive.contracts import BudgetSpec, Decision, Evaluation
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramedView, FramingError
 from strive.revisions import (
@@ -216,6 +216,23 @@ class SurfaceEvidence:
     run_id: str | None = None
 
 
+@register("evidence-link", 1)
+@dataclass(frozen=True)
+class EvidenceLink:
+    """Links an assessment record to its versioned evidence envelope
+    (Stage 3C.2A): a `ValidationBundle` for evaluations/surface evidence, a
+    `SelectionDecision` for selections. Appended alongside new records and
+    BACKFILLED for pre-envelope history (migration 0005) — original records
+    and refs are never rewritten; `synthetic` marks derived envelopes."""
+
+    revision_id: str
+    kind: str  # "evaluation" | "selection" | "surface"
+    original_ref: str  # the evaluation_ref / decision_ref / evidence_ref linked
+    envelope_ref: str  # CAS ref of the ValidationBundle / SelectionDecision
+    synthetic: bool
+    at: str
+
+
 LifecycleEntry = (
     RevisionRetained
     | RevisionEvaluated
@@ -228,6 +245,7 @@ LifecycleEntry = (
     | RevisionActivation
     | LifecycleBreaker
     | SurfaceEvidence
+    | EvidenceLink
 )
 
 _ENTRY_TYPES = (
@@ -242,6 +260,7 @@ _ENTRY_TYPES = (
     RevisionActivation,
     LifecycleBreaker,
     SurfaceEvidence,
+    EvidenceLink,
 )
 
 
@@ -287,6 +306,7 @@ class LifecycleState:
     selections: dict[str, tuple[RevisionSelected, ...]]
     overrides: dict[str, tuple[TrustedOverride, ...]]
     surface_evidence: dict[str, tuple[SurfaceEvidence, ...]]
+    evidence_links: dict[str, tuple[EvidenceLink, ...]]  # by revision_id
     activation_order: tuple[str, ...]  # revision ids, activation order
     active_revision_id: str | None
     open_intents: tuple[ActivationIntent, ...]
@@ -302,6 +322,7 @@ def _state_from(view: FramedView) -> LifecycleState:
     selections: dict[str, list[RevisionSelected]] = {}
     overrides: dict[str, list[TrustedOverride]] = {}
     surface_evidence: dict[str, list[SurfaceEvidence]] = {}
+    evidence_links: dict[str, list[EvidenceLink]] = {}
     order: list[str] = []
     active: str | None = None
     intents: dict[str, ActivationIntent] = {}
@@ -321,6 +342,8 @@ def _state_from(view: FramedView) -> LifecycleState:
             overrides.setdefault(entry.revision_id, []).append(entry)
         elif isinstance(entry, SurfaceEvidence):
             surface_evidence.setdefault(entry.revision_id, []).append(entry)
+        elif isinstance(entry, EvidenceLink):
+            evidence_links.setdefault(entry.revision_id, []).append(entry)
         elif isinstance(entry, RevisionActivation):
             revision_id = entry.revision.revision_id
             order.append(revision_id)
@@ -341,6 +364,7 @@ def _state_from(view: FramedView) -> LifecycleState:
         selections={k: tuple(v) for k, v in selections.items()},
         overrides={k: tuple(v) for k, v in overrides.items()},
         surface_evidence={k: tuple(v) for k, v in surface_evidence.items()},
+        evidence_links={k: tuple(v) for k, v in evidence_links.items()},
         activation_order=tuple(order),
         active_revision_id=active,
         open_intents=tuple(
@@ -537,7 +561,10 @@ def record_surface_evidence(
     evidence_ref: str,
     improved: bool,
     run_id: str | None = None,
+    bundle_ref: str | None = None,
 ) -> str:
+    from strive.evidence import ValidationBundle
+
     ctx = lifecycle(store)
     st = _state_from(ctx.journal.read())
     _require_clean(st, "surface-evidence recording")
@@ -549,19 +576,40 @@ def record_surface_evidence(
         codec.loads(ctx.objects.get_text(evidence_ref))  # must decode
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
         raise LifecycleError(f"surface evidence invalid: {exc}") from None
-    try:
-        return ctx.journal.append_batch(
-            [
-                SurfaceEvidence(
-                    revision_id=revision_id,
-                    surface=surface,
-                    evidence_ref=evidence_ref,
-                    improved=improved,
-                    at=now_iso(),
-                    run_id=run_id,
-                )
-            ]
+    batch: list[object] = [
+        SurfaceEvidence(
+            revision_id=revision_id,
+            surface=surface,
+            evidence_ref=evidence_ref,
+            improved=improved,
+            at=now_iso(),
+            run_id=run_id,
         )
+    ]
+    if bundle_ref is not None:
+        try:
+            bundle: ValidationBundle = codec.loads(
+                ctx.objects.get_text(bundle_ref), ValidationBundle
+            )
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            raise LifecycleError(f"surface bundle invalid: {exc}") from None
+        if bundle.subject.revision_id != revision_id:
+            raise LifecycleError(
+                f"surface bundle subject {bundle.subject.revision_id} does not "
+                f"match {revision_id}"
+            )
+        batch.append(
+            EvidenceLink(
+                revision_id=revision_id,
+                kind="surface",
+                original_ref=evidence_ref,
+                envelope_ref=bundle_ref,
+                synthetic=False,
+                at=now_iso(),
+            )
+        )
+    try:
+        return ctx.journal.append_batch(batch)
     except FramingError as exc:
         raise LifecycleError(str(exc)) from None
 
@@ -638,7 +686,14 @@ def record_evaluation(
     evaluation_ref: str,
     manifest_ref: str,
     run_id: str | None = None,
+    bundle_ref: str | None = None,
 ) -> str:
+    """Append one assessment. Re-evaluating the same revision under a new
+    manifest appends evidence without redefining identity. When
+    ``bundle_ref`` names a `ValidationBundle`, an `EvidenceLink` rides in
+    the same batch (validated: decodable, subject matches)."""
+    from strive.evidence import ValidationBundle
+
     ctx = lifecycle(store)
     st = _state_from(ctx.journal.read())
     _require_clean(st, "evaluation recording")
@@ -653,19 +708,40 @@ def record_evaluation(
         _load_manifest(ctx, manifest_ref)
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
         raise LifecycleError(f"evaluation evidence invalid: {exc}") from None
-    try:
-        return ctx.journal.append_batch(
-            [
-                RevisionEvaluated(
-                    revision_id=revision_id,
-                    baseline_revision_id=baseline_revision_id,
-                    evaluation_ref=evaluation_ref,
-                    manifest_ref=manifest_ref,
-                    at=now_iso(),
-                    run_id=run_id,
-                )
-            ]
+    batch: list[object] = [
+        RevisionEvaluated(
+            revision_id=revision_id,
+            baseline_revision_id=baseline_revision_id,
+            evaluation_ref=evaluation_ref,
+            manifest_ref=manifest_ref,
+            at=now_iso(),
+            run_id=run_id,
         )
+    ]
+    if bundle_ref is not None:
+        try:
+            bundle: ValidationBundle = codec.loads(
+                ctx.objects.get_text(bundle_ref), ValidationBundle
+            )
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            raise LifecycleError(f"validation bundle invalid: {exc}") from None
+        if bundle.subject.revision_id != revision_id:
+            raise LifecycleError(
+                f"validation bundle subject {bundle.subject.revision_id} does "
+                f"not match the evaluated revision {revision_id}"
+            )
+        batch.append(
+            EvidenceLink(
+                revision_id=revision_id,
+                kind="evaluation",
+                original_ref=evaluation_ref,
+                envelope_ref=bundle_ref,
+                synthetic=False,
+                at=now_iso(),
+            )
+        )
+    try:
+        return ctx.journal.append_batch(batch)
     except FramingError as exc:
         raise LifecycleError(str(exc)) from None
 
@@ -680,7 +756,20 @@ def record_selection(
     policy_ref: str,
     accepted: bool,
     run_id: str | None = None,
+    selection_ref: str | None = None,
+    task: object | None = None,
 ) -> str:
+    """Append one selection verdict, ALWAYS with a `SelectionDecision`
+    envelope: pass ``selection_ref`` for an explicitly built envelope, or
+    ``task`` to synthesize the lossless legacy mapping (original evaluation
+    and decision refs preserved as the bundle artifacts). A selection with
+    neither is refused — every disposition requires evidence."""
+    from strive.evidence import (
+        ACTIVATING_DISPOSITIONS,
+        SelectionDecision,
+        validate_selection,
+    )
+
     ctx = lifecycle(store)
     st = _state_from(ctx.journal.read())
     _require_clean(st, "selection recording")
@@ -702,6 +791,54 @@ def record_selection(
             "selection record disagrees with its decision evidence "
             f"(record says accepted={accepted}, decision says {decision.accepted})"
         )
+    synthesized_envelope = False
+    if selection_ref is None:
+        if task is None:
+            raise LifecycleError(
+                "a selection requires its SelectionDecision envelope: pass "
+                "selection_ref (explicitly built) or task (lossless synthesis)"
+            )
+        from strive.selection import synthesize_selection
+        from strive.tasks import Task
+
+        assert isinstance(task, Task)
+        prompt_records = st.surface_evidence.get(revision_id, ())
+        latest_prompt = prompt_records[-1] if prompt_records else None
+        synthesized = synthesize_selection(
+            store,
+            task,
+            revision_id=revision_id,
+            baseline_revision_id=baseline_revision_id,
+            evaluation_ref=evaluation_ref,
+            decision_ref=decision_ref,
+            policy_ref=policy_ref,
+            prompt_evidence_ref=(
+                latest_prompt.evidence_ref if latest_prompt is not None else None
+            ),
+            prompt_improved=(
+                latest_prompt.improved if latest_prompt is not None else None
+            ),
+        )
+        selection_ref = synthesized.selection_ref
+        synthesized_envelope = True
+    try:
+        envelope: SelectionDecision = codec.loads(
+            ctx.objects.get_text(selection_ref), SelectionDecision
+        )
+        validate_selection(envelope)
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError, ContractViolation) as exc:
+        raise LifecycleError(f"selection envelope invalid: {exc}") from None
+    if envelope.subject.revision_id != revision_id:
+        raise LifecycleError(
+            f"selection envelope subject {envelope.subject.revision_id} does "
+            f"not match the selected revision {revision_id}"
+        )
+    envelope_accepted = envelope.disposition in ACTIVATING_DISPOSITIONS
+    if envelope_accepted != accepted:
+        raise LifecycleError(
+            f"selection envelope disposition {envelope.disposition!r} disagrees "
+            f"with the record's accepted={accepted}"
+        )
     try:
         return ctx.journal.append_batch(
             [
@@ -714,34 +851,271 @@ def record_selection(
                     accepted=accepted,
                     at=now_iso(),
                     run_id=run_id,
-                )
+                ),
+                EvidenceLink(
+                    revision_id=revision_id,
+                    kind="selection",
+                    original_ref=decision_ref,
+                    envelope_ref=selection_ref,
+                    synthetic=synthesized_envelope,
+                    at=now_iso(),
+                ),
             ]
         )
     except FramingError as exc:
         raise LifecycleError(str(exc)) from None
 
 
-def _check_promote_evidence(st: LifecycleState, revision_id: str) -> None:
-    """Promote-like activation requires the revision's LATEST selection to be
-    accepted against the CURRENT active baseline."""
+@dataclass(frozen=True)
+class ReadinessReport:
+    """Whether the revision's evidence authorizes activation RIGHT NOW —
+    complete, current, role-covered, and uncorrupted — with every blocking
+    reason listed (for the gate and for `strive evidence`)."""
+
+    ok: bool
+    revision_id: str
+    selection_ref: str | None
+    reasons: tuple[str, ...]
+
+
+def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
+    """The full activation-evidence verification (Stage 3C.2A), fail-closed:
+
+    - the LATEST selection must be accepted against the CURRENT active
+      baseline, and must link a decodable `SelectionDecision` envelope with
+      an activating disposition for the exact subject/incumbent;
+    - every typed evidence role required by the revision's changed surfaces
+      (plus task + constraint always) must be present — surfaces cannot
+      borrow one another's evidence;
+    - every linked bundle must decode, declare the linked role, name the
+      exact subject, pin a decodable manifest whose validators resolve by
+      name AND version, and pin the CURRENT dataset revision's fingerprint
+      (stale dataset evidence blocks; re-baseline instead of acknowledging
+      drift);
+    - constraint results must ALL be `passed` (failed or inconclusive hard
+      constraints block); the task bundle's candidate suite and the prompt
+      bundle's comparison must be `passed`; result artifacts must decode.
+    """
+    from strive import validators as validator_registry
+    from strive.datasets import DatasetError, current_dataset_revision
+    from strive.evidence import (
+        ACTIVATING_DISPOSITIONS,
+        ALWAYS_REQUIRED_ROLES,
+        REQUIRED_SURFACE_ROLE,
+        ROLE_CONSTRAINT,
+        ROLE_PROMPT,
+        ROLE_TASK,
+        VALIDATOR_PASSED,
+        EvaluationManifest,
+        SelectionDecision,
+        ValidationBundle,
+        validate_selection,
+    )
+
+    ctx = lifecycle(store)
+    st = _state_from(ctx.journal.read())
+    reasons: list[str] = []
+
+    def report(selection_ref: str | None = None) -> ReadinessReport:
+        return ReadinessReport(
+            ok=not reasons,
+            revision_id=revision_id,
+            selection_ref=selection_ref,
+            reasons=tuple(reasons),
+        )
+
+    if st.journal_errors:
+        reasons.append(
+            f"the lifecycle journal has {st.journal_errors} unverifiable line(s)"
+        )
+        return report()
     selections = st.selections.get(revision_id, ())
     if not selections:
-        raise LifecycleError(
-            f"activation of {revision_id} refused: no selection evidence "
-            "(use a trusted override to activate without evidence)"
+        reasons.append(
+            "no selection evidence (use a trusted override to activate "
+            "without evidence)"
         )
+        return report()
     latest = selections[-1]
     if not latest.accepted:
-        raise LifecycleError(
-            f"activation of {revision_id} refused: its latest selection was "
-            "REJECTED (use a trusted override to activate anyway)"
+        reasons.append(
+            "its latest selection was REJECTED (use a trusted override to "
+            "activate anyway)"
         )
+        return report()
     if latest.baseline_revision_id != st.active_revision_id:
+        reasons.append(
+            f"its accepted selection was against baseline "
+            f"{latest.baseline_revision_id}, but the active revision is "
+            f"{st.active_revision_id} — re-evaluate against the current baseline"
+        )
+        return report()
+
+    # -- resolve the selection envelope ---------------------------------------
+    link = next(
+        (
+            candidate
+            for candidate in reversed(st.evidence_links.get(revision_id, ()))
+            if candidate.kind == "selection"
+            and candidate.original_ref == latest.decision_ref
+        ),
+        None,
+    )
+    if link is None:
+        reasons.append(
+            "its selection has no SelectionDecision envelope — pre-envelope "
+            "history; run `strive migrate` (0005-evidence-backfill)"
+        )
+        return report()
+    try:
+        envelope: SelectionDecision = codec.loads(
+            ctx.objects.get_text(link.envelope_ref), SelectionDecision
+        )
+        validate_selection(envelope)
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError, ContractViolation) as exc:
+        reasons.append(f"selection envelope corrupt/invalid: {exc}")
+        return report(link.envelope_ref)
+    if envelope.disposition not in ACTIVATING_DISPOSITIONS:
+        reasons.append(
+            f"selection disposition {envelope.disposition!r} does not "
+            "authorize activation"
+        )
+    if envelope.subject.revision_id != revision_id:
+        reasons.append(
+            f"selection envelope names subject {envelope.subject.revision_id}, "
+            f"not {revision_id}"
+        )
+    envelope_incumbent = (
+        envelope.incumbent.revision_id if envelope.incumbent is not None else None
+    )
+    if envelope_incumbent != st.active_revision_id:
+        reasons.append(
+            f"selection envelope names incumbent {envelope_incumbent}, but the "
+            f"active revision is {st.active_revision_id}"
+        )
+
+    # -- required roles from the revision's changed surfaces ------------------
+    record = st.retained.get(revision_id)
+    required_roles = set(ALWAYS_REQUIRED_ROLES)
+    if record is None:
+        reasons.append("the revision is not retained")
+    else:
+        try:
+            revision = load_revision(ctx, record.revision_ref)
+            for delta in revision.deltas:
+                role = REQUIRED_SURFACE_ROLE.get(delta.kind)
+                if role is not None:
+                    required_roles.add(role)
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            reasons.append(f"retained revision unreadable: {exc}")
+    present_roles = {item.role for item in envelope.evidence}
+    missing_roles = sorted(required_roles - present_roles)
+    if missing_roles:
+        reasons.append(
+            f"missing required evidence role(s): {', '.join(missing_roles)} — "
+            "each changed surface needs its own validator's evidence"
+        )
+
+    # -- dataset currency ------------------------------------------------------
+    try:
+        current_dataset = current_dataset_revision(store)
+    except DatasetError as exc:
+        reasons.append(f"dataset journal unreadable: {exc}")
+        current_dataset = None
+    if current_dataset is None and not reasons:
+        reasons.append(
+            "no dataset revision recorded for this task; run a cycle or "
+            "`strive migrate` first"
+        )
+
+    # -- every linked bundle: decode, roles, versions, currency, verdicts -----
+    for item in envelope.evidence:
+        label = f"{item.role} bundle {item.bundle_ref[:12]}…"
+        try:
+            bundle: ValidationBundle = codec.loads(
+                ctx.objects.get_text(item.bundle_ref), ValidationBundle
+            )
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            reasons.append(f"{label} corrupt/unavailable: {exc}")
+            continue
+        if bundle.role != item.role:
+            reasons.append(
+                f"{label} declares role {bundle.role!r} but is linked as "
+                f"{item.role!r} — evidence cannot be relabeled"
+            )
+        if bundle.subject.revision_id != revision_id:
+            reasons.append(
+                f"{label} assesses {bundle.subject.revision_id}, not "
+                f"{revision_id} — evidence cannot be borrowed across subjects"
+            )
+        try:
+            manifest: EvaluationManifest = codec.loads(
+                ctx.objects.get_text(bundle.evaluation_manifest_ref),
+                EvaluationManifest,
+            )
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            reasons.append(f"{label} evaluation manifest corrupt: {exc}")
+            continue
+        for validator_ref in manifest.validators + tuple(
+            result.validator for result in bundle.results
+        ):
+            try:
+                validator_registry.get_validator(validator_ref)
+            except validator_registry.ValidatorError as exc:
+                reasons.append(f"{label}: {exc}")
+        if current_dataset is not None and (
+            manifest.dataset_fingerprint != current_dataset.fingerprint
+        ):
+            reasons.append(
+                f"{label} pins dataset fingerprint "
+                f"{manifest.dataset_fingerprint[:12]}… but the current dataset "
+                f"revision is r{current_dataset.revision} "
+                f"({current_dataset.fingerprint[:12]}…) — STALE evidence; "
+                "re-evaluate under the current dataset"
+            )
+        for result in bundle.results:
+            if result.artifact_ref is not None:
+                try:
+                    codec.loads(ctx.objects.get_text(result.artifact_ref))
+                except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                    reasons.append(
+                        f"{label} artifact for {result.validator} corrupt: {exc}"
+                    )
+        if item.role == ROLE_CONSTRAINT:
+            for result in bundle.results:
+                if result.status != VALIDATOR_PASSED:
+                    reasons.append(
+                        f"{label}: hard constraint {result.validator} is "
+                        f"{result.status.upper()} ({result.detail}) — "
+                        "failed or inconclusive constraints block activation"
+                    )
+        elif item.role == ROLE_TASK:
+            candidate_suites = [
+                r for r in bundle.results if r.subject_role == "candidate"
+            ]
+            if not candidate_suites:
+                reasons.append(f"{label} has no candidate suite result")
+            elif any(r.status != VALIDATOR_PASSED for r in candidate_suites):
+                reasons.append(f"{label}: the candidate suite did not pass")
+        elif item.role == ROLE_PROMPT:
+            if not any(
+                r.status == VALIDATOR_PASSED for r in bundle.results
+            ):
+                reasons.append(
+                    f"{label}: the prompt comparison did not pass — a prompt "
+                    "delta must earn its own surface-specific evidence"
+                )
+    return report(link.envelope_ref)
+
+
+def _check_promote_evidence(store: object, revision_id: str) -> None:
+    """Promote-like activation requires complete, current, role-covered
+    evidence for the exact revision and active baseline (fail-closed)."""
+    readiness = activation_readiness(store, revision_id)
+    if not readiness.ok:
         raise LifecycleError(
-            f"activation of {revision_id} refused: its accepted selection was "
-            f"against baseline {latest.baseline_revision_id}, but the active "
-            f"revision is {st.active_revision_id} — re-evaluate against the "
-            "current baseline"
+            f"activation of {revision_id} refused: "
+            + "; ".join(readiness.reasons)
         )
 
 
@@ -795,7 +1169,7 @@ def activate(
         if override_reason is not None:
             batch.append(TrustedOverride(revision_id, override_reason, now_iso()))
         else:
-            _check_promote_evidence(st, revision_id)
+            _check_promote_evidence(store, revision_id)
     elif override_reason is not None:
         batch.append(TrustedOverride(revision_id, override_reason, now_iso()))
 
@@ -879,7 +1253,7 @@ def run_activation_op(
         )
     # gates run BEFORE the intent so a refused activation writes nothing
     if reason in EVIDENCE_REQUIRED_REASONS and override_reason is None:
-        _check_promote_evidence(st, revision_id)
+        _check_promote_evidence(store, revision_id)
 
     intent = ActivationIntent(
         op_id=f"op-{uuid.uuid4().hex[:8]}",
@@ -1354,6 +1728,165 @@ def sync_from_generations(store: object) -> None:
             ]
         )
         st = _state_from(ctx.journal.read())
+
+
+# -- evidence-envelope backfill (migration 0005 + ongoing convergence) ---------------------------
+
+
+def evidence_links_needed(store: object) -> bool:
+    """True when any assessment record lacks its evidence envelope, or when
+    the lifecycle has history but no dataset revision is persisted."""
+    from strive.datasets import DatasetError, current_dataset_revision
+
+    ctx = lifecycle(store)
+    view = ctx.journal.read()
+    if view.errors:
+        return False  # repair first; backfill refuses over a corrupt journal
+    st = _state_from(view)
+    if not st.retained:
+        return False
+    try:
+        if current_dataset_revision(store) is None:
+            return True
+    except DatasetError:
+        return False
+    linked = {
+        (link.kind, link.original_ref, link.revision_id)
+        for links in st.evidence_links.values()
+        for link in links
+    }
+    for entry in view.entries:
+        if isinstance(entry, RevisionEvaluated) and (
+            ("evaluation", entry.evaluation_ref, entry.revision_id) not in linked
+        ):
+            return True
+        if isinstance(entry, RevisionSelected) and (
+            ("selection", entry.decision_ref, entry.revision_id) not in linked
+        ):
+            return True
+        if isinstance(entry, SurfaceEvidence) and (
+            ("surface", entry.evidence_ref, entry.revision_id) not in linked
+        ):
+            return True
+    return False
+
+
+def ensure_evidence_links(store: object, task: object) -> int:
+    """Idempotent envelope backfill: every pre-envelope `RevisionEvaluated`
+    / `RevisionSelected` / `SurfaceEvidence` record gains an `EvidenceLink`
+    to a SYNTHETIC-BUT-LOSSLESS envelope (the original evaluation/decision/
+    evidence refs become the bundle artifacts, byte-identical). Original
+    records are never rewritten; running twice appends nothing. Returns the
+    number of links appended."""
+    from strive.selection import (
+        build_prompt_bundle,
+        synthesize_evaluation_bundle,
+        synthesize_selection,
+    )
+    from strive.tasks import Task
+
+    assert isinstance(task, Task)
+    ctx = lifecycle(store)
+    view = ctx.journal.read()
+    st = _state_from(view)
+    _require_clean(st, "evidence backfill")
+    linked = {
+        (link.kind, link.original_ref, link.revision_id)
+        for links in st.evidence_links.values()
+        for link in links
+    }
+    appended = 0
+    # journal order: surface evidence first per revision is not guaranteed,
+    # so pre-index the latest surface evidence per revision for selections
+    for entry in view.entries:
+        batch: list[object] = []
+        if isinstance(entry, RevisionEvaluated):
+            key = ("evaluation", entry.evaluation_ref, entry.revision_id)
+            if key in linked:
+                continue
+            bundle_ref = synthesize_evaluation_bundle(
+                store,
+                task,
+                revision_id=entry.revision_id,
+                evaluation_ref=entry.evaluation_ref,
+            )
+            batch.append(
+                EvidenceLink(
+                    revision_id=entry.revision_id,
+                    kind="evaluation",
+                    original_ref=entry.evaluation_ref,
+                    envelope_ref=bundle_ref,
+                    synthetic=True,
+                    at=now_iso(),
+                )
+            )
+            linked.add(key)
+        elif isinstance(entry, RevisionSelected):
+            key = ("selection", entry.decision_ref, entry.revision_id)
+            if key in linked:
+                continue
+            surface_records = st.surface_evidence.get(entry.revision_id, ())
+            latest_surface = surface_records[-1] if surface_records else None
+            synthesized = synthesize_selection(
+                store,
+                task,
+                revision_id=entry.revision_id,
+                baseline_revision_id=entry.baseline_revision_id,
+                evaluation_ref=entry.evaluation_ref,
+                decision_ref=entry.decision_ref,
+                policy_ref=entry.policy_ref,
+                prompt_evidence_ref=(
+                    latest_surface.evidence_ref
+                    if latest_surface is not None
+                    else None
+                ),
+                prompt_improved=(
+                    latest_surface.improved if latest_surface is not None else None
+                ),
+            )
+            batch.append(
+                EvidenceLink(
+                    revision_id=entry.revision_id,
+                    kind="selection",
+                    original_ref=entry.decision_ref,
+                    envelope_ref=synthesized.selection_ref,
+                    synthetic=True,
+                    at=now_iso(),
+                )
+            )
+            linked.add(key)
+        elif isinstance(entry, SurfaceEvidence):
+            key = ("surface", entry.evidence_ref, entry.revision_id)
+            if key in linked:
+                continue
+            _bundle, bundle_ref = build_prompt_bundle(
+                store,
+                task,
+                subject_revision_id=entry.revision_id,
+                resolved_manifest_ref="",
+                prompt_evidence_ref=entry.evidence_ref,
+                improved=entry.improved,
+                detail="synthesized from recorded surface evidence",
+                budget=BudgetSpec(),
+            )
+            batch.append(
+                EvidenceLink(
+                    revision_id=entry.revision_id,
+                    kind="surface",
+                    original_ref=entry.evidence_ref,
+                    envelope_ref=bundle_ref,
+                    synthetic=True,
+                    at=now_iso(),
+                )
+            )
+            linked.add(key)
+        if batch:
+            try:
+                ctx.journal.append_batch(batch)
+            except FramingError as exc:
+                raise LifecycleError(str(exc)) from None
+            appended += len(batch)
+    return appended
 
 
 # -- composite fixture builder ------------------------------------------------------------------
