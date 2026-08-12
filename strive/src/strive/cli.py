@@ -294,7 +294,7 @@ def _cmd_inspect(store: Store, task: Task, args: argparse.Namespace) -> dict[str
 
 def _cmd_compare(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     report = compare_generations(store, task, args.baseline, args.candidate)
-    data = {
+    data: dict[str, Any] = {
         "baseline": {"id": report.left_id, "scores": report.left.split_scores,
                      "overall": report.left.overall_score},
         "candidate": {"id": report.right_id, "scores": report.right.split_scores,
@@ -310,7 +310,53 @@ def _cmd_compare(store: Store, task: Task, args: argparse.Namespace) -> dict[str
         f"{verdict} [{report.decision.policy}@{report.decision.policy_version}]: "
         f"{report.decision.reason}",
     ]
+    # RECORDED evidence: derive the candidate's stored verdict from its
+    # selection envelope (bundles/decisions, versions resolved exactly)
+    recorded = _recorded_selection_for_generation(store, args.candidate)
+    data["recorded_selection"] = recorded
+    if recorded is not None:
+        lines.append(
+            f"recorded: {recorded['disposition'].upper()} by "
+            f"{recorded['policy_ref']} (roles: {', '.join(recorded['roles'])}"
+            + (", synthetic" if recorded["synthetic"] else "")
+            + f") — {recorded['rationale']}"
+        )
     return {"data": data, "human": "\n".join(lines)}
+
+
+def _recorded_selection_for_generation(
+    store: Store, generation_id: str
+) -> dict[str, Any] | None:
+    """The latest recorded SelectionDecision envelope for a generation's
+    lifecycle identity, derived from bundles/decisions — never recomputed."""
+    from strive.evidence import SelectionDecision
+
+    st = lifecycle.state(store)
+    if st.journal_errors:
+        return None
+    result: dict[str, Any] | None = None
+    for revision_id, linked_generation in st.links.items():
+        if linked_generation != generation_id:
+            continue
+        for link in st.evidence_links.get(revision_id, ()):
+            if link.kind != "selection":
+                continue
+            try:
+                decision: SelectionDecision = codec.loads(
+                    store.objects.get_text(link.envelope_ref), SelectionDecision
+                )
+            except Exception:  # noqa: BLE001 — inspection: skip unreadable
+                continue
+            result = {
+                "revision_id": revision_id,
+                "selection_ref": link.envelope_ref,
+                "policy_ref": decision.policy_ref,
+                "disposition": decision.disposition,
+                "roles": [e.role for e in decision.evidence],
+                "rationale": decision.rationale,
+                "synthetic": link.synthetic,
+            }
+    return result
 
 
 def _cmd_replay(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
@@ -326,6 +372,9 @@ def _cmd_replay(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
         "candidate_generation_id": report.candidate_generation_id,
         "candidate_replayed_score": report.candidate_replayed_score,
         "decision_matches": report.decision_matches,
+        "bundle_checked": report.bundle_checked,
+        "bundle_metric_diffs": report.bundle_metric_diffs,
+        "bundle_matches": report.bundle_matches,
     }
     lines = [
         f"replay of {report.run_id} (generation {report.generation_id}):",
@@ -339,6 +388,14 @@ def _cmd_replay(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
             f"decision_reproduced={report.decision_matches}"
             if report.candidate_replayed_score is not None
             else f"  candidate {report.candidate_generation_id}: not replayed"
+        )
+    if report.bundle_checked:
+        diffs = report.bundle_metric_diffs or {}
+        nonzero = {k: v for k, v in diffs.items() if v != 0.0}
+        lines.append(
+            "  evidence bundle: recomputed candidate metrics "
+            + ("MATCH the recorded envelope" if report.bundle_matches
+               else f"DIFFER from the recorded envelope: {nonzero}")
         )
     if report.task_drift:
         lines.append("  WARNING: task fingerprint drifted since this run was recorded")
@@ -627,6 +684,154 @@ def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[s
     return {"data": data, "human": "\n".join(lines)}
 
 
+def _cmd_evidence(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    """Inspect the versioned evidence envelopes for one revision (default:
+    the active revision): the dataset revision, evaluation manifests,
+    validation bundles with their roles and validators, selection decisions,
+    and the activation-readiness verdict with every stale/blocking reason."""
+    from strive import validators as validator_registry
+    from strive.datasets import current_dataset_revision, load_dataset_revisions
+    from strive.evidence import EvaluationManifest, SelectionDecision, ValidationBundle
+
+    ensure_seeded(store, task)
+    st = lifecycle.state(store)
+    revision_id = args.revision or st.active_revision_id
+    if revision_id is None:
+        raise CliError("no active revision and no --revision given")
+    if revision_id not in st.retained:
+        raise CliError(f"revision {revision_id!r} is not retained")
+
+    dataset_revisions = load_dataset_revisions(store)
+    current_dataset = current_dataset_revision(store)
+    links = st.evidence_links.get(revision_id, ())
+
+    bundles: list[dict[str, Any]] = []
+    selections: list[dict[str, Any]] = []
+    for link in links:
+        entry: dict[str, Any] = {
+            "kind": link.kind,
+            "original_ref": link.original_ref,
+            "envelope_ref": link.envelope_ref,
+            "synthetic": link.synthetic,
+        }
+        try:
+            if link.kind == "selection":
+                decision: SelectionDecision = codec.loads(
+                    store.objects.get_text(link.envelope_ref), SelectionDecision
+                )
+                entry.update(
+                    policy_ref=decision.policy_ref,
+                    disposition=decision.disposition,
+                    incumbent=(
+                        decision.incumbent.revision_id
+                        if decision.incumbent is not None
+                        else None
+                    ),
+                    roles=[
+                        {"role": e.role, "bundle_ref": e.bundle_ref}
+                        for e in decision.evidence
+                    ],
+                    rationale=decision.rationale,
+                )
+                selections.append(entry)
+                continue
+            bundle: ValidationBundle = codec.loads(
+                store.objects.get_text(link.envelope_ref), ValidationBundle
+            )
+            manifest: EvaluationManifest = codec.loads(
+                store.objects.get_text(bundle.evaluation_manifest_ref),
+                EvaluationManifest,
+            )
+            stale = (
+                current_dataset is not None
+                and manifest.dataset_fingerprint != current_dataset.fingerprint
+            )
+            entry.update(
+                role=bundle.role,
+                manifest={
+                    "dataset_fingerprint": manifest.dataset_fingerprint,
+                    "task_fingerprint": manifest.task_fingerprint,
+                    "environment": manifest.environment,
+                    "scorer": manifest.scorer,
+                    "runtime": manifest.runtime,
+                    "validators": list(manifest.validators),
+                    "stale_dataset": stale,
+                },
+                results=[
+                    {
+                        "validator": r.validator,
+                        "subject_role": r.subject_role,
+                        "status": r.status,
+                        "metrics": r.metrics,
+                        "detail": r.detail,
+                    }
+                    for r in bundle.results
+                ],
+            )
+            bundles.append(entry)
+        except Exception as exc:  # noqa: BLE001 — inspection reports, never hides
+            entry["error"] = f"{type(exc).__name__}: {exc}"
+            (selections if link.kind == "selection" else bundles).append(entry)
+
+    readiness = lifecycle.activation_readiness(store, revision_id)
+    data: dict[str, Any] = {
+        "revision_id": revision_id,
+        "dataset": {
+            "current": codec.encode(current_dataset) if current_dataset else None,
+            "revisions": [codec.encode(r) for r in dataset_revisions],
+        },
+        "validators_known": sorted(validator_registry.registry()),
+        "bundles": bundles,
+        "selections": selections,
+        "readiness": {
+            "ok": readiness.ok,
+            "selection_ref": readiness.selection_ref,
+            "reasons": list(readiness.reasons),
+        },
+    }
+    lines = [f"evidence for {revision_id}:"]
+    if current_dataset is not None:
+        lines.append(
+            f"  dataset r{current_dataset.revision} "
+            f"({current_dataset.fingerprint[:12]}…) — {current_dataset.reason}; "
+            f"splits: "
+            + " ".join(
+                f"{s}={n}" for s, n in sorted(current_dataset.split_counts.items())
+            )
+        )
+    else:
+        lines.append("  dataset: NO revision recorded")
+    for entry in bundles:
+        if "error" in entry:
+            lines.append(f"  bundle [{entry['kind']}] UNREADABLE: {entry['error']}")
+            continue
+        statuses = ", ".join(
+            f"{r['validator']}({r['subject_role']})={r['status']}"
+            for r in entry["results"]
+        )
+        stale_note = " STALE-DATASET" if entry["manifest"]["stale_dataset"] else ""
+        synthetic_note = " synthetic" if entry["synthetic"] else ""
+        lines.append(
+            f"  bundle role={entry['role']}{synthetic_note}{stale_note}: {statuses}"
+        )
+    for entry in selections:
+        if "error" in entry:
+            lines.append(f"  selection UNREADABLE: {entry['error']}")
+            continue
+        roles = ", ".join(r["role"] for r in entry["roles"])
+        lines.append(
+            f"  selection {entry['disposition'].upper()} by {entry['policy_ref']} "
+            f"vs {entry['incumbent']} (evidence roles: {roles})"
+            + (" [synthetic]" if entry["synthetic"] else "")
+        )
+    lines.append(
+        f"  activation readiness: {'OK' if readiness.ok else 'BLOCKED'}"
+    )
+    for reason in readiness.reasons:
+        lines.append(f"    - {reason}")
+    return {"data": data, "human": "\n".join(lines)}
+
+
 def _cmd_experiment(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     """The Stage-3C.1 prompt-surface composite experiment: matched arms over
     the deterministic prompt-sensitive fixture (pipeline-wiring proof), plus
@@ -871,6 +1076,7 @@ _COMMANDS = {
     "parity": _cmd_parity,
     "revisions": _cmd_revisions,
     "lifecycle": _cmd_lifecycle,
+    "evidence": _cmd_evidence,
     "reader": _cmd_reader,
     "experiment": _cmd_experiment,
 }
@@ -966,6 +1172,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="status (default) | rollback (whole-revision, drives BOTH the "
         "lifecycle and served compatibility behavior) | repair (quarantine "
         "and truncate an unverified journal region)",
+    )
+    evidence_parser = sub.add_parser(
+        "evidence",
+        help="inspect the versioned evidence envelopes for a revision: the "
+        "dataset revision, evaluation manifests, validation bundles with "
+        "roles and validators, selection decisions, and the "
+        "activation-readiness verdict with stale-evidence reasons",
+    )
+    evidence_parser.add_argument(
+        "revision",
+        nargs="?",
+        default=None,
+        help="revision id (default: the active revision)",
     )
     experiment_parser = sub.add_parser(
         "experiment",

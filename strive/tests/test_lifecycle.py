@@ -35,6 +35,7 @@ from strive.lifecycle import (
     reconcile,
     record_evaluation,
     record_selection,
+    record_surface_evidence,
     retain,
     rollback,
     run_activation_op,
@@ -77,6 +78,44 @@ def _active_bindings(store: Store) -> tuple[ManifestBinding, ...]:
     resolved = materialize_active(store)
     assert resolved is not None
     return resolved.effective
+
+
+def _record_prompt_evidence(store: Store, revision_id: str) -> None:
+    """Record fixture prompt-comparison evidence for a composite's prompt
+    delta — the surface-specific evidence its promoting selection must
+    carry (surfaces cannot borrow the task gate's evidence)."""
+    from strive.promptgate import PromptComparisonEvidence, TemplateOutcome
+
+    def outcome(ref: str, gate: bool) -> TemplateOutcome:
+        return TemplateOutcome(
+            template_ref=ref,
+            proposal_valid=True,
+            failure_kind=None,
+            source_ref=None,
+            gate_accepted=gate,
+            candidate_score=None,
+            regressed_cases=0,
+            model_calls=1,
+            tokens=0,
+            cost=None,
+        )
+
+    evidence = PromptComparisonEvidence(
+        incumbent=outcome("tmpl-incumbent", False),
+        candidate=outcome("tmpl-candidate", True),
+        adapter="fixture",
+        policy_ref="prompt-comparison@1",
+        improved=True,
+        detail="fixture: candidate strictly dominates",
+        at="2026-01-01T00:00:00Z",
+    )
+    record_surface_evidence(
+        store,
+        revision_id,
+        surface="prompt",
+        evidence_ref=store.objects.put_text(codec.dumps(evidence)),
+        improved=True,
+    )
 
 
 def _evaluate_and_select(
@@ -136,6 +175,7 @@ def _evaluate_and_select(
         decision_ref=decision_ref,
         policy_ref=f"{policy.name}@{policy.version}",
         accepted=decision.accepted,
+        task=TASK,  # synthesize the lossless SelectionDecision envelope
     )
     return evaluation_ref, decision_ref, decision.accepted
 
@@ -245,6 +285,9 @@ def test_actually_evaluated_code_plus_prompt_has_one_identity(tmp_path: Path) ->
         {("strategy-code", "solve"): code, ("prompt", "proposal-template"): prompt},
     )
     evaluated_id = revision.ref.revision_id
+    # the composite's prompt delta needs its own surface evidence BEFORE the
+    # selection, or the evidence gate refuses promotion (no piggybacking)
+    _record_prompt_evidence(store, evaluated_id)
     _evaluation_ref, decision_ref, accepted = _evaluate_and_select(
         store, revision, baseline
     )

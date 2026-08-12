@@ -1,6 +1,105 @@
 # HANDOFF — strive
 
-## Stage 3C.1 — the prompt-surface composite evolution experiment (current)
+## Stage 3C.2A — versioned validation evidence and policy-neutral selection (current)
+
+The ADR-0003/0004 selection slice, frozen and integrated. Six areas:
+
+1. **Frozen evidence contracts** (`strive.evidence`, re-exported by
+   `strive.stage3_contracts`): `DatasetRevision@1` — per-split CAS
+   manifests (every historical split re-materializes exactly), parent,
+   reason, counts, fingerprint; persisted per task in
+   `ledger/<task>.datasets.jsonl` (strictly parsed, lineage-checked, fail
+   closed). `EvaluationManifest@1` pins the run-resolved harness ref,
+   objective spec, task AND dataset fingerprints, environment/scorer ids,
+   tool versions, runtime, seeds, the validator list (name@version), and
+   budgets — owned by bundles, never by revisions, so one revision is
+   routinely evaluated under many manifests. `ValidatorResult@1` /
+   `ValidationBundle@1` keep summary metrics FLAT and put per-case
+   outcomes, regression ids, and comparison payloads in CAS artifacts
+   (failure-as-data and per-example alignment preserved: the artifact IS
+   the existing Evaluation/Decision/PromptComparisonEvidence record).
+   Typed `DecisionEvidence@1` + `SelectionDecision@1`: policy_ref,
+   objective_spec_ref, subject, incumbent, closed dispositions (promote /
+   reject / frontier_add / provisional_activate), role-typed evidence
+   links, rationale, timestamp — EVERY disposition requires evidence.
+   Minimal trusted `ObjectiveSpec@1` (not evolvable). Current tasks
+   adapted as `function-task@1` via `TaskSpecVersion` (signature/catalog
+   in the config blob; the spec fingerprint EXCLUDES cases, so data
+   growth and spec drift are distinct events); Environment/Trajectory
+   protocols remain provisional.
+2. **Role-aware trusted validators** (`strive.validators`): a registry
+   resolved by name AND version — an unknown name and an unknown version
+   of a known name both fail closed with the known alternatives named.
+   Converters wrap the existing trusted mechanisms: `task-suite@1`,
+   `paired-comparison@1` (task role), `prompt-comparison@1` (prompt role),
+   `source-screen@1`, `budget-within-spec@1`, `prompt-template@1`
+   (constraint role). A composite gets separate task, prompt, and
+   constraint bundles; each bundle declares its role and exact subject.
+3. **Policy-neutral selection** (`strive.selection`): builders for
+   manifests, role bundles, and SelectionDecisions; the paired policy and
+   the prompt-dominance gate now conclude through the envelope
+   (disposition promote/reject with task+constraint(+prompt) evidence).
+   `frontier_add` is structurally supported (recordable, evidence-backed,
+   never authorizes serving) with NO frontier algorithm implemented.
+4. **Lifecycle integration**: `EvidenceLink@1` records tie each
+   `RevisionEvaluated`/`RevisionSelected`/`SurfaceEvidence` to its
+   envelope; `record_selection` REFUSES a selection with no envelope
+   (explicit `selection_ref` or lossless synthesis from a passed task).
+   The activation-evidence gate (`activation_readiness`, enforced inside
+   promote-reason activation): latest selection accepted against the
+   CURRENT active baseline; a decodable SelectionDecision naming the exact
+   subject and incumbent with an activating disposition; every changed
+   surface's required role present (task + constraint always, prompt for
+   prompt deltas — evidence cannot be borrowed across subjects or
+   relabeled across roles); every bundle's manifest decodable with
+   validators resolved exactly and the CURRENT dataset fingerprint (stale
+   evidence forces incumbent re-baselining, never a task-drift
+   acknowledgement); all constraint results PASSED (failed or
+   INCONCLUSIVE hard constraints block); artifacts decodable (corruption
+   blocks). Activation cites the exact SelectionDecision in its
+   decision_ref; trusted overrides remain distinct journaled records.
+   Re-evaluating one revision under a new manifest appends evidence
+   without redefining identity.
+5. **Migration + compatibility**: migration `0005-evidence-backfill`
+   (also run by every seeding convergence) appends EvidenceLinks to
+   synthetic-but-lossless envelopes for pre-envelope history — the
+   ORIGINAL evaluation/decision refs become the bundle artifacts
+   byte-identically; original records are never rewritten; a second run
+   appends nothing. `strive evidence` inspects the dataset revision,
+   manifests, bundles (roles, validators, staleness), selection decisions,
+   and the readiness verdict with every blocking reason; `strive compare`
+   adds the RECORDED verdict derived from the selection envelope; replay
+   recomputes the recorded task bundle's candidate metrics from the
+   re-executed evaluation and diffs them (`bundle_checked` /
+   `bundle_metric_diffs` / `bundle_matches`).
+6. **Adversarial verification** (`tests/test_evidence.py`, 17 tests):
+   distinct task/prompt/constraint bundles for 3C.1-style composites; a
+   prompt delta without prompt evidence cannot activate on good code; one
+   revision evaluated under two dataset revisions with identity unchanged;
+   dataset growth blocks promotion until re-baselining (spec fingerprint
+   unchanged — no drift acknowledgement); selections without envelopes
+   refused; frontier_add recordable but never serving; unknown validator
+   versions, borrowed subjects, relabeled roles, inconclusive constraints,
+   and corrupted envelopes all fail closed; migration idempotent with the
+   journal's original bytes preserved as an exact prefix; activation cites
+   the SelectionDecision; replay diffs bundle metrics; rollback, restart,
+   and cross-task isolation intact.
+
+**Verification:** 288 tests pass; `mypy --strict` clean over 56 files.
+
+**The Stage 3C.2A claim, stated precisely:** strive records
+reconstructable, versioned validation evidence and policy-neutral
+selection decisions for every composite candidate; activation is
+authorized only by complete current evidence for the exact revision and
+active baseline.
+
+**Next phase (exact):** a separate budget-matched `hill-climb@1` versus
+GEPA-style `pareto-population@1` experiment (ADR-0005) using these
+envelopes unchanged — the frontier maintained via journaled `frontier_add`
+dispositions, both algorithms behind the `EvolutionAlgorithm` protocol
+under equal trusted budgets.
+
+## Stage 3C.1 — the prompt-surface composite evolution experiment (historical)
 
 The corrected slice. Six areas:
 

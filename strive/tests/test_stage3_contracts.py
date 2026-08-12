@@ -562,12 +562,16 @@ def test_one_revision_evaluated_under_two_manifests(tmp_path: Path) -> None:
     assert ref_v1 != ref_v2
     bundles = [
         ValidationBundle(
+            role="task",
             evaluation_manifest_ref=ref,
             subject=revision.ref,
             results=(
-                ValidatorResult("selection-suite@1", "passed", {"overall": 1.0}, "ok"),
+                ValidatorResult(
+                    "task-suite@1", "candidate", "passed", {"overall": 1.0}, "ok"
+                ),
             ),
             feedback="all selection cases passed",
+            at="2026-08-11T00:00:00Z",
         )
         for ref in (ref_v1, ref_v2)
     ]
@@ -606,31 +610,44 @@ def test_task_spec_and_dataset_revision_round_trip(tmp_path: Path) -> None:
 
 
 def test_selection_dispositions_are_policy_neutral_and_evidence_backed() -> None:
-    def decision(disposition: str, evidence: tuple[str, ...]) -> SelectionDecision:
+    from strive.evidence import DecisionEvidence
+
+    def links(*refs: str) -> tuple[DecisionEvidence, ...]:
+        return tuple(DecisionEvidence(role="task", bundle_ref=ref) for ref in refs)
+
+    def decision(
+        disposition: str, evidence: tuple[DecisionEvidence, ...]
+    ) -> SelectionDecision:
         return SelectionDecision(
             policy_ref="paired-deterministic@1",
             objective_spec_ref="88" * 32,
             disposition=disposition,
             subject=RevisionRef(TASK_SCOPE, "rev-0042"),
             incumbent=RevisionRef(TASK_SCOPE, "rev-0041"),
-            evidence_refs=evidence,
+            evidence=evidence,
             rationale="r",
             at="t",
         )
 
     for disposition in ("promote", "reject", "frontier_add", "provisional_activate"):
-        validated = decision(disposition, ("aa" * 32,))
+        validated = decision(disposition, links("aa" * 32))
         validate_selection(validated)
         assert codec.loads(codec.dumps(validated)) == validated
         with pytest.raises(ContractViolation, match="requires evidence"):
             validate_selection(decision(disposition, ()))
     with pytest.raises(ContractViolation, match="unknown disposition"):
-        validate_selection(decision("retain", ("aa" * 32,)))
+        validate_selection(decision("retain", links("aa" * 32)))
+    with pytest.raises(ContractViolation, match="unknown evidence role"):
+        validate_selection(
+            decision(
+                "promote", (DecisionEvidence(role="vibes", bundle_ref="aa" * 32),)
+            )
+        )
     with pytest.raises(ContractViolation, match="must be versioned"):
         validate_selection(
             SelectionDecision(
                 "vibes", "88" * 32, "promote",
-                RevisionRef(TASK_SCOPE, "r"), None, ("aa" * 32,), "r", "t",
+                RevisionRef(TASK_SCOPE, "r"), None, links("aa" * 32), "r", "t",
             )
         )
 
