@@ -627,6 +627,93 @@ def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[s
     return {"data": data, "human": "\n".join(lines)}
 
 
+def _cmd_experiment(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    """The Stage-3C.1 prompt-surface composite experiment: matched arms over
+    the deterministic prompt-sensitive fixture (pipeline-wiring proof), plus
+    an opt-in real-model run of the proposer arms."""
+    from strive import experiment
+
+    root = store.root / "experiment"
+    if args.real_model:
+        if not args.unsafe_model_code:
+            raise CliError(
+                "--real-model runs model-generated code without confinement; "
+                "acknowledge with --unsafe-model-code (lifecycle/canary "
+                "authority stays refused for these runs regardless)"
+            )
+        reports = experiment.run_real_model_arms(root)
+        real_data: dict[str, Any] = {
+            "real_model": [
+                {
+                    "arm": rm.arm, "model_id": rm.model_id,
+                    "proposal_valid": rm.proposal_valid,
+                    "failure_kind": rm.failure_kind, "accepted": rm.accepted,
+                    "notes": rm.notes,
+                }
+                for rm in reports
+            ]
+        }
+        lines = ["real-model proposer arms (honest outcomes; gate unchanged):"]
+        for rm in reports:
+            lines.append(
+                f"  arm {rm.arm} [{rm.model_id}]: proposal_valid={rm.proposal_valid} "
+                f"failure={rm.failure_kind or '-'} accepted={rm.accepted}"
+            )
+            lines.append(f"    {rm.notes}")
+        return {"data": real_data, "human": "\n".join(lines)}
+
+    report = experiment.run_prompt_experiment(root)
+    data: dict[str, Any] = {
+        "arms": {
+            arm: {
+                "description": r.description,
+                "proposal_valid": r.proposal_valid,
+                "failure_kind": r.failure_kind,
+                "accepted": r.accepted,
+                "candidate_overall": r.candidate_overall,
+                "candidate_split_scores": r.candidate_split_scores,
+                "regressed_cases": r.regressed_cases,
+                "executions": r.executions,
+                "model_calls": r.model_calls,
+                "tokens": r.tokens,
+                "latency_ms": r.latency_ms,
+                "cost": r.cost,
+                "prompt_ref": r.prompt_ref,
+                "prompt_contained_input_excerpts": r.prompt_contained_input_excerpts,
+                "revision_id": r.revision_id,
+            }
+            for arm, r in report.arms.items()
+        },
+        "causal_prompt_effect": report.causal_prompt_effect,
+        "composite_gate_passed": report.composite_gate_passed,
+        "prompt_consumed": report.prompt_consumed,
+        "restart_serves_candidate_prompt": report.restart_serves_candidate_prompt,
+        "rollback_restores_incumbent": report.rollback_restores_incumbent,
+        "offline_fixture": report.offline,
+        "passed": report.passed,
+    }
+    lines = [
+        "prompt-surface composite experiment (deterministic offline fixture —",
+        "proves causal pipeline wiring, NOT model capability):",
+    ]
+    for arm, r in report.arms.items():
+        overall = f"{r.candidate_overall:.3f}" if r.candidate_overall is not None else "-"
+        lines.append(
+            f"  {arm}: accepted={r.accepted} overall={overall} "
+            f"model_calls={r.model_calls} excerpts_in_prompt="
+            f"{r.prompt_contained_input_excerpts} — {r.description}"
+        )
+    lines.append(
+        f"causal prompt effect (A fails, B passes): {report.causal_prompt_effect}"
+    )
+    lines.append(f"composite gate passed + activated (E): {report.composite_gate_passed}")
+    lines.append(f"prompt artifact consumption proven: {report.prompt_consumed}")
+    lines.append(f"restart serves candidate prompt: {report.restart_serves_candidate_prompt}")
+    lines.append(f"rollback restores incumbent prompt+code: {report.rollback_restores_incumbent}")
+    lines.append(f"OVERALL: {'PASSED' if report.passed else 'FAILED'}")
+    return {"data": data, "human": "\n".join(lines)}
+
+
 def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     action = args.action
     quarantined: str | None = None
@@ -746,6 +833,7 @@ _COMMANDS = {
     "revisions": _cmd_revisions,
     "lifecycle": _cmd_lifecycle,
     "reader": _cmd_reader,
+    "experiment": _cmd_experiment,
 }
 
 
@@ -839,6 +927,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="status (default) | rollback (whole-revision, drives BOTH the "
         "lifecycle and served compatibility behavior) | repair (quarantine "
         "and truncate an unverified journal region)",
+    )
+    experiment_parser = sub.add_parser(
+        "experiment",
+        help="the stage-3C.1 prompt-surface composite experiment: matched "
+        "arms A-E over the deterministic prompt-sensitive fixture "
+        "(pipeline-wiring proof); --real-model runs the proposer arms with "
+        "the env-configured adapter",
+    )
+    experiment_parser.add_argument("--real-model", action="store_true")
+    experiment_parser.add_argument(
+        "--unsafe-model-code",
+        action="store_true",
+        help="required acknowledgement for --real-model",
     )
     reader_parser = sub.add_parser(
         "reader",

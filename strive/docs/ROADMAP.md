@@ -338,14 +338,65 @@ its own append-only lifecycle, not a strategy-only generation:
   evaluates, selects, activates, recovers, and rolls back the exact
   composite revision without losing surfaces or bypassing evidence.
 
-## Stage 3C — The prompt-surface composite evolution experiment (next)
+## Stage 3C.1 — The prompt-surface composite evolution experiment ✅ (2026-08-11)
 
-In a separate PR, and only now that the evaluate → retain → activate
-round-trip exists for a multi-surface revision: the first empirically
-evaluated prompt-surface composite evolution experiment — a `prompt` surface
-delta (the proposal template) proposed and evolved alongside strategy code
-in one composite revision, validated under the trusted paired gate with
-held-out discipline. This is where prompt evolution begins.
+The first empirically evaluated prompt-surface composite evolution
+experiment, exercising the 3B.3 lifecycle (no parallel substrate; no Pareto
+search, policy-parameter evolution, online adaptation, task refactoring, or
+new sandbox tier):
+- **Operational prompt surface.** `prompt/proposal-template` is a live
+  task-scoped surface: pinned descriptor (`prompt@2`, materializer
+  kernel-text@1), a versioned template validator (bounded size, known
+  placeholder set, output contract), and kernel resolution from the active
+  revision's manifest (`resolve_active_prompt`) with the built-in default
+  as the explicit fallback — no static-template assumption. Every model
+  request journals the prompt ref and active revision (`prompt_resolved`
+  event + content-addressed prompt bytes per model call). Restart and
+  whole-revision rollback restore prompt and strategy together.
+- **Exact composite candidates.** Proposals may carry a bounded
+  `prompt_update` (proposal@2; changed_surfaces must agree); the loop
+  builds ONE immutable candidate revision containing both deltas BEFORE
+  evaluation against the parent manifest (unchanged bindings carry over),
+  screened kernel-side (template validity + no hidden-split content) and
+  validated by the 3B.3 parent-replay/closure machinery. The exact
+  evaluated revision is retained, selected, activated, and rolled back —
+  never a post-evaluation reconstruction.
+- **Causal experiment (matched arms, deterministic offline).** The
+  prompt-sensitive fixture adapter is an instruction follower whose output
+  is a function of the prompt content; the incumbent template withholds
+  failing-input excerpts, the candidate template surfaces them. Arms from
+  the same baseline/adapter/budgets: A incumbent prompt → valid proposal,
+  unsigned fix, gate REJECTS (the measurable failure); B candidate prompt →
+  signed fix, gate ACCEPTS (causality: only the prompt differed); C
+  prompt-only ablation → REJECTED (prompt alone cannot move execution
+  scores); D code-only → ACCEPTED; E prompt+code composite → ACCEPTED and
+  ACTIVATED as one revision, restart resolves the new prompt from the
+  manifest, rollback restores incumbent prompt AND code. Per-arm records:
+  proposal validity, per-split scores, regressions, executions, model
+  calls, tokens, latency, cost. Consumption is proven from journaled
+  prompt bytes. `strive experiment` runs it; `--real-model` (env-configured,
+  `--unsafe-model-code` acknowledged) runs the proposer arms with a real
+  adapter, generation-native only, and records honest outcomes.
+- **Honest claim boundary.** The offline fixture proves causal PIPELINE
+  WIRING — the prompt artifact is consumed and changes proposer behavior
+  through the real loop. It demonstrates nothing about real-model
+  prompt-following; genuine model-driven prompt improvement is claimed only
+  with recorded real-model evidence, and a real-model failure is an honest
+  result, never a reason to weaken the gate.
+- Exit claim: strive can evolve, empirically evaluate, retain, activate,
+  restart, and roll back a prompt-plus-code revision as one exact candidate
+  under trusted held-out discipline. The offline fixture proves causal
+  pipeline wiring; genuine model-driven prompt improvement is claimed only
+  with recorded real-model evidence.
+
+## Stage 3C.2 — Validation/selection envelopes, then algorithm comparison (next)
+
+First: versioned `ValidationBundle`/`SelectionDecision` envelopes with typed
+evidence roles (the ADR-0004 selection slice — the provisional schemas the
+lifecycle currently references by bare CAS ref). Then: a budget-matched
+comparison of incumbent hill-climb versus a GEPA-style Pareto-population
+algorithm over the same task set — the first pluggable-evolution-algorithm
+experiment (ADR-0005).
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 

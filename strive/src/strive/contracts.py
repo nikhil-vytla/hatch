@@ -165,7 +165,7 @@ class Diagnosis:
     evidence_case_ids: tuple[str, ...]
 
 
-@register("proposal", 1)
+@register("proposal", 2)
 @dataclass(frozen=True)
 class ProposalRecord:
     """A structured proposed change, as validated from a proposer's output.
@@ -185,6 +185,9 @@ class ProposalRecord:
     changed_surfaces: tuple[str, ...]
     risks: tuple[str, ...]
     assumptions: tuple[str, ...]
+    # optional bounded change to the prompt/proposal-template surface: the
+    # complete replacement template text (None = strategy-only proposal)
+    prompt_update: str | None = None
 
 
 @register("candidate", 1)

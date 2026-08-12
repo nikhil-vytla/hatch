@@ -577,11 +577,13 @@ def test_candidate_overlay_created_and_validated_in_every_mode(
 
 
 def test_overlay_failure_has_no_silent_native_path(tmp_path: Path) -> None:
+    import strive.loop as loop_module
+
     # shadow: unavailable is recorded
     store = Store(tmp_path / "shadow", TASK.task_id)
     set_mode(store, MODE_SHADOW, "test")
-    original = StateReader.candidate_subject
-    StateReader.candidate_subject = lambda self, **kwargs: None  # type: ignore[method-assign]
+    original = loop_module._build_composite_overlay
+    loop_module._build_composite_overlay = lambda *args, **kwargs: None
     try:
         # under 3B.3, an ACCEPTED candidate whose evaluated identity cannot
         # be retained is refused promotion outright — stronger than the old
@@ -597,16 +599,16 @@ def test_overlay_failure_has_no_silent_native_path(tmp_path: Path) -> None:
 
         # canary: the breaker opens BEFORE execution
         canary = Store(tmp_path / "canary", TASK.task_id)
-        StateReader.candidate_subject = original  # type: ignore[method-assign]
+        loop_module._build_composite_overlay = original
         _exercise_all_paths(canary)
         enable_canary(canary)
         rollback_generation(canary)  # make the next cycle evolve
-        StateReader.candidate_subject = lambda self, **kwargs: None  # type: ignore[method-assign]
+        loop_module._build_composite_overlay = lambda *args, **kwargs: None
         with pytest.raises(StoreError, match="evaluated identity"):
             run_cycle(canary, TASK)
         assert reader_state(canary).breaker_open
     finally:
-        StateReader.candidate_subject = original  # type: ignore[method-assign]
+        loop_module._build_composite_overlay = original
 
 
 def test_retention_references_the_exact_evaluated_candidate(tmp_path: Path) -> None:
