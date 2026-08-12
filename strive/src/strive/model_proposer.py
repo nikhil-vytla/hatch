@@ -40,7 +40,13 @@ from strive.propose import (
     ProposalResult,
 )
 
-PROMPT_TEMPLATE = """\
+# The DEFAULT proposal template — the prompt/proposal-template surface's
+# built-in value, used when no revision-activated template exists. Templates
+# are evolvable artifacts: the active one is resolved from the native
+# lifecycle's ScopeManifest and validated (`validate_prompt_template`) before
+# use. Placeholders are filled by `build_prompt` from the trusted
+# ProposalRequest (visible evidence only).
+DEFAULT_PROPOSAL_TEMPLATE = """\
 You are the proposal component of a gated self-evolution harness. Propose one
 bounded improvement to the strategy below. Your proposal will be executed in a
 sandbox and accepted only if it strictly improves evaluation with zero
@@ -81,10 +87,47 @@ Reply with ONLY a JSON object (no prose, no code fences) with exactly these keys
 - "expected_outcome": string
 - "source": string — the COMPLETE replacement strategy source implementing
   {task_signature}
-- "changed_surfaces": array — must be ["strategy-code"]
+- "changed_surfaces": array — ["strategy-code"], or
+  ["prompt", "strategy-code"] when you also propose a template change
 - "risks": array of strings
 - "assumptions": array of strings
+- "prompt_update": string or null — OPTIONAL complete replacement text for
+  this very proposal template (bounded; visible evidence only)
 """
+
+# every placeholder a template may use, with the request field that fills it;
+# templates using anything else are rejected before use
+TEMPLATE_PLACEHOLDERS: tuple[str, ...] = (
+    "task_id", "task_description", "task_signature", "catalog",
+    "parent_generation_id", "parent_source", "weakness_id",
+    "diagnosis_description", "failing_cases", "failing_case_ids", "history",
+    "max_output_tokens", "model_calls_remaining", "executions_remaining",
+)
+
+PROMPT_TEMPLATE_MAX_CHARS = 8000
+
+
+def validate_prompt_template(text: str) -> str | None:
+    """The prompt surface's versioned validator (descriptor `prompt@2`,
+    materializer kernel-text@1): non-empty, bounded, formats cleanly against
+    the known placeholder set, and demands the structured-output contract.
+    Returns a rejection reason, or None when valid."""
+    if not text.strip():
+        return "prompt template is empty"
+    if len(text) > PROMPT_TEMPLATE_MAX_CHARS:
+        return (
+            f"prompt template is {len(text)} chars; the bound is "
+            f"{PROMPT_TEMPLATE_MAX_CHARS}"
+        )
+    try:
+        text.format(**{name: "x" for name in TEMPLATE_PLACEHOLDERS})
+    except (KeyError, IndexError, ValueError) as exc:
+        return f"prompt template does not format against the placeholder set: {exc}"
+    if "{parent_generation_id}" not in text:
+        return "prompt template must include {parent_generation_id}"
+    if "JSON" not in text:
+        return "prompt template must state the JSON output contract"
+    return None
 
 _REQUIRED_FIELDS: dict[str, type] = {
     "parent_generation_id": str,
@@ -100,6 +143,11 @@ _REQUIRED_FIELDS: dict[str, type] = {
 
 
 def build_prompt(request: ProposalRequest) -> str:
+    """Fill the ACTIVE template (revision-resolved or default) from the
+    trusted request. The template chooses which placeholders to include —
+    e.g. {failing_cases} carries full input excerpts while
+    {failing_case_ids} carries ids + feedback only — but every value is
+    visible-split data regardless."""
     failing = [
         ce for ce in request.ctx.evaluation.case_evaluations if not ce.passed
     ]
@@ -108,12 +156,16 @@ def build_prompt(request: ProposalRequest) -> str:
         f"expected={ce.expected} got={ce.output} feedback={ce.feedback!r}"
         for ce in failing
     ) or "(none)"
+    failing_id_lines = "\n".join(
+        f"- {ce.case_id}: feedback={ce.feedback!r}" for ce in failing
+    ) or "(none)"
     history_lines = "\n".join(
         f"- {item.generation_id} [{item.weakness_id or 'n/a'}]: "
         f"{item.description} -> {item.outcome}"
         for item in request.history
     ) or "(no prior proposals)"
-    return PROMPT_TEMPLATE.format(
+    template = request.prompt_template or DEFAULT_PROPOSAL_TEMPLATE
+    return template.format(
         task_id=request.ctx.task_id,
         task_description=request.task_description,
         task_signature=request.task_signature,
@@ -123,6 +175,7 @@ def build_prompt(request: ProposalRequest) -> str:
         weakness_id=request.diagnosis.weakness_id,
         diagnosis_description=request.diagnosis.description,
         failing_cases=failing_lines,
+        failing_case_ids=failing_id_lines,
         history=history_lines,
         max_output_tokens=request.max_output_tokens,
         model_calls_remaining=request.model_calls_remaining,
@@ -172,9 +225,15 @@ def parse_completion(
     missing = _REQUIRED_FIELDS.keys() - parsed.keys()
     if missing:
         return invalid(f"missing fields {sorted(missing)}")
-    extra = parsed.keys() - _REQUIRED_FIELDS.keys()
+    extra = parsed.keys() - _REQUIRED_FIELDS.keys() - {"prompt_update"}
     if extra:
         return invalid(f"unexpected fields {sorted(extra)}")
+    prompt_update = parsed.get("prompt_update")
+    if prompt_update is not None and not isinstance(prompt_update, str):
+        return invalid(
+            f"field 'prompt_update' is {type(prompt_update).__name__}, "
+            "expected string or null"
+        )
     for field_name, expected_type in _REQUIRED_FIELDS.items():
         if not isinstance(parsed[field_name], expected_type):
             return invalid(
@@ -186,9 +245,15 @@ def parse_completion(
             return invalid(f"field {list_field!r} must contain only strings")
     if not parsed["source"].strip():
         return invalid("field 'source' is empty")
-    if parsed["changed_surfaces"] != [STRATEGY_CODE_SURFACE]:
+    expected_surfaces = (
+        ["prompt", STRATEGY_CODE_SURFACE]
+        if prompt_update is not None
+        else [STRATEGY_CODE_SURFACE]
+    )
+    if parsed["changed_surfaces"] != expected_surfaces:
         return invalid(
-            f"changed_surfaces {parsed['changed_surfaces']!r} != ['strategy-code']"
+            f"changed_surfaces {parsed['changed_surfaces']!r} != "
+            f"{expected_surfaces!r} (must agree with prompt_update presence)"
         )
     if parsed["parent_generation_id"] != request.ctx.parent_generation_id:
         return invalid(
@@ -220,6 +285,7 @@ def parse_completion(
         changed_surfaces=tuple(parsed["changed_surfaces"]),
         risks=tuple(parsed["risks"]),
         assumptions=tuple(parsed["assumptions"]),
+        prompt_update=prompt_update,
     )
 
 

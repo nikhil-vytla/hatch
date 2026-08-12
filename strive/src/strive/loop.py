@@ -62,6 +62,7 @@ from strive.propose import (
     Proposer,
     RegistryProposer,
     STRATEGY_CODE_SURFACE,
+    screen_prompt_update,
     screen_source,
 )
 from strive import lifecycle
@@ -289,6 +290,54 @@ def _record_candidate_evidence(
     return revision.ref.revision_id, decision_ref
 
 
+def _build_composite_overlay(
+    store: Store,
+    candidate: Candidate,
+    proposal: ProposalRecord,
+    lifecycle_baseline: str | None,
+    proposer_ref: str,
+    task: Task,
+) -> CandidateSubject | None:
+    """Build the ONE immutable candidate revision containing every proposed
+    delta — strategy-code always, prompt/proposal-template when the proposal
+    carries a prompt_update — BEFORE evaluation, against the lifecycle's
+    active manifest (unchanged bindings carry over). The exact evaluated
+    revision is what gets retained, selected, and activated; there is no
+    post-evaluation reconstruction. None on failure (the caller refuses
+    promotion of identity-less candidates)."""
+    try:
+        if lifecycle_baseline is None:
+            return None
+        resolved = lifecycle.materialize_active(store)
+        if resolved is None:
+            return None
+        surfaces: dict[tuple[str, str], str] = {
+            ("strategy-code", "solve"): proposal.source,
+        }
+        if proposal.prompt_update is not None:
+            surfaces[("prompt", "proposal-template")] = proposal.prompt_update
+        revision, revision_ref = lifecycle.compose_revision(
+            store,
+            revision_id=f"rev-{candidate.candidate_id}",
+            base_parent_id=lifecycle_baseline,
+            parent_manifest_bindings=resolved.effective,
+            surfaces=surfaces,
+            proposer=proposer_ref,
+            summary=proposal.summary,
+            task_fingerprint=task.fingerprint(),
+            weakness_id=candidate.weakness_id,
+            origin="candidate-overlay",
+        )
+        return CandidateSubject(
+            revision_ref=revision_ref,
+            manifest_ref=revision.scope_manifest_ref,
+            provenance_ref=revision.provenance_ref or "",
+            source_ref=candidate.source_ref,
+        )
+    except Exception:  # noqa: BLE001 — construction failure = refusal path
+        return None
+
+
 def _provenance_fingerprint(store: Store, revision: "HarnessRevision") -> str:
     """Read the task fingerprint the revision's provenance recorded, so the
     lifecycle retention carries the same fingerprint as the artifact."""
@@ -459,6 +508,39 @@ def _resolve_provisional(store: Store, reader: StateReader, events: EventLog) ->
     )
 
 
+def resolve_active_prompt(store: Store) -> tuple[str, str, str | None, str]:
+    """The ACTIVE prompt/proposal-template surface, resolved from the native
+    lifecycle's manifest — no static-template assumption. Returns
+    (template_text, prompt_ref, active_revision_id, source) where source is
+    "revision" (manifest-bound) or "default" (the built-in template,
+    CAS-stored so it has a stable ref)."""
+    from strive.model_proposer import DEFAULT_PROPOSAL_TEMPLATE
+
+    try:
+        resolved = lifecycle.materialize_active(store)
+    except lifecycle.LifecycleError:
+        resolved = None
+    if resolved is not None:
+        binding = next(
+            (
+                b
+                for b in resolved.effective
+                if (b.kind, b.name) == ("prompt", "proposal-template")
+            ),
+            None,
+        )
+        if binding is not None and binding.binding.content_ref is not None:
+            return (
+                store.objects.get_text(binding.binding.content_ref),
+                binding.binding.content_ref,
+                resolved.contributions[0].revision.revision_id,
+                "revision",
+            )
+    default_ref = store.objects.put_text(DEFAULT_PROPOSAL_TEMPLATE)
+    active = lifecycle.active_revision_id(store)
+    return DEFAULT_PROPOSAL_TEMPLATE, default_ref, active, "default"
+
+
 def _proposal_stage(
     store: Store,
     task: Task,
@@ -469,13 +551,24 @@ def _proposal_stage(
     events: EventLog,
     reader: StateReader,
 ) -> tuple[ProposalRecord | None, FailureRecord | None]:
-    """Run the proposer, then kernel-side checks: staleness and the forbidden-
-    source screen. Every rejection is journaled with its distinct kind."""
+    """Run the proposer, then kernel-side checks: staleness, the forbidden-
+    source screen, and the prompt-update screen. Every rejection is journaled
+    with its distinct kind."""
     model_handle = None
     if config.model_adapter is not None:
         model_handle = MeteredJournalingAdapter(
             config.model_adapter, meter, events, store.objects
         )
+    # the active prompt surface, journaled for EVERY model request
+    prompt_template, prompt_ref, prompt_revision, prompt_source = (
+        resolve_active_prompt(store)
+    )
+    events.emit(
+        "prompt_resolved",
+        prompt_ref=prompt_ref,
+        prompt_source=prompt_source,
+        active_revision=prompt_revision,
+    )
     usage = meter.usage()
     request = ProposalRequest(
         ctx=ctx,
@@ -488,6 +581,8 @@ def _proposal_stage(
         model_calls_remaining=max(0, config.budget.model_calls - usage.model_calls - 1),
         executions_remaining=max(0, config.budget.executions - usage.executions),
         model=model_handle,
+        prompt_template=prompt_template,
+        prompt_ref=prompt_ref,
     )
     result = config.proposer.propose(request)
 
@@ -529,6 +624,22 @@ def _proposal_stage(
             failure=codec.encode(screen),
         )
         return None, screen
+
+    if proposal.prompt_update is not None:
+        hidden_texts = tuple(
+            value
+            for case in task.cases
+            if case.split != VISIBLE
+            for value in (case.input_text, case.case_id)
+        )
+        prompt_screen = screen_prompt_update(proposal.prompt_update, hidden_texts)
+        if prompt_screen is not None:
+            events.emit(
+                "proposal_rejected",
+                proposer=config.proposer.name,
+                failure=codec.encode(prompt_screen),
+            )
+            return None, prompt_screen
 
     events.emit(
         "proposal",
@@ -664,14 +775,9 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                     # base parent, so the evaluated revision's lineage is the
                     # canonical one (not the generation-derived id)
                     lifecycle_baseline = lifecycle.active_revision_id(store)
-                    overlay = reader.candidate_subject(
-                        candidate_id=candidate.candidate_id,
-                        source_ref=candidate.source_ref,
-                        proposer=proposer_ref,
-                        summary=proposal.summary,
-                        weakness_id=diagnosis.weakness_id,
-                        task_fingerprint=task.fingerprint(),
-                        parent_revision_id=lifecycle_baseline,
+                    overlay = _build_composite_overlay(
+                        store, candidate, proposal, lifecycle_baseline,
+                        proposer_ref, task,
                     )
                     if overlay is None:
                         # no silent derived->native path: recorded, and in
