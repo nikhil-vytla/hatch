@@ -568,7 +568,7 @@ def test_candidate_overlay_created_and_validated_in_every_mode(
         )
         assert revision.ref.revision_id.startswith("rev-cand-")
         assert revision.base_parent is not None
-        assert revision.base_parent.revision_id == "rev-0000"
+        assert revision.base_parent.revision_id == "rev-prompt-default"
         assert revision.provenance_ref is not None
         provenance: RevisionProvenance = codec.loads(
             store.objects.get_text(revision.provenance_ref), RevisionProvenance
@@ -577,11 +577,13 @@ def test_candidate_overlay_created_and_validated_in_every_mode(
 
 
 def test_overlay_failure_has_no_silent_native_path(tmp_path: Path) -> None:
+    import strive.loop as loop_module
+
     # shadow: unavailable is recorded
     store = Store(tmp_path / "shadow", TASK.task_id)
     set_mode(store, MODE_SHADOW, "test")
-    original = StateReader.candidate_subject
-    StateReader.candidate_subject = lambda self, **kwargs: None  # type: ignore[method-assign]
+    original = loop_module._build_composite_overlay
+    loop_module._build_composite_overlay = lambda *args, **kwargs: None
     try:
         # under 3B.3, an ACCEPTED candidate whose evaluated identity cannot
         # be retained is refused promotion outright — stronger than the old
@@ -597,16 +599,16 @@ def test_overlay_failure_has_no_silent_native_path(tmp_path: Path) -> None:
 
         # canary: the breaker opens BEFORE execution
         canary = Store(tmp_path / "canary", TASK.task_id)
-        StateReader.candidate_subject = original  # type: ignore[method-assign]
+        loop_module._build_composite_overlay = original
         _exercise_all_paths(canary)
         enable_canary(canary)
         rollback_generation(canary)  # make the next cycle evolve
-        StateReader.candidate_subject = lambda self, **kwargs: None  # type: ignore[method-assign]
+        loop_module._build_composite_overlay = lambda *args, **kwargs: None
         with pytest.raises(StoreError, match="evaluated identity"):
             run_cycle(canary, TASK)
         assert reader_state(canary).breaker_open
     finally:
-        StateReader.candidate_subject = original  # type: ignore[method-assign]
+        loop_module._build_composite_overlay = original
 
 
 def test_retention_references_the_exact_evaluated_candidate(tmp_path: Path) -> None:
@@ -630,14 +632,23 @@ def test_retention_references_the_exact_evaluated_candidate(tmp_path: Path) -> N
     decision: object = codec.loads(store.objects.get_text(record.decision_ref))
     assert codec.encode(decision) == codec.encode(report.decision)
 
-    # the retained mirror is content-identical to the evaluated overlay
+    # the retained mirror serves the EXACT evaluated strategy artifact (the
+    # mirror is strategy-only compat; the overlay's manifest also carries the
+    # prompt binding, which lives in the native lifecycle)
     overlay: HarnessRevision = codec.loads(
         store.objects.get_text(overlay_ref), HarnessRevision
     )
     snapshot = verify_revision_snapshot(store)
-    mirrored = snapshot.revisions["rev-0001"]
-    assert mirrored.deltas == overlay.deltas
-    assert mirrored.scope_manifest_ref == overlay.scope_manifest_ref
+    mirrored_ref, _text = snapshot.sources["rev-0001"]
+    overlay_manifest: ScopeManifest = codec.loads(
+        store.objects.get_text(overlay.scope_manifest_ref), ScopeManifest
+    )
+    overlay_strategy = next(
+        b.binding.content_ref
+        for b in overlay_manifest.bindings
+        if (b.kind, b.name) == ("strategy-code", "solve")
+    )
+    assert mirrored_ref == overlay_strategy
     # ... and the retained-candidate check agreed on exactly that
     rows = [c for c in _checks(store) if c.subject == "cycle-candidate-retained"]
     assert rows[-1].outcome == OUTCOME_AGREED
@@ -668,16 +679,26 @@ def test_ephemeral_candidate_execution_names_the_overlay(tmp_path: Path) -> None
     base: ResolvedHarnessManifest = codec.loads(
         store.objects.get_text(record.base_resolved_ref), ResolvedHarnessManifest
     )
-    # the run activated the candidate, yet the execution ran under rev-0000
+    # the run activated the candidate, yet the execution ran under the
+    # pre-candidate baseline (the mirror snapshot is strategy-only; the
+    # generation-derived baseline id is rev-0000)
     assert base.contributions[0].revision.revision_id == "rev-0000"
     seed = store.generations()["gen-0000"]
     candidate = store.generations()["gen-0001"]
-    assert base.effective[0].binding.content_ref == seed.source_ref
+    base_strategy = next(
+        b.binding.content_ref for b in base.effective if b.kind == "strategy-code"
+    )
+    assert base_strategy == seed.source_ref
     assert record.effective_manifest_ref is not None
     subject_manifest: ScopeManifest = codec.loads(
         store.objects.get_text(record.effective_manifest_ref), ScopeManifest
     )
-    assert subject_manifest.bindings[0].binding.content_ref == candidate.source_ref
+    subject_strategy = next(
+        b.binding.content_ref
+        for b in subject_manifest.bindings
+        if b.kind == "strategy-code"
+    )
+    assert subject_strategy == candidate.source_ref
     # the overlay is unactivated and never in the mirror journal
     snapshot = verify_revision_snapshot(store)
     overlay: HarnessRevision = codec.loads(
@@ -718,12 +739,22 @@ def test_non_active_subjects_are_never_claimed_as_the_active_baseline(
             store.objects.get_text(record.base_resolved_ref), ResolvedHarnessManifest
         )
         assert base.contributions[0].revision.revision_id == "rev-0001"
-        assert base.effective[0].binding.content_ref == active.source_ref
+        base_strategy = next(
+            b.binding.content_ref
+            for b in base.effective
+            if b.kind == "strategy-code"
+        )
+        assert base_strategy == active.source_ref
     assert left.effective_manifest_ref is not None
     left_manifest: ScopeManifest = codec.loads(
         store.objects.get_text(left.effective_manifest_ref), ScopeManifest
     )
-    assert left_manifest.bindings[0].binding.content_ref == seed.source_ref
+    left_strategy = next(
+        b.binding.content_ref
+        for b in left_manifest.bindings
+        if b.kind == "strategy-code"
+    )
+    assert left_strategy == seed.source_ref
 
 
 # -- stale mutations -----------------------------------------------------------------------------
