@@ -68,6 +68,7 @@ from strive.propose import (
 )
 from strive import lifecycle
 from strive.promptgate import PromptComparisonEvidence
+from strive.selection import ExecutionProvenance, RecordedAssessment
 from strive.reader import MODE_CANARY, CandidateSubject, StateReader
 from strive.revisions import HarnessRevision
 from strive.sandbox import run_strategy
@@ -133,13 +134,20 @@ def guard_task_binding(
 ) -> bool:
     """The one shared task-binding guard, called by every public operation.
 
-    Verifies the store is bound to this task, and detects task-fingerprint
-    drift (the task definition changed since the active generation was
-    created). Drift blocks *mutating* operations unless explicitly
-    acknowledged; read-only operations proceed (their reports carry the drift
-    flag). Returns True when acknowledged drift was present, so callers can
-    journal the acknowledgement.
+    Verifies the store is bound to this task, and detects task-SPEC drift:
+    once the store carries a `TaskSpecBound` record, drift means the task's
+    SPEC identity changed (signature, catalog, description, version,
+    scorer, environment) — the cases are dataset state, so DATASET GROWTH
+    NEVER TRIPS THIS GUARD; it invalidates evidence instead and forces
+    incumbent re-baselining through the activation gate. A store without a
+    spec binding (pre-3C.2A.1 history) keeps the legacy case-inclusive
+    comparison until its first clean convergence or acknowledged drift
+    binds the spec. Drift blocks *mutating* operations unless explicitly
+    acknowledged; read-only operations proceed. Returns True when
+    acknowledged drift was present, so callers can journal it.
     """
+    from strive.evidence import task_spec_fingerprint
+
     if store.task_id != task.task_id:
         raise StoreError(
             f"store is bound to task {store.task_id!r}, got {task.task_id!r}"
@@ -147,6 +155,24 @@ def guard_task_binding(
     active = derive_active_generation(entries if entries is not None else store.entries())
     if active is None:
         return False
+    bound = lifecycle.state(store).task_spec
+    if bound is not None:
+        spec_now = task_spec_fingerprint(task)
+        if bound.spec_fingerprint == spec_now:
+            return False  # dataset growth is NOT drift
+        if mutating and not acknowledge_drift:
+            raise StoreError(
+                f"task-SPEC drift: the store is bound to spec fingerprint "
+                f"{bound.spec_fingerprint[:12]}… but the current definition "
+                f"of {task.task_id!r} has spec fingerprint {spec_now[:12]}… "
+                "(the task's signature, catalog, version, scorer, or "
+                "description changed — NOT its cases; dataset growth never "
+                "requires this). Refusing to mutate. Re-run with "
+                "--acknowledge-task-drift to re-bind (journaled), or restore "
+                "the original task definition."
+            )
+        return mutating and acknowledge_drift
+    # legacy (unbound) store: the pre-3C.2A.1 case-inclusive comparison
     if active.task_fingerprint == task.fingerprint():
         return False
     if mutating and not acknowledge_drift:
@@ -154,10 +180,10 @@ def guard_task_binding(
             f"task-fingerprint drift: the active generation was created for "
             f"fingerprint {active.task_fingerprint[:12]}… but the current "
             f"definition of {task.task_id!r} fingerprints as "
-            f"{task.fingerprint()[:12]}… (the task's cases or version changed). "
-            "Refusing to mutate. Re-run with --acknowledge-task-drift to "
-            "proceed against the new definition (journaled), or restore the "
-            "original task definition."
+            f"{task.fingerprint()[:12]}… (the task's cases or version changed "
+            "and this store predates spec binding). Refusing to mutate. "
+            "Re-run with --acknowledge-task-drift to proceed against the new "
+            "definition (journaled), or restore the original task definition."
         )
     return mutating and acknowledge_drift
 
@@ -188,6 +214,11 @@ def guard_mutation(
                 at=now_iso(),
             )
         )
+        # the acknowledgement re-binds the store to the new SPEC identity
+        try:
+            lifecycle.bind_task_spec(store, task)
+        except lifecycle.LifecycleError as exc:
+            store._note_diagnostic(f"spec re-bind failed: {exc}")
 
 
 def ensure_seeded(store: Store, task: Task) -> Generation:
@@ -242,6 +273,17 @@ def _converge_lifecycle(store: Store, task: Task) -> None:
         ensure_dataset_revision(store, task)
         if lifecycle.evidence_links_needed(store):
             lifecycle.ensure_evidence_links(store, task)
+        # bind the SPEC identity once — but never across unacknowledged
+        # legacy drift: an unbound store whose active generation was
+        # created under a DIFFERENT case-inclusive fingerprint keeps the
+        # legacy guard until the operator acknowledges
+        st = lifecycle.state(store)
+        active_generation = store.active_generation()
+        if st.task_spec is None and (
+            active_generation is None
+            or active_generation.task_fingerprint == task.fingerprint()
+        ):
+            lifecycle.bind_task_spec(store, task)
     except lifecycle.LifecycleError as exc:
         store._note_diagnostic(f"lifecycle convergence failed: {exc}")
 
@@ -300,18 +342,30 @@ def _pin_default_prompt(store: Store) -> None:
     )
 
 
-@dataclass(frozen=True)
-class RecordedEvidence:
-    """What one candidate assessment persisted: the lifecycle identity, the
-    legacy decision ref, the SelectionDecision envelope (which activation
-    cites), and the per-role bundle refs."""
+def _provenance_from_execution_record(
+    store: Store, execution_record_ref: str, revision_id: str, run_id: str
+) -> "ExecutionProvenance":
+    """The evidence provenance pair from the reader's pinned
+    ExecutionRecord; when the record is unavailable or carries no resolved
+    baseline, pin fresh truthful provenance for the retained subject."""
+    from strive import selection as selection_mod
+    from strive.reader import ExecutionRecord
 
-    revision_id: str
-    decision_ref: str
-    selection_ref: str
-    task_bundle_ref: str
-    constraint_bundle_ref: str
-    prompt_bundle_ref: str | None
+    if execution_record_ref:
+        try:
+            execution_record: ExecutionRecord = codec.loads(
+                store.objects.get_text(execution_record_ref), ExecutionRecord
+            )
+            if execution_record.base_resolved_ref is not None:
+                return selection_mod.ExecutionProvenance(
+                    resolved_manifest_ref=execution_record.base_resolved_ref,
+                    execution_record_ref=execution_record_ref,
+                )
+        except Exception:  # noqa: BLE001 — fall through to fresh provenance
+            pass
+    return selection_mod.pin_execution_provenance(
+        store, subject_revision_id=revision_id, operation="cycle", run_id=run_id
+    )
 
 
 def _record_candidate_evidence(
@@ -327,127 +381,60 @@ def _record_candidate_evidence(
     run_id: str,
     events: EventLog,
     *,
-    resolved_manifest_ref: str,
+    execution_record_ref: str,
     usage: BudgetUsage,
     budget: BudgetSpec,
     prompt_evidence_ref: str | None = None,
     prompt_improved: bool | None = None,
-) -> RecordedEvidence:
+) -> "RecordedAssessment":
     """Persist the evaluated candidate's IDENTITY and EVIDENCE into the
     lifecycle BEFORE any served behavior changes: retain the exact evaluated
     revision (accepted or rejected), link its compatibility generation, and
-    append the evaluation + selection records WITH their versioned evidence
-    envelopes — separate task, constraint, and (for composites) prompt
-    bundles, typed per role, so no surface borrows another's evidence.
-    Raises on failure — retention or evidence problems must surface before
-    activation, not after."""
+    record the assessment with modern promote-grade envelopes — separate
+    task/constraint(/prompt) bundles pinned to the exact execution
+    provenance (the reader's ExecutionRecord and the resolved harness it
+    ran under). Raises on failure — retention or evidence problems must
+    surface before activation, not after."""
     from strive import selection as selection_mod
-    from strive.evidence import (
-        DISPOSITION_PROMOTE,
-        DISPOSITION_REJECT,
-        DecisionEvidence,
-        ROLE_CONSTRAINT,
-        ROLE_PROMPT,
-        ROLE_TASK,
-    )
 
     revision: HarnessRevision = codec.loads(
         store.objects.get_text(overlay.revision_ref), HarnessRevision
     )
     revision_id = revision.ref.revision_id
-    evaluation_ref = store.objects.put_text(codec.dumps(candidate_evaluation))
-    decision_ref = store.objects.put_text(codec.dumps(decision))
     lifecycle.retain(
         store,
         revision,
         task_fingerprint=_provenance_fingerprint(store, revision),
         generation_id=candidate_generation_id,
     )
-    _task_bundle, task_bundle_ref = selection_mod.build_task_bundle(
+    provenance = _provenance_from_execution_record(
+        store, execution_record_ref, revision_id, run_id
+    )
+    recorded = selection_mod.record_assessment(
         store,
         task,
-        subject_revision_id=revision_id,
-        resolved_manifest_ref=resolved_manifest_ref,
+        revision_id=revision_id,
+        baseline_revision_id=baseline_revision_id,
         baseline_evaluation=baseline_evaluation,
         candidate_evaluation=candidate_evaluation,
         decision=decision,
-        budget=budget,
-    )
-    _constraint_bundle, constraint_bundle_ref = selection_mod.build_constraint_bundle(
-        store,
-        task,
-        subject_revision_id=revision_id,
-        resolved_manifest_ref=resolved_manifest_ref,
-        screen_rejection_kind=None,
-        screen_detail="kernel source screen passed before evaluation",
+        policy_ref=policy_ref,
+        scope_manifest_ref=overlay.manifest_ref,
+        provenance=provenance,
         usage=usage,
         budget=budget,
-    )
-    evidence = [
-        DecisionEvidence(role=ROLE_TASK, bundle_ref=task_bundle_ref),
-        DecisionEvidence(role=ROLE_CONSTRAINT, bundle_ref=constraint_bundle_ref),
-    ]
-    prompt_bundle_ref: str | None = None
-    if prompt_evidence_ref is not None and prompt_improved is not None:
-        _prompt_bundle, prompt_bundle_ref = selection_mod.build_prompt_bundle(
-            store,
-            task,
-            subject_revision_id=revision_id,
-            resolved_manifest_ref=resolved_manifest_ref,
-            prompt_evidence_ref=prompt_evidence_ref,
-            improved=prompt_improved,
-            detail="trusted prompt-vs-prompt comparison (see artifact)",
-            budget=budget,
-        )
-        evidence.append(
-            DecisionEvidence(role=ROLE_PROMPT, bundle_ref=prompt_bundle_ref)
-        )
-    _selection_decision, selection_ref = selection_mod.build_selection_decision(
-        store,
-        policy_ref=policy_ref,
-        disposition=(
-            DISPOSITION_PROMOTE if decision.accepted else DISPOSITION_REJECT
-        ),
-        subject_revision_id=revision_id,
-        incumbent_revision_id=baseline_revision_id,
-        evidence=tuple(evidence),
-        rationale=decision.reason,
-    )
-    lifecycle.record_evaluation(
-        store,
-        revision_id,
-        baseline_revision_id=baseline_revision_id,
-        evaluation_ref=evaluation_ref,
-        manifest_ref=overlay.manifest_ref,
+        prompt_evidence_ref=prompt_evidence_ref,
+        prompt_improved=prompt_improved,
         run_id=run_id,
-        bundle_ref=task_bundle_ref,
-    )
-    lifecycle.record_selection(
-        store,
-        revision_id,
-        baseline_revision_id=baseline_revision_id,
-        evaluation_ref=evaluation_ref,
-        decision_ref=decision_ref,
-        policy_ref=policy_ref,
-        accepted=decision.accepted,
-        run_id=run_id,
-        selection_ref=selection_ref,
     )
     events.emit(
         "lifecycle_retained",
         revision_id=revision_id,
         accepted=decision.accepted,
         baseline_revision_id=baseline_revision_id,
-        selection_ref=selection_ref,
+        selection_ref=recorded.selection_ref,
     )
-    return RecordedEvidence(
-        revision_id=revision_id,
-        decision_ref=decision_ref,
-        selection_ref=selection_ref,
-        task_bundle_ref=task_bundle_ref,
-        constraint_bundle_ref=constraint_bundle_ref,
-        prompt_bundle_ref=prompt_bundle_ref,
-    )
+    return recorded
 
 
 def _build_composite_overlay(
@@ -571,7 +558,6 @@ def _activate_code_only_sibling(
     proposer_ref: str,
     run_id: str,
     *,
-    resolved_manifest_ref: str,
     usage: BudgetUsage,
     budget: BudgetSpec,
     gen_expected_active: str | None,
@@ -599,13 +585,6 @@ def _activate_code_only_sibling(
         origin="candidate-overlay",
     )
     from strive import selection as selection_mod
-    from strive.evidence import (
-        DISPOSITION_PROMOTE,
-        DISPOSITION_REJECT,
-        DecisionEvidence,
-        ROLE_CONSTRAINT,
-        ROLE_TASK,
-    )
 
     lifecycle.retain(
         store,
@@ -613,71 +592,42 @@ def _activate_code_only_sibling(
         task_fingerprint=task.fingerprint(),
         generation_id=candidate_generation.generation_id,
     )
-    evaluation_ref = store.objects.put_text(codec.dumps(candidate_evaluation))
-    decision_ref = store.objects.put_text(codec.dumps(task_decision))
     # the sibling's own envelopes: its sole delta IS the executed artifact,
     # so the task evidence applies to it exactly; no prompt role is required
-    # (or permitted) — the composite keeps the rejected prompt evidence
-    _task_bundle, task_bundle_ref = selection_mod.build_task_bundle(
+    # (or permitted) — the composite keeps the rejected prompt evidence.
+    # Provenance is pinned fresh for the retained sibling (the sandbox ran
+    # the identical strategy artifact as the composite overlay).
+    provenance = selection_mod.pin_execution_provenance(
+        store,
+        subject_revision_id=sibling.ref.revision_id,
+        operation="cycle",
+        run_id=run_id,
+        detail=(
+            "code-only sibling of the executed composite overlay "
+            "(identical strategy artifact)"
+        ),
+    )
+    recorded = selection_mod.record_assessment(
         store,
         task,
-        subject_revision_id=sibling.ref.revision_id,
-        resolved_manifest_ref=resolved_manifest_ref,
+        revision_id=sibling.ref.revision_id,
+        baseline_revision_id=lifecycle_baseline,
         baseline_evaluation=baseline_evaluation,
         candidate_evaluation=candidate_evaluation,
         decision=task_decision,
-        budget=budget,
-    )
-    _constraint_bundle, constraint_bundle_ref = selection_mod.build_constraint_bundle(
-        store,
-        task,
-        subject_revision_id=sibling.ref.revision_id,
-        resolved_manifest_ref=resolved_manifest_ref,
-        screen_rejection_kind=None,
-        screen_detail="kernel source screen passed before evaluation",
+        policy_ref=policy_ref,
+        scope_manifest_ref=sibling.scope_manifest_ref,
+        provenance=provenance,
         usage=usage,
         budget=budget,
-    )
-    _selection_decision, selection_ref = selection_mod.build_selection_decision(
-        store,
-        policy_ref=policy_ref,
-        disposition=(
-            DISPOSITION_PROMOTE if task_decision.accepted else DISPOSITION_REJECT
-        ),
-        subject_revision_id=sibling.ref.revision_id,
-        incumbent_revision_id=lifecycle_baseline,
-        evidence=(
-            DecisionEvidence(role=ROLE_TASK, bundle_ref=task_bundle_ref),
-            DecisionEvidence(role=ROLE_CONSTRAINT, bundle_ref=constraint_bundle_ref),
-        ),
-        rationale=task_decision.reason,
-    )
-    lifecycle.record_evaluation(
-        store,
-        sibling.ref.revision_id,
-        baseline_revision_id=lifecycle_baseline,
-        evaluation_ref=evaluation_ref,
-        manifest_ref=sibling.scope_manifest_ref,
         run_id=run_id,
-        bundle_ref=task_bundle_ref,
-    )
-    lifecycle.record_selection(
-        store,
-        sibling.ref.revision_id,
-        baseline_revision_id=lifecycle_baseline,
-        evaluation_ref=evaluation_ref,
-        decision_ref=decision_ref,
-        policy_ref=policy_ref,
-        accepted=task_decision.accepted,
-        run_id=run_id,
-        selection_ref=selection_ref,
     )
     lifecycle.run_activation_op(
         store,
         sibling.ref.revision_id,
         reason="evolved",
         policy_ref=policy_ref,
-        decision_ref=selection_ref,
+        decision_ref=recorded.selection_ref,
         gen_expected_active=gen_expected_active,
         gen_expected_head=gen_expected_head,
     )
@@ -1324,7 +1274,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                             selection_policy_ref,
                             run_id,
                             events,
-                            resolved_manifest_ref=candidate_execution_record.get(
+                            execution_record_ref=candidate_execution_record.get(
                                 "ref", ""
                             ),
                             usage=meter.usage(),
@@ -1378,9 +1328,6 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                                 lifecycle_baseline, candidate_generation,
                                 evaluation, candidate_evaluation, decision,
                                 policy_ref, proposer_ref, run_id,
-                                resolved_manifest_ref=(
-                                    candidate_execution_record.get("ref", "")
-                                ),
                                 usage=meter.usage(),
                                 budget=config.budget,
                                 gen_expected_active=active.generation_id,

@@ -1,6 +1,94 @@
 # HANDOFF — strive
 
-## Stage 3C.2A — versioned validation evidence and policy-neutral selection (current)
+## Stage 3C.2A.1 — authoritative envelopes (current)
+
+The correction pass making the merged validation/selection envelopes
+AUTHORITATIVE. Five areas:
+
+1. **Task/dataset identity finished.** `EvaluationManifest` (v2) pins the
+   exact `TaskSpecVersion` and `DatasetRevision` by CAS ref
+   (`task_spec_ref` / `dataset_revision_ref`) with the fingerprints
+   verified against what those refs decode to; the pinned task fingerprint
+   is the SPEC fingerprint (pure `task_spec_fingerprint`, cases excluded).
+   The live mutation guard now detects task-SPEC drift: a `TaskSpecBound`
+   record in the lifecycle journal (bound at seeding, or re-bound on
+   acknowledged drift) is what mutations are checked against — DATASET
+   GROWTH FLOWS THROUGH THE REAL GUARD WITH NO ACKNOWLEDGEMENT, invalidates
+   evidence via the current-dataset check, and forces incumbent
+   re-baselining; spec changes (signature/catalog/version/scorer/
+   description) still require the journaled acknowledgement, which
+   re-binds. Unbound legacy stores keep the case-inclusive guard until
+   their first clean convergence binds the spec (never across
+   unacknowledged legacy drift). Existing generation/revision provenance
+   is untouched — the binding is additive.
+2. **Execution provenance corrected.** `resolved_manifest_ref` must decode
+   to the exact `ResolvedHarnessManifest` the evaluation executed under —
+   an ExecutionRecord smuggled in its place fails the typed decode;
+   `execution_record_ref` is pinned separately. The activation gate
+   verifies agreement: the record names the exact subject revision (CAS
+   ref equality with the retained revision), its effective manifest equals
+   the subject's scope manifest, the record ran under the same resolved
+   baseline the manifest pins, and a journal head is present. The loop
+   uses the reader's pinned ExecutionRecord; harness-internal paths (the
+   experiment's metered gate, lifecycle fixtures) pin truthful provenance
+   via `selection.pin_execution_provenance`.
+3. **Complete evidence semantics.** For promote: each role's bundle must
+   pin the EXACT validator set the role prescribes
+   (`ROLE_REQUIRED_VALIDATORS`), with one-to-one agreement between
+   manifest validator refs and bundle results (missing results,
+   extraneous results, duplicate (validator, subject_role) pairs, and
+   duplicate evidence roles all block); the paired comparison must have
+   PASSED with its recorded `Decision` artifact accepted — a noncrashing
+   candidate suite is never acceptance; a baseline suite is required when
+   an incumbent is named, and suite artifacts must decode and agree with
+   the recorded scores and the journal's evaluation ref; objective specs
+   decode and match across the decision and every bundle; the envelope's
+   policy_ref/subject/incumbent/disposition must agree with the journal
+   record.
+4. **Synthetic evidence graded honestly.** Migrated/inferred envelopes
+   (`EvidenceLink.synthetic`) are preserved for inspection, replay,
+   rollback, and reactivation of previously served known-good revisions —
+   but never authorize a FRESH promotion: inferred source-screen claims
+   and zero-usage budget records are not promote-grade; the gate demands a
+   modern re-evaluation (`selection.record_assessment` — the shared
+   loop/experiment/fixture recording path with real evaluations, real
+   usage, and pinned provenance). `ensure_evidence_links` also RE-LINKS
+   records whose envelopes no longer decode under this build (schema
+   upgrades), appending fresh synthetic links without rewriting old bytes.
+5. **Hard constraints + storage safety.** `budget-within-spec@1` covers
+   wall time, executions, model calls, tokens, output bytes, cost, and
+   recursion depth with the meter's exact limit semantics (-1 accounting
+   only; 0 nothing allowed; otherwise usage must not exceed the limit);
+   unknown usage stays INCONCLUSIVE and blocks. Dataset revision creation
+   is locked (advisory flock), expected-head checked (`dataset_head`),
+   crash-safe (a torn final line is quarantined and truncated under the
+   lock; interior corruption never auto-repairs), idempotent under
+   contention, and CAS-closure verified (the revision object and every
+   split manifest must round-trip before the append is durable) — with
+   concurrent-writer and crash-injection tests.
+
+**Verification:** 300 tests pass; `mypy --strict` clean over 56 files.
+Adversarial additions: regression growth through the real mutation guard
+(no acknowledgement; spec change still refused), spec re-bind invalidating
+old evidence, a wrong-but-noncrashing candidate, missing and failed paired
+comparisons, objective mismatch, an ExecutionRecord passed as a resolved
+manifest, synthetic evidence attempting fresh promotion (then unblocked by
+a modern re-evaluation), duplicate roles/validators/extraneous results,
+every budget dimension individually, concurrent dataset growth with
+stale-head refusal, and torn-tail/interior-corruption crash injection.
+
+**The Stage 3C.2A.1 claim, stated precisely:** strive authorizes
+activation only from reconstructable evidence whose task, dataset, harness
+state, validators, objectives, budgets, subject, and baseline all match
+the exact evaluation that produced the decision.
+
+**Next phase (exact):** the budget-matched `hill-climb@1` versus
+GEPA-style `pareto-population@1` experiment (ADR-0005) using these
+contracts unchanged — the frontier maintained via journaled `frontier_add`
+dispositions, both algorithms behind the `EvolutionAlgorithm` protocol
+under equal trusted budgets.
+
+## Stage 3C.2A — versioned validation evidence and policy-neutral selection (historical)
 
 The ADR-0003/0004 selection slice, frozen and integrated. Six areas:
 

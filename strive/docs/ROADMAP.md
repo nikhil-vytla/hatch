@@ -458,6 +458,46 @@ The ADR-0003/0004 evidence slice, frozen and integrated:
   activation is authorized only by complete current evidence for the exact
   revision and active baseline.
 
+## Stage 3C.2A.1 — Authoritative envelopes (done)
+
+The correction pass that makes the merged envelopes AUTHORITATIVE:
+
+- Task/dataset identity finished: evaluation manifests (v2) pin the exact
+  `TaskSpecVersion` and `DatasetRevision` by CAS ref with fingerprints
+  verified against what the refs decode to; the live mutation guard now
+  detects task-SPEC drift (`TaskSpecBound` in the lifecycle journal, bound
+  at seeding or on acknowledged drift) — dataset growth flows through the
+  REAL guard with no acknowledgement, invalidates evidence, and forces
+  incumbent re-baselining; unbound legacy stores keep the case-inclusive
+  guard until their first clean convergence.
+- Execution provenance corrected: `resolved_manifest_ref` must decode to
+  the exact `ResolvedHarnessManifest` the evaluation ran under (an
+  ExecutionRecord in its place fails the typed decode);
+  `execution_record_ref` is pinned separately, and the gate verifies the
+  record, subject revision, effective manifest, resolved baseline, and
+  journal heads agree.
+- Complete evidence semantics: promote requires the exact validator set
+  each role prescribes, one-to-one manifest↔results agreement (no missing,
+  extraneous, or duplicate results; no duplicate roles), a PASSED paired
+  comparison (a noncrashing candidate suite is not acceptance), decoded
+  objective specs matching across the decision and every bundle, and
+  policy/subject/incumbent/evaluation/baseline artifact agreement.
+- Synthetic evidence graded honestly: preserved for inspection, replay,
+  rollback, and reactivation, but inferred source-screen/zero-usage
+  records never authorize a fresh promotion — a modern re-evaluation
+  (`selection.record_assessment`, the shared loop/experiment/fixture
+  path) is required.
+- Hard constraints + storage safety: budget validation covers all seven
+  dimensions with the meter's exact limit semantics; dataset revision
+  creation is locked, expected-head checked, crash-safe (torn tails
+  quarantined under the lock; interior corruption never auto-repairs),
+  idempotent, and CAS-closure verified — with concurrent-writer and
+  crash-injection tests.
+- Exit claim: strive authorizes activation only from reconstructable
+  evidence whose task, dataset, harness state, validators, objectives,
+  budgets, subject, and baseline all match the exact evaluation that
+  produced the decision.
+
 ## Stage 3C.2B — Budget-matched algorithm comparison (next)
 
 A separate experiment using the 3C.2A envelopes UNCHANGED: `hill-climb@1`

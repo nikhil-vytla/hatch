@@ -54,7 +54,7 @@ from strive.lifecycle import (
 )
 from strive.loop import replay_run, rollback_generation, run_cycle
 from strive.migrations import apply_pending, pending_migrations
-from strive.revisions import RevisionActivation
+from strive.revisions import HarnessRevision, RevisionActivation
 from strive.selection import (
     build_constraint_bundle,
     build_selection_decision,
@@ -775,7 +775,27 @@ def test_migration_0005_is_idempotent_and_preserves_bytes(tmp_path: Path) -> Non
     )
     artifact_refs = {r.artifact_ref for r in task_bundle.results}
     assert evaluation_ref in artifact_refs and decision_ref in artifact_refs
-    # and the backfilled evidence now authorizes activation
+    # HONEST GRADING: the backfilled envelope is preserved for inspection but
+    # NEVER authorizes a fresh promotion — inferred source-screen and usage
+    # records aren't promote-grade; a modern re-evaluation is required
+    readiness = activation_readiness(store, "rev-legacy-history")
+    assert not readiness.ok
+    assert any("modern re-evaluation is required" in r for r in readiness.reasons)
+    with pytest.raises(LifecycleError, match="modern re-evaluation"):
+        run_activation_op(
+            store,
+            "rev-legacy-history",
+            reason="promote",
+            policy_ref="paired-deterministic@1",
+        )
+    # a modern re-evaluation (real envelopes, pinned provenance) unblocks
+    retained = codec.loads(
+        store.objects.get_text(
+            state(store).retained["rev-legacy-history"].revision_ref
+        ),
+        HarnessRevision,
+    )
+    _evaluate_and_select(store, retained, baseline)
     assert activation_readiness(store, "rev-legacy-history").ok
 
 
@@ -881,3 +901,473 @@ def test_cli_evidence_reports_roles_and_blocking_reasons(
         "missing required evidence role" in reason
         for reason in data["readiness"]["reasons"]
     )
+
+
+# =====================================================================================
+# Stage 3C.2A.1 — authoritative envelopes
+# =====================================================================================
+
+
+def test_regression_growth_passes_the_real_mutation_guard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dataset growth flows through the REAL mutation guard with NO drift
+    acknowledgement: the spec is unchanged, so run_cycle proceeds, the new
+    dataset revision is persisted, and fresh evidence pins it."""
+    store = _store(tmp_path)
+    run_cycle(store, TASK)  # binds the task SPEC at seeding
+    st = state(store)
+    assert st.task_spec is not None
+
+    grown = _grown_task()
+    monkeypatch.setattr(test_lifecycle, "TASK", grown)
+    # the real guard, mutating, with NO acknowledgement: growth is not drift
+    report = run_cycle(store, grown)
+    assert report is not None
+    dataset = current_dataset_revision(store)
+    assert dataset is not None and dataset.revision == 2
+    assert not any(
+        i.kind == "task-drift-acknowledged" for i in store.interventions()
+    )
+    # a SPEC change (version bump) still requires the acknowledgement
+    from strive.store import StoreError
+
+    spec_changed = dataclasses.replace(grown, version=99)
+    with pytest.raises(StoreError, match="task-SPEC drift"):
+        run_cycle(store, spec_changed)
+
+
+def test_spec_drift_invalidates_evidence(tmp_path: Path) -> None:
+    """Evidence produced under an older spec binding cannot authorize
+    activation after an acknowledged spec re-bind."""
+    store = _store(tmp_path)
+    baseline = _promotable(store, "rev-spec-drift")
+    assert activation_readiness(store, "rev-spec-drift").ok
+    lifecycle.bind_task_spec(store, dataclasses.replace(TASK, version=99))
+    readiness = activation_readiness(store, "rev-spec-drift")
+    assert not readiness.ok
+    assert any("spec drift invalidates evidence" in r for r in readiness.reasons)
+    assert baseline is not None
+
+
+def test_wrong_but_noncrashing_candidate_cannot_promote(tmp_path: Path) -> None:
+    """A candidate that executes cleanly but scores WRONG: the candidate
+    suite is noncrashing, the paired comparison fails, and nothing
+    activates — a noncrashing run is not acceptance."""
+    store = _store(tmp_path)
+    run_cycle(store, TASK)
+    lifecycle.rollback(store)
+    baseline = active_revision_id(store)
+    assert baseline is not None
+    wrong_source = (
+        '"""Wrong but noncrashing."""\n\n\ndef solve(input_text: str) -> int:\n'
+        "    return 0\n"
+    )
+    revision = _compose_linked(
+        store, "rev-wrong-quiet", {("strategy-code", "solve"): wrong_source}
+    )
+    _eval_ref, _decision_ref, accepted = _evaluate_and_select(
+        store, revision, baseline
+    )
+    assert not accepted  # the paired comparison failed despite clean execution
+    readiness = activation_readiness(store, "rev-wrong-quiet")
+    assert not readiness.ok
+    assert any("REJECTED" in r for r in readiness.reasons)
+    with pytest.raises(LifecycleError, match="REJECTED"):
+        run_activation_op(
+            store, "rev-wrong-quiet", reason="promote",
+            policy_ref="paired-deterministic@1",
+        )
+
+
+def _tampered_selection(
+    store: Store,
+    revision_id: str,
+    baseline: str,
+    mutate: Any,
+) -> None:
+    """Re-record the latest selection with a tampered envelope produced by
+    `mutate(envelope) -> envelope`."""
+    st = state(store)
+    link = next(
+        l for l in reversed(st.evidence_links[revision_id]) if l.kind == "selection"
+    )
+    envelope: SelectionDecision = codec.loads(
+        store.objects.get_text(link.envelope_ref), SelectionDecision
+    )
+    latest = st.selections[revision_id][-1]
+    record_selection(
+        store,
+        revision_id,
+        baseline_revision_id=baseline,
+        evaluation_ref=latest.evaluation_ref,
+        decision_ref=latest.decision_ref,
+        policy_ref=latest.policy_ref,
+        accepted=True,
+        selection_ref=store.objects.put_text(codec.dumps(mutate(envelope))),
+    )
+
+
+def _replace_task_bundle(
+    store: Store, envelope: SelectionDecision, mutate_bundle: Any
+) -> SelectionDecision:
+    task_ev = next(e for e in envelope.evidence if e.role == ROLE_TASK)
+    bundle: ValidationBundle = codec.loads(
+        store.objects.get_text(task_ev.bundle_ref), ValidationBundle
+    )
+    new_bundle = mutate_bundle(bundle)
+    new_ref = store.objects.put_text(codec.dumps(new_bundle))
+    return dataclasses.replace(
+        envelope,
+        evidence=tuple(
+            dataclasses.replace(e, bundle_ref=new_ref) if e.role == ROLE_TASK else e
+            for e in envelope.evidence
+        ),
+    )
+
+
+def test_missing_paired_comparison_blocks(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    baseline = _promotable(store, "rev-no-comparison")
+
+    def drop_comparison(bundle: ValidationBundle) -> ValidationBundle:
+        return dataclasses.replace(
+            bundle,
+            results=tuple(
+                r for r in bundle.results if r.validator != "paired-comparison@1"
+            ),
+        )
+
+    _tampered_selection(
+        store, "rev-no-comparison", baseline,
+        lambda env: _replace_task_bundle(store, env, drop_comparison),
+    )
+    readiness = activation_readiness(store, "rev-no-comparison")
+    assert not readiness.ok
+    assert any("paired-comparison" in r for r in readiness.reasons)
+
+
+def test_failed_paired_comparison_blocks(tmp_path: Path) -> None:
+    """A comparison whose recorded decision was REJECTED cannot ride into a
+    promote — even when every suite result 'passed' (noncrashing)."""
+    store = _store(tmp_path)
+    baseline = _promotable(store, "rev-failed-comparison")
+    from strive.contracts import Decision
+
+    rejected = Decision(
+        accepted=False,
+        reason="tampered: rejected comparison",
+        policy="paired-deterministic",
+        policy_version=1,
+        baseline_score=0.0,
+        candidate_score=1.0,
+        baseline_split_scores={},
+        candidate_split_scores={},
+        regressed_case_ids=(),
+    )
+    rejected_ref = store.objects.put_text(codec.dumps(rejected))
+
+    def swap_comparison_artifact(bundle: ValidationBundle) -> ValidationBundle:
+        return dataclasses.replace(
+            bundle,
+            results=tuple(
+                dataclasses.replace(r, artifact_ref=rejected_ref)
+                if r.validator == "paired-comparison@1"
+                else r
+                for r in bundle.results
+            ),
+        )
+
+    _tampered_selection(
+        store, "rev-failed-comparison", baseline,
+        lambda env: _replace_task_bundle(store, env, swap_comparison_artifact),
+    )
+    readiness = activation_readiness(store, "rev-failed-comparison")
+    assert not readiness.ok
+    assert any("NOT accepted" in r for r in readiness.reasons)
+
+
+def test_objective_mismatch_blocks(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    baseline = _promotable(store, "rev-objective-mismatch")
+    from strive.evidence import ObjectiveSpec, ObjectiveTerm
+
+    other_objective = ObjectiveSpec(
+        name="latency-first", version=1, description="different objective",
+        objectives=(ObjectiveTerm(metric="latency", direction="min", weight=1.0),),
+        constraints=(),
+    )
+    other_ref = store.objects.put_text(codec.dumps(other_objective))
+
+    def swap_objective(bundle: ValidationBundle) -> ValidationBundle:
+        manifest: EvaluationManifest = codec.loads(
+            store.objects.get_text(bundle.evaluation_manifest_ref),
+            EvaluationManifest,
+        )
+        new_manifest = dataclasses.replace(manifest, objective_spec_ref=other_ref)
+        return dataclasses.replace(
+            bundle,
+            evaluation_manifest_ref=store.objects.put_text(
+                codec.dumps(new_manifest)
+            ),
+        )
+
+    _tampered_selection(
+        store, "rev-objective-mismatch", baseline,
+        lambda env: _replace_task_bundle(store, env, swap_objective),
+    )
+    readiness = activation_readiness(store, "rev-objective-mismatch")
+    assert not readiness.ok
+    assert any(
+        "objective spec differs from the decision's" in r for r in readiness.reasons
+    )
+
+
+def test_execution_record_as_resolved_manifest_blocks(tmp_path: Path) -> None:
+    """An ExecutionRecord smuggled in as the resolved manifest fails the
+    exact-type decode — the manifest must pin a ResolvedHarnessManifest."""
+    store = _store(tmp_path)
+    baseline = _promotable(store, "rev-record-smuggle")
+
+    def smuggle(bundle: ValidationBundle) -> ValidationBundle:
+        manifest: EvaluationManifest = codec.loads(
+            store.objects.get_text(bundle.evaluation_manifest_ref),
+            EvaluationManifest,
+        )
+        # point resolved_manifest_ref at the EXECUTION RECORD instead
+        new_manifest = dataclasses.replace(
+            manifest, resolved_manifest_ref=manifest.execution_record_ref
+        )
+        return dataclasses.replace(
+            bundle,
+            evaluation_manifest_ref=store.objects.put_text(
+                codec.dumps(new_manifest)
+            ),
+        )
+
+    _tampered_selection(
+        store, "rev-record-smuggle", baseline,
+        lambda env: _replace_task_bundle(store, env, smuggle),
+    )
+    readiness = activation_readiness(store, "rev-record-smuggle")
+    assert not readiness.ok
+    assert any(
+        "does not decode to a ResolvedHarnessManifest" in r
+        for r in readiness.reasons
+    )
+
+
+def test_duplicate_roles_and_validators_and_extraneous_results_block(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    baseline = _promotable(store, "rev-duplicates")
+    st = state(store)
+    link = next(
+        l for l in reversed(st.evidence_links["rev-duplicates"]) if l.kind == "selection"
+    )
+    envelope: SelectionDecision = codec.loads(
+        store.objects.get_text(link.envelope_ref), SelectionDecision
+    )
+    task_ev = next(e for e in envelope.evidence if e.role == ROLE_TASK)
+    # (a) duplicate role
+    _tampered_selection(
+        store, "rev-duplicates", baseline,
+        lambda env: dataclasses.replace(env, evidence=env.evidence + (task_ev,)),
+    )
+    readiness = activation_readiness(store, "rev-duplicates")
+    assert not readiness.ok
+    assert any("duplicate evidence role" in r for r in readiness.reasons)
+
+    # (b) duplicate (validator, subject_role) result + extraneous validator
+    def duplicate_and_extraneous(bundle: ValidationBundle) -> ValidationBundle:
+        extraneous = dataclasses.replace(
+            bundle.results[0], validator="source-screen@1"
+        )
+        return dataclasses.replace(
+            bundle, results=bundle.results + (bundle.results[0], extraneous)
+        )
+
+    _tampered_selection(
+        store, "rev-duplicates", baseline,
+        lambda env: _replace_task_bundle(store, env, duplicate_and_extraneous),
+    )
+    readiness = activation_readiness(store, "rev-duplicates")
+    assert not readiness.ok
+    assert any("duplicate result" in r for r in readiness.reasons)
+    assert any("never pinned" in r for r in readiness.reasons)
+
+
+def test_budget_validation_covers_every_dimension() -> None:
+    """Each budget dimension is enforced with the meter's exact limit
+    semantics: -1 accounting-only, 0 nothing-allowed, otherwise usage must
+    not exceed the limit."""
+    from strive.contracts import BudgetUsage
+    from strive.validators import budget_result
+
+    spec = BudgetSpec(
+        wall_time_s=10.0, executions=4, model_calls=2, tokens=100,
+        output_bytes=1000, cost=1.0, max_recursion_depth=1,
+    )
+    ok = BudgetUsage(
+        wall_time_s=9.0, executions=4, model_calls=2, tokens=100,
+        output_bytes=1000, cost=1.0, recursion_depth=1,
+    )
+    assert budget_result(ok, spec).status == "passed"  # AT the limit is fine
+
+    overruns = {
+        "wall_time_s": dataclasses.replace(ok, wall_time_s=10.5),
+        "executions": dataclasses.replace(ok, executions=5),
+        "model_calls": dataclasses.replace(ok, model_calls=3),
+        "tokens": dataclasses.replace(ok, tokens=101),
+        "output_bytes": dataclasses.replace(ok, output_bytes=1001),
+        "cost": dataclasses.replace(ok, cost=1.5),
+        "recursion_depth": dataclasses.replace(ok, recursion_depth=2),
+    }
+    for dimension, usage in overruns.items():
+        result = budget_result(usage, spec)
+        assert result.status == "failed", dimension
+        assert dimension in result.detail, dimension
+    # -1: accounting only — never a violation
+    unlimited = BudgetSpec(
+        wall_time_s=-1, executions=-1, model_calls=-1, tokens=-1,
+        output_bytes=-1, cost=-1.0, max_recursion_depth=-1,
+    )
+    heavy = BudgetUsage(
+        wall_time_s=9e9, executions=10**6, model_calls=10**6, tokens=10**9,
+        output_bytes=10**9, cost=9e9, recursion_depth=99,
+    )
+    assert budget_result(heavy, unlimited).status == "passed"
+    # 0: nothing allowed — any usage violates
+    nothing = BudgetSpec(
+        wall_time_s=0, executions=0, model_calls=0, tokens=0,
+        output_bytes=0, cost=0.0, max_recursion_depth=0,
+    )
+    result = budget_result(BudgetUsage(executions=1), nothing)
+    assert result.status == "failed" and "executions" in result.detail
+    assert budget_result(BudgetUsage(), nothing).status == "passed"
+    # unknown usage: INCONCLUSIVE (blocks activation)
+    assert budget_result(None, spec).status == "inconclusive"
+
+
+def test_concurrent_dataset_growth_is_serialized(tmp_path: Path) -> None:
+    """Racing writers are serialized by the journal lock: lineage stays
+    monotonic with exact parent linkage, and a writer that decided against
+    a stale head refuses."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from strive.datasets import DatasetError, dataset_head
+
+    store = _store(tmp_path)
+    ensure_dataset_revision(store, TASK)
+
+    def variant(i: int) -> Task:
+        return dataclasses.replace(
+            TASK,
+            cases=TASK.cases
+            + tuple(
+                TaskCase(f"reg-{j}", f"case {j}: -{j} and {j}", 0, REGRESSION)
+                for j in range(1, i + 2)
+            ),
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(
+            lambda i: ensure_dataset_revision(
+                store, variant(i), reason=f"growth {i}"
+            ),
+            list(range(6)) * 2,  # repeats: idempotency under contention
+        ))
+    revisions = load_dataset_revisions(store)
+    assert [r.revision for r in revisions] == list(range(1, len(revisions) + 1))
+    assert [r.parent_revision for r in revisions] == [None] + [
+        r.revision for r in revisions[:-1]
+    ]
+    # expected-head: a decision made against a stale view refuses
+    stale_head = dataset_head(revisions[:1])
+    with pytest.raises(DatasetError, match="stale dataset head"):
+        ensure_dataset_revision(
+            store, variant(40), reason="stale", expected_head=stale_head
+        )
+    # and the CURRENT head is accepted
+    ensure_dataset_revision(
+        store, variant(41), reason="fresh", expected_head=dataset_head(revisions)
+    )
+
+
+def test_dataset_crash_injection_torn_tail_and_interior_corruption(
+    tmp_path: Path,
+) -> None:
+    from strive.datasets import DatasetError, _journal_path
+
+    store = _store(tmp_path)
+    ensure_dataset_revision(store, TASK)
+    path = Path(_journal_path(store))
+    good_bytes = path.read_bytes()
+
+    # crash mid-append: a torn (unterminated) final line
+    path.write_bytes(good_bytes + b'{"schema": "dataset-revision@1", "trunc')
+    with pytest.raises(DatasetError, match="torn final line"):
+        load_dataset_revisions(store)
+    # ensure recovers UNDER THE LOCK: quarantine + truncate, then proceeds
+    recovered = ensure_dataset_revision(store, _grown_task(), reason="post-crash")
+    assert recovered.revision == 2
+    quarantines = list(path.parent.glob(f"{path.name}.quarantine-*"))
+    assert quarantines and b"trunc" in quarantines[0].read_bytes()
+
+    # interior corruption (a bad line WITH newline) never auto-repairs
+    lines = path.read_bytes().splitlines(keepends=True)
+    path.write_bytes(lines[0] + b'{"not": "a revision"}\n' + b"".join(lines[1:]))
+    with pytest.raises(DatasetError, match="corrupt"):
+        load_dataset_revisions(store)
+    with pytest.raises(DatasetError, match="corrupt"):
+        ensure_dataset_revision(store, TASK)
+
+
+def test_promote_grade_evidence_pins_verified_provenance(tmp_path: Path) -> None:
+    """A modern promote-grade envelope decodes to the exact
+    ResolvedHarnessManifest + ExecutionRecord, refs and fingerprints agree,
+    and the manifest pins the exact TaskSpecVersion and DatasetRevision."""
+    from strive.evidence import DatasetRevision as DatasetRevisionRecord
+    from strive.evidence import TaskSpecVersion
+    from strive.reader import ExecutionRecord
+    from strive.revisions import ResolvedHarnessManifest
+
+    store = _store(tmp_path)
+    baseline = _promotable(store, "rev-provenance")
+    assert baseline is not None
+    st = state(store)
+    link = next(
+        l for l in reversed(st.evidence_links["rev-provenance"]) if l.kind == "selection"
+    )
+    envelope: SelectionDecision = codec.loads(
+        store.objects.get_text(link.envelope_ref), SelectionDecision
+    )
+    for item in envelope.evidence:
+        bundle: ValidationBundle = codec.loads(
+            store.objects.get_text(item.bundle_ref), ValidationBundle
+        )
+        manifest: EvaluationManifest = codec.loads(
+            store.objects.get_text(bundle.evaluation_manifest_ref),
+            EvaluationManifest,
+        )
+        resolved = codec.loads(
+            store.objects.get_text(manifest.resolved_manifest_ref),
+            ResolvedHarnessManifest,
+        )
+        assert resolved.effective  # the exact resolved harness, not a record
+        record = codec.loads(
+            store.objects.get_text(manifest.execution_record_ref), ExecutionRecord
+        )
+        assert record.subject_revision_ref == st.retained["rev-provenance"].revision_ref
+        assert record.base_resolved_ref == manifest.resolved_manifest_ref
+        assert record.canonical_head
+        spec: TaskSpecVersion = codec.loads(
+            store.objects.get_text(manifest.task_spec_ref), TaskSpecVersion
+        )
+        assert spec.fingerprint == manifest.task_fingerprint
+        dataset: DatasetRevisionRecord = codec.loads(
+            store.objects.get_text(manifest.dataset_revision_ref),
+            DatasetRevisionRecord,
+        )
+        assert dataset.fingerprint == manifest.dataset_fingerprint
