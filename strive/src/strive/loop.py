@@ -62,9 +62,11 @@ from strive.propose import (
     Proposer,
     RegistryProposer,
     STRATEGY_CODE_SURFACE,
+    screen_surface_update,
     screen_source,
 )
 from strive import lifecycle
+from strive.promptgate import PromptComparisonEvidence
 from strive.reader import MODE_CANARY, CandidateSubject, StateReader
 from strive.revisions import HarnessRevision
 from strive.sandbox import run_strategy
@@ -230,8 +232,63 @@ def _converge_lifecycle(store: Store) -> None:
         lifecycle.reconcile(store)
         if lifecycle.sync_needed(store):
             lifecycle.sync_from_generations(store)
+        _pin_default_prompt(store)
     except lifecycle.LifecycleError as exc:
         store._note_diagnostic(f"lifecycle convergence failed: {exc}")
+
+
+def _pin_default_prompt(store: Store) -> None:
+    """Pin the build's default proposal template INTO lifecycle state, once:
+    a prompt-only composite child of the current active revision, installed
+    through the recoverable activation op with a journaled structural
+    override. Historical revisions then resolve their prompt from CAS —
+    never from the current build's default string — and rollback restores
+    the pinned historical text."""
+    from strive.model_proposer import DEFAULT_PROPOSAL_TEMPLATE
+
+    st = lifecycle.state(store)
+    if st.breaker_open or st.journal_errors or st.open_intents:
+        return
+    if "rev-prompt-default" in st.retained:
+        return  # pinned once; rollback below the pin is explicit legacy state
+    active = st.active_revision_id
+    if active is None:
+        return
+    resolved = lifecycle.materialize_active(store)
+    if resolved is None:
+        return
+    if any(b.kind == "prompt" for b in resolved.effective):
+        return  # a prompt is already bound (nothing legacy to pin)
+    active_generation = store.active_generation()
+    if active_generation is None:
+        return
+    revision, _ref = lifecycle.compose_revision(
+        store,
+        revision_id="rev-prompt-default",
+        base_parent_id=active,
+        parent_manifest_bindings=resolved.effective,
+        surfaces={("prompt", "proposal-template"): DEFAULT_PROPOSAL_TEMPLATE},
+        proposer="default-prompt-pin@1",
+        summary="pin the built-in proposal template into lifecycle state",
+        task_fingerprint=active_generation.task_fingerprint,
+        origin="default-prompt-pin",
+    )
+    lifecycle.retain(
+        store,
+        revision,
+        task_fingerprint=active_generation.task_fingerprint,
+        generation_id=active_generation.generation_id,
+    )
+    lifecycle.run_activation_op(
+        store,
+        "rev-prompt-default",
+        reason="promote",
+        policy_ref="default-prompt-pin@1",
+        override_reason=(
+            "structural: pin the default proposal template into lifecycle "
+            "state (no behavioral change; the served strategy is unchanged)"
+        ),
+    )
 
 
 def _record_candidate_evidence(
@@ -287,6 +344,188 @@ def _record_candidate_evidence(
         baseline_revision_id=baseline_revision_id,
     )
     return revision.ref.revision_id, decision_ref
+
+
+def _build_composite_overlay(
+    store: Store,
+    candidate: Candidate,
+    proposal: ProposalRecord,
+    lifecycle_baseline: str | None,
+    proposer_ref: str,
+    task: Task,
+) -> CandidateSubject | None:
+    """Build the ONE immutable candidate revision containing every proposed
+    delta — strategy-code always, prompt/proposal-template when the proposal
+    carries a prompt_update — BEFORE evaluation, against the lifecycle's
+    active manifest (unchanged bindings carry over). The exact evaluated
+    revision is what gets retained, selected, and activated; there is no
+    post-evaluation reconstruction. None on failure (the caller refuses
+    promotion of identity-less candidates)."""
+    try:
+        if lifecycle_baseline is None:
+            return None
+        resolved = lifecycle.materialize_active(store)
+        if resolved is None:
+            return None
+        surfaces: dict[tuple[str, str], str] = {
+            ("strategy-code", "solve"): proposal.source,
+        }
+        from strive.revisions import DESCRIPTOR_REGISTRY
+
+        for update in proposal.surface_updates:
+            kind = DESCRIPTOR_REGISTRY[update.descriptor_ref].kind
+            surfaces[(kind, update.name)] = update.content
+        revision, revision_ref = lifecycle.compose_revision(
+            store,
+            revision_id=f"rev-{candidate.candidate_id}",
+            base_parent_id=lifecycle_baseline,
+            parent_manifest_bindings=resolved.effective,
+            surfaces=surfaces,
+            proposer=proposer_ref,
+            summary=proposal.summary,
+            task_fingerprint=task.fingerprint(),
+            weakness_id=candidate.weakness_id,
+            origin="candidate-overlay",
+        )
+        return CandidateSubject(
+            revision_ref=revision_ref,
+            manifest_ref=revision.scope_manifest_ref,
+            provenance_ref=revision.provenance_ref or "",
+            source_ref=candidate.source_ref,
+        )
+    except Exception:  # noqa: BLE001 — construction failure = refusal path
+        return None
+
+
+def _prompt_surface_gate(
+    store: Store,
+    task: Task,
+    proposal: ProposalRecord,
+    request: ProposalRequest,
+    task_decision: Decision,
+    config: LoopConfig,
+    events: EventLog,
+) -> "tuple[PromptComparisonEvidence | None, str | None, Decision]":
+    """The trusted prompt validator over a composite's prompt delta: matched
+    proposer trials under candidate vs incumbent templates (same adapter,
+    context, budgets, metered handle). Returns (evidence, evidence_ref,
+    composite_decision). When no evidence can be produced (no adapter), the
+    composite is not promotable — the prompt cannot piggyback."""
+    from strive import promptgate
+
+    update = proposal.surface_updates[0]
+    if request.model is None:
+        composite = Decision(
+            accepted=False,
+            reason=(
+                "composite carries a prompt delta but no adapter is available "
+                "to produce prompt-specific evidence; a prompt must not "
+                "piggyback on code evidence"
+            ),
+            policy="prompt-comparison",
+            policy_version=1,
+            baseline_score=task_decision.baseline_score,
+            candidate_score=task_decision.candidate_score,
+            baseline_split_scores=dict(task_decision.baseline_split_scores),
+            candidate_split_scores=dict(task_decision.candidate_split_scores),
+            regressed_case_ids=task_decision.regressed_case_ids,
+        )
+        return None, None, composite
+    evidence, evidence_ref = promptgate.compare_templates(
+        store,
+        task,
+        incumbent_template=request.prompt_template,
+        candidate_template=update.content,
+        request=request,
+        model=request.model,
+        adapter_name=(
+            type(config.model_adapter).__name__ if config.model_adapter else "none"
+        ),
+    )
+    events.emit(
+        "prompt_comparison",
+        evidence_ref=evidence_ref,
+        improved=evidence.improved,
+        detail=evidence.detail,
+    )
+    return evidence, evidence_ref, promptgate.prompt_gate_decision(
+        task_decision, evidence
+    )
+
+
+def _activate_code_only_sibling(
+    store: Store,
+    task: Task,
+    candidate: Candidate,
+    proposal: ProposalRecord,
+    lifecycle_baseline: str | None,
+    candidate_generation: Generation,
+    candidate_evaluation: Evaluation,
+    task_decision: Decision,
+    policy_ref: str,
+    proposer_ref: str,
+    run_id: str,
+    *,
+    gen_expected_active: str | None,
+    gen_expected_head: str | None,
+) -> str:
+    """When the code passes the task gate but the bundled prompt delta earns
+    no surface-specific benefit: retain and activate the code-only sibling
+    revision. Its sole delta IS the artifact the sandbox executed, so the
+    task evidence applies to it exactly; the composite stays retained as
+    rejected evidence."""
+    assert lifecycle_baseline is not None
+    resolved = lifecycle.materialize_active(store)
+    assert resolved is not None
+    sibling, _ref = lifecycle.compose_revision(
+        store,
+        revision_id=f"rev-{candidate.candidate_id}-code",
+        base_parent_id=lifecycle_baseline,
+        parent_manifest_bindings=resolved.effective,
+        surfaces={("strategy-code", "solve"): proposal.source},
+        proposer=proposer_ref,
+        summary=f"code-only sibling of rev-{candidate.candidate_id} "
+        "(prompt delta earned no surface-specific evidence)",
+        task_fingerprint=task.fingerprint(),
+        weakness_id=candidate.weakness_id,
+        origin="candidate-overlay",
+    )
+    lifecycle.retain(
+        store,
+        sibling,
+        task_fingerprint=task.fingerprint(),
+        generation_id=candidate_generation.generation_id,
+    )
+    evaluation_ref = store.objects.put_text(codec.dumps(candidate_evaluation))
+    decision_ref = store.objects.put_text(codec.dumps(task_decision))
+    lifecycle.record_evaluation(
+        store,
+        sibling.ref.revision_id,
+        baseline_revision_id=lifecycle_baseline,
+        evaluation_ref=evaluation_ref,
+        manifest_ref=sibling.scope_manifest_ref,
+        run_id=run_id,
+    )
+    lifecycle.record_selection(
+        store,
+        sibling.ref.revision_id,
+        baseline_revision_id=lifecycle_baseline,
+        evaluation_ref=evaluation_ref,
+        decision_ref=decision_ref,
+        policy_ref=policy_ref,
+        accepted=task_decision.accepted,
+        run_id=run_id,
+    )
+    lifecycle.run_activation_op(
+        store,
+        sibling.ref.revision_id,
+        reason="evolved",
+        policy_ref=policy_ref,
+        decision_ref=decision_ref,
+        gen_expected_active=gen_expected_active,
+        gen_expected_head=gen_expected_head,
+    )
+    return sibling.ref.revision_id
 
 
 def _provenance_fingerprint(store: Store, revision: "HarnessRevision") -> str:
@@ -459,6 +698,53 @@ def _resolve_provisional(store: Store, reader: StateReader, events: EventLog) ->
     )
 
 
+def resolve_active_prompt(store: Store) -> tuple[str, str, str | None, str]:
+    """The ACTIVE prompt/proposal-template surface, resolved from the native
+    lifecycle's manifest — no static-template assumption. Returns
+    (template_text, prompt_ref, active_revision_id, source) where source is
+    "revision" (manifest-bound; the normal case once the default is pinned
+    into lifecycle state) or "legacy-default" (explicitly unmigrated
+    pre-prompt history ONLY). Corruption, a missing artifact, or an invalid
+    template is a structured failure — never a silent fallback."""
+    from strive.cas import ObjectCorruption, ObjectMissing
+    from strive.model_proposer import DEFAULT_PROPOSAL_TEMPLATE, validate_prompt_template
+
+    resolved = lifecycle.materialize_active(store)  # LifecycleError propagates
+    if resolved is not None:
+        binding = next(
+            (
+                b
+                for b in resolved.effective
+                if (b.kind, b.name) == ("prompt", "proposal-template")
+            ),
+            None,
+        )
+        if binding is not None and binding.binding.content_ref is not None:
+            try:
+                text = store.objects.get_text(binding.binding.content_ref)
+            except (ObjectMissing, ObjectCorruption) as exc:
+                raise StoreError(
+                    f"active prompt artifact unavailable: {exc}"
+                ) from None
+            rejection = validate_prompt_template(text)
+            if rejection is not None:
+                raise StoreError(
+                    f"active prompt template is invalid: {rejection}"
+                )
+            return (
+                text,
+                binding.binding.content_ref,
+                resolved.contributions[0].revision.revision_id,
+                "revision",
+            )
+    # explicitly unmigrated legacy state: no revision in this lifecycle has
+    # ever bound a prompt (pre-prompt history). The pin step in seeding
+    # normally removes this case on the next operation.
+    default_ref = store.objects.put_text(DEFAULT_PROPOSAL_TEMPLATE)
+    active = lifecycle.active_revision_id(store)
+    return DEFAULT_PROPOSAL_TEMPLATE, default_ref, active, "legacy-default"
+
+
 def _proposal_stage(
     store: Store,
     task: Task,
@@ -468,14 +754,33 @@ def _proposal_stage(
     config: LoopConfig,
     events: EventLog,
     reader: StateReader,
-) -> tuple[ProposalRecord | None, FailureRecord | None]:
-    """Run the proposer, then kernel-side checks: staleness and the forbidden-
-    source screen. Every rejection is journaled with its distinct kind."""
+) -> tuple[ProposalRecord | None, FailureRecord | None, ProposalRequest]:
+    """Run the proposer, then kernel-side checks: staleness (generation id,
+    active prompt, lifecycle head), the forbidden-source screen, and the
+    generic surface-update screen. Every rejection is journaled with its
+    distinct kind. The request (with its pinned state and metered model
+    handle) is returned so the composite prompt gate can run matched trials
+    under the SAME conditions and budgets."""
     model_handle = None
     if config.model_adapter is not None:
         model_handle = MeteredJournalingAdapter(
             config.model_adapter, meter, events, store.objects
         )
+    # the active prompt surface + the pinned lifecycle state, journaled for
+    # EVERY model request and carried in the request for staleness checks
+    prompt_template, prompt_ref, prompt_revision, prompt_source = (
+        resolve_active_prompt(store)
+    )
+    from strive.revisions import current_descriptor
+
+    lifecycle_head = lifecycle.state(store).head
+    events.emit(
+        "prompt_resolved",
+        prompt_ref=prompt_ref,
+        prompt_source=prompt_source,
+        active_revision=prompt_revision,
+        lifecycle_head=lifecycle_head,
+    )
     usage = meter.usage()
     request = ProposalRequest(
         ctx=ctx,
@@ -488,6 +793,11 @@ def _proposal_stage(
         model_calls_remaining=max(0, config.budget.model_calls - usage.model_calls - 1),
         executions_remaining=max(0, config.budget.executions - usage.executions),
         model=model_handle,
+        prompt_template=prompt_template,
+        prompt_ref=prompt_ref,
+        prompt_descriptor_ref=current_descriptor("prompt").descriptor_ref,
+        parent_revision_id=prompt_revision,
+        lifecycle_head=lifecycle_head,
     )
     result = config.proposer.propose(request)
 
@@ -497,29 +807,44 @@ def _proposal_stage(
             proposer=config.proposer.name,
             failure=codec.encode(result.failure),
         )
-        return None, result.failure
+        return None, result.failure, request
     assert result.proposal is not None
     proposal = result.proposal
 
     # staleness: re-read the incumbent through the read boundary's explicit
     # staleness re-read; a slow proposal must not apply to a generation that
-    # is no longer active
+    # is no longer active — and the PROMPT/LIFECYCLE state pinned in the
+    # request must be unchanged too, even when the generation id is not
     current = reader.recheck_active_for_staleness()
     current_id = current.generation_id if current is not None else "(none)"
+    stale_detail: str | None = None
     if current_id != proposal.parent_generation_id:
-        stale = FailureRecord(
-            kind=FAILURE_PROPOSAL_STALE,
-            detail=(
-                f"proposal parented on {proposal.parent_generation_id} but the "
-                f"active generation is now {current_id}"
-            ),
+        stale_detail = (
+            f"proposal parented on {proposal.parent_generation_id} but the "
+            f"active generation is now {current_id}"
         )
+    else:
+        _t, prompt_ref_now, _rev, _src = resolve_active_prompt(store)
+        head_now = lifecycle.state(store).head
+        if prompt_ref_now != request.prompt_ref:
+            stale_detail = (
+                "the active prompt changed during the model call "
+                f"({request.prompt_ref[:12]}… -> {prompt_ref_now[:12]}…)"
+            )
+        elif head_now != request.lifecycle_head:
+            stale_detail = (
+                "the lifecycle head advanced during the model call "
+                f"({request.lifecycle_head.split(':')[0]} -> "
+                f"{head_now.split(':')[0]})"
+            )
+    if stale_detail is not None:
+        stale = FailureRecord(kind=FAILURE_PROPOSAL_STALE, detail=stale_detail)
         events.emit(
             "proposal_rejected",
             proposer=config.proposer.name,
             failure=codec.encode(stale),
         )
-        return None, stale
+        return None, stale, request
 
     screen = screen_source(proposal.source, task.primitive_catalog)
     if screen is not None:
@@ -528,7 +853,24 @@ def _proposal_stage(
             proposer=config.proposer.name,
             failure=codec.encode(screen),
         )
-        return None, screen
+        return None, screen, request
+
+    if proposal.surface_updates:
+        hidden_texts = tuple(
+            value
+            for case in task.cases
+            if case.split != VISIBLE
+            for value in (case.input_text, case.case_id)
+        )
+        for update in proposal.surface_updates:
+            update_screen = screen_surface_update(update, hidden_texts)
+            if update_screen is not None:
+                events.emit(
+                    "proposal_rejected",
+                    proposer=config.proposer.name,
+                    failure=codec.encode(update_screen),
+                )
+                return None, update_screen, request
 
     events.emit(
         "proposal",
@@ -536,7 +878,7 @@ def _proposal_stage(
         proposal=codec.encode(proposal),
         source_ref=store.objects.put_text(proposal.source),
     )
-    return proposal, None
+    return proposal, None, request
 
 
 def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> CycleReport:
@@ -627,7 +969,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                 )
             else:
                 events.emit("weakness_detected", diagnosis=codec.encode(diagnosis))
-                proposal, proposal_failure = _proposal_stage(
+                proposal, proposal_failure, proposal_request = _proposal_stage(
                     store, task, ctx, diagnosis, meter, config, events, reader
                 )
                 if proposal is None:
@@ -664,14 +1006,9 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                     # base parent, so the evaluated revision's lineage is the
                     # canonical one (not the generation-derived id)
                     lifecycle_baseline = lifecycle.active_revision_id(store)
-                    overlay = reader.candidate_subject(
-                        candidate_id=candidate.candidate_id,
-                        source_ref=candidate.source_ref,
-                        proposer=proposer_ref,
-                        summary=proposal.summary,
-                        weakness_id=diagnosis.weakness_id,
-                        task_fingerprint=task.fingerprint(),
-                        parent_revision_id=lifecycle_baseline,
+                    overlay = _build_composite_overlay(
+                        store, candidate, proposal, lifecycle_baseline,
+                        proposer_ref, task,
                     )
                     if overlay is None:
                         # no silent derived->native path: recorded, and in
@@ -794,23 +1131,49 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         # recoverable cross-journal operation — never a
                         # replacement built after evaluation
                         assert candidate_evaluation is not None
+                        # SURFACE-SPECIFIC EVIDENCE: a prompt delta must earn
+                        # its own trusted verdict; it never piggybacks on the
+                        # bundled code's task scores
+                        composite_decision = decision
+                        prompt_evidence = None
+                        prompt_evidence_ref: str | None = None
+                        if proposal.surface_updates:
+                            prompt_evidence, prompt_evidence_ref, composite_decision = (
+                                _prompt_surface_gate(
+                                    store, task, proposal, proposal_request,
+                                    decision, config, events,
+                                )
+                            )
+                        selection_policy_ref = (
+                            f"{composite_decision.policy}@"
+                            f"{composite_decision.policy_version}"
+                        )
                         revision_id, decision_ref = _record_candidate_evidence(
                             store,
                             overlay,
                             lifecycle_baseline,
                             candidate_generation.generation_id,
                             candidate_evaluation,
-                            decision,
-                            policy_ref,
+                            composite_decision,
+                            selection_policy_ref,
                             run_id,
                             events,
                         )
-                        if decision.accepted:
+                        if prompt_evidence is not None and prompt_evidence_ref:
+                            lifecycle.record_surface_evidence(
+                                store,
+                                revision_id,
+                                surface="prompt",
+                                evidence_ref=prompt_evidence_ref,
+                                improved=prompt_evidence.improved,
+                                run_id=run_id,
+                            )
+                        if composite_decision.accepted:
                             lifecycle.run_activation_op(
                                 store,
                                 revision_id,
                                 reason="evolved",
-                                policy_ref=policy_ref,
+                                policy_ref=selection_policy_ref,
                                 decision_ref=decision_ref,
                                 gen_expected_active=active.generation_id,
                                 gen_expected_head=reader.canonical_head,
@@ -823,6 +1186,35 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                             )
                             events.emit(
                                 "lifecycle_activated", revision_id=revision_id
+                            )
+                        elif decision.accepted:
+                            # the CODE passed but the prompt delta earned no
+                            # surface-specific benefit: activate the code-only
+                            # sibling (the same executed artifact, prompt
+                            # unchanged) and keep the composite retained as
+                            # rejected evidence
+                            sibling_id = _activate_code_only_sibling(
+                                store, task, candidate, proposal,
+                                lifecycle_baseline, candidate_generation,
+                                candidate_evaluation, decision, policy_ref,
+                                proposer_ref, run_id,
+                                gen_expected_active=active.generation_id,
+                                gen_expected_head=reader.canonical_head,
+                            )
+                            reader.refresh()
+                            events.emit(
+                                "activated",
+                                generation_id=candidate_generation.generation_id,
+                                mode=ACTIVATION_DURABLE,
+                            )
+                            events.emit(
+                                "lifecycle_activated", revision_id=sibling_id
+                            )
+                            events.emit(
+                                "composite_demoted",
+                                composite_revision_id=revision_id,
+                                activated_revision_id=sibling_id,
+                                reason=composite_decision.reason,
                             )
 
         usage = meter.usage()

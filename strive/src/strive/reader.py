@@ -1279,40 +1279,48 @@ class StateReader:
     def check_retained_matches_overlay(
         self, subject: str, overlay: CandidateSubject, retained: Generation
     ) -> None:
-        """The retained (mirrored) revision must be content-identical to the
-        EXACT evaluated candidate: same deltas, same scope manifest. The
-        retained mirror is a compatibility projection of the same artifact,
-        never a disconnected replacement."""
+        """The retained (mirrored) revision must serve the EXACT evaluated
+        candidate's strategy artifact. The mirror is a strategy-only
+        compatibility projection: a composite overlay's non-code surfaces
+        live in the native lifecycle (which retains the whole revision by
+        content-addressed identity), so the mirror comparison pins the
+        strategy binding — never a disconnected replacement artifact."""
         if self.effective_mode == MODE_NATIVE:
             self._add(subject, OUTCOME_NATIVE, "comparison off")
             return
         try:
-            overlay_revision: HarnessRevision = codec.loads(
-                self.store.objects.get_text(overlay.revision_ref), HarnessRevision
+            manifest: ScopeManifest = codec.loads(
+                self.store.objects.get_text(overlay.manifest_ref), ScopeManifest
             )
         except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
-            self._handle_unavailable(subject, f"overlay revision: {exc}")
+            self._handle_unavailable(subject, f"overlay manifest: {exc}")
             return
+        overlay_strategy = next(
+            (
+                b.binding.content_ref
+                for b in manifest.bindings
+                if (b.kind, b.name) == _SURFACE_KEY
+            ),
+            None,
+        )
         if not self._snapshot.available:
             self._handle_unavailable(subject, self._snapshot.reason)
             return
-        mirrored = self._snapshot.revisions.get(_rev_id(retained.generation_id))
-        if mirrored is None:
+        mirrored_id = _rev_id(retained.generation_id)
+        if mirrored_id not in self._snapshot.revisions:
             self._handle_divergence(
                 subject, f"no revision mirror for {retained.generation_id}"
             )
             return
-        if (
-            mirrored.deltas != overlay_revision.deltas
-            or mirrored.scope_manifest_ref != overlay_revision.scope_manifest_ref
-        ):
+        mirrored_ref, _text = self._snapshot.sources[mirrored_id]
+        if overlay_strategy is None or mirrored_ref != overlay_strategy:
             self._handle_divergence(
                 subject,
-                f"retained revision {mirrored.ref.revision_id} is not "
-                "content-identical to the evaluated candidate overlay",
+                f"retained revision {mirrored_id} does not serve the evaluated "
+                "candidate's strategy artifact",
             )
             return
-        self._add(subject, OUTCOME_AGREED, mirrored.ref.revision_id)
+        self._add(subject, OUTCOME_AGREED, mirrored_id)
 
     def _compare_generation(
         self, subject: str, generation: Generation, *, expect_active: bool

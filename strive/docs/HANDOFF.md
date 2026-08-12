@@ -1,6 +1,94 @@
 # HANDOFF — strive
 
-## Stage 3B.3 — native composite revision lifecycle (current)
+## Stage 3C.1 — the prompt-surface composite evolution experiment (current)
+
+The corrected slice. Six areas:
+
+1. **Prompt-specific evidence — no piggybacking.** The trusted
+   `strive.promptgate` validator compares candidate vs incumbent templates
+   under matched conditions (same adapter, visible context, parameters,
+   budgets; calls through the cycle's metered handle): each template's
+   proposed strategy is task-gated, and the verdict is a strict ordering
+   over (gate_accepted, proposal_valid, -regressions). In `run_cycle`, a
+   composite carrying a prompt delta activates only when the CODE passes
+   the task gate AND the PROMPT earns `improved`; when the code passes but
+   the prompt does not (or no adapter can produce evidence), the code-only
+   sibling revision activates (its sole delta is exactly the artifact the
+   sandbox executed) and the composite is retained as REJECTED evidence.
+   `SurfaceEvidence` records link the prompt comparison to the exact
+   revision, separate from the task evidence.
+2. **Two-stage self-produced composite.** The experiment's arm E: the
+   incumbent proposer proposes prompt p1 (screened); p1 generates strategy
+   s1 in a fresh fixed-budget call; the immutable p1+s1 revision is built
+   BEFORE evaluation; the SAME id is proposed, evaluated (task gate via the
+   metered path + prompt gate via `promptgate`), retained, selected,
+   activated, restarted, replayed (execution-and-decision replay from the
+   exact retained artifacts), and rolled back. The sparse incumbent
+   template is installed as the arm's initial condition through a journaled
+   override and is explicitly NOT counted as evolution; manual cross-arm
+   assembly is gone.
+3. **Stale-safe, complete prompt state.** `_pin_default_prompt` pins the
+   build's default template into lifecycle state at seeding
+   (`rev-prompt-default`, journaled structural override): resolution reads
+   history (CAS), never the current build's default string; rollback
+   restores the pinned historical text (tested against a mutated build
+   default); the built-in fallback applies only to explicitly unmigrated
+   pre-prompt history; corruption/missing/invalid templates are structured
+   failures. `ProposalRequest` pins parent_revision_id, lifecycle_head,
+   prompt_ref, and prompt_descriptor_ref; after the slow model call the
+   kernel re-resolves and rejects the proposal as STALE if the prompt or
+   lifecycle head changed even when the generation id did not (tested with
+   a concurrent activation inside the responder). Generation-history
+   backfill now carries non-code surfaces forward (compose-based, last-wins
+   parent identity), so lifecycle-refused runs converge losslessly.
+4. **Hardened descriptor.** `prompt@3` pins validation_policy
+   `prompt-template@1` — string.Formatter parsing with exact placeholder
+   names only; attribute/index traversal, conversions, format specs,
+   positional fields, and excessive repetition rejected; required output
+   fields enforced; bounded size — invoked by `validate_composite` at
+   retention/activation and by resolution/replay. Rendered prompts are
+   bounded BEFORE any provider call (`rendered_prompt_overflow`,
+   budget-exhausted failure, adapter never invoked).
+5. **Reproducible experiment.** All arms run over normal metered paths (the
+   discarded BudgetMeter is gone); `ExperimentManifest` (task fingerprint,
+   template/source refs, adapter, seed statement, budgets, arm order,
+   lifecycle heads, outcomes) persists in a unique run directory (reuse
+   refused). `passed` requires valid A/B proposals, A rejected, B accepted,
+   matched configuration, prompt-consumption proof from journaled bytes,
+   and the two-stage identity chain. Real-model runs are labeled
+   SINGLE-TRIAL with tokens/latency/cost/parameters recorded; a failure is
+   an honest result.
+6. **Generic surface updates.** `ProposalRecord` (proposal@2) carries typed
+   `surface_updates` keyed by pinned descriptor ref — no per-surface schema
+   fields; the model-facing JSON keeps the "prompt_update" convenience key,
+   converted by the kernel. proposal@1 is proven event-payload-only (never
+   codec-decoded from disk; decoding refuses with the strict
+   unsupported-version error), so no v1 migration exists by design.
+
+**Verification:** 271 tests pass; `mypy --strict` clean over 51 files. The
+offline experiment: A rejected (no excerpts reached the proposer), B
+accepted (only the prompt differed), C rejected, D accepted, E =
+`rev-cand-two-stage` proposed == retained == activated with task AND prompt
+gates passed, restart/replay/rollback verified, manifest persisted.
+Adversarial: a harmful prompt riding on good code is demoted (code-only
+sibling activates; composite retained rejected with improved=False
+evidence); a beneficial prompt on failing code is retained with
+improved=True evidence but nothing activates.
+
+**The Stage 3C.1 claim, stated precisely:** strive activates a
+self-produced prompt-plus-code revision only when the exact prompt
+improves proposal behavior under its own trusted validator and the exact
+code passes task validation; neither surface may piggyback on the other's
+evidence. The offline fixture proves causal pipeline wiring; genuine
+model-driven prompt improvement is claimed only with recorded
+(single-trial-labeled) real-model evidence.
+
+**Next phase (exact):** versioned validation/selection envelopes
+(ValidationBundle/SelectionDecision with typed evidence roles — the
+ADR-0004 selection slice), then a budget-matched incumbent hill-climb
+versus GEPA-style Pareto-population experiment (ADR-0005).
+
+## Stage 3B.3 — native composite revision lifecycle (historical)
 
 The correction pass over the first 3B.3 cut. Six areas:
 

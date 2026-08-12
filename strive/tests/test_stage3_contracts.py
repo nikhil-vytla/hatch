@@ -192,14 +192,14 @@ def test_descriptor_registry_is_historical_with_a_current_pointer() -> None:
 
 
 def test_historical_binding_stays_valid_after_new_descriptor_version() -> None:
-    """prompt@2 is current, but a binding pinned to prompt@1 validates against
+    """prompt@3 is current, but a binding pinned to prompt@1 validates against
     its exact pinned descriptor — history does not rot on registry upgrades."""
-    assert CURRENT_DESCRIPTOR["prompt"] == "prompt@2"
+    assert CURRENT_DESCRIPTOR["prompt"] == "prompt@3"
     historical = content_binding("prompt", "aa" * 32, descriptor_ref="prompt@1")
     assert historical.descriptor_ref == "prompt@1"
     validate_binding(historical, "prompt")  # resolves the pinned version
     fresh = content_binding("prompt", "bb" * 32)
-    assert fresh.descriptor_ref == "prompt@2"  # default is the current pointer
+    assert fresh.descriptor_ref == "prompt@3"  # default is the current pointer
     with pytest.raises(ContractViolation, match="not in the trusted registry"):
         content_binding("prompt", "cc" * 32, descriptor_ref="prompt@9")
     with pytest.raises(ContractViolation, match="does not describe kind"):
@@ -667,7 +667,10 @@ def test_revision_activation_maps_real_history_and_preserves_derivation(
     promote_generation(store, SUM_INTEGERS_TASK, "gen-0001")  # promote activation
 
     live = [e for e in store.entries() if isinstance(e, LiveActivation)]
-    assert [a.reason for a in live] == ["seed", "evolved", "rollback", "promote"]
+    # the default-prompt pin re-activates the seed generation once ("promote")
+    assert [a.reason for a in live] == [
+        "seed", "promote", "evolved", "rollback", "promote"
+    ]
 
     # evidence is operation-specific: legacy activation@2 maps to
     # decision_ref=None across the board (the generation's original decision
@@ -688,7 +691,8 @@ def test_revision_activation_maps_real_history_and_preserves_derivation(
         assert migrated.baseline_score == original.baseline_score
         assert "@" in migrated.policy_ref  # legacy markers get the @0 era
     assert mapped[0].policy_ref == "seed@0"
-    assert mapped[1].policy_ref == "paired-deterministic@1"  # already versioned
+    assert mapped[1].policy_ref == "default-prompt-pin@1"  # the pin activation
+    assert mapped[2].policy_ref == "paired-deterministic@1"  # already versioned
 
     # derivation parity: last-activation-wins yields the same active sequence
     for i in range(1, len(live) + 1):
