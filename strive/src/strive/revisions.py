@@ -237,6 +237,19 @@ DESCRIPTOR_REGISTRY: dict[str, SurfaceDescriptor] = {
         risk_policy_ref="prompt-risk@1",
         online_policy=ONLINE_NEVER,  # stage 5 revisits via a descriptor version
     ),
+    # prompt@3 (Stage 3C.1): pins the versioned prompt-template validator —
+    # invoked at retention, activation, resolution, and replay. prompt@2
+    # bindings remain valid against their own pinned descriptor.
+    "prompt@3": _descriptor(
+        kind=SURFACE_PROMPT,
+        version=3,
+        artifact_schema="prompt-template@1",
+        materializer="kernel-text@1",
+        allowed_scopes=SCOPE_LEVELS,
+        validation_policy="prompt-template@1",
+        risk_policy_ref="prompt-risk@1",
+        online_policy=ONLINE_NEVER,
+    ),
     "policy-params@1": _descriptor(
         kind=SURFACE_POLICY_PARAMS,
         version=1,
@@ -251,7 +264,7 @@ DESCRIPTOR_REGISTRY: dict[str, SurfaceDescriptor] = {
 
 CURRENT_DESCRIPTOR: dict[str, str] = {
     SURFACE_STRATEGY_CODE: "strategy-code@1",
-    SURFACE_PROMPT: "prompt@2",
+    SURFACE_PROMPT: "prompt@3",
     SURFACE_POLICY_PARAMS: "policy-params@1",
 }
 

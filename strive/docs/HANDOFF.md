@@ -2,84 +2,86 @@
 
 ## Stage 3C.1 — the prompt-surface composite evolution experiment (current)
 
-The first empirically evaluated prompt-surface composite evolution
-experiment, run entirely on the 3B.3 lifecycle. Five areas:
+The corrected slice. Six areas:
 
-1. **Operational prompt surface.** `prompt/proposal-template` is live at
-   task scope: pinned descriptor `prompt@2` (materializer kernel-text@1),
-   the versioned validator `validate_prompt_template` (non-empty, ≤8000
-   chars, known placeholder set, JSON output contract, required
-   {parent_generation_id}), and kernel resolution via
-   `loop.resolve_active_prompt` — the active revision's manifest binding
-   first, the built-in `DEFAULT_PROPOSAL_TEMPLATE` (CAS-stored, stable ref)
-   as the explicit fallback. `build_prompt` fills the ACTIVE template; the
-   static-template assumption is gone. Every model request journals a
-   `prompt_resolved` event (prompt_ref, source, active revision), and the
-   metered adapter already journals the exact consumed prompt bytes
-   content-addressed. Restart and whole-revision rollback restore prompt
-   and strategy together (tested in the experiment itself).
-2. **Exact composite candidates.** `ProposalRecord` (proposal@2) carries an
-   optional bounded `prompt_update` (complete replacement template text;
-   `changed_surfaces` must agree). The kernel screens it
-   (`screen_prompt_update`): template validity plus NO hidden-split content
-   (the kernel checks against non-visible case inputs and ids — proposers
-   never see them). `loop._build_composite_overlay` builds ONE immutable
-   candidate revision with both deltas BEFORE evaluation, against the
-   lifecycle's active manifest (unchanged bindings carry over), validated
-   by the 3B.3 parent-replay/closure machinery at retention and activation.
-   The exact evaluated revision is retained, selected, activated, and
-   rolled back; an accepted candidate whose overlay cannot be built is
-   refused promotion (3B.3 invariant, unchanged).
-3. **The causal experiment** (`strive.experiment`, `strive experiment`).
-   The deterministic `prompt_sensitive_adapter` is an instruction follower
-   whose output is a function of the prompt content: the INCUMBENT template
-   surfaces failing case ids+feedback only ({failing_case_ids}); the
-   CANDIDATE template surfaces the actual input excerpts
-   ({failing_cases}). The adapter proposes the signed-extraction fix only
-   when the excerpts actually reach it, and proposes a bounded
-   `prompt_update` when they don't. Matched arms (same baseline, adapter,
-   parameters, budgets): **A** incumbent → valid proposal, unsigned fix,
-   gate REJECTS (0.455; the incumbent prompt's measurable failure);
-   **B** candidate → signed fix, gate ACCEPTS (1.000; causality — only the
-   prompt differed, matched model calls); **C** prompt-only ablation →
-   REJECTED (execution scores unchanged); **D** code-only → ACCEPTED;
-   **E** prompt+code composite → ACCEPTED, ACTIVATED via the recoverable
-   3B.3 operation; restart resolves the candidate prompt from the manifest;
-   rollback restores incumbent prompt AND code with compat parity OK.
-   Per-arm records: proposal validity, per-split scores, regressions,
-   executions, model calls, tokens, latency, cost (None for the fake).
-   Consumption is proven from the journaled prompt bytes (arm A's prompt
-   contains no excerpts; arm B's does).
-4. **Trusted evaluation, unchanged.** The proposer still sees only visible
-   failures and sanitized history; malformed prompt edits are
-   `proposal-schema-invalid`, hidden-content embedding is
-   `proposal-forbidden`, and every refusal leaves the incumbent active.
-   Rejected composites are retained with evidence (arm A verified).
-   Activation requires accepted selection evidence against the active
-   baseline through `run_activation_op`; composite crash injection resumes
-   to the SAME composite revision with both surfaces intact.
-5. **Honest claim boundary.** The offline experiment proves CAUSAL PIPELINE
-   WIRING: the prompt artifact is resolved from the manifest, consumed by
-   the proposer, changes proposer behavior, and rides one exact composite
-   through the gate. Both strategy variants are author-written fixtures —
-   this demonstrates nothing about real-model prompt-following. The opt-in
-   real-model run (`strive experiment --real-model`, env-configured,
-   `--unsafe-model-code` acknowledged) executes arms A/B with a real
-   adapter, generation-native only (lifecycle authority stays refused for
-   unconfined model code), and records model id, parameters, budgets,
-   artifacts, and honest outcomes. A real-model failure is an honest
-   result, never a reason to weaken the gate.
+1. **Prompt-specific evidence — no piggybacking.** The trusted
+   `strive.promptgate` validator compares candidate vs incumbent templates
+   under matched conditions (same adapter, visible context, parameters,
+   budgets; calls through the cycle's metered handle): each template's
+   proposed strategy is task-gated, and the verdict is a strict ordering
+   over (gate_accepted, proposal_valid, -regressions). In `run_cycle`, a
+   composite carrying a prompt delta activates only when the CODE passes
+   the task gate AND the PROMPT earns `improved`; when the code passes but
+   the prompt does not (or no adapter can produce evidence), the code-only
+   sibling revision activates (its sole delta is exactly the artifact the
+   sandbox executed) and the composite is retained as REJECTED evidence.
+   `SurfaceEvidence` records link the prompt comparison to the exact
+   revision, separate from the task evidence.
+2. **Two-stage self-produced composite.** The experiment's arm E: the
+   incumbent proposer proposes prompt p1 (screened); p1 generates strategy
+   s1 in a fresh fixed-budget call; the immutable p1+s1 revision is built
+   BEFORE evaluation; the SAME id is proposed, evaluated (task gate via the
+   metered path + prompt gate via `promptgate`), retained, selected,
+   activated, restarted, replayed (execution-and-decision replay from the
+   exact retained artifacts), and rolled back. The sparse incumbent
+   template is installed as the arm's initial condition through a journaled
+   override and is explicitly NOT counted as evolution; manual cross-arm
+   assembly is gone.
+3. **Stale-safe, complete prompt state.** `_pin_default_prompt` pins the
+   build's default template into lifecycle state at seeding
+   (`rev-prompt-default`, journaled structural override): resolution reads
+   history (CAS), never the current build's default string; rollback
+   restores the pinned historical text (tested against a mutated build
+   default); the built-in fallback applies only to explicitly unmigrated
+   pre-prompt history; corruption/missing/invalid templates are structured
+   failures. `ProposalRequest` pins parent_revision_id, lifecycle_head,
+   prompt_ref, and prompt_descriptor_ref; after the slow model call the
+   kernel re-resolves and rejects the proposal as STALE if the prompt or
+   lifecycle head changed even when the generation id did not (tested with
+   a concurrent activation inside the responder). Generation-history
+   backfill now carries non-code surfaces forward (compose-based, last-wins
+   parent identity), so lifecycle-refused runs converge losslessly.
+4. **Hardened descriptor.** `prompt@3` pins validation_policy
+   `prompt-template@1` — string.Formatter parsing with exact placeholder
+   names only; attribute/index traversal, conversions, format specs,
+   positional fields, and excessive repetition rejected; required output
+   fields enforced; bounded size — invoked by `validate_composite` at
+   retention/activation and by resolution/replay. Rendered prompts are
+   bounded BEFORE any provider call (`rendered_prompt_overflow`,
+   budget-exhausted failure, adapter never invoked).
+5. **Reproducible experiment.** All arms run over normal metered paths (the
+   discarded BudgetMeter is gone); `ExperimentManifest` (task fingerprint,
+   template/source refs, adapter, seed statement, budgets, arm order,
+   lifecycle heads, outcomes) persists in a unique run directory (reuse
+   refused). `passed` requires valid A/B proposals, A rejected, B accepted,
+   matched configuration, prompt-consumption proof from journaled bytes,
+   and the two-stage identity chain. Real-model runs are labeled
+   SINGLE-TRIAL with tokens/latency/cost/parameters recorded; a failure is
+   an honest result.
+6. **Generic surface updates.** `ProposalRecord` (proposal@2) carries typed
+   `surface_updates` keyed by pinned descriptor ref — no per-surface schema
+   fields; the model-facing JSON keeps the "prompt_update" convenience key,
+   converted by the kernel. proposal@1 is proven event-payload-only (never
+   codec-decoded from disk; decoding refuses with the strict
+   unsupported-version error), so no v1 migration exists by design.
 
-**Verification:** 266 tests pass (9 new experiment tests); `mypy --strict`
-clean over 50 files. Live CLI: `strive experiment` prints all five arms and
-five verdicts (causal effect, composite gate, consumption, restart,
-rollback) — OVERALL PASSED.
+**Verification:** 271 tests pass; `mypy --strict` clean over 51 files. The
+offline experiment: A rejected (no excerpts reached the proposer), B
+accepted (only the prompt differed), C rejected, D accepted, E =
+`rev-cand-two-stage` proposed == retained == activated with task AND prompt
+gates passed, restart/replay/rollback verified, manifest persisted.
+Adversarial: a harmful prompt riding on good code is demoted (code-only
+sibling activates; composite retained rejected with improved=False
+evidence); a beneficial prompt on failing code is retained with
+improved=True evidence but nothing activates.
 
-**The Stage 3C.1 claim, stated precisely:** strive can evolve, empirically
-evaluate, retain, activate, restart, and roll back a prompt-plus-code
-revision as one exact candidate under trusted held-out discipline. The
-offline fixture proves causal pipeline wiring; genuine model-driven prompt
-improvement is claimed only with recorded real-model evidence.
+**The Stage 3C.1 claim, stated precisely:** strive activates a
+self-produced prompt-plus-code revision only when the exact prompt
+improves proposal behavior under its own trusted validator and the exact
+code passes task validation; neither surface may piggyback on the other's
+evidence. The offline fixture proves causal pipeline wiring; genuine
+model-driven prompt improvement is claimed only with recorded
+(single-trial-labeled) real-model evidence.
 
 **Next phase (exact):** versioned validation/selection envelopes
 (ValidationBundle/SelectionDecision with typed evidence roles — the

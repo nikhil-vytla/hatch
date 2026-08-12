@@ -165,6 +165,19 @@ class Diagnosis:
     evidence_case_ids: tuple[str, ...]
 
 
+@register("surface-update", 1)
+@dataclass(frozen=True)
+class SurfaceUpdate:
+    """One proposed change to a non-code evolvable surface, keyed by its
+    pinned descriptor ref — generic by design so future surfaces need no new
+    ProposalRecord fields. The model-facing JSON keeps convenience keys (e.g.
+    "prompt_update"); the kernel converts them into this typed form."""
+
+    descriptor_ref: str  # e.g. "prompt@3" — pinned at proposal time
+    name: str  # e.g. "proposal-template"
+    content: str  # the complete replacement artifact text
+
+
 @register("proposal", 2)
 @dataclass(frozen=True)
 class ProposalRecord:
@@ -185,9 +198,12 @@ class ProposalRecord:
     changed_surfaces: tuple[str, ...]
     risks: tuple[str, ...]
     assumptions: tuple[str, ...]
-    # optional bounded change to the prompt/proposal-template surface: the
-    # complete replacement template text (None = strategy-only proposal)
-    prompt_update: str | None = None
+    # generic typed updates to non-code surfaces, keyed by descriptor ref
+    # (empty = strategy-only proposal). Note on proposal@1: those records
+    # exist only inside run-event payloads and are never codec-decoded from
+    # disk (verified by test); decoding one raises the strict
+    # unsupported-version error, so no v1 migration path is required.
+    surface_updates: tuple[SurfaceUpdate, ...] = ()
 
 
 @register("candidate", 1)

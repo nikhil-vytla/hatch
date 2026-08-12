@@ -29,6 +29,7 @@ from strive.contracts import (
     Diagnosis,
     FailureRecord,
     ProposalRecord,
+    SurfaceUpdate,
 )
 from strive.diagnose import NEGATIVE_INTEGERS_DROPPED, VisibleContext
 from strive.model import CompletingAdapter
@@ -65,9 +66,16 @@ class ProposalRequest:
     model: CompletingAdapter | None = None
     # the ACTIVE prompt/proposal-template surface, resolved by the kernel
     # from the native lifecycle's manifest ("" -> the built-in default) and
-    # journaled per model request alongside the active revision
+    # journaled per model request alongside the active revision. The pinned
+    # state (parent revision, lifecycle head, prompt ref, descriptor ref)
+    # travels with the request so the kernel can reject the proposal as
+    # STALE after the slow model call if prompt or lifecycle state changed —
+    # even when the active generation id did not.
     prompt_template: str = ""
     prompt_ref: str = ""
+    prompt_descriptor_ref: str = ""
+    parent_revision_id: str | None = None
+    lifecycle_head: str = ""
 
 
 @dataclass(frozen=True)
@@ -135,28 +143,34 @@ def screen_source(source: str, primitive_catalog: tuple[str, ...]) -> FailureRec
     return None
 
 
-def screen_prompt_update(
-    prompt_update: str, hidden_case_texts: tuple[str, ...]
+def screen_surface_update(
+    update: "SurfaceUpdate", hidden_case_texts: tuple[str, ...]
 ) -> FailureRecord | None:
-    """Trusted screen for a proposed prompt-template change: it must validate
-    as a template (bounded, known placeholders, output contract) and must not
-    embed non-visible evaluation content — the kernel knows the hidden case
-    inputs and ids; proposers never do."""
-    from strive.model_proposer import validate_prompt_template
+    """Trusted screen for one proposed non-code surface update: the pinned
+    descriptor must be known, its versioned validator must accept the
+    artifact, and the content must not embed non-visible evaluation content —
+    the kernel knows the hidden case inputs and ids; proposers never do."""
+    from strive.lifecycle import validate_surface_artifact
+    from strive.revisions import DESCRIPTOR_REGISTRY
 
-    reason = validate_prompt_template(prompt_update)
+    if update.descriptor_ref not in DESCRIPTOR_REGISTRY:
+        return FailureRecord(
+            kind=FAILURE_PROPOSAL_SCHEMA_INVALID,
+            detail=f"surface update pins unknown descriptor {update.descriptor_ref!r}",
+        )
+    reason = validate_surface_artifact(update.descriptor_ref, update.content)
     if reason is not None:
         return FailureRecord(
             kind=FAILURE_PROPOSAL_SCHEMA_INVALID,
-            detail=f"prompt_update rejected: {reason}",
+            detail=f"surface update ({update.descriptor_ref}) rejected: {reason}",
         )
     for hidden in hidden_case_texts:
-        if hidden and hidden in prompt_update:
+        if hidden and hidden in update.content:
             return FailureRecord(
                 kind=FAILURE_PROPOSAL_FORBIDDEN,
                 detail=(
-                    "prompt_update embeds non-visible evaluation content; "
-                    "hidden splits must stay out of evolvable prompts"
+                    "surface update embeds non-visible evaluation content; "
+                    "hidden splits must stay out of evolvable surfaces"
                 ),
             )
     return None
