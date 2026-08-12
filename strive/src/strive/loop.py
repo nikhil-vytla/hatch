@@ -35,6 +35,7 @@ from strive.contracts import (
     VISIBLE,
     Activation,
     BudgetSpec,
+    BudgetUsage,
     Candidate,
     CycleRecord,
     Decision,
@@ -215,24 +216,32 @@ def ensure_seeded(store: Store, task: Task) -> Generation:
             )
             reader.refresh()
             active = record
-        _converge_lifecycle(store)  # reconcile crash points + sync identities
+        _converge_lifecycle(store, task)  # reconcile crash points + sync identities
         return active
     finally:
         reader.finish(None)
 
 
-def _converge_lifecycle(store: Store) -> None:
+def _converge_lifecycle(store: Store, task: Task) -> None:
     """Reconcile unfinished activation operations and converge the lifecycle
     with generation-native history (backfilling identities and replaying the
     activation tail — never seeding only the root when the actual active
-    state is later). Failures are loud diagnostics here so a wedged lifecycle
-    never blocks generation-native reads; the divergence stays visible via
+    state is later), then converge the evidence side: the current dataset
+    revision is persisted and pre-envelope assessments gain their
+    synthetic-but-lossless envelopes (migration 0005's ongoing form).
+    Failures are loud diagnostics here so a wedged lifecycle never blocks
+    generation-native reads; the divergence stays visible via
     `lifecycle.compat_parity`, and lifecycle MUTATIONS still fail closed."""
+    from strive.datasets import ensure_dataset_revision
+
     try:
         lifecycle.reconcile(store)
         if lifecycle.sync_needed(store):
             lifecycle.sync_from_generations(store)
         _pin_default_prompt(store)
+        ensure_dataset_revision(store, task)
+        if lifecycle.evidence_links_needed(store):
+            lifecycle.ensure_evidence_links(store, task)
     except lifecycle.LifecycleError as exc:
         store._note_diagnostic(f"lifecycle convergence failed: {exc}")
 
@@ -291,26 +300,61 @@ def _pin_default_prompt(store: Store) -> None:
     )
 
 
+@dataclass(frozen=True)
+class RecordedEvidence:
+    """What one candidate assessment persisted: the lifecycle identity, the
+    legacy decision ref, the SelectionDecision envelope (which activation
+    cites), and the per-role bundle refs."""
+
+    revision_id: str
+    decision_ref: str
+    selection_ref: str
+    task_bundle_ref: str
+    constraint_bundle_ref: str
+    prompt_bundle_ref: str | None
+
+
 def _record_candidate_evidence(
     store: Store,
+    task: Task,
     overlay: CandidateSubject,
     baseline_revision_id: str | None,
     candidate_generation_id: str,
+    baseline_evaluation: Evaluation,
     candidate_evaluation: Evaluation,
     decision: Decision,
     policy_ref: str,
     run_id: str,
     events: EventLog,
-) -> tuple[str, str]:
+    *,
+    resolved_manifest_ref: str,
+    usage: BudgetUsage,
+    budget: BudgetSpec,
+    prompt_evidence_ref: str | None = None,
+    prompt_improved: bool | None = None,
+) -> RecordedEvidence:
     """Persist the evaluated candidate's IDENTITY and EVIDENCE into the
     lifecycle BEFORE any served behavior changes: retain the exact evaluated
     revision (accepted or rejected), link its compatibility generation, and
-    append the evaluation + selection records. Returns
-    (revision_id, decision_ref). Raises on failure — retention or evidence
-    problems must surface before activation, not after."""
+    append the evaluation + selection records WITH their versioned evidence
+    envelopes — separate task, constraint, and (for composites) prompt
+    bundles, typed per role, so no surface borrows another's evidence.
+    Raises on failure — retention or evidence problems must surface before
+    activation, not after."""
+    from strive import selection as selection_mod
+    from strive.evidence import (
+        DISPOSITION_PROMOTE,
+        DISPOSITION_REJECT,
+        DecisionEvidence,
+        ROLE_CONSTRAINT,
+        ROLE_PROMPT,
+        ROLE_TASK,
+    )
+
     revision: HarnessRevision = codec.loads(
         store.objects.get_text(overlay.revision_ref), HarnessRevision
     )
+    revision_id = revision.ref.revision_id
     evaluation_ref = store.objects.put_text(codec.dumps(candidate_evaluation))
     decision_ref = store.objects.put_text(codec.dumps(decision))
     lifecycle.retain(
@@ -319,31 +363,91 @@ def _record_candidate_evidence(
         task_fingerprint=_provenance_fingerprint(store, revision),
         generation_id=candidate_generation_id,
     )
+    _task_bundle, task_bundle_ref = selection_mod.build_task_bundle(
+        store,
+        task,
+        subject_revision_id=revision_id,
+        resolved_manifest_ref=resolved_manifest_ref,
+        baseline_evaluation=baseline_evaluation,
+        candidate_evaluation=candidate_evaluation,
+        decision=decision,
+        budget=budget,
+    )
+    _constraint_bundle, constraint_bundle_ref = selection_mod.build_constraint_bundle(
+        store,
+        task,
+        subject_revision_id=revision_id,
+        resolved_manifest_ref=resolved_manifest_ref,
+        screen_rejection_kind=None,
+        screen_detail="kernel source screen passed before evaluation",
+        usage=usage,
+        budget=budget,
+    )
+    evidence = [
+        DecisionEvidence(role=ROLE_TASK, bundle_ref=task_bundle_ref),
+        DecisionEvidence(role=ROLE_CONSTRAINT, bundle_ref=constraint_bundle_ref),
+    ]
+    prompt_bundle_ref: str | None = None
+    if prompt_evidence_ref is not None and prompt_improved is not None:
+        _prompt_bundle, prompt_bundle_ref = selection_mod.build_prompt_bundle(
+            store,
+            task,
+            subject_revision_id=revision_id,
+            resolved_manifest_ref=resolved_manifest_ref,
+            prompt_evidence_ref=prompt_evidence_ref,
+            improved=prompt_improved,
+            detail="trusted prompt-vs-prompt comparison (see artifact)",
+            budget=budget,
+        )
+        evidence.append(
+            DecisionEvidence(role=ROLE_PROMPT, bundle_ref=prompt_bundle_ref)
+        )
+    _selection_decision, selection_ref = selection_mod.build_selection_decision(
+        store,
+        policy_ref=policy_ref,
+        disposition=(
+            DISPOSITION_PROMOTE if decision.accepted else DISPOSITION_REJECT
+        ),
+        subject_revision_id=revision_id,
+        incumbent_revision_id=baseline_revision_id,
+        evidence=tuple(evidence),
+        rationale=decision.reason,
+    )
     lifecycle.record_evaluation(
         store,
-        revision.ref.revision_id,
+        revision_id,
         baseline_revision_id=baseline_revision_id,
         evaluation_ref=evaluation_ref,
         manifest_ref=overlay.manifest_ref,
         run_id=run_id,
+        bundle_ref=task_bundle_ref,
     )
     lifecycle.record_selection(
         store,
-        revision.ref.revision_id,
+        revision_id,
         baseline_revision_id=baseline_revision_id,
         evaluation_ref=evaluation_ref,
         decision_ref=decision_ref,
         policy_ref=policy_ref,
         accepted=decision.accepted,
         run_id=run_id,
+        selection_ref=selection_ref,
     )
     events.emit(
         "lifecycle_retained",
-        revision_id=revision.ref.revision_id,
+        revision_id=revision_id,
         accepted=decision.accepted,
         baseline_revision_id=baseline_revision_id,
+        selection_ref=selection_ref,
     )
-    return revision.ref.revision_id, decision_ref
+    return RecordedEvidence(
+        revision_id=revision_id,
+        decision_ref=decision_ref,
+        selection_ref=selection_ref,
+        task_bundle_ref=task_bundle_ref,
+        constraint_bundle_ref=constraint_bundle_ref,
+        prompt_bundle_ref=prompt_bundle_ref,
+    )
 
 
 def _build_composite_overlay(
@@ -460,12 +564,16 @@ def _activate_code_only_sibling(
     proposal: ProposalRecord,
     lifecycle_baseline: str | None,
     candidate_generation: Generation,
+    baseline_evaluation: Evaluation,
     candidate_evaluation: Evaluation,
     task_decision: Decision,
     policy_ref: str,
     proposer_ref: str,
     run_id: str,
     *,
+    resolved_manifest_ref: str,
+    usage: BudgetUsage,
+    budget: BudgetSpec,
     gen_expected_active: str | None,
     gen_expected_head: str | None,
 ) -> str:
@@ -490,6 +598,15 @@ def _activate_code_only_sibling(
         weakness_id=candidate.weakness_id,
         origin="candidate-overlay",
     )
+    from strive import selection as selection_mod
+    from strive.evidence import (
+        DISPOSITION_PROMOTE,
+        DISPOSITION_REJECT,
+        DecisionEvidence,
+        ROLE_CONSTRAINT,
+        ROLE_TASK,
+    )
+
     lifecycle.retain(
         store,
         sibling,
@@ -498,6 +615,43 @@ def _activate_code_only_sibling(
     )
     evaluation_ref = store.objects.put_text(codec.dumps(candidate_evaluation))
     decision_ref = store.objects.put_text(codec.dumps(task_decision))
+    # the sibling's own envelopes: its sole delta IS the executed artifact,
+    # so the task evidence applies to it exactly; no prompt role is required
+    # (or permitted) — the composite keeps the rejected prompt evidence
+    _task_bundle, task_bundle_ref = selection_mod.build_task_bundle(
+        store,
+        task,
+        subject_revision_id=sibling.ref.revision_id,
+        resolved_manifest_ref=resolved_manifest_ref,
+        baseline_evaluation=baseline_evaluation,
+        candidate_evaluation=candidate_evaluation,
+        decision=task_decision,
+        budget=budget,
+    )
+    _constraint_bundle, constraint_bundle_ref = selection_mod.build_constraint_bundle(
+        store,
+        task,
+        subject_revision_id=sibling.ref.revision_id,
+        resolved_manifest_ref=resolved_manifest_ref,
+        screen_rejection_kind=None,
+        screen_detail="kernel source screen passed before evaluation",
+        usage=usage,
+        budget=budget,
+    )
+    _selection_decision, selection_ref = selection_mod.build_selection_decision(
+        store,
+        policy_ref=policy_ref,
+        disposition=(
+            DISPOSITION_PROMOTE if task_decision.accepted else DISPOSITION_REJECT
+        ),
+        subject_revision_id=sibling.ref.revision_id,
+        incumbent_revision_id=lifecycle_baseline,
+        evidence=(
+            DecisionEvidence(role=ROLE_TASK, bundle_ref=task_bundle_ref),
+            DecisionEvidence(role=ROLE_CONSTRAINT, bundle_ref=constraint_bundle_ref),
+        ),
+        rationale=task_decision.reason,
+    )
     lifecycle.record_evaluation(
         store,
         sibling.ref.revision_id,
@@ -505,6 +659,7 @@ def _activate_code_only_sibling(
         evaluation_ref=evaluation_ref,
         manifest_ref=sibling.scope_manifest_ref,
         run_id=run_id,
+        bundle_ref=task_bundle_ref,
     )
     lifecycle.record_selection(
         store,
@@ -515,13 +670,14 @@ def _activate_code_only_sibling(
         policy_ref=policy_ref,
         accepted=task_decision.accepted,
         run_id=run_id,
+        selection_ref=selection_ref,
     )
     lifecycle.run_activation_op(
         store,
         sibling.ref.revision_id,
         reason="evolved",
         policy_ref=policy_ref,
-        decision_ref=decision_ref,
+        decision_ref=selection_ref,
         gen_expected_active=gen_expected_active,
         gen_expected_head=gen_expected_head,
     )
@@ -551,6 +707,7 @@ def _execute_and_evaluate(
     reader: StateReader,
     subject: str,
     overlay: CandidateSubject | None = None,
+    execution_record: dict[str, str] | None = None,
 ) -> Evaluation:
     """Charge, execute, attribute, and evaluate one generation. Never raises
     for candidate behavior: failures come back inside the Evaluation.
@@ -560,8 +717,13 @@ def _execute_and_evaluate(
     harness and the evaluated subject (active revision, retained revision,
     or candidate overlay) with exact heads (never blocking). The executed
     source comes through the read boundary — in canary mode it is the
-    revision-materialized artifact, compared with the native value first."""
-    reader.record_execution(subject, generation, events, overlay=overlay)
+    revision-materialized artifact, compared with the native value first.
+    When the caller passes ``execution_record``, the CAS ref of that
+    run-resolved record is returned in it (the evidence envelope's
+    `resolved_manifest_ref`)."""
+    record_ref = reader.record_execution(subject, generation, events, overlay=overlay)
+    if execution_record is not None and record_ref is not None:
+        execution_record["ref"] = record_ref
     denial = meter.request_execution()
     if denial is not None:
         events.emit(
@@ -1039,9 +1201,11 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         created_at=now_iso(),
                         source_ref=candidate.source_ref,
                     )
+                    candidate_execution_record: dict[str, str] = {}
                     candidate_evaluation = _execute_and_evaluate(
                         store, task, candidate_probe, meter, config, events,
                         reader, "cycle-candidate-overlay", overlay=overlay,
+                        execution_record=candidate_execution_record,
                     )
                     decision = policy.decide(evaluation, candidate_evaluation)
                     events.emit("decision", decision=codec.encode(decision))
@@ -1148,17 +1312,31 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                             f"{composite_decision.policy}@"
                             f"{composite_decision.policy_version}"
                         )
-                        revision_id, decision_ref = _record_candidate_evidence(
+                        recorded = _record_candidate_evidence(
                             store,
+                            task,
                             overlay,
                             lifecycle_baseline,
                             candidate_generation.generation_id,
+                            evaluation,
                             candidate_evaluation,
                             composite_decision,
                             selection_policy_ref,
                             run_id,
                             events,
+                            resolved_manifest_ref=candidate_execution_record.get(
+                                "ref", ""
+                            ),
+                            usage=meter.usage(),
+                            budget=config.budget,
+                            prompt_evidence_ref=prompt_evidence_ref,
+                            prompt_improved=(
+                                prompt_evidence.improved
+                                if prompt_evidence is not None
+                                else None
+                            ),
                         )
+                        revision_id = recorded.revision_id
                         if prompt_evidence is not None and prompt_evidence_ref:
                             lifecycle.record_surface_evidence(
                                 store,
@@ -1167,14 +1345,16 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                                 evidence_ref=prompt_evidence_ref,
                                 improved=prompt_evidence.improved,
                                 run_id=run_id,
+                                bundle_ref=recorded.prompt_bundle_ref,
                             )
                         if composite_decision.accepted:
+                            # activation cites the exact SelectionDecision
                             lifecycle.run_activation_op(
                                 store,
                                 revision_id,
                                 reason="evolved",
                                 policy_ref=selection_policy_ref,
-                                decision_ref=decision_ref,
+                                decision_ref=recorded.selection_ref,
                                 gen_expected_active=active.generation_id,
                                 gen_expected_head=reader.canonical_head,
                             )
@@ -1196,8 +1376,13 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                             sibling_id = _activate_code_only_sibling(
                                 store, task, candidate, proposal,
                                 lifecycle_baseline, candidate_generation,
-                                candidate_evaluation, decision, policy_ref,
-                                proposer_ref, run_id,
+                                evaluation, candidate_evaluation, decision,
+                                policy_ref, proposer_ref, run_id,
+                                resolved_manifest_ref=(
+                                    candidate_execution_record.get("ref", "")
+                                ),
+                                usage=meter.usage(),
+                                budget=config.budget,
                                 gen_expected_active=active.generation_id,
                                 gen_expected_head=reader.canonical_head,
                             )
@@ -1523,6 +1708,12 @@ class ReplayReport:
     candidate_generation_id: str | None
     candidate_replayed_score: float | None
     decision_matches: bool | None
+    # evidence-envelope replay: the candidate's recorded ValidationBundle
+    # metrics recomputed from the re-executed evaluation and diffed —
+    # "compare beyond the boolean" over the envelope, not just the verdict
+    bundle_checked: bool = False
+    bundle_metric_diffs: dict[str, float] | None = None
+    bundle_matches: bool | None = None
 
 
 def replay_run(
@@ -1570,6 +1761,9 @@ def replay_run(
 
         candidate_replayed_score: float | None = None
         decision_matches: bool | None = None
+        bundle_checked = False
+        bundle_metric_diffs: dict[str, float] | None = None
+        bundle_matches: bool | None = None
         if cycle.candidate_generation_id is None:
             reader.note_not_applicable("replay-candidate", "cycle had no candidate")
         else:
@@ -1609,6 +1803,51 @@ def replay_run(
                     == recorded_decision.regressed_case_ids
                 )
 
+            # evidence-envelope replay: recompute the recorded task bundle's
+            # candidate metrics from the re-executed evaluation and diff them
+            from strive import validators as validator_registry
+            from strive.evidence import ValidationBundle
+
+            lifecycle_state = lifecycle.state(store)
+            for revision_id_ in (
+                r
+                for r, g in lifecycle_state.links.items()
+                if g == cycle.candidate_generation_id
+            ):
+                for link in lifecycle_state.evidence_links.get(revision_id_, ()):
+                    if link.kind != "evaluation":
+                        continue
+                    try:
+                        bundle: ValidationBundle = codec.loads(
+                            store.objects.get_text(link.envelope_ref),
+                            ValidationBundle,
+                        )
+                    except Exception:  # noqa: BLE001 — unreadable bundle: skip
+                        continue
+                    recorded_result = next(
+                        (
+                            r
+                            for r in bundle.results
+                            if r.subject_role == "candidate"
+                        ),
+                        None,
+                    )
+                    if recorded_result is None:
+                        continue
+                    recomputed = validator_registry.task_suite_result(
+                        store, candidate_evaluation, subject_role="candidate"
+                    )
+                    bundle_metric_diffs = {
+                        key: round(
+                            recomputed.metrics.get(key, 0.0) - recorded_value, 6
+                        )
+                        for key, recorded_value in recorded_result.metrics.items()
+                    }
+                    bundle_matches = all(
+                        diff == 0.0 for diff in bundle_metric_diffs.values()
+                    )
+                    bundle_checked = True
+
         reader.add_fact("replay")
         return ReplayReport(
             run_id=run_id,
@@ -1621,6 +1860,9 @@ def replay_run(
             candidate_generation_id=cycle.candidate_generation_id,
             candidate_replayed_score=candidate_replayed_score,
             decision_matches=decision_matches,
+            bundle_checked=bundle_checked,
+            bundle_metric_diffs=bundle_metric_diffs,
+            bundle_matches=bundle_matches,
         )
     except BaseException as exc:
         status = f"error:{type(exc).__name__}"
