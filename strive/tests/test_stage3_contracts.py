@@ -537,7 +537,10 @@ def test_scope_refs_are_validated_and_context_is_explicit() -> None:
 def _evaluation_manifest(dataset_fingerprint: str, seeds: tuple[int, ...]) -> EvaluationManifest:
     return EvaluationManifest(
         resolved_manifest_ref="77" * 32,
+        execution_record_ref="99" * 32,
         objective_spec_ref="88" * 32,
+        task_spec_ref="55" * 32,
+        dataset_revision_ref="66" * 32,
         task_fingerprint="11" * 32,
         dataset_fingerprint=dataset_fingerprint,
         environment="function-task@1",

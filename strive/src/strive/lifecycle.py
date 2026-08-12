@@ -216,6 +216,20 @@ class SurfaceEvidence:
     run_id: str | None = None
 
 
+@register("task-spec-bound", 1)
+@dataclass(frozen=True)
+class TaskSpecBound:
+    """The task SPEC this store is bound to (Stage 3C.2A.1): the live
+    mutation guard compares SPEC fingerprints — which exclude the cases —
+    so dataset growth invalidates evidence and forces re-baselining but
+    NEVER requires a task-drift acknowledgement. Spec changes still do."""
+
+    task_id: str
+    spec_fingerprint: str
+    task_spec_ref: str  # CAS ref of the exact TaskSpecVersion
+    at: str
+
+
 @register("evidence-link", 1)
 @dataclass(frozen=True)
 class EvidenceLink:
@@ -246,6 +260,7 @@ LifecycleEntry = (
     | LifecycleBreaker
     | SurfaceEvidence
     | EvidenceLink
+    | TaskSpecBound
 )
 
 _ENTRY_TYPES = (
@@ -261,6 +276,7 @@ _ENTRY_TYPES = (
     LifecycleBreaker,
     SurfaceEvidence,
     EvidenceLink,
+    TaskSpecBound,
 )
 
 
@@ -307,6 +323,7 @@ class LifecycleState:
     overrides: dict[str, tuple[TrustedOverride, ...]]
     surface_evidence: dict[str, tuple[SurfaceEvidence, ...]]
     evidence_links: dict[str, tuple[EvidenceLink, ...]]  # by revision_id
+    task_spec: TaskSpecBound | None  # latest spec binding (None = unbound legacy)
     activation_order: tuple[str, ...]  # revision ids, activation order
     active_revision_id: str | None
     open_intents: tuple[ActivationIntent, ...]
@@ -323,6 +340,7 @@ def _state_from(view: FramedView) -> LifecycleState:
     overrides: dict[str, list[TrustedOverride]] = {}
     surface_evidence: dict[str, list[SurfaceEvidence]] = {}
     evidence_links: dict[str, list[EvidenceLink]] = {}
+    task_spec: TaskSpecBound | None = None
     order: list[str] = []
     active: str | None = None
     intents: dict[str, ActivationIntent] = {}
@@ -344,6 +362,8 @@ def _state_from(view: FramedView) -> LifecycleState:
             surface_evidence.setdefault(entry.revision_id, []).append(entry)
         elif isinstance(entry, EvidenceLink):
             evidence_links.setdefault(entry.revision_id, []).append(entry)
+        elif isinstance(entry, TaskSpecBound):
+            task_spec = entry
         elif isinstance(entry, RevisionActivation):
             revision_id = entry.revision.revision_id
             order.append(revision_id)
@@ -365,6 +385,7 @@ def _state_from(view: FramedView) -> LifecycleState:
         overrides={k: tuple(v) for k, v in overrides.items()},
         surface_evidence={k: tuple(v) for k, v in surface_evidence.items()},
         evidence_links={k: tuple(v) for k, v in evidence_links.items()},
+        task_spec=task_spec,
         activation_order=tuple(order),
         active_revision_id=active,
         open_intents=tuple(
@@ -866,6 +887,33 @@ def record_selection(
         raise LifecycleError(str(exc)) from None
 
 
+def bind_task_spec(store: object, task: object) -> TaskSpecBound | None:
+    """Bind (or re-bind, after an acknowledged spec change) the store to the
+    task's exact SPEC identity. Idempotent: no append when the latest
+    binding already pins this spec fingerprint. Returns the binding
+    appended, or None when already bound."""
+    from strive.evidence import store_task_spec, task_spec_fingerprint
+
+    ctx = lifecycle(store)
+    st = _state_from(ctx.journal.read())
+    _require_clean(st, "task-spec binding")
+    fingerprint = task_spec_fingerprint(task)
+    if st.task_spec is not None and st.task_spec.spec_fingerprint == fingerprint:
+        return None
+    _spec, spec_ref = store_task_spec(store, task)
+    bound = TaskSpecBound(
+        task_id=ctx.task_id,
+        spec_fingerprint=fingerprint,
+        task_spec_ref=spec_ref,
+        at=now_iso(),
+    )
+    try:
+        ctx.journal.append_batch([bound])
+    except FramingError as exc:
+        raise LifecycleError(str(exc)) from None
+    return bound
+
+
 @dataclass(frozen=True)
 class ReadinessReport:
     """Whether the revision's evidence authorizes activation RIGHT NOW —
@@ -879,38 +927,65 @@ class ReadinessReport:
 
 
 def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
-    """The full activation-evidence verification (Stage 3C.2A), fail-closed:
+    """The full activation-evidence verification (Stage 3C.2A.1),
+    fail-closed. Evidence authorizes activation only when EVERYTHING about
+    it matches the exact evaluation that produced the decision:
 
-    - the LATEST selection must be accepted against the CURRENT active
-      baseline, and must link a decodable `SelectionDecision` envelope with
-      an activating disposition for the exact subject/incumbent;
-    - every typed evidence role required by the revision's changed surfaces
-      (plus task + constraint always) must be present — surfaces cannot
-      borrow one another's evidence;
-    - every linked bundle must decode, declare the linked role, name the
-      exact subject, pin a decodable manifest whose validators resolve by
-      name AND version, and pin the CURRENT dataset revision's fingerprint
-      (stale dataset evidence blocks; re-baseline instead of acknowledging
-      drift);
-    - constraint results must ALL be `passed` (failed or inconclusive hard
-      constraints block); the task bundle's candidate suite and the prompt
-      bundle's comparison must be `passed`; result artifacts must decode.
+    - the LATEST selection is accepted against the CURRENT active baseline
+      and links a decodable, non-synthetic `SelectionDecision` whose
+      policy_ref, subject, incumbent, and disposition agree with the
+      journal record (synthetic/historical envelopes are preserved for
+      inspection and rollback but NEVER authorize a fresh promotion — a
+      modern re-evaluation is required);
+    - every required evidence role is present exactly once (task +
+      constraint always, plus each changed surface's role) — no missing,
+      duplicate, borrowed, or relabeled evidence;
+    - each bundle pins the EXACT validator set its role prescribes, with
+      one-to-one agreement between the manifest's validator refs and the
+      bundle's results (no missing results, no extraneous results, no
+      duplicate (validator, subject_role) pairs), every validator resolved
+      by exact name@version;
+    - each manifest pins the exact `TaskSpecVersion` and `DatasetRevision`
+      by ref, the refs decode, their fingerprints match the pinned
+      fingerprints, the spec matches the store's CURRENT spec binding, and
+      the dataset is the CURRENT dataset revision (stale ⇒ re-baseline,
+      never a task-drift acknowledgement);
+    - each manifest's objective spec decodes and matches the decision's;
+    - execution provenance agrees: `resolved_manifest_ref` decodes to the
+      exact `ResolvedHarnessManifest` (an ExecutionRecord in its place
+      fails), the `ExecutionRecord` names the exact subject revision and
+      its effective manifest, references the same resolved baseline, and
+      carries a journal head;
+    - the task bundle's paired comparison PASSED (a noncrashing candidate
+      suite is not acceptance) and its artifacts (candidate + baseline
+      evaluations, the paired decision) decode and agree with the recorded
+      scores and the journal's evaluation ref;
+    - constraint results are ALL `passed` (failed or inconclusive hard
+      constraints block); the prompt comparison passed where required.
     """
     from strive import validators as validator_registry
+    from strive.contracts import Decision as TaskDecision
+    from strive.contracts import Evaluation as TaskEvaluation
     from strive.datasets import DatasetError, current_dataset_revision
     from strive.evidence import (
         ACTIVATING_DISPOSITIONS,
         ALWAYS_REQUIRED_ROLES,
+        DISPOSITION_PROMOTE,
         REQUIRED_SURFACE_ROLE,
         ROLE_CONSTRAINT,
         ROLE_PROMPT,
+        ROLE_REQUIRED_VALIDATORS,
         ROLE_TASK,
         VALIDATOR_PASSED,
+        DatasetRevision as DatasetRevisionRecord,
         EvaluationManifest,
+        ObjectiveSpec,
         SelectionDecision,
+        TaskSpecVersion,
         ValidationBundle,
         validate_selection,
     )
+    from strive.reader import ExecutionRecord
 
     ctx = lifecycle(store)
     st = _state_from(ctx.journal.read())
@@ -967,6 +1042,14 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
             "history; run `strive migrate` (0005-evidence-backfill)"
         )
         return report()
+    if link.synthetic:
+        reasons.append(
+            "its selection envelope is SYNTHETIC (historical/inferred): "
+            "preserved for inspection, replay, and rollback, but inferred "
+            "source-screen and usage records never authorize a fresh "
+            "promotion — a modern re-evaluation is required"
+        )
+        return report(link.envelope_ref)
     try:
         envelope: SelectionDecision = codec.loads(
             ctx.objects.get_text(link.envelope_ref), SelectionDecision
@@ -979,6 +1062,11 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
         reasons.append(
             f"selection disposition {envelope.disposition!r} does not "
             "authorize activation"
+        )
+    if envelope.policy_ref != latest.policy_ref:
+        reasons.append(
+            f"selection envelope policy {envelope.policy_ref} disagrees with "
+            f"the journal record's policy {latest.policy_ref}"
         )
     if envelope.subject.revision_id != revision_id:
         reasons.append(
@@ -993,16 +1081,32 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
             f"selection envelope names incumbent {envelope_incumbent}, but the "
             f"active revision is {st.active_revision_id}"
         )
+    role_counts: dict[str, int] = {}
+    for item in envelope.evidence:
+        role_counts[item.role] = role_counts.get(item.role, 0) + 1
+    duplicate_roles = sorted(r for r, n in role_counts.items() if n > 1)
+    if duplicate_roles:
+        reasons.append(
+            f"duplicate evidence role(s): {', '.join(duplicate_roles)} — one "
+            "bundle per role"
+        )
+    try:
+        codec.loads(
+            ctx.objects.get_text(envelope.objective_spec_ref), ObjectiveSpec
+        )
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+        reasons.append(f"decision objective spec corrupt/invalid: {exc}")
 
     # -- required roles from the revision's changed surfaces ------------------
     record = st.retained.get(revision_id)
     required_roles = set(ALWAYS_REQUIRED_ROLES)
+    subject_revision: HarnessRevision | None = None
     if record is None:
         reasons.append("the revision is not retained")
     else:
         try:
-            revision = load_revision(ctx, record.revision_ref)
-            for delta in revision.deltas:
+            subject_revision = load_revision(ctx, record.revision_ref)
+            for delta in subject_revision.deltas:
                 role = REQUIRED_SURFACE_ROLE.get(delta.kind)
                 if role is not None:
                     required_roles.add(role)
@@ -1016,7 +1120,7 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
             "each changed surface needs its own validator's evidence"
         )
 
-    # -- dataset currency ------------------------------------------------------
+    # -- current dataset + current spec binding --------------------------------
     try:
         current_dataset = current_dataset_revision(store)
     except DatasetError as exc:
@@ -1028,7 +1132,7 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
             "`strive migrate` first"
         )
 
-    # -- every linked bundle: decode, roles, versions, currency, verdicts -----
+    # -- every linked bundle: the full agreement matrix ------------------------
     for item in envelope.evidence:
         label = f"{item.role} bundle {item.bundle_ref[:12]}…"
         try:
@@ -1056,13 +1160,77 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
         except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
             reasons.append(f"{label} evaluation manifest corrupt: {exc}")
             continue
-        for validator_ref in manifest.validators + tuple(
-            result.validator for result in bundle.results
-        ):
+
+        # exact validator set per role, one-to-one with results
+        prescribed = ROLE_REQUIRED_VALIDATORS.get(item.role, frozenset())
+        manifest_set = set(manifest.validators)
+        if manifest_set != prescribed:
+            reasons.append(
+                f"{label} manifest pins validators {sorted(manifest_set)} but "
+                f"the {item.role} role prescribes {sorted(prescribed)}"
+            )
+        result_set = {result.validator for result in bundle.results}
+        missing_results = sorted(manifest_set - result_set)
+        extraneous_results = sorted(result_set - manifest_set)
+        if missing_results:
+            reasons.append(
+                f"{label}: manifest validators without results: "
+                f"{', '.join(missing_results)}"
+            )
+        if extraneous_results:
+            reasons.append(
+                f"{label}: results from validators the manifest never pinned: "
+                f"{', '.join(extraneous_results)}"
+            )
+        seen_pairs: set[tuple[str, str]] = set()
+        for result in bundle.results:
+            pair = (result.validator, result.subject_role)
+            if pair in seen_pairs:
+                reasons.append(
+                    f"{label}: duplicate result {result.validator} "
+                    f"({result.subject_role})"
+                )
+            seen_pairs.add(pair)
+        for validator_ref in sorted(manifest_set | result_set):
             try:
                 validator_registry.get_validator(validator_ref)
             except validator_registry.ValidatorError as exc:
                 reasons.append(f"{label}: {exc}")
+
+        # exact task spec + dataset revision, by ref, fingerprints verified
+        try:
+            spec: TaskSpecVersion = codec.loads(
+                ctx.objects.get_text(manifest.task_spec_ref), TaskSpecVersion
+            )
+            if spec.fingerprint != manifest.task_fingerprint:
+                reasons.append(
+                    f"{label}: pinned task fingerprint does not match the "
+                    "TaskSpecVersion the manifest references"
+                )
+            if (
+                st.task_spec is not None
+                and spec.fingerprint != st.task_spec.spec_fingerprint
+            ):
+                reasons.append(
+                    f"{label}: evidence was produced under task spec "
+                    f"{spec.fingerprint[:12]}… but the store is bound to "
+                    f"{st.task_spec.spec_fingerprint[:12]}… — spec drift "
+                    "invalidates evidence"
+                )
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            reasons.append(f"{label} task spec ref invalid: {exc}")
+        try:
+            pinned_dataset: DatasetRevisionRecord = codec.loads(
+                ctx.objects.get_text(manifest.dataset_revision_ref),
+                DatasetRevisionRecord,
+            )
+            if pinned_dataset.fingerprint != manifest.dataset_fingerprint:
+                reasons.append(
+                    f"{label}: pinned dataset fingerprint does not match the "
+                    "DatasetRevision the manifest references"
+                )
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            reasons.append(f"{label} dataset revision ref invalid: {exc}")
         if current_dataset is not None and (
             manifest.dataset_fingerprint != current_dataset.fingerprint
         ):
@@ -1073,14 +1241,77 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
                 f"({current_dataset.fingerprint[:12]}…) — STALE evidence; "
                 "re-evaluate under the current dataset"
             )
-        for result in bundle.results:
-            if result.artifact_ref is not None:
-                try:
-                    codec.loads(ctx.objects.get_text(result.artifact_ref))
-                except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
-                    reasons.append(
-                        f"{label} artifact for {result.validator} corrupt: {exc}"
-                    )
+
+        # objective agreement across the decision and every bundle
+        if manifest.objective_spec_ref != envelope.objective_spec_ref:
+            reasons.append(
+                f"{label}: manifest objective spec differs from the "
+                "decision's — a decision must be judged against one objective"
+            )
+
+        # execution provenance: resolved manifest + execution record agree
+        execution_record: ExecutionRecord | None = None
+        if not manifest.resolved_manifest_ref:
+            reasons.append(
+                f"{label}: no resolved-harness provenance — promote-grade "
+                "evidence must pin the exact ResolvedHarnessManifest"
+            )
+        else:
+            try:
+                codec.loads(
+                    ctx.objects.get_text(manifest.resolved_manifest_ref),
+                    ResolvedHarnessManifest,
+                )
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                reasons.append(
+                    f"{label}: resolved_manifest_ref does not decode to a "
+                    f"ResolvedHarnessManifest: {exc}"
+                )
+        if not manifest.execution_record_ref:
+            reasons.append(
+                f"{label}: no execution record — promote-grade evidence must "
+                "pin per-execution provenance"
+            )
+        else:
+            try:
+                execution_record = codec.loads(
+                    ctx.objects.get_text(manifest.execution_record_ref),
+                    ExecutionRecord,
+                )
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                reasons.append(f"{label}: execution record invalid: {exc}")
+        if execution_record is not None and record is not None:
+            if execution_record.subject_revision_ref != record.revision_ref:
+                reasons.append(
+                    f"{label}: execution record names subject revision "
+                    f"{str(execution_record.subject_revision_ref)[:12]}… but the "
+                    f"retained revision is {record.revision_ref[:12]}…"
+                )
+            if (
+                subject_revision is not None
+                and execution_record.effective_manifest_ref
+                != subject_revision.scope_manifest_ref
+            ):
+                reasons.append(
+                    f"{label}: execution record's effective manifest disagrees "
+                    "with the subject revision's scope manifest"
+                )
+            if (
+                manifest.resolved_manifest_ref
+                and execution_record.base_resolved_ref
+                != manifest.resolved_manifest_ref
+            ):
+                reasons.append(
+                    f"{label}: execution record ran under resolved baseline "
+                    f"{str(execution_record.base_resolved_ref)[:12]}… but the "
+                    "manifest pins a different resolved harness"
+                )
+            if not execution_record.canonical_head:
+                reasons.append(
+                    f"{label}: execution record carries no journal head"
+                )
+
+        # verdict + artifact agreement per role
         if item.role == ROLE_CONSTRAINT:
             for result in bundle.results:
                 if result.status != VALIDATOR_PASSED:
@@ -1091,20 +1322,137 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
                     )
         elif item.role == ROLE_TASK:
             candidate_suites = [
-                r for r in bundle.results if r.subject_role == "candidate"
+                r
+                for r in bundle.results
+                if r.validator == "task-suite@1" and r.subject_role == "candidate"
+            ]
+            baseline_suites = [
+                r
+                for r in bundle.results
+                if r.validator == "task-suite@1" and r.subject_role == "baseline"
+            ]
+            comparisons = [
+                r for r in bundle.results if r.validator == "paired-comparison@1"
             ]
             if not candidate_suites:
                 reasons.append(f"{label} has no candidate suite result")
             elif any(r.status != VALIDATOR_PASSED for r in candidate_suites):
                 reasons.append(f"{label}: the candidate suite did not pass")
+            if envelope.incumbent is not None and not baseline_suites:
+                reasons.append(
+                    f"{label} has no baseline suite result despite a named "
+                    "incumbent — paired evidence requires both sides"
+                )
+            if not comparisons:
+                reasons.append(
+                    f"{label} has no paired-comparison result — a noncrashing "
+                    "candidate suite is not acceptance"
+                )
+            else:
+                comparison = comparisons[0]
+                if (
+                    envelope.disposition == DISPOSITION_PROMOTE
+                    and comparison.status != VALIDATOR_PASSED
+                ):
+                    reasons.append(
+                        f"{label}: the paired comparison did not pass — a "
+                        "promote requires an accepted comparison, not merely "
+                        "a noncrashing candidate"
+                    )
+                comparison_decision: TaskDecision | None = None
+                if comparison.artifact_ref is None:
+                    reasons.append(
+                        f"{label}: the paired comparison has no decision "
+                        "artifact"
+                    )
+                else:
+                    try:
+                        comparison_decision = codec.loads(
+                            ctx.objects.get_text(comparison.artifact_ref),
+                            TaskDecision,
+                        )
+                    except (
+                        ObjectMissing, ObjectCorruption, codec.SchemaError,
+                    ) as exc:
+                        reasons.append(
+                            f"{label}: paired-comparison artifact corrupt: {exc}"
+                        )
+                if comparison_decision is not None:
+                    if (
+                        envelope.disposition == DISPOSITION_PROMOTE
+                        and not comparison_decision.accepted
+                    ):
+                        reasons.append(
+                            f"{label}: the recorded paired decision was NOT "
+                            "accepted — it cannot authorize a promote"
+                        )
+                    for suites, expected_score, side in (
+                        (
+                            candidate_suites,
+                            comparison_decision.candidate_score,
+                            "candidate",
+                        ),
+                        (
+                            baseline_suites,
+                            comparison_decision.baseline_score,
+                            "baseline",
+                        ),
+                    ):
+                        for suite in suites:
+                            if suite.artifact_ref is None:
+                                reasons.append(
+                                    f"{label}: the {side} suite has no "
+                                    "evaluation artifact"
+                                )
+                                continue
+                            try:
+                                suite_eval: TaskEvaluation = codec.loads(
+                                    ctx.objects.get_text(suite.artifact_ref),
+                                    TaskEvaluation,
+                                )
+                            except (
+                                ObjectMissing,
+                                ObjectCorruption,
+                                codec.SchemaError,
+                            ) as exc:
+                                reasons.append(
+                                    f"{label}: {side} evaluation artifact "
+                                    f"corrupt: {exc}"
+                                )
+                                continue
+                            if suite_eval.overall_score != expected_score:
+                                reasons.append(
+                                    f"{label}: the {side} evaluation artifact "
+                                    f"scores {suite_eval.overall_score} but the "
+                                    "paired decision recorded "
+                                    f"{expected_score} — artifacts disagree"
+                                )
+                            if (
+                                side == "candidate"
+                                and suite.artifact_ref != latest.evaluation_ref
+                            ):
+                                reasons.append(
+                                    f"{label}: the candidate evaluation "
+                                    "artifact differs from the journal's "
+                                    "recorded evaluation ref"
+                                )
         elif item.role == ROLE_PROMPT:
-            if not any(
-                r.status == VALIDATOR_PASSED for r in bundle.results
-            ):
+            if not any(r.status == VALIDATOR_PASSED for r in bundle.results):
                 reasons.append(
                     f"{label}: the prompt comparison did not pass — a prompt "
                     "delta must earn its own surface-specific evidence"
                 )
+            for result in bundle.results:
+                if result.artifact_ref is not None:
+                    try:
+                        codec.loads(ctx.objects.get_text(result.artifact_ref))
+                    except (
+                        ObjectMissing, ObjectCorruption, codec.SchemaError,
+                    ) as exc:
+                        reasons.append(
+                            f"{label} artifact for {result.validator} "
+                            f"corrupt: {exc}"
+                        )
     return report(link.envelope_ref)
 
 
@@ -1733,6 +2081,38 @@ def sync_from_generations(store: object) -> None:
 # -- evidence-envelope backfill (migration 0005 + ongoing convergence) ---------------------------
 
 
+def _envelope_ok(ctx: _Ctx, link: EvidenceLink) -> bool:
+    """Can this link's envelope still be fully decoded by THIS build
+    (envelope + every bundle + every evaluation manifest)? A link written
+    by an older build whose manifest schema has since been bumped fails
+    here and gets a fresh synthetic re-link (the old bytes stay)."""
+    from strive.evidence import (
+        EvaluationManifest,
+        SelectionDecision,
+        ValidationBundle,
+    )
+
+    try:
+        if link.kind == "selection":
+            envelope: SelectionDecision = codec.loads(
+                ctx.objects.get_text(link.envelope_ref), SelectionDecision
+            )
+            bundle_refs = [item.bundle_ref for item in envelope.evidence]
+        else:
+            bundle_refs = [link.envelope_ref]
+        for bundle_ref in bundle_refs:
+            bundle: ValidationBundle = codec.loads(
+                ctx.objects.get_text(bundle_ref), ValidationBundle
+            )
+            codec.loads(
+                ctx.objects.get_text(bundle.evaluation_manifest_ref),
+                EvaluationManifest,
+            )
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+        return False
+    return True
+
+
 def evidence_links_needed(store: object) -> bool:
     """True when any assessment record lacks its evidence envelope, or when
     the lifecycle has history but no dataset revision is persisted."""
@@ -1750,22 +2130,27 @@ def evidence_links_needed(store: object) -> bool:
             return True
     except DatasetError:
         return False
-    linked = {
-        (link.kind, link.original_ref, link.revision_id)
-        for links in st.evidence_links.values()
-        for link in links
-    }
+    ctx = lifecycle(store)
+    latest_links: dict[tuple[str, str, str], EvidenceLink] = {}
+    for links in st.evidence_links.values():
+        for link in links:
+            latest_links[(link.kind, link.original_ref, link.revision_id)] = link
+
+    def missing_or_unreadable(kind: str, original_ref: str, revision_id: str) -> bool:
+        link = latest_links.get((kind, original_ref, revision_id))
+        return link is None or not _envelope_ok(ctx, link)
+
     for entry in view.entries:
-        if isinstance(entry, RevisionEvaluated) and (
-            ("evaluation", entry.evaluation_ref, entry.revision_id) not in linked
+        if isinstance(entry, RevisionEvaluated) and missing_or_unreadable(
+            "evaluation", entry.evaluation_ref, entry.revision_id
         ):
             return True
-        if isinstance(entry, RevisionSelected) and (
-            ("selection", entry.decision_ref, entry.revision_id) not in linked
+        if isinstance(entry, RevisionSelected) and missing_or_unreadable(
+            "selection", entry.decision_ref, entry.revision_id
         ):
             return True
-        if isinstance(entry, SurfaceEvidence) and (
-            ("surface", entry.evidence_ref, entry.revision_id) not in linked
+        if isinstance(entry, SurfaceEvidence) and missing_or_unreadable(
+            "surface", entry.evidence_ref, entry.revision_id
         ):
             return True
     return False
@@ -1790,10 +2175,15 @@ def ensure_evidence_links(store: object, task: object) -> int:
     view = ctx.journal.read()
     st = _state_from(view)
     _require_clean(st, "evidence backfill")
+    latest_links: dict[tuple[str, str, str], EvidenceLink] = {}
+    for links in st.evidence_links.values():
+        for existing_link in links:
+            latest_links[
+                (existing_link.kind, existing_link.original_ref,
+                 existing_link.revision_id)
+            ] = existing_link
     linked = {
-        (link.kind, link.original_ref, link.revision_id)
-        for links in st.evidence_links.values()
-        for link in links
+        key for key, existing in latest_links.items() if _envelope_ok(ctx, existing)
     }
     appended = 0
     # journal order: surface evidence first per revision is not guaranteed,

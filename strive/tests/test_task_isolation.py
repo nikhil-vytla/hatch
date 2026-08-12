@@ -175,7 +175,7 @@ def test_fingerprint_drift_blocks_mutation_until_acknowledged(tmp_path: Path) ->
     assert drifted_task.fingerprint() != SUM_INTEGERS_TASK.fingerprint()
 
     # mutating operation refuses
-    with pytest.raises(StoreError, match="task-fingerprint drift"):
+    with pytest.raises(StoreError, match="task-SPEC drift"):
         run_cycle(store, drifted_task)
     # read-only operations proceed (their reports carry drift information)
     replay = replay_run(store, drifted_task, report.run_id)
@@ -202,7 +202,7 @@ def test_promote_journals_drift_acknowledgement_like_run(tmp_path: Path) -> None
     drifted_task = dataclasses.replace(SUM_INTEGERS_TASK, version=99)
 
     # refused without acknowledgement
-    with pytest.raises(StoreError, match="task-fingerprint drift"):
+    with pytest.raises(StoreError, match="task-SPEC drift"):
         promote_generation(store, drifted_task, "gen-0001")
     assert not any(
         i.kind == "task-drift-acknowledged" for i in store.interventions()
