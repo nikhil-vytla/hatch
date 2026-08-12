@@ -986,3 +986,50 @@ accepted-and-current at resume time.
   staleness), selections, and readiness with every blocking reason.
 
 288 tests, mypy strict clean (56 files).
+
+## Stage 3C.2A.1 — authoritative envelopes (correction pass)
+
+- EvaluationManifest bumped to @2: + execution_record_ref, task_spec_ref,
+  dataset_revision_ref; task_fingerprint now = the SPEC fingerprint. The
+  codec supports one version per kind, so ensure_evidence_links learned to
+  RE-LINK records whose latest envelope no longer decodes under this build
+  (fresh synthetic link appended; old bytes preserved).
+- Live guard replaced: TaskSpecBound in the lifecycle journal; the guard
+  compares pure task_spec_fingerprint (cases excluded). Bound at seeding
+  ONLY when no legacy drift exists; acknowledged drift re-binds. Dataset
+  growth now flows through the real mutation guard unacknowledged (tested)
+  and forces re-baselining via the current-dataset check.
+- Provenance: resolved_manifest_ref must decode to ResolvedHarnessManifest
+  (typed decode catches an ExecutionRecord smuggled in — adversarial
+  test); the ExecutionRecord must name the exact retained subject revision
+  ref, its scope manifest, the same resolved baseline, and a journal head.
+  The loop uses the reader's pinned record;
+  selection.pin_execution_provenance pins truthful provenance for
+  harness-internal paths (experiment metered gate, fixtures).
+- Complete semantics in activation_readiness: ROLE_REQUIRED_VALIDATORS
+  exact-set per role; manifest↔results one-to-one; duplicate roles /
+  duplicate (validator, subject_role) / extraneous results block; paired
+  comparison must be PASSED with its Decision artifact accepted
+  (wrong-but-noncrashing candidates end at REJECTED selections); suite
+  artifacts must agree with recorded scores and the journal's
+  evaluation_ref; objective specs decode and match everywhere;
+  policy_ref/subject/incumbent agreement.
+- Honest grading: EvidenceLink.synthetic blocks fresh promotion with a
+  named modern-re-evaluation requirement; selection.record_assessment is
+  the one shared promote-grade recording path (loop, experiment ablation +
+  two-stage arms, lifecycle fixtures all moved onto it; record_selection's
+  task-synthesis remains for backfill and is now promotion-inert).
+- budget_result covers all 7 dimensions with the meter's exact semantics
+  (-1 accounting-only / 0 nothing-allowed / otherwise used <= limit; None
+  usage inconclusive → blocks).
+- datasets.jsonl hardened: flock-serialized writers, expected_head
+  (dataset_head = "n:fingerprint"), torn-tail quarantine+truncate under
+  the lock (interior corruption never auto-repairs), CAS closure
+  (revision object + every split manifest round-trip) before the durable
+  append. Concurrency + crash-injection tests.
+- Gotcha: the code-only sibling's execution record can't reuse the
+  composite overlay's (different revision identity) — pin fresh provenance
+  for the retained sibling with an explicit detail naming the identical
+  executed artifact.
+
+300 tests, mypy strict clean (56 files).

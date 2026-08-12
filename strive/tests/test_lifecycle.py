@@ -158,26 +158,40 @@ def _evaluate_and_select(
     )
     policy = get_policy("paired-deterministic")
     decision = policy.decide(baseline_eval, candidate_eval)
-    evaluation_ref = store.objects.put_text(codec.dumps(candidate_eval))
-    decision_ref = store.objects.put_text(codec.dumps(decision))
-    record_evaluation(
+    # promote-grade evidence: real envelopes with pinned execution
+    # provenance (synthetic/inferred envelopes never authorize promotion)
+    from strive import selection as selection_mod
+    from strive.contracts import BudgetSpec, BudgetUsage
+
+    provenance = selection_mod.pin_execution_provenance(
         store,
-        revision.ref.revision_id,
-        baseline_revision_id=baseline_id,
-        evaluation_ref=evaluation_ref,
-        manifest_ref=revision.scope_manifest_ref,
+        subject_revision_id=revision.ref.revision_id,
+        operation="lifecycle-fixture",
+        detail="lifecycle fixture assessment (sandbox-evaluated)",
     )
-    record_selection(
+    prompt_records = state(store).surface_evidence.get(revision.ref.revision_id, ())
+    latest_prompt = prompt_records[-1] if prompt_records else None
+    recorded = selection_mod.record_assessment(
         store,
-        revision.ref.revision_id,
+        TASK,
+        revision_id=revision.ref.revision_id,
         baseline_revision_id=baseline_id,
-        evaluation_ref=evaluation_ref,
-        decision_ref=decision_ref,
+        baseline_evaluation=baseline_eval,
+        candidate_evaluation=candidate_eval,
+        decision=decision,
         policy_ref=f"{policy.name}@{policy.version}",
-        accepted=decision.accepted,
-        task=TASK,  # synthesize the lossless SelectionDecision envelope
+        scope_manifest_ref=revision.scope_manifest_ref,
+        provenance=provenance,
+        usage=BudgetUsage(executions=2, wall_time_s=0.1),
+        budget=BudgetSpec(),
+        prompt_evidence_ref=(
+            latest_prompt.evidence_ref if latest_prompt is not None else None
+        ),
+        prompt_improved=(
+            latest_prompt.improved if latest_prompt is not None else None
+        ),
     )
-    return evaluation_ref, decision_ref, decision.accepted
+    return recorded.evaluation_ref, recorded.decision_ref, decision.accepted
 
 
 def _compose_linked(

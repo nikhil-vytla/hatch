@@ -61,6 +61,15 @@ REQUIRED_SURFACE_ROLE: dict[str, str] = {
 # roles every promoting decision must carry regardless of surfaces
 ALWAYS_REQUIRED_ROLES = (ROLE_TASK, ROLE_CONSTRAINT)
 
+# the EXACT validator set each role prescribes for a promoting decision:
+# a promote-authorizing bundle's manifest AND results must match this set
+# one-to-one — no missing results, no extraneous results, no substitutes
+ROLE_REQUIRED_VALIDATORS: dict[str, frozenset[str]] = {
+    ROLE_TASK: frozenset({"task-suite@1", "paired-comparison@1"}),
+    ROLE_PROMPT: frozenset({"prompt-comparison@1"}),
+    ROLE_CONSTRAINT: frozenset({"source-screen@1", "budget-within-spec@1"}),
+}
+
 VALIDATOR_PASSED = "passed"
 VALIDATOR_FAILED = "failed"
 VALIDATOR_INCONCLUSIVE = "inconclusive"
@@ -87,15 +96,24 @@ class DatasetRevision:
 # -- evaluation manifests ------------------------------------------------------------------------
 
 
-@register("evaluation-manifest", 1)
+@register("evaluation-manifest", 2)
 @dataclass(frozen=True)
 class EvaluationManifest:
-    """Everything a validation ran under. References the run-resolved
-    manifest — never a revision's own scope manifest (ADR-0003/0004)."""
+    """Everything a validation ran under (v2: exact identity by REF, not
+    fingerprint alone). `resolved_manifest_ref` must decode to the exact
+    `ResolvedHarnessManifest` the evaluation executed under — never a
+    revision's own scope manifest and never an ExecutionRecord;
+    `execution_record_ref` carries the per-execution provenance separately.
+    `task_spec_ref` / `dataset_revision_ref` decode to the exact
+    `TaskSpecVersion` / `DatasetRevision`, and the pinned fingerprints must
+    match what those refs decode to (verified by the activation gate)."""
 
-    resolved_manifest_ref: str
+    resolved_manifest_ref: str  # CAS ref of the ResolvedHarnessManifest
+    execution_record_ref: str  # CAS ref of the ExecutionRecord ("" = none)
     objective_spec_ref: str
-    task_fingerprint: str
+    task_spec_ref: str  # CAS ref of the exact TaskSpecVersion
+    dataset_revision_ref: str  # CAS ref of the exact DatasetRevision
+    task_fingerprint: str  # the TaskSpecVersion's SPEC fingerprint
     dataset_fingerprint: str
     environment: str  # adapter id@version, e.g. function-task@1
     scorer: str  # id@version
@@ -316,17 +334,16 @@ FUNCTION_TASK_ENVIRONMENT = "function-task@1"
 FUNCTION_TASK_SCORER = "exact-int@1"
 
 
-def task_spec_version(store: object, task: object) -> TaskSpecVersion:
-    """Adapt a current `strive.tasks.Task` as `function-task@1`: the spec
-    fingerprint covers spec identity only (NOT the cases — those belong to
-    the dataset revision), so growing data never trips spec drift."""
-    objects = getattr(store, "objects")
+def _spec_body(task: object) -> dict[str, object]:
+    """The spec fields, with the config ref computed PURELY (the CAS address
+    the config blob would have) so spec identity needs no store access."""
+    from strive.cas import hash_text
+
     config = FunctionTaskConfig(
         signature=str(getattr(task, "signature")),
         primitive_catalog=tuple(getattr(task, "primitive_catalog")),
     )
-    config_ref = objects.put_text(codec.dumps(config))
-    body = {
+    return {
         "task_id": getattr(task, "task_id"),
         "version": getattr(task, "version"),
         "description": getattr(task, "description"),
@@ -334,13 +351,40 @@ def task_spec_version(store: object, task: object) -> TaskSpecVersion:
         "action_schema": "submit-int@1",
         "observation_schema": "input-text@1",
         "scorer": FUNCTION_TASK_SCORER,
-        "config_ref": config_ref,
+        "config_ref": hash_text(codec.dumps(config)),
     }
-    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"))
-    return TaskSpecVersion(
-        fingerprint=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
-        **body,
+
+
+def task_spec_fingerprint(task: object) -> str:
+    """SPEC identity only — deliberately excludes the cases, which belong to
+    the dataset revision: growing data never trips spec drift. Pure (no
+    store access), so the live mutation guard can call it."""
+    canonical = json.dumps(_spec_body(task), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def task_spec_version(store: object, task: object) -> TaskSpecVersion:
+    """Adapt a current `strive.tasks.Task` as `function-task@1`, publishing
+    the config blob to CAS so the spec's config_ref resolves."""
+    objects = getattr(store, "objects")
+    config = FunctionTaskConfig(
+        signature=str(getattr(task, "signature")),
+        primitive_catalog=tuple(getattr(task, "primitive_catalog")),
     )
+    config_ref = objects.put_text(codec.dumps(config))
+    body = _spec_body(task)
+    assert body["config_ref"] == config_ref  # pure address == published address
+    return TaskSpecVersion(
+        fingerprint=task_spec_fingerprint(task),
+        **body,  # type: ignore[arg-type]
+    )
+
+
+def store_task_spec(store: object, task: object) -> tuple[TaskSpecVersion, str]:
+    """CAS-store the exact TaskSpecVersion; returns (spec, ref)."""
+    spec = task_spec_version(store, task)
+    objects = getattr(store, "objects")
+    return spec, objects.put_text(codec.dumps(spec))
 
 
 __all__ = [
@@ -363,6 +407,7 @@ __all__ = [
     "ObjectiveSpec",
     "ObjectiveTerm",
     "REQUIRED_SURFACE_ROLE",
+    "ROLE_REQUIRED_VALIDATORS",
     "ROLE_CONSTRAINT",
     "ROLE_PROMPT",
     "ROLE_TASK",
@@ -375,6 +420,8 @@ __all__ = [
     "ValidationBundle",
     "ValidatorResult",
     "objective_spec_ref",
+    "store_task_spec",
+    "task_spec_fingerprint",
     "task_spec_version",
     "validate_bundle",
     "validate_selection",
