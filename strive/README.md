@@ -31,8 +31,10 @@ loop is gated: candidates are promoted only on trusted, journaled evidence.
 | Attribution | every execution event records the generation that served it |
 | Monitors | trusted mechanical stall detector; freeze halts adaptation (not evaluation); operator `resume` lifts it; all journaled |
 | Isolation | holdout data is mechanically absent from diagnosis/proposal inputs (`VisibleContext`) |
+| Secure sandbox (stage 3C.2B) | pluggable versioned `SandboxBackend` boundary with a fail-closed registry (never downgrades): `process-fault-only@1` (fixtures/trusted only), `deno-pyodide@1` (**shipping secure local backend** — Deno+Pyodide WASM: no host filesystem/network/env/subprocess, fresh interpreter per case, parent wall-clock hard-kill), and a Linux Landlock/seccomp spike. Protected cases each run in a fresh sandbox seeing only `input_text`; sandbox provenance is pinned into evidence and lifecycle authority for model code requires a mechanically-secure backend. `strive sandbox`, `strive capability` |
 | Policies | pluggable, named, versioned acceptance policies recorded in every decision — `paired-deterministic@1` (durable code promotion) and `provisional@1` (scoped, monitored, expiring — refused for executable strategy-code; reserved for future explicitly low-risk non-code surfaces) |
-| Models | provider-neutral `ModelAdapter` + deterministic `FakeModelAdapter`; all I/O journaled with latency and content-addressed prompt/completion artifacts, budget-metered; real adapter only via env vars (`STRIVE_MODEL_PROVIDER=openai-compatible` + base URL/key/model id) |
+| Models | provider-neutral `ModelAdapter` + deterministic `FakeModelAdapter`; all I/O journaled with latency and content-addressed prompt/completion artifacts, budget-metered; real adapter only via env vars (`STRIVE_MODEL_PROVIDER=openai-compatible` + base URL/key/model id, incl. local vLLM/Ollama-compatible servers) |
+| Capability lane (stage 3C.2B) | `strive.capability`: repeated **seeded** real-model trials executed inside the secure sandbox backend, recording model id/params/prompt-completion refs/sandbox provenance/budgets/outcomes/regressions/failures and an honest aggregate verdict (`supported`/`inconclusive`/`negative`). Fixtures and single trials are never capability evidence (`trials >= 2` for a verdict); the scripted fixture stays the deterministic CI control, labeled `inconclusive` |
 | Revisions (stage 3B) | dual-write mirror in a **separate append-only mirror journal** (`<task>.mirror.jsonl`): corrupt or unsupported mirrors can never block generation-native run/activation/rollback/replay/inspection. Every mirror carries a deterministic `SourceRecordRef` (schema, journal, ordinal, digest) and matching/repair go by source ref, never position; active-revision derivation follows source activation order. Projection is pinned to `generation-to-revision@1` with explicit historical descriptors and fail-closed source validation; evidence is operation-specific (legacy activations map to `decision_ref=None`; the generation's decision lives only in `MigrationProvenance`). Backfill/repair run a durable intent→progress→completed state machine (pending = completion, not parity); planning is pure and stale plans are refused; a source commit whose mirror publication fails reports the explicit `source-committed-parity-incomplete` condition. Stage 3B.1 hardened the derived side: intents pin the exact canonical source prefix (altered prefixes refuse resume; appends are fine); one operation-level lock and single-open-intent enforcement; planning fails closed before publishing anything; parity verifies the **full artifact closure** (manifests, provenance, decision evidence, pinned descriptors, source artifacts — missing derived objects repairable, corrupt ones fail closed, never overwritten); `strive parity --rebuild` quarantines a corrupt mirror journal byte-for-byte and atomically installs a rebuild from canonical history. Intent completion is prefix-scoped (later canonical records and their live mirrors are tolerated and left to a subsequent operation); stage-3B-era journals (`migration-intent@1`) are detected precisely with rebuild guidance. `strive parity [--repair|--rebuild]`, `strive revisions`, `strive migrate` |
 | Reads (stage 3B.2) | **one read boundary** (`strive.reader.StateReader`) every operation reads through — cycle, compare, replay, audit, promotion, rollback, provisional resolution, proposal staleness, task/drift guards, proposal history, seeding, status, lineage, restart. Each operation captures the canonical entries **and their exact bytes in one read** (native view and `SourceSnapshot` derive from that capture), pairs the mirror capture through an optimistic read-recheck loop that retakes both if the canonical journal moved, and refreshes only after its own writes; mutations (activation, rollback, seeding, provisional confirm/revert) carry the expected head and refuse stale writes. Durable journaled modes (default `native`): `shadow` compares each supported read against the parity-grade `VerifiedRevisionSnapshot` (complete source-ref agreement both directions, recomputed projections, full artifact closure, bounded cycle-free lineage); `revision-canary` is the **revision-derived execution/read canary** — executed sources come from the verified snapshot after native comparison, identity reads are agreement-gated, and unavailable/divergent derived state opens a **durable circuit breaker** (no per-read silent fallback). The evaluated subject is an immutable, unactivated candidate overlay revision created and validated *before* evaluation; retention links back to that exact overlay (`RetentionRecord`) and verifies the retained mirror is content-identical. Evidence lives in a locked, fsynced, task-bound reader journal written in **crash-framed, hash-chained batches** (deletion/reordering/forged lines detected, never honored); each check records mode + heads at check time, one terminal outcome per subject, in `finally` with `missing` synthesized for uninstrumented paths. Repair/rebuild/version-change atomically open the breaker and reset the epoch (fail-closed); `clear-breaker` needs native/shadow + complete parity + a fresh epoch and never reactivates a canary; a journal-independent force-native override (`STRIVE_FORCE_NATIVE=1`) is the emergency kill. Canary is refused for real/unsafe model-generated code (same-UID sandbox). Enablement requires current-epoch eligibility: complete parity, zero divergences/errors, minimum total + per-subject samples, and observed accepted/rejected/no-candidate/rollback/re-promotion/audit/replay/restart paths. Activation and durable promotion remain generation-native. `strive reader [status\|native\|shadow\|canary\|kill\|clear-breaker\|force-native\|lift-force\|reset-journal]` |
 | Revision lifecycle (stage 3B.3) | **the canonical owner of native composite revisions** (`strive.lifecycle`, `<task>.revisions.jsonl`), separate from the generation ledger and the mirror (both now explicitly derived compatibility), written in crash-framed, hash-chained, expected-head batches (shared `strive.framing` — tamper-EVIDENT, not same-UID secure). **Identity is separated from evidence**: `RevisionRetained` pins the EXACT evaluated `HarnessRevision` by CAS ref (identity only); `RevisionEvaluated`/`RevisionSelected` are appended per assessment (one revision evaluated repeatedly under different baselines), with all evidence refs validated; promote-like activation requires the CURRENT accepted selection against the active baseline, and rejected/evidence-free revisions activate only through a durable `TrustedOverride`. The pre-evaluation candidate overlay is retained unchanged for **both rejected and accepted** candidates; on acceptance the SAME revision is activated (evaluated id == retained id == activated id) through **one recoverable cross-journal operation** (`ActivationIntent`/`Progress`/`Completed` spanning the generation compatibility activation and the lifecycle activation): identity + evidence persist before served behavior changes, every crash point reconciles (abandon / resume / revert+breaker), and a lifecycle failure after generation activation is never swallowed. Validation replays the **parent ScopeManifest**: every `delta.before` must match, transitions apply, unchanged bindings carry over, and the child manifest must equal the result exactly — undeclared changes, stale before-states, and dropped surfaces fail closed (a code-only child of a code+prompt parent preserves the prompt). Whole-revision rollback drives BOTH journals (served strategy changes too); `compat_parity` exposes lifecycle/served agreement. Framed journals refuse appends over unverified regions; recovery = durable quarantine + truncation to the last verified boundary. Migrations: `0003-lifecycle-backfill` (identities + full activation replay, preserving the ACTUAL active revision) and `0004-reader-journal-upgrade` (exact PR#43 journal → shared framing, bytes preserved, loud on ambiguity). Lifecycle authority is refused for unsafe model-generated code. `strive lifecycle [status\|rollback\|repair]` |
@@ -99,26 +101,48 @@ in `docs/HANDOFF.md`.
 
 ## The isolation boundary, honestly
 
-Candidate code runs outside the controller: a separate `python -I` process
-with a hard timeout, a private temp workspace as cwd, a scrubbed environment
-(no inherited variables, hence no inherited secrets), bounded stdout/stderr,
-and POSIX rlimits (CPU, file size, open files). That is **fault containment,
-not a security sandbox**: network access is not denied (no reliable
-unprivileged cross-platform mechanism), address-space limits are unreliable on
-macOS, and a candidate that guesses absolute paths can touch anything the
-controller's UID can. Do not run untrusted third-party candidates on this
-boundary. Kernel-level confinement (Landlock/seccomp, then containers) is
-roadmap stage 3/6.
+Candidate code runs behind a **pluggable, versioned `SandboxBackend`**
+boundary (`strive.sandboxes`; stage 3C.2B, ADR-0007). Each backend reports
+exactly which capabilities it MECHANICALLY enforces, and the registry fails
+closed — a requested backend that is unavailable on this host raises rather
+than silently downgrading to a weaker one. Three backends:
 
-Two further honest caveats. First, **hidden evaluation data reaches candidate
-code at execution time**: the runner sends every selection case's *input*
-(never expected outputs) to the strategy process, so a malicious candidate
-could read raw held-out/regression/adversarial inputs while running; holdout
-isolation is mechanical for *proposers*, not for executing candidates, until
-stronger sandboxing exists. Second, the store assumes **single-writer
-operation** per task: an advisory file lock serializes same-host appends and
-activations take an expected-incumbent head check, but concurrent multi-host
-writers are out of scope.
+- **`process-fault-only@1`** — the original `python -I` subprocess: separate
+  process, hard timeout, scrubbed environment, private temp workspace,
+  bounded output, POSIX rlimits. This is **fault containment, not a security
+  sandbox** (no filesystem confinement, no network denial), and its
+  capability report says so. It is the default, for author-written fixtures
+  and trusted code only.
+- **`deno-pyodide@1`** — the shipping **secure local** backend (DSPy's
+  `PythonInterpreter` over Deno + Pyodide WASM). Default-deny: the candidate
+  runs in a WASM virtual filesystem that cannot name a host path, with no
+  network, no host environment, and no `os.fork`/subprocess. A **fresh
+  interpreter per case** means no candidate state survives between protected
+  cases, and a parent-side wall-clock watchdog hard-kills a runaway. This is
+  a real security boundary: `strive`'s adversarial suite runs the escape
+  battery (read the repo/ledger/CAS/`~/.ssh`/env, open sockets, fork, write
+  outside the workspace, persist across cases, flood output, spin forever)
+  and every attempt is mechanically denied and journaled.
+- **`linux-landlock-seccomp@1`** — a NOOA-derived (Apache-2.0) spike:
+  unprivileged Landlock + seccomp + rlimits, available only on a
+  probe-confirmed Linux kernel.
+
+`strive sandbox` reports availability and capabilities; `strive capability`
+runs the model-capability lane inside a secure backend. Sandbox provenance
+(backend, runtime digest, enforced capabilities, mount/network policy,
+limits) is pinned into the evidence manifests, and **lifecycle authority is
+granted for model-generated code only when a mechanically-secure backend
+executed it**.
+
+Protected evaluation is now isolated correctly: each
+held-out/regression/adversarial/audit case runs in its own fresh sandbox and
+the candidate receives ONLY that case's `input_text` — the parent keeps case
+id, split, expected output, and the rest of the suite. (On the legacy
+fault-only boundary, case inputs still reached the shared strategy process;
+the secure backend closes that gap.) One remaining honest caveat: the store
+assumes **single-writer operation** per task — an advisory file lock
+serializes same-host appends and activations take an expected-incumbent head
+check, but concurrent multi-host writers are out of scope.
 
 ## Layout
 

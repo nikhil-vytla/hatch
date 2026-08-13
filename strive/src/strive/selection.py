@@ -56,6 +56,7 @@ def build_evaluation_manifest(
     budget: BudgetSpec,
     seeds: tuple[int, ...] = (),
     execution_record_ref: str = "",
+    sandbox_provenance_ref: str = "",
 ) -> tuple[EvaluationManifest, str]:
     """Pin everything the assessment ran under — by exact REF, not
     fingerprint alone: the TaskSpecVersion and the CURRENT DatasetRevision
@@ -73,6 +74,7 @@ def build_evaluation_manifest(
     manifest = EvaluationManifest(
         resolved_manifest_ref=resolved_manifest_ref,
         execution_record_ref=execution_record_ref,
+        sandbox_provenance_ref=sandbox_provenance_ref,
         objective_spec_ref=objective_spec_ref(store),
         task_spec_ref=spec_ref,
         dataset_revision_ref=dataset_revision_ref(store, dataset),
@@ -115,6 +117,7 @@ def build_task_bundle(
     budget: BudgetSpec,
     seeds: tuple[int, ...] = (),
     execution_record_ref: str = "",
+    sandbox_provenance_ref: str = "",
 ) -> tuple[ValidationBundle, str]:
     """The task-role bundle: baseline suite, candidate suite, and the paired
     comparison — per-case outcomes and regression ids in CAS artifacts."""
@@ -139,6 +142,7 @@ def build_task_bundle(
         budget=budget,
         seeds=seeds,
         execution_record_ref=execution_record_ref,
+        sandbox_provenance_ref=sandbox_provenance_ref,
     )
     bundle = ValidationBundle(
         role=ROLE_TASK,
@@ -162,6 +166,7 @@ def build_prompt_bundle(
     detail: str,
     budget: BudgetSpec,
     execution_record_ref: str = "",
+    sandbox_provenance_ref: str = "",
 ) -> tuple[ValidationBundle, str]:
     """The prompt-role bundle: the trusted template comparison, linked to
     the exact composite revision — never derived from code scores."""
@@ -172,6 +177,7 @@ def build_prompt_bundle(
         validator_refs=(validators.PROMPT_COMPARISON.ref,),
         budget=budget,
         execution_record_ref=execution_record_ref,
+        sandbox_provenance_ref=sandbox_provenance_ref,
     )
     bundle = ValidationBundle(
         role=ROLE_PROMPT,
@@ -199,6 +205,7 @@ def build_constraint_bundle(
     usage: BudgetUsage | None,
     budget: BudgetSpec,
     execution_record_ref: str = "",
+    sandbox_provenance_ref: str = "",
 ) -> tuple[ValidationBundle, str]:
     """The constraint-role bundle: source screening + budget ceilings. An
     inconclusive result here blocks activation."""
@@ -212,6 +219,7 @@ def build_constraint_bundle(
         ),
         budget=budget,
         execution_record_ref=execution_record_ref,
+        sandbox_provenance_ref=sandbox_provenance_ref,
     )
     results = (
         validators.source_screen_result(screen_rejection_kind, screen_detail),
@@ -300,12 +308,14 @@ def synthesize_evaluation_bundle(
 
 @dataclass(frozen=True)
 class ExecutionProvenance:
-    """The provenance pair every promote-authorizing manifest pins: the
-    exact ResolvedHarnessManifest the evaluation executed under and the
-    per-execution ExecutionRecord naming the subject."""
+    """The provenance every promote-authorizing manifest pins: the exact
+    ResolvedHarnessManifest the evaluation executed under, the per-execution
+    ExecutionRecord naming the subject, and the SandboxProvenance naming the
+    boundary that executed the candidate ("" when none was recorded)."""
 
     resolved_manifest_ref: str
     execution_record_ref: str
+    sandbox_provenance_ref: str = ""
 
 
 def pin_execution_provenance(
@@ -315,6 +325,7 @@ def pin_execution_provenance(
     operation: str,
     run_id: str | None = None,
     detail: str = "harness-internal metered evaluation (no StateReader)",
+    sandbox_provenance_ref: str = "",
 ) -> ExecutionProvenance:
     """Pin truthful execution provenance for a harness-internal evaluation
     path that does not run through `StateReader` (the experiment's metered
@@ -353,6 +364,7 @@ def pin_execution_provenance(
     return ExecutionProvenance(
         resolved_manifest_ref=resolved_ref,
         execution_record_ref=ctx.objects.put_text(codec.dumps(execution_record)),
+        sandbox_provenance_ref=sandbox_provenance_ref,
     )
 
 
@@ -416,6 +428,7 @@ def record_assessment(
         budget=budget,
         seeds=seeds,
         execution_record_ref=provenance.execution_record_ref,
+        sandbox_provenance_ref=provenance.sandbox_provenance_ref,
     )
     _cb, constraint_bundle_ref = build_constraint_bundle(
         store,
@@ -427,6 +440,7 @@ def record_assessment(
         usage=usage,
         budget=budget,
         execution_record_ref=provenance.execution_record_ref,
+        sandbox_provenance_ref=provenance.sandbox_provenance_ref,
     )
     evidence = [
         DecisionEvidence(role=ROLE_TASK, bundle_ref=task_bundle_ref),
@@ -444,6 +458,7 @@ def record_assessment(
             detail="trusted prompt-vs-prompt comparison (see artifact)",
             budget=budget,
             execution_record_ref=provenance.execution_record_ref,
+            sandbox_provenance_ref=provenance.sandbox_provenance_ref,
         )
         evidence.append(
             DecisionEvidence(role=ROLE_PROMPT, bundle_ref=prompt_bundle_ref)

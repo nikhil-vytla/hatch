@@ -498,13 +498,46 @@ The correction pass that makes the merged envelopes AUTHORITATIVE:
   budgets, subject, and baseline all match the exact evaluation that
   produced the decision.
 
-## Stage 3C.2B — Budget-matched algorithm comparison (next)
+## Stage 3C.2B — Secure local execution + the model-capability lane (done)
 
-A separate experiment using the 3C.2A envelopes UNCHANGED: `hill-climb@1`
-(today's loop, extracted behind the `EvolutionAlgorithm` protocol) versus a
-GEPA-style `pareto-population@1` (frontier maintained via journaled
-`frontier_add` dispositions) under equal trusted budgets over the same task
-set — the first pluggable-evolution-algorithm experiment (ADR-0005).
+Secure candidate execution and a genuine model-capability lane, before
+comparing algorithms (ADR-0007):
+
+- A trusted, versioned `SandboxBackend` boundary (`strive.sandboxes`) with a
+  capability report, per-execution provenance, and a fail-closed registry
+  that never silently downgrades a requested backend.
+- `process-fault-only@1` (renamed honestly; fixtures/trusted code only),
+  `deno-pyodide@1` (the shipping SECURE local backend — DSPy's
+  `PythonInterpreter` over Deno+Pyodide WASM: no host filesystem, network,
+  environment, or subprocess; fresh interpreter per case; parent-side
+  wall-clock hard-kill), and `linux-landlock-seccomp@1` (a NOOA-derived
+  Apache-2.0 spike, available only on a probe-confirmed Linux kernel).
+- Protected evaluation runs each held-out/regression/adversarial/audit case
+  in a FRESH sandbox that sees only `input_text` — no repo, CAS, ledger,
+  journal, task definition, credentials, home, or host socket reachable, and
+  no candidate state across cases (`strive.protected`).
+- Sandbox provenance pinned into `EvaluationManifest` (v3); evidence from
+  different backends is distinct and replay demands the recorded backend.
+  Lifecycle authority is granted for model-generated code only under a
+  mechanically-secure backend.
+- The model-capability lane (`strive.capability`, `strive capability`):
+  repeated seeded real-model trials (OpenAI-compatible adapter, incl. local
+  vLLM/Ollama) executed inside the secure backend, with honest aggregate
+  verdicts (supported / inconclusive / negative). Fixtures and single trials
+  are never capability evidence.
+- Exit claim: strive can execute real model-generated candidates locally
+  without granting host filesystem, network, secret, or cross-case access,
+  and can separate deterministic pipeline tests from repeated
+  model-capability evidence.
+
+## Stage 3C.2C — Budget-matched algorithm comparison (next)
+
+A separate experiment using the 3C.2A envelopes and the 3C.2B secure
+backend UNCHANGED: `hill-climb@1` (today's loop, extracted behind the
+`EvolutionAlgorithm` protocol) versus a GEPA-style `pareto-population@1`
+(frontier maintained via journaled `frontier_add` dispositions) under equal
+trusted budgets over the same task set — the first
+pluggable-evolution-algorithm experiment (ADR-0005).
 
 ## Stage 3C — Composite generations + pluggable evolution algorithms + hardened sandbox
 
