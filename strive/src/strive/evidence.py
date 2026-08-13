@@ -96,20 +96,26 @@ class DatasetRevision:
 # -- evaluation manifests ------------------------------------------------------------------------
 
 
-@register("evaluation-manifest", 2)
+@register("evaluation-manifest", 3)
 @dataclass(frozen=True)
 class EvaluationManifest:
-    """Everything a validation ran under (v2: exact identity by REF, not
-    fingerprint alone). `resolved_manifest_ref` must decode to the exact
+    """Everything a validation ran under (v3 adds sandbox provenance to v2's
+    exact-identity-by-REF). `resolved_manifest_ref` must decode to the exact
     `ResolvedHarnessManifest` the evaluation executed under — never a
     revision's own scope manifest and never an ExecutionRecord;
     `execution_record_ref` carries the per-execution provenance separately.
     `task_spec_ref` / `dataset_revision_ref` decode to the exact
     `TaskSpecVersion` / `DatasetRevision`, and the pinned fingerprints must
-    match what those refs decode to (verified by the activation gate)."""
+    match what those refs decode to. `sandbox_provenance_ref` decodes to the
+    `SandboxProvenance` naming the exact boundary (backend@version, runtime
+    digest, enforced capabilities, mount/network policy, resource limits)
+    that executed the candidate — "" for evidence that predates the sandbox
+    boundary (historical/inferred; never promote-grade for untrusted code).
+    All verified by the activation gate."""
 
     resolved_manifest_ref: str  # CAS ref of the ResolvedHarnessManifest
     execution_record_ref: str  # CAS ref of the ExecutionRecord ("" = none)
+    sandbox_provenance_ref: str  # CAS ref of the SandboxProvenance ("" = none)
     objective_spec_ref: str
     task_spec_ref: str  # CAS ref of the exact TaskSpecVersion
     dataset_revision_ref: str  # CAS ref of the exact DatasetRevision

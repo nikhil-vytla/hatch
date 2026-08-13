@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "A self-evolving agent harness: execute, observe, evaluate, diagnose, propose, validate, accept/reject, retain, repeat."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "dspy>=3.3.0",
+]
 
 [project.scripts]
 strive = "strive.cli:main"
@@ -28,3 +30,9 @@ testpaths = ["tests"]
 [tool.mypy]
 strict = true
 files = ["src", "tests"]
+
+# DSPy ships no py.typed marker; the deno-pyodide backend uses it behind a
+# narrow typed wrapper (strive.sandbox_backends).
+[[tool.mypy.overrides]]
+module = ["dspy.*"]
+ignore_missing_imports = true

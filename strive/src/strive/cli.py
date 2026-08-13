@@ -1032,6 +1032,88 @@ def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str,
     return {"data": data, "human": "\n".join(lines)}
 
 
+def _cmd_sandbox(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    """Report the pluggable sandbox backends: which are available on this
+    host and exactly which capabilities each mechanically enforces (never a
+    silent downgrade — an unavailable requested backend fails closed)."""
+    import strive.sandbox_backends  # noqa: F401 — register backends
+    from strive.sandboxes import get_backend, known_backends
+
+    backends: list[dict[str, Any]] = []
+    lines: list[str] = ["sandbox backends:"]
+    for name in known_backends():
+        backend = get_backend(name, require_available=False)
+        available, reason = backend.available()
+        caps = backend.capabilities()
+        backends.append(
+            {
+                "backend": name,
+                "available": available,
+                "reason": reason,
+                "secure": caps.secure,
+                "enforced": list(caps.enforced),
+                "not_enforced": list(caps.not_enforced),
+                "detail": caps.detail,
+            }
+        )
+        marker = "OK" if available else "unavailable"
+        secure = "SECURE" if caps.secure else "not-secure"
+        lines.append(f"  {name} [{marker}, {secure}]: {reason}")
+        lines.append(f"    enforces: {', '.join(caps.enforced) or '(none)'}")
+        if caps.not_enforced:
+            lines.append(f"    does NOT enforce: {', '.join(caps.not_enforced)}")
+    return {"data": {"backends": backends}, "human": "\n".join(lines)}
+
+
+def _cmd_capability(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    """Run the model-capability lane: repeated seeded trials (real model, or
+    the deterministic fixture control) executed inside the secure sandbox
+    backend, with honest aggregate evidence."""
+    from strive.capability import run_capability_trials
+    from strive.loop import _new_run_id
+
+    root = args.artifacts / "capability" / _new_run_id("cap")
+    report = run_capability_trials(
+        root,
+        task,
+        trials=args.trials,
+        sandbox_backend=args.sandbox_backend,
+        use_fixture=args.fixture,
+    )
+    data = {
+        "task_id": report.task_id,
+        "source": report.source,
+        "model_id": report.model_id,
+        "parameters": report.parameters,
+        "sandbox_backend": report.sandbox_backend,
+        "sandbox_secure": report.sandbox_secure,
+        "n": report.n,
+        "acceptance_rate": report.acceptance_rate,
+        "clean_acceptance_rate": report.clean_acceptance_rate,
+        "total_failures": report.total_failures,
+        "verdict": report.verdict,
+        "notes": report.notes,
+        "trials": [
+            {
+                "trial": t.trial, "seed": t.seed, "accepted": t.accepted,
+                "regressions": t.regressions, "failure_kind": t.failure_kind,
+                "model_calls": t.model_calls, "tokens": t.tokens,
+                "sandbox_backend": t.sandbox_backend, "run_id": t.run_id,
+            }
+            for t in report.trials
+        ],
+    }
+    lines = [
+        f"capability lane [{report.source}] model={report.model_id} "
+        f"backend={report.sandbox_backend} "
+        f"({'secure' if report.sandbox_secure else 'NOT secure'})",
+        f"  trials={report.n} acceptance={report.acceptance_rate:.2f} "
+        f"clean={report.clean_acceptance_rate:.2f} failures={report.total_failures}",
+        f"  VERDICT: {report.verdict.upper()} — {report.notes}",
+    ]
+    return {"data": data, "human": "\n".join(lines)}
+
+
 def _cmd_history(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
     entries = store.entries()
     data = {"entries": [codec.encode(e) for e in entries]}
@@ -1078,6 +1160,8 @@ _COMMANDS = {
     "lifecycle": _cmd_lifecycle,
     "evidence": _cmd_evidence,
     "reader": _cmd_reader,
+    "sandbox": _cmd_sandbox,
+    "capability": _cmd_capability,
     "experiment": _cmd_experiment,
 }
 
@@ -1185,6 +1269,29 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         default=None,
         help="revision id (default: the active revision)",
+    )
+    sub.add_parser(
+        "sandbox",
+        help="report pluggable sandbox backends: availability and the exact "
+        "capabilities each mechanically enforces (never a silent downgrade)",
+    )
+    capability_parser = sub.add_parser(
+        "capability",
+        help="the model-capability lane: repeated seeded trials (real model, "
+        "or --fixture control) executed inside the secure sandbox backend, "
+        "with honest aggregate evidence (single trials/fixtures are never "
+        "capability evidence)",
+    )
+    capability_parser.add_argument("--trials", type=int, default=3)
+    capability_parser.add_argument(
+        "--sandbox-backend", default="deno-pyodide@1",
+        help="the secure backend real trials execute under (default "
+        "deno-pyodide@1); an insecure backend is refused for real model code",
+    )
+    capability_parser.add_argument(
+        "--fixture", action="store_true",
+        help="use the deterministic scripted adapter (labeled inconclusive; "
+        "a CI control, never capability evidence)",
     )
     experiment_parser = sub.add_parser(
         "experiment",

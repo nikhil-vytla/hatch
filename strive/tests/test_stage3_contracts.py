@@ -538,6 +538,7 @@ def _evaluation_manifest(dataset_fingerprint: str, seeds: tuple[int, ...]) -> Ev
     return EvaluationManifest(
         resolved_manifest_ref="77" * 32,
         execution_record_ref="99" * 32,
+        sandbox_provenance_ref="aa" * 32,
         objective_spec_ref="88" * 32,
         task_spec_ref="55" * 32,
         dataset_revision_ref="66" * 32,
