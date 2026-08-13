@@ -1249,6 +1249,28 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
                 "decision's — a decision must be judged against one objective"
             )
 
+        # sandbox provenance: when pinned it must decode to a
+        # SandboxProvenance whose backend is self-consistent — evidence from
+        # different backends is distinct and never confused
+        if manifest.sandbox_provenance_ref:
+            from strive.sandboxes import SandboxProvenance
+
+            try:
+                sandbox_prov: SandboxProvenance = codec.loads(
+                    ctx.objects.get_text(manifest.sandbox_provenance_ref),
+                    SandboxProvenance,
+                )
+                if "@" not in sandbox_prov.backend:
+                    reasons.append(
+                        f"{label}: sandbox provenance backend "
+                        f"{sandbox_prov.backend!r} is not versioned (name@version)"
+                    )
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                reasons.append(
+                    f"{label}: sandbox_provenance_ref does not decode to a "
+                    f"SandboxProvenance: {exc}"
+                )
+
         # execution provenance: resolved manifest + execution record agree
         execution_record: ExecutionRecord | None = None
         if not manifest.resolved_manifest_ref:

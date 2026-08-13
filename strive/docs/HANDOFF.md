@@ -1,6 +1,75 @@
 # HANDOFF — strive
 
-## Stage 3C.2A.1 — authoritative envelopes (current)
+## Stage 3C.2B — secure local execution + the model-capability lane (current)
+
+Secure candidate execution and a genuine model-capability lane, before
+comparing evolution algorithms (ADR-0007). Five areas:
+
+1. **Pluggable sandbox boundary** (`strive.sandboxes`,
+   `strive.sandbox_backends`): a trusted, versioned `SandboxBackend`
+   protocol with a capability report (`SandboxCapabilities` — the closed
+   vocabulary filesystem_confined / network_denied / subprocess_denied /
+   env_scrubbed / resource_limited / fresh_per_case; `secure` iff the
+   secure-execution floor is met), per-execution `SandboxProvenance`, and a
+   registry that resolves by exact name@version and FAILS CLOSED — a
+   requested backend that is unknown or unavailable raises rather than
+   downgrading to a weaker one. `process-fault-only@1` is the renamed
+   fault-containment subprocess (fixtures/trusted code only; its report
+   names the filesystem/network/subprocess gaps). `deno-pyodide@1` is the
+   shipping secure local backend (DSPy `PythonInterpreter`, Deno+Pyodide
+   WASM). `linux-landlock-seccomp@1` is a NOOA-derived Apache-2.0 spike
+   (`strive.sandbox_guards`; unprivileged Landlock+seccomp+rlimits with a
+   fail-closed `check_enforceable` probe) available only on a
+   probe-confirmed Linux kernel.
+2. **Correct protected isolation** (`strive.protected`,
+   `run_protected_suite`): each held-out/regression/adversarial/audit case
+   runs in a FRESH sandbox; the candidate receives only `input_text`; the
+   parent keeps case id, split, expected output, and the rest of the suite.
+   In deno-pyodide the candidate runs in a WASM VFS that cannot name a host
+   path (no repo/CAS/ledger/journal/task/creds/home/socket reachable), with
+   no network, no host env, no fork/subprocess, and a fresh interpreter per
+   case so no state persists. A parent-side wall-clock watchdog SIGKILLs the
+   deno OS process on overrun (its graceful shutdown blocks on a CPU-bound
+   child — NOOA's hard-kill).
+3. **Sandbox provenance in the evidence**: `EvaluationManifest` (v3) gains
+   `sandbox_provenance_ref`; the activation gate decodes it and checks the
+   backend is versioned. Evidence from different backends is distinct and
+   replay demands the recorded backend. The loop's `unsafe_model_code`
+   branch now falls through to the native lifecycle path (full authority)
+   when `LoopConfig.sandbox_backend` is mechanically secure, and stays
+   generation-native only without one (`_backend_is_secure`).
+4. **The model-capability lane** (`strive.capability`, `strive capability`):
+   repeated SEEDED real-model trials through the existing OpenAI-compatible
+   adapter (incl. local vLLM/Ollama), candidate code executed inside the
+   secure backend, recording model id/params/prompt-completion refs/sandbox
+   provenance/budgets/outcomes/regressions/failures. Honest aggregate
+   verdicts — `supported` only with `trials >= 2` real trials and a
+   regression-free acceptance; `inconclusive` for fixtures/single trials;
+   `negative` reported honestly. The scripted `FakeModelAdapter` stays the
+   deterministic CI control, labeled `fixture`/`inconclusive` unchanged.
+   Real trials refuse an insecure backend.
+5. **Adversarial verification** (`tests/test_sandbox_backend.py`, 19 tests,
+   deno-gated with skip-not-pass): the escape battery against
+   `deno-pyodide@1` — read the repo/task answers/ledger/CAS/env/`~/.ssh`/
+   sibling cases/caller frames, open internet sockets, fork/subprocess,
+   write outside the workspace, persist state across cases, flood output,
+   spin forever — each mechanically denied and journaled; plus fail-closed
+   registry, no-downgrade, honest capability reports, and distinct
+   per-backend provenance.
+
+**Verification:** the full offline suite passes and `mypy --strict` is
+clean; the sandbox suite (19) runs the real deno+pyodide boundary.
+
+**The Stage 3C.2B claim, stated precisely:** strive can execute real
+model-generated candidates locally without granting host filesystem,
+network, secret, or cross-case access, and can separate deterministic
+pipeline tests from repeated model-capability evidence.
+
+**Next phase (exact):** the budget-matched `hill-climb@1` versus
+GEPA-style `pareto-population@1` experiment (ADR-0005), using the 3C.2A
+envelopes and the 3C.2B secure backend unchanged.
+
+## Stage 3C.2A.1 — authoritative envelopes (historical)
 
 The correction pass making the merged validation/selection envelopes
 AUTHORITATIVE. Five areas:

@@ -99,9 +99,14 @@ class LoopConfig:
     stall_window: int = 3
     history_limit: int = 5
     acknowledge_task_drift: bool = False
-    # set when the proposer runs REAL model-generated code without host
-    # confinement: canary mode is refused for such runs (threat model)
+    # set when the proposer runs REAL model-generated code. With a secure
+    # sandbox backend (below) the code is mechanically contained, so lifecycle
+    # authority is GRANTED; without one, authority is refused (threat model)
     unsafe_model_code: bool = False
+    # the sandbox boundary candidate code executes under. The default is the
+    # honest fault-containment subprocess (fixtures/trusted code); set to a
+    # secure backend (e.g. "deno-pyodide@1") to contain untrusted model code.
+    sandbox_backend: str = "process-fault-only@1"
 
 
 @dataclass(frozen=True)
@@ -342,12 +347,34 @@ def _pin_default_prompt(store: Store) -> None:
     )
 
 
+def _backend_is_secure(backend_name: str) -> bool:
+    """True iff the named sandbox backend is available AND mechanically
+    enforces every secure-execution capability — the floor for granting
+    lifecycle authority to model-generated (untrusted) code. Fail-closed: an
+    unavailable or unknown backend is not secure."""
+    if backend_name == "process-fault-only@1":
+        return False
+    import strive.sandbox_backends  # noqa: F401 — register backends
+    from strive.sandboxes import SandboxError, get_backend
+
+    try:
+        backend = get_backend(backend_name)
+    except SandboxError:
+        return False
+    return backend.capabilities().secure
+
+
 def _provenance_from_execution_record(
-    store: Store, execution_record_ref: str, revision_id: str, run_id: str
+    store: Store,
+    execution_record_ref: str,
+    revision_id: str,
+    run_id: str,
+    sandbox_provenance_ref: str = "",
 ) -> "ExecutionProvenance":
-    """The evidence provenance pair from the reader's pinned
-    ExecutionRecord; when the record is unavailable or carries no resolved
-    baseline, pin fresh truthful provenance for the retained subject."""
+    """The evidence provenance from the reader's pinned ExecutionRecord plus
+    the sandbox provenance naming the boundary that executed the candidate;
+    when the record is unavailable or carries no resolved baseline, pin
+    fresh truthful provenance for the retained subject."""
     from strive import selection as selection_mod
     from strive.reader import ExecutionRecord
 
@@ -360,11 +387,13 @@ def _provenance_from_execution_record(
                 return selection_mod.ExecutionProvenance(
                     resolved_manifest_ref=execution_record.base_resolved_ref,
                     execution_record_ref=execution_record_ref,
+                    sandbox_provenance_ref=sandbox_provenance_ref,
                 )
         except Exception:  # noqa: BLE001 — fall through to fresh provenance
             pass
     return selection_mod.pin_execution_provenance(
-        store, subject_revision_id=revision_id, operation="cycle", run_id=run_id
+        store, subject_revision_id=revision_id, operation="cycle", run_id=run_id,
+        sandbox_provenance_ref=sandbox_provenance_ref,
     )
 
 
@@ -386,15 +415,17 @@ def _record_candidate_evidence(
     budget: BudgetSpec,
     prompt_evidence_ref: str | None = None,
     prompt_improved: bool | None = None,
+    sandbox_provenance_ref: str = "",
 ) -> "RecordedAssessment":
     """Persist the evaluated candidate's IDENTITY and EVIDENCE into the
     lifecycle BEFORE any served behavior changes: retain the exact evaluated
     revision (accepted or rejected), link its compatibility generation, and
     record the assessment with modern promote-grade envelopes — separate
     task/constraint(/prompt) bundles pinned to the exact execution
-    provenance (the reader's ExecutionRecord and the resolved harness it
-    ran under). Raises on failure — retention or evidence problems must
-    surface before activation, not after."""
+    provenance (the reader's ExecutionRecord, the resolved harness it ran
+    under, and the sandbox boundary that executed it). Raises on failure —
+    retention or evidence problems must surface before activation, not
+    after."""
     from strive import selection as selection_mod
 
     revision: HarnessRevision = codec.loads(
@@ -408,7 +439,7 @@ def _record_candidate_evidence(
         generation_id=candidate_generation_id,
     )
     provenance = _provenance_from_execution_record(
-        store, execution_record_ref, revision_id, run_id
+        store, execution_record_ref, revision_id, run_id, sandbox_provenance_ref
     )
     recorded = selection_mod.record_assessment(
         store,
@@ -691,13 +722,48 @@ def _execute_and_evaluate(
     # routine execution covers the selection cases only; the audit split is
     # excluded from every routine flow (see audit_generation)
     cases = task.selection_cases()
-    report = run_strategy(
-        reader.source_for_execution(subject, generation, overlay),
-        cases,
-        generation_id=generation.generation_id,
-        timeout_s=meter.execution_timeout_s(config.sandbox_timeout_s),
-        output_bytes_cap=meter.execution_output_cap(),
-    )
+    source = reader.source_for_execution(subject, generation, overlay)
+    if config.sandbox_backend == "process-fault-only@1":
+        report = run_strategy(
+            source,
+            cases,
+            generation_id=generation.generation_id,
+            timeout_s=meter.execution_timeout_s(config.sandbox_timeout_s),
+            output_bytes_cap=meter.execution_output_cap(),
+        )
+    else:
+        # a chosen (secure) backend: EACH case in a fresh sandbox, candidate
+        # sees only input_text; the boundary's provenance is captured for the
+        # evidence and never silently downgraded (get_backend fails closed)
+        import strive.sandbox_backends  # noqa: F401 — register backends
+        from strive.sandboxes import SandboxLimits, get_backend, run_protected_suite
+
+        backend = get_backend(config.sandbox_backend)
+        outcomes, sandbox_provenance, denials = run_protected_suite(
+            backend,
+            source,
+            cases,
+            generation_id=generation.generation_id,
+            limits=SandboxLimits(
+                wall_time_s=meter.execution_timeout_s(config.sandbox_timeout_s),
+                output_bytes=meter.execution_output_cap(),
+            ),
+        )
+        report = ExecutionReport(
+            ok=True,
+            generation_id=generation.generation_id,
+            outcomes=tuple(outcomes.values()),
+            failure=None,
+            wall_time_s=0.0,
+            stdout_bytes=0,
+        )
+        if execution_record is not None:
+            execution_record["sandbox_provenance_ref"] = store.objects.put_text(
+                codec.dumps(sandbox_provenance)
+            )
+        for note in denials:
+            events.emit("sandbox_denial", generation_id=generation.generation_id,
+                        detail=note)
     meter.note_output_bytes(report.stdout_bytes)
     for outcome in report.outcomes:
         events.emit(
@@ -1197,16 +1263,21 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         accepted=decision.accepted,
                     )
                     policy_ref = f"{policy.name}@{policy.version}"
-                    if config.unsafe_model_code:
-                        # threat model: candidate code can write the lifecycle
-                        # journal (same UID, no confinement), so lifecycle
-                        # AUTHORITY is refused for unsafe model-generated code
-                        # — served behavior evolves generation-native only,
-                        # and the gap stays visible via compat_parity until a
-                        # later safe run's convergence backfills it
+                    secure_backend = _backend_is_secure(config.sandbox_backend)
+                    if config.unsafe_model_code and not secure_backend:
+                        # threat model: without a secure backend, candidate
+                        # code ran on the fault-only boundary (it could read
+                        # the repo/ledger and open sockets), so lifecycle
+                        # AUTHORITY is refused — served behavior evolves
+                        # generation-native only, and the gap stays visible
+                        # via compat_parity until a later contained run's
+                        # convergence backfills it. With a secure backend the
+                        # code was mechanically contained and falls through to
+                        # the native lifecycle path below.
                         store._note_diagnostic(
                             "lifecycle authority refused for unsafe "
-                            "model-generated code; generation-native only"
+                            "model-generated code with no secure sandbox "
+                            "backend; generation-native only"
                         )
                         if decision.accepted:
                             store.activate(
@@ -1284,6 +1355,9 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                                 prompt_evidence.improved
                                 if prompt_evidence is not None
                                 else None
+                            ),
+                            sandbox_provenance_ref=candidate_execution_record.get(
+                                "sandbox_provenance_ref", ""
                             ),
                         )
                         revision_id = recorded.revision_id

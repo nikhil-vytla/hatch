@@ -105,22 +105,35 @@ self-reported by evolvable code (exo's cost doc admits agent-reported usage is
 untrustworthy, note 04). Budgets are hierarchical: a delegated child receives the
 parent's *remaining* budget, RLM-style (note 05), so recursion is safe by construction.
 
-**Sandbox boundary.** One interface, a registry of tiers (RLM's ladder, note 05):
-1. `subprocess` — `python -I` + timeout (v0 floor);
-2. `restricted` — + scrubbed environment (no inherited secrets), private temp
-   workspace as cwd, bounded stdout/stderr, POSIX rlimits (CPU, file size, open
-   files). **Implemented in phase 3** as the default. Honest limits: network
-   denial is NOT enforced (no reliable unprivileged cross-platform mechanism),
-   RLIMIT_AS is unreliable on macOS, and filesystem confinement is absent — a
-   candidate that guesses absolute paths can touch anything the controller's
-   UID can. Fault containment, not a security sandbox (see README).
-3. `kernel` — Landlock + seccomp self-installed post-fork with fail-closed capability
-   probing (NOOA `guards.py`, note 06; Linux-only — macOS falls back to tier 2);
-4. `container` / microVM (stage 6).
-The runner **rejects loudly on schema mismatch** (implemented: protocol-checked
-payloads, dedicated exit code, recorded `schema-mismatch` failure) — a malformed
-payload is an observable failure event, never a silent fallback (CH's
-842-repetition stall was caused by exactly that silence, note 03 §B.3).
+**Sandbox boundary.** A trusted, versioned `SandboxBackend` protocol
+(`strive.sandboxes`; stage 3C.2B, ADR-0007) with a capability report,
+per-execution provenance, and a fail-closed registry that NEVER silently
+downgrades a requested backend. Backends:
+1. `process-fault-only@1` — `python -I` + timeout, scrubbed environment,
+   private temp workspace, bounded output, POSIX rlimits. Fault containment,
+   NOT security: no filesystem confinement, no network denial (its capability
+   report names these gaps). Default; fixtures and trusted code only.
+2. `deno-pyodide@1` — the shipping **secure local** backend (DSPy
+   `PythonInterpreter`; Deno + Pyodide WASM). Default-deny: WASM VFS with no
+   host path nameable, no `--allow-net`, no `--allow-env`, no
+   `os.fork`/subprocess; fresh interpreter per case (no cross-case state);
+   parent-side wall-clock watchdog hard-kills a runaway (deno's graceful
+   shutdown blocks on a CPU-bound child, so the parent SIGKILLs the OS
+   process — NOOA's hard-kill doctrine).
+3. `linux-landlock-seccomp@1` — NOOA-derived (Apache-2.0) spike: unprivileged
+   Landlock + seccomp + rlimits self-installed post-fork with a fail-closed
+   `check_enforceable` probe; available only on a probe-confirmed Linux
+   kernel (this build reports UNAVAILABLE elsewhere rather than pretending).
+4. `container` / microVM (deferred; slots behind the same protocol).
+Protected evaluation (`strive.protected`) runs each
+held-out/regression/adversarial/audit case in a FRESH sandbox that receives
+only `input_text`. Sandbox provenance is pinned into `EvaluationManifest`
+(v3), so evidence from different backends is distinct and replay demands the
+recorded backend; lifecycle authority for model-generated code is granted
+only under a mechanically-secure backend. The runner **rejects loudly on
+schema mismatch** — a malformed payload is an observable failure event,
+never a silent fallback (CH's 842-repetition stall was caused by exactly
+that silence, note 03 §B.3).
 
 **Secrets broker.** Credentials live host-side only and cross into sandboxes never;
 model calls made on behalf of sandboxed code go through a kernel-side proxy
