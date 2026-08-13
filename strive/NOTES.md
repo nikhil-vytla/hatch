@@ -1033,3 +1033,49 @@ accepted-and-current at resume time.
   executed artifact.
 
 300 tests, mypy strict clean (56 files).
+
+## Stage 3C.2B — secure local execution + model-capability lane
+
+- strive/sandboxes.py: SandboxBackend protocol (backend@version,
+  capabilities(), provenance(), run()), SandboxCapabilities (closed cap
+  vocabulary; .secure = secure-execution floor), SandboxProvenance,
+  SandboxLimits, fail-closed registry (get_backend raises on unknown/
+  unavailable — NEVER downgrades), run_protected_suite (each case in a
+  fresh backend.run).
+- strive/sandbox_backends.py: process-fault-only@1 (wraps run_strategy,
+  honest not_enforced list), deno-pyodide@1 (DSPy PythonInterpreter, Deno+
+  Pyodide WASM; fresh interpreter per run; parent wall-clock watchdog),
+  linux-landlock-seccomp@1 (spike; available() only on probe-confirmed
+  Linux). Backends registered at import.
+- KEY GOTCHA: DSPy's interp.shutdown() sends a graceful JSON-RPC shutdown
+  then blocks on deno_process.wait() — a CPU-bound infinite loop in pyodide
+  never reads it, so shutdown hangs forever. Fix: run execute() in a worker
+  thread with join(timeout=wall_time_s); on overrun, _hard_kill() calls
+  interp.deno_process.kill() directly (SIGKILL the OS process, NOOA's
+  doctrine); teardown shutdown() also runs in a watchdog thread with a
+  hard-kill fallback. Verified: infinite loop returns in ~3.3s as a
+  FAILURE_TIMEOUT.
+- Verified escapes DENIED in pyodide: host fs read (WASM VFS, FileNotFound),
+  /root/.ssh, os.environ has only web_user vars, os.fork (not implemented),
+  subprocess (emscripten no processes), socket.connect (host unreachable),
+  inspect.stack has no strive frames, write /etc (denied), cross-case
+  builtins._leak absent (fresh interpreter). deno boots ~1.4s cached.
+- strive/protected.py: evaluate_through_backend → normal Evaluation +
+  SandboxProvenance, failure-as-data preserved.
+- Manifest bumped @2 → @3: + sandbox_provenance_ref. selection builders +
+  ExecutionProvenance + record_assessment thread it through; readiness gate
+  decodes it when present (backend must be versioned). test_stage3_contracts
+  manifest helper updated.
+- loop: LoopConfig.sandbox_backend (default process-fault-only@1 so the 300
+  existing tests stay fast); _execute_and_evaluate routes through the backend
+  per-case when non-default, capturing sandbox provenance into the execution
+  record dict; _backend_is_secure gates the unsafe_model_code branch — model
+  code gets full lifecycle authority under a secure backend, generation-
+  native only without one.
+- strive/capability.py + `strive capability`/`strive sandbox`: repeated
+  seeded trials, fixture vs real, honest supported/inconclusive/negative;
+  real trials require a secure backend (refuse insecure). n>=2 for a verdict.
+- dspy added as a dep; mypy override ignore_missing_imports for dspy.* (no
+  py.typed). deno installed via brew (deno 2.9.5).
+- ADR-0007 written; docs updated; next phase renamed 3C.2C (algorithm
+  comparison over the secure backend).
