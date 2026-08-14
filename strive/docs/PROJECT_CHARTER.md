@@ -1,12 +1,37 @@
 # strive — Project Charter
 
-**Mission.** Build a robust, extensible, observable, safe, and empirically
-validated self-evolving agent harness: a system in which an agent improves its
-own strategies, prompts, policies, and (eventually) code by learning from
-evidence of its own behavior, under explicit human-defined guardrails. The
-first prototype is an early milestone, not the final scope.
+> **vNext thesis (supersedes the promotion-centric charter below).** Strive
+> provides **Exo-like durable mechanisms for model-led adaptation**: one
+> revision-native event/artifact substrate and a resumable policy command
+> boundary that let a policy **apply, observe, checkpoint, and revert exact
+> composite changes** to allowlisted surfaces. **Comparative evaluation is an
+> optional mechanism a policy may request — not a universal activation
+> prerequisite.** The earlier thesis ("every change requires empirical
+> promotion") is retired: an `AcceptancePolicy` gate no longer stands between
+> a policy and a change. What remains non-configurable is the FLOOR (below),
+> not any particular adaptation ceremony.
+>
+> **The non-configurable floor.** Regardless of policy: allowlisted surfaces;
+> exact before/after state (content-addressed); expected-head conflict
+> checks; CAS integrity; append-only, tamper-evident effects;
+> checkpoints/rollback and crash recovery; budgets; the sandbox / secret /
+> permission boundaries; and explicit controls around irreversible effects.
+> Comparative evaluation, held-out discipline, statistical acceptance, and
+> Pareto retention are all *mechanisms a policy may compose*, never a gate
+> the kernel imposes.
+>
+> See `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and
+> `docs/adrs/0008-vnext-substrate.md`. The mission and questions below are
+> retained as historical context for the promotion-era design (Stages 1–3C).
 
-## Central research and engineering questions
+**Mission (historical, promotion-era).** Build a robust, extensible,
+observable, safe, and empirically validated self-evolving agent harness: a
+system in which an agent improves its own strategies, prompts, policies, and
+(eventually) code by learning from evidence of its own behavior, under
+explicit human-defined guardrails. The first prototype is an early
+milestone, not the final scope.
+
+## Central research and engineering questions (historical)
 
 **Research questions**
 

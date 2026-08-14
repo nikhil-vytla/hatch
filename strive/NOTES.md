@@ -1126,3 +1126,37 @@ accepted-and-current at resume time.
   refuses insecure backend.
 
 336 tests (300 non-deno + 36 deno-gated), mypy strict clean (63 files).
+
+## vNext Phase A — policy-neutral revision-native substrate (architecture reset)
+
+- New thesis: durable mechanisms for model-led adaptation (Exo lineage);
+  comparative evaluation is an OPTIONAL mechanism a policy requests
+  (EvaluateFork), NOT a universal activation gate. The AcceptancePolicy /
+  empirical-promotion ceremony is retired.
+- New core: strive.substrate (append-only framed event stream + CAS as the
+  SOLE harness state; native composite state = allowlisted surface bindings
+  with exact before/after CAS refs; 11 typed records; state folded from
+  authority events; exact revert by change inversion; expected-head checks).
+  strive.policy (AdaptationPolicy[Config,State] + SurfaceStrategy protocols;
+  closed command vocabulary; immutable RunView; injected immutable
+  PolicyCatalog). strive.kernel (resumable command loop; journals
+  intent/result; content-addressed policy-state checkpoints; idempotent
+  across crashes via completed-command set + authority-effect detection).
+  strive.policies.manual_change (manual-change@1 proof + TOML config +
+  versioned prompt md).
+- Deleted (compat/migration out of scope): lifecycle, loop, reader,
+  dualwrite, experiment, selection, evidence, validators, datasets,
+  promptgate, migrations, migrate, capability, store, stage3_contracts,
+  monitors, propose, model_proposer, diagnose, revisions, old policy,
+  fakemodel, cli; + promotion wire types in contracts.
+- Kept: codec, cas, framing, contracts (primitives), tasks, evaluate,
+  budget, model, and the whole secure sandbox stack (CandidateExecutor).
+- Gotchas: (1) RunView must carry the pinned SEED state, not just current —
+  the policy builds its change against the seed so resume-after-apply
+  re-derives the same change and the kernel's idempotency skips re-applying.
+  (2) The kernel dedups identical consecutive checkpoints so repeated
+  resumes of a completed run are side-effect-free. (3) Substrate.put stores
+  registered contracts or raw strings only (no unversioned dict blobs).
+- 99 tests, mypy strict clean (28 src files). Default sandbox stays
+  process-fault-only@1; deno-pyodide@1 + adversarial suite unchanged.
+- PR opened for review; NOT merged (per the goal).

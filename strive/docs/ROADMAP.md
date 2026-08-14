@@ -1,5 +1,16 @@
 # strive — Roadmap
 
+> **vNext reset (Phase A) — new thesis.** Strive provides durable mechanisms
+> for model-led adaptation, not a universal empirical-promotion pipeline. A
+> policy may apply/observe/checkpoint/revert exact composite changes;
+> comparative evaluation is an optional mechanism it may request. Phase A
+> shipped the substrate + policy command boundary + `manual-change@1`
+> (see `docs/adrs/0008-vnext-substrate.md`). NEXT (deferred): a budget-matched
+> `hill-climb@1` vs `pareto-population@1` policy comparison on this substrate,
+> as a journaled command/reducer state machine. The promotion-era roadmap
+> below (Stages 1–3C) is historical.
+
+
 Staged maturity targets, revised 2026-08-06 after the research phase (notes 01–06,
 [comparative matrix](agents/research/comparative-matrix.md), [ARCHITECTURE](ARCHITECTURE.md)).
 Supersedes the charter's original six-stage sketch; the charter's non-goals still bind

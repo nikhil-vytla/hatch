@@ -1,5 +1,19 @@
 # strive — Target Architecture
 
+> **vNext reset (Phase A).** Strive is now a policy-neutral, revision-native
+> mechanism substrate: one append-only event/artifact store
+> (`strive.substrate`) + a resumable policy command boundary
+> (`strive.policy`, `strive.kernel`), proved by the `manual-change@1` policy.
+> Comparative evaluation is an OPTIONAL mechanism a policy requests
+> (`EvaluateFork`), not a universal activation gate. The promotion-era
+> architecture below (generation ledger, revision mirror, dual-write/parity,
+> reader canary, `AcceptancePolicy`, lifecycle promotion, evidence/selection
+> envelopes, migrations) has been DELETED — see
+> `docs/adrs/0008-vnext-substrate.md`. The secure sandbox boundary (ADR-0007)
+> and the floor mechanisms survive. The sections below are retained as
+> historical context for Stages 1–3C.
+
+
 Status: designed 2026-08-06 from the v0 vertical slice plus the research corpus in
 [docs/agents/research/](agents/research/00-index.md). This document describes the
 platform strive is growing into; the [ROADMAP](ROADMAP.md) sequences the work and
