@@ -71,7 +71,12 @@ from strive.promptgate import PromptComparisonEvidence
 from strive.selection import ExecutionProvenance, RecordedAssessment
 from strive.reader import MODE_CANARY, CandidateSubject, StateReader
 from strive.revisions import HarnessRevision
-from strive.sandbox import run_strategy
+from strive.sandboxes import (
+    FAULT_ONLY_BACKEND,
+    BackendCatalog,
+    CandidateExecutor,
+    SandboxError,
+)
 from strive.store import (
     LedgerEntry,
     Store,
@@ -107,6 +112,13 @@ class LoopConfig:
     # honest fault-containment subprocess (fixtures/trusted code); set to a
     # secure backend (e.g. "deno-pyodide@1") to contain untrusted model code.
     sandbox_backend: str = "process-fault-only@1"
+    # the immutable backend catalog to resolve `sandbox_backend` against
+    # (None -> the build's default_catalog()). Injecting a catalog keeps the
+    # available backends explicit and testable — no import-time global.
+    backend_catalog: "BackendCatalog | None" = None
+    # the per-model-request seed, propagated into every ModelRequest so that
+    # "seeded" trials really vary the seed (capability lane sets this).
+    model_seed: int = 0
 
 
 @dataclass(frozen=True)
@@ -347,18 +359,38 @@ def _pin_default_prompt(store: Store) -> None:
     )
 
 
-def _backend_is_secure(backend_name: str) -> bool:
+def candidate_executor(config: LoopConfig) -> "CandidateExecutor":
+    """Build the one execution service for a cycle from its config: the
+    catalog resolves the backend (fail-closed), and code is TRUSTED iff the
+    run is not executing model-authored code — so a fault-only backend is
+    accepted only for trusted fixtures, and model code on a fault-only
+    boundary is refused by the executor."""
+    from strive.sandboxes import CandidateExecutor as _Executor
+
+    catalog = config.backend_catalog or _default_catalog()
+    return _Executor.from_catalog(
+        catalog, config.sandbox_backend, trusted=not config.unsafe_model_code
+    )
+
+
+def _default_catalog() -> "BackendCatalog":
+    from strive.sandboxes import default_catalog
+
+    return default_catalog()
+
+
+def _backend_is_secure(backend_name: str, config: "LoopConfig | None" = None) -> bool:
     """True iff the named sandbox backend is available AND mechanically
     enforces every secure-execution capability — the floor for granting
     lifecycle authority to model-generated (untrusted) code. Fail-closed: an
     unavailable or unknown backend is not secure."""
+    from strive.sandboxes import SandboxError
+
     if backend_name == "process-fault-only@1":
         return False
-    import strive.sandbox_backends  # noqa: F401 — register backends
-    from strive.sandboxes import SandboxError, get_backend
-
+    catalog = (config.backend_catalog if config else None) or _default_catalog()
     try:
-        backend = get_backend(backend_name)
+        backend = catalog.resolve(backend_name)
     except SandboxError:
         return False
     return backend.capabilities().secure
@@ -563,6 +595,7 @@ def _prompt_surface_gate(
         adapter_name=(
             type(config.model_adapter).__name__ if config.model_adapter else "none"
         ),
+        executor=candidate_executor(config),
     )
     events.emit(
         "prompt_comparison",
@@ -723,53 +756,38 @@ def _execute_and_evaluate(
     # excluded from every routine flow (see audit_generation)
     cases = task.selection_cases()
     source = reader.source_for_execution(subject, generation, overlay)
-    if config.sandbox_backend == "process-fault-only@1":
-        report = run_strategy(
-            source,
-            cases,
-            generation_id=generation.generation_id,
-            timeout_s=meter.execution_timeout_s(config.sandbox_timeout_s),
-            output_bytes_cap=meter.execution_output_cap(),
-        )
-    else:
-        # a chosen (secure) backend: EACH case in a fresh sandbox, candidate
-        # sees only input_text; the boundary's provenance is captured for the
-        # evidence and never silently downgraded (get_backend fails closed)
-        import strive.sandbox_backends  # noqa: F401 — register backends
-        from strive.sandboxes import SandboxLimits, get_backend, run_protected_suite
+    # ONE execution service: fault-only requires trusted code (fixtures /
+    # registry proposals — unsafe_model_code=False); model-authored code
+    # must name a secure backend or the executor refuses it. Each secure
+    # case runs in a fresh sandbox seeing only input_text, and its boundary
+    # provenance is captured for the evidence (never silently downgraded).
+    from strive.sandboxes import SandboxLimits
 
-        backend = get_backend(config.sandbox_backend)
-        outcomes, sandbox_provenance, denials = run_protected_suite(
-            backend,
-            source,
-            cases,
-            generation_id=generation.generation_id,
-            limits=SandboxLimits(
-                wall_time_s=meter.execution_timeout_s(config.sandbox_timeout_s),
-                output_bytes=meter.execution_output_cap(),
-            ),
+    executor = candidate_executor(config)
+    outcome = executor.execute_suite(
+        source,
+        cases,
+        generation_id=generation.generation_id,
+        limits=SandboxLimits(
+            wall_time_s=meter.execution_timeout_s(config.sandbox_timeout_s),
+            output_bytes=meter.execution_output_cap(),
+        ),
+    )
+    report = outcome.report
+    if execution_record is not None:
+        execution_record["sandbox_provenance_ref"] = store.objects.put_text(
+            codec.dumps(outcome.provenance)
         )
-        report = ExecutionReport(
-            ok=True,
-            generation_id=generation.generation_id,
-            outcomes=tuple(outcomes.values()),
-            failure=None,
-            wall_time_s=0.0,
-            stdout_bytes=0,
+    for note in outcome.denials:
+        events.emit(
+            "sandbox_denial", generation_id=generation.generation_id, detail=note
         )
-        if execution_record is not None:
-            execution_record["sandbox_provenance_ref"] = store.objects.put_text(
-                codec.dumps(sandbox_provenance)
-            )
-        for note in denials:
-            events.emit("sandbox_denial", generation_id=generation.generation_id,
-                        detail=note)
     meter.note_output_bytes(report.stdout_bytes)
-    for outcome in report.outcomes:
+    for case_outcome in report.outcomes:
         events.emit(
             "case_executed",
             generation_id=generation.generation_id,
-            outcome=codec.encode(outcome),
+            outcome=codec.encode(case_outcome),
         )
     if not report.ok and report.failure is not None:
         events.emit(
@@ -971,6 +989,7 @@ def _proposal_stage(
         model_calls_remaining=max(0, config.budget.model_calls - usage.model_calls - 1),
         executions_remaining=max(0, config.budget.executions - usage.executions),
         model=model_handle,
+        seed=config.model_seed,
         prompt_template=prompt_template,
         prompt_ref=prompt_ref,
         prompt_descriptor_ref=current_descriptor("prompt").descriptor_ref,
@@ -1263,7 +1282,7 @@ def run_cycle(store: Store, task: Task, config: LoopConfig | None = None) -> Cyc
                         accepted=decision.accepted,
                     )
                     policy_ref = f"{policy.name}@{policy.version}"
-                    secure_backend = _backend_is_secure(config.sandbox_backend)
+                    secure_backend = _backend_is_secure(config.sandbox_backend, config)
                     if config.unsafe_model_code and not secure_backend:
                         # threat model: without a secure backend, candidate
                         # code ran on the fault-only boundary (it could read
@@ -1527,13 +1546,18 @@ def audit_generation(
             status = "denied"
             raise StoreError(f"audit denied by budget: {denial.detail}")
         reader.record_execution("audit-target", generation, events)
-        report = run_strategy(
+        from strive.sandboxes import SandboxLimits
+
+        outcome = candidate_executor(config).execute_suite(
             reader.source_for_execution("audit-target", generation),
             cases,
             generation_id=generation.generation_id,
-            timeout_s=meter.execution_timeout_s(config.sandbox_timeout_s),
-            output_bytes_cap=meter.execution_output_cap(),
+            limits=SandboxLimits(
+                wall_time_s=meter.execution_timeout_s(config.sandbox_timeout_s),
+                output_bytes=meter.execution_output_cap(),
+            ),
         )
+        report = outcome.report
         evaluation = evaluate(task, report, cases)
         events.emit(
             "audited",
@@ -1735,6 +1759,53 @@ class ReplayReport:
     bundle_checked: bool = False
     bundle_metric_diffs: dict[str, float] | None = None
     bundle_matches: bool | None = None
+    # sandbox-provenance replay: the backend the recorded evidence ran under
+    # (from the candidate's evidence). Replay uses THAT backend or reports it
+    # unavailable — it never re-validates on a different boundary.
+    recorded_backend: str | None = None
+    backend_unavailable: bool = False
+
+
+def _recorded_backend_for(store: Store, candidate_generation_id: str) -> str | None:
+    """The sandbox backend the candidate's recorded evidence executed under,
+    read from its selection envelope's bundles (None when the evidence pins
+    no sandbox provenance — e.g. trusted fault-only history)."""
+    from strive import codec
+    from strive.evidence import (
+        EvaluationManifest,
+        SelectionDecision,
+        ValidationBundle,
+    )
+    from strive.sandboxes import SandboxProvenance
+
+    st = lifecycle.state(store)
+    for revision_id, generation_id in st.links.items():
+        if generation_id != candidate_generation_id:
+            continue
+        for link in reversed(st.evidence_links.get(revision_id, ())):
+            if link.kind != "selection":
+                continue
+            try:
+                decision: SelectionDecision = codec.loads(
+                    store.objects.get_text(link.envelope_ref), SelectionDecision
+                )
+                for item in decision.evidence:
+                    bundle: ValidationBundle = codec.loads(
+                        store.objects.get_text(item.bundle_ref), ValidationBundle
+                    )
+                    manifest: EvaluationManifest = codec.loads(
+                        store.objects.get_text(bundle.evaluation_manifest_ref),
+                        EvaluationManifest,
+                    )
+                    if manifest.sandbox_provenance_ref:
+                        prov: SandboxProvenance = codec.loads(
+                            store.objects.get_text(manifest.sandbox_provenance_ref),
+                            SandboxProvenance,
+                        )
+                        return prov.backend
+            except Exception:  # noqa: BLE001 — best-effort provenance read
+                return None
+    return None
 
 
 def replay_run(
@@ -1767,6 +1838,46 @@ def replay_run(
         if cycle is None:
             raise StoreError(f"unknown run for task {store.task_id!r}: {run_id}")
         task_drift = cycle.task_fingerprint != task.fingerprint()
+        # REPLAY UNDER THE RECORDED BOUNDARY: if the candidate's evidence
+        # pins a sandbox backend, replay must use THAT backend (equivalent
+        # capabilities) — never re-validate a Pyodide-contained candidate in
+        # plain CPython. When the recorded backend is unavailable here, we
+        # report unavailable rather than silently downgrading.
+        recorded_backend = (
+            _recorded_backend_for(store, cycle.candidate_generation_id)
+            if cycle.candidate_generation_id is not None
+            else None
+        )
+        if recorded_backend is not None:
+            catalog = config.backend_catalog or _default_catalog()
+            try:
+                catalog.resolve(recorded_backend)
+                import dataclasses as _dc
+
+                config = _dc.replace(
+                    config,
+                    sandbox_backend=recorded_backend,
+                    unsafe_model_code=recorded_backend != FAULT_ONLY_BACKEND,
+                )
+            except SandboxError:
+                events.emit(
+                    "replay_backend_unavailable", recorded_backend=recorded_backend
+                )
+                reader.add_fact("replay")
+                return ReplayReport(
+                    run_id=run_id,
+                    generation_id=cycle.generation_id,
+                    task_drift=task_drift,
+                    recorded_score=cycle.overall_score,
+                    replayed_score=0.0,
+                    matches=False,
+                    split_diffs={},
+                    candidate_generation_id=cycle.candidate_generation_id,
+                    candidate_replayed_score=None,
+                    decision_matches=None,
+                    recorded_backend=recorded_backend,
+                    backend_unavailable=True,
+                )
         # the exact native read, paired through the boundary before use
         generation = reader.read_generation("replay-baseline", cycle.generation_id)
         meter = BudgetMeter(config.budget)
@@ -1884,6 +1995,7 @@ def replay_run(
             bundle_checked=bundle_checked,
             bundle_metric_diffs=bundle_metric_diffs,
             bundle_matches=bundle_matches,
+            recorded_backend=recorded_backend,
         )
     except BaseException as exc:
         status = f"error:{type(exc).__name__}"

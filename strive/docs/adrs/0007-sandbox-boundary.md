@@ -1,8 +1,77 @@
 # ADR-0007 — The pluggable sandbox boundary and the model-capability lane
 
-Status: accepted and implemented in Stage 3C.2B (`strive.sandboxes`,
-`strive.sandbox_backends`, `strive.sandbox_guards`, `strive.protected`,
-`strive.capability`).
+Status: accepted and implemented in Stage 3C.2B, made end-to-end
+authoritative in Stage 3C.2B.1 (`strive.sandboxes`,
+`strive.sandbox_backends`, `strive.sandbox_launcher`,
+`strive.sandbox_guards`, `strive.capability`).
+
+## Stage 3C.2B.1 — making secure execution and capability evidence trustworthy
+
+The 3C.2B slice shipped the boundary but left seams: execution was still
+scattered across direct `run_strategy` calls; the deno runner executed the
+candidate in the SAME namespace as the payload and trusted serialization;
+`resource_limited` was not part of "secure"; provenance did not pin exact
+runtime digests; the Linux spike reported available+secure with a raising
+`run`; and capability trials sent a repeated seed-0 while calling it
+"seeded." 3C.2B.1 closes all of these:
+
+- **One execution service.** `CandidateExecutor` is the single kernel-owned
+  path; run, promptgate, visible-context, experiments, compare, replay,
+  audit, promotion, and capability all execute through it. `run_strategy`
+  is called only inside `process-fault-only@1` and its tests. A
+  fault-only executor REQUIRES `trusted=True`, so untrusted (model-authored)
+  code on the fault-only boundary fails closed.
+- **Injected immutable catalog.** Registration is no longer an import-time
+  mutable global: `strive.sandbox_backends.DESCRIPTORS` (name + factory) are
+  assembled into a `BackendCatalog` (`default_catalog()`), resolved by exact
+  name@version, fail-closed. A reusable `conformance_violations` suite
+  checks every backend's self-consistency.
+- **Hardened protected protocol.** The candidate runs in a SEPARATE
+  namespace holding only builtins; only `input_text` enters the sandbox
+  (case id, split, expected value, and the rest of the suite stay
+  parent-side). The result envelope is built OUTSIDE the candidate namespace
+  with a serialization reference captured BEFORE the candidate ran, so
+  rebinding `json.dumps` cannot hijack it. The parent assigns case ids by
+  position and validates result count and exact per-result shape (a non-bool
+  int or null; no extra/missing/duplicate fields; no protocol mutation), so
+  forged ids and spoofed outcomes are rejected. Frame/global inspection
+  yields only the candidate's own input — nothing sibling or secret.
+- **Resource limiting is part of "secure."** `resource_limited` joins the
+  secure floor. `deno-pyodide@1` launches Deno through
+  `strive.sandbox_launcher`, which applies POSIX rlimits (CPU seconds, open
+  files, processes, single-file size, and a coarse RLIMIT_AS ceiling) to the
+  Deno process, plus a parent wall-clock hard-kill and an absolute suite
+  deadline. The memory ceiling is honestly documented as a coarse
+  whole-runtime bound (the WASM baseline is large; RLIMIT_AS is unreliable
+  on macOS).
+- **Authoritative provenance.** `SandboxProvenance` (v2) pins exact
+  component digests (Deno version, Pyodide marker, DSPy version, runner-code
+  sha256, backend-config digest). Each validator pins the boundary it
+  actually used — the prompt validator carries its own sandbox provenance
+  and cannot borrow the task candidate's. The activation gate checks
+  provenance decodes, is versioned, is self-consistent about its secure
+  claim, and AGREES across a decision's bundles (one bounded boundary per
+  decision). Replay uses the recorded backend or reports it unavailable —
+  never re-validating a Pyodide-contained candidate in plain CPython.
+- **The Linux spike is honestly unavailable.** `linux-landlock-seccomp@1`
+  reports no enforced capabilities and is ALWAYS unavailable until its full
+  ruleset and leak-vs-closed tests land; it never claims available+secure
+  with a raising `run`.
+- **Trustworthy capability trials.** Each trial's seed is propagated into
+  every `ModelRequest` (`LoopConfig.model_seed`), and the adapter's seed
+  support is recorded honestly; a run persists one immutable `manifest.json`
+  pinning per-trial request/prompt/completion/revision/evidence/sandbox/
+  budget/outcome refs; a PREREGISTERED `CapabilityCriterion` (min trials,
+  min clean-acceptance, interval lower bound > 0) decides the verdict, so a
+  lone success among many never reads as `supported`; and `resume=True`
+  reuses completed trials without duplicate model spend.
+
+Exit claim: every model-authored execution path uses one mechanically
+bounded backend; protected cases expose only input text; activation/replay
+require exact sandbox provenance; capability trials use real recorded seeds
+and reproducible manifests.
+
+## Stage 3C.2B — the original slice
 
 ## Context
 

@@ -1079,3 +1079,50 @@ accepted-and-current at resume time.
   py.typed). deno installed via brew (deno 2.9.5).
 - ADR-0007 written; docs updated; next phase renamed 3C.2C (algorithm
   comparison over the secure backend).
+
+## Stage 3C.2B.1 — authoritative secure execution + trustworthy capability evidence
+
+- One kernel-owned strive.sandboxes.CandidateExecutor; every execution path
+  routes through it. `run_strategy` only inside process-fault-only@1 backend
+  + tests. trusted = not config.unsafe_model_code; fault-only + untrusted →
+  SandboxError (fail-closed). This SUPERSEDED the old "unsafe code runs
+  generation-native on fault-only" path — updated the 3 threat-model tests
+  (test_unsafe_model_code_*, canary refusal) to expect the fail-closed
+  refusal.
+- Registry → injected immutable BackendCatalog(DESCRIPTORS = (name, factory))
+  + default_catalog() + conformance_violations(). Removed register_backend/
+  _BACKENDS/get_backend/known_backends. LoopConfig.backend_catalog injects.
+- Hardened deno runner: KEY BUG fixed earlier — the template used
+  `.format()`-style doubled braces `{{}}` but was concatenated directly, so
+  `_ns = {{...}}` became a set-of-dict → unhashable. Single braces now.
+  Candidate runs in a separate namespace (builtins only); only input_text
+  enters; result built outside with captured _dumps; parent assigns ids by
+  position and strictly validates count + {output,error,duration_ms} +
+  non-bool-int. Verified: frame-walk yields only own input; patched
+  json.dumps can't hijack; forged extra results rejected.
+- resource_limited added to SECURE_EXECUTION_CAPABILITIES. deno launches via
+  `python -m strive.sandbox_launcher <cpu mem nofile nproc fsize> -- <deno...>`.
+  Base deno_command read from a throwaway PythonInterpreter().deno_command
+  (lazy — no spawn) and prepended with the launcher. RLIMIT_AS is coarse
+  (pyodide WASM baseline is large; 2GB default) and unreliable on macOS —
+  documented honestly. CPU/NOFILE/NPROC/FSIZE are mechanical.
+- SandboxProvenance @1→@2: + component_digests {deno,pyodide,dspy,
+  runner_sha256,backend_config}. PromptComparisonEvidence @1→@2: +
+  sandbox_backend/sandbox_provenance_ref (validator pins its OWN boundary).
+- Readiness gate: sandbox provenance must decode + be versioned + secure-
+  self-consistent + AGREE across bundles (backend/runtime/capset). Replay:
+  _recorded_backend_for reads the candidate's evidence backend; replay_run
+  overrides config to it (or reports backend_unavailable) — never validates
+  in Pyodide and serves in CPython.
+- linux-landlock-seccomp@1: available() ALWAYS False, capabilities().enforced
+  = () (no stubbed available+secure with raising run).
+- capability.py: LoopConfig.model_seed → ProposalRequest.seed → ModelRequest.
+  seed (was hardcoded seed=0 — the "seeded" lie). adapters carry seed_support
+  (fake: deterministic-by-seed; openai: sent-honored-unverified). Immutable
+  manifest.json + per-trial trial.json; CapabilityCriterion (min_trials,
+  min_clean_rate, Wilson lower bound > 0 so a lone success ≠ supported);
+  resume=True reuses trial.json without re-running.
+- CLI: --sandbox-backend on run/compare/replay/audit/promote; real-model run
+  refuses insecure backend.
+
+336 tests (300 non-deno + 36 deno-gated), mypy strict clean (63 files).

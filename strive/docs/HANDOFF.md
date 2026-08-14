@@ -1,6 +1,80 @@
 # HANDOFF — strive
 
-## Stage 3C.2B — secure local execution + the model-capability lane (current)
+## Stage 3C.2B.1 — authoritative secure execution + trustworthy capability evidence (current)
+
+Made the 3C.2B boundary end-to-end and the capability evidence honest
+(ADR-0007). Five areas:
+
+1. **One execution service.** `strive.sandboxes.CandidateExecutor` is the
+   single kernel-owned strategy-execution path; run
+   (`_execute_and_evaluate`), promptgate (`compare_templates` /
+   `make_visible_context`), the experiment gate, compare, replay, audit,
+   promotion, and the capability lane all go through it. `run_strategy` is
+   called only inside `process-fault-only@1` and its own tests. A fault-only
+   executor requires `trusted=True` (`trusted = not
+   config.unsafe_model_code`), so untrusted model code on the fault-only
+   boundary fails closed — the old "runs generation-native on fault-only"
+   path is gone. `strive run/compare/replay/audit/promote` gained
+   `--sandbox-backend`; a real-model `run` refuses an insecure backend.
+2. **Injected immutable catalog.** `strive.sandbox_backends.DESCRIPTORS`
+   (name + zero-arg factory) are assembled by `default_catalog()` into a
+   `BackendCatalog` resolved by exact name@version, fail-closed — no
+   import-time mutable registry. `conformance_violations` is the reusable
+   conformance suite; `LoopConfig.backend_catalog` injects an alternate
+   catalog.
+3. **Hardened protected protocol** (the deno runner). Only `input_text`
+   enters the sandbox; the candidate executes in a SEPARATE namespace
+   (builtins only) that cannot see the payload, the runner globals, or the
+   captured serialization; the result envelope is built OUTSIDE that
+   namespace with a `json.dumps` reference captured before the candidate
+   ran; the parent assigns case ids by position and strictly validates the
+   envelope (result count == input count; each result exactly
+   `{output, error, duration_ms}`; output a non-bool int or null; protocol
+   integer unchanged) — rejecting bool-as-int, forged/duplicate/extra/
+   spoofed outcomes and protocol mutation. Frame/global inspection yields
+   only the candidate's own input.
+4. **Resource limiting + provenance + honesty.** `resource_limited` is in
+   `SECURE_EXECUTION_CAPABILITIES`. `deno-pyodide@1` launches Deno through
+   `strive.sandbox_launcher` (POSIX rlimits: CPU seconds, open files,
+   processes, single-file size, coarse RLIMIT_AS) with an absolute suite
+   deadline and a parent wall-clock hard-kill; the memory bound is
+   documented as coarse (WASM baseline; RLIMIT_AS unreliable on macOS).
+   `SandboxProvenance` (v2) pins exact Deno/Pyodide/DSPy/runner-sha256/
+   backend-config digests; each validator pins the boundary it used
+   (promptgate carries its own `sandbox_provenance_ref`); the activation
+   gate checks the provenance decodes, is versioned, is self-consistent
+   about `secure`, and AGREES across a decision's bundles; replay uses the
+   recorded backend or reports `backend_unavailable`. `linux-landlock-
+   seccomp@1` reports no capabilities and is ALWAYS unavailable (never
+   available+secure with a raising `run`).
+5. **Trustworthy capability trials** (`strive.capability`). Each trial's
+   seed is propagated into every `ModelRequest` via `LoopConfig.model_seed`
+   (the adapter's `seed_support` is recorded honestly; a mismatch is
+   flagged); a run persists one immutable `manifest.json` pinning per-trial
+   request/prompt/completion/revision/evidence/sandbox/budget/outcome refs;
+   a preregistered `CapabilityCriterion` (min trials, min clean-acceptance,
+   Wilson lower bound > 0) decides the verdict, so a lone success never
+   reads as `supported`; `resume=True` reuses completed trials (a
+   per-trial `trial.json`) without duplicate model spend.
+
+**Verification:** 336 tests pass (300 non-deno + 36 deno-gated, which run
+the real Deno+Pyodide boundary — the adversarial battery, protocol
+hardening, resource/provenance, and the capability lane); `mypy --strict`
+clean over 63 files. The default backend stays `process-fault-only@1`, so
+the deterministic suite is unchanged and fast.
+
+**The Stage 3C.2B.1 claim, stated precisely:** every model-authored
+execution path uses one mechanically bounded backend; protected cases
+expose only input text; activation/replay require exact sandbox
+provenance; capability trials use real recorded seeds and reproducible
+manifests.
+
+**Next phase (exact):** the budget-matched `hill-climb@1` versus GEPA-style
+`pareto-population@1` experiment (ADR-0005), built as a journaled
+command/reducer state machine, using the 3C.2A envelopes and this secure
+backend unchanged.
+
+## Stage 3C.2B — secure local execution + the model-capability lane (historical)
 
 Secure candidate execution and a genuine model-capability lane, before
 comparing evolution algorithms (ADR-0007). Five areas:

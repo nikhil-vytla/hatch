@@ -947,19 +947,17 @@ def test_breaker_blocks_activation_and_clear_revalidates(tmp_path: Path) -> None
         lifecycle.clear_breaker(store, "stale clear", expected_head=stale_head)
 
 
-def test_unsafe_model_code_refuses_lifecycle_authority(tmp_path: Path) -> None:
+def test_unsafe_model_code_on_fault_only_is_refused(tmp_path: Path) -> None:
+    """Stage 3C.2B.1 contract: untrusted (model-authored) code can NEVER run
+    on the fault-only boundary — the executor fails closed rather than
+    executing untrusted code without confinement. (Under a secure backend it
+    runs AND earns lifecycle authority; see test_capability_lane.)"""
+    from strive.sandboxes import SandboxError
+
     store = _store(tmp_path)
-    report = run_cycle(store, TASK, LoopConfig(unsafe_model_code=True))
-    assert report.decision is not None and report.decision.accepted
-    served = store.active_generation()
-    assert served is not None and served.generation_id == "gen-0001"
-    # NO lifecycle identity was written for the unsafe-run candidate
-    st = state(store)
-    assert all(not r.startswith("rev-cand-") for r in st.retained)
-    parity = compat_parity(store)
-    assert not parity.ok  # the gap is visible, not hidden
-    # a later SAFE operation converges the lifecycle from the authoritative
-    # generation ledger (kernel-derived history, not candidate-driven writes)
+    with pytest.raises(SandboxError, match="trusted fixtures/code only"):
+        run_cycle(store, TASK, LoopConfig(unsafe_model_code=True))
+    # a trusted run still converges the lifecycle normally
     run_cycle(store, TASK)
     assert compat_parity(store).ok
 

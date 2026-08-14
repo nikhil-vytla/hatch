@@ -188,7 +188,7 @@ def test_real_model_requires_unsafe_acknowledgement(
     assert code == 1
     assert envelope["ok"] is False
     assert "--unsafe-model-code" in envelope["error"]
-    assert "network or filesystem confinement" in envelope["error"]
+    assert "runs untrusted" in envelope["error"]
 
 
 def test_invalid_model_env_is_a_clean_cli_error(

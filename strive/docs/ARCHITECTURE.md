@@ -105,35 +105,46 @@ self-reported by evolvable code (exo's cost doc admits agent-reported usage is
 untrustworthy, note 04). Budgets are hierarchical: a delegated child receives the
 parent's *remaining* budget, RLM-style (note 05), so recursion is safe by construction.
 
-**Sandbox boundary.** A trusted, versioned `SandboxBackend` protocol
-(`strive.sandboxes`; stage 3C.2B, ADR-0007) with a capability report,
-per-execution provenance, and a fail-closed registry that NEVER silently
-downgrades a requested backend. Backends:
+**Sandbox boundary.** ONE kernel-owned `CandidateExecutor`
+(`strive.sandboxes`; stages 3C.2B / 3C.2B.1, ADR-0007) is the single
+strategy-execution path — run, promptgate, visible-context, experiments,
+compare, replay, audit, promotion, and the capability lane all go through
+it, and `run_strategy` is called only inside the fault-only backend and its
+tests. Backends come from an INJECTED IMMUTABLE `BackendCatalog` (name +
+factory descriptors — no import-time mutable global), resolved by exact
+name@version, fail-closed (never a silent downgrade), with a reusable
+`conformance_violations` suite. Backends:
 1. `process-fault-only@1` — `python -I` + timeout, scrubbed environment,
-   private temp workspace, bounded output, POSIX rlimits. Fault containment,
-   NOT security: no filesystem confinement, no network denial (its capability
-   report names these gaps). Default; fixtures and trusted code only.
+   bounded output, some POSIX rlimits. Fault containment, NOT security: its
+   report names the filesystem/network/subprocess/resource gaps, and the
+   executor REFUSES untrusted code on it (trusted fixtures only).
 2. `deno-pyodide@1` — the shipping **secure local** backend (DSPy
-   `PythonInterpreter`; Deno + Pyodide WASM). Default-deny: WASM VFS with no
-   host path nameable, no `--allow-net`, no `--allow-env`, no
-   `os.fork`/subprocess; fresh interpreter per case (no cross-case state);
-   parent-side wall-clock watchdog hard-kills a runaway (deno's graceful
-   shutdown blocks on a CPU-bound child, so the parent SIGKILLs the OS
-   process — NOOA's hard-kill doctrine).
-3. `linux-landlock-seccomp@1` — NOOA-derived (Apache-2.0) spike: unprivileged
-   Landlock + seccomp + rlimits self-installed post-fork with a fail-closed
-   `check_enforceable` probe; available only on a probe-confirmed Linux
-   kernel (this build reports UNAVAILABLE elsewhere rather than pretending).
+   `PythonInterpreter`; Deno + Pyodide WASM). Default-deny filesystem /
+   network / environment / subprocess; fresh interpreter per case; the
+   protected protocol sends only `input_text` into a SEPARATE candidate
+   namespace (no payload, runner globals, or serialization reachable) and
+   builds the result outside it with a captured `json.dumps`, the parent
+   assigning case ids and strictly validating one declared-type result;
+   Deno launches through `strive.sandbox_launcher` (POSIX rlimits: CPU,
+   files, procs, size, coarse RLIMIT_AS) with an absolute suite deadline and
+   a wall-clock hard-kill (NOOA's hard-kill doctrine), so `resource_limited`
+   is mechanically enforced.
+3. `linux-landlock-seccomp@1` — a NOOA-derived (Apache-2.0) spike that is
+   ALWAYS unavailable on this build (full ruleset + leak-vs-closed tests
+   unimplemented); it reports no capabilities and never claims
+   available+secure with a raising `run`.
 4. `container` / microVM (deferred; slots behind the same protocol).
-Protected evaluation (`strive.protected`) runs each
-held-out/regression/adversarial/audit case in a FRESH sandbox that receives
-only `input_text`. Sandbox provenance is pinned into `EvaluationManifest`
-(v3), so evidence from different backends is distinct and replay demands the
-recorded backend; lifecycle authority for model-generated code is granted
-only under a mechanically-secure backend. The runner **rejects loudly on
-schema mismatch** — a malformed payload is an observable failure event,
-never a silent fallback (CH's 842-repetition stall was caused by exactly
-that silence, note 03 §B.3).
+`SandboxProvenance` (v2) pins exact Deno/Pyodide/DSPy/runner-sha256/
+backend-config digests; each validator pins the boundary it used
+(promptgate carries its own); the activation gate verifies the provenance
+decodes, is versioned, is self-consistent about `secure`, and AGREES across
+a decision's bundles; and replay uses the recorded backend or reports it
+unavailable — a Pyodide-contained candidate is never re-validated in plain
+CPython. Lifecycle authority for model-generated code is granted only under
+a mechanically-secure backend. The runner **rejects loudly on schema
+mismatch** — a malformed payload is an observable failure event, never a
+silent fallback (CH's 842-repetition stall was caused by exactly that
+silence, note 03 §B.3).
 
 **Secrets broker.** Credentials live host-side only and cross into sandboxes never;
 model calls made on behalf of sandboxed code go through a kernel-side proxy
