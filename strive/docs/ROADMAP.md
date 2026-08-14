@@ -530,10 +530,46 @@ comparing algorithms (ADR-0007):
   and can separate deterministic pipeline tests from repeated
   model-capability evidence.
 
+## Stage 3C.2B.1 — Authoritative secure execution + trustworthy capability evidence (done)
+
+Made the 3C.2B boundary end-to-end and the capability evidence honest
+(ADR-0007):
+
+- One kernel-owned `CandidateExecutor` — every run, promptgate,
+  visible-context, experiment, compare, replay, audit, promotion, and
+  capability path executes through it; `run_strategy` only inside
+  `process-fault-only@1` and its tests; untrusted code on the fault-only
+  boundary fails closed. `--sandbox-backend` added to the CLI operations.
+- Registration replaced with an injected immutable `BackendCatalog` of
+  descriptor factories plus a reusable conformance suite (no import-time
+  mutable global).
+- Hardened protected protocol: only `input_text` enters the sandbox, the
+  candidate runs in a separate namespace, the result is built outside it
+  with captured trusted serialization, and the parent assigns ids and
+  strictly validates one declared-type result (rejecting bool-as-int,
+  forged/duplicate/extra/spoofed outcomes and protocol mutation).
+- `resource_limited` is part of the secure floor; deno launches through a
+  POSIX-rlimit launcher (CPU/files/procs/size + coarse memory) with an
+  absolute suite deadline and a wall-clock hard-kill.
+- Authoritative provenance: exact Deno/Pyodide/DSPy/runner/backend-config
+  digests; each validator pins the boundary it used; the gate checks
+  cross-bundle agreement; replay requires the recorded backend or reports
+  unavailable. The Linux spike is always unavailable (never stubbed
+  available+secure).
+- Trustworthy capability trials: real per-trial seeds into every
+  `ModelRequest`, an immutable report manifest, a preregistered
+  minimum-trial/clean-acceptance criterion with an interval lower bound, and
+  resume without duplicate spend.
+- Exit claim: every model-authored execution path uses one mechanically
+  bounded backend; protected cases expose only input text; activation/replay
+  require exact sandbox provenance; capability trials use real recorded
+  seeds and reproducible manifests.
+
 ## Stage 3C.2C — Budget-matched algorithm comparison (next)
 
-A separate experiment using the 3C.2A envelopes and the 3C.2B secure
-backend UNCHANGED: `hill-climb@1` (today's loop, extracted behind the
+A separate experiment using the 3C.2A envelopes and the 3C.2B/3C.2B.1
+secure backend UNCHANGED, built as a journaled command/reducer state
+machine: `hill-climb@1` (today's loop, extracted behind the
 `EvolutionAlgorithm` protocol) versus a GEPA-style `pareto-population@1`
 (frontier maintained via journaled `frontier_add` dispositions) under equal
 trusted budgets over the same task set — the first

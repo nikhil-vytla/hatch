@@ -99,6 +99,9 @@ def _generation_data(store: Store, generation: Generation) -> dict[str, Any]:
 
 
 def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
+    from strive.loop import _backend_is_secure
+
+    backend = args.sandbox_backend
     if args.proposer == "model":
         adapter = adapter_from_env()
         if adapter is not None:
@@ -106,13 +109,20 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
                 raise CliError(
                     "a real model provider is configured "
                     "(STRIVE_MODEL_PROVIDER); real-model-generated executable "
-                    "code will run in a subprocess WITHOUT network or "
-                    "filesystem confinement, and the AST screen is a "
-                    "prefilter, not a security boundary. Re-run with "
-                    "--unsafe-model-code to acknowledge this, or unset "
-                    "STRIVE_MODEL_PROVIDER to use the offline scripted fixture."
+                    "code runs untrusted. Re-run with --unsafe-model-code to "
+                    "acknowledge, or unset STRIVE_MODEL_PROVIDER to use the "
+                    "offline scripted fixture."
                 )
-            adapter_note = "real (env-configured; --unsafe-model-code acknowledged)"
+            if not _backend_is_secure(backend):
+                raise CliError(
+                    f"real model-authored code requires a SECURE sandbox "
+                    f"backend; {backend!r} is not secure. Pass "
+                    "--sandbox-backend deno-pyodide@1 (see `strive sandbox`)."
+                )
+            adapter_note = (
+                f"real (env-configured; --unsafe-model-code acknowledged; "
+                f"contained by {backend})"
+            )
             unsafe = True
         else:
             adapter = scripted_fixture_adapter()
@@ -129,12 +139,14 @@ def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, An
             budget=BudgetSpec(model_calls=4),
             acknowledge_task_drift=args.acknowledge_task_drift,
             unsafe_model_code=unsafe,
+            sandbox_backend=backend,
         )
     else:
         adapter_note = None
         config = LoopConfig(
             sandbox_timeout_s=args.timeout,
             acknowledge_task_drift=args.acknowledge_task_drift,
+            sandbox_backend=backend,
         )
     report = run_cycle(store, task, config)
     data: dict[str, Any] = {
@@ -293,7 +305,10 @@ def _cmd_inspect(store: Store, task: Task, args: argparse.Namespace) -> dict[str
 
 
 def _cmd_compare(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = compare_generations(store, task, args.baseline, args.candidate)
+    report = compare_generations(
+        store, task, args.baseline, args.candidate,
+        LoopConfig(sandbox_backend=args.sandbox_backend),
+    )
     data: dict[str, Any] = {
         "baseline": {"id": report.left_id, "scores": report.left.split_scores,
                      "overall": report.left.overall_score},
@@ -360,7 +375,9 @@ def _recorded_selection_for_generation(
 
 
 def _cmd_replay(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = replay_run(store, task, args.run_id)
+    report = replay_run(
+        store, task, args.run_id, LoopConfig(sandbox_backend=args.sandbox_backend)
+    )
     data = {
         "run_id": report.run_id,
         "generation_id": report.generation_id,
@@ -409,7 +426,10 @@ def _cmd_promote(store: Store, task: Task, args: argparse.Namespace) -> dict[str
         args.generation_id,
         provisional=args.provisional,
         expires_after_cycles=args.expires,
-        config=LoopConfig(acknowledge_task_drift=args.acknowledge_task_drift),
+        config=LoopConfig(
+            acknowledge_task_drift=args.acknowledge_task_drift,
+            sandbox_backend=args.sandbox_backend,
+        ),
     )
     data = {
         "activation": codec.encode(activation),
@@ -426,7 +446,10 @@ def _cmd_promote(store: Store, task: Task, args: argparse.Namespace) -> dict[str
 
 
 def _cmd_audit(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = audit_generation(store, task, args.generation)
+    report = audit_generation(
+        store, task, args.generation,
+        LoopConfig(sandbox_backend=args.sandbox_backend),
+    )
     data = {
         "generation_id": report.generation_id,
         "audit_score": report.evaluation.overall_score,
@@ -1036,13 +1059,13 @@ def _cmd_sandbox(store: Store, task: Task, args: argparse.Namespace) -> dict[str
     """Report the pluggable sandbox backends: which are available on this
     host and exactly which capabilities each mechanically enforces (never a
     silent downgrade — an unavailable requested backend fails closed)."""
-    import strive.sandbox_backends  # noqa: F401 — register backends
-    from strive.sandboxes import get_backend, known_backends
+    from strive.sandboxes import default_catalog
 
+    catalog = default_catalog()
     backends: list[dict[str, Any]] = []
     lines: list[str] = ["sandbox backends:"]
-    for name in known_backends():
-        backend = get_backend(name, require_available=False)
+    for name in catalog.names():
+        backend = catalog.resolve(name, require_available=False)
         available, reason = backend.available()
         caps = backend.capabilities()
         backends.append(
@@ -1192,8 +1215,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--unsafe-model-code",
         action="store_true",
         help="required acknowledgement when a REAL model provider is "
-        "configured: model-generated code runs without network/filesystem "
-        "confinement",
+        "configured: model-generated code is untrusted (must run under a "
+        "secure --sandbox-backend)",
+    )
+    run_parser.add_argument(
+        "--sandbox-backend",
+        default="process-fault-only@1",
+        help="the sandbox boundary candidate code executes under (see "
+        "`strive sandbox`); real model code requires a secure backend "
+        "(e.g. deno-pyodide@1)",
     )
     sub.add_parser("status", help="active generation, freeze state, diagnostics")
     sub.add_parser("lineage", help="chain from active generation to seed")
@@ -1203,9 +1233,16 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser.add_argument(
         "--type", help="filter run events by type (e.g. model_call, proposal)"
     )
+    _backend_help = (
+        "the sandbox boundary candidate code executes under (see "
+        "`strive sandbox`; default the fault-only boundary for trusted code)"
+    )
     compare_parser = sub.add_parser("compare", help="paired evaluation of two generations")
     compare_parser.add_argument("baseline")
     compare_parser.add_argument("candidate")
+    compare_parser.add_argument(
+        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
+    )
     replay_parser = sub.add_parser(
         "replay",
         help="execution-and-decision replay: re-execute a recorded run's "
@@ -1213,17 +1250,26 @@ def build_parser() -> argparse.ArgumentParser:
         "replay of diagnosis/prompt/proposal)",
     )
     replay_parser.add_argument("run_id")
+    replay_parser.add_argument(
+        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
+    )
     audit_parser = sub.add_parser(
         "audit",
         help="evaluate a generation on the final audit holdout (on demand; "
         "never part of routine selection)",
     )
     audit_parser.add_argument("--generation", help="default: the active generation")
+    audit_parser.add_argument(
+        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
+    )
     promote_parser = sub.add_parser("promote", help="activate a retained generation")
     promote_parser.add_argument("generation_id")
     promote_parser.add_argument("--provisional", action="store_true")
     promote_parser.add_argument("--expires", type=int, default=3)
     promote_parser.add_argument("--acknowledge-task-drift", action="store_true")
+    promote_parser.add_argument(
+        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
+    )
     sub.add_parser("rollback", help="reactivate the parent of the active generation")
     sub.add_parser("resume", help="lift a stall freeze")
     sub.add_parser("history", help="dump the full ledger journal")

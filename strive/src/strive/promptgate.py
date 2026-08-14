@@ -32,7 +32,7 @@ from strive.events import now_iso
 from strive.model import CompletingAdapter
 from strive.policy import get_policy
 from strive.propose import ProposalRequest, screen_source
-from strive.sandbox import run_strategy
+from strive.sandboxes import CandidateExecutor
 from strive.store import Store
 from strive.tasks import Task
 
@@ -54,12 +54,14 @@ class TemplateOutcome:
     cost: float | None
 
 
-@register("prompt-comparison", 1)
+@register("prompt-comparison", 2)
 @dataclass(frozen=True)
 class PromptComparisonEvidence:
     """The trusted prompt-vs-prompt comparison, CAS-stored and linked to the
     exact candidate revision. `improved` is the surface-specific verdict a
-    composite's prompt delta must earn to activate."""
+    composite's prompt delta must earn to activate. `sandbox_backend` and
+    `sandbox_provenance_ref` pin the boundary this validator ACTUALLY used —
+    the prompt validator cannot borrow the task candidate's provenance."""
 
     incumbent: TemplateOutcome
     candidate: TemplateOutcome
@@ -68,6 +70,8 @@ class PromptComparisonEvidence:
     improved: bool
     detail: str
     at: str
+    sandbox_backend: str = ""
+    sandbox_provenance_ref: str = ""
 
 
 def _outcome_tuple(outcome: TemplateOutcome) -> tuple[int, int, int]:
@@ -84,11 +88,14 @@ def _run_template(
     template: str,
     request: ProposalRequest,
     model: CompletingAdapter,
+    executor: "CandidateExecutor",
 ) -> TemplateOutcome:
     """One matched trial: propose under `template`, then evaluate the proposed
     strategy under the trusted paired gate. Every model call goes through the
-    caller-supplied METERED handle; sandbox executions use the task's normal
-    evaluation path."""
+    caller-supplied METERED handle; the proposed strategy (model-authored)
+    executes through the SAME `CandidateExecutor` boundary as the task
+    candidate — the validator uses a real mechanically-bounded sandbox, not
+    a borrowed one."""
     import dataclasses
 
     from strive.model_proposer import ModelProposer
@@ -131,12 +138,16 @@ def _run_template(
     cases = task.selection_cases()
     baseline_eval = evaluate(
         task,
-        run_strategy(request.ctx.parent_source, cases, generation_id="gate-baseline"),
+        executor.execute_suite(
+            request.ctx.parent_source, cases, generation_id="gate-baseline"
+        ).report,
         cases,
     )
     candidate_eval = evaluate(
         task,
-        run_strategy(result.proposal.source, cases, generation_id="gate-candidate"),
+        executor.execute_suite(
+            result.proposal.source, cases, generation_id="gate-candidate"
+        ).report,
         cases,
     )
     policy = get_policy("paired-deterministic")
@@ -164,17 +175,23 @@ def compare_templates(
     request: ProposalRequest,
     model: CompletingAdapter,
     adapter_name: str,
+    executor: "CandidateExecutor",
 ) -> tuple[PromptComparisonEvidence, str]:
     """The trusted prompt-vs-prompt comparison under matched conditions.
     Returns (evidence, CAS ref). Charges the caller's metered model handle
-    (two proposer calls) and the sandbox (four gate executions)."""
-    incumbent = _run_template(store, task, incumbent_template, request, model)
-    candidate = _run_template(store, task, candidate_template, request, model)
+    (two proposer calls) and the sandbox (four gate executions), all under
+    the given `CandidateExecutor` boundary — whose provenance is pinned into
+    the evidence so the prompt validator names the boundary it truly used."""
+    incumbent = _run_template(store, task, incumbent_template, request, model, executor)
+    candidate = _run_template(store, task, candidate_template, request, model, executor)
     improved = _outcome_tuple(candidate) > _outcome_tuple(incumbent)
     detail = (
         f"candidate {_outcome_tuple(candidate)} vs incumbent "
         f"{_outcome_tuple(incumbent)} on (gate_accepted, proposal_valid, "
         "-regressions)"
+    )
+    sandbox_provenance_ref = store.objects.put_text(
+        codec.dumps(executor.provenance())
     )
     evidence = PromptComparisonEvidence(
         incumbent=incumbent,
@@ -184,6 +201,8 @@ def compare_templates(
         improved=improved,
         detail=detail,
         at=now_iso(),
+        sandbox_backend=executor.backend_name,
+        sandbox_provenance_ref=sandbox_provenance_ref,
     )
     return evidence, store.objects.put_text(codec.dumps(evidence))
 
@@ -222,17 +241,23 @@ def prompt_gate_decision(
 
 
 def make_visible_context(
-    task: Task, parent_generation_id: str, parent_source: str
+    task: Task,
+    parent_generation_id: str,
+    parent_source: str,
+    executor: "CandidateExecutor",
 ) -> tuple[VisibleContext, Diagnosis | None]:
     """A fresh visible-only context for template trials (used by the
     experiment's isolated stages): evaluate the parent on the visible split
-    and diagnose from that evidence alone."""
+    through the shared `CandidateExecutor` boundary and diagnose from that
+    evidence alone."""
     from strive.diagnose import EvidenceDiagnoser
 
     cases = task.visible_cases()
     evaluation = evaluate(
         task,
-        run_strategy(parent_source, cases, generation_id=parent_generation_id),
+        executor.execute_suite(
+            parent_source, cases, generation_id=parent_generation_id
+        ).report,
         cases,
     )
     ctx = VisibleContext(

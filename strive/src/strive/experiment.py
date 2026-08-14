@@ -77,7 +77,7 @@ from strive.promptgate import (
 )
 from strive.propose import ProposalRequest, screen_source, screen_surface_update
 from strive.revisions import HarnessRevision, ScopeManifest
-from strive.sandbox import run_strategy
+from strive.sandboxes import CandidateExecutor, SandboxLimits
 from strive.store import Store
 from strive.contracts import VISIBLE
 from strive.tasks import SUM_INTEGERS_TASK
@@ -349,12 +349,31 @@ def _cycle_arm(
     return result, store
 
 
+def _gate_executor(
+    backend: str = "process-fault-only@1", *, trusted: bool = True
+) -> "CandidateExecutor":
+    """The experiment's execution service. The OFFLINE experiment is a
+    deterministic pipeline-wiring proof over a scripted fixture (trusted,
+    author-written strategy source), so it uses the fault-only boundary;
+    real-model arms pass a secure backend."""
+    from strive.sandboxes import CandidateExecutor, default_catalog
+
+    return CandidateExecutor.from_catalog(
+        default_catalog(), backend, trusted=trusted
+    )
+
+
 def _metered_gate(
-    store: Store, meter: BudgetMeter, baseline_source: str, candidate_source: str
+    store: Store,
+    meter: BudgetMeter,
+    baseline_source: str,
+    candidate_source: str,
+    executor: "CandidateExecutor | None" = None,
 ) -> tuple[Decision, Evaluation, Evaluation, int]:
     """Task-gate evaluation through the normal metered execution path.
     Returns (decision, baseline_evaluation, candidate_evaluation,
     executions_used)."""
+    exec_service = executor or _gate_executor()
     cases = TASK.selection_cases()
     executions = 0
     evaluations = []
@@ -363,18 +382,26 @@ def _metered_gate(
         if denial is not None:
             raise RuntimeError(f"experiment budget denied execution: {denial.detail}")
         executions += 1
-        report = run_strategy(
+        outcome = exec_service.execute_suite(
             source,
             cases,
             generation_id=f"gate-{label}",
-            timeout_s=meter.execution_timeout_s(SANDBOX_TIMEOUT_S),
-            output_bytes_cap=meter.execution_output_cap(),
+            limits=_gate_limits(meter),
         )
-        meter.note_output_bytes(report.stdout_bytes)
-        evaluations.append(evaluate(TASK, report, cases))
+        meter.note_output_bytes(outcome.report.stdout_bytes)
+        evaluations.append(evaluate(TASK, outcome.report, cases))
     policy = get_policy("paired-deterministic")
     decision = policy.decide(evaluations[0], evaluations[1])
     return decision, evaluations[0], evaluations[1], executions
+
+
+def _gate_limits(meter: BudgetMeter) -> "SandboxLimits":
+    from strive.sandboxes import SandboxLimits
+
+    return SandboxLimits(
+        wall_time_s=meter.execution_timeout_s(SANDBOX_TIMEOUT_S),
+        output_bytes=meter.execution_output_cap(),
+    )
 
 
 def _ablation_arm(
@@ -501,8 +528,10 @@ def _two_stage_arm(
     meter = BudgetMeter(EXPERIMENT_BUDGET)
     events = EventLog(store.runs_dir / "exp-two-stage" / "events.jsonl", "exp-two-stage")
     model = MeteredJournalingAdapter(adapter, meter, events, store.objects)
+    gate_executor = _gate_executor()
     ctx, diagnosis = make_visible_context(
-        TASK, active_generation.generation_id, store.source_of(active_generation)
+        TASK, active_generation.generation_id, store.source_of(active_generation),
+        gate_executor,
     )
     assert diagnosis is not None
     request = ProposalRequest(
@@ -590,7 +619,7 @@ def _two_stage_arm(
 
     # -- evidence: the task gate (code) AND the prompt gate (prompt) --------
     task_decision, baseline_eval, candidate_eval, executions = _metered_gate(
-        store, meter, store.source_of(active_generation), s1
+        store, meter, store.source_of(active_generation), s1, gate_executor
     )
     overall = candidate_eval.overall_score
     splits = dict(candidate_eval.split_scores)
@@ -601,6 +630,7 @@ def _two_stage_arm(
         request=request,
         model=model,
         adapter_name=type(adapter).__name__,
+        executor=gate_executor,
     )
     composite_decision = prompt_gate_decision(task_decision, prompt_evidence)
     provenance = selection_mod.pin_execution_provenance(
@@ -742,11 +772,20 @@ def _replay_composite(store: Store, revision_id: str, decision_ref: str) -> bool
         and b.binding.content_ref is not None
     )
     cases = TASK.selection_cases()
+    executor = _gate_executor()
     baseline_eval = evaluate(
-        TASK, run_strategy(baseline_source, cases, generation_id="replay-b"), cases
+        TASK,
+        executor.execute_suite(
+            baseline_source, cases, generation_id="replay-b"
+        ).report,
+        cases,
     )
     candidate_eval = evaluate(
-        TASK, run_strategy(candidate_source, cases, generation_id="replay-c"), cases
+        TASK,
+        executor.execute_suite(
+            candidate_source, cases, generation_id="replay-c"
+        ).report,
+        cases,
     )
     policy = get_policy("paired-deterministic")
     replayed = policy.decide(baseline_eval, candidate_eval)
@@ -903,6 +942,9 @@ def run_real_model_arms(root: Path) -> tuple[RealModelArmReport, ...]:
         _activate_prompt_only(store, template, f"real-{arm.lower()}")
         config = _config(adapter)
         config.unsafe_model_code = True
+        # real model-authored code MUST run under a secure backend; the
+        # executor refuses fault-only for untrusted code
+        config.sandbox_backend = "deno-pyodide@1"
         report = run_cycle(store, TASK, config)
         calls, tokens, latency, _prompt = _model_call_metrics(store, report.run_id)
         reports.append(

@@ -83,6 +83,9 @@ class FakeModelAdapter:
     adapter_name = "fake"
     model_id = "fake-deterministic-v1"
     reports_cost = True  # its 0.0 is truthful: the fake costs nothing
+    # the fake genuinely varies its digest reply by seed (prompt|seed), so a
+    # seeded trial is honestly seeded here
+    seed_support = "deterministic-by-seed"
 
     def __init__(
         self,
@@ -138,6 +141,9 @@ class OpenAICompatAdapter:
 
     adapter_name = "openai-compatible"
     reports_cost = False  # provider pricing is not modeled; cost is always 0.0
+    # the seed is SENT on every request, but whether the remote provider
+    # honors it is provider-dependent and not verifiable from here
+    seed_support = "sent-honored-unverified"
 
     def __init__(self, base_url: str, api_key: str, model_id: str) -> None:
         self._base_url = base_url.rstrip("/")
