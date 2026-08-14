@@ -1,81 +1,65 @@
-"""Codec: round trips, strict validation, loud rejection, v1 compatibility."""
+"""Codec: round trips, strict validation, loud rejection.
+
+Exercised against surviving primitives and the vNext substrate records
+(the promotion-era wire types were deleted in the Phase-A reset)."""
 
 import pytest
 
 from strive import codec
 from strive.contracts import (
-    Activation,
     BudgetUsage,
-    CycleRecord,
-    Decision,
     Event,
+    ExecutionReport,
     FailureRecord,
-    Generation,
-    Intervention,
     TaskCase,
+)
+from strive.substrate import (
+    ChangeApplied,
+    CompositeChange,
+    HarnessState,
+    PolicyBound,
+    SurfaceBinding,
+    SurfaceDelta,
 )
 
 
-def _decision() -> Decision:
-    return Decision(
-        accepted=True,
-        reason="test",
-        policy="paired-deterministic",
-        policy_version=1,
-        baseline_score=0.5,
-        candidate_score=1.0,
-        baseline_split_scores={"visible": 0.5},
-        candidate_split_scores={"visible": 1.0},
-        regressed_case_ids=(),
-    )
-
-
-def _generation() -> Generation:
-    return Generation(
-        generation_id="gen-0001",
-        task_id="sum-integers",
-        task_fingerprint="fe" * 32,
-        parent_id="gen-0000",
-        origin="evolved",
-        surface="strategy-code",
-        weakness_id="negative-integers-dropped",
-        created_at="2026-08-06T00:00:00+00:00",
-        source_ref="ab" * 32,
-        decision=_decision(),
+def _change() -> CompositeChange:
+    return CompositeChange(
+        change_id="manual-change-1",
+        deltas=(
+            SurfaceDelta("strategy-code", "solve", "aa" * 32, "bb" * 32),
+            SurfaceDelta("prompt", "proposal-template", None, "cc" * 32),
+        ),
+        summary="install the signed-sum strategy and matching prompt",
     )
 
 
 ROUND_TRIP_SAMPLES = [
     TaskCase("c1", "text", 5, "visible"),
     FailureRecord("timeout", "killed after 1.0s"),
-    _decision(),
-    _generation(),
-    Activation(
-        generation_id="gen-0001",
-        task_id="sum-integers",
-        reason="evolved",
-        mode="durable",
-        at="2026-08-06T00:00:00+00:00",
-        policy="paired-deterministic@1",
-        expires_after_cycles=None,
-        baseline_score=None,
+    ExecutionReport(ok=True, generation_id="g", outcomes=(), failure=None,
+                    wall_time_s=0.1, stdout_bytes=0),
+    BudgetUsage(wall_time_s=0.5, executions=1),
+    SurfaceBinding("strategy-code", "solve", "ab" * 32),
+    HarnessState(bindings=(SurfaceBinding("prompt", "proposal-template", "cd" * 32),)),
+    _change(),
+    PolicyBound(
+        policy_ref="manual-change@1",
+        config_ref="ab" * 32,
+        prompt_refs={"refine": "cd" * 32},
+        seed=7,
+        seed_state_ref="ef" * 32,
+        run_metadata={"model": "none"},
+        at="2026-08-14T00:00:00+00:00",
     ),
-    CycleRecord(
-        run_id="run-x",
-        at="2026-08-06T00:00:00+00:00",
-        task_id="sum-integers",
-        task_fingerprint="ff" * 32,
-        generation_id="gen-0001",
-        overall_score=1.0,
-        split_scores={"visible": 1.0, "held_out": 1.0},
-        weakness_id=None,
-        candidate_generation_id=None,
-        accepted=None,
-        frozen=False,
-        usage=BudgetUsage(wall_time_s=0.5, executions=1),
+    ChangeApplied(
+        change_id="manual-change-1",
+        change_ref="11" * 32,
+        before_state_ref="22" * 32,
+        after_state_ref="33" * 32,
+        at="2026-08-14T00:00:00+00:00",
     ),
-    Intervention(kind="stall-freeze", reason="flat", at="2026-08-06T00:00:00+00:00"),
-    Event(ts="t", type="evaluated", run_id="run-x", payload={"k": [1, 2]}),
+    Event(ts="t", type="policy_step", run_id="run-x", payload={"k": [1, 2]}),
 ]
 
 
@@ -86,10 +70,10 @@ def test_round_trip(obj: object) -> None:
     assert codec.loads(line) == obj
 
 
-def test_nested_decision_survives_round_trip() -> None:
-    decoded: Generation = codec.loads(codec.dumps(_generation()), Generation)
-    assert decoded.decision is not None
-    assert decoded.decision.candidate_split_scores == {"visible": 1.0}
+def test_nested_change_survives_round_trip() -> None:
+    decoded: CompositeChange = codec.loads(codec.dumps(_change()), CompositeChange)
+    assert decoded.deltas[0].before_ref == "aa" * 32
+    assert decoded.deltas[1].before_ref is None
 
 
 def test_unknown_kind_rejected_loudly() -> None:
@@ -136,41 +120,3 @@ def test_expect_mismatch_rejected() -> None:
     line = codec.dumps(FailureRecord("timeout", "d"))
     with pytest.raises(codec.SchemaError, match="expected task-case@1"):
         codec.loads(line, TaskCase)
-
-
-GOLDEN_V2_GENERATION = (
-    '{"created_at":"2026-08-06T00:00:00+00:00","decision":null,'
-    '"generation_id":"gen-0000","origin":"seed","parent_id":null,'
-    '"schema":"generation@2","source_ref":"' + "ab" * 32 + '",'
-    '"task_fingerprint":"' + "fe" * 32 + '","task_id":"sum-integers",'
-    '"surface":"strategy-code","weakness_id":null}'
-)
-
-
-def test_golden_v2_generation_still_decodes() -> None:
-    """Compatibility pin: v2 records written today must decode as long as
-    generation@2 is the current version. If this test breaks, the contract
-    changed shape without a version bump.
-    """
-    generation: Generation = codec.loads(GOLDEN_V2_GENERATION, Generation)
-    assert generation.generation_id == "gen-0000"
-    assert generation.task_id == "sum-integers"
-    assert generation.decision is None
-    assert codec.loads(codec.dumps(generation), Generation) == generation
-
-
-GOLDEN_V1_GENERATION = (
-    '{"created_at":"2026-08-06T00:00:00+00:00","decision":null,'
-    '"generation_id":"gen-0000","origin":"seed","parent_id":null,'
-    '"schema":"generation@1","source_ref":"' + "ab" * 32 + '",'
-    '"surface":"strategy-code","weakness_id":null}'
-)
-
-
-def test_superseded_v1_generation_is_rejected_loudly() -> None:
-    """generation@1 (pre task-scoping) is a superseded schema: decoding fails
-    loudly by design — there is deliberately no migration machinery yet
-    (deferred; see HANDOFF). Old ledgers must be regenerated or migrated by
-    hand, never silently reinterpreted."""
-    with pytest.raises(codec.SchemaError, match="unsupported generation version 1"):
-        codec.loads(GOLDEN_V1_GENERATION)

@@ -1,147 +1,282 @@
-"""Pluggable, versioned acceptance and promotion policies.
+"""The policy boundary (Strive vNext, Phase A).
 
-There is deliberately no single universal acceptance formula (D14): each
-policy is a trusted, named, versioned object, and every Decision records
-which policy produced it. The kernel's invariant is that decisions are
-journaled with trusted-side evidence — what counts as sufficient evidence is
-the policy's business, chosen per surface and risk tier (D1):
+A policy is the model-led adaptation program. ONE active orchestrating
+`AdaptationPolicy` owns timing and lifecycle decisions for a run;
+`SurfaceStrategy` objects analyze immutable views and PROPOSE changes
+(including coupled multi-surface proposals) but can never mutate state.
 
-- ``paired-deterministic@1`` — durable promotion of deterministic code:
-  paired incumbent/candidate evaluation, zero regressions on any split,
-  strict improvement on visible AND held-out evidence.
-- ``provisional@1`` — low-risk / online changes: activation without full
-  paired evidence, but scoped, monitored, reversible, and expiring; confirmed
-  to durable only if the observation window sustains the baseline score.
+Policies receive IMMUTABLE views and emit KERNEL COMMANDS — they never
+touch the event store or CAS directly. The kernel executes commands,
+journals their intent and result, and content-addresses policy state, so a
+restart resumes without repeating completed model calls or side effects.
 
-Static checks and model judgment may *reject* candidates early (pre-filters);
-no policy in this module treats them as sufficient evidence for durable
-broad-scope promotion.
+The command vocabulary is small and closed:
+
+- `RequestRefinement` — ask the model (via a pinned prompt) for a typed
+  proposal; the kernel performs and journals the model call.
+- `ApplyChange` — apply an exact composite change to harness state.
+- `EvaluateFork` — request an OPTIONAL comparative observation of a
+  candidate state against the current one (a mechanism, not a gate).
+- `ScheduleTrigger` — ask to be re-invoked later (timing).
+- `ConfirmChange` / `RevertChange` — annotate or exactly undo an applied
+  change.
+- `StopAdaptation` — end the run.
+
+Comparative evaluation is thus something a policy may REQUEST
+(`EvaluateFork`), never a universal activation prerequisite.
+
+Catalogs are INJECTED and IMMUTABLE (name → factory descriptors); there is
+no import-time registration.
 """
 
 from __future__ import annotations
 
-from typing import Protocol
+from dataclasses import dataclass, field
+from typing import Any, Callable, Generic, Protocol, Sequence, TypeVar
 
-from strive.contracts import HELD_OUT, VISIBLE, Decision, Evaluation
+from strive.substrate import CompositeChange, HarnessState, SubstrateView
+
+Config = TypeVar("Config", contravariant=True)
+State = TypeVar("State")
+
+# -- immutable views policies/strategies receive --------------------------------------------------
 
 
-class AcceptancePolicy(Protocol):
-    """Compares candidate evidence against the incumbent and renders a Decision."""
+@dataclass(frozen=True)
+class RunView:
+    """The immutable read a policy/strategy is handed each step: the current
+    composite state, the journal head it was taken at, and the ordered event
+    entries (read-only). No handle to mutate anything."""
+
+    task_id: str
+    state: HarnessState
+    state_ref: str | None
+    seed_state: HarnessState  # the pinned initial state (stable across resume)
+    head: str
+    entries: tuple[object, ...]
+    seed: int
+
+    @staticmethod
+    def of(task_id: str, seed: int, view: SubstrateView) -> "RunView":
+        return RunView(
+            task_id=task_id,
+            state=view.state,
+            state_ref=view.state_ref,
+            seed_state=view.seed_state,
+            head=view.head,
+            entries=view.entries,
+            seed=seed,
+        )
+
+
+# -- kernel commands (closed vocabulary) ----------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RequestRefinement:
+    """Ask the kernel to run the model under a pinned prompt role and decode
+    a strict typed proposal. The kernel performs and journals the model
+    call, so a restart after completion does not repeat it."""
+
+    command_id: str
+    prompt_role: str
+    context_ref: str  # CAS ref of the model-facing context payload
+
+
+@dataclass(frozen=True)
+class ApplyChange:
+    """Apply an exact composite change to harness state (head-checked). The
+    policy stages NEW surface content in `content_blobs` (ref → content),
+    where each ref is the pure content address (`strive.cas.hash_text`) the
+    change's `after_ref` points at; the kernel puts and verifies each blob
+    before applying, so policies never touch CAS directly."""
+
+    command_id: str
+    change: CompositeChange
+    content_blobs: dict[str, str] = field(default_factory=dict)
+    expected_head: str | None = None
+
+
+@dataclass(frozen=True)
+class EvaluateFork:
+    """Request an OPTIONAL comparative observation: evaluate a candidate
+    composite state (a fork) alongside the current one and record the
+    observation. A mechanism a policy may request — never a gate the kernel
+    imposes."""
+
+    command_id: str
+    candidate: CompositeChange
+    content_blobs: dict[str, str] = field(default_factory=dict)
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class ScheduleTrigger:
+    """Ask to be re-invoked later (the policy owns timing)."""
+
+    command_id: str
+    after_seconds: float
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class ConfirmChange:
+    """Annotate a previously-applied change as confirmed."""
+
+    command_id: str
+    change_id: str
+    rationale: str = ""
+
+
+@dataclass(frozen=True)
+class RevertChange:
+    """Exactly undo a previously-applied change (head-checked)."""
+
+    command_id: str
+    change_id: str
+    expected_head: str | None = None
+
+
+@dataclass(frozen=True)
+class StopAdaptation:
+    """End the run."""
+
+    command_id: str
+    reason: str = ""
+
+
+KernelCommand = (
+    RequestRefinement
+    | ApplyChange
+    | EvaluateFork
+    | ScheduleTrigger
+    | ConfirmChange
+    | RevertChange
+    | StopAdaptation
+)
+
+
+@dataclass(frozen=True)
+class CommandResult:
+    """What the kernel hands back for a completed command: an outcome, an
+    optional typed payload, and the head after the command."""
+
+    command_id: str
+    outcome: str  # "ok" | "failed"
+    head: str
+    detail: str = ""
+    proposal: CompositeChange | None = None
+    observation_ref: str | None = None
+
+
+# -- the public protocols -------------------------------------------------------------------------
+
+
+class SurfaceStrategy(Protocol):
+    """Analyzes an immutable view and PROPOSES a change (possibly coupled
+    multi-surface). A strategy cannot mutate state — it only returns a
+    proposal or None."""
+
+    name: str  # name@version
+
+    def propose(self, view: RunView) -> CompositeChange | None: ...
+
+
+@dataclass(frozen=True)
+class Step(Generic[State]):
+    """One orchestration step: the commands to execute now and the successor
+    policy state to checkpoint. `done` ends the run after these commands."""
+
+    commands: tuple[KernelCommand, ...]
+    next_state: State
+    done: bool = False
+    checkpoint: bool = True
+
+
+class AdaptationPolicy(Protocol[Config, State]):
+    """The ONE active orchestrating policy for a run. It owns timing and
+    lifecycle decisions; it consumes immutable views and completed-command
+    results and emits kernel commands. It never mutates state directly.
+
+    `State` is the policy's own content-addressable state machine value
+    (checkpointed by the kernel so a restart resumes exactly). `Config` is a
+    frozen, policy-specific config dataclass."""
+
+    name: str  # name@version
+
+    def initial_state(self, config: Config, view: RunView) -> State: ...
+
+    def step(
+        self,
+        config: Config,
+        state: State,
+        view: RunView,
+        last_result: CommandResult | None,
+    ) -> Step[State]: ...
+
+
+# -- the injected immutable policy/strategy catalog -----------------------------------------------
+
+
+@dataclass(frozen=True)
+class PolicyDescriptor:
+    """An immutable catalog entry: a policy name, a zero-arg factory building
+    a fresh policy, a config loader (TOML path → frozen Config), and the
+    versioned prompt files the policy pins (role → path)."""
 
     name: str
-    version: int
+    factory: Callable[[], "AdaptationPolicy[Any, Any]"]
+    config_loader: Callable[[str], object]
+    prompt_files: dict[str, str] = field(default_factory=dict)
 
-    def decide(self, baseline: Evaluation, candidate: Evaluation) -> Decision: ...
 
+class PolicyCatalog:
+    """An immutable set of policy descriptors, resolved by exact name@version.
+    Fail-closed: an unknown policy raises rather than guessing."""
 
-class PairedDeterministicPolicy:
-    """Durable promotion for deterministic code surfaces.
+    def __init__(self, descriptors: Sequence[PolicyDescriptor]) -> None:
+        self._by_name: dict[str, PolicyDescriptor] = {}
+        for descriptor in descriptors:
+            if descriptor.name in self._by_name:
+                raise ValueError(f"duplicate policy descriptor {descriptor.name!r}")
+            self._by_name[descriptor.name] = descriptor
 
-    Rules, in order:
-    1. The candidate execution must have completed (failure-as-data → reject).
-    2. Zero regressions: every case the baseline passed still passes, on
-       every split.
-    3. Strict improvement on the visible split.
-    4. Held-out discipline: held-out score must strictly improve when the
-       baseline left room, and must never degrade.
-    """
+    def names(self) -> tuple[str, ...]:
+        return tuple(sorted(self._by_name))
 
-    name = "paired-deterministic"
-    version = 1
-
-    def decide(self, baseline: Evaluation, candidate: Evaluation) -> Decision:
-        def verdict(accepted: bool, reason: str, regressed: tuple[str, ...] = ()) -> Decision:
-            return Decision(
-                accepted=accepted,
-                reason=reason,
-                policy=self.name,
-                policy_version=self.version,
-                baseline_score=baseline.overall_score,
-                candidate_score=candidate.overall_score,
-                baseline_split_scores=dict(baseline.split_scores),
-                candidate_split_scores=dict(candidate.split_scores),
-                regressed_case_ids=regressed,
+    def descriptor(self, name: str) -> PolicyDescriptor:
+        descriptor = self._by_name.get(name)
+        if descriptor is None:
+            raise KeyError(
+                f"unknown policy {name!r}; known: {list(self.names())} — "
+                "refusing to substitute a different policy"
             )
-
-        if candidate.failure is not None:
-            return verdict(
-                False,
-                f"candidate execution failed: {candidate.failure.kind} — "
-                f"{candidate.failure.detail}",
-            )
-
-        candidate_passing = set(candidate.passing_case_ids())
-        regressed = tuple(
-            case_id
-            for case_id in baseline.passing_case_ids()
-            if case_id not in candidate_passing
-        )
-        if regressed:
-            return verdict(
-                False,
-                f"regressions on previously passing cases: {', '.join(regressed)}",
-                regressed,
-            )
-
-        baseline_visible = baseline.split_scores.get(VISIBLE, 0.0)
-        candidate_visible = candidate.split_scores.get(VISIBLE, 0.0)
-        if candidate_visible <= baseline_visible:
-            return verdict(
-                False,
-                f"no strict improvement on visible split: "
-                f"{candidate_visible:.3f} <= {baseline_visible:.3f}",
-            )
-
-        baseline_held = baseline.split_scores.get(HELD_OUT)
-        candidate_held = candidate.split_scores.get(HELD_OUT)
-        if baseline_held is not None and candidate_held is not None:
-            if candidate_held < baseline_held:
-                return verdict(
-                    False,
-                    f"held-out degradation: {candidate_held:.3f} < {baseline_held:.3f}",
-                )
-            if baseline_held < 1.0 and candidate_held <= baseline_held:
-                return verdict(
-                    False,
-                    "no held-out improvement despite headroom: "
-                    f"{candidate_held:.3f} <= {baseline_held:.3f}",
-                )
-
-        return verdict(
-            True,
-            "strict improvement with zero regressions "
-            f"(visible {baseline_visible:.3f} -> {candidate_visible:.3f}, "
-            f"overall {baseline.overall_score:.3f} -> {candidate.overall_score:.3f})",
-        )
+        return descriptor
 
 
-class ProvisionalPolicy:
-    """Expiring provisional activation for low-risk changes.
+def default_catalog() -> PolicyCatalog:
+    """The build's default policy catalog, assembled WITHOUT import-time
+    registration side effects."""
+    from strive.policies.manual_change import DESCRIPTOR as MANUAL_CHANGE
 
-    A provisional activation is confirmed to durable only if every cycle in
-    its observation window scored at least the recorded baseline; otherwise
-    it reverts to the previous generation. Either outcome is journaled.
-    """
-
-    name = "provisional"
-    version = 1
-
-    def confirm(self, window_scores: list[float], baseline_score: float) -> bool:
-        if not window_scores:
-            return False
-        return all(score >= baseline_score for score in window_scores)
+    return PolicyCatalog([MANUAL_CHANGE])
 
 
-POLICIES: dict[str, AcceptancePolicy] = {
-    PairedDeterministicPolicy.name: PairedDeterministicPolicy(),
-}
-
-PROVISIONAL_POLICY = ProvisionalPolicy()
-
-
-def get_policy(name: str) -> AcceptancePolicy:
-    if name not in POLICIES:
-        raise KeyError(
-            f"unknown acceptance policy {name!r}; known: {sorted(POLICIES)}"
-        )
-    return POLICIES[name]
+__all__ = [
+    "AdaptationPolicy",
+    "ApplyChange",
+    "CommandResult",
+    "ConfirmChange",
+    "EvaluateFork",
+    "KernelCommand",
+    "PolicyCatalog",
+    "PolicyDescriptor",
+    "RequestRefinement",
+    "RevertChange",
+    "RunView",
+    "ScheduleTrigger",
+    "Step",
+    "StopAdaptation",
+    "SurfaceStrategy",
+    "default_catalog",
+]

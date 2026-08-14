@@ -1,0 +1,17 @@
+# manual-change@1 — frozen, policy-specific config (no universal DSL).
+# The exact target the single coupled prompt+code change installs.
+[manual_change]
+summary = "install the signed-integer sum strategy and its matching prompt"
+
+target_strategy = """
+import re
+
+
+def solve(input_text: str) -> int:
+    return sum(int(token) for token in re.findall(r"-?\\d+", input_text))
+"""
+
+target_prompt = """You revise a Python `solve(input_text: str) -> int` strategy.
+Return ONLY a JSON object for {parent_generation_id} with keys `summary` and `source`.
+Sum every SIGNED integer in the input, including negatives.
+"""

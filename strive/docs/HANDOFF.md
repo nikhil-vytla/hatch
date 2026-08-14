@@ -1,6 +1,61 @@
 # HANDOFF — strive
 
-## Stage 3C.2B.1 — authoritative secure execution + trustworthy capability evidence (current)
+## vNext Phase A — policy-neutral revision-native substrate (current)
+
+Strive was reset around a policy-neutral, revision-native mechanism
+substrate. New thesis: durable mechanisms for model-led adaptation;
+comparative evaluation is an optional mechanism a policy requests, never a
+universal activation prerequisite. What shipped:
+
+- **`strive.substrate`** — one task/run-scoped append-only, crash-framed,
+  hash-chained event stream + CAS as the SOLE harness state. Native
+  composite state (allowlisted surface bindings) with exact before/after
+  CAS refs; 11 typed records (PolicyBound, PolicyCheckpointed,
+  PolicyCommandIssued/Completed, ChangeProposed, ChangeApplied,
+  ObservationRecorded, ChangeConfirmed, ChangeRevised, ChangeReverted,
+  OperationFailed) sharing one ordered stream with distinct authority /
+  observation / annotation / bookkeeping semantics; expected-head conflict
+  checks; state materialized by folding authority events; exact revert by
+  change inversion.
+- **`strive.policy`** — `AdaptationPolicy[Config, State]` and
+  `SurfaceStrategy` protocols; the closed command vocabulary
+  (RequestRefinement, ApplyChange, EvaluateFork, ScheduleTrigger,
+  ConfirmChange, RevertChange, StopAdaptation); immutable `RunView`; an
+  injected immutable `PolicyCatalog` (no import-time registration).
+- **`strive.kernel`** — the resumable command loop: journals command
+  intent/result, content-addresses policy state as checkpoints, and resumes
+  exactly (a completed command is never repeated; a crash between an
+  authority effect and its completion is reconciled by detecting the
+  effect). Reuses the secure `CandidateExecutor` for `EvaluateFork`.
+- **`strive.policies.manual_change`** — the deterministic `manual-change@1`
+  proof: a policy package (`manual_change.py` + `manual_change.toml` +
+  `prompts/manual_change_refine@1.md`) that submits ONE coupled prompt+code
+  change, records an OPTIONAL fork observation, applies it, checkpoints each
+  step so the kernel can crash/resume at any boundary, and reverts it
+  EXACTLY (final state == pinned seed).
+
+**Deleted** (backward-compat/migration explicitly out of scope): lifecycle,
+loop, reader, dualwrite, experiment, selection, evidence, validators,
+datasets, promptgate, migrations, migrate, capability, store,
+stage3_contracts, monitors, propose, model_proposer, diagnose, revisions,
+the old AcceptancePolicy `policy`, fakemodel, the promotion CLI, and the
+promotion-era `contracts` wire types.
+
+**Verification:** 99 tests pass; `mypy --strict` clean over 28 source files.
+The default sandbox backend stays `process-fault-only@1` (trusted fixtures);
+the secure `deno-pyodide@1` backend and its adversarial suite are unchanged.
+
+**The Phase-A claim, stated precisely:** Strive has one revision-native
+event/artifact substrate and a resumable policy command boundary; policies
+can apply, observe, checkpoint, and revert exact composite changes without a
+universal empirical-authorization ceremony.
+
+**Next phase:** a budget-matched `hill-climb@1` versus `pareto-population@1`
+experiment on this substrate, built as a journaled command/reducer state
+machine (do NOT bake it into the kernel; it is a policy comparison).
+
+## Stage 3C.2B.1 — authoritative secure execution (historical)
+
 
 Made the 3C.2B boundary end-to-end and the capability evidence honest
 (ADR-0007). Five areas:

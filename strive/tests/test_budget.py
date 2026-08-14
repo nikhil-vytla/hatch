@@ -1,13 +1,9 @@
 """Trusted budget enforcement: every enforced limit is tested; zero-limit
 semantics are defined (0 = nothing allowed, -1 = accounting only)."""
 
-from pathlib import Path
 
 from strive.budget import UNLIMITED, BudgetMeter
 from strive.contracts import FAILURE_BUDGET_EXHAUSTED, BudgetSpec
-from strive.loop import LoopConfig, run_cycle
-from strive.store import Store
-from strive.tasks import SUM_INTEGERS_TASK
 
 
 def test_meter_denies_beyond_execution_ceiling() -> None:
@@ -86,35 +82,3 @@ def test_recursion_depth_zero_denies_any_delegation() -> None:
     meter = BudgetMeter(BudgetSpec(max_recursion_depth=0))
     assert meter.enter_recursion(1) is not None
     assert meter.enter_recursion(0) is None
-
-
-def test_cycle_with_execution_budget_one_rejects_candidate_as_data(tmp_path: Path) -> None:
-    """One execution allowed: the baseline runs, the candidate validation is
-    denied by the trusted meter and recorded as a rejection — no exception."""
-    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
-    config = LoopConfig(budget=BudgetSpec(executions=1))
-    report = run_cycle(store, SUM_INTEGERS_TASK, config)
-
-    assert report.diagnosis is not None  # baseline ran and was diagnosed
-    assert report.candidate_evaluation is not None
-    assert report.candidate_evaluation.failure is not None
-    assert report.candidate_evaluation.failure.kind == FAILURE_BUDGET_EXHAUSTED
-    assert report.decision is not None and not report.decision.accepted
-    assert "budget" in report.decision.reason
-
-    # the rejected candidate is still retained with its decision
-    active = store.active_generation()
-    assert active is not None and active.generation_id == report.generation_before
-
-
-def test_cycle_with_zero_wall_budget_records_floor_evaluation(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
-    config = LoopConfig(budget=BudgetSpec(wall_time_s=0.0))
-    report = run_cycle(store, SUM_INTEGERS_TASK, config)
-
-    assert report.evaluation.failure is not None
-    assert report.evaluation.failure.kind == FAILURE_BUDGET_EXHAUSTED
-    assert report.evaluation.overall_score == 0.0
-    assert report.diagnosis is None  # nothing passed, diagnosis abstains
-    # the cycle was journaled with its usage despite total exhaustion
-    assert store.cycles()[-1].usage.executions == 0

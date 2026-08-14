@@ -40,12 +40,6 @@ FAILURE_MODEL_ERROR = "model-error"
 FAILURE_COST_UNAVAILABLE = "cost-limit-unavailable"
 
 # proposal-pipeline rejection kinds, each journaled distinctly
-FAILURE_PROPOSAL_TRUNCATED = "proposal-truncated"
-FAILURE_PROPOSAL_MALFORMED = "proposal-malformed"
-FAILURE_PROPOSAL_SCHEMA_INVALID = "proposal-schema-invalid"
-FAILURE_PROPOSAL_FORBIDDEN = "proposal-forbidden"
-FAILURE_PROPOSAL_STALE = "proposal-stale"
-FAILURE_PROPOSAL_ABSTAINED = "proposal-abstained"
 
 
 @register("failure", 1)
@@ -157,121 +151,12 @@ class Evaluation:
 # -- diagnosis / proposal ----------------------------------------------------------
 
 
-@register("diagnosis", 1)
-@dataclass(frozen=True)
-class Diagnosis:
-    weakness_id: str
-    description: str
-    evidence_case_ids: tuple[str, ...]
-
-
-@register("surface-update", 1)
-@dataclass(frozen=True)
-class SurfaceUpdate:
-    """One proposed change to a non-code evolvable surface, keyed by its
-    pinned descriptor ref — generic by design so future surfaces need no new
-    ProposalRecord fields. The model-facing JSON keeps convenience keys (e.g.
-    "prompt_update"); the kernel converts them into this typed form."""
-
-    descriptor_ref: str  # e.g. "prompt@3" — pinned at proposal time
-    name: str  # e.g. "proposal-template"
-    content: str  # the complete replacement artifact text
-
-
-@register("proposal", 2)
-@dataclass(frozen=True)
-class ProposalRecord:
-    """A structured proposed change, as validated from a proposer's output.
-
-    ``parent_generation_id`` names the incumbent the proposal was derived
-    from; the kernel rejects the proposal as stale if the active generation
-    has changed by the time it is applied.
-    """
-
-    parent_generation_id: str
-    surface: str
-    summary: str
-    rationale: str
-    trace_evidence: tuple[str, ...]
-    expected_outcome: str
-    source: str
-    changed_surfaces: tuple[str, ...]
-    risks: tuple[str, ...]
-    assumptions: tuple[str, ...]
-    # generic typed updates to non-code surfaces, keyed by descriptor ref
-    # (empty = strategy-only proposal). Note on proposal@1: those records
-    # exist only inside run-event payloads and are never codec-decoded from
-    # disk (verified by test); decoding one raises the strict
-    # unsupported-version error, so no v1 migration path is required.
-    surface_updates: tuple[SurfaceUpdate, ...] = ()
-
-
-@register("candidate", 1)
-@dataclass(frozen=True)
-class Candidate:
-    """A bounded proposed change to an evolvable surface.
-
-    ``source_ref`` is a content-address (sha256) into the object store; the
-    candidate's full source never lives inside ledger entries.
-    """
-
-    candidate_id: str
-    parent_generation_id: str
-    surface: str
-    weakness_id: str
-    description: str
-    source_ref: str
-
-
-# -- decision / promotion ----------------------------------------------------------
-
-
-@register("decision", 1)
-@dataclass(frozen=True)
-class Decision:
-    """An accept/reject verdict, stamped with the policy that produced it."""
-
-    accepted: bool
-    reason: str
-    policy: str
-    policy_version: int
-    baseline_score: float
-    candidate_score: float
-    baseline_split_scores: dict[str, float]
-    candidate_split_scores: dict[str, float]
-    regressed_case_ids: tuple[str, ...] = ()
-
-
-@register("generation", 2)
-@dataclass(frozen=True)
-class Generation:
-    generation_id: str
-    task_id: str
-    task_fingerprint: str
-    parent_id: str | None
-    origin: str  # "seed" | "evolved" | "manual"
-    surface: str
-    weakness_id: str | None
-    created_at: str
-    source_ref: str
-    decision: Decision | None = None
-
-
-ACTIVATION_DURABLE = "durable"
-ACTIVATION_PROVISIONAL = "provisional"
-
-
-@register("activation", 2)
-@dataclass(frozen=True)
-class Activation:
-    generation_id: str
-    task_id: str
-    reason: str  # "seed" | "evolved" | "rollback" | "promote" | "confirmed" | "expired-reverted"
-    mode: str  # "durable" | "provisional"
-    at: str
-    policy: str
-    expires_after_cycles: int | None = None
-    baseline_score: float | None = None
+# NOTE (Strive vNext): the promotion-era wire types (SurfaceUpdate,
+# ProposalRecord, Candidate, Decision, Generation, Activation) were DELETED
+# in the Phase-A reset. Harness state is now native composite state in the
+# revision-native event substrate (`strive.substrate`); there is no
+# generation ledger, no accept/reject promotion decision, and no activation
+# record. See docs/adrs/0008-vnext-substrate.md.
 
 
 # -- budgets --------------------------------------------------------------------
@@ -308,45 +193,10 @@ class BudgetUsage:
     recursion_depth: int = 0
 
 
-# -- journal entries ---------------------------------------------------------------
-
-
-@register("cycle", 1)
-@dataclass(frozen=True)
-class CycleRecord:
-    """Ledger summary of one loop cycle, including usage attribution."""
-
-    run_id: str
-    at: str
-    task_id: str
-    task_fingerprint: str
-    generation_id: str
-    overall_score: float
-    split_scores: dict[str, float]
-    weakness_id: str | None
-    candidate_generation_id: str | None
-    accepted: bool | None
-    frozen: bool
-    usage: BudgetUsage
-
-
-INTERVENTION_STALL_FREEZE = "stall-freeze"
-INTERVENTION_RESUME = "resume"
-INTERVENTION_EXPIRY_REVERT = "expiry-revert"
-INTERVENTION_LEGACY_MIGRATION = "legacy-migration"
-INTERVENTION_SHADOW_DIVERGENCE = "shadow-divergence"
-INTERVENTION_DRIFT_ACKNOWLEDGED = "task-drift-acknowledged"
-
-
-@register("intervention", 1)
-@dataclass(frozen=True)
-class Intervention:
-    """A trusted-monitor action: freeze, resume, or provisional expiry revert."""
-
-    kind: str
-    reason: str
-    at: str
-    run_id: str | None = None
+# NOTE (Strive vNext): the loop-era journal entries (CycleRecord,
+# Intervention) were DELETED in the Phase-A reset. The run's history is the
+# typed event stream in `strive.substrate`; optional external tracing uses
+# the read-only `event@1` stream below.
 
 
 @register("event", 1)
