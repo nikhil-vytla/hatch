@@ -1133,6 +1133,9 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
         )
 
     # -- every linked bundle: the full agreement matrix ------------------------
+    from strive.sandboxes import SandboxProvenance as _SandboxProvenance
+
+    sandbox_provs: list[tuple[str, _SandboxProvenance]] = []
     for item in envelope.evidence:
         label = f"{item.role} bundle {item.bundle_ref[:12]}…"
         try:
@@ -1250,10 +1253,16 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
             )
 
         # sandbox provenance: when pinned it must decode to a
-        # SandboxProvenance whose backend is self-consistent — evidence from
-        # different backends is distinct and never confused
+        # SandboxProvenance whose backend is versioned and whose secure
+        # claim is self-consistent (a provenance claiming `secure` must
+        # actually list the full registered secure-capability floor —
+        # evidence cannot claim containment it does not enforce). Collected
+        # here and checked for cross-bundle CONSISTENCY after the loop.
         if manifest.sandbox_provenance_ref:
-            from strive.sandboxes import SandboxProvenance
+            from strive.sandboxes import (
+                SECURE_EXECUTION_CAPABILITIES,
+                SandboxProvenance,
+            )
 
             try:
                 sandbox_prov: SandboxProvenance = codec.loads(
@@ -1265,6 +1274,15 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
                         f"{label}: sandbox provenance backend "
                         f"{sandbox_prov.backend!r} is not versioned (name@version)"
                     )
+                if sandbox_prov.secure and not all(
+                    cap in sandbox_prov.enforced_capabilities
+                    for cap in SECURE_EXECUTION_CAPABILITIES
+                ):
+                    reasons.append(
+                        f"{label}: sandbox provenance claims secure but omits "
+                        "a required secure-execution capability"
+                    )
+                sandbox_provs.append((item.role, sandbox_prov))
             except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
                 reasons.append(
                     f"{label}: sandbox_provenance_ref does not decode to a "
@@ -1475,6 +1493,33 @@ def activation_readiness(store: object, revision_id: str) -> ReadinessReport:
                             f"{label} artifact for {result.validator} "
                             f"corrupt: {exc}"
                         )
+
+    # -- sandbox provenance consistency across the decision's bundles ---------
+    # A model-authored promotion must rest on ONE mechanically-bounded
+    # boundary: every bundle that pins sandbox provenance must agree on the
+    # backend, the enforced capabilities, and the runtime digest. A prompt
+    # validator cannot borrow the task candidate's boundary (they carry
+    # their own provenance, checked equal here); mixed or divergent
+    # boundaries fail closed.
+    if sandbox_provs:
+        backends = {prov.backend for _role, prov in sandbox_provs}
+        runtimes = {prov.runtime_digest for _role, prov in sandbox_provs}
+        capsets = {tuple(prov.enforced_capabilities) for _role, prov in sandbox_provs}
+        if len(backends) > 1:
+            reasons.append(
+                f"sandbox provenance disagrees across bundles: backends "
+                f"{sorted(backends)} — one bounded boundary per decision"
+            )
+        if len(runtimes) > 1:
+            reasons.append(
+                f"sandbox provenance disagrees across bundles: runtimes "
+                f"{sorted(runtimes)}"
+            )
+        if len(capsets) > 1:
+            reasons.append(
+                "sandbox provenance disagrees across bundles: enforced "
+                "capabilities differ between validators"
+            )
     return report(link.envelope_ref)
 
 

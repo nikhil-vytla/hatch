@@ -7,16 +7,15 @@ from pathlib import Path
 
 import pytest
 
-import strive.sandbox_backends  # noqa: F401 — registers backends
 from strive.capability import (
     MIN_CAPABILITY_TRIALS,
     VERDICT_INCONCLUSIVE,
     run_capability_trials,
 )
-from strive.sandboxes import get_backend
+from strive.sandboxes import default_catalog
 from strive.tasks import SUM_INTEGERS_TASK
 
-_available, _reason = get_backend("deno-pyodide@1", require_available=False).available()
+_available, _reason = default_catalog().create("deno-pyodide@1").available()
 requires_deno = pytest.mark.skipif(
     not _available, reason=f"deno-pyodide unavailable: {_reason}"
 )
@@ -117,3 +116,85 @@ def test_secure_backend_cycle_pins_sandbox_provenance_and_grants_authority(
             assert "network_denied" in prov.enforced_capabilities
             saw_provenance = True
     assert saw_provenance, "no bundle pinned the sandbox provenance"
+
+
+@requires_deno
+def test_trials_use_distinct_real_seeds_and_write_immutable_manifest(
+    tmp_path: Path,
+) -> None:
+    import json
+
+    root = tmp_path / "cap"
+    report = run_capability_trials(
+        root, SUM_INTEGERS_TASK, trials=3, seeds=(11, 22, 33), use_fixture=True
+    )
+    # the DISTINCT seeds were propagated (not a repeated seed-0)
+    assert [t.seed for t in report.trials] == [11, 22, 33]
+    assert all(t.seed_support == "deterministic-by-seed" for t in report.trials)
+    # one immutable manifest pins the per-trial refs
+    manifest_path = root / "manifest.json"
+    assert manifest_path.exists() and report.manifest_path == str(manifest_path)
+    data = json.loads(manifest_path.read_text())
+    assert data["schema"] == "capability-report@1"
+    assert len(data["trials"]) == 3
+    for trial in data["trials"]:
+        assert trial["prompt_refs"] and trial["completion_refs"]
+    # the fixture control is inconclusive regardless of outcome
+    assert report.verdict == VERDICT_INCONCLUSIVE
+
+
+@requires_deno
+def test_resume_reuses_completed_trials_without_duplicate_spend(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "cap"
+    first = run_capability_trials(
+        root, SUM_INTEGERS_TASK, trials=2, seeds=(1, 2), use_fixture=True
+    )
+    markers = sorted(root.glob("trial-*/trial.json"))
+    assert len(markers) == 2
+    stamps = {m: m.read_text() for m in markers}
+
+    # resume with MORE trials: the first two are reused byte-for-byte (no
+    # re-run / duplicate spend), only the third executes
+    resumed = run_capability_trials(
+        root, SUM_INTEGERS_TASK, trials=3, seeds=(1, 2, 3),
+        use_fixture=True, resume=True,
+    )
+    assert resumed.n == 3
+    assert [t.seed for t in resumed.trials] == [1, 2, 3]
+    for marker, text in stamps.items():
+        assert marker.read_text() == text  # untouched — reused, not re-run
+
+
+def test_criterion_requires_more_than_one_success() -> None:
+    """A lone clean acceptance among many trials never reads as `supported`:
+    the interval lower bound stays at zero."""
+    from strive.capability import (
+        CapabilityCriterion,
+        TrialResult,
+        VERDICT_INCONCLUSIVE,
+        VERDICT_SUPPORTED,
+        _aggregate,
+    )
+
+    def trial(i: int, accepted: bool) -> TrialResult:
+        return TrialResult(
+            trial=i, seed=i, source="real", model_id="m",
+            seed_support="sent-honored-unverified", proposal_valid=True,
+            accepted=accepted, regressions=0, failure_kind=None, model_calls=1,
+            tokens=0, latency_ms=None, sandbox_backend="deno-pyodide@1",
+            run_id=f"r{i}",
+        )
+
+    crit = CapabilityCriterion(min_trials=2, min_clean_rate=0.5)
+    one_of_eight = _aggregate(
+        SUM_INTEGERS_TASK, "real", "m", "deno-pyodide@1", True, crit,
+        tuple([trial(0, True)] + [trial(i, False) for i in range(1, 8)]),
+    )
+    assert one_of_eight.verdict == VERDICT_INCONCLUSIVE
+    all_clean = _aggregate(
+        SUM_INTEGERS_TASK, "real", "m", "deno-pyodide@1", True, crit,
+        tuple(trial(i, True) for i in range(6)),
+    )
+    assert all_clean.verdict == VERDICT_SUPPORTED
