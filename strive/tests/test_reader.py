@@ -535,15 +535,23 @@ def solve(text):
 
 
 def test_canary_is_refused_for_unsafe_model_code(tmp_path: Path) -> None:
+    """Stage 3C.2B.1: untrusted model code on the fault-only boundary is
+    refused fail-closed regardless of reader mode (canary or native) — it
+    can never execute without a secure backend."""
+    from strive.sandboxes import SandboxError
+
     store = Store(tmp_path / "artifacts", TASK.task_id)
     _exercise_all_paths(store)
     enable_canary(store)
+    # canary mode refuses unsafe code up front (reader control could be
+    # tampered with under an unconfined boundary)
     with pytest.raises(StoreError, match="refused for real model-generated"):
         run_cycle(store, TASK, LoopConfig(unsafe_model_code=True))
-    # native mode accepts the same configuration
+    # killing the canary back to native does NOT relax the boundary: the
+    # executor still refuses untrusted code on the fault-only sandbox
     kill_switch(store)
-    report = run_cycle(store, TASK, LoopConfig(unsafe_model_code=True))
-    assert report.run_id
+    with pytest.raises(SandboxError, match="trusted fixtures/code only"):
+        run_cycle(store, TASK, LoopConfig(unsafe_model_code=True))
 
 
 # -- honest evaluated subjects --------------------------------------------------------------------

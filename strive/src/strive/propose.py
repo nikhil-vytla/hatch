@@ -64,6 +64,9 @@ class ProposalRequest:
     model_calls_remaining: int
     executions_remaining: int
     model: CompletingAdapter | None = None
+    # the per-request seed, propagated into the ModelRequest so seeded trials
+    # genuinely vary the seed (never a repeated seed-0 masquerading as seeded)
+    seed: int = 0
     # the ACTIVE prompt/proposal-template surface, resolved by the kernel
     # from the native lifecycle's manifest ("" -> the built-in default) and
     # journaled per model request alongside the active revision. The pinned

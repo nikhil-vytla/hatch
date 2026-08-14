@@ -379,7 +379,11 @@ class ModelProposer:
         if overflow is not None:
             return ProposalResult(failure=overflow)
         outcome = request.model.complete(
-            ModelRequest(prompt=prompt, max_tokens=request.max_output_tokens)
+            ModelRequest(
+                prompt=prompt,
+                max_tokens=request.max_output_tokens,
+                seed=request.seed,
+            )
         )
         if isinstance(outcome, FailureRecord):
             return ProposalResult(failure=outcome)

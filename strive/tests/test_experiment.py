@@ -196,7 +196,14 @@ def test_rendered_prompt_overflow_refuses_before_provider_call(
     active = store.active_generation()
     assert active is not None
     huge_source = store.source_of(active) + "\n# pad\n" * 12000  # ~26k rendered
-    ctx, diagnosis = make_visible_context(TASK, active.generation_id, huge_source)
+    from strive.sandboxes import CandidateExecutor, default_catalog
+
+    trusted_executor = CandidateExecutor.from_catalog(
+        default_catalog(), "process-fault-only@1", trusted=True
+    )
+    ctx, diagnosis = make_visible_context(
+        TASK, active.generation_id, huge_source, trusted_executor
+    )
     diagnosis = diagnosis or Diagnosis(
         weakness_id="visible-case-failures", description="d",
         evidence_case_ids=("positives-pair",),
