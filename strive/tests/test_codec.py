@@ -16,6 +16,7 @@ from strive.contracts import (
 from strive.substrate import (
     ChangeApplied,
     CompositeChange,
+    EventEnvelope,
     HarnessState,
     PolicyBound,
     SurfaceBinding,
@@ -50,13 +51,16 @@ ROUND_TRIP_SAMPLES = [
         seed=7,
         seed_state_ref="ef" * 32,
         run_metadata={"model": "none"},
-        at="2026-08-14T00:00:00+00:00",
     ),
     ChangeApplied(
         change_id="manual-change-1",
         change_ref="11" * 32,
         before_state_ref="22" * 32,
         after_state_ref="33" * 32,
+    ),
+    EventEnvelope(
+        event_id="run-x#1", run_id="run-x", task_id="sum-integers", seq=1,
+        caused_by=None, body_kind="policy-bound@2", body_ref="ab" * 32,
         at="2026-08-14T00:00:00+00:00",
     ),
     Event(ts="t", type="policy_step", run_id="run-x", payload={"k": [1, 2]}),

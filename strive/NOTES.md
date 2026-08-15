@@ -1160,3 +1160,47 @@ accepted-and-current at resume time.
 - 99 tests, mypy strict clean (28 src files). Default sandbox stays
   process-fault-only@1; deno-pyodide@1 + adversarial suite unchanged.
 - PR opened for review; NOT merged (per the goal).
+
+## vNext Phase A — CORRECTED (PR #50 correction pass)
+
+- Run-scoped substrate: one artifact root, many runs
+  (`<root>/runs/<run_id>.events`), CAS shared at `<root>/objects`. Every
+  event is an EventEnvelope (stable id `<run_id>#<seq>`, run/task scope,
+  caused_by, seq, at, body_kind, body_ref); typed bodies live in CAS. No
+  count-based/fixed ids. command_id bound to one canonical payload digest;
+  reuse-with-different-payload fails closed.
+- VerifiedSubstrateView (`verify()`): framing + exactly-one-leading
+  PolicyBound + CAS closure + canonical/allowlisted/existing bindings +
+  EXACT apply/revert replay (before==prior, decodes, deterministic
+  apply==after, effect cites a command) + command lifecycle/one-terminal +
+  checkpoint agreement + change-id uniqueness. ok=False refuses every
+  authority append. repair() quarantines ONLY a torn/forged tail; semantic
+  corruption is refused, not auto-quarantined.
+- Result-driven kernel: next_command + reduce (replaced Step). Per command:
+  one intent, perform/reconcile one effect, one terminal result, reduce,
+  checkpoint(state + consumed_command_id cursor). Never advance before the
+  outcome; restart reconstructs the exact result (fork metrics reconstructed
+  from the recorded ForkObservation so the reducer reacts identically).
+  Idempotency by change-id (proposal/apply), reverted-set (revert),
+  caused-by-observation (fork), and completed-set (terminal).
+- Floor: bound identity authoritative on resume (config-digest/prompt/seed
+  mismatch → KernelError); BudgetMeter charges executions (per fork case);
+  required sandbox capabilities checked, exact SandboxProvenance recorded;
+  stage_change_closure stages EXACTLY the change's refs and apply requires
+  full closure; EvaluateFork captures base+candidate refs before execution
+  and records both.
+- manual-change@1: emits ChangeProposed, run-scoped unique ids
+  (`<run_id>:fork|apply|revert|stop-*`), reacts to fork improved/not through
+  reduce. Honest: fork scores CODE; prompt is round-trip only until
+  continual-refine@1.
+- CLI (`strive`): run/runs/status/view/history/inspect/revert/repair/sandbox;
+  entry point strive.cli:main; pyproject 0.2.0.
+- Docs: PROJECT_CHARTER/ARCHITECTURE/ROADMAP/HANDOFF/README/ADR-0008 rewritten
+  as current vNext; Stage 1-3C prose archived under docs/archive/. Next phase
+  = continual-refine@1 (NOT Pareto).
+- Gotchas fixed: (1) ChangeProposed double-emit (fork + apply) → idempotent
+  by change_id globally. (2) fork-crash resume returned empty metrics → the
+  reducer misread "not improved"; now reconstructs metrics from the recorded
+  ForkObservation. (3) apply allowlist check must precede CAS-closure check.
+
+115 tests, mypy strict clean (30 files). PR updated; NOT merged.
