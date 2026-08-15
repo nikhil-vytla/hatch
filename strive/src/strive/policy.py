@@ -1,108 +1,110 @@
-"""The policy boundary (Strive vNext, Phase A).
+"""The policy boundary (Strive vNext).
 
 A policy is the model-led adaptation program. ONE active orchestrating
-`AdaptationPolicy` owns timing and lifecycle decisions for a run;
-`SurfaceStrategy` objects analyze immutable views and PROPOSE changes
-(including coupled multi-surface proposals) but can never mutate state.
+`AdaptationPolicy` owns timing and lifecycle for a run; `SurfaceStrategy`
+objects analyze immutable views and PROPOSE changes (including coupled
+multi-surface proposals) but can never mutate state.
 
-Policies receive IMMUTABLE views and emit KERNEL COMMANDS — they never
-touch the event store or CAS directly. The kernel executes commands,
-journals their intent and result, and content-addresses policy state, so a
-restart resumes without repeating completed model calls or side effects.
+The lifecycle is RESULT-DRIVEN, one command at a time:
 
-The command vocabulary is small and closed:
+    command = policy.next_command(config, state, view)   # None => done
+    result  = kernel runs & journals the single command
+    state   = policy.reduce(config, state, result)       # fold the outcome
 
-- `RequestRefinement` — ask the model (via a pinned prompt) for a typed
-  proposal; the kernel performs and journals the model call.
-- `ApplyChange` — apply an exact composite change to harness state.
-- `EvaluateFork` — request an OPTIONAL comparative observation of a
-  candidate state against the current one (a mechanism, not a gate).
-- `ScheduleTrigger` — ask to be re-invoked later (timing).
-- `ConfirmChange` / `RevertChange` — annotate or exactly undo an applied
-  change.
-- `StopAdaptation` — end the run.
+The kernel never advances policy state before a command's outcome exists,
+and on restart it reconstructs the exact same `result` from the journal —
+so `last_result` can never disappear and no effect, model call, observation,
+or spend is duplicated.
 
-Comparative evaluation is thus something a policy may REQUEST
-(`EvaluateFork`), never a universal activation prerequisite.
+Policies receive IMMUTABLE `RunView`s and emit a small closed command
+vocabulary (`RequestRefinement`, `ApplyChange`, `EvaluateFork`,
+`ScheduleTrigger`, `ConfirmChange`, `RevertChange`, `StopAdaptation`). Each
+command carries a run-scoped unique `command_id` bound to one canonical
+payload digest. Comparative evaluation is what `EvaluateFork` REQUESTS; the
+kernel never imposes it.
 
-Catalogs are INJECTED and IMMUTABLE (name → factory descriptors); there is
-no import-time registration.
+Catalogs are INJECTED and IMMUTABLE (name → descriptor); the descriptor's
+config loader and prompt slots are authoritative (conformance-tested), and
+there is no import-time registration.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generic, Protocol, Sequence, TypeVar
+from typing import Any, Callable, Protocol, Sequence, TypeVar
 
-from strive.substrate import CompositeChange, HarnessState, SubstrateView
+from strive.substrate import CompositeChange, HarnessState, VerifiedSubstrateView
 
 Config = TypeVar("Config", contravariant=True)
 State = TypeVar("State")
 
-# -- immutable views policies/strategies receive --------------------------------------------------
+
+# -- the immutable view policies receive ----------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class RunView:
-    """The immutable read a policy/strategy is handed each step: the current
-    composite state, the journal head it was taken at, and the ordered event
-    entries (read-only). No handle to mutate anything."""
+    """The immutable read a policy is handed each step: the run/task scope,
+    the current composite state, the pinned seed state (stable across
+    resume), the journal head, and the ordered event bodies (read-only)."""
 
+    run_id: str
     task_id: str
     state: HarnessState
     state_ref: str | None
-    seed_state: HarnessState  # the pinned initial state (stable across resume)
+    seed_state: HarnessState
     head: str
-    entries: tuple[object, ...]
     seed: int
+    bodies: tuple[object, ...]
 
     @staticmethod
-    def of(task_id: str, seed: int, view: SubstrateView) -> "RunView":
+    def of(seed: int, view: VerifiedSubstrateView) -> "RunView":
         return RunView(
-            task_id=task_id,
+            run_id=view.run_id,
+            task_id=view.task_id,
             state=view.state,
             state_ref=view.state_ref,
             seed_state=view.seed_state,
             head=view.head,
-            entries=view.entries,
             seed=seed,
+            bodies=view.bodies,
         )
 
 
-# -- kernel commands (closed vocabulary) ----------------------------------------------------------
+# -- kernel commands (closed vocabulary; each has a run-scoped command_id) -------------------------
 
 
 @dataclass(frozen=True)
 class RequestRefinement:
-    """Ask the kernel to run the model under a pinned prompt role and decode
-    a strict typed proposal. The kernel performs and journals the model
-    call, so a restart after completion does not repeat it."""
+    """Ask the kernel to run the model under a pinned prompt role and decode a
+    strict typed proposal. The kernel performs and journals the model call
+    once, so a restart never repeats it."""
 
     command_id: str
     prompt_role: str
-    context_ref: str  # CAS ref of the model-facing context payload
+    context_ref: str
 
 
 @dataclass(frozen=True)
 class ApplyChange:
-    """Apply an exact composite change to harness state (head-checked). The
-    policy stages NEW surface content in `content_blobs` (ref → content),
-    where each ref is the pure content address (`strive.cas.hash_text`) the
-    change's `after_ref` points at; the kernel puts and verifies each blob
-    before applying, so policies never touch CAS directly."""
+    """Apply an exact composite change (head-checked). The policy stages the
+    change's new content in `content_blobs` (ref → content, each the pure
+    content address of the delta's `after_ref`); the kernel stages the full
+    closure and verifies it before applying."""
 
     command_id: str
     change: CompositeChange
+    strategy_ref: str
     content_blobs: dict[str, str] = field(default_factory=dict)
     expected_head: str | None = None
 
 
 @dataclass(frozen=True)
 class EvaluateFork:
-    """Request an OPTIONAL comparative observation: evaluate a candidate
-    composite state (a fork) alongside the current one and record the
-    observation. A mechanism a policy may request — never a gate the kernel
-    imposes."""
+    """Request an OPTIONAL comparative observation: score the current
+    composite state and a forked candidate, recording BOTH exact state refs
+    (captured before execution) even if active state later advances. A
+    mechanism a policy requests — never a gate the kernel imposes."""
 
     command_id: str
     candidate: CompositeChange
@@ -112,8 +114,6 @@ class EvaluateFork:
 
 @dataclass(frozen=True)
 class ScheduleTrigger:
-    """Ask to be re-invoked later (the policy owns timing)."""
-
     command_id: str
     after_seconds: float
     reason: str = ""
@@ -121,8 +121,6 @@ class ScheduleTrigger:
 
 @dataclass(frozen=True)
 class ConfirmChange:
-    """Annotate a previously-applied change as confirmed."""
-
     command_id: str
     change_id: str
     rationale: str = ""
@@ -130,8 +128,6 @@ class ConfirmChange:
 
 @dataclass(frozen=True)
 class RevertChange:
-    """Exactly undo a previously-applied change (head-checked)."""
-
     command_id: str
     change_id: str
     expected_head: str | None = None
@@ -139,8 +135,6 @@ class RevertChange:
 
 @dataclass(frozen=True)
 class StopAdaptation:
-    """End the run."""
-
     command_id: str
     reason: str = ""
 
@@ -158,81 +152,71 @@ KernelCommand = (
 
 @dataclass(frozen=True)
 class CommandResult:
-    """What the kernel hands back for a completed command: an outcome, an
-    optional typed payload, and the head after the command."""
+    """What the kernel hands back for a completed command: an outcome, the
+    head after it, optional typed payloads, and numeric metrics (e.g. fork
+    scores) the reducer may react to."""
 
     command_id: str
+    kind: str
     outcome: str  # "ok" | "failed"
     head: str
     detail: str = ""
     proposal: CompositeChange | None = None
     observation_ref: str | None = None
+    metrics: dict[str, float] = field(default_factory=dict)
 
 
-# -- the public protocols -------------------------------------------------------------------------
+# -- the protocols --------------------------------------------------------------------------------
 
 
 class SurfaceStrategy(Protocol):
     """Analyzes an immutable view and PROPOSES a change (possibly coupled
-    multi-surface). A strategy cannot mutate state — it only returns a
-    proposal or None."""
+    multi-surface). Cannot mutate state — returns a proposal or None."""
 
-    name: str  # name@version
+    name: str
 
     def propose(self, view: RunView) -> CompositeChange | None: ...
 
 
-@dataclass(frozen=True)
-class Step(Generic[State]):
-    """One orchestration step: the commands to execute now and the successor
-    policy state to checkpoint. `done` ends the run after these commands."""
-
-    commands: tuple[KernelCommand, ...]
-    next_state: State
-    done: bool = False
-    checkpoint: bool = True
-
-
 class AdaptationPolicy(Protocol[Config, State]):
-    """The ONE active orchestrating policy for a run. It owns timing and
-    lifecycle decisions; it consumes immutable views and completed-command
-    results and emits kernel commands. It never mutates state directly.
+    """The one active orchestrating policy for a run. Result-driven: the
+    kernel asks for the next command, runs it, and folds the result back with
+    `reduce`. `State` is the policy's content-addressable state machine value
+    (checkpointed so a restart resumes exactly); `Config` is a frozen,
+    policy-specific config dataclass."""
 
-    `State` is the policy's own content-addressable state machine value
-    (checkpointed by the kernel so a restart resumes exactly). `Config` is a
-    frozen, policy-specific config dataclass."""
-
-    name: str  # name@version
+    name: str
 
     def initial_state(self, config: Config, view: RunView) -> State: ...
 
-    def step(
-        self,
-        config: Config,
-        state: State,
-        view: RunView,
-        last_result: CommandResult | None,
-    ) -> Step[State]: ...
+    def decode_state(self, data: object) -> State: ...
+
+    def next_command(
+        self, config: Config, state: State, view: RunView
+    ) -> KernelCommand | None: ...
+
+    def reduce(self, config: Config, state: State, result: CommandResult) -> State: ...
 
 
-# -- the injected immutable policy/strategy catalog -----------------------------------------------
+# -- the injected immutable catalog ---------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class PolicyDescriptor:
-    """An immutable catalog entry: a policy name, a zero-arg factory building
-    a fresh policy, a config loader (TOML path → frozen Config), and the
-    versioned prompt files the policy pins (role → path)."""
+    """An immutable catalog entry: a policy name, a factory, an authoritative
+    config loader (TOML path → frozen Config), and the versioned prompt slots
+    the policy pins (role → file path)."""
 
     name: str
     factory: Callable[[], "AdaptationPolicy[Any, Any]"]
     config_loader: Callable[[str], object]
+    default_config_path: str
     prompt_files: dict[str, str] = field(default_factory=dict)
 
 
 class PolicyCatalog:
-    """An immutable set of policy descriptors, resolved by exact name@version.
-    Fail-closed: an unknown policy raises rather than guessing."""
+    """An immutable set of policy descriptors, resolved by exact name@version,
+    fail-closed."""
 
     def __init__(self, descriptors: Sequence[PolicyDescriptor]) -> None:
         self._by_name: dict[str, PolicyDescriptor] = {}
@@ -254,9 +238,29 @@ class PolicyCatalog:
         return descriptor
 
 
+def conformance_violations(descriptor: PolicyDescriptor) -> list[str]:
+    """Reusable descriptor conformance checks: versioned name, a policy whose
+    `name` matches the descriptor, a loadable default config, and prompt
+    slots that resolve to existing files."""
+    import os
+
+    problems: list[str] = []
+    if "@" not in descriptor.name:
+        problems.append(f"policy name {descriptor.name!r} is not versioned")
+    policy = descriptor.factory()
+    if policy.name != descriptor.name:
+        problems.append("policy.name disagrees with descriptor.name")
+    for role, path in descriptor.prompt_files.items():
+        if not os.path.exists(path):
+            problems.append(f"prompt slot {role!r} file is missing: {path}")
+    try:
+        descriptor.config_loader(descriptor.default_config_path)
+    except Exception as exc:  # noqa: BLE001 — report, don't raise
+        problems.append(f"default config does not load: {exc}")
+    return problems
+
+
 def default_catalog() -> PolicyCatalog:
-    """The build's default policy catalog, assembled WITHOUT import-time
-    registration side effects."""
     from strive.policies.manual_change import DESCRIPTOR as MANUAL_CHANGE
 
     return PolicyCatalog([MANUAL_CHANGE])
@@ -275,8 +279,8 @@ __all__ = [
     "RevertChange",
     "RunView",
     "ScheduleTrigger",
-    "Step",
     "StopAdaptation",
     "SurfaceStrategy",
+    "conformance_violations",
     "default_catalog",
 ]
