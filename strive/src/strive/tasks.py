@@ -73,14 +73,27 @@ class Task:
         return self.cases_in(AUDIT)
 
     def fingerprint(self) -> str:
-        """Content hash of the task's cases + scoring version, for drift detection."""
+        """A RECONSTRUCTABLE identity of the task AND its scorer: id, version,
+        the strategy signature, the primitive catalog, every case, AND the
+        source of `score_case` (scorer semantics). Two tasks that score
+        differently — even with identical cases — fingerprint differently, so a
+        resumed run detects a scorer swap, not only a case-set change."""
+        import inspect
+
+        try:
+            scorer_src = inspect.getsource(type(self).score_case)
+        except (OSError, TypeError):
+            scorer_src = type(self).score_case.__qualname__
         canonical = json.dumps(
             {
                 "task_id": self.task_id,
                 "version": self.version,
+                "signature": self.signature,
+                "primitive_catalog": list(self.primitive_catalog),
                 "cases": [
                     [c.case_id, c.input_text, c.expected, c.split] for c in self.cases
                 ],
+                "scorer_impl": hashlib.sha256(scorer_src.encode("utf-8")).hexdigest(),
             },
             sort_keys=True,
             separators=(",", ":"),

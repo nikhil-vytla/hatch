@@ -57,6 +57,29 @@ def test_missing_object_raises(tmp_path: Path) -> None:
         store.get_text("a" * 64)
 
 
+def test_put_text_detects_preexisting_corrupt_object(tmp_path: Path) -> None:
+    store = ObjectStore(tmp_path)
+    ref = store.put_text("hello")
+    store._path(ref).write_bytes(b"corrupted")  # tamper in place
+    # a later put of the SAME logical content must not silently trust the
+    # corrupt preexisting object — it is surfaced as corruption
+    with pytest.raises(ObjectCorruption):
+        store.put_text("hello")
+
+
+def test_invalid_utf8_is_corruption(tmp_path: Path) -> None:
+    store = ObjectStore(tmp_path)
+    raw = b"\xff\xfe not utf-8"
+    import hashlib
+
+    ref = hashlib.sha256(raw).hexdigest()  # a valid ref for invalid-UTF-8 bytes
+    path = store._path(ref)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(raw)
+    with pytest.raises(ObjectCorruption):
+        store.get_text(ref)
+
+
 def test_concurrent_writers_of_identical_content(tmp_path: Path) -> None:
     store = ObjectStore(tmp_path)
     text = "concurrent-content-" * 500

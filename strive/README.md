@@ -38,18 +38,20 @@ exactly resumable**:
   validator before it is ever seeded or applied. A change is coupled, exact
   before→after per surface, and invertible.
 - **Exact run identity.** A run id is an opaque, validated token (no path
-  separators, no `..`); the task is discovered from a persisted binding index,
-  never string-parsed. Each run pins its task fingerprint, policy digest,
-  config, prompts, seed + seed state, budget spec, capability profile, and
-  surface-catalog digest in the leading `PolicyBound` event; resume loads the
-  bound values and rejects any caller that disagrees.
+  separators, no `..`); the task is discovered from a DERIVED binding index
+  (rebuildable, crash-safe), never string-parsed. Each run pins its task
+  fingerprint (incl. scorer semantics), full policy-module digest, config,
+  prompts, seed + seed state, budget spec, capability profile, and a versioned
+  per-surface descriptor snapshot in the authoritative leading `PolicyBound`
+  event; resume loads the bound values and rejects any caller that disagrees.
 - **A verified event log.** One artifact root holds many runs; each run is an
   append-only, crash-framed, hash-chained stream of `EventEnvelope`s (stable
   id, run/task scope, command causation, timestamp). Nothing mutates over an
-  unverified log: `verify()` is pure (it never writes CAS) and closed (it
-  accepts only the known body union), replays every apply/revert exactly,
-  checks CAS closure and the command lifecycle, and on any structural or
-  semantic error refuses every mutation and exposes no active state.
+  unverified log: `verify()` is pure (it never writes CAS) and closed (only the
+  known body union), decodes/hash-verifies every referenced object, replays
+  every apply/revert exactly, requires each effect to cite an issued compatible
+  command and each revert to be the exact inverse of one unreverted apply, and
+  on any error refuses every mutation and exposes no active state.
 - **A resumable kernel.** One command at a time — one intent, one effect
   (performed or reconciled), one terminal result — then `reduce` and
   checkpoint. State never advances before the outcome; a crash at any
@@ -62,11 +64,12 @@ exactly resumable**:
   is how a policy *requests* comparative evaluation. Policies are packages:
   typed code + frozen TOML config + versioned Markdown instructions, pinned
   per run by implementation, config, prompts, and seed.
-- **A floor that is not configurable.** Catalogued surfaces with structural
-  validators, exact before/after, expected-head conflict checks, canonical
-  traversal-safe CAS with verified reads and concurrent-writer-safe
-  publication, append-only tamper-evident events, budgets that survive
-  restart, the secure `CandidateExecutor` sandbox boundary with declared
+- **A floor that is not configurable.** Catalogued surfaces with pinned
+  versioned validators, exact before/after, logical expected-state conflict
+  checks, a per-run execution lease, canonical traversal-safe CAS with verified
+  reads and concurrent-writer-safe publication, append-only tamper-evident
+  events, budgets that survive restart, the secure `CandidateExecutor` sandbox
+  boundary with declared
   capabilities, checkpoints/rollback, crash recovery, and explicit (never
   silent) repair. Operator mutations (e.g. `strive revert`) go through the
   same durable command path as a policy.

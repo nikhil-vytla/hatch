@@ -4,14 +4,53 @@
 
 Strive is a policy-neutral, revision-native mechanism substrate plus a
 result-driven, resumable policy kernel. Comparative evaluation is an optional
-mechanism a policy requests, never a universal activation gate. This is the
-third correction pass on the Phase-A PR: it makes run identity exact,
-verification pure/closed/complete, command and policy identity strict,
-effect/budget semantics honest and restart-safe, the CAS + surface catalog
-hardened, and keeps every mutation (including operator reverts) on the
-command path.
+mechanism a policy requests, never a universal activation gate.
 
-### Correction pass (what changed since the last review)
+### Correctness pass 2 (what changed since the last review)
+
+- **Verification is closed AND deep.** Every envelope's run AND task scope is
+  checked; a duplicate intent is rejected even with the same digest; every
+  effect/annotation/terminal/checkpoint must cite an ISSUED, compatible command
+  in valid order; every referenced ref (command payload, result, policy-state,
+  observation, proposal, config, budget, prompt, surface, state) is
+  decoded/hash-verified, not merely `has()`-checked; proposal/change ids agree
+  with their refs; a revert must follow one unreverted apply and equal its
+  EXACT inverse; a checkpoint's cursor must name a command whose terminal it
+  reduced. Verification stays pure and exposes no state on error.
+- **Run discovery is crash-safe.** `PolicyBound` is authoritative; the
+  `<run>.binding.json` index is a DERIVED cache. `ensure_binding`/`discover`
+  rebuild it after a crash between the event and the index write, cross-check
+  its `run_id`, and quarantine a divergent index rather than invalidating a
+  valid event stream. `bind_policy` preflights every bound ref + seed invariant.
+- **Command exactness + concurrency.** An exclusive per-run advisory LEASE
+  stops two processes executing one run concurrently; a same-id/same-digest
+  issue is an idempotent read (no second intent); the initial and reconstructed
+  `CommandResult` (including `head`) are identical (the command's canonical head
+  is a stable pre-terminal point); `expected_state_ref` is a LOGICAL
+  harness-state precondition (robust to intervening non-state events) and is
+  excluded from the command's identity digest so re-derivation stays stable.
+- **Honest budgets/effects.** Per-command usage (including failed/partial) is
+  persisted in the terminal result and re-seeded from EVERY completed command
+  on restart — no reset, no double-absorption; sandbox limits are capped by
+  remaining wall/output budget; a fork records its base and candidate attempts
+  SEPARATELY with actual provenance, failure, denials, usage, and state ref; a
+  dispatch with no recoverable durable result is recorded `indeterminate` and
+  requires an explicit retry (never a silent re-dispatch).
+- **CAS + extensibility hardened.** `put_text` verifies a preexisting object
+  (corruption is loud); invalid UTF-8 is `ObjectCorruption`; a change's
+  referenced surface artifacts are validated even when already shared, and
+  unrelated staged blobs are rejected. Surfaces are pinned PER RUN as versioned
+  `SurfaceDescriptorSnapshot` refs (validator name + IMPLEMENTATION digest):
+  adding a catalog surface never invalidates an old run, and a validator
+  implementation change is detected as drift. Task identity now includes the
+  signature, primitive catalog, and SCORER semantics; policy identity is the
+  full policy MODULE, not just the class source.
+- **Operator/package papercuts.** The CLI catches sandbox/config errors
+  cleanly; state/config decode strictly and reject unknown TOML fields; the
+  wheel is BUILT, INSTALLED into an isolated venv, and the real `strive` script
+  is invoked end to end (build/install failures fail the test, never skip).
+
+### Correctness pass 1 (earlier in this PR)
 
 - **Exact run identity.** Run ids are opaque validated tokens (no separators,
   no `..`); the task is discovered from a persisted `RunBinding` index, never
@@ -53,18 +92,23 @@ command path.
   (`<root>/runs/<run_id>.events`), CAS shared at `<root>/objects`. Composite
   `HarnessState`; coupled `CompositeChange` (exact before/after, invertible);
   `EventEnvelope` (stable `<run_id>#<seq>` id, run/task scope, `caused_by`,
-  timestamp, CAS body ref). `verify()` → `VerifiedSubstrateView` checks
-  framing, one leading `PolicyBound`, CAS closure, canonical/allowlisted
-  bindings, an EXACT apply/revert replay, command lifecycle + one terminal +
-  one payload digest per command id, checkpoint agreement, observation
-  subjects, and change-id uniqueness. Authority appends verify first and are
-  head-checked; a structural/semantic error refuses mutation. `repair`
-  quarantines only a torn/forged tail (semantic corruption is refused, not
-  auto-quarantined).
+  timestamp, CAS body ref). `verify()` → `VerifiedSubstrateView` is pure and
+  closed: framing, one leading `PolicyBound`, per-envelope run/task scope,
+  decode/hash-verify of every referenced ref, catalogued/validated bindings, an
+  EXACT apply/revert replay (recomputed without writing CAS), causation
+  (every effect/terminal/checkpoint cites an issued compatible command in
+  order), one intent + one terminal + one digest per command id, revert =
+  exact inverse of one unreverted apply, and checkpoint state+cursor agreement.
+  Authority appends verify first and are head-checked; a per-run advisory lease
+  serializes runners. `repair` quarantines only a torn/forged tail. The
+  `<run>.binding.json` index is DERIVED (rebuilt/quarantined by
+  `ensure_binding`/`discover`), never part of stream validity.
 - **`strive.surfaces`** — the injected immutable `SurfaceCatalog`
   (`SurfaceDescriptor` per legal surface) and trusted structural validators
-  (`validate_solve_code`, `validate_prompt`); its `descriptor_digest()` is
-  pinned per run.
+  (`validate_solve_code`, `validate_prompt`). A run pins one
+  `SurfaceDescriptorSnapshot` (validator name + implementation digest) PER
+  surface, so catalog growth never invalidates old runs and validator drift is
+  detected.
 - **`strive.policy`** — `AdaptationPolicy[Config, State]` (`next_command` +
   `reduce`, `decode_state`) and `SurfaceStrategy`; the closed command
   vocabulary; immutable `RunView`; injected immutable `PolicyCatalog` with a
@@ -92,29 +136,27 @@ model refiner arrive with `continual-refine@1`.
 
 ### Verification
 
-- `uv run pytest` — 159 tests. The Phase-A floor (substrate verified view,
-  missing-CAS + semantic-corruption refusal, concurrent heads, multiple runs,
-  exact revert; kernel happy path + identity/seed mismatch + budget + fork
-  reaction + idempotent re-run + crash after every command effect +
-  fork-crash-without-duplicate-execution + crash-before-apply; CLI flow +
-  installed entry point; codec; sandbox) PLUS the correction-pass adversarial
-  matrix: CAS traversal/corruption/concurrent-writers (`test_cas`), surface
-  validators + catalog digest (`test_surfaces`), and `test_adversarial`
-  (run/task spoofing, traversal run ids, hyphenated-task discovery, binding
-  tamper, unknown body kinds, corrupt-but-present CAS hiding state, verify
-  purity, arbitrary/duplicate revert, changed re-derived commands, budget
-  reset/expansion refusal, structurally-invalid seed + staged content), plus
-  a built-wheel package-data + console-script check (`test_packaging`).
+- `uv run pytest` — 178 tests. The Phase-A floor plus the adversarial matrix:
+  CAS traversal / corrupt-but-present / preexisting-corrupt / invalid-UTF-8 /
+  concurrent-writers (`test_cas`); surface validators + catalog digest
+  (`test_surfaces`); and `test_adversarial` — task-scope forgery (envelope +
+  reopen), traversal run ids, hyphenated-task discovery, binding
+  divergence-quarantine and publication-crash rebuild, closed-body-union
+  refusal, corrupt config/result refs hiding state, verify purity,
+  arbitrary/duplicate revert, command/effect kind mismatch, duplicate intents,
+  concurrent runners (lease), failed-command budget persistence, indeterminate
+  effect + no-retry, exact result/head reconstruction, catalog extension +
+  validator drift, task/scorer fingerprint drift, and preexisting-invalid
+  shared surface content. `test_packaging` BUILDS + INSTALLS the wheel in an
+  isolated venv and runs the real `strive` script (never skipped).
 - `uv run mypy` — clean, `--strict`, over 35 files (src + tests).
 - `uv run strive` — installed console script; verified in tests and smoke.
 
 ### The Phase-A claim
 
-Strive has a path-safe, task-bound, semantically closed event/CAS substrate
-and a strictly typed, result-driven kernel: durable state effects reconcile
-exactly, external effects have honest idempotency semantics, budgets survive
-restart, and every policy or operator change passes validated surface and
-command boundaries — exact across concurrency and crashes.
+Strive's event/CAS substrate is pure-verifiable and crash-recoverable; command
+causation, run identity, surfaces, budgets, and external effects remain exact
+or explicitly indeterminate across concurrency, corruption, and restart.
 
 ### Next
 

@@ -1278,3 +1278,69 @@ reset/expansion refusal, invalid seed + staged content), `test_packaging.py`
 Result: 159 tests pass (was 115), `uv run mypy` clean over 35 files (src +
 tests). CLI smoke confirms opaque ids, binding discovery, and budget re-seed
 on resume. PR to be updated; NOT merged — stop for review.
+
+## vNext Phase A — correctness pass 2 (before merge)
+
+Second correctness pass on PR #50. Thesis + promotion-era deletion unchanged;
+did NOT begin continual-refine@1 or Pareto. 178 tests pass; `uv run mypy`
+clean over 35 files.
+
+Area 1 — closed verification (substrate `_verify`). Added per-envelope task
+scope check; duplicate-intent rejection (even same digest); a general
+causation gate (`_CAUSE_COMPAT`) requiring every effect/annotation/terminal/
+checkpoint to cite an ISSUED, kind-compatible command appearing earlier;
+decode/hash-verify of every ref via `get_text`/`codec.loads` (command payload,
+result, policy-state, observation, proposal, config[opaque hash-verify],
+budget[BudgetSpec], prompt, surface content, state) — `has()` no longer
+trusted; proposal/change id↔ref agreement; revert == exact inverse of the one
+unreverted apply (decode both, compare `applied.invert()`); checkpoint cursor
+must be a completed command and self-caused. Still pure (no CAS writes) and
+returns EMPTY state on error.
+
+Area 2 — crash-safe discovery. `RunBinding` is now DERIVED: verify no longer
+errors on a missing/divergent index. New `Substrate.ensure_binding()` reads
+the authoritative in-stream `PolicyBound`, rebuilds a missing index, and
+quarantines (`os.replace` to `.quarantine-*`) a divergent one before
+rewriting. `discover()` learns scope from `_stream_policy_bound()` then
+reconciles; falls back to the index only when its `run_id` matches. `run_policy`
+calls `ensure_binding` on entry. `bind_policy` preflights config/budget/prompt
+refs + validates seed content before appending.
+
+Area 3 — command exactness + concurrency. `Substrate.run_lease()` — non-
+blocking `fcntl.flock` on `<run>.lease`; `run_policy`/`operator_revert` hold it.
+`issue_command` is idempotent for same id+digest (returns the view, no second
+intent). `_run_command` now returns the pre-terminal `head` (stable), stored in
+`_StoredResult.head`, so initial == reconstructed. `expected_head` →
+`expected_state_ref` (logical composite-state ref), compared to `view.state_ref`
+in apply/revert; excluded from the command IDENTITY digest via
+`_command_identity_json` so re-derivation is stable even though the guard value
+advances.
+
+Area 4 — honest budgets/effects. `_StoredResult.usage` (v3) persists per-command
+spend incl. failed/partial; `_seed_meter` sums EVERY completed command's usage
+(not just forks) — no reset/double. `ForkObservation` (v4) now holds two
+`AttemptRecord`s (base/candidate) each with ACTUAL provenance, failure, denials,
+usage, state ref. `_budget_limits` caps `SandboxLimits` by remaining wall/output.
+New `IndeterminateEffect`: `_run_command` records a durable `indeterminate`
+terminal and never silently re-dispatches. Reconcile path absorbs recorded
+usage so the live meter matches durable spend.
+
+Area 5 — CAS + extensibility. `put_text` verifies a preexisting object
+(ObjectCorruption); `get_text` maps invalid UTF-8 → ObjectCorruption.
+`stage_change_closure` rejects unrelated blobs and validates every referenced
+after-content even when already shared. `SurfaceDescriptorSnapshot` (codec) +
+`SurfaceCatalog.snapshots()`/`resolve_pinned()` pin validator NAME + impl digest
+per surface; `PolicyBound.surface_descriptor_refs` (v4) replaces the whole-
+catalog digest, so adding a surface doesn't invalidate old runs and validator
+drift is caught. `Task.fingerprint()` now includes signature/primitive_catalog/
+scorer source; `_policy_digest` hashes the whole policy MODULE.
+
+Area 6 — papercuts. CLI `_cmd_run` + top-level catch SandboxError; TOML config
+rejects unknown keys; `decode_state` strictly validates. `test_packaging` now
+builds the wheel, installs it into an isolated `uv venv`, and runs the real
+`strive` script end to end (fails, never skips, on build/install error).
+
+New tests: expanded `test_cas`, `test_surfaces`, `test_adversarial` (full
+matrix), rewrote `test_packaging`. Updated substrate/kernel/codec tests for the
+new causation discipline (direct callers must issue a compatible, CAS-backed
+command first) and the `expected_state_ref` rename.

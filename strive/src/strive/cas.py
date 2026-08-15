@@ -81,6 +81,15 @@ class ObjectStore:
         ref = _digest(data)
         path = self._path(ref)
         if path.exists():
+            # an existing object is NOT trusted blindly: a preexisting object
+            # whose bytes no longer hash to the ref is corruption, surfaced
+            # loudly rather than silently returning a ref to bad content.
+            existing = path.read_bytes()
+            if _digest(existing) != ref:
+                raise ObjectCorruption(
+                    f"object {ref} already present but corrupt (content hashes "
+                    f"to {_digest(existing)})"
+                )
             return ref
         path.parent.mkdir(parents=True, exist_ok=True)
         # a UNIQUE temp file per writer (concurrent-writer safe), fsynced,
@@ -110,7 +119,14 @@ class ObjectStore:
             raise ObjectCorruption(
                 f"object {ref} failed verification (content hashes to {actual})"
             )
-        return data.decode("utf-8")
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            # a hash-matching object that is not valid UTF-8 is corruption
+            # (every object this store holds is UTF-8 text)
+            raise ObjectCorruption(
+                f"object {ref} is not valid UTF-8: {exc}"
+            ) from None
 
     def has(self, ref: str, *, verify: bool = False) -> bool:
         """Whether `ref` is present. With `verify=True`, also confirm the

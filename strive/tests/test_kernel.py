@@ -92,8 +92,11 @@ def test_full_run_proposes_forks_applies_reverts_exactly(tmp_path: Path) -> None
     obs = next(b for b in _bodies(tmp_path, run) if isinstance(b, ObservationRecorded))
     sub = Substrate.open(tmp_path, TASK.task_id, run)
     fork: ForkObservation = codec.loads(sub.objects.get_text(obs.observation_ref), ForkObservation)
-    assert fork.base_state_ref and fork.candidate_state_ref
+    assert fork.base.state_ref and fork.candidate.state_ref
     assert fork.improved and fork.candidate_overall > fork.base_overall
+    # each attempt records its ACTUAL provenance and metered usage separately
+    assert fork.base.provenance.backend and fork.candidate.provenance.backend
+    assert fork.candidate.usage.executions > 0
 
 
 def test_idempotent_rerun_of_completed_run(tmp_path: Path) -> None:
@@ -220,11 +223,11 @@ def test_crash_before_apply_effect_still_applies_once(
     state = {"fired": False}
     real = Substrate.apply
 
-    def flaky(self: Substrate, *, change: object, caused_by: str, expected_head: object = None) -> object:
+    def flaky(self: Substrate, *, change: object, caused_by: str, expected_state_ref: object = None) -> object:
         if not state["fired"]:
             state["fired"] = True
             raise _Boom("crash before apply effect")
-        return real(self, change=change, caused_by=caused_by, expected_head=expected_head)  # type: ignore[arg-type]
+        return real(self, change=change, caused_by=caused_by, expected_state_ref=expected_state_ref)  # type: ignore[arg-type]
 
     monkeypatch.setattr(Substrate, "apply", flaky)
     with pytest.raises(_Boom):

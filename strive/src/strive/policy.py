@@ -87,16 +87,18 @@ class RequestRefinement:
 
 @dataclass(frozen=True)
 class ApplyChange:
-    """Apply an exact composite change (head-checked). The policy stages the
-    change's new content in `content_blobs` (ref → content, each the pure
-    content address of the delta's `after_ref`); the kernel stages the full
-    closure and verifies it before applying."""
+    """Apply an exact composite change. The policy stages the change's new
+    content in `content_blobs` (ref → content, each the pure content address of
+    the delta's `after_ref`); the kernel stages the full closure and verifies
+    it before applying. `expected_state_ref` (optional) is the LOGICAL composite
+    harness-state ref the policy expects to still hold — robust to intervening
+    non-state-moving events; a stale expectation is a real conflict."""
 
     command_id: str
     change: CompositeChange
     strategy_ref: str
     content_blobs: dict[str, str] = field(default_factory=dict)
-    expected_head: str | None = None
+    expected_state_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -130,7 +132,7 @@ class ConfirmChange:
 class RevertChange:
     command_id: str
     change_id: str
-    expected_head: str | None = None
+    expected_state_ref: str | None = None
 
 
 @dataclass(frozen=True)
