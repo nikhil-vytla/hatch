@@ -157,6 +157,43 @@ thesis:
   operator `RevertChange` command through the kernel, never a direct
   `Substrate.revert`.
 
+## Phase-A correctness pass 2
+
+A second pass closed the remaining correctness gaps before merge, without
+changing the thesis:
+
+- **Verification closed and deep.** `verify()` now checks every envelope's run
+  AND task scope, rejects a duplicate intent even at the same digest, requires
+  every effect/annotation/terminal/checkpoint to cite an ISSUED, kind-compatible
+  command in valid order, decodes/hash-verifies EVERY referenced object (not
+  `has()`), requires proposal/change id↔ref agreement, requires a revert to
+  follow one unreverted apply and equal its EXACT inverse, and ties a
+  checkpoint's cursor to the completed result it reduced — staying pure and
+  exposing no state on error.
+- **Crash-safe derived discovery.** `PolicyBound` is authoritative; the binding
+  index is a rebuildable cache reconciled by `ensure_binding`/`discover`
+  (rebuild-after-publication-crash, run_id cross-check, quarantine-on-divergence)
+  and is NOT part of stream validity. `bind_policy` preflights every bound ref
+  and seed invariant.
+- **Command exactness + concurrency.** A per-run advisory lease serializes
+  runners; a same-id/same-digest issue is an idempotent read; the initial and
+  reconstructed `CommandResult` (incl. `head`) are identical; `expected_state_ref`
+  is a logical precondition excluded from command identity so re-derivation is
+  stable.
+- **Honest budgets/effects.** Per-command usage (incl. failed/partial) is
+  durable and re-seeded from every completed command on restart (no reset /
+  no double-absorption); sandbox limits are capped by the remaining budget; a
+  fork records base and candidate attempts separately with actual
+  provenance/failure/denials/usage/state; a dispatch with no recoverable result
+  is `indeterminate` (explicit retry, never silent re-dispatch).
+- **CAS + versioned extensibility.** `put_text` verifies a preexisting object;
+  invalid UTF-8 is corruption; referenced surface artifacts are validated even
+  when shared and unrelated staged blobs are refused. A run pins versioned
+  per-surface descriptor snapshots (validator name + implementation digest), so
+  catalog growth never invalidates old runs and validator drift is detected.
+  Task identity includes signature/catalog/scorer semantics; policy identity is
+  the full policy module.
+
 ## Sources: borrowed / rejected / deferred
 
 - **Borrowed** — exo (note 04): durable adaptation mechanisms + journaled

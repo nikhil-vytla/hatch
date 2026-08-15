@@ -55,7 +55,7 @@ ROUND_TRIP_SAMPLES = [
         seed_state_ref="ef" * 32,
         budget_ref="be" * 32,
         required_capabilities=("network-isolation",),
-        surface_catalog_digest="ca" * 32,
+        surface_descriptor_refs={"strategy-code/solve": "ca" * 32},
         run_metadata={"model": "none"},
     ),
     ChangeApplied(

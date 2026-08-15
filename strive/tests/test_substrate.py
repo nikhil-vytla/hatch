@@ -13,6 +13,7 @@ import pytest
 
 from strive import codec
 from strive.cas import hash_text
+from strive.contracts import BudgetSpec
 from strive.substrate import (
     ChangeApplied,
     CompositeChange,
@@ -51,7 +52,7 @@ def _bind(sub: Substrate) -> None:
         config_ref=sub.objects.put_text("cfg"),
         prompt_refs={"refine": sub.objects.put_text("prompt-md")},
         seed=1, seed_state=seed,
-        budget_ref=sub.objects.put_text("budget"),
+        budget_ref=sub.put(BudgetSpec()),  # budget must decode as a BudgetSpec
         required_capabilities=(),
         run_metadata={"model": "none"},
     )
@@ -91,12 +92,30 @@ def test_apply_replays_and_revert_restores_exactly(tmp_path: Path) -> None:
     _bind(sub)
     seed_ref = sub.verify().state_ref
     change, blobs = _change(sub, code=_code(1), prompt="new proposal template")
+    # effects must cite an issued, compatible command (valid causation)
+    sub.issue_command(command_id="cmd-apply", command_kind="ApplyChange", command_ref=sub.objects.put_text("pl-apply"))
     sub.stage_change_closure(change, blobs)
     view = sub.apply(change=change, caused_by="cmd-apply")
     assert view.ok and "c1" in view.applied_change_ids
+    sub.issue_command(command_id="cmd-revert", command_kind="RevertChange", command_ref=sub.objects.put_text("pl-revert"))
     view = sub.revert(change_id="c1", caused_by="cmd-revert")
     assert view.ok and "c1" in view.reverted_change_ids
     assert view.state_ref == seed_ref  # reverted EXACTLY to the seed
+
+
+def test_expected_state_ref_guard(tmp_path: Path) -> None:
+    """expected_state_ref is LOGICAL: a wrong expected state is a conflict, and
+    the CORRECT current state ref is accepted (the field works)."""
+    sub = _open(tmp_path)
+    _bind(sub)
+    change, blobs = _change(sub, code=_code(1), prompt="new proposal template")
+    sub.issue_command(command_id="cmd-apply", command_kind="ApplyChange", command_ref=sub.objects.put_text("pl-apply"))
+    sub.stage_change_closure(change, blobs)
+    with pytest.raises(SubstrateError, match="stale apply"):
+        sub.apply(change=change, caused_by="cmd-apply", expected_state_ref="0" * 64)
+    current = sub.verify().state_ref
+    view = sub.apply(change=change, caused_by="cmd-apply", expected_state_ref=current)
+    assert "c1" in view.applied_change_ids
 
 
 def test_non_allowlisted_surface_refused(tmp_path: Path) -> None:
@@ -119,40 +138,47 @@ def test_apply_requires_full_cas_closure(tmp_path: Path) -> None:
 def test_stage_closure_rejects_mismatched_content(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    change, _blobs = _change(sub, code=_code(9), prompt="p template")
+    change, blobs = _change(sub, code=_code(9), prompt="p template")
+    # a blob whose ref IS referenced by the change but whose content does not
+    # hash to it (mismatched content, not an unrelated blob)
+    bad = {ref: "not the content" for ref in list(blobs)[:1]}
     with pytest.raises(SubstrateError, match="does not hash to its ref"):
-        sub.stage_change_closure(change, {"aa" * 32: "not the content"})
+        sub.stage_change_closure(change, bad)
 
 
 def test_command_id_reuse_with_different_payload_fails_closed(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    sub.issue_command(command_id="k", command_kind="X", command_ref="aa" * 32)
+    sub.issue_command(command_id="k", command_kind="X", command_ref=sub.objects.put_text("pl1"))
     with pytest.raises(SubstrateError, match="reused with a different payload"):
-        sub.issue_command(command_id="k", command_kind="X", command_ref="bb" * 32)
+        sub.issue_command(command_id="k", command_kind="X", command_ref=sub.objects.put_text("pl2"))
 
 
 def test_duplicate_terminal_completion_refused(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    sub.issue_command(command_id="k", command_kind="X", command_ref="aa" * 32)
+    sub.issue_command(command_id="k", command_kind="X", command_ref=sub.objects.put_text("pl1"))
     sub.complete_command(command_id="k", outcome="ok", result=None)
     with pytest.raises(SubstrateError, match="already has a terminal completion"):
         sub.complete_command(command_id="k", outcome="ok", result=None)
 
 
-def test_concurrent_heads_conflict(tmp_path: Path) -> None:
+def test_stale_expected_state_after_concurrent_apply(tmp_path: Path) -> None:
     root = tmp_path / "root"
     run = new_run_id()
     a = Substrate.open(root, TASK, run)
     _bind(a)
-    stale = a.verify().head
+    seed_ref = a.verify().state_ref  # the state B will (stalely) expect
+    change, blobs = _change(a, code=_code(2), prompt="q template")
+    a.issue_command(command_id="a-apply", command_kind="ApplyChange", command_ref=a.objects.put_text("pl-a"))
+    a.stage_change_closure(change, blobs)
+    a.apply(change=change, caused_by="a-apply")  # A moves the logical state
     b = Substrate.open(root, TASK, run)  # a second handle on the same run
-    a.confirm_change(change_id="none", rationale="advance", caused_by="cmd")  # a advances
-    change, blobs = _change(b, code=_code(2), prompt="q template")
-    b.stage_change_closure(change, blobs)
-    with pytest.raises(SubstrateError, match="stale|advanced"):
-        b.apply(change=change, caused_by="c", expected_head=stale)
+    other, other_blobs = _change(b, code=_code(3), prompt="r template")
+    b.issue_command(command_id="b-apply", command_kind="ApplyChange", command_ref=b.objects.put_text("pl-b"))
+    b.stage_change_closure(other, other_blobs)
+    with pytest.raises(SubstrateError, match="stale"):
+        b.apply(change=other, caused_by="b-apply", expected_state_ref=seed_ref)
 
 
 def test_multiple_runs_under_one_root_are_independent(tmp_path: Path) -> None:

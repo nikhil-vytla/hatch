@@ -30,6 +30,7 @@ from strive.contracts import BudgetSpec
 from strive.kernel import KernelError, KernelServices, operator_revert, run_policy
 from strive.policy import default_catalog
 from strive.policies import manual_change as mc
+from strive.sandboxes import SandboxError
 from strive.substrate import Substrate, SubstrateError, new_run_id
 from strive.surfaces import SurfaceValidationError
 from strive.tasks import TASKS
@@ -67,9 +68,9 @@ def _cmd_run(args: argparse.Namespace) -> dict[str, Any]:
             sandbox_backend=args.backend, trusted=trusted,
             budget=BudgetSpec(executions=args.executions),
         )
-    except KernelError as exc:
+        config = mc.load_config(args.config or mc.DEFAULT_CONFIG_PATH)
+    except (KernelError, SandboxError, SubstrateError, SurfaceValidationError) as exc:
         raise CliError(str(exc)) from None
-    config = mc.load_config(args.config or mc.DEFAULT_CONFIG_PATH)
     objects = services.substrate.objects
     seed_state = mc.seed_state(objects, code=task.seed_source, prompt=_BASELINE_PROMPT)
     report = run_policy(
@@ -283,6 +284,7 @@ def main(argv: list[str] | None = None) -> int:
     except (
         CliError, SubstrateError, KernelError, codec.SchemaError,
         ObjectCorruption, ObjectMissing, InvalidRef, SurfaceValidationError,
+        SandboxError,
     ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:

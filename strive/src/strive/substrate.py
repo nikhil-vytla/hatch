@@ -39,27 +39,41 @@ is explicit (`repair`), never silent.
 
 from __future__ import annotations
 
+import fcntl
 import os
 import re
 import tempfile
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping
+from typing import Iterator, Mapping
 
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
+from strive.contracts import BudgetSpec
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramingError
 from strive.surfaces import (
     SurfaceCatalog,
+    SurfaceDescriptorSnapshot,
     SurfaceValidationError,
     default_surface_catalog,
 )
 
-SUBSTRATE_STREAM = "strive-substrate@3"
+SUBSTRATE_STREAM = "strive-substrate@4"
+
+# which command kind may CAUSE each effect/annotation body (valid causation)
+_CAUSE_COMPAT: dict[str, set[str]] = {
+    "change-proposed@2": {"ApplyChange", "EvaluateFork", "RequestRefinement"},
+    "change-applied@2": {"ApplyChange"},
+    "change-reverted@2": {"RevertChange"},
+    "observation-recorded@2": {"EvaluateFork"},
+    "change-confirmed@2": {"ConfirmChange"},
+    "change-revised@2": {"RequestRefinement"},
+}
 
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -210,15 +224,17 @@ def apply_change(
 # -- event bodies (typed; the envelope carries id/scope/causation/time) ---------------------------
 
 
-@register("policy-bound", 3)
+@register("policy-bound", 4)
 @dataclass(frozen=True)
 class PolicyBound:
     """AUTHORITY + identity. Pins EVERYTHING that defines this run: the task
     id and its spec fingerprint, the policy implementation ref + package
     digest, the exact frozen config, versioned prompt refs, seed, the SEED
     composite state, the pinned budget spec, the required sandbox/semantic
-    capability profile, and the surface catalog digest. Model/provider is
-    `run_metadata` (reproducibility), NOT identity."""
+    capability profile, and — PER SURFACE — the CAS ref of a pinned
+    `SurfaceDescriptorSnapshot` (so adding a catalog surface never invalidates
+    this run, and a validator implementation change is detected as drift).
+    Model/provider is `run_metadata` (reproducibility), NOT identity."""
 
     task_id: str
     task_fingerprint: str
@@ -230,17 +246,18 @@ class PolicyBound:
     seed_state_ref: str
     budget_ref: str
     required_capabilities: tuple[str, ...]
-    surface_catalog_digest: str
+    surface_descriptor_refs: dict[str, str]  # "kind/name" -> descriptor snapshot ref
     run_metadata: dict[str, str]
 
 
-@register("run-binding", 1)
+@register("run-binding", 2)
 @dataclass(frozen=True)
 class RunBinding:
-    """The discovery index mirror of `PolicyBound`, persisted at
-    ``<root>/runs/<run_id>.binding.json``. Lets a tool learn a run's task
-    WITHOUT string-parsing the run id, and is cross-checked against the
-    authoritative in-stream `PolicyBound` on every verify."""
+    """The DERIVED discovery index for a run, persisted at
+    ``<root>/runs/<run_id>.binding.json``. It lets a tool learn a run's task
+    WITHOUT string-parsing the run id. It is NOT authoritative: `PolicyBound`
+    in the event stream is. It is rebuildable from the stream, and a divergent
+    index is quarantined and rebuilt rather than invalidating a valid stream."""
 
     run_id: str
     task_id: str
@@ -253,7 +270,7 @@ class RunBinding:
     seed_state_ref: str
     budget_ref: str
     required_capabilities: tuple[str, ...]
-    surface_catalog_digest: str
+    surface_descriptor_refs: dict[str, str]
 
     @staticmethod
     def of(run_id: str, bound: PolicyBound) -> "RunBinding":
@@ -269,7 +286,7 @@ class RunBinding:
             seed_state_ref=bound.seed_state_ref,
             budget_ref=bound.budget_ref,
             required_capabilities=tuple(bound.required_capabilities),
-            surface_catalog_digest=bound.surface_catalog_digest,
+            surface_descriptor_refs=dict(bound.surface_descriptor_refs),
         )
 
     def agrees_with(self, bound: PolicyBound) -> bool:
@@ -484,21 +501,66 @@ class Substrate:
         root: Path, run_id: str, *, catalog: SurfaceCatalog | None = None
     ) -> "Substrate":
         """Open a run WITHOUT being told its task — the task id comes from the
-        binding index (never from parsing the run id)."""
+        DERIVED binding index (never from parsing the run id). The authoritative
+        source is the in-stream `PolicyBound`: if the index is missing it is
+        rebuilt, and a divergent index (or one whose run_id disagrees with the
+        opened run) is quarantined and rebuilt rather than trusted. A crash
+        between the `PolicyBound` event and the index write is thus recovered."""
         validate_run_id(run_id)
+        # first, learn the scope authoritatively from the stream's PolicyBound.
+        peek = Substrate.open(root, "", run_id, catalog=catalog)
+        stream_bound = peek._stream_policy_bound()
+        if stream_bound is not None:
+            sub = Substrate.open(root, stream_bound.task_id, run_id, catalog=catalog)
+            sub.ensure_binding()  # rebuild/quarantine the derived index as needed
+            return sub
+        # no PolicyBound yet: trust the derived index only as a hint, and only
+        # if its run_id matches the run we were asked to open.
         binding = _read_binding(root, run_id)
-        if binding is not None:
+        if binding is not None and binding.run_id == run_id:
             return Substrate.open(root, binding.task_id, run_id, catalog=catalog)
-        # no binding yet: peek the stream's first envelope for scope
-        sub = Substrate.open(root, "", run_id, catalog=catalog)
-        framed = sub.journal.read()
+        raise SubstrateError(
+            f"cannot discover task for run {run_id!r}: no bound event and no "
+            "matching binding index"
+        )
+
+    def _stream_policy_bound(self) -> "PolicyBound | None":
+        """Read the FIRST envelope's body if it is a PolicyBound (authoritative
+        scope), tolerating an otherwise-unverifiable tail. Returns None for an
+        empty/unbound stream."""
+        framed = self.journal.read()
         for entry in framed.entries:
             assert isinstance(entry, EventEnvelope)
-            return Substrate.open(root, entry.task_id, run_id, catalog=catalog)
-        raise SubstrateError(
-            f"cannot discover task for run {run_id!r}: no binding index and an "
-            "empty stream"
-        )
+            body: object
+            try:
+                body = codec.loads(self.objects.get_text(entry.body_ref))
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+                return None
+            return body if isinstance(body, PolicyBound) else None
+        return None
+
+    def ensure_binding(self) -> str | None:
+        """Reconcile the DERIVED binding index against the authoritative
+        in-stream `PolicyBound`. Rebuilds a missing index (crash between the
+        event and the index write); quarantines a divergent or run_id-mismatched
+        index and rewrites the correct one. Never touches the event stream.
+        Returns a quarantine path when one was taken, else None."""
+        bound = self._stream_policy_bound()
+        if bound is None:
+            return None
+        expected = RunBinding.of(self.run_id, bound)
+        existing = _read_binding(self.root, self.run_id)
+        if existing == expected:
+            return None
+        quarantine: str | None = None
+        path = self._binding_path()
+        if path.exists():
+            quarantine = str(
+                path.with_name(path.name + f".quarantine-{now_iso().replace(':', '')}")
+            )
+            os.replace(path, quarantine)  # preserve the divergent index
+        self._write_binding(expected)
+        return quarantine
 
     @staticmethod
     def list_runs(root: Path) -> list[str]:
@@ -512,6 +574,33 @@ class Substrate:
 
     def _binding_path(self) -> Path:
         return self.root / "runs" / f"{self.run_id}.binding.json"
+
+    def _lease_path(self) -> Path:
+        return self.root / "runs" / f"{self.run_id}.lease"
+
+    @contextmanager
+    def run_lease(self) -> Iterator[None]:
+        """An exclusive, advisory RUN lease so two processes cannot drive (and
+        execute commands for) the same run concurrently. Non-blocking: a second
+        holder fails closed rather than racing. Released on exit/crash (the OS
+        drops the flock when the fd closes)."""
+        path = self._lease_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle = path.open("a")
+        try:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                raise SubstrateError(
+                    f"run {self.run_id!r} is already being driven by another "
+                    "process (run lease held) — refusing concurrent execution"
+                ) from None
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
 
     # -- CAS --------------------------------------------------------------
 
@@ -580,6 +669,19 @@ class Substrate:
         self._require_ok(view, "bind")
         if view.bound is not None:
             raise SubstrateError("this run is already bound to a policy")
+        # PREFLIGHT every bound ref before appending an authoritative event:
+        # config is hash-verified (opaque to the substrate; the KERNEL decodes
+        # it), budget must decode as a BudgetSpec, prompts hash-verify.
+        try:
+            self.objects.get_text(config_ref)
+            codec.loads(self.objects.get_text(budget_ref), BudgetSpec)
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            raise SubstrateError(f"bound config/budget ref invalid: {exc}") from None
+        for role, ref in prompt_refs.items():
+            try:
+                self.objects.get_text(ref)
+            except (ObjectMissing, ObjectCorruption) as exc:
+                raise SubstrateError(f"bound prompt {role!r} ref invalid: {exc}") from None
         # trusted structural validation of every seed binding BEFORE seeding
         for binding in seed_state.bindings:
             if not self.catalog.allows(binding.kind, binding.name):
@@ -595,6 +697,13 @@ class Substrate:
                 raise SubstrateError(
                     f"seed binding {(binding.kind, binding.name)} invalid: {exc}"
                 ) from None
+        # pin a versioned descriptor snapshot ref for every catalog surface, so
+        # later catalog additions never invalidate this run and a validator
+        # implementation change is detectable as drift.
+        surface_descriptor_refs = {
+            key: self.put(snapshot)
+            for key, snapshot in self.catalog.snapshots().items()
+        }
         record = PolicyBound(
             task_id=self.task_id,
             task_fingerprint=task_fingerprint,
@@ -606,11 +715,11 @@ class Substrate:
             seed_state_ref=self.put_state(seed_state),
             budget_ref=budget_ref,
             required_capabilities=tuple(required_capabilities),
-            surface_catalog_digest=self.catalog.descriptor_digest(),
+            surface_descriptor_refs=surface_descriptor_refs,
             run_metadata=dict(run_metadata),
         )
         updated = self._emit(record, caused_by=None, view=view)
-        # persist the discovery index AFTER the authoritative event exists
+        # persist the DERIVED discovery index AFTER the authoritative event
         self._write_binding(RunBinding.of(self.run_id, record))
         return updated
 
@@ -643,12 +752,16 @@ class Substrate:
         view = self.verify()
         self._require_ok(view, "issue-command")
         prior = view.issued.get(command_id)
-        if prior is not None and prior.command_ref != command_ref:
-            raise SubstrateError(
-                f"command id {command_id!r} reused with a different payload "
-                f"digest ({prior.command_ref[:12]}… vs {command_ref[:12]}…) — "
-                "fail closed"
-            )
+        if prior is not None:
+            if prior.command_ref != command_ref:
+                raise SubstrateError(
+                    f"command id {command_id!r} reused with a different payload "
+                    f"digest ({prior.command_ref[:12]}… vs {command_ref[:12]}…) — "
+                    "fail closed"
+                )
+            # same id + same digest: an IDEMPOTENT READ, not a second intent —
+            # never append a duplicate PolicyCommandIssued.
+            return view
         return self._emit(
             PolicyCommandIssued(command_id, command_kind, command_ref),
             caused_by=command_id, view=view,
@@ -697,8 +810,10 @@ class Substrate:
 
     def stage_change_closure(self, change: CompositeChange, blobs: dict[str, str]) -> None:
         """Stage EXACTLY the CAS objects a change references, verifying each
-        blob hashes to the ref the change points at AND passes the surface's
-        trusted structural validator. Full closure is required before apply."""
+        blob hashes to its ref. Reject any UNRELATED staged blob. Then validate
+        EVERY referenced surface artifact structurally — even one already
+        present in the shared CAS — so a change can never install content that
+        would fail its surface's validator."""
         validate_change(change, self.catalog)
         after_surface = {
             d.after_ref: (d.kind, d.name)
@@ -706,19 +821,17 @@ class Substrate:
             if d.after_ref is not None
         }
         needed = change.referenced_refs()
+        unrelated = set(blobs) - needed
+        if unrelated:
+            raise SubstrateError(
+                f"refusing unrelated staged blob(s) not referenced by change "
+                f"{change.change_id!r}: {sorted(r[:12] for r in unrelated)}"
+            )
         for ref, content in blobs.items():
             if hash_text(content) != ref:
                 raise SubstrateError(
                     f"staged content does not hash to its ref {ref[:12]}…"
                 )
-            if ref in after_surface:
-                kind, name = after_surface[ref]
-                try:
-                    self.catalog.validate_content(kind, name, content)
-                except SurfaceValidationError as exc:
-                    raise SubstrateError(
-                        f"staged content for {(kind, name)} is invalid: {exc}"
-                    ) from None
             self.objects.put_text(content)
         missing = {ref for ref in needed if not self.objects.has(ref)}
         if missing:
@@ -726,19 +839,31 @@ class Substrate:
                 f"change {change.change_id!r} references CAS objects not "
                 f"staged: {sorted(r[:12] for r in missing)}"
             )
+        # validate EVERY referenced surface artifact, incl. ones already shared
+        for ref, (kind, name) in after_surface.items():
+            try:
+                self.catalog.validate_content(kind, name, self.objects.get_text(ref))
+            except (SurfaceValidationError, ObjectMissing, ObjectCorruption) as exc:
+                raise SubstrateError(
+                    f"referenced content for {(kind, name)} is invalid: {exc}"
+                ) from None
 
     def apply(
         self, *, change: CompositeChange, caused_by: str,
-        expected_head: str | None = None,
+        expected_state_ref: str | None = None,
     ) -> VerifiedSubstrateView:
         view = self.verify()
         self._require_ok(view, "apply")
         if view.bound is None:
             raise SubstrateError("cannot apply before the policy is bound")
-        if expected_head is not None and expected_head != view.head:
+        # expected-state is LOGICAL (the composite harness state ref), so it is
+        # robust to intervening non-state-moving events (proposals, the kernel's
+        # own intent). A stale expected state is a real conflict.
+        if expected_state_ref is not None and expected_state_ref != view.state_ref:
             raise SubstrateError(
-                f"stale apply: authorized at head {expected_head.split(':')[0]} "
-                f"but the run is at {view.head.split(':')[0]}"
+                f"stale apply: authorized against state "
+                f"{str(expected_state_ref)[:12]!r} but the run's state is "
+                f"{str(view.state_ref)[:12]!r}"
             )
         validate_change(change, self.catalog)  # catalog / shape before apply
         for ref in change.referenced_refs():
@@ -782,14 +907,15 @@ class Substrate:
         )
 
     def revert(
-        self, *, change_id: str, caused_by: str, expected_head: str | None = None,
+        self, *, change_id: str, caused_by: str, expected_state_ref: str | None = None,
     ) -> VerifiedSubstrateView:
         view = self.verify()
         self._require_ok(view, "revert")
-        if expected_head is not None and expected_head != view.head:
+        if expected_state_ref is not None and expected_state_ref != view.state_ref:
             raise SubstrateError(
-                f"stale revert: authorized at head {expected_head.split(':')[0]} "
-                f"but the run is at {view.head.split(':')[0]}"
+                f"stale revert: authorized against state "
+                f"{str(expected_state_ref)[:12]!r} but the run's state is "
+                f"{str(view.state_ref)[:12]!r}"
             )
         if change_id not in view.applied_change_ids:
             raise SubstrateError(f"no applied change {change_id!r} to revert")
@@ -885,6 +1011,11 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
             errors.append(f"envelope {index} has seq {env.seq}, expected {index + 1}")
         if env.run_id != sub.run_id:
             errors.append(f"envelope {env.seq} run_id {env.run_id!r} != {sub.run_id!r}")
+        if env.task_id != sub.task_id:
+            errors.append(
+                f"envelope {env.seq} task_id {env.task_id!r} != {sub.task_id!r} "
+                "(cross-task scope forgery)"
+            )
         if env.event_id != f"{sub.run_id}#{env.seq}":
             errors.append(f"envelope {env.seq} has non-canonical id {env.event_id!r}")
         body: object
@@ -926,39 +1057,37 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
     bound = bodies[0]
     assert isinstance(bound, PolicyBound)
 
-    # the binding index must exist and AGREE with the authoritative event
+    # bound task scope must match the opened run. The binding index is DERIVED
+    # (reconciled by discover/ensure_binding) and is deliberately NOT part of
+    # stream validity — a valid stream is never invalidated by a missing index.
     if bound.task_id != sub.task_id:
         errors.append(
             f"bound task id {bound.task_id!r} disagrees with the opened scope "
             f"{sub.task_id!r}"
         )
-    if bound.surface_catalog_digest != sub.catalog.descriptor_digest():
-        errors.append(
-            "bound surface-catalog digest disagrees with the injected catalog — "
-            "the run's legal surfaces/validators changed underneath it"
-        )
-    binding = _read_binding(sub.root, sub.run_id)
-    if binding is None:
-        errors.append("run binding index is missing (never established)")
-    elif not binding.agrees_with(bound):
-        errors.append("run binding index disagrees with the authoritative PolicyBound")
 
-    # CAS closure of the bound identity
-    for ref, what in [
-        (bound.config_ref, "config"),
-        (bound.seed_state_ref, "seed state"),
-        (bound.budget_ref, "budget spec"),
-    ]:
-        if not sub.objects.has(ref):
-            errors.append(f"bound {what} ref {ref[:12]}… missing from CAS")
+    # decode + hash-verify the bound identity refs — has() alone is insufficient
+    try:
+        sub.objects.get_text(bound.config_ref)  # opaque blob; hash-verify only
+    except (ObjectMissing, ObjectCorruption) as exc:
+        errors.append(f"bound config ref unreadable: {exc}")
+    try:
+        codec.loads(sub.objects.get_text(bound.budget_ref), BudgetSpec)
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+        errors.append(f"bound budget ref does not decode: {exc}")
     for role, ref in bound.prompt_refs.items():
-        if not sub.objects.has(ref):
-            errors.append(f"bound prompt {role!r} ref {ref[:12]}… missing from CAS")
+        try:
+            sub.objects.get_text(ref)
+        except (ObjectMissing, ObjectCorruption) as exc:
+            errors.append(f"bound prompt {role!r} ref unreadable: {exc}")
+
+    # resolve the run's PINNED surface descriptor snapshots (version-safe)
+    pinned = _load_pinned_snapshots(sub, bound, errors)
 
     seed_state = EMPTY_STATE
     try:
         seed_state = sub._load_state(bound.seed_state_ref)
-        _verify_state(sub, seed_state, "seed state", errors)
+        _verify_state(sub, seed_state, "seed state", errors, pinned)
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
         errors.append(f"seed state unreadable: {exc}")
 
@@ -970,67 +1099,134 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
     latest_checkpoint: PolicyCheckpointed | None = None
     applied_ids: set[str] = set()
     reverted_ids: set[str] = set()
-    seen_change_ids: set[str] = set()
+    applied_changes: dict[str, CompositeChange] = {}
 
     for env, body in zip(envelopes[1:], bodies[1:], strict=True):
+        kind = env.body_kind
         if isinstance(body, PolicyBound):
             errors.append(f"envelope {env.seq}: a second PolicyBound")
-        elif isinstance(body, PolicyCommandIssued):
-            prior = issued.get(body.command_id)
-            if prior is not None and prior.command_ref != body.command_ref:
+            continue
+        if isinstance(body, PolicyCommandIssued):
+            # duplicate intents are REJECTED even with the same digest
+            if body.command_id in issued:
                 errors.append(
-                    f"command {body.command_id!r} reissued with a different digest"
+                    f"envelope {env.seq}: duplicate intent for command "
+                    f"{body.command_id!r} (issued at most once)"
                 )
+            elif env.caused_by != body.command_id:
+                errors.append(f"envelope {env.seq}: an issue must be self-caused")
+            try:
+                sub.objects.get_text(body.command_ref)  # hash-verify the payload
+            except (ObjectMissing, ObjectCorruption) as exc:
+                errors.append(f"envelope {env.seq}: command payload unreadable: {exc}")
             issued.setdefault(body.command_id, body)
-            if env.caused_by != body.command_id:
-                errors.append(f"envelope {env.seq}: issue causation mismatch")
-        elif isinstance(body, PolicyCommandCompleted):
+            continue
+
+        # every non-bound, non-issue event must cite an ISSUED command that
+        # appears EARLIER (valid order) and is of a COMPATIBLE kind.
+        cause = env.caused_by
+        cause_issue = issued.get(cause) if cause is not None else None
+        if cause is None or cause_issue is None:
+            errors.append(
+                f"envelope {env.seq} ({kind}) does not cite an issued command"
+            )
+        elif kind in _CAUSE_COMPAT and cause_issue.command_kind not in _CAUSE_COMPAT[kind]:
+            errors.append(
+                f"envelope {env.seq}: {kind} caused by incompatible command kind "
+                f"{cause_issue.command_kind!r}"
+            )
+
+        if isinstance(body, PolicyCommandCompleted):
             if body.command_id not in issued:
                 errors.append(f"completion for un-issued command {body.command_id!r}")
             if body.command_id in completed:
                 errors.append(
                     f"command {body.command_id!r} has more than one terminal completion"
                 )
-            if env.caused_by != body.command_id:
-                errors.append(f"envelope {env.seq}: completion causation mismatch")
+            if cause != body.command_id:
+                errors.append(f"envelope {env.seq}: completion must be self-caused")
+            if body.outcome not in ("ok", "failed", "indeterminate"):
+                errors.append(f"envelope {env.seq}: unknown outcome {body.outcome!r}")
+            if body.result_ref is not None:
+                try:
+                    codec.loads(sub.objects.get_text(body.result_ref))
+                except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                    errors.append(f"envelope {env.seq}: result ref does not decode: {exc}")
             completed[body.command_id] = body
-        elif isinstance(body, (ChangeApplied, ChangeReverted)):
+        elif isinstance(body, ChangeApplied):
             new_ref, new_state = _replay(sub, state, state_ref, body, env, errors)
             state, state_ref = new_state, new_ref
             cid = body.change_id
-            if isinstance(body, ChangeApplied):
-                if cid in seen_change_ids:
-                    errors.append(f"change id {cid!r} applied more than once")
-                seen_change_ids.add(cid)
-                applied_ids.add(cid)
-            else:
-                if cid not in applied_ids:
+            if cid in applied_ids:
+                errors.append(f"change id {cid!r} applied more than once")
+            applied_ids.add(cid)
+            change = _decode_change(sub, body.change_ref, env, errors)
+            if change is not None:
+                if change.change_id != cid:
+                    errors.append(f"envelope {env.seq}: applied change id/ref disagree")
+                applied_changes[cid] = change
+        elif isinstance(body, ChangeReverted):
+            new_ref, new_state = _replay(sub, state, state_ref, body, env, errors)
+            state, state_ref = new_state, new_ref
+            cid = body.change_id
+            if cid not in applied_ids:
+                errors.append(
+                    f"envelope {env.seq}: revert of {cid!r} that was never applied"
+                )
+            if cid in reverted_ids:
+                errors.append(f"envelope {env.seq}: duplicate revert of {cid!r}")
+            reverted_ids.add(cid)
+            revert_change = _decode_change(sub, body.revert_change_ref, env, errors)
+            applied = applied_changes.get(cid)
+            if revert_change is not None and applied is not None:
+                if revert_change != applied.invert():
                     errors.append(
-                        f"envelope {env.seq}: revert of {cid!r} that was never applied"
+                        f"envelope {env.seq}: revert is not the EXACT inverse of the "
+                        f"applied change {cid!r}"
                     )
-                if cid in reverted_ids:
-                    errors.append(f"envelope {env.seq}: duplicate revert of {cid!r}")
-                reverted_ids.add(cid)
         elif isinstance(body, PolicyCheckpointed):
             latest_checkpoint = body
+            try:
+                sub.objects.get_text(body.policy_state_ref)  # hash-verify the blob
+            except (ObjectMissing, ObjectCorruption) as exc:
+                errors.append(f"envelope {env.seq}: policy-state ref unreadable: {exc}")
             if body.state_ref != (state_ref or ""):
                 errors.append(
-                    f"envelope {env.seq}: checkpoint state_ref disagrees with "
-                    "the folded state"
+                    f"envelope {env.seq}: checkpoint state_ref disagrees with the "
+                    "folded state"
                 )
+            consumed = body.consumed_command_id
+            if consumed is not None:
+                if consumed not in completed:
+                    errors.append(
+                        f"envelope {env.seq}: checkpoint consumed {consumed!r} which "
+                        "has no terminal result yet"
+                    )
+                if cause != consumed:
+                    errors.append(
+                        f"envelope {env.seq}: checkpoint must be caused by the command "
+                        "it reduced"
+                    )
         elif isinstance(body, ObservationRecorded):
-            if body.subject_state_ref and not sub.objects.has(body.subject_state_ref):
-                errors.append(
-                    f"envelope {env.seq}: observation subject state missing from CAS"
-                )
-            if not sub.objects.has(body.observation_ref):
-                errors.append(
-                    f"envelope {env.seq}: observation body missing from CAS"
-                )
+            for ref, what in [
+                (body.subject_state_ref, "subject state"),
+                (body.observation_ref, "observation body"),
+            ]:
+                if ref:
+                    try:
+                        codec.loads(sub.objects.get_text(ref))
+                    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                        errors.append(f"envelope {env.seq}: {what} does not decode: {exc}")
         elif isinstance(body, ChangeProposed):
-            if not sub.objects.has(body.change_ref):
-                errors.append(f"envelope {env.seq}: proposed change ref missing")
-        # ChangeConfirmed / ChangeRevised / OperationFailed: annotation only
+            proposed = _decode_change(sub, body.change_ref, env, errors)
+            if proposed is not None and proposed.change_id != body.change_id:
+                errors.append(f"envelope {env.seq}: proposed change id/ref disagree")
+        # ChangeConfirmed / ChangeRevised / OperationFailed: annotation (caused-by checked)
+
+    # validate the FINAL folded state's surface content too (catches corruption
+    # or preexisting-invalid content surviving into current state)
+    if state_ref is not None:
+        _verify_state(sub, state, "current state", errors, pinned)
 
     if errors:
         return fail(bound)
@@ -1046,8 +1242,63 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
     )
 
 
+def _load_pinned_snapshots(
+    sub: Substrate, bound: PolicyBound, errors: list[str]
+) -> dict[str, SurfaceDescriptorSnapshot]:
+    pinned: dict[str, SurfaceDescriptorSnapshot] = {}
+    for key, ref in bound.surface_descriptor_refs.items():
+        try:
+            snap = codec.loads(sub.objects.get_text(ref), SurfaceDescriptorSnapshot)
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+            errors.append(f"pinned surface descriptor {key!r} unreadable: {exc}")
+            continue
+        if f"{snap.kind}/{snap.name}" != key:
+            errors.append(f"pinned surface descriptor {key!r} key/content disagree")
+        pinned[key] = snap
+    return pinned
+
+
+def _decode_change(
+    sub: Substrate, ref: str, env: EventEnvelope, errors: list[str]
+) -> CompositeChange | None:
+    try:
+        return codec.loads(sub.objects.get_text(ref), CompositeChange)
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+        errors.append(f"envelope {env.seq}: change ref does not decode: {exc}")
+        return None
+
+
+def _validate_surface_content(
+    sub: Substrate,
+    pinned: dict[str, SurfaceDescriptorSnapshot],
+    kind: str,
+    name: str,
+    content_ref: str,
+    what: str,
+    errors: list[str],
+) -> None:
+    try:
+        content = sub.objects.get_text(content_ref)  # hash-verify + UTF-8
+    except (ObjectMissing, ObjectCorruption) as exc:
+        errors.append(f"{what} binding {(kind, name)} content unreadable: {exc}")
+        return
+    snap = pinned.get(f"{kind}/{name}")
+    if snap is None:
+        errors.append(f"{what} binding {(kind, name)} has no pinned surface descriptor")
+        return
+    try:
+        descriptor = sub.catalog.resolve_pinned(snap)  # refuses validator drift
+        descriptor.validator(content)
+    except SurfaceValidationError as exc:
+        errors.append(f"{what} binding {(kind, name)} invalid: {exc}")
+
+
 def _verify_state(
-    sub: Substrate, state: HarnessState, what: str, errors: list[str]
+    sub: Substrate,
+    state: HarnessState,
+    what: str,
+    errors: list[str],
+    pinned: dict[str, SurfaceDescriptorSnapshot],
 ) -> None:
     seen: set[tuple[str, str]] = set()
     ordered = list(state.bindings)
@@ -1060,8 +1311,10 @@ def _verify_state(
         seen.add(key)
         if not sub.catalog.allows(*key):
             errors.append(f"{what} binding {key} is not in the surface catalog")
-        if not sub.objects.has(binding.content_ref):
-            errors.append(f"{what} binding {key} content missing from CAS")
+        # decode + hash-verify + structurally validate content (even if shared)
+        _validate_surface_content(
+            sub, pinned, binding.kind, binding.name, binding.content_ref, what, errors
+        )
 
 
 def _replay(
@@ -1095,6 +1348,10 @@ def _replay(
         errors.append(
             f"envelope {env.seq}: deterministic application does not equal "
             "the recorded after_state_ref"
+        )
+    elif not sub.objects.has(body.after_state_ref, verify=True):
+        errors.append(
+            f"envelope {env.seq}: recorded after-state object missing/corrupt in CAS"
         )
     return body.after_state_ref, recomputed
 

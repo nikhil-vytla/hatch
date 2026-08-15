@@ -87,6 +87,11 @@ def _require_str(section: dict[str, object], key: str, default: str | None = Non
     return value
 
 
+_ALLOWED_CONFIG_KEYS = frozenset(
+    {"summary", "target_prompt", "target_strategy", "change_id"}
+)
+
+
 def load_config(path: str) -> ManualChangeConfig:
     with open(path, "rb") as handle:
         data = tomllib.load(handle)
@@ -94,6 +99,12 @@ def load_config(path: str) -> ManualChangeConfig:
     if not isinstance(raw, dict):
         raise SubstrateError("manual_change config section is not a table")
     section: dict[str, object] = raw
+    unknown = set(section) - _ALLOWED_CONFIG_KEYS
+    if unknown:
+        raise SubstrateError(
+            f"manual_change config has unknown key(s): {sorted(unknown)} "
+            f"(allowed: {sorted(_ALLOWED_CONFIG_KEYS)})"
+        )
     return ManualChangeConfig(
         summary=_require_str(section, "summary"),
         target_prompt=_require_str(section, "target_prompt"),
@@ -111,12 +122,17 @@ class ManualChangePolicy:
         return ManualChangeState(phase="start")
 
     def decode_state(self, data: object) -> ManualChangeState:
-        assert isinstance(data, dict)
+        if not isinstance(data, dict):
+            raise SubstrateError("manual-change state is not an object")
+        unknown = set(data) - {"phase", "fork_improved"}
+        if unknown:
+            raise SubstrateError(f"manual-change state has unknown key(s): {sorted(unknown)}")
+        if "phase" not in data or not isinstance(data["phase"], str):
+            raise SubstrateError("manual-change state is missing a string 'phase'")
         improved = data.get("fork_improved")
-        return ManualChangeState(
-            phase=str(data["phase"]),
-            fork_improved=None if improved is None else bool(improved),
-        )
+        if improved is not None and not isinstance(improved, bool):
+            raise SubstrateError("manual-change state 'fork_improved' must be bool or null")
+        return ManualChangeState(phase=data["phase"], fork_improved=improved)
 
     def next_command(
         self, config: ManualChangeConfig, state: ManualChangeState, view: RunView
@@ -138,6 +154,9 @@ class ManualChangePolicy:
                     change=change,
                     strategy_ref=STRATEGY_REF,
                     content_blobs=blobs,
+                    # the LOGICAL state the change was built against — robust to
+                    # the kernel's own intervening proposal event.
+                    expected_state_ref=view.state_ref,
                 )
             return StopAdaptation(
                 command_id=f"{rid}:stop-noimprove",
