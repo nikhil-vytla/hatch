@@ -70,6 +70,18 @@ class BudgetMeter:
             recursion_depth=self._recursion_depth,
         )
 
+    def absorb(self, usage: BudgetUsage) -> None:
+        """Seed cumulative spend from durably-recorded prior usage, so a
+        resumed run cannot reset or expand its budget. Wall time is NOT
+        resumed — it is a within-process guard, and each process starts its
+        own wall clock (the durable ceilings are the countable resources)."""
+        self._executions += usage.executions
+        self._model_calls += usage.model_calls
+        self._tokens += usage.tokens
+        self._output_bytes += usage.output_bytes
+        self._cost += usage.cost
+        self._recursion_depth = max(self._recursion_depth, usage.recursion_depth)
+
     def _exhausted(self, what: str, detail: str) -> FailureRecord:
         return FailureRecord(
             kind=FAILURE_BUDGET_EXHAUSTED, detail=f"{what} budget exhausted ({detail})"

@@ -45,11 +45,17 @@ ROUND_TRIP_SAMPLES = [
     HarnessState(bindings=(SurfaceBinding("prompt", "proposal-template", "cd" * 32),)),
     _change(),
     PolicyBound(
+        task_id="sum-integers",
+        task_fingerprint="fp",
         policy_ref="manual-change@1",
+        policy_digest="pd",
         config_ref="ab" * 32,
         prompt_refs={"refine": "cd" * 32},
         seed=7,
         seed_state_ref="ef" * 32,
+        budget_ref="be" * 32,
+        required_capabilities=("network-isolation",),
+        surface_catalog_digest="ca" * 32,
         run_metadata={"model": "none"},
     ),
     ChangeApplied(

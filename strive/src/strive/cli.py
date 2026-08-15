@@ -25,15 +25,19 @@ from pathlib import Path
 from typing import Any
 
 from strive import codec
-from strive.cas import ObjectCorruption, ObjectMissing
+from strive.cas import InvalidRef, ObjectCorruption, ObjectMissing
 from strive.contracts import BudgetSpec
-from strive.kernel import KernelError, KernelServices, run_policy
+from strive.kernel import KernelError, KernelServices, operator_revert, run_policy
 from strive.policy import default_catalog
 from strive.policies import manual_change as mc
 from strive.substrate import Substrate, SubstrateError, new_run_id
+from strive.surfaces import SurfaceValidationError
 from strive.tasks import TASKS
 
-_BASELINE_PROMPT = "Return ONLY a JSON object for {parent_generation_id}."
+_BASELINE_PROMPT = (
+    "Return ONLY a JSON object with keys `summary` and `source` describing the "
+    "revised solve() strategy."
+)
 
 
 class CliError(Exception):
@@ -55,7 +59,7 @@ def _cmd_run(args: argparse.Namespace) -> dict[str, Any]:
     task = TASKS.get(args.task)
     if task is None:
         raise CliError(f"unknown task {args.task!r}; known: {sorted(TASKS)}")
-    run_id = args.run or new_run_id(task.task_id)
+    run_id = args.run or new_run_id()
     trusted = args.backend == "process-fault-only@1"
     try:
         services = KernelServices.open(
@@ -95,9 +99,12 @@ def _cmd_runs(args: argparse.Namespace) -> dict[str, Any]:
 
 def _open_view(root: Path, run: str | None) -> tuple[Substrate, Any]:
     run_id = _resolve_run(root, run)
-    # the run's task id is embedded in the run id (run-<task>-<hex>)
-    task_id = run_id.split("-", 2)[1] if run_id.startswith("run-") else run_id
-    sub = Substrate.open(root, task_id, run_id)
+    # discover the run's task from its binding index — NEVER by string-parsing
+    # the (opaque) run id.
+    try:
+        sub = Substrate.discover(root, run_id)
+    except SubstrateError as exc:
+        raise CliError(str(exc)) from None
     return sub, sub.verify()
 
 
@@ -170,13 +177,25 @@ def _cmd_revert(args: argparse.Namespace) -> dict[str, Any]:
     sub, view = _open_view(args.root, args.run)
     if not view.ok:
         raise CliError(f"run is unverifiable; repair first: {'; '.join(view.errors[:2])}")
+    if view.bound is None:
+        raise CliError("run is not bound to a policy; nothing to revert")
+    task = TASKS.get(view.task_id)
+    if task is None:
+        raise CliError(f"run's task {view.task_id!r} is unknown to this build")
+    # route the mutation through the durable command path (issue → perform →
+    # terminal), NOT a direct Substrate.revert.
     try:
-        updated = sub.revert(change_id=args.change, caused_by=f"cli-revert:{args.change}")
-    except SubstrateError as exc:
+        services = KernelServices.open(args.root, task, view.run_id)
+        result = operator_revert(services, args.change)
+    except (KernelError, SubstrateError) as exc:
         raise CliError(str(exc)) from None
+    if result.outcome != "ok":
+        raise CliError(f"revert failed: {result.detail}")
+    updated = sub.verify()
     return {
-        "data": {"reverted": args.change, "head": updated.head, "state_ref": updated.state_ref},
-        "human": f"reverted {args.change}; state @ {updated.head}",
+        "data": {"reverted": args.change, "command_id": result.command_id,
+                 "head": updated.head, "state_ref": updated.state_ref},
+        "human": f"reverted {args.change} via {result.command_id}; state @ {updated.head}",
     }
 
 
@@ -261,7 +280,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         result = _COMMANDS[args.command](args)
-    except (CliError, SubstrateError, KernelError, codec.SchemaError) as exc:
+    except (
+        CliError, SubstrateError, KernelError, codec.SchemaError,
+        ObjectCorruption, ObjectMissing, InvalidRef, SurfaceValidationError,
+    ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:
             print(json.dumps({"ok": False, "command": args.command, "error": message}))

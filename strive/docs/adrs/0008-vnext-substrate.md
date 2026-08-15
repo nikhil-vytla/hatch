@@ -118,6 +118,45 @@ strive/policies/manual_change.toml     # frozen ManualChangeConfig (TOML)
 strive/policies/prompts/manual_change_refine@1.md   # versioned instructions
 ```
 
+## Phase-A hardening (correction pass)
+
+The Phase-A implementation was hardened before merge without changing the
+thesis:
+
+- **Exact run identity.** Run ids are opaque validated tokens (traversal
+  safe); the task is discovered from a persisted `RunBinding` index, never
+  parsed from the id. `PolicyBound` pins the task fingerprint, policy
+  implementation digest, config, prompts, seed + seed state, budget spec,
+  required capability profile, and surface-catalog digest; resume rejects a
+  disagreeing caller. The binding index is cross-checked against the
+  authoritative in-stream `PolicyBound` on every verify.
+- **`verify()` is pure, closed, and complete.** It never writes CAS (the
+  apply/revert replay recomputes expected refs with `hash_text`), accepts
+  only the closed substrate body union, and additionally checks command
+  causation / one-terminal / one-digest, observation + proposal ref presence,
+  revert-follows-an-unreverted-apply (no arbitrary or duplicate reverts), and
+  the surface-catalog digest. On any error it exposes NO active state.
+- **Strict identity + codecs.** The kernel re-derives each command's payload
+  digest and compares it before both the already-issued and already-completed
+  paths; canonical encoding is strict typed JSON (no `default=str`); config /
+  policy-state blobs pin an encoder version; TOML loading rejects non-string
+  values; public views expose read-only mapping proxies.
+- **Honest effects + restart-safe budgets.** Durable state effects reconcile
+  exactly; a completed fork's base/candidate refs + metered usage are recorded
+  durably and reused on resume (never re-executed or re-charged); the budget
+  spec is content-addressed in `PolicyBound` and cumulative spend is re-seeded
+  from durable usage, so restart cannot reset or expand it; wall + cumulative
+  output are enforced alongside execution count. External model calls
+  (`RequestRefinement`, deferred) are documented as not exactly-once and must
+  record `indeterminate` on a dispatch-without-durable-result crash.
+- **Hardened CAS + injected surface catalog.** Canonical sha256 ref
+  validation (traversal safe), hash-verified reads, concurrent-writer-safe
+  publication (unique temp + fsync + atomic replace); an injected immutable
+  `SurfaceCatalog` with trusted structural validators run before seed/apply.
+- **Mutation stays on the command path.** `strive revert` issues a durable
+  operator `RevertChange` command through the kernel, never a direct
+  `Substrate.revert`.
+
 ## Sources: borrowed / rejected / deferred
 
 - **Borrowed** — exo (note 04): durable adaptation mechanisms + journaled

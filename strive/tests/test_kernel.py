@@ -48,7 +48,7 @@ def _drive(root: Path, run_id: str, *, config: object | None = None) -> RunRepor
     services = _services(root, run_id)
     objects = services.substrate.objects
     cfg = config or mc.load_config(mc.DEFAULT_CONFIG_PATH)
-    seed_state = mc.seed_state(objects, code=_BASELINE, prompt="base {parent_generation_id}")
+    seed_state = mc.seed_state(objects, code=_BASELINE, prompt="base proposal template")
     return run_policy(
         services, default_catalog(), "manual-change@1", cfg,
         prompt_refs=mc.prompt_refs(objects), seed_state=seed_state,
@@ -81,7 +81,7 @@ def test_descriptor_conformance() -> None:
 
 
 def test_full_run_proposes_forks_applies_reverts_exactly(tmp_path: Path) -> None:
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     report = _drive(tmp_path, run)
     assert report.stopped_reason == "manual change complete"
     assert report.usage.executions > 0  # budget charged
@@ -97,7 +97,7 @@ def test_full_run_proposes_forks_applies_reverts_exactly(tmp_path: Path) -> None
 
 
 def test_idempotent_rerun_of_completed_run(tmp_path: Path) -> None:
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     _drive(tmp_path, run)
     before = len(_bodies(tmp_path, run))
     report2 = _drive(tmp_path, run)
@@ -112,10 +112,10 @@ def test_fork_failure_stops_without_applying(tmp_path: Path) -> None:
     # a target that is worse than the baseline on the signed-integer task
     worse = mc.ManualChangeConfig(
         summary="a strictly worse strategy",
-        target_prompt="worse {parent_generation_id}",
+        target_prompt="worse proposal template",
         target_strategy="def solve(input_text: str) -> int:\n    return 0\n",
     )
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     report = _drive(tmp_path, run, config=worse)
     assert "did not improve" in report.stopped_reason
     assert _count(tmp_path, run, ObservationRecorded) == 1
@@ -128,10 +128,10 @@ def test_fork_failure_stops_without_applying(tmp_path: Path) -> None:
 
 
 def test_binding_mismatch_is_rejected(tmp_path: Path) -> None:
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     _drive(tmp_path, run)
     other = mc.ManualChangeConfig(
-        summary="different", target_prompt="x {parent_generation_id}",
+        summary="different", target_prompt="x proposal template",
         target_strategy="def solve(t):\n    return 3\n",
     )
     with pytest.raises(KernelError, match="config does not match"):
@@ -139,7 +139,7 @@ def test_binding_mismatch_is_rejected(tmp_path: Path) -> None:
 
 
 def test_seed_mismatch_is_rejected(tmp_path: Path) -> None:
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     _drive(tmp_path, run)
     services = KernelServices.open(tmp_path, TASK, run, seed=999, budget=BudgetSpec(executions=64))
     objects = services.substrate.objects
@@ -148,7 +148,7 @@ def test_seed_mismatch_is_rejected(tmp_path: Path) -> None:
             services, default_catalog(), "manual-change@1",
             mc.load_config(mc.DEFAULT_CONFIG_PATH),
             prompt_refs=mc.prompt_refs(objects),
-            seed_state=mc.seed_state(objects, code=_BASELINE, prompt="base {parent_generation_id}"),
+            seed_state=mc.seed_state(objects, code=_BASELINE, prompt="base proposal template"),
             run_metadata={},
         )
 
@@ -180,7 +180,7 @@ def _crash_after(monkeypatch: pytest.MonkeyPatch, target_command: str) -> dict[s
 def test_crash_after_each_effect_resumes_exactly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, boundary: str
 ) -> None:
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     state = _crash_after(monkeypatch, boundary)
     with pytest.raises(_Boom):
         _drive(tmp_path, run)
@@ -199,7 +199,7 @@ def test_fork_crash_does_not_duplicate_execution(
 ) -> None:
     """A crash after the fork observation (before completion) must not re-run
     the executor on resume — exactly one fork observation survives."""
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     _crash_after(monkeypatch, "fork")
     with pytest.raises(_Boom):
         _drive(tmp_path, run)
@@ -216,7 +216,7 @@ def test_crash_before_apply_effect_still_applies_once(
 ) -> None:
     """A crash AFTER the intent but BEFORE the apply effect (uncaught) leaves
     no ChangeApplied; resume applies exactly once."""
-    run = new_run_id(TASK.task_id)
+    run = new_run_id()
     state = {"fired": False}
     real = Substrate.apply
 
