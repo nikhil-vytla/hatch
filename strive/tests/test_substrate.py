@@ -30,21 +30,30 @@ from strive.events import now_iso
 TASK = "sum-integers"
 
 
+def _code(ret: int) -> str:
+    return f"def solve(input_text: str) -> int:\n    return {ret}\n"
+
+
 def _open(root: Path, run_id: str | None = None) -> Substrate:
-    return Substrate.open(root, TASK, run_id or new_run_id(TASK))
+    return Substrate.open(root, TASK, run_id or new_run_id())
 
 
 def _bind(sub: Substrate) -> None:
-    code_ref = sub.objects.put_text("def solve(t):\n    return 0\n")
-    prompt_ref = sub.objects.put_text("baseline {parent_generation_id}")
+    code_ref = sub.objects.put_text(_code(0))
+    prompt_ref = sub.objects.put_text("baseline proposal template")
     seed = canonical_state(
         {("strategy-code", "solve"): code_ref, ("prompt", "proposal-template"): prompt_ref}
     )
     sub.bind_policy(
+        task_fingerprint="fp",
         policy_ref="manual-change@1",
+        policy_digest="pd",
         config_ref=sub.objects.put_text("cfg"),
         prompt_refs={"refine": sub.objects.put_text("prompt-md")},
-        seed=1, seed_state=seed, run_metadata={"model": "none"},
+        seed=1, seed_state=seed,
+        budget_ref=sub.objects.put_text("budget"),
+        required_capabilities=(),
+        run_metadata={"model": "none"},
     )
 
 
@@ -81,7 +90,7 @@ def test_apply_replays_and_revert_restores_exactly(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
     seed_ref = sub.verify().state_ref
-    change, blobs = _change(sub, code="def solve(t):\n    return 1\n", prompt="new {parent_generation_id}")
+    change, blobs = _change(sub, code=_code(1), prompt="new proposal template")
     sub.stage_change_closure(change, blobs)
     view = sub.apply(change=change, caused_by="cmd-apply")
     assert view.ok and "c1" in view.applied_change_ids
@@ -94,14 +103,14 @@ def test_non_allowlisted_surface_refused(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
     bad = CompositeChange("bad", (SurfaceDelta("secret-keys", "prod", None, "aa" * 32),), "x")
-    with pytest.raises(SubstrateError, match="not allowlisted"):
+    with pytest.raises(SubstrateError, match="not in the surface catalog"):
         sub.apply(change=bad, caused_by="c")
 
 
 def test_apply_requires_full_cas_closure(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    change, _blobs = _change(sub, code="def solve(t):\n    return 9\n", prompt="p {parent_generation_id}")
+    change, _blobs = _change(sub, code=_code(9), prompt="p template")
     # NOT staged -> after_refs missing from CAS
     with pytest.raises(SubstrateError, match="un-staged CAS object"):
         sub.apply(change=change, caused_by="c")
@@ -110,7 +119,7 @@ def test_apply_requires_full_cas_closure(tmp_path: Path) -> None:
 def test_stage_closure_rejects_mismatched_content(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    change, _blobs = _change(sub, code="def solve(t):\n    return 9\n", prompt="p {parent_generation_id}")
+    change, _blobs = _change(sub, code=_code(9), prompt="p template")
     with pytest.raises(SubstrateError, match="does not hash to its ref"):
         sub.stage_change_closure(change, {"aa" * 32: "not the content"})
 
@@ -134,13 +143,13 @@ def test_duplicate_terminal_completion_refused(tmp_path: Path) -> None:
 
 def test_concurrent_heads_conflict(tmp_path: Path) -> None:
     root = tmp_path / "root"
-    run = new_run_id(TASK)
+    run = new_run_id()
     a = Substrate.open(root, TASK, run)
     _bind(a)
     stale = a.verify().head
     b = Substrate.open(root, TASK, run)  # a second handle on the same run
     a.confirm_change(change_id="none", rationale="advance", caused_by="cmd")  # a advances
-    change, blobs = _change(b, code="def solve(t):\n    return 2\n", prompt="q {parent_generation_id}")
+    change, blobs = _change(b, code=_code(2), prompt="q template")
     b.stage_change_closure(change, blobs)
     with pytest.raises(SubstrateError, match="stale|advanced"):
         b.apply(change=change, caused_by="c", expected_head=stale)
@@ -148,9 +157,9 @@ def test_concurrent_heads_conflict(tmp_path: Path) -> None:
 
 def test_multiple_runs_under_one_root_are_independent(tmp_path: Path) -> None:
     root = tmp_path / "root"
-    a = Substrate.open(root, TASK, new_run_id(TASK))
+    a = Substrate.open(root, TASK, new_run_id())
     _bind(a)
-    b = Substrate.open(root, TASK, new_run_id(TASK))
+    b = Substrate.open(root, TASK, new_run_id())
     _bind(b)
     assert len(Substrate.list_runs(root)) == 2
     # advancing one run does not touch the other's head

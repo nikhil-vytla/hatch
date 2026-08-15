@@ -13,27 +13,46 @@ Per command it journals exactly one intent, performs or RECONCILES exactly
 one effect, journals exactly one terminal result, then reduces and
 checkpoints (state + a consumed-result cursor). It never advances policy
 state before the outcome. On restart it reloads the last checkpoint,
-re-derives the same deterministic command, and:
+re-derives the same deterministic command, RE-DERIVES that command's payload
+digest and compares it to the issued digest (BOTH on the already-issued and
+already-completed paths — a changed re-derivation fails closed), and:
 
 - if the command already has a terminal result, RECONSTRUCTS that exact
-  result (so `last_result` can never disappear) and does not repeat the
+  recorded result (including its recorded head) and does not repeat the
   effect;
 - if the effect is present but not yet terminal (a crash between them),
   finishes by recording the terminal result;
 - if not yet reduced (the checkpoint's consumed cursor is behind), reduces
   and re-checkpoints — exactly once.
 
-Floor enforced here regardless of policy: bound identity is authoritative
-(a caller whose config/prompts/seed disagree with `PolicyBound` is
-rejected); trusted budgets charge executions/model-calls; the secure
-`CandidateExecutor` runs candidate code under declared, capability-checked
-sandbox provenance; a change's full CAS closure is staged and required
-before apply; and `EvaluateFork` captures exact base/candidate state refs
-BEFORE execution and records both even if active state later advances.
+Effect honesty: durable STATE effects (apply/revert) reconcile EXACTLY — a
+recorded effect without a terminal is finished, not repeated. A fork's
+sandbox executions are deterministic and re-runnable, but their outcome is
+recorded durably (base/candidate state refs + metered usage) and REUSED on
+resume, so a completed fork never re-executes or re-charges. External model
+calls (`RequestRefinement`) are NOT exactly-once and are unimplemented in
+Phase A; when one is added, a dispatch-without-durable-result crash must be
+recorded `indeterminate` and require explicit retry, never silently
+duplicated.
+
+Budgets survive restart: the pinned `BudgetSpec` is content-addressed in
+`PolicyBound` (a resumed caller with a different budget is rejected), and
+cumulative countable spend is re-seeded from the durably-recorded per-fork
+usage — restart cannot reset or expand the budget.
+
+Floor enforced here regardless of policy: authoritative bound identity (task
+fingerprint, policy digest, config, prompts, seed, budget, capabilities);
+trusted budgets charging executions AND wall/output; the secure
+`CandidateExecutor` under declared, capability-checked provenance; a change's
+full CAS closure staged (and structurally validated) before apply; and
+`EvaluateFork` capturing exact base/candidate refs BEFORE execution.
 """
 
 from __future__ import annotations
 
+import dataclasses
+import inspect
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -67,12 +86,17 @@ from strive.sandboxes import (
 from strive.substrate import (
     CompositeChange,
     HarnessState,
+    ObservationRecorded,
+    PolicyCommandCompleted,
     Substrate,
     SubstrateError,
     VerifiedSubstrateView,
     apply_change,
 )
+from strive.surfaces import SurfaceCatalog, default_surface_catalog
 from strive.tasks import Task
+
+_ENCODING = "strict-json@1"
 
 
 class KernelError(Exception):
@@ -83,12 +107,13 @@ class KernelError(Exception):
 # -- content-addressable kernel blobs -------------------------------------------------------------
 
 
-@register("fork-observation", 2)
+@register("fork-observation", 3)
 @dataclass(frozen=True)
 class ForkObservation:
     """The result of an OPTIONAL `EvaluateFork`: the exact base and candidate
     state refs (captured BEFORE execution), the code score of each over the
-    task's cases, the sandbox provenance, and the metered usage."""
+    task's cases, the sandbox provenance, and the metered usage THIS command
+    charged (durably recorded so resume re-seeds the budget)."""
 
     candidate_change_id: str
     base_state_ref: str
@@ -97,6 +122,7 @@ class ForkObservation:
     candidate_overall: float
     improved: bool
     sandbox_provenance: SandboxProvenance
+    usage: BudgetUsage
     detail: str
 
 
@@ -108,30 +134,34 @@ class _CommandPayload:
 
     command_id: str
     kind: str
+    encoding: str
     json: str
 
 
-@register("kernel-stored-result", 1)
+@register("kernel-stored-result", 2)
 @dataclass(frozen=True)
 class _StoredResult:
     command_id: str
     kind: str
     outcome: str
+    head: str
     detail: str
     proposal_ref: str | None
     observation_ref: str | None
     metrics: dict[str, float]
 
 
-@register("kernel-policy-state", 1)
+@register("kernel-policy-state", 2)
 @dataclass(frozen=True)
 class _PolicyStateBlob:
+    encoding: str
     json: str
 
 
-@register("kernel-config", 1)
+@register("kernel-config", 2)
 @dataclass(frozen=True)
 class _ConfigBlob:
+    encoding: str
     json: str
 
 
@@ -142,7 +172,7 @@ class _ConfigBlob:
 class KernelServices:
     """Everything the kernel needs: the run's substrate, the task, the secure
     executor candidate code runs under, the seed, and the trusted budget
-    meter that charges executions/model-calls."""
+    meter that charges executions/wall/output."""
 
     substrate: Substrate
     task: Task
@@ -162,13 +192,17 @@ class KernelServices:
         trusted: bool = True,
         budget: BudgetSpec | None = None,
         required_capabilities: tuple[str, ...] = (),
+        surface_catalog: SurfaceCatalog | None = None,
     ) -> "KernelServices":
         executor = CandidateExecutor.from_catalog(
             default_sandbox_catalog(), sandbox_backend, trusted=trusted
         )
         _require_capabilities(executor, required_capabilities)
         return KernelServices(
-            substrate=Substrate.open(root, task.task_id, run_id),
+            substrate=Substrate.open(
+                root, task.task_id, run_id,
+                catalog=surface_catalog or default_surface_catalog(),
+            ),
             task=task,
             executor=executor,
             seed=seed,
@@ -216,13 +250,15 @@ def run_policy(
     """Bind (once) and drive the named policy to completion or `max_commands`.
     Safe to call again after a crash: it resumes from the last checkpoint and
     never repeats a completed command's effect, model call, observation, or
-    reduction."""
+    reduction, and re-seeds the budget from durable usage."""
     substrate = services.substrate
     descriptor = catalog.descriptor(policy_name)
     policy = descriptor.factory()
 
-    config_json = _canonical_json(config)
-    config_ref = hash_text(codec.dumps(_ConfigBlob(json=config_json)))
+    config_ref = _config_ref(config)
+    policy_digest = _policy_digest(policy)
+    task_fingerprint = services.task.fingerprint()
+    budget_ref = hash_text(codec.dumps(services.meter.spec))
 
     view = substrate.verify()
     if not view.ok:
@@ -232,22 +268,31 @@ def run_policy(
         )
     resumed = view.bound is not None
     if view.bound is None:
-        substrate.put(_ConfigBlob(json=config_json))
+        substrate.put(_config_blob(config))
+        substrate.put(services.meter.spec)  # pin the budget spec in CAS
         view = substrate.bind_policy(
+            task_fingerprint=task_fingerprint,
             policy_ref=policy.name,
+            policy_digest=policy_digest,
             config_ref=config_ref,
             prompt_refs=prompt_refs,
             seed=services.seed,
             seed_state=seed_state,
+            budget_ref=budget_ref,
+            required_capabilities=services.required_capabilities,
             run_metadata=run_metadata or {},
         )
     else:
-        _enforce_identity(view, policy, config_ref, prompt_refs, services.seed)
+        _enforce_identity(
+            services, view, policy, config_ref, policy_digest,
+            task_fingerprint, budget_ref, prompt_refs,
+        )
+        _seed_meter(services, view)
 
     # resume policy state + the consumed-result cursor from the last checkpoint
     checkpoint = view.latest_checkpoint
     if checkpoint is not None:
-        state = policy.decode_state(_load_json(substrate, checkpoint.policy_state_ref))
+        state = policy.decode_state(_load_state_json(substrate, checkpoint.policy_state_ref))
         consumed = checkpoint.consumed_command_id
     else:
         state = policy.initial_state(config, RunView.of(services.seed, view))
@@ -255,7 +300,6 @@ def run_policy(
 
     commands = 0
     stopped_reason = "max-commands"
-    last_result: CommandResult | None = None
     while commands < max_commands:
         view = substrate.verify()
         substrate._require_ok(view, "run")
@@ -267,21 +311,17 @@ def run_policy(
         result = _run_command(services, view, command)
         if command.command_id != consumed:
             state = policy.reduce(config, state, result)
-            view = substrate.checkpoint(
-                policy_state_ref=substrate.put(
-                    _PolicyStateBlob(json=_canonical_json_state(state))
-                ),
+            substrate.checkpoint(
+                policy_state_ref=substrate.put(_state_blob(state)),
                 consumed_command_id=command.command_id,
                 caused_by=command.command_id,
             )
             consumed = command.command_id
-        last_result = result
         commands += 1
         if isinstance(command, StopAdaptation):
             stopped_reason = command.reason or "stopped"
             break
 
-    _ = last_result
     return RunReport(
         run_id=substrate.run_id,
         task_id=services.task.task_id,
@@ -295,18 +335,30 @@ def run_policy(
 
 
 def _enforce_identity(
+    services: KernelServices,
     view: VerifiedSubstrateView,
     policy: AdaptationPolicy[Any, Any],
     config_ref: str,
+    policy_digest: str,
+    task_fingerprint: str,
+    budget_ref: str,
     prompt_refs: dict[str, str],
-    seed: int,
 ) -> None:
     assert view.bound is not None
     bound = view.bound
     if bound.policy_ref != policy.name:
+        raise KernelError(f"run is bound to {bound.policy_ref!r}, not {policy.name!r}")
+    if bound.policy_digest != policy_digest:
         raise KernelError(
-            f"run is bound to {bound.policy_ref!r}, not {policy.name!r}"
+            "policy implementation digest does not match the bound run "
+            "(the policy code changed underneath a resume)"
         )
+    if bound.task_id != services.task.task_id:
+        raise KernelError(
+            f"run is bound to task {bound.task_id!r}, not {services.task.task_id!r}"
+        )
+    if bound.task_fingerprint != task_fingerprint:
+        raise KernelError("task spec fingerprint does not match the bound run")
     if bound.config_ref != config_ref:
         raise KernelError(
             "caller config does not match the bound config for this run "
@@ -314,10 +366,56 @@ def _enforce_identity(
         )
     if bound.prompt_refs != prompt_refs:
         raise KernelError("caller prompt refs do not match the bound run")
-    if bound.seed != seed:
+    if bound.seed != services.seed:
         raise KernelError(
-            f"caller seed {seed} does not match the bound seed {bound.seed}"
+            f"caller seed {services.seed} does not match the bound seed {bound.seed}"
         )
+    if bound.budget_ref != budget_ref:
+        raise KernelError(
+            "caller budget spec does not match the bound run (budgets cannot be "
+            "changed on resume)"
+        )
+    if tuple(bound.required_capabilities) != tuple(services.required_capabilities):
+        raise KernelError(
+            "required capability profile does not match the bound run"
+        )
+
+
+def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
+    """Re-seed cumulative countable spend from the durably-recorded per-fork
+    usage so a resumed run cannot reset or expand its budget."""
+    substrate = services.substrate
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if isinstance(body, ObservationRecorded) and body.observation_kind == "fork-evaluation":
+            fork = codec.loads(
+                substrate.objects.get_text(body.observation_ref), ForkObservation
+            )
+            services.meter.absorb(fork.usage)
+
+
+def operator_revert(services: KernelServices, change_id: str) -> CommandResult:
+    """Operator-initiated revert that goes through the SAME command path as a
+    policy (issue → perform → terminal), never a direct `Substrate.revert`.
+    Idempotent by a stable operator command id, so repeating it never double-
+    reverts. Returns the command result (outcome "failed" if there is nothing
+    to revert)."""
+    substrate = services.substrate
+    view = substrate.verify()
+    substrate._require_ok(view, "operator-revert")
+    if view.bound is None:
+        raise KernelError("cannot revert an unbound run")
+    # precheck so an operator gets an honest error rather than a silent no-op
+    # (the command path itself is idempotent, which is right for resume but
+    # wrong feedback for a deliberate operator request)
+    if change_id not in view.applied_change_ids:
+        raise KernelError(f"no applied change {change_id!r} to revert")
+    if change_id in view.reverted_change_ids:
+        raise KernelError(f"change {change_id!r} is already reverted")
+    command = RevertChange(
+        command_id=f"{substrate.run_id}:operator-revert:{change_id}",
+        change_id=change_id,
+    )
+    return _run_command(services, view, command)
 
 
 # -- one command: intent → effect/reconcile → terminal ---------------------------------------------
@@ -330,14 +428,26 @@ def _run_command(
     cid = command.command_id
     kind = type(command).__name__
 
+    # re-derive the command's canonical payload digest and compare it to any
+    # issued digest — BEFORE both the already-completed and already-issued
+    # paths — so a changed re-derivation fails closed rather than reconciling
+    # against a different intent.
+    command_ref = substrate.put(
+        _CommandPayload(command_id=cid, kind=kind, encoding=_ENCODING, json=_strict_json(command))
+    )
+    issued = view.issued.get(cid)
+    if issued is not None and issued.command_ref != command_ref:
+        raise KernelError(
+            f"command {cid!r} re-derived a different payload digest than the "
+            f"issued intent ({issued.command_ref[:12]}… vs {command_ref[:12]}…) — "
+            "refusing to reconcile against a changed command"
+        )
+
     terminal = view.completed.get(cid)
     if terminal is not None:
         return _reconstruct(services, command, terminal)
 
-    command_ref = substrate.put(
-        _CommandPayload(command_id=cid, kind=kind, json=_canonical_json(command))
-    )
-    if cid not in view.issued:
+    if issued is None:
         substrate.issue_command(command_id=cid, command_kind=kind, command_ref=command_ref)
 
     try:
@@ -346,19 +456,18 @@ def _run_command(
         substrate.record_failure(command_id=cid, kind=kind, detail=str(exc))
         result = CommandResult(cid, kind, "failed", substrate.verify().head, detail=str(exc))
 
-    substrate.complete_command(
+    head = substrate.verify().head
+    stored = _StoredResult(
         command_id=cid,
+        kind=kind,
         outcome=result.outcome,
-        result=_StoredResult(
-            command_id=cid,
-            kind=kind,
-            outcome=result.outcome,
-            detail=result.detail,
-            proposal_ref=substrate.put(result.proposal) if result.proposal else None,
-            observation_ref=result.observation_ref,
-            metrics=result.metrics,
-        ),
+        head=head,
+        detail=result.detail,
+        proposal_ref=substrate.put(result.proposal) if result.proposal else None,
+        observation_ref=result.observation_ref,
+        metrics=dict(result.metrics),
     )
+    substrate.complete_command(command_id=cid, outcome=result.outcome, result=stored)
     return CommandResult(
         cid, kind, result.outcome, substrate.verify().head, detail=result.detail,
         proposal=result.proposal, observation_ref=result.observation_ref,
@@ -414,6 +523,8 @@ def _perform(
 
     if isinstance(command, RequestRefinement):
         # Phase A ships no model refiner; a policy needing one must supply it.
+        # A real implementation must give the model call an idempotency key and
+        # record `indeterminate` on a dispatch-without-durable-result crash.
         raise KernelError(
             "RequestRefinement is unimplemented in Phase A (no model refiner "
             "bound; manual-change@1 constructs its typed change directly)"
@@ -427,8 +538,9 @@ def _evaluate_fork(
     """OPTIONAL comparative mechanism. Captures the exact base and candidate
     state refs BEFORE execution, scores each over the task's cases under the
     secure executor (charging the budget), and records ONE observation with
-    both refs — even if active state later advances. Idempotent: if this
-    command already recorded its observation, it is not re-run."""
+    both refs and the metered usage — even if active state later advances.
+    Idempotent: a fork that already recorded its observation is REUSED, not
+    re-executed or re-charged."""
     substrate = services.substrate
     cid = command.command_id
     kind = type(command).__name__
@@ -442,8 +554,6 @@ def _evaluate_fork(
         # already observed (a crash between the observation and completion):
         # reconstruct the SAME metrics from the recorded ForkObservation so
         # the reducer's reaction is identical — and do NOT re-run the executor
-        from strive.substrate import ObservationRecorded
-
         recorded = codec.loads(substrate.objects.get_text(existing), ObservationRecorded)
         fork = codec.loads(
             substrate.objects.get_text(recorded.observation_ref), ForkObservation
@@ -451,21 +561,19 @@ def _evaluate_fork(
         return CommandResult(
             cid, kind, "ok", view.head, observation_ref=existing,
             detail="fork already observed",
-            metrics={
-                "base_overall": fork.base_overall,
-                "candidate_overall": fork.candidate_overall,
-                "improved": 1.0 if fork.improved else 0.0,
-            },
+            metrics=_fork_metrics(fork.base_overall, fork.candidate_overall, fork.improved),
         )
 
     substrate.stage_change_closure(command.candidate, command.content_blobs)
     base_state = view.state
     base_ref = view.state_ref or ""
-    candidate_state = apply_change(base_state, command.candidate)
+    candidate_state = apply_change(base_state, command.candidate, substrate.catalog)
     candidate_ref = substrate.put_state(candidate_state)
 
+    before = services.meter.usage()
     base_overall = _score(services, base_state)
     candidate_overall = _score(services, candidate_state)
+    charged = _usage_delta(before, services.meter.usage())
     observation = ForkObservation(
         candidate_change_id=command.candidate.change_id,
         base_state_ref=base_ref,
@@ -474,6 +582,7 @@ def _evaluate_fork(
         candidate_overall=candidate_overall,
         improved=candidate_overall > base_overall,
         sandbox_provenance=services.executor.provenance(),
+        usage=charged,
         detail=command.detail,
     )
     updated = substrate.record_observation(
@@ -483,17 +592,34 @@ def _evaluate_fork(
     ref = updated.envelopes[-1].body_ref
     return CommandResult(
         cid, kind, "ok", updated.head, observation_ref=ref, detail="fork evaluated",
-        metrics={
-            "base_overall": base_overall,
-            "candidate_overall": candidate_overall,
-            "improved": 1.0 if observation.improved else 0.0,
-        },
+        metrics=_fork_metrics(base_overall, candidate_overall, observation.improved),
+    )
+
+
+def _fork_metrics(base: float, candidate: float, improved: bool) -> dict[str, float]:
+    return {
+        "base_overall": base,
+        "candidate_overall": candidate,
+        "improved": 1.0 if improved else 0.0,
+    }
+
+
+def _usage_delta(before: BudgetUsage, after: BudgetUsage) -> BudgetUsage:
+    return BudgetUsage(
+        wall_time_s=round(max(0.0, after.wall_time_s - before.wall_time_s), 6),
+        executions=after.executions - before.executions,
+        model_calls=after.model_calls - before.model_calls,
+        tokens=after.tokens - before.tokens,
+        output_bytes=after.output_bytes - before.output_bytes,
+        cost=after.cost - before.cost,
+        recursion_depth=after.recursion_depth,
     )
 
 
 def _score(services: KernelServices, state: HarnessState) -> float:
     """Run the state's strategy code over the task's selection cases under the
-    secure executor, charging one execution per case. Returns the overall
+    secure executor, charging one execution per case (executions AND wall are
+    gated pre-request) and accounting cumulative output. Returns the overall
     score (0.0 with no code surface)."""
     code_ref = state.content_ref("strategy-code", "solve")
     if code_ref is None:
@@ -507,6 +633,7 @@ def _score(services: KernelServices, state: HarnessState) -> float:
     outcome = services.executor.execute_suite(
         source, cases, generation_id="fork", limits=SandboxLimits()
     )
+    services.meter.note_output_bytes(outcome.report.stdout_bytes)
     return evaluate(services.task, outcome.report, cases).overall_score
 
 
@@ -535,10 +662,9 @@ def _caused_ref(view: VerifiedSubstrateView, command_id: str, body_kind: str) ->
 def _reconstruct(
     services: KernelServices, command: KernelCommand, terminal: object
 ) -> CommandResult:
-    """Rebuild the exact recorded result of an already-completed command, so a
-    resumed step sees the same `last_result` without repeating the effect."""
-    from strive.substrate import PolicyCommandCompleted
-
+    """Rebuild the exact recorded result of an already-completed command —
+    including its recorded head — so a resumed step sees the same
+    `last_result` without repeating the effect."""
     substrate = services.substrate
     assert isinstance(terminal, PolicyCommandCompleted)
     cid = command.command_id
@@ -553,43 +679,71 @@ def _reconstruct(
         )
     return CommandResult(
         command_id=stored.command_id, kind=stored.kind, outcome=stored.outcome,
-        head=substrate.verify().head, detail=stored.detail, proposal=proposal,
+        head=stored.head, detail=stored.detail, proposal=proposal,
         observation_ref=stored.observation_ref, metrics=dict(stored.metrics),
     )
 
 
-# -- canonical encoding of config / command / policy state ----------------------------------------
+# -- strict, typed canonical encoding (NO permissive default=str coercion) ------------------------
 
 
-def _canonical_json(obj: object) -> str:
-    import dataclasses
-    import json
-
-    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-        return json.dumps(_encode(dataclasses.asdict(obj)), sort_keys=True)
-    return json.dumps(obj, sort_keys=True, default=str)
+def _config_ref(config: object) -> str:
+    return hash_text(codec.dumps(_config_blob(config)))
 
 
-def _canonical_json_state(state: object) -> str:
-    return _canonical_json(state)
+def _config_blob(config: object) -> _ConfigBlob:
+    return _ConfigBlob(encoding=_ENCODING, json=_strict_json(config))
 
 
-def _encode(value: object) -> object:
-    import dataclasses
+def _state_blob(state: object) -> _PolicyStateBlob:
+    return _PolicyStateBlob(encoding=_ENCODING, json=_strict_json(state))
 
+
+def _policy_digest(policy: AdaptationPolicy[Any, Any]) -> str:
+    cls = type(policy)
+    try:
+        source = inspect.getsource(cls)
+    except (OSError, TypeError):
+        source = cls.__qualname__
+    return hash_text(f"{cls.__module__}.{cls.__qualname__}\n{source}")
+
+
+def _strict_json(obj: object) -> str:
+    return json.dumps(_strict_encode(obj), sort_keys=True, separators=(",", ":"))
+
+
+def _strict_encode(value: object) -> object:
+    if isinstance(value, bool) or value is None or isinstance(value, (int, float, str)):
+        return value
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return _encode(dataclasses.asdict(value))
-    if isinstance(value, dict):
-        return {str(k): _encode(v) for k, v in value.items()}
+        return {
+            f.name: _strict_encode(getattr(value, f.name))
+            for f in dataclasses.fields(value)
+        }
     if isinstance(value, (list, tuple)):
-        return [_encode(v) for v in value]
-    return value
+        return [_strict_encode(item) for item in value]
+    if isinstance(value, dict):
+        out: dict[str, object] = {}
+        for key, val in value.items():
+            if not isinstance(key, str):
+                raise KernelError(
+                    f"cannot canonically encode a non-string dict key {key!r}"
+                )
+            out[key] = _strict_encode(val)
+        return out
+    raise KernelError(
+        f"cannot canonically encode a value of type {type(value).__name__} "
+        "(strict encoding refuses to coerce)"
+    )
 
 
-def _load_json(substrate: Substrate, ref: str) -> object:
-    import json
-
+def _load_state_json(substrate: Substrate, ref: str) -> object:
     blob = codec.loads(substrate.objects.get_text(ref), _PolicyStateBlob)
+    if blob.encoding != _ENCODING:
+        raise KernelError(
+            f"policy state was encoded with {blob.encoding!r}, this build uses "
+            f"{_ENCODING!r} — refusing to guess"
+        )
     return json.loads(blob.json)
 
 
@@ -598,5 +752,6 @@ __all__ = [
     "KernelError",
     "KernelServices",
     "RunReport",
+    "operator_revert",
     "run_policy",
 ]

@@ -12,8 +12,9 @@ and exactly resumable* — not a fixed acceptance ceremony.
 
 Regardless of policy, the substrate and kernel enforce:
 
-- **Allowlisted surfaces** — a change touches only `(kind, name)` pairs in
-  `SURFACE_ALLOWLIST`.
+- **Catalogued surfaces** — a change touches only `(kind, name)` pairs in the
+  injected immutable `SurfaceCatalog`, and each surface's content passes that
+  surface's trusted structural validator before it is seeded or applied.
 - **Exact before/after state** — every surface delta pins exact content by
   CAS ref, so a change applies and inverts deterministically; a stale before
   is a conflict.

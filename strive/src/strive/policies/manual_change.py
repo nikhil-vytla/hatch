@@ -63,21 +63,42 @@ class ManualChangeConfig:
 @dataclass(frozen=True)
 class ManualChangeState:
     """The policy's content-addressable state machine value.
-    phase: start -> observed -> applied -> reverted -> done."""
+    phase: start -> observed -> applied -> reverted -> done. A failed command
+    outcome drives the terminal `failed` phase (the policy stops, honestly, on
+    a failed Apply/Revert/Fork/Stop rather than pretending it advanced)."""
 
     phase: str
     fork_improved: bool | None = None
 
 
+def _require_str(section: dict[str, object], key: str, default: str | None = None) -> str:
+    """Strictly read a string TOML field — NO permissive `str()` coercion of
+    ints/floats/bools/tables into config values."""
+    if key not in section:
+        if default is not None:
+            return default
+        raise SubstrateError(f"manual_change config is missing required key {key!r}")
+    value = section[key]
+    if not isinstance(value, str):
+        raise SubstrateError(
+            f"manual_change config {key!r} must be a string, got "
+            f"{type(value).__name__}"
+        )
+    return value
+
+
 def load_config(path: str) -> ManualChangeConfig:
     with open(path, "rb") as handle:
         data = tomllib.load(handle)
-    section = data.get("manual_change", data)
+    raw = data.get("manual_change", data)
+    if not isinstance(raw, dict):
+        raise SubstrateError("manual_change config section is not a table")
+    section: dict[str, object] = raw
     return ManualChangeConfig(
-        summary=str(section["summary"]),
-        target_prompt=str(section["target_prompt"]),
-        target_strategy=str(section["target_strategy"]),
-        change_id=str(section.get("change_id", "manual-change-1")),
+        summary=_require_str(section, "summary"),
+        target_prompt=_require_str(section, "target_prompt"),
+        target_strategy=_require_str(section, "target_strategy"),
+        change_id=_require_str(section, "change_id", "manual-change-1"),
     )
 
 
@@ -130,11 +151,15 @@ class ManualChangePolicy:
             return StopAdaptation(
                 command_id=f"{rid}:stop-done", reason="manual change complete"
             )
-        return None  # phase == "done"
+        return None  # phase == "done" or "failed"
 
     def reduce(
         self, config: ManualChangeConfig, state: ManualChangeState, result: CommandResult
     ) -> ManualChangeState:
+        if result.outcome != "ok":
+            # honest failure handling: a failed Apply/Revert/Fork/Stop stops the
+            # policy at a terminal `failed` phase — it never claims to advance.
+            return ManualChangeState(phase="failed", fork_improved=state.fork_improved)
         if result.kind == "EvaluateFork":
             return ManualChangeState(
                 phase="observed",

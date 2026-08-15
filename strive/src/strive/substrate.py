@@ -10,51 +10,84 @@ reverts EXACT composite changes directly, and comparative evaluation is an
 OPTIONAL mechanism a policy requests — never a universal activation
 prerequisite.
 
+Run identity is EXACT. A `run_id` is an opaque, validated token (no path
+separators, no ``..``); the task id is NEVER parsed out of it. A run's
+identity — its task spec fingerprint, policy implementation digest, exact
+frozen config, versioned prompt refs, seed + seed state, budget spec, the
+required sandbox/semantic capability profile, and the surface catalog digest
+— is pinned in the leading `PolicyBound` event (authoritative, hash-chained,
+tamper-evident) AND mirrored into a `<root>/runs/<run_id>.binding.json`
+discovery index. Resume loads the bound values and refuses any caller whose
+values disagree.
+
 Every event is an `EventEnvelope`: a kernel-generated stable id
 (``<run_id>#<seq>``), the run/task scope, the command that CAUSED it, a
-monotonic seq, a timestamp, and a CAS ref to a typed body. Authority bodies
-(`PolicyBound`, `ChangeApplied`, `ChangeReverted`) move harness state;
-observations and annotations never do; command bookkeeping
-(`PolicyCommandIssued`/`Completed`, `PolicyCheckpointed`, `OperationFailed`)
-makes the kernel resumable.
+monotonic seq, a timestamp, and a CAS ref to a typed body decoded on read.
 
-Nothing mutates over an UNVERIFIED log: `verify()` parses the whole stream
-into a `VerifiedSubstrateView`, checking framing integrity, exactly-one
-leading `PolicyBound`, full CAS closure, canonical/allowlisted state
-bindings, an exact apply/revert replay, command-lifecycle and
-command-digest consistency, checkpoint agreement, observation subjects, and
-change-id uniqueness. A structural or semantic error REFUSES every
-authority append (fail closed). Recovery — quarantine + truncate to the last
-verified frame — is explicit (`repair`), never silent.
+Nothing mutates over an UNVERIFIED log: `verify()` is PURE (it never writes
+CAS) and CLOSED (it accepts only the known body union). It parses the whole
+stream into a `VerifiedSubstrateView`, checking framing integrity,
+exactly-one leading `PolicyBound` with full CAS closure and a matching
+binding index + surface-catalog digest, canonical/catalogued state bindings,
+an exact apply/revert replay, command-lifecycle and command-digest
+consistency, checkpoint agreement, observation subjects, proposal refs, and
+change-id uniqueness. On a structural OR semantic error the view is
+``ok=False``, exposes NO active state, and every authority append is refused
+(fail closed). Recovery — quarantine + truncate to the last verified frame —
+is explicit (`repair`), never silent.
 """
 
 from __future__ import annotations
 
-import hashlib
+import os
+import re
+import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
+from typing import Mapping
 
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramingError
-
-SUBSTRATE_STREAM = "strive-substrate@2"
-
-SURFACE_ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
-    {("strategy-code", "solve"), ("prompt", "proposal-template")}
+from strive.surfaces import (
+    SurfaceCatalog,
+    SurfaceValidationError,
+    default_surface_catalog,
 )
+
+SUBSTRATE_STREAM = "strive-substrate@3"
+
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 class SubstrateError(Exception):
     """A substrate integrity or floor-violation failure."""
 
 
-def new_run_id(task_id: str) -> str:
-    """A fresh, collision-free run id under one artifact root."""
-    return f"run-{task_id}-{uuid.uuid4().hex[:12]}"
+# -- exact run identity ---------------------------------------------------------------------------
+
+
+def validate_run_id(run_id: str) -> str:
+    """A run id must be an opaque token safe as a filename component: it can
+    never contain a path separator or ``..`` (traversal), be empty, or exceed
+    128 chars. The TASK is discovered from the binding index — never parsed
+    from the run id."""
+    if not _RUN_ID_RE.match(run_id) or ".." in run_id:
+        raise SubstrateError(
+            f"invalid run id {run_id!r}: expected an opaque token "
+            "(alnum . _ - , no separators, no '..')"
+        )
+    return run_id
+
+
+def new_run_id() -> str:
+    """A fresh, collision-free, OPAQUE run id. It deliberately encodes no task
+    id: nothing may recover a task by string-parsing a run id."""
+    return f"run-{uuid.uuid4().hex}"
 
 
 # -- composite state ------------------------------------------------------------------------------
@@ -132,16 +165,17 @@ class CompositeChange:
         return refs
 
 
-def validate_change(change: CompositeChange) -> None:
+def validate_change(change: CompositeChange, catalog: SurfaceCatalog | None = None) -> None:
+    cat = catalog or default_surface_catalog()
     seen: set[tuple[str, str]] = set()
     if not change.deltas:
         raise SubstrateError("a change must carry at least one delta")
     for delta in change.deltas:
         key = (delta.kind, delta.name)
-        if key not in SURFACE_ALLOWLIST:
+        if not cat.allows(*key):
             raise SubstrateError(
-                f"surface {key} is not allowlisted (allowed: "
-                f"{sorted(SURFACE_ALLOWLIST)})"
+                f"surface {key} is not in the surface catalog "
+                f"(allowed: {sorted(cat.keys())})"
             )
         if key in seen:
             raise SubstrateError(f"duplicate delta for surface {key}")
@@ -150,11 +184,13 @@ def validate_change(change: CompositeChange) -> None:
             raise SubstrateError(f"no-op delta for surface {key}")
 
 
-def apply_change(state: HarnessState, change: CompositeChange) -> HarnessState:
+def apply_change(
+    state: HarnessState, change: CompositeChange, catalog: SurfaceCatalog | None = None
+) -> HarnessState:
     """Apply a change EXACTLY: every `before_ref` must equal the surface's
     current content (a stale before is a conflict); `after_ref=None` removes
     it. Returns the new canonical state."""
-    validate_change(change)
+    validate_change(change, catalog)
     current = state.as_map()
     for delta in change.deltas:
         key = (delta.kind, delta.name)
@@ -174,20 +210,70 @@ def apply_change(state: HarnessState, change: CompositeChange) -> HarnessState:
 # -- event bodies (typed; the envelope carries id/scope/causation/time) ---------------------------
 
 
-@register("policy-bound", 2)
+@register("policy-bound", 3)
 @dataclass(frozen=True)
 class PolicyBound:
-    """AUTHORITY + identity. Pins the policy implementation, its exact frozen
-    config, versioned prompt refs, seed, and the SEED composite state — the
-    harness identity for this run. Model/provider is `run_metadata`
-    (reproducibility), NOT identity."""
+    """AUTHORITY + identity. Pins EVERYTHING that defines this run: the task
+    id and its spec fingerprint, the policy implementation ref + package
+    digest, the exact frozen config, versioned prompt refs, seed, the SEED
+    composite state, the pinned budget spec, the required sandbox/semantic
+    capability profile, and the surface catalog digest. Model/provider is
+    `run_metadata` (reproducibility), NOT identity."""
 
+    task_id: str
+    task_fingerprint: str
     policy_ref: str
+    policy_digest: str
     config_ref: str
     prompt_refs: dict[str, str]
     seed: int
     seed_state_ref: str
+    budget_ref: str
+    required_capabilities: tuple[str, ...]
+    surface_catalog_digest: str
     run_metadata: dict[str, str]
+
+
+@register("run-binding", 1)
+@dataclass(frozen=True)
+class RunBinding:
+    """The discovery index mirror of `PolicyBound`, persisted at
+    ``<root>/runs/<run_id>.binding.json``. Lets a tool learn a run's task
+    WITHOUT string-parsing the run id, and is cross-checked against the
+    authoritative in-stream `PolicyBound` on every verify."""
+
+    run_id: str
+    task_id: str
+    task_fingerprint: str
+    policy_ref: str
+    policy_digest: str
+    config_ref: str
+    prompt_refs: dict[str, str]
+    seed: int
+    seed_state_ref: str
+    budget_ref: str
+    required_capabilities: tuple[str, ...]
+    surface_catalog_digest: str
+
+    @staticmethod
+    def of(run_id: str, bound: PolicyBound) -> "RunBinding":
+        return RunBinding(
+            run_id=run_id,
+            task_id=bound.task_id,
+            task_fingerprint=bound.task_fingerprint,
+            policy_ref=bound.policy_ref,
+            policy_digest=bound.policy_digest,
+            config_ref=bound.config_ref,
+            prompt_refs=dict(bound.prompt_refs),
+            seed=bound.seed,
+            seed_state_ref=bound.seed_state_ref,
+            budget_ref=bound.budget_ref,
+            required_capabilities=tuple(bound.required_capabilities),
+            surface_catalog_digest=bound.surface_catalog_digest,
+        )
+
+    def agrees_with(self, bound: PolicyBound) -> bool:
+        return self == RunBinding.of(self.run_id, bound)
 
 
 @register("policy-checkpointed", 2)
@@ -219,7 +305,7 @@ class PolicyCommandCompleted:
     """COMMAND terminal result (exactly one per command_id)."""
 
     command_id: str
-    outcome: str  # "ok" | "failed"
+    outcome: str  # "ok" | "failed" | "indeterminate"
     result_ref: str | None
 
 
@@ -307,7 +393,20 @@ class EventEnvelope:
     at: str
 
 
-_STATE_MOVING = ("change-applied@2", "change-reverted@2", "policy-bound@2")
+# the CLOSED body union verify accepts — anything else fails the stream
+_BODY_UNION: tuple[type, ...] = (
+    PolicyBound,
+    PolicyCheckpointed,
+    PolicyCommandIssued,
+    PolicyCommandCompleted,
+    ChangeProposed,
+    ChangeApplied,
+    ObservationRecorded,
+    ChangeConfirmed,
+    ChangeRevised,
+    ChangeReverted,
+    OperationFailed,
+)
 
 
 # -- the journal ----------------------------------------------------------------------------------
@@ -326,7 +425,8 @@ class _EventJournal(FramedJournal):
 class VerifiedSubstrateView:
     """A fully parsed + verified read. `ok` is False (with `errors`) when the
     log has a structural or semantic defect; the substrate then REFUSES every
-    authority append."""
+    authority append and exposes NO active state. Its mapping fields are
+    read-only proxies (the public view is deeply immutable)."""
 
     run_id: str
     task_id: str
@@ -340,8 +440,8 @@ class VerifiedSubstrateView:
     seed_state: HarnessState
     envelopes: tuple[EventEnvelope, ...]
     bodies: tuple[object, ...]  # index-aligned with envelopes
-    issued: dict[str, PolicyCommandIssued]
-    completed: dict[str, PolicyCommandCompleted]
+    issued: Mapping[str, PolicyCommandIssued]
+    completed: Mapping[str, PolicyCommandCompleted]
     latest_checkpoint: PolicyCheckpointed | None
     applied_change_ids: frozenset[str]
     reverted_change_ids: frozenset[str]
@@ -352,21 +452,52 @@ class VerifiedSubstrateView:
 
 @dataclass(frozen=True)
 class Substrate:
-    """CAS (shared across runs) + one run's append-only event stream. Every
-    authority append verifies the whole log first and is head-checked."""
+    """CAS (shared across runs) + one run's append-only event stream, over an
+    injected immutable `SurfaceCatalog`. Every authority append verifies the
+    whole log first and is head-checked."""
 
     root: Path
     task_id: str
     run_id: str
     objects: ObjectStore
     journal: _EventJournal
+    catalog: SurfaceCatalog
 
     @staticmethod
-    def open(root: Path, task_id: str, run_id: str) -> "Substrate":
+    def open(
+        root: Path,
+        task_id: str,
+        run_id: str,
+        *,
+        catalog: SurfaceCatalog | None = None,
+    ) -> "Substrate":
+        validate_run_id(run_id)
         objects = ObjectStore(root / "objects")
         journal = _EventJournal(root / "runs" / f"{run_id}.events.jsonl", run_id)
         return Substrate(
-            root=root, task_id=task_id, run_id=run_id, objects=objects, journal=journal
+            root=root, task_id=task_id, run_id=run_id, objects=objects,
+            journal=journal, catalog=catalog or default_surface_catalog(),
+        )
+
+    @staticmethod
+    def discover(
+        root: Path, run_id: str, *, catalog: SurfaceCatalog | None = None
+    ) -> "Substrate":
+        """Open a run WITHOUT being told its task — the task id comes from the
+        binding index (never from parsing the run id)."""
+        validate_run_id(run_id)
+        binding = _read_binding(root, run_id)
+        if binding is not None:
+            return Substrate.open(root, binding.task_id, run_id, catalog=catalog)
+        # no binding yet: peek the stream's first envelope for scope
+        sub = Substrate.open(root, "", run_id, catalog=catalog)
+        framed = sub.journal.read()
+        for entry in framed.entries:
+            assert isinstance(entry, EventEnvelope)
+            return Substrate.open(root, entry.task_id, run_id, catalog=catalog)
+        raise SubstrateError(
+            f"cannot discover task for run {run_id!r}: no binding index and an "
+            "empty stream"
         )
 
     @staticmethod
@@ -378,6 +509,9 @@ class Substrate:
             p.name[: -len(".events.jsonl")]
             for p in runs_dir.glob("*.events.jsonl")
         )
+
+    def _binding_path(self) -> Path:
+        return self.root / "runs" / f"{self.run_id}.binding.json"
 
     # -- CAS --------------------------------------------------------------
 
@@ -431,26 +565,77 @@ class Substrate:
     def bind_policy(
         self,
         *,
+        task_fingerprint: str,
         policy_ref: str,
+        policy_digest: str,
         config_ref: str,
         prompt_refs: dict[str, str],
         seed: int,
         seed_state: HarnessState,
+        budget_ref: str,
+        required_capabilities: tuple[str, ...],
         run_metadata: dict[str, str],
     ) -> VerifiedSubstrateView:
         view = self.verify()
         self._require_ok(view, "bind")
         if view.bound is not None:
             raise SubstrateError("this run is already bound to a policy")
+        # trusted structural validation of every seed binding BEFORE seeding
+        for binding in seed_state.bindings:
+            if not self.catalog.allows(binding.kind, binding.name):
+                raise SubstrateError(
+                    f"seed binding {(binding.kind, binding.name)} not in catalog"
+                )
+            try:
+                self.catalog.validate_content(
+                    binding.kind, binding.name,
+                    self.objects.get_text(binding.content_ref),
+                )
+            except (SurfaceValidationError, ObjectMissing, ObjectCorruption) as exc:
+                raise SubstrateError(
+                    f"seed binding {(binding.kind, binding.name)} invalid: {exc}"
+                ) from None
         record = PolicyBound(
+            task_id=self.task_id,
+            task_fingerprint=task_fingerprint,
             policy_ref=policy_ref,
+            policy_digest=policy_digest,
             config_ref=config_ref,
             prompt_refs=dict(prompt_refs),
             seed=seed,
             seed_state_ref=self.put_state(seed_state),
+            budget_ref=budget_ref,
+            required_capabilities=tuple(required_capabilities),
+            surface_catalog_digest=self.catalog.descriptor_digest(),
             run_metadata=dict(run_metadata),
         )
-        return self._emit(record, caused_by=None, view=view)
+        updated = self._emit(record, caused_by=None, view=view)
+        # persist the discovery index AFTER the authoritative event exists
+        self._write_binding(RunBinding.of(self.run_id, record))
+        return updated
+
+    def _write_binding(self, binding: RunBinding) -> None:
+        path = self._binding_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        text = codec.dumps(binding)
+        if path.exists() and path.read_text(encoding="utf-8") == text:
+            return
+        if path.exists():
+            raise SubstrateError(
+                f"run {self.run_id!r} binding index already exists with different "
+                "content — refusing to overwrite an established binding"
+            )
+        fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp, path)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
 
     def issue_command(
         self, *, command_id: str, command_kind: str, command_ref: str,
@@ -512,14 +697,28 @@ class Substrate:
 
     def stage_change_closure(self, change: CompositeChange, blobs: dict[str, str]) -> None:
         """Stage EXACTLY the CAS objects a change references, verifying each
-        blob hashes to the ref the change points at. Full closure is required
-        before apply (checked in verify's replay)."""
+        blob hashes to the ref the change points at AND passes the surface's
+        trusted structural validator. Full closure is required before apply."""
+        validate_change(change, self.catalog)
+        after_surface = {
+            d.after_ref: (d.kind, d.name)
+            for d in change.deltas
+            if d.after_ref is not None
+        }
         needed = change.referenced_refs()
         for ref, content in blobs.items():
             if hash_text(content) != ref:
                 raise SubstrateError(
                     f"staged content does not hash to its ref {ref[:12]}…"
                 )
+            if ref in after_surface:
+                kind, name = after_surface[ref]
+                try:
+                    self.catalog.validate_content(kind, name, content)
+                except SurfaceValidationError as exc:
+                    raise SubstrateError(
+                        f"staged content for {(kind, name)} is invalid: {exc}"
+                    ) from None
             self.objects.put_text(content)
         missing = {ref for ref in needed if not self.objects.has(ref)}
         if missing:
@@ -541,14 +740,14 @@ class Substrate:
                 f"stale apply: authorized at head {expected_head.split(':')[0]} "
                 f"but the run is at {view.head.split(':')[0]}"
             )
-        validate_change(change)  # allowlist / shape before staging + apply
+        validate_change(change, self.catalog)  # catalog / shape before apply
         for ref in change.referenced_refs():
             if not self.objects.has(ref):
                 raise SubstrateError(
                     f"apply refused: change references un-staged CAS object "
                     f"{ref[:12]}… (stage the full closure first)"
                 )
-        after = apply_change(view.state, change)
+        after = apply_change(view.state, change, self.catalog)
         assert view.state_ref is not None
         return self._emit(
             ChangeApplied(
@@ -600,7 +799,7 @@ class Substrate:
         assert applied is not None
         change = codec.loads(self.objects.get_text(applied.change_ref), CompositeChange)
         revert = change.invert()
-        after = apply_change(view.state, revert)
+        after = apply_change(view.state, revert, self.catalog)
         assert view.state_ref is not None
         return self._emit(
             ChangeReverted(
@@ -629,6 +828,19 @@ class Substrate:
         return self.journal.repair_to_verified(reason)
 
 
+# -- binding index io -----------------------------------------------------------------------------
+
+
+def _read_binding(root: Path, run_id: str) -> RunBinding | None:
+    path = root / "runs" / f"{run_id}.binding.json"
+    if not path.exists():
+        return None
+    try:
+        return codec.loads(path.read_text(encoding="utf-8"), RunBinding)
+    except (codec.SchemaError, OSError):
+        return None
+
+
 # -- verification implementation ------------------------------------------------------------------
 
 
@@ -654,26 +866,20 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
         assert isinstance(entry, EventEnvelope)
         envelopes.append(entry)
 
-    def fail(state_ref: str | None, bound: PolicyBound | None) -> VerifiedSubstrateView:
-        state = EMPTY_STATE
-        seed = EMPTY_STATE
-        try:
-            if bound is not None:
-                seed = sub._load_state(bound.seed_state_ref)
-            if state_ref is not None:
-                state = sub._load_state(state_ref)
-        except (ObjectMissing, ObjectCorruption, codec.SchemaError):
-            pass
+    def fail(bound: PolicyBound | None) -> VerifiedSubstrateView:
+        # NEVER expose active state from an unverifiable stream — seed and
+        # active state are both withheld (EMPTY) so no caller can act on them.
         return VerifiedSubstrateView(
             run_id=sub.run_id, task_id=sub.task_id, head=framed.head,
             seq=len(envelopes), ok=False, errors=tuple(errors), bound=bound,
-            state=state, state_ref=state_ref, seed_state=seed,
+            state=EMPTY_STATE, state_ref=None, seed_state=EMPTY_STATE,
             envelopes=tuple(envelopes), bodies=tuple(bodies),
-            issued={}, completed={}, latest_checkpoint=None,
+            issued=MappingProxyType({}), completed=MappingProxyType({}),
+            latest_checkpoint=None,
             applied_change_ids=frozenset(), reverted_change_ids=frozenset(),
         )
 
-    # envelope structure: monotonic seq, correct scope, stable id
+    # envelope structure: monotonic seq, correct scope, stable id, CLOSED body
     for index, env in enumerate(envelopes):
         if env.seq != index + 1:
             errors.append(f"envelope {index} has seq {env.seq}, expected {index + 1}")
@@ -681,23 +887,31 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
             errors.append(f"envelope {env.seq} run_id {env.run_id!r} != {sub.run_id!r}")
         if env.event_id != f"{sub.run_id}#{env.seq}":
             errors.append(f"envelope {env.seq} has non-canonical id {env.event_id!r}")
+        body: object
         try:
-            bodies.append(codec.loads(sub.objects.get_text(env.body_ref)))
+            body = codec.loads(sub.objects.get_text(env.body_ref))
         except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
             errors.append(f"envelope {env.seq} body unreadable: {exc}")
             bodies.append(None)
-        else:
-            if codec.schema_of(type(bodies[-1])) != env.body_kind:
-                errors.append(f"envelope {env.seq} body_kind disagrees with its body")
+            continue
+        bodies.append(body)
+        if not isinstance(body, _BODY_UNION):
+            errors.append(
+                f"envelope {env.seq} body kind {env.body_kind!r} is not in the "
+                "closed substrate body union"
+            )
+        elif codec.schema_of(type(body)) != env.body_kind:
+            errors.append(f"envelope {env.seq} body_kind disagrees with its body")
     if errors:
-        return fail(None, None)
+        return fail(None)
 
     if not envelopes:  # a fresh, unbound run is verifiable
         return VerifiedSubstrateView(
             run_id=sub.run_id, task_id=sub.task_id, head=framed.head, seq=0,
             ok=True, errors=(), bound=None, state=EMPTY_STATE, state_ref=None,
-            seed_state=EMPTY_STATE, envelopes=(), bodies=(), issued={},
-            completed={}, latest_checkpoint=None,
+            seed_state=EMPTY_STATE, envelopes=(), bodies=(),
+            issued=MappingProxyType({}), completed=MappingProxyType({}),
+            latest_checkpoint=None,
             applied_change_ids=frozenset(), reverted_change_ids=frozenset(),
         )
 
@@ -708,12 +922,33 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
             "expected exactly one PolicyBound as the first event; found "
             f"{len(bound_indices)} at {bound_indices}"
         )
-        return fail(None, None)
+        return fail(None)
     bound = bodies[0]
     assert isinstance(bound, PolicyBound)
 
+    # the binding index must exist and AGREE with the authoritative event
+    if bound.task_id != sub.task_id:
+        errors.append(
+            f"bound task id {bound.task_id!r} disagrees with the opened scope "
+            f"{sub.task_id!r}"
+        )
+    if bound.surface_catalog_digest != sub.catalog.descriptor_digest():
+        errors.append(
+            "bound surface-catalog digest disagrees with the injected catalog — "
+            "the run's legal surfaces/validators changed underneath it"
+        )
+    binding = _read_binding(sub.root, sub.run_id)
+    if binding is None:
+        errors.append("run binding index is missing (never established)")
+    elif not binding.agrees_with(bound):
+        errors.append("run binding index disagrees with the authoritative PolicyBound")
+
     # CAS closure of the bound identity
-    for ref, what in [(bound.config_ref, "config"), (bound.seed_state_ref, "seed state")]:
+    for ref, what in [
+        (bound.config_ref, "config"),
+        (bound.seed_state_ref, "seed state"),
+        (bound.budget_ref, "budget spec"),
+    ]:
         if not sub.objects.has(ref):
             errors.append(f"bound {what} ref {ref[:12]}… missing from CAS")
     for role, ref in bound.prompt_refs.items():
@@ -727,7 +962,7 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
         errors.append(f"seed state unreadable: {exc}")
 
-    # fold authority events with an exact apply/revert replay
+    # fold authority events with an exact, PURE apply/revert replay
     state = seed_state
     state_ref: str | None = bound.seed_state_ref
     issued: dict[str, PolicyCommandIssued] = {}
@@ -756,6 +991,8 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
                 errors.append(
                     f"command {body.command_id!r} has more than one terminal completion"
                 )
+            if env.caused_by != body.command_id:
+                errors.append(f"envelope {env.seq}: completion causation mismatch")
             completed[body.command_id] = body
         elif isinstance(body, (ChangeApplied, ChangeReverted)):
             new_ref, new_state = _replay(sub, state, state_ref, body, env, errors)
@@ -767,6 +1004,12 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
                 seen_change_ids.add(cid)
                 applied_ids.add(cid)
             else:
+                if cid not in applied_ids:
+                    errors.append(
+                        f"envelope {env.seq}: revert of {cid!r} that was never applied"
+                    )
+                if cid in reverted_ids:
+                    errors.append(f"envelope {env.seq}: duplicate revert of {cid!r}")
                 reverted_ids.add(cid)
         elif isinstance(body, PolicyCheckpointed):
             latest_checkpoint = body
@@ -780,17 +1023,24 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
                 errors.append(
                     f"envelope {env.seq}: observation subject state missing from CAS"
                 )
+            if not sub.objects.has(body.observation_ref):
+                errors.append(
+                    f"envelope {env.seq}: observation body missing from CAS"
+                )
         elif isinstance(body, ChangeProposed):
             if not sub.objects.has(body.change_ref):
                 errors.append(f"envelope {env.seq}: proposed change ref missing")
         # ChangeConfirmed / ChangeRevised / OperationFailed: annotation only
 
-    ok = not errors
+    if errors:
+        return fail(bound)
     return VerifiedSubstrateView(
         run_id=sub.run_id, task_id=sub.task_id, head=framed.head, seq=len(envelopes),
-        ok=ok, errors=tuple(errors), bound=bound, state=state, state_ref=state_ref,
+        ok=True, errors=(), bound=bound, state=state, state_ref=state_ref,
         seed_state=seed_state, envelopes=tuple(envelopes), bodies=tuple(bodies),
-        issued=issued, completed=completed, latest_checkpoint=latest_checkpoint,
+        issued=MappingProxyType(dict(issued)),
+        completed=MappingProxyType(dict(completed)),
+        latest_checkpoint=latest_checkpoint,
         applied_change_ids=frozenset(applied_ids),
         reverted_change_ids=frozenset(reverted_ids),
     )
@@ -808,8 +1058,8 @@ def _verify_state(
         if key in seen:
             errors.append(f"{what} has a duplicate binding {key}")
         seen.add(key)
-        if key not in SURFACE_ALLOWLIST:
-            errors.append(f"{what} binding {key} is not allowlisted")
+        if not sub.catalog.allows(*key):
+            errors.append(f"{what} binding {key} is not in the surface catalog")
         if not sub.objects.has(binding.content_ref):
             errors.append(f"{what} binding {key} content missing from CAS")
 
@@ -822,6 +1072,8 @@ def _replay(
     env: EventEnvelope,
     errors: list[str],
 ) -> tuple[str, HarnessState]:
+    """PURE replay: recompute the expected after-state ref WITHOUT publishing
+    anything to CAS (verify must never write)."""
     assert isinstance(body, (ChangeApplied, ChangeReverted))
     if body.before_state_ref != (state_ref or ""):
         errors.append(
@@ -834,8 +1086,8 @@ def _replay(
     )
     try:
         change = codec.loads(sub.objects.get_text(change_ref), CompositeChange)
-        recomputed = apply_change(state, change)
-        recomputed_ref = sub.put_state(recomputed)
+        recomputed = apply_change(state, change, sub.catalog)
+        recomputed_ref = hash_text(codec.dumps(recomputed))  # pure: no put
     except (ObjectMissing, ObjectCorruption, codec.SchemaError, SubstrateError) as exc:
         errors.append(f"envelope {env.seq}: change does not replay: {exc}")
         return body.after_state_ref, state
@@ -850,7 +1102,6 @@ def _replay(
 __all__ = [
     "EMPTY_STATE",
     "SUBSTRATE_STREAM",
-    "SURFACE_ALLOWLIST",
     "ChangeApplied",
     "ChangeConfirmed",
     "ChangeProposed",
@@ -865,6 +1116,7 @@ __all__ = [
     "PolicyCheckpointed",
     "PolicyCommandCompleted",
     "PolicyCommandIssued",
+    "RunBinding",
     "Substrate",
     "SubstrateError",
     "SurfaceBinding",
@@ -874,4 +1126,5 @@ __all__ = [
     "canonical_state",
     "new_run_id",
     "validate_change",
+    "validate_run_id",
 ]

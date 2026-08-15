@@ -1204,3 +1204,77 @@ accepted-and-current at resume time.
   ForkObservation. (3) apply allowlist check must precede CAS-closure check.
 
 115 tests, mypy strict clean (30 files). PR updated; NOT merged.
+
+## vNext Phase A — correction pass #3 (hardening before merge)
+
+Goal: correct PR #50 across six areas, preserve the vNext thesis and the
+deletion of promotion-era compatibility, do NOT begin continual-refine@1 or
+Pareto, update the PR and STOP for review (no merge).
+
+New module: `strive/surfaces.py` — injected immutable `SurfaceCatalog`
+(`SurfaceDescriptor` per legal surface + `descriptor_digest()`) and trusted
+structural validators (`validate_solve_code` requires exactly one top-level
+`solve(input_text)`; `validate_prompt` requires non-empty). Threaded through
+the substrate (`validate_change`/`apply_change`/`stage_change_closure`/
+`bind_policy`/`_verify_state` take/consult the catalog).
+
+Area 1 — exact run identity. `new_run_id()` is now opaque (`run-<uuid>`; no
+task encoded); `validate_run_id` rejects separators/`..`/empty/oversize.
+`PolicyBound` bumped to v3 and now pins task_id + task_fingerprint,
+policy_ref + policy_digest (inspect.getsource of the policy class), config,
+prompts, seed + seed_state, budget_ref, required_capabilities,
+surface_catalog_digest. New `RunBinding` (v1) is a discovery index written to
+`<root>/runs/<run>.binding.json` (write-once, atomic), cross-checked against
+the in-stream PolicyBound on every verify. `Substrate.discover()` opens a run
+by reading the binding (never string-parsing the id). Kernel `_enforce_identity`
+checks all pinned fields on resume.
+
+Area 2 — pure/closed/complete verify. `_replay` recomputes expected refs with
+`hash_text(codec.dumps(...))` (NO put_state — verify never writes). Closed
+`_BODY_UNION` (anything else → error). Added completion-causation,
+revert-after-unreverted-apply and no-duplicate-revert, observation-body and
+binding-agreement checks. The failure path returns EMPTY state (never exposes
+active state from an unverifiable stream).
+
+Area 3 — identity + codecs + immutability. `_run_command` re-derives the
+command payload digest and compares it to the issued digest BEFORE both the
+already-completed and already-issued paths. Strict typed JSON encoder replaces
+`json.dumps(default=str)` (refuses to coerce unknown types). `_ConfigBlob`/
+`_PolicyStateBlob` bumped to v2 with an `encoding` field (checked on load).
+`_StoredResult` bumped to v2 to persist the original `head`. TOML load uses a
+strict `_require_str` (no `str()` coercion). `VerifiedSubstrateView.issued/
+completed` are `MappingProxyType`.
+
+Area 4 — honest effects + budgets. `ForkObservation` bumped to v3 with a
+`usage: BudgetUsage` field; `_seed_meter` re-seeds cumulative spend from the
+durable per-fork usage on resume; `BudgetMeter.absorb` added; budget spec is
+put to CAS + pinned in PolicyBound (budget_ref); resume with a different
+budget is rejected. `_score` now also notes cumulative output bytes (wall +
+executions already gated pre-request). Documented that durable state effects
+reconcile exactly, a completed fork is reused (not re-run/re-charged), and
+model calls (deferred) must record `indeterminate` on dispatch-without-result.
+
+Area 5 — hardened CAS. Canonical sha256 ref validation (traversal-safe
+`_path`), hash-verified reads, `has(verify=True)`, concurrent-writer-safe
+publication (mkstemp per writer + fsync + atomic replace + dir fsync).
+
+Area 6 — command-path mutation. `kernel.operator_revert(services, change_id)`
+issues a durable `RevertChange` operator command (with a precheck so operators
+get an honest error, not a silent no-op) through `_run_command`; the CLI
+`revert` calls it instead of `Substrate.revert`. CLI `_open_view` uses
+`Substrate.discover` (no id parsing); top-level error handling catches CAS +
+surface-validation errors. manual-change@1: `reduce` routes any non-ok
+outcome to a terminal `failed` phase; `{parent_generation_id}` removed from
+the TOML target prompt and the CLI baseline prompt.
+
+Adversarial tests added: `test_cas.py` (traversal, corrupt-but-present,
+concurrent writers), `test_surfaces.py` (validators + catalog digest),
+`test_adversarial.py` (run/task spoofing, traversal ids, hyphenated-task
+discovery, binding tamper, unknown body kinds, corrupt CAS hides state, verify
+purity, arbitrary/duplicate revert, changed re-derived command, budget
+reset/expansion refusal, invalid seed + staged content), `test_packaging.py`
+(built wheel ships the toml + prompt and declares the console script).
+
+Result: 159 tests pass (was 115), `uv run mypy` clean over 35 files (src +
+tests). CLI smoke confirms opaque ids, binding discovery, and budget re-seed
+on resume. PR to be updated; NOT merged — stop for review.
