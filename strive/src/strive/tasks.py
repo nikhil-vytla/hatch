@@ -73,17 +73,27 @@ class Task:
         return self.cases_in(AUDIT)
 
     def fingerprint(self) -> str:
-        """A RECONSTRUCTABLE identity of the task AND its scorer: id, version,
-        the strategy signature, the primitive catalog, every case, AND the
-        source of `score_case` (scorer semantics). Two tasks that score
-        differently — even with identical cases — fingerprint differently, so a
-        resumed run detects a scorer swap, not only a case-set change."""
+        """A RECONSTRUCTABLE identity of the task AND its full evaluation
+        semantics: id, version, signature, primitive catalog, every case, the
+        per-case scorer (`score_case`), the CASE-SELECTION rule
+        (`selection_cases` — which cases a fork scores), AND the AGGREGATE
+        evaluator (`strive.evaluate.evaluate` + `_aggregate`). Two tasks that
+        select or aggregate differently fingerprint differently, so a resumed
+        run detects an evaluation-semantics swap, not only a scorer or
+        case-set change."""
         import inspect
 
-        try:
-            scorer_src = inspect.getsource(type(self).score_case)
-        except (OSError, TypeError):
-            scorer_src = type(self).score_case.__qualname__
+        from strive import evaluate as _eval
+
+        def _src(obj: object) -> str:
+            try:
+                return inspect.getsource(obj)  # type: ignore[arg-type]
+            except (OSError, TypeError):
+                return getattr(obj, "__qualname__", repr(obj))
+
+        def _digest(text: str) -> str:
+            return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
         canonical = json.dumps(
             {
                 "task_id": self.task_id,
@@ -93,12 +103,14 @@ class Task:
                 "cases": [
                     [c.case_id, c.input_text, c.expected, c.split] for c in self.cases
                 ],
-                "scorer_impl": hashlib.sha256(scorer_src.encode("utf-8")).hexdigest(),
+                "scorer_impl": _digest(_src(type(self).score_case)),
+                "selection_impl": _digest(_src(type(self).selection_cases)),
+                "evaluator_impl": _digest(_src(_eval.evaluate) + _src(_eval._aggregate)),
             },
             sort_keys=True,
             separators=(",", ":"),
         )
-        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return _digest(canonical)
 
     def score_case(
         self, case: TaskCase, output: int | None, error: str | None

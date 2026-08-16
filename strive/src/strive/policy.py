@@ -208,14 +208,20 @@ class AdaptationPolicy(Protocol[Config, State]):
 @dataclass(frozen=True)
 class PolicyDescriptor:
     """An immutable catalog entry: a policy name, a factory, an authoritative
-    config loader (TOML path → frozen Config), and the versioned prompt slots
-    the policy pins (role → file path)."""
+    config loader (TOML path → frozen Config), the versioned prompt slots the
+    policy pins (role → file path), and an EXPLICIT policy-package manifest —
+    the module names whose source is part of the policy's durable identity
+    (`dependency_modules`), i.e. any strategy/helper module the policy relies on
+    OUTSIDE its own module. The kernel folds these module sources into the
+    pinned policy digest, so a change to a declared dependency is detected on
+    resume even though it lives elsewhere."""
 
     name: str
     factory: Callable[[], "AdaptationPolicy[Any, Any]"]
     config_loader: Callable[[str], object]
     default_config_path: str
     prompt_files: dict[str, str] = field(default_factory=dict)
+    dependency_modules: tuple[str, ...] = ()
 
 
 class PolicyCatalog:

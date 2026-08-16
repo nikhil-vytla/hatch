@@ -46,7 +46,7 @@ def _case(cid: str = "c", text: str = "1 2 3") -> TaskCase:
 
 def _run(source: str, text: str = "1 2 3") -> tuple[object, str | None]:
     """Run a one-case suite; return (output, error)."""
-    outcomes, _prov, _denials = run_protected_suite(
+    outcomes, _prov, _denials, *_ = run_protected_suite(
         DENO, source, (_case("c", text),), generation_id="adv"
     )
     o = outcomes["c"]
@@ -231,7 +231,7 @@ def test_state_does_not_persist_across_cases() -> None:
         "    return 1 if prev is None else 999"
     )
     cases = (_case("a", "1 2 3"), _case("b", "1 2 3"))
-    outcomes, _prov, _denials = run_protected_suite(
+    outcomes, _prov, _denials, *_ = run_protected_suite(
         DENO, src, cases, generation_id="persist"
     )
     # if state leaked, the second case would see prev != None and return 999
@@ -258,7 +258,7 @@ def test_infinite_loop_does_not_hang_controller() -> None:
     from strive.sandboxes import SandboxLimits
 
     src = "def solve(t):\n    while True:\n        pass"
-    outcomes, _prov, _denials = run_protected_suite(
+    outcomes, _prov, _denials, *_ = run_protected_suite(
         DENO, src, (_case(),), generation_id="loop",
         limits=SandboxLimits(wall_time_s=3.0),
     )
@@ -369,7 +369,7 @@ def test_forged_extra_results_are_rejected() -> None:
         "{\"output\":2,\"error\":null,\"duration_ms\":0.0}]}'\n"
         "    return 5"
     )
-    outcomes, _prov, _denials = run_protected_suite(
+    outcomes, _prov, _denials, *_ = run_protected_suite(
         DENO, src, (_case("only", "5"),), generation_id="forge"
     )
     assert set(outcomes) == {"only"}  # exactly the parent-dispatched case id
@@ -382,7 +382,7 @@ def test_resource_limit_caps_cpu_runaway() -> None:
     # rlimit launcher's CPU ceiling) — the controller never hangs
     from strive.sandboxes import SandboxLimits
 
-    outcomes, _prov, denials = run_protected_suite(
+    outcomes, _prov, denials, *_ = run_protected_suite(
         DENO,
         "def solve(t):\n    x = 0\n    while True:\n        x += 1",
         (_case("c", "1"),),

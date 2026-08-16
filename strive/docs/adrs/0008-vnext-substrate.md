@@ -221,6 +221,36 @@ closed and neutral:
   rebuilt fresh from the durable per-attempt ledger; wall is cumulative active
   time and output is enforced cumulatively across cases.
 
+## Phase-A command/attempt state-machine pass
+
+The final pass makes each command and external attempt a single verifiable
+lifecycle:
+
+- **Closed per-command grammar.** `verify()` enforces the exact allowed effects
+  per command kind + outcome (proposal/apply, exact revert, fork
+  proposal→dispatch→result×2→summary, confirmation, or none for schedule/stop),
+  rejects effects before intent / after terminal, missing/extra effects, a
+  successful terminal without a `StoredResult`, and duplicate checkpoints; a
+  checkpoint follows one terminal, consumes its command once, and pins the
+  exact reduced state.
+- **Typed command/result semantics.** Embedded command/config/policy-state JSON
+  must be canonical; a `StoredResult` matches its command's id/kind/outcome,
+  proposal ref, observation ref, and metrics; `expected_state_ref` stays in the
+  durable identity; initial and reconstructed results are byte-for-byte equal.
+- **Fork-attempt lifecycle.** One dispatch → at most one result per
+  `(command_id, label)`, no result without a dispatch, base before candidate,
+  dispatch/result `state_ref` equal to the observation subject, a summary equal
+  to the two durable results and the issued candidate change, provenance that
+  satisfies the pinned capability profile, and finite/nonnegative usage.
+- **Honest budget dimensions.** Open dispatches reserve executions AND wall AND
+  output; `CandidateExecutor` preserves the actual backend wall/output/failure
+  (no zeroed wall, no error-string byte counts); output is enforced from real
+  captured bytes.
+- **Pinned evaluation + policy package.** The task fingerprint includes the
+  case-selection and aggregate-evaluator identity; a policy descriptor may
+  declare an explicit `dependency_modules` manifest folded into the policy
+  digest.
+
 ## Sources: borrowed / rejected / deferred
 
 - **Borrowed** — exo (note 04): durable adaptation mechanisms + journaled
