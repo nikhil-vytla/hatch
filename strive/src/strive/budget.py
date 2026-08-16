@@ -42,6 +42,7 @@ class BudgetMeter:
     def __init__(self, spec: BudgetSpec) -> None:
         self.spec = spec
         self._started = time.monotonic()
+        self._absorbed_wall = 0.0  # durable active time from prior processes
         self._executions = 0
         self._model_calls = 0
         self._tokens = 0
@@ -52,7 +53,9 @@ class BudgetMeter:
     # -- accounting -----------------------------------------------------------
 
     def elapsed_wall_s(self) -> float:
-        return time.monotonic() - self._started
+        # DURABLE wall: cumulative active time across restarts (absorbed from
+        # durable usage) plus this process's own elapsed time.
+        return self._absorbed_wall + (time.monotonic() - self._started)
 
     def remaining_wall_s(self) -> float:
         if not _limited(self.spec.wall_time_s):
@@ -72,9 +75,10 @@ class BudgetMeter:
 
     def absorb(self, usage: BudgetUsage) -> None:
         """Seed cumulative spend from durably-recorded prior usage, so a
-        resumed run cannot reset or expand its budget. Wall time is NOT
-        resumed — it is a within-process guard, and each process starts its
-        own wall clock (the durable ceilings are the countable resources)."""
+        resumed run cannot reset or expand its budget. Wall time IS resumed as
+        cumulative active time (durable wall semantics), so a run cannot buy
+        unbounded wall by repeatedly restarting."""
+        self._absorbed_wall += usage.wall_time_s
         self._executions += usage.executions
         self._model_calls += usage.model_calls
         self._tokens += usage.tokens

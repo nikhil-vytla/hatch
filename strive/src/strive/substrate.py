@@ -56,6 +56,19 @@ from strive.codec import register
 from strive.contracts import BudgetSpec
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramingError
+from strive.runtime import (
+    ENCODING,
+    FORK_DISPATCH,
+    FORK_RESULT,
+    FORK_SUMMARY,
+    AttemptDispatched,
+    AttemptRecord,
+    CommandPayload,
+    ConfigBlob,
+    ForkObservation,
+    PolicyStateBlob,
+    StoredResult,
+)
 from strive.surfaces import (
     SurfaceCatalog,
     SurfaceDescriptorSnapshot,
@@ -179,18 +192,15 @@ class CompositeChange:
         return refs
 
 
-def validate_change(change: CompositeChange, catalog: SurfaceCatalog | None = None) -> None:
-    cat = catalog or default_surface_catalog()
+def _shape_check(change: CompositeChange) -> None:
+    """Catalog-INDEPENDENT shape rules: non-empty, no duplicate surface, no
+    no-op delta. (Membership is checked separately — against the live catalog
+    for reads, against the run's PINNED set for mutation.)"""
     seen: set[tuple[str, str]] = set()
     if not change.deltas:
         raise SubstrateError("a change must carry at least one delta")
     for delta in change.deltas:
         key = (delta.kind, delta.name)
-        if not cat.allows(*key):
-            raise SubstrateError(
-                f"surface {key} is not in the surface catalog "
-                f"(allowed: {sorted(cat.keys())})"
-            )
         if key in seen:
             raise SubstrateError(f"duplicate delta for surface {key}")
         seen.add(key)
@@ -198,13 +208,23 @@ def validate_change(change: CompositeChange, catalog: SurfaceCatalog | None = No
             raise SubstrateError(f"no-op delta for surface {key}")
 
 
-def apply_change(
-    state: HarnessState, change: CompositeChange, catalog: SurfaceCatalog | None = None
-) -> HarnessState:
-    """Apply a change EXACTLY: every `before_ref` must equal the surface's
-    current content (a stale before is a conflict); `after_ref=None` removes
-    it. Returns the new canonical state."""
-    validate_change(change, catalog)
+def validate_change(change: CompositeChange, catalog: SurfaceCatalog | None = None) -> None:
+    _shape_check(change)
+    cat = catalog or default_surface_catalog()
+    for delta in change.deltas:
+        key = (delta.kind, delta.name)
+        if not cat.allows(*key):
+            raise SubstrateError(
+                f"surface {key} is not in the surface catalog "
+                f"(allowed: {sorted(cat.keys())})"
+            )
+
+
+def _apply_deltas(state: HarnessState, change: CompositeChange) -> HarnessState:
+    """Apply a change EXACTLY (shape-checked, NO catalog membership): every
+    `before_ref` must equal the surface's current content (a stale before is a
+    conflict); `after_ref=None` removes it. Returns the new canonical state."""
+    _shape_check(change)
     current = state.as_map()
     for delta in change.deltas:
         key = (delta.kind, delta.name)
@@ -219,6 +239,15 @@ def apply_change(
         else:
             current[key] = delta.after_ref
     return canonical_state(current)
+
+
+def apply_change(
+    state: HarnessState, change: CompositeChange, catalog: SurfaceCatalog | None = None
+) -> HarnessState:
+    """Apply a change with catalog-membership validation (used for reads /
+    replay). Mutation paths use pinned membership + `_apply_deltas` directly."""
+    validate_change(change, catalog)
+    return _apply_deltas(state, change)
 
 
 # -- event bodies (typed; the envelope carries id/scope/causation/time) ---------------------------
@@ -635,6 +664,11 @@ class Substrate:
     def _emit(
         self, body: object, *, caused_by: str | None, view: VerifiedSubstrateView
     ) -> VerifiedSubstrateView:
+        """Append ONE authority event ATOMICALLY: the candidate envelope is
+        preflighted through a PURE fold of the resulting stream, and the append
+        is refused unless the POST-event view is fully valid. So an accepted
+        append can never turn a valid run invalid; a rejected one leaves the
+        journal byte-for-byte unchanged (only an orphan CAS body may remain)."""
         envelope = EventEnvelope(
             event_id=f"{self.run_id}#{view.seq + 1}",
             run_id=self.run_id,
@@ -642,9 +676,15 @@ class Substrate:
             seq=view.seq + 1,
             caused_by=caused_by,
             body_kind=codec.schema_of(type(body)),
-            body_ref=self.put(body),
+            body_ref=self.put(body),  # orphan-safe: no journal write yet
             at=now_iso(),
         )
+        post = _fold_view(self, view.head, list(view.envelopes) + [envelope], [])
+        if not post.ok:
+            raise SubstrateError(
+                "refusing to append: the resulting run would be invalid "
+                f"({'; '.join(post.errors[:3])})"
+            )
         try:
             self.journal.append_batch([envelope], expected_head=view.head)
         except FramingError as exc:
@@ -808,18 +848,57 @@ class Substrate:
             caused_by=caused_by, view=view,
         )
 
+    def _pinned(self, view: VerifiedSubstrateView) -> dict[str, SurfaceDescriptorSnapshot]:
+        """The run's PINNED surface descriptor snapshots (from PolicyBound),
+        loaded + decoded. A run may only mutate/validate through THESE."""
+        assert view.bound is not None
+        pinned: dict[str, SurfaceDescriptorSnapshot] = {}
+        for key, ref in view.bound.surface_descriptor_refs.items():
+            pinned[key] = codec.loads(self.objects.get_text(ref), SurfaceDescriptorSnapshot)
+        return pinned
+
+    def _validate_pinned_content(
+        self, pinned: dict[str, SurfaceDescriptorSnapshot], kind: str, name: str, content: str
+    ) -> None:
+        snap = pinned.get(f"{kind}/{name}")
+        if snap is None:
+            raise SubstrateError(
+                f"surface {(kind, name)} is not pinned in this run (a rebind/new "
+                "run is required to mutate it)"
+            )
+        try:
+            descriptor = self.catalog.resolve_pinned(snap)  # refuses validator drift
+            descriptor.validator(content)
+        except SurfaceValidationError as exc:
+            raise SubstrateError(
+                f"content for {(kind, name)} is invalid under the pinned "
+                f"descriptor: {exc}"
+            ) from None
+
     def stage_change_closure(self, change: CompositeChange, blobs: dict[str, str]) -> None:
         """Stage EXACTLY the CAS objects a change references, verifying each
         blob hashes to its ref. Reject any UNRELATED staged blob. Then validate
-        EVERY referenced surface artifact structurally — even one already
-        present in the shared CAS — so a change can never install content that
-        would fail its surface's validator."""
-        validate_change(change, self.catalog)
+        EVERY referenced surface artifact structurally THROUGH THE RUN'S PINNED
+        descriptors — even one already present in the shared CAS — so a change
+        can never install content that would fail its surface's pinned
+        validator, and can never touch a surface the run did not pin."""
+        view = self.verify()
+        self._require_ok(view, "stage-change")
+        if view.bound is None:
+            raise SubstrateError("cannot stage a change before the policy is bound")
+        pinned = self._pinned(view)
+        _shape_check(change)
         after_surface = {
             d.after_ref: (d.kind, d.name)
             for d in change.deltas
             if d.after_ref is not None
         }
+        for delta in change.deltas:  # membership: only pinned surfaces
+            if f"{delta.kind}/{delta.name}" not in pinned:
+                raise SubstrateError(
+                    f"change touches surface {(delta.kind, delta.name)} not pinned "
+                    "in this run"
+                )
         needed = change.referenced_refs()
         unrelated = set(blobs) - needed
         if unrelated:
@@ -839,14 +918,16 @@ class Substrate:
                 f"change {change.change_id!r} references CAS objects not "
                 f"staged: {sorted(r[:12] for r in missing)}"
             )
-        # validate EVERY referenced surface artifact, incl. ones already shared
+        # validate EVERY referenced surface artifact through the PINNED
+        # descriptor, incl. ones already shared in CAS
         for ref, (kind, name) in after_surface.items():
             try:
-                self.catalog.validate_content(kind, name, self.objects.get_text(ref))
-            except (SurfaceValidationError, ObjectMissing, ObjectCorruption) as exc:
+                content = self.objects.get_text(ref)
+            except (ObjectMissing, ObjectCorruption) as exc:
                 raise SubstrateError(
-                    f"referenced content for {(kind, name)} is invalid: {exc}"
+                    f"referenced content for {(kind, name)} unreadable: {exc}"
                 ) from None
+            self._validate_pinned_content(pinned, kind, name, content)
 
     def apply(
         self, *, change: CompositeChange, caused_by: str,
@@ -865,14 +946,21 @@ class Substrate:
                 f"{str(expected_state_ref)[:12]!r} but the run's state is "
                 f"{str(view.state_ref)[:12]!r}"
             )
-        validate_change(change, self.catalog)  # catalog / shape before apply
+        _shape_check(change)
+        pinned = self._pinned(view)
+        for delta in change.deltas:  # only PINNED surfaces may be mutated
+            if f"{delta.kind}/{delta.name}" not in pinned:
+                raise SubstrateError(
+                    f"apply refused: surface {(delta.kind, delta.name)} is not "
+                    "pinned in this run (rebind/new run required)"
+                )
         for ref in change.referenced_refs():
             if not self.objects.has(ref):
                 raise SubstrateError(
                     f"apply refused: change references un-staged CAS object "
                     f"{ref[:12]}… (stage the full closure first)"
                 )
-        after = apply_change(view.state, change, self.catalog)
+        after = _apply_deltas(view.state, change)
         assert view.state_ref is not None
         return self._emit(
             ChangeApplied(
@@ -925,7 +1013,7 @@ class Substrate:
         assert applied is not None
         change = codec.loads(self.objects.get_text(applied.change_ref), CompositeChange)
         revert = change.invert()
-        after = apply_change(view.state, revert, self.catalog)
+        after = _apply_deltas(view.state, revert)  # surfaces already pinned (applied)
         assert view.state_ref is not None
         return self._emit(
             ChangeReverted(
@@ -977,26 +1065,39 @@ def _find_applied(view: VerifiedSubstrateView, change_id: str) -> ChangeApplied 
     return None
 
 
-def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one place, exhaustive
+def _verify(sub: Substrate) -> VerifiedSubstrateView:
+    """Read the journal and fold it into a verified view (pure — no writes)."""
     framed = sub.journal.read()
-    errors: list[str] = []
+    framing_errors: list[str] = []
     if framed.errors or framed.torn_tail:
-        errors.append(
+        framing_errors.append(
             f"journal has {framed.errors} unverifiable line(s)"
             + (", torn tail" if framed.torn_tail else "")
         )
-
     envelopes: list[EventEnvelope] = []
-    bodies: list[object] = []
     for entry in framed.entries:
         assert isinstance(entry, EventEnvelope)
         envelopes.append(entry)
+    return _fold_view(sub, framed.head, envelopes, framing_errors)
+
+
+def _fold_view(  # noqa: C901 — one place, exhaustive
+    sub: Substrate,
+    head: str,
+    envelopes: list[EventEnvelope],
+    framing_errors: list[str],
+) -> VerifiedSubstrateView:
+    """The PURE fold over a candidate list of envelopes. Used both to verify
+    the persisted stream and to PREFLIGHT a would-be append (existing envelopes
+    plus one candidate) before it is written."""
+    errors: list[str] = list(framing_errors)
+    bodies: list[object] = []
 
     def fail(bound: PolicyBound | None) -> VerifiedSubstrateView:
         # NEVER expose active state from an unverifiable stream — seed and
         # active state are both withheld (EMPTY) so no caller can act on them.
         return VerifiedSubstrateView(
-            run_id=sub.run_id, task_id=sub.task_id, head=framed.head,
+            run_id=sub.run_id, task_id=sub.task_id, head=head,
             seq=len(envelopes), ok=False, errors=tuple(errors), bound=bound,
             state=EMPTY_STATE, state_ref=None, seed_state=EMPTY_STATE,
             envelopes=tuple(envelopes), bodies=tuple(bodies),
@@ -1038,7 +1139,7 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
 
     if not envelopes:  # a fresh, unbound run is verifiable
         return VerifiedSubstrateView(
-            run_id=sub.run_id, task_id=sub.task_id, head=framed.head, seq=0,
+            run_id=sub.run_id, task_id=sub.task_id, head=head, seq=0,
             ok=True, errors=(), bound=None, state=EMPTY_STATE, state_ref=None,
             seed_state=EMPTY_STATE, envelopes=(), bodies=(),
             issued=MappingProxyType({}), completed=MappingProxyType({}),
@@ -1068,9 +1169,11 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
 
     # decode + hash-verify the bound identity refs — has() alone is insufficient
     try:
-        sub.objects.get_text(bound.config_ref)  # opaque blob; hash-verify only
-    except (ObjectMissing, ObjectCorruption) as exc:
-        errors.append(f"bound config ref unreadable: {exc}")
+        cfg = codec.loads(sub.objects.get_text(bound.config_ref), ConfigBlob)
+        if cfg.encoding != ENCODING:
+            errors.append(f"bound config encoding {cfg.encoding!r} != {ENCODING!r}")
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+        errors.append(f"bound config ref does not decode: {exc}")
     try:
         codec.loads(sub.objects.get_text(bound.budget_ref), BudgetSpec)
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
@@ -1095,11 +1198,13 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
     state = seed_state
     state_ref: str | None = bound.seed_state_ref
     issued: dict[str, PolicyCommandIssued] = {}
+    payloads: dict[str, CommandPayload] = {}
     completed: dict[str, PolicyCommandCompleted] = {}
     latest_checkpoint: PolicyCheckpointed | None = None
     applied_ids: set[str] = set()
     reverted_ids: set[str] = set()
     applied_changes: dict[str, CompositeChange] = {}
+    proposals: dict[str, str] = {}  # change_id -> change_ref (one per change id)
 
     for env, body in zip(envelopes[1:], bodies[1:], strict=True):
         kind = env.body_kind
@@ -1115,10 +1220,16 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
                 )
             elif env.caused_by != body.command_id:
                 errors.append(f"envelope {env.seq}: an issue must be self-caused")
+            # decode the payload as a typed CommandPayload and match its scope
             try:
-                sub.objects.get_text(body.command_ref)  # hash-verify the payload
-            except (ObjectMissing, ObjectCorruption) as exc:
-                errors.append(f"envelope {env.seq}: command payload unreadable: {exc}")
+                payload = codec.loads(sub.objects.get_text(body.command_ref), CommandPayload)
+                if payload.command_id != body.command_id:
+                    errors.append(f"envelope {env.seq}: payload command_id disagrees")
+                if payload.kind != body.command_kind:
+                    errors.append(f"envelope {env.seq}: payload kind disagrees with intent")
+                payloads.setdefault(body.command_id, payload)
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                errors.append(f"envelope {env.seq}: command payload does not decode: {exc}")
             issued.setdefault(body.command_id, body)
             continue
 
@@ -1126,6 +1237,7 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
         # appears EARLIER (valid order) and is of a COMPATIBLE kind.
         cause = env.caused_by
         cause_issue = issued.get(cause) if cause is not None else None
+        cause_payload = payloads.get(cause) if cause is not None else None
         if cause is None or cause_issue is None:
             errors.append(
                 f"envelope {env.seq} ({kind}) does not cite an issued command"
@@ -1149,7 +1261,14 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
                 errors.append(f"envelope {env.seq}: unknown outcome {body.outcome!r}")
             if body.result_ref is not None:
                 try:
-                    codec.loads(sub.objects.get_text(body.result_ref))
+                    stored = codec.loads(sub.objects.get_text(body.result_ref), StoredResult)
+                    if stored.command_id != body.command_id:
+                        errors.append(f"envelope {env.seq}: result command_id disagrees")
+                    if stored.outcome != body.outcome:
+                        errors.append(f"envelope {env.seq}: result outcome disagrees")
+                    issue = issued.get(body.command_id)
+                    if issue is not None and stored.kind != issue.command_kind:
+                        errors.append(f"envelope {env.seq}: result kind disagrees with intent")
                 except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
                     errors.append(f"envelope {env.seq}: result ref does not decode: {exc}")
             completed[body.command_id] = body
@@ -1164,7 +1283,19 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
             if change is not None:
                 if change.change_id != cid:
                     errors.append(f"envelope {env.seq}: applied change id/ref disagree")
+                _require_pinned_deltas(change, bound, env, errors)
                 applied_changes[cid] = change
+            # the applied change must match BOTH its proposal AND the durable
+            # command payload's target change — not merely a command kind.
+            if proposals.get(cid) != body.change_ref:
+                errors.append(
+                    f"envelope {env.seq}: applied change does not match its proposal"
+                )
+            if cause_payload is not None and cause_payload.change_ref != body.change_ref:
+                errors.append(
+                    f"envelope {env.seq}: applied change does not match the issued "
+                    "command payload"
+                )
         elif isinstance(body, ChangeReverted):
             new_ref, new_state = _replay(sub, state, state_ref, body, env, errors)
             state, state_ref = new_state, new_ref
@@ -1178,8 +1309,9 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
             reverted_ids.add(cid)
             revert_change = _decode_change(sub, body.revert_change_ref, env, errors)
             applied = applied_changes.get(cid)
-            if revert_change is not None and applied is not None:
-                if revert_change != applied.invert():
+            if revert_change is not None:
+                _require_pinned_deltas(revert_change, bound, env, errors)
+                if applied is not None and revert_change != applied.invert():
                     errors.append(
                         f"envelope {env.seq}: revert is not the EXACT inverse of the "
                         f"applied change {cid!r}"
@@ -1187,9 +1319,14 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
         elif isinstance(body, PolicyCheckpointed):
             latest_checkpoint = body
             try:
-                sub.objects.get_text(body.policy_state_ref)  # hash-verify the blob
-            except (ObjectMissing, ObjectCorruption) as exc:
-                errors.append(f"envelope {env.seq}: policy-state ref unreadable: {exc}")
+                st = codec.loads(sub.objects.get_text(body.policy_state_ref), PolicyStateBlob)
+                if st.encoding != ENCODING:
+                    errors.append(
+                        f"envelope {env.seq}: policy-state encoding {st.encoding!r} "
+                        f"!= {ENCODING!r}"
+                    )
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                errors.append(f"envelope {env.seq}: policy-state ref does not decode: {exc}")
             if body.state_ref != (state_ref or ""):
                 errors.append(
                     f"envelope {env.seq}: checkpoint state_ref disagrees with the "
@@ -1208,20 +1345,40 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
                         "it reduced"
                     )
         elif isinstance(body, ObservationRecorded):
-            for ref, what in [
-                (body.subject_state_ref, "subject state"),
-                (body.observation_ref, "observation body"),
-            ]:
-                if ref:
-                    try:
-                        codec.loads(sub.objects.get_text(ref))
-                    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
-                        errors.append(f"envelope {env.seq}: {what} does not decode: {exc}")
+            _verify_observation(sub, body, env, cause_payload, proposals, errors)
         elif isinstance(body, ChangeProposed):
+            if body.change_id in proposals:
+                errors.append(
+                    f"envelope {env.seq}: more than one proposal for change "
+                    f"{body.change_id!r} (one proposal per change id)"
+                )
+            proposals.setdefault(body.change_id, body.change_ref)
             proposed = _decode_change(sub, body.change_ref, env, errors)
             if proposed is not None and proposed.change_id != body.change_id:
                 errors.append(f"envelope {env.seq}: proposed change id/ref disagree")
-        # ChangeConfirmed / ChangeRevised / OperationFailed: annotation (caused-by checked)
+            if cause_payload is not None and cause_payload.change_ref != body.change_ref:
+                errors.append(
+                    f"envelope {env.seq}: proposal does not match its command's target "
+                    "change"
+                )
+        elif isinstance(body, ChangeConfirmed):
+            if body.change_id not in proposals:
+                errors.append(
+                    f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
+                    "never proposed"
+                )
+        elif isinstance(body, ChangeRevised):
+            if body.change_id not in proposals:
+                errors.append(
+                    f"envelope {env.seq}: revise of change {body.change_id!r} that was "
+                    "never proposed"
+                )
+            _decode_change(sub, body.new_change_ref, env, errors)
+        elif isinstance(body, OperationFailed):
+            if body.command_id != cause:
+                errors.append(
+                    f"envelope {env.seq}: OperationFailed command_id must equal caused_by"
+                )
 
     # validate the FINAL folded state's surface content too (catches corruption
     # or preexisting-invalid content surviving into current state)
@@ -1231,7 +1388,7 @@ def _verify(sub: Substrate) -> VerifiedSubstrateView:  # noqa: C901 — one plac
     if errors:
         return fail(bound)
     return VerifiedSubstrateView(
-        run_id=sub.run_id, task_id=sub.task_id, head=framed.head, seq=len(envelopes),
+        run_id=sub.run_id, task_id=sub.task_id, head=head, seq=len(envelopes),
         ok=True, errors=(), bound=bound, state=state, state_ref=state_ref,
         seed_state=seed_state, envelopes=tuple(envelopes), bodies=tuple(bodies),
         issued=MappingProxyType(dict(issued)),
@@ -1266,6 +1423,69 @@ def _decode_change(
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
         errors.append(f"envelope {env.seq}: change ref does not decode: {exc}")
         return None
+
+
+def _require_pinned_deltas(
+    change: CompositeChange, bound: PolicyBound, env: EventEnvelope, errors: list[str]
+) -> None:
+    """A run may only mutate surfaces PINNED in its PolicyBound — adding a
+    surface to the live catalog is not enough (that needs a rebind/new run)."""
+    for delta in change.deltas:
+        if f"{delta.kind}/{delta.name}" not in bound.surface_descriptor_refs:
+            errors.append(
+                f"envelope {env.seq}: change touches surface "
+                f"{(delta.kind, delta.name)} not pinned in this run"
+            )
+
+
+def _verify_observation(
+    sub: Substrate,
+    body: ObservationRecorded,
+    env: EventEnvelope,
+    cause_payload: CommandPayload | None,
+    proposals: dict[str, str],
+    errors: list[str],
+) -> None:
+    """Decode a fork observation as its EXPECTED typed body (dispatch / result /
+    summary) and cross-check its scope against the causing command."""
+    for ref, what in [
+        (body.subject_state_ref, "subject state"),
+        (body.observation_ref, "observation body"),
+    ]:
+        if ref:
+            try:
+                sub.objects.get_text(ref)  # hash-verify presence + UTF-8
+            except (ObjectMissing, ObjectCorruption) as exc:
+                errors.append(f"envelope {env.seq}: {what} unreadable: {exc}")
+    cause = env.caused_by
+    try:
+        if body.observation_kind == FORK_DISPATCH:
+            disp = codec.loads(sub.objects.get_text(body.observation_ref), AttemptDispatched)
+            if disp.command_id != cause:
+                errors.append(f"envelope {env.seq}: attempt dispatch command_id disagrees")
+            if disp.label not in ("base", "candidate"):
+                errors.append(f"envelope {env.seq}: unknown attempt label {disp.label!r}")
+        elif body.observation_kind == FORK_RESULT:
+            rec = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
+            if rec.command_id != cause:
+                errors.append(f"envelope {env.seq}: attempt result command_id disagrees")
+            if rec.label not in ("base", "candidate"):
+                errors.append(f"envelope {env.seq}: unknown attempt label {rec.label!r}")
+        elif body.observation_kind == FORK_SUMMARY:
+            fork = codec.loads(sub.objects.get_text(body.observation_ref), ForkObservation)
+            if cause_payload is not None and proposals.get(
+                fork.candidate_change_id
+            ) != cause_payload.change_ref:
+                errors.append(
+                    f"envelope {env.seq}: fork candidate does not match the proposed / "
+                    "issued change"
+                )
+        else:
+            errors.append(
+                f"envelope {env.seq}: unknown observation_kind {body.observation_kind!r}"
+            )
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+        errors.append(f"envelope {env.seq}: observation body does not decode: {exc}")
 
 
 def _validate_surface_content(

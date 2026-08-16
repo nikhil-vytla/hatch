@@ -14,6 +14,7 @@ import pytest
 from strive import codec
 from strive.cas import hash_text
 from strive.contracts import BudgetSpec
+from strive.runtime import ENCODING, CommandPayload, ConfigBlob
 from strive.substrate import (
     ChangeApplied,
     CompositeChange,
@@ -29,6 +30,30 @@ from strive.substrate import (
 from strive.events import now_iso
 
 TASK = "sum-integers"
+
+
+def _issue(sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None) -> None:
+    """Issue a command with a REAL typed CommandPayload (the substrate now
+    decodes and matches it), returning nothing."""
+    change_ref = sub.put(change) if change is not None else None
+    ref = sub.put(CommandPayload(command_id=cid, kind=kind, encoding=ENCODING,
+                                 change_ref=change_ref, json="{}"))
+    sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
+
+
+def _apply(sub: Substrate, cid: str, change: CompositeChange, blobs: dict[str, str],
+           *, expected_state_ref: str | None = None) -> None:
+    """The full valid apply lifecycle a direct caller must build: issue an
+    ApplyChange (payload carries the change), propose it, stage, apply."""
+    _issue(sub, cid, "ApplyChange", change)
+    sub.record_proposal(change=change, strategy_ref="t", caused_by=cid)
+    sub.stage_change_closure(change, blobs)
+    sub.apply(change=change, caused_by=cid, expected_state_ref=expected_state_ref)
+
+
+def _revert(sub: Substrate, cid: str, change_id: str) -> None:
+    _issue(sub, cid, "RevertChange")
+    sub.revert(change_id=change_id, caused_by=cid)
 
 
 def _code(ret: int) -> str:
@@ -49,7 +74,7 @@ def _bind(sub: Substrate) -> None:
         task_fingerprint="fp",
         policy_ref="manual-change@1",
         policy_digest="pd",
-        config_ref=sub.objects.put_text("cfg"),
+        config_ref=sub.put(ConfigBlob(ENCODING, "{}")),
         prompt_refs={"refine": sub.objects.put_text("prompt-md")},
         seed=1, seed_state=seed,
         budget_ref=sub.put(BudgetSpec()),  # budget must decode as a BudgetSpec
@@ -58,11 +83,13 @@ def _bind(sub: Substrate) -> None:
     )
 
 
-def _change(sub: Substrate, *, code: str, prompt: str) -> tuple[CompositeChange, dict[str, str]]:
+def _change(
+    sub: Substrate, *, code: str, prompt: str, change_id: str = "c1"
+) -> tuple[CompositeChange, dict[str, str]]:
     seed = sub.verify().seed_state.as_map()
     code_after, prompt_after = hash_text(code), hash_text(prompt)
     change = CompositeChange(
-        change_id="c1",
+        change_id=change_id,
         deltas=(
             SurfaceDelta("strategy-code", "solve", seed.get(("strategy-code", "solve")), code_after),
             SurfaceDelta("prompt", "proposal-template", seed.get(("prompt", "proposal-template")), prompt_after),
@@ -92,13 +119,11 @@ def test_apply_replays_and_revert_restores_exactly(tmp_path: Path) -> None:
     _bind(sub)
     seed_ref = sub.verify().state_ref
     change, blobs = _change(sub, code=_code(1), prompt="new proposal template")
-    # effects must cite an issued, compatible command (valid causation)
-    sub.issue_command(command_id="cmd-apply", command_kind="ApplyChange", command_ref=sub.objects.put_text("pl-apply"))
-    sub.stage_change_closure(change, blobs)
-    view = sub.apply(change=change, caused_by="cmd-apply")
+    _apply(sub, "cmd-apply", change, blobs)
+    view = sub.verify()
     assert view.ok and "c1" in view.applied_change_ids
-    sub.issue_command(command_id="cmd-revert", command_kind="RevertChange", command_ref=sub.objects.put_text("pl-revert"))
-    view = sub.revert(change_id="c1", caused_by="cmd-revert")
+    _revert(sub, "cmd-revert", "c1")
+    view = sub.verify()
     assert view.ok and "c1" in view.reverted_change_ids
     assert view.state_ref == seed_ref  # reverted EXACTLY to the seed
 
@@ -109,7 +134,8 @@ def test_expected_state_ref_guard(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
     change, blobs = _change(sub, code=_code(1), prompt="new proposal template")
-    sub.issue_command(command_id="cmd-apply", command_kind="ApplyChange", command_ref=sub.objects.put_text("pl-apply"))
+    _issue(sub, "cmd-apply", "ApplyChange", change)
+    sub.record_proposal(change=change, strategy_ref="t", caused_by="cmd-apply")
     sub.stage_change_closure(change, blobs)
     with pytest.raises(SubstrateError, match="stale apply"):
         sub.apply(change=change, caused_by="cmd-apply", expected_state_ref="0" * 64)
@@ -118,11 +144,12 @@ def test_expected_state_ref_guard(tmp_path: Path) -> None:
     assert "c1" in view.applied_change_ids
 
 
-def test_non_allowlisted_surface_refused(tmp_path: Path) -> None:
+def test_non_pinned_surface_refused(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
     bad = CompositeChange("bad", (SurfaceDelta("secret-keys", "prod", None, "aa" * 32),), "x")
-    with pytest.raises(SubstrateError, match="not in the surface catalog"):
+    _issue(sub, "c", "ApplyChange", bad)
+    with pytest.raises(SubstrateError, match="not pinned"):
         sub.apply(change=bad, caused_by="c")
 
 
@@ -130,6 +157,7 @@ def test_apply_requires_full_cas_closure(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
     change, _blobs = _change(sub, code=_code(9), prompt="p template")
+    _issue(sub, "c", "ApplyChange", change)
     # NOT staged -> after_refs missing from CAS
     with pytest.raises(SubstrateError, match="un-staged CAS object"):
         sub.apply(change=change, caused_by="c")
@@ -149,15 +177,17 @@ def test_stage_closure_rejects_mismatched_content(tmp_path: Path) -> None:
 def test_command_id_reuse_with_different_payload_fails_closed(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    sub.issue_command(command_id="k", command_kind="X", command_ref=sub.objects.put_text("pl1"))
+    p1 = sub.put(CommandPayload("k", "ConfirmChange", ENCODING, None, '{"a":1}'))
+    p2 = sub.put(CommandPayload("k", "ConfirmChange", ENCODING, None, '{"a":2}'))
+    sub.issue_command(command_id="k", command_kind="ConfirmChange", command_ref=p1)
     with pytest.raises(SubstrateError, match="reused with a different payload"):
-        sub.issue_command(command_id="k", command_kind="X", command_ref=sub.objects.put_text("pl2"))
+        sub.issue_command(command_id="k", command_kind="ConfirmChange", command_ref=p2)
 
 
 def test_duplicate_terminal_completion_refused(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    sub.issue_command(command_id="k", command_kind="X", command_ref=sub.objects.put_text("pl1"))
+    _issue(sub, "k", "ConfirmChange")
     sub.complete_command(command_id="k", outcome="ok", result=None)
     with pytest.raises(SubstrateError, match="already has a terminal completion"):
         sub.complete_command(command_id="k", outcome="ok", result=None)
@@ -170,12 +200,11 @@ def test_stale_expected_state_after_concurrent_apply(tmp_path: Path) -> None:
     _bind(a)
     seed_ref = a.verify().state_ref  # the state B will (stalely) expect
     change, blobs = _change(a, code=_code(2), prompt="q template")
-    a.issue_command(command_id="a-apply", command_kind="ApplyChange", command_ref=a.objects.put_text("pl-a"))
-    a.stage_change_closure(change, blobs)
-    a.apply(change=change, caused_by="a-apply")  # A moves the logical state
+    _apply(a, "a-apply", change, blobs)  # A moves the logical state
     b = Substrate.open(root, TASK, run)  # a second handle on the same run
-    other, other_blobs = _change(b, code=_code(3), prompt="r template")
-    b.issue_command(command_id="b-apply", command_kind="ApplyChange", command_ref=b.objects.put_text("pl-b"))
+    other, other_blobs = _change(b, code=_code(3), prompt="r template", change_id="c2")
+    _issue(b, "b-apply", "ApplyChange", other)
+    b.record_proposal(change=other, strategy_ref="t", caused_by="b-apply")
     b.stage_change_closure(other, other_blobs)
     with pytest.raises(SubstrateError, match="stale"):
         b.apply(change=other, caused_by="b-apply", expected_state_ref=seed_ref)
@@ -189,7 +218,7 @@ def test_multiple_runs_under_one_root_are_independent(tmp_path: Path) -> None:
     _bind(b)
     assert len(Substrate.list_runs(root)) == 2
     # advancing one run does not touch the other's head
-    a.confirm_change(change_id="x", rationale="r", caused_by="c")
+    _issue(a, "a:cmd", "StopAdaptation")
     assert a.verify().seq == 2 and b.verify().seq == 1
 
 

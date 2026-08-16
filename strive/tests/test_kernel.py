@@ -22,6 +22,7 @@ from strive.kernel import (
 )
 from strive.policies import manual_change as mc
 from strive.policy import conformance_violations, default_catalog
+from strive.runtime import FORK_RESULT, FORK_SUMMARY
 from strive.substrate import (
     ChangeApplied,
     ChangeProposed,
@@ -64,6 +65,13 @@ def _count(root: Path, run_id: str, kind: type) -> int:
     return sum(isinstance(b, kind) for b in _bodies(root, run_id))
 
 
+def _count_obs(root: Path, run_id: str, observation_kind: str) -> int:
+    return sum(
+        isinstance(b, ObservationRecorded) and b.observation_kind == observation_kind
+        for b in _bodies(root, run_id)
+    )
+
+
 def _final_exact(root: Path, run_id: str) -> None:
     view = Substrate.open(root, TASK.task_id, run_id).verify()
     assert view.ok, view.errors
@@ -86,10 +94,14 @@ def test_full_run_proposes_forks_applies_reverts_exactly(tmp_path: Path) -> None
     assert report.stopped_reason == "manual change complete"
     assert report.usage.executions > 0  # budget charged
     assert _count(tmp_path, run, ChangeProposed) == 1
-    assert _count(tmp_path, run, ObservationRecorded) == 1
+    assert _count_obs(tmp_path, run, FORK_SUMMARY) == 1  # exactly one fork summary
+    assert _count_obs(tmp_path, run, FORK_RESULT) == 2  # base + candidate attempts
     _final_exact(tmp_path, run)
-    # the fork observation pins BOTH exact state refs and improved=True
-    obs = next(b for b in _bodies(tmp_path, run) if isinstance(b, ObservationRecorded))
+    # the fork summary pins BOTH exact state refs and improved=True
+    obs = next(
+        b for b in _bodies(tmp_path, run)
+        if isinstance(b, ObservationRecorded) and b.observation_kind == FORK_SUMMARY
+    )
     sub = Substrate.open(tmp_path, TASK.task_id, run)
     fork: ForkObservation = codec.loads(sub.objects.get_text(obs.observation_ref), ForkObservation)
     assert fork.base.state_ref and fork.candidate.state_ref
@@ -121,7 +133,7 @@ def test_fork_failure_stops_without_applying(tmp_path: Path) -> None:
     run = new_run_id()
     report = _drive(tmp_path, run, config=worse)
     assert "did not improve" in report.stopped_reason
-    assert _count(tmp_path, run, ObservationRecorded) == 1
+    assert _count_obs(tmp_path, run, FORK_SUMMARY) == 1
     assert _count(tmp_path, run, ChangeApplied) == 0
     view = Substrate.open(tmp_path, TASK.task_id, run).verify()
     assert view.state_ref == view.bound.seed_state_ref  # type: ignore[union-attr]
@@ -193,24 +205,26 @@ def test_crash_after_each_effect_resumes_exactly(
     assert report.resumed is True
     _final_exact(tmp_path, run)
     # the effect that was mid-completion was not duplicated
-    assert _count(tmp_path, run, ObservationRecorded) == 1
+    assert _count_obs(tmp_path, run, FORK_SUMMARY) == 1
     assert _count(tmp_path, run, ChangeProposed) == 1
 
 
 def test_fork_crash_does_not_duplicate_execution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A crash after the fork observation (before completion) must not re-run
-    the executor on resume — exactly one fork observation survives."""
+    """A crash after the fork summary (before completion) must not re-run the
+    executor on resume — exactly one summary + two attempt results survive."""
     run = new_run_id()
     _crash_after(monkeypatch, "fork")
     with pytest.raises(_Boom):
         _drive(tmp_path, run)
-    # the observation was recorded before the crash
-    assert _count(tmp_path, run, ObservationRecorded) == 1
+    # the fork's attempts + summary were recorded before the completion crash
+    assert _count_obs(tmp_path, run, FORK_SUMMARY) == 1
+    assert _count_obs(tmp_path, run, FORK_RESULT) == 2
     monkeypatch.undo()
     _drive(tmp_path, run)  # resume: fork must NOT execute again
-    assert _count(tmp_path, run, ObservationRecorded) == 1
+    assert _count_obs(tmp_path, run, FORK_SUMMARY) == 1  # no duplicate summary
+    assert _count_obs(tmp_path, run, FORK_RESULT) == 2  # no re-run attempts
     _final_exact(tmp_path, run)
 
 

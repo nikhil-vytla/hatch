@@ -60,8 +60,7 @@ from typing import Any
 from strive import codec
 from strive.budget import BudgetMeter
 from strive.cas import hash_text
-from strive.codec import register
-from strive.contracts import BudgetSpec, BudgetUsage, FailureRecord
+from strive.contracts import BudgetSpec, BudgetUsage, CaseOutcome, ExecutionReport
 from strive.evaluate import evaluate
 from strive.policy import (
     AdaptationPolicy,
@@ -77,10 +76,22 @@ from strive.policy import (
     ScheduleTrigger,
     StopAdaptation,
 )
+from strive.runtime import (
+    ENCODING as _ENCODING,
+    FORK_DISPATCH,
+    FORK_RESULT,
+    FORK_SUMMARY,
+    AttemptDispatched,
+    AttemptRecord,
+    CommandPayload,
+    ConfigBlob,
+    ForkObservation,
+    PolicyStateBlob,
+    StoredResult,
+)
 from strive.sandboxes import (
     CandidateExecutor,
     SandboxLimits,
-    SandboxProvenance,
     default_catalog as default_sandbox_catalog,
 )
 from strive.substrate import (
@@ -96,8 +107,6 @@ from strive.substrate import (
 from strive.surfaces import SurfaceCatalog, default_surface_catalog
 from strive.tasks import Task
 
-_ENCODING = "strict-json@1"
-
 
 class KernelError(Exception):
     """A kernel orchestration/identity failure (never a policy proposal
@@ -105,93 +114,10 @@ class KernelError(Exception):
 
 
 class IndeterminateEffect(Exception):
-    """Raised by `_perform` when a command DISPATCHED an external effect but no
-    durable result is recoverable and there is no idempotency key. The kernel
-    records the command `indeterminate` (durable) and requires an EXPLICIT
-    retry — it never silently re-dispatches and claims exactly-once."""
-
-
-# -- content-addressable kernel blobs -------------------------------------------------------------
-
-
-@register("execution-attempt", 1)
-@dataclass(frozen=True)
-class AttemptRecord:
-    """One base-or-candidate execution attempt, recorded with the ACTUAL
-    returned provenance, any failure, denials, the metered usage THIS attempt
-    charged, and the state ref it scored — separately, so a fork's two
-    executions are each independently auditable."""
-
-    label: str  # "base" | "candidate"
-    state_ref: str
-    overall: float
-    ok: bool
-    provenance: SandboxProvenance
-    failure: FailureRecord | None
-    denials: tuple[str, ...]
-    usage: BudgetUsage
-
-
-@register("fork-observation", 4)
-@dataclass(frozen=True)
-class ForkObservation:
-    """The result of an OPTIONAL `EvaluateFork`: the exact base and candidate
-    execution ATTEMPTS (each with actual provenance/failures/denials/usage/state
-    ref, captured around execution) and whether the candidate improved."""
-
-    candidate_change_id: str
-    base: AttemptRecord
-    candidate: AttemptRecord
-    improved: bool
-    detail: str
-
-    @property
-    def base_overall(self) -> float:
-        return self.base.overall
-
-    @property
-    def candidate_overall(self) -> float:
-        return self.candidate.overall
-
-
-@register("kernel-command-payload", 1)
-@dataclass(frozen=True)
-class _CommandPayload:
-    """The canonical, content-addressable command payload — its CAS ref is
-    the command digest that binds a command_id to one payload."""
-
-    command_id: str
-    kind: str
-    encoding: str
-    json: str
-
-
-@register("kernel-stored-result", 3)
-@dataclass(frozen=True)
-class _StoredResult:
-    command_id: str
-    kind: str
-    outcome: str
-    head: str
-    detail: str
-    proposal_ref: str | None
-    observation_ref: str | None
-    metrics: dict[str, float]
-    usage: BudgetUsage  # the metered spend THIS command charged (durable)
-
-
-@register("kernel-policy-state", 2)
-@dataclass(frozen=True)
-class _PolicyStateBlob:
-    encoding: str
-    json: str
-
-
-@register("kernel-config", 2)
-@dataclass(frozen=True)
-class _ConfigBlob:
-    encoding: str
-    json: str
+    """Raised when a command DISPATCHED an external effect but no durable
+    result is recoverable and there is no idempotency key. The kernel records
+    the command `indeterminate` (durable) and requires an EXPLICIT retry — it
+    never silently re-dispatches and claims exactly-once."""
 
 
 # -- services -------------------------------------------------------------------------------------
@@ -421,16 +347,65 @@ def _enforce_identity(
 
 
 def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
-    """Re-seed cumulative countable spend from the durably-recorded per-command
-    usage of every COMPLETED command (including failed/partial ones), so a
-    resumed run reconstructs all budget dimensions without reset or double
-    absorption. A command is counted exactly once, when it has a terminal."""
+    """Rebuild a FRESH meter from the DURABLE per-attempt ledger (never absorb
+    repeatedly into a reused meter). Each fork attempt is counted exactly once:
+    its actual usage if a RESULT was journaled, else its worst-case reservation
+    if only a DISPATCH is on record (an open dispatch — spend conservatively
+    reserved so a crash-loop can never expand the budget). Non-fork commands
+    spend nothing."""
     substrate = services.substrate
-    for terminal in view.completed.values():
-        if terminal.result_ref is None:
+    fresh = BudgetMeter(services.meter.spec)
+    results: dict[tuple[str, str], BudgetUsage] = {}
+    dispatched: dict[tuple[str, str], int] = {}
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if not isinstance(body, ObservationRecorded):
             continue
-        stored = codec.loads(substrate.objects.get_text(terminal.result_ref), _StoredResult)
-        services.meter.absorb(stored.usage)
+        if body.observation_kind == FORK_RESULT:
+            rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
+            results[(rec.command_id, rec.label)] = rec.usage
+        elif body.observation_kind == FORK_DISPATCH:
+            disp = codec.loads(
+                substrate.objects.get_text(body.observation_ref), AttemptDispatched
+            )
+            dispatched[(disp.command_id, disp.label)] = disp.reserved_executions
+    for usage in results.values():
+        fresh.absorb(usage)
+    for key, reserved in dispatched.items():
+        if key not in results:  # OPEN dispatch: reserve the worst case
+            fresh.absorb(BudgetUsage(executions=reserved))
+    services.meter = fresh
+
+
+def _fork_attempts(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> dict[str, tuple[str, AttemptRecord | None]]:
+    """The durable base/candidate attempt state for a fork command:
+    ``label -> ("result", AttemptRecord)`` or ``("dispatched", None)`` (open)."""
+    substrate = services.substrate
+    out: dict[str, tuple[str, AttemptRecord | None]] = {}
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if env.caused_by != cid or not isinstance(body, ObservationRecorded):
+            continue
+        if body.observation_kind == FORK_DISPATCH:
+            disp = codec.loads(
+                substrate.objects.get_text(body.observation_ref), AttemptDispatched
+            )
+            out.setdefault(disp.label, ("dispatched", None))
+        elif body.observation_kind == FORK_RESULT:
+            rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
+            out[rec.label] = ("result", rec)
+    return out
+
+
+def _fork_summary_ref(view: VerifiedSubstrateView, cid: str) -> str | None:
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == FORK_SUMMARY
+        ):
+            return body.observation_ref
+    return None
 
 
 def operator_revert(services: KernelServices, change_id: str) -> CommandResult:
@@ -475,8 +450,9 @@ def _run_command(
     # paths — so a changed re-derivation fails closed rather than reconciling
     # against a different intent.
     command_ref = substrate.put(
-        _CommandPayload(
+        CommandPayload(
             command_id=cid, kind=kind, encoding=_ENCODING,
+            change_ref=_command_change_ref(substrate, command),
             json=_command_identity_json(command),
         )
     )
@@ -512,7 +488,7 @@ def _run_command(
     # terminal completion — a stable logical point both the initial run and a
     # reconstruction return identically.
     head = substrate.verify().head
-    stored = _StoredResult(
+    stored = StoredResult(
         command_id=cid,
         kind=kind,
         outcome=result.outcome,
@@ -592,12 +568,12 @@ def _perform(
 def _evaluate_fork(
     services: KernelServices, view: VerifiedSubstrateView, command: EvaluateFork
 ) -> CommandResult:
-    """OPTIONAL comparative mechanism. Captures the exact base and candidate
-    state refs BEFORE execution, scores each over the task's cases under the
-    secure executor (charging the budget), and records ONE observation with
-    both refs and the metered usage — even if active state later advances.
-    Idempotent: a fork that already recorded its observation is REUSED, not
-    re-executed or re-charged."""
+    """OPTIONAL comparative mechanism. Journals each base/candidate attempt as
+    a DISPATCH then a RESULT (separately, before the next attempt), so a crash
+    between dispatch and result is an OPEN dispatch — reconciled as
+    `indeterminate`, never implicitly re-run. A completed fork's summary is
+    reused verbatim; the budget is reconstructed from the durable attempt
+    ledger by `_seed_meter`, never re-charged here."""
     substrate = services.substrate
     cid = command.command_id
     kind = type(command).__name__
@@ -606,20 +582,12 @@ def _evaluate_fork(
         substrate.record_proposal(
             change=command.candidate, strategy_ref=command.detail or "fork", caused_by=cid
         )
-    existing = _caused_ref(view, cid, "observation-recorded@2")
-    if existing is not None:
-        # already observed (a crash between the observation and completion):
-        # REUSE the recorded attempts — do NOT re-run the executor — and ABSORB
-        # the recorded usage so this process's meter reflects the durable spend
-        # (the crashed process's live charge died with it).
-        recorded = codec.loads(substrate.objects.get_text(existing), ObservationRecorded)
-        fork = codec.loads(
-            substrate.objects.get_text(recorded.observation_ref), ForkObservation
-        )
-        services.meter.absorb(fork.base.usage)
-        services.meter.absorb(fork.candidate.usage)
+
+    summary_ref = _fork_summary_ref(view, cid)
+    if summary_ref is not None:
+        fork = codec.loads(substrate.objects.get_text(summary_ref), ForkObservation)
         return CommandResult(
-            cid, kind, "ok", view.head, observation_ref=existing,
+            cid, kind, "ok", view.head, observation_ref=summary_ref,
             detail="fork already observed",
             metrics=_fork_metrics(fork.base_overall, fork.candidate_overall, fork.improved),
         )
@@ -630,17 +598,50 @@ def _evaluate_fork(
     candidate_state = apply_change(base_state, command.candidate, substrate.catalog)
     candidate_ref = substrate.put_state(candidate_state)
 
-    base = _run_attempt(services, "base", base_state, base_ref)
-    candidate = _run_attempt(services, "candidate", candidate_state, candidate_ref)
+    prior = _fork_attempts(services, view, cid)
+    reserved = len(services.task.selection_cases())
+    attempts: dict[str, AttemptRecord] = {}
+    for label, st, ref in [
+        ("base", base_state, base_ref),
+        ("candidate", candidate_state, candidate_ref),
+    ]:
+        status = prior.get(label)
+        if status is not None and status[0] == "result":
+            assert status[1] is not None
+            attempts[label] = status[1]  # reuse; usage already reseeded
+            continue
+        if status is not None and status[0] == "dispatched":
+            # dispatched but no durable result: NEVER implicitly re-run
+            raise IndeterminateEffect(
+                f"fork {label!r} attempt dispatched without a durable result"
+            )
+        # fresh attempt: DISPATCH (durable) → run → RESULT (durable)
+        substrate.record_observation(
+            observation_kind=FORK_DISPATCH,
+            observation=AttemptDispatched(cid, label, ref, reserved),
+            subject_state_ref=ref, caused_by=cid,
+        )
+        rec = _run_attempt(services, cid, label, st, ref)
+        substrate.record_observation(
+            observation_kind=FORK_RESULT, observation=rec,
+            subject_state_ref=ref, caused_by=cid,
+        )
+        attempts[label] = rec
+
+    base, candidate = attempts["base"], attempts["candidate"]
+    if not base.ok or not candidate.ok:
+        # a partial/failed attempt is durably recorded (provenance, failure,
+        # usage preserved); the fork command itself fails.
+        raise KernelError(
+            f"fork attempt failed (base ok={base.ok}, candidate ok={candidate.ok})"
+        )
     observation = ForkObservation(
         candidate_change_id=command.candidate.change_id,
-        base=base,
-        candidate=candidate,
-        improved=candidate.overall > base.overall,
-        detail=command.detail,
+        base=base, candidate=candidate,
+        improved=candidate.overall > base.overall, detail=command.detail,
     )
     updated = substrate.record_observation(
-        observation_kind="fork-evaluation", observation=observation,
+        observation_kind=FORK_SUMMARY, observation=observation,
         subject_state_ref=candidate_ref, caused_by=cid,
     )
     ref = updated.envelopes[-1].body_ref
@@ -693,39 +694,58 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
 
 
 def _run_attempt(
-    services: KernelServices, label: str, state: HarnessState, state_ref: str
+    services: KernelServices, cid: str, label: str, state: HarnessState, state_ref: str
 ) -> AttemptRecord:
-    """Execute one base-or-candidate attempt, recording the ACTUAL returned
-    provenance, failure, denials, and the usage THIS attempt charged. Executions
-    AND wall are gated pre-request; sandbox limits are capped by the budget."""
+    """Execute one base/candidate attempt CASE-BY-CASE, enforcing CUMULATIVE
+    output and wall across cases (each case's sandbox caps come from the
+    REMAINING budget, not a fresh per-case cap). Returns an AttemptRecord even
+    when the attempt is denied/fails mid-suite — with the ACTUAL provenance,
+    failure, denials, and the usage it actually charged — so charges and
+    provenance survive to the next crash point (`ok=False` on any failure)."""
     meter = services.meter
     before = meter.usage()
     code_ref = state.content_ref("strategy-code", "solve")
     if code_ref is None:
         return AttemptRecord(
-            label=label, state_ref=state_ref, overall=0.0, ok=True,
+            command_id=cid, label=label, state_ref=state_ref, overall=0.0, ok=True,
             provenance=services.executor.provenance(), failure=None, denials=(),
             usage=_usage_delta(before, meter.usage()),
         )
     source = services.substrate.objects.get_text(code_ref)
     cases = services.task.selection_cases()
-    for _case in cases:
-        denial = meter.request_execution()
+    outcomes: list[CaseOutcome] = []
+    denials: list[str] = []
+    provenance = None
+    failure = None
+    for case in cases:
+        denial = meter.request_execution()  # cumulative executions + wall gate
         if denial is not None:
-            raise KernelError(f"budget denied fork execution: {denial.detail}")
-    outcome = services.executor.execute_suite(
-        source, cases, generation_id=f"fork-{label}", limits=_budget_limits(services)
+            failure = denial
+            break
+        result = services.executor.execute_suite(
+            source, [case], generation_id=f"fork-{label}",
+            limits=_budget_limits(services),  # caps from REMAINING budget
+        )
+        meter.note_output_bytes(result.report.stdout_bytes)  # cumulative output
+        provenance = result.provenance
+        denials.extend(result.denials)
+        outcomes.extend(result.report.outcomes)
+        if result.report.failure is not None and failure is None:
+            failure = result.report.failure
+    if provenance is None:  # denied before any case ran
+        provenance = services.executor.provenance()
+    report = ExecutionReport(
+        ok=failure is None,
+        generation_id=f"fork-{label}",
+        outcomes=tuple(outcomes),
+        failure=failure,
+        stdout_bytes=sum(len(o.error or "") for o in outcomes),
     )
-    meter.note_output_bytes(outcome.report.stdout_bytes)
-    evaluation = evaluate(services.task, outcome.report, cases)
+    evaluation = evaluate(services.task, report, cases)
     return AttemptRecord(
-        label=label,
-        state_ref=state_ref,
-        overall=evaluation.overall_score,
-        ok=outcome.report.ok and outcome.report.failure is None,
-        provenance=outcome.provenance,  # ACTUAL boundary provenance
-        failure=outcome.report.failure,
-        denials=tuple(outcome.denials),
+        command_id=cid, label=label, state_ref=state_ref,
+        overall=evaluation.overall_score, ok=failure is None,
+        provenance=provenance, failure=failure, denials=tuple(denials),
         usage=_usage_delta(before, meter.usage()),
     )
 
@@ -764,7 +784,7 @@ def _reconstruct(
     kind = type(command).__name__
     if terminal.result_ref is None:
         return CommandResult(cid, kind, terminal.outcome, substrate.verify().head)
-    stored = codec.loads(substrate.objects.get_text(terminal.result_ref), _StoredResult)
+    stored = codec.loads(substrate.objects.get_text(terminal.result_ref), StoredResult)
     proposal: CompositeChange | None = None
     if stored.proposal_ref is not None:
         proposal = codec.loads(
@@ -784,12 +804,12 @@ def _config_ref(config: object) -> str:
     return hash_text(codec.dumps(_config_blob(config)))
 
 
-def _config_blob(config: object) -> _ConfigBlob:
-    return _ConfigBlob(encoding=_ENCODING, json=_strict_json(config))
+def _config_blob(config: object) -> ConfigBlob:
+    return ConfigBlob(encoding=_ENCODING, json=_strict_json(config))
 
 
-def _state_blob(state: object) -> _PolicyStateBlob:
-    return _PolicyStateBlob(encoding=_ENCODING, json=_strict_json(state))
+def _state_blob(state: object) -> PolicyStateBlob:
+    return PolicyStateBlob(encoding=_ENCODING, json=_strict_json(state))
 
 
 def _policy_digest(policy: AdaptationPolicy[Any, Any]) -> str:
@@ -813,17 +833,21 @@ def _strict_json(obj: object) -> str:
     return json.dumps(_strict_encode(obj), sort_keys=True, separators=(",", ":"))
 
 
-# a command's IDENTITY excludes preconditions that legitimately vary across a
-# resume (they gate execution but do not change WHAT the command is).
-_COMMAND_NON_IDENTITY_FIELDS = frozenset({"expected_state_ref"})
-
-
 def _command_identity_json(command: object) -> str:
-    data = _strict_encode(command)
-    if isinstance(data, dict):
-        for field in _COMMAND_NON_IDENTITY_FIELDS:
-            data.pop(field, None)
-    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+    """The FULL canonical command is its durable identity — INCLUDING its
+    `expected_state_ref` precondition. A changed precondition before an effect
+    is a changed command and fails closed."""
+    return json.dumps(_strict_encode(command), sort_keys=True, separators=(",", ":"))
+
+
+def _command_change_ref(substrate: Substrate, command: KernelCommand) -> str | None:
+    """The CAS ref of the CompositeChange a change-bearing command targets, so
+    verification can match an effect to its command's ACTUAL change."""
+    if isinstance(command, ApplyChange):
+        return substrate.put(command.change)
+    if isinstance(command, EvaluateFork):
+        return substrate.put(command.candidate)
+    return None
 
 
 def _strict_encode(value: object) -> object:
@@ -852,7 +876,7 @@ def _strict_encode(value: object) -> object:
 
 
 def _load_state_json(substrate: Substrate, ref: str) -> object:
-    blob = codec.loads(substrate.objects.get_text(ref), _PolicyStateBlob)
+    blob = codec.loads(substrate.objects.get_text(ref), PolicyStateBlob)
     if blob.encoding != _ENCODING:
         raise KernelError(
             f"policy state was encoded with {blob.encoding!r}, this build uses "
@@ -871,3 +895,6 @@ __all__ = [
     "operator_revert",
     "run_policy",
 ]
+
+# re-exported from the neutral runtime module for backward-compatible imports
+_ = (AttemptRecord, ForkObservation)

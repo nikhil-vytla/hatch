@@ -194,6 +194,33 @@ changing the thesis:
   Task identity includes signature/catalog/scorer semantics; policy identity is
   the full policy module.
 
+## Phase-A semantic-atomicity pass
+
+The final pass makes every append semantically atomic and every runtime record
+closed and neutral:
+
+- **Atomic append.** Each authority append is preflighted by a PURE fold of the
+  RESULTING stream and refused unless the post-event view is fully valid, so a
+  valid run can never be turned invalid and a refused append leaves the journal
+  byte-for-byte unchanged.
+- **Neutral runtime contracts.** Command payloads, stored results,
+  config/policy-state envelopes, attempt dispatches/records, and fork
+  observations moved to `strive.runtime`, imported directly by the substrate;
+  verification decodes each ref as its expected type and matches
+  id/kind/outcome/encoding, requires one proposal per change id, and matches an
+  applied/forked change to its proposal AND its issued command payload — never
+  a kind string. Verification is independent of kernel import order.
+- **Pinned-surface mutation.** A run may mutate only the surface snapshots
+  pinned in its `PolicyBound`, resolved + validated through those descriptors
+  even for shared CAS content; catalog growth keeps old runs readable but
+  mutating a new surface needs a rebind.
+- **Durable preconditions.** `expected_state_ref` is part of the command's
+  durable identity; the manual policy derives a stable seed-state precondition.
+- **Truthful attempts + budgets.** Each fork attempt journals a DISPATCH then a
+  RESULT; an open dispatch is `indeterminate`, never re-run; the meter is
+  rebuilt fresh from the durable per-attempt ledger; wall is cumulative active
+  time and output is enforced cumulatively across cases.
+
 ## Sources: borrowed / rejected / deferred
 
 - **Borrowed** — exo (note 04): durable adaptation mechanisms + journaled
