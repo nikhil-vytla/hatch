@@ -351,7 +351,7 @@ class CandidateExecutor:
         return a case-ordered `ExecutionReport` plus the boundary provenance.
         Failure-as-data: a case the boundary refused or crashed on carries
         its error at the floor, never raising into the controller."""
-        outcomes, provenance, denials = run_protected_suite(
+        outcomes, provenance, denials, wall_time_s, stdout_bytes = run_protected_suite(
             self._backend,
             strategy_source,
             cases,
@@ -368,10 +368,8 @@ class CandidateExecutor:
             generation_id=generation_id,
             outcomes=ordered,
             failure=None,
-            wall_time_s=0.0,
-            stdout_bytes=sum(
-                len(o.error or "") for o in ordered
-            ),
+            wall_time_s=wall_time_s,      # ACTUAL aggregated backend wall time
+            stdout_bytes=stdout_bytes,    # ACTUAL captured output bytes
         )
         return ExecutionOutcome(report=report, provenance=provenance, denials=denials)
 
@@ -386,12 +384,13 @@ def run_protected_suite(
     *,
     generation_id: str,
     limits: SandboxLimits | None = None,
-) -> tuple[dict[str, CaseOutcome], SandboxProvenance, tuple[str, ...]]:
+) -> tuple[dict[str, CaseOutcome], SandboxProvenance, tuple[str, ...], float, int]:
     """Execute EACH protected case in a FRESH sandbox, in isolation: the
     candidate sees only that case's `input_text`, and no candidate state
     survives between cases. The parent retains case id, split, expected
     output, and the rest of the suite. Enforces the ABSOLUTE suite deadline
-    across cases. Returns (outcomes by case id, provenance, denial notes).
+    across cases. Returns (outcomes by case id, provenance, denial notes, the
+    ACTUAL aggregated backend wall time, and the ACTUAL captured output bytes).
 
     Kept as the per-case primitive `CandidateExecutor.execute_suite` builds
     on; callers outside the executor and backend tests should not use it."""
@@ -401,6 +400,8 @@ def run_protected_suite(
     denials: list[str] = []
     provenance: SandboxProvenance | None = None
     effective_limits = limits or SandboxLimits()
+    total_wall_s = 0.0
+    total_stdout_bytes = 0
     suite_started = time.monotonic()
     for case in cases:
         remaining = effective_limits.suite_deadline_s - (
@@ -428,6 +429,9 @@ def run_protected_suite(
         )
         provenance = result.provenance
         denials.extend(result.denials)
+        # preserve the ACTUAL backend wall + captured output, never discard them
+        total_wall_s += result.report.wall_time_s
+        total_stdout_bytes += result.report.stdout_bytes
         if result.report.ok:
             for outcome in result.report.outcomes:
                 outcomes[outcome.case_id] = outcome
@@ -443,7 +447,7 @@ def run_protected_suite(
             )
     if provenance is None:  # empty suite (or all deadline-skipped)
         provenance = backend.provenance(effective_limits)
-    return outcomes, provenance, tuple(denials)
+    return outcomes, provenance, tuple(denials), round(total_wall_s, 6), total_stdout_bytes
 
 
 __all__ = [

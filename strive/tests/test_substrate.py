@@ -14,7 +14,8 @@ import pytest
 from strive import codec
 from strive.cas import hash_text
 from strive.contracts import BudgetSpec
-from strive.runtime import ENCODING, CommandPayload, ConfigBlob
+from strive.contracts import BudgetUsage
+from strive.runtime import ENCODING, CommandPayload, ConfigBlob, StoredResult
 from strive.substrate import (
     ChangeApplied,
     CompositeChange,
@@ -187,10 +188,16 @@ def test_command_id_reuse_with_different_payload_fails_closed(tmp_path: Path) ->
 def test_duplicate_terminal_completion_refused(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    _issue(sub, "k", "ConfirmChange")
-    sub.complete_command(command_id="k", outcome="ok", result=None)
+    # a minimal VALID completed command: StopAdaptation(ok) has no state effect
+    # but a successful terminal still requires a StoredResult.
+    _issue(sub, "k", "StopAdaptation")
+    result = StoredResult(
+        command_id="k", kind="StopAdaptation", outcome="ok", head="0:x", detail="",
+        proposal_ref=None, observation_ref=None, metrics={}, usage=BudgetUsage(),
+    )
+    sub.complete_command(command_id="k", outcome="ok", result=result)
     with pytest.raises(SubstrateError, match="already has a terminal completion"):
-        sub.complete_command(command_id="k", outcome="ok", result=None)
+        sub.complete_command(command_id="k", outcome="ok", result=result)
 
 
 def test_stale_expected_state_after_concurrent_apply(tmp_path: Path) -> None:

@@ -72,17 +72,21 @@ class ConfigBlob:
     json: str
 
 
-@register("attempt-dispatched", 1)
+@register("attempt-dispatched", 2)
 @dataclass(frozen=True)
 class AttemptDispatched:
     """Journaled BEFORE a base/candidate attempt runs. If a result never
     follows (a crash between dispatch and result), the attempt is an OPEN
-    dispatch — reconciled as `indeterminate`, never implicitly re-run."""
+    dispatch — reconciled as `indeterminate`, never implicitly re-run. The
+    reservation is CONSERVATIVE across every countable dimension (executions,
+    wall, output), so a crash-loop can never expand any budget dimension."""
 
     command_id: str
     label: str  # "base" | "candidate"
     state_ref: str
     reserved_executions: int
+    reserved_wall_s: float
+    reserved_output_bytes: int
 
 
 @register("execution-attempt", 1)

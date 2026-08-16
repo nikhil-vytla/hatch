@@ -6,7 +6,42 @@ Strive is a policy-neutral, revision-native mechanism substrate plus a
 result-driven, resumable policy kernel. Comparative evaluation is an optional
 mechanism a policy requests, never a universal activation gate.
 
-### Semantic-atomicity pass (what changed since the last review)
+### Command/attempt state-machine pass (what changed since the last review)
+
+- **Each command is a CLOSED state machine.** `verify()` now checks the exact
+  per-kind + per-outcome effect grammar: ApplyChange(ok) = a matching proposal
+  + one apply; RevertChange(ok) = one exact revert; EvaluateFork(ok) = proposal
+  + base dispatch→result + candidate dispatch→result + a matching summary;
+  ConfirmChange(ok) = one confirmation; Schedule/Stop = no state effect. A
+  failed/indeterminate command requires exactly one failure record and NO
+  success effect. Effects before intent, effects after terminal, missing/extra
+  effects, a successful terminal without a `StoredResult`, and a duplicate
+  checkpoint are all rejected; a checkpoint must follow one terminal, consume
+  its command exactly once, and reference the exact reduced state.
+- **Typed command/result semantics.** `CommandPayload.json`, `ConfigBlob.json`,
+  and `PolicyStateBlob.json` must be canonical JSON; a `StoredResult`'s id,
+  kind, outcome, proposal ref, observation ref, and metrics must match the
+  command's actual effects; the full `expected_state_ref` stays in the durable
+  command identity; and the initial and reconstructed results (incl. the fork
+  observation ref) are byte-for-byte equivalent.
+- **Verified fork-attempt lifecycle.** Per `(command_id, label)`: exactly one
+  dispatch then at most one result, no result without a dispatch, no duplicate
+  labels, base before candidate; dispatch/result `state_ref` must equal the
+  observation's `subject_state_ref`; a summary must equal the two durable result
+  records and the issued candidate change; actual attempt provenance must
+  satisfy the run's pinned capability profile; and every `BudgetUsage` field
+  (incl. reservations) must be finite and nonnegative.
+- **Honest budget dimensions.** An open dispatch reserves executions AND wall
+  AND output (not executions alone). `CandidateExecutor` no longer zeroes
+  backend wall time or derives stdout bytes from error strings — it preserves
+  the ACTUAL captured wall/output/failure, and cumulative output across cases
+  is enforced from real captured bytes.
+- **Pinned evaluation + policy package.** The task fingerprint now includes the
+  case-selection rule and the aggregate evaluator (not only `score_case`); a
+  `PolicyDescriptor` may declare `dependency_modules` folded into the pinned
+  policy digest (an explicit policy-package manifest).
+
+### Semantic-atomicity pass (earlier in this PR)
 
 - **No append can turn a valid run invalid.** Every authority append runs a
   PURE candidate-event preflight (`_fold_view` over the resulting stream) and
@@ -173,28 +208,28 @@ model refiner arrive with `continual-refine@1`.
 
 ### Verification
 
-- `uv run pytest` — 193 tests. The Phase-A floor plus the adversarial matrix
-  (`test_cas`, `test_surfaces`, `test_adversarial`, `test_budget`): CAS
-  traversal / corrupt / concurrent-writers; surface validators + drift; and —
-  from the semantic-atomicity pass — preflight-no-append (byte-for-byte
-  unchanged), type-substituted refs, applied-change / proposal / payload
-  mismatch, duplicate + different proposals, ghost confirm/revise, noncanonical
-  + duplicate seed bindings, old-run mutation of a newly-added surface,
-  crash-after-dispatch → indeterminate (never re-run), failure-before-terminal
-  budget persistence, same-services reseed, and cumulative wall/output.
-  `test_substrate_only` verifies a kernel-driven run in a FRESH interpreter
-  that never imports the kernel. `test_packaging` BUILDS + INSTALLS the wheel
-  in an isolated venv and runs the real `strive` script (never skipped).
-- `uv run mypy` — clean, `--strict`, over 37 files (src + tests).
+- `uv run pytest` — 212 tests. The Phase-A floor plus the adversarial matrix
+  (`test_cas`, `test_surfaces`, `test_adversarial`, `test_budget`,
+  `test_state_machine`): CAS/surface/identity/budget attacks PLUS the
+  command/attempt state machine — ok-without-effect, effect-after-terminal,
+  failed-with-success-effect, null/wrong stored result, duplicate checkpoint,
+  result-before-dispatch, duplicate/mismatched attempts, forged summary,
+  subject-state mismatch, weaker-than-required provenance, negative/NaN usage,
+  open-dispatch wall+output reservation, actual-stdout accounting (a printing
+  strategy), and evaluator-selection drift. `test_substrate_only` verifies a
+  kernel-driven run in a FRESH interpreter that never imports the kernel;
+  `test_packaging` BUILDS + INSTALLS the wheel in an isolated venv and runs the
+  real `strive` script (never skipped).
+- `uv run mypy` — clean, `--strict`, over 38 files (src + tests).
 - `uv run strive` — installed console script; verified in tests and smoke.
 
 ### The Phase-A claim
 
-Every accepted append preserves a semantically valid run; command intent fully
-determines effects and preconditions; pinned surfaces cannot expand implicitly;
-and external attempts plus every budget dimension are durably accounted, safely
-reconciled, or explicitly indeterminate — across concurrency, corruption, and
-restart, with verification pure and independent of kernel import order.
+Every command and external attempt has one verifiable lifecycle; successful
+terminals prove their required effects, summaries equal durable attempts,
+capabilities and all budget dimensions are checked, and no accepted history can
+claim work that did not occur — across concurrency, corruption, and restart,
+with verification pure and independent of kernel import order.
 
 ### Next
 

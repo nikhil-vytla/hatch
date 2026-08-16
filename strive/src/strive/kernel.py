@@ -211,7 +211,7 @@ def run_policy(
     policy = descriptor.factory()
 
     config_ref = _config_ref(config)
-    policy_digest = _policy_digest(policy)
+    policy_digest = _policy_digest(policy, descriptor.dependency_modules)
     task_fingerprint = services.task.fingerprint()
     budget_ref = hash_text(codec.dumps(services.meter.spec))
 
@@ -356,7 +356,7 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
     substrate = services.substrate
     fresh = BudgetMeter(services.meter.spec)
     results: dict[tuple[str, str], BudgetUsage] = {}
-    dispatched: dict[tuple[str, str], int] = {}
+    dispatched: dict[tuple[str, str], AttemptDispatched] = {}
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if not isinstance(body, ObservationRecorded):
             continue
@@ -367,12 +367,16 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
             disp = codec.loads(
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
-            dispatched[(disp.command_id, disp.label)] = disp.reserved_executions
+            dispatched[(disp.command_id, disp.label)] = disp
     for usage in results.values():
         fresh.absorb(usage)
-    for key, reserved in dispatched.items():
-        if key not in results:  # OPEN dispatch: reserve the worst case
-            fresh.absorb(BudgetUsage(executions=reserved))
+    for key, disp in dispatched.items():
+        if key not in results:  # OPEN dispatch: reserve the worst case (all dims)
+            fresh.absorb(BudgetUsage(
+                executions=disp.reserved_executions,
+                wall_time_s=disp.reserved_wall_s,
+                output_bytes=disp.reserved_output_bytes,
+            ))
     services.meter = fresh
 
 
@@ -397,14 +401,23 @@ def _fork_attempts(
     return out
 
 
-def _fork_summary_ref(view: VerifiedSubstrateView, cid: str) -> str | None:
+def _fork_summary(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> tuple[str, ForkObservation] | None:
+    """The fork command's durable summary, if present: the (ObservationRecorded
+    EVENT body ref, decoded ForkObservation). The event body ref — not the
+    inner ref — is what `StoredResult.observation_ref` records, so the initial
+    and reconstructed results are byte-for-byte equivalent."""
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if (
             env.caused_by == cid
             and isinstance(body, ObservationRecorded)
             and body.observation_kind == FORK_SUMMARY
         ):
-            return body.observation_ref
+            fork = codec.loads(
+                services.substrate.objects.get_text(body.observation_ref), ForkObservation
+            )
+            return env.body_ref, fork
     return None
 
 
@@ -583,11 +596,11 @@ def _evaluate_fork(
             change=command.candidate, strategy_ref=command.detail or "fork", caused_by=cid
         )
 
-    summary_ref = _fork_summary_ref(view, cid)
-    if summary_ref is not None:
-        fork = codec.loads(substrate.objects.get_text(summary_ref), ForkObservation)
+    existing_summary = _fork_summary(services, view, cid)
+    if existing_summary is not None:
+        summary_event_ref, fork = existing_summary
         return CommandResult(
-            cid, kind, "ok", view.head, observation_ref=summary_ref,
+            cid, kind, "ok", view.head, observation_ref=summary_event_ref,
             detail="fork already observed",
             metrics=_fork_metrics(fork.base_overall, fork.candidate_overall, fork.improved),
         )
@@ -599,7 +612,15 @@ def _evaluate_fork(
     candidate_ref = substrate.put_state(candidate_state)
 
     prior = _fork_attempts(services, view, cid)
-    reserved = len(services.task.selection_cases())
+    # a CONSERVATIVE per-attempt reservation across EVERY countable dimension:
+    # the worst case a running attempt could durably charge (one per case at
+    # the default per-case sandbox caps), so an open dispatch reserves
+    # executions AND wall AND output — never executions alone.
+    n_cases = len(services.task.selection_cases())
+    _cap = SandboxLimits()
+    reserved_exec = n_cases
+    reserved_wall = round(n_cases * _cap.wall_time_s, 6)
+    reserved_out = n_cases * _cap.output_bytes
     attempts: dict[str, AttemptRecord] = {}
     for label, st, ref in [
         ("base", base_state, base_ref),
@@ -618,7 +639,9 @@ def _evaluate_fork(
         # fresh attempt: DISPATCH (durable) → run → RESULT (durable)
         substrate.record_observation(
             observation_kind=FORK_DISPATCH,
-            observation=AttemptDispatched(cid, label, ref, reserved),
+            observation=AttemptDispatched(
+                cid, label, ref, reserved_exec, reserved_wall, reserved_out
+            ),
             subject_state_ref=ref, caused_by=cid,
         )
         rec = _run_attempt(services, cid, label, st, ref)
@@ -717,6 +740,8 @@ def _run_attempt(
     denials: list[str] = []
     provenance = None
     failure = None
+    total_stdout = 0
+    total_wall = 0.0
     for case in cases:
         denial = meter.request_execution()  # cumulative executions + wall gate
         if denial is not None:
@@ -726,7 +751,9 @@ def _run_attempt(
             source, [case], generation_id=f"fork-{label}",
             limits=_budget_limits(services),  # caps from REMAINING budget
         )
-        meter.note_output_bytes(result.report.stdout_bytes)  # cumulative output
+        meter.note_output_bytes(result.report.stdout_bytes)  # ACTUAL captured bytes
+        total_stdout += result.report.stdout_bytes
+        total_wall += result.report.wall_time_s
         provenance = result.provenance
         denials.extend(result.denials)
         outcomes.extend(result.report.outcomes)
@@ -739,7 +766,8 @@ def _run_attempt(
         generation_id=f"fork-{label}",
         outcomes=tuple(outcomes),
         failure=failure,
-        stdout_bytes=sum(len(o.error or "") for o in outcomes),
+        wall_time_s=round(total_wall, 6),
+        stdout_bytes=total_stdout,  # ACTUAL captured output, not error-string length
     )
     evaluation = evaluate(services.task, report, cases)
     return AttemptRecord(
@@ -812,21 +840,37 @@ def _state_blob(state: object) -> PolicyStateBlob:
     return PolicyStateBlob(encoding=_ENCODING, json=_strict_json(state))
 
 
-def _policy_digest(policy: AdaptationPolicy[Any, Any]) -> str:
-    """A reconstructable identity of the policy's full package, not merely its
-    class source: the policy module's ENTIRE source (its helpers, config
-    dataclass, and strategy dependencies living in the same module) plus the
-    module qualname. A change to any of them shifts the digest and is detected
-    on resume."""
-    cls = type(policy)
+def _policy_digest(
+    policy: AdaptationPolicy[Any, Any], dependency_modules: tuple[str, ...] = ()
+) -> str:
+    """A reconstructable identity of the policy's full PACKAGE manifest: the
+    policy module's ENTIRE source (its helpers, config dataclass, and strategy
+    dependencies living in the same module) plus the module qualname, PLUS the
+    source of every explicitly-declared `dependency_modules` (strategy/helper
+    modules the policy relies on OUTSIDE its own module). A change to any part
+    of the manifest shifts the digest and is detected on resume."""
     import sys
 
-    module = sys.modules.get(cls.__module__)
+    cls = type(policy)
+
+    def _module_source(name: str) -> str:
+        module = sys.modules.get(name)
+        try:
+            return inspect.getsource(module) if module is not None else name
+        except (OSError, TypeError):
+            return name
+
     try:
-        source = inspect.getsource(module) if module is not None else inspect.getsource(cls)
-    except (OSError, TypeError):
-        source = cls.__qualname__
-    return hash_text(f"{cls.__module__}.{cls.__qualname__}\n{source}")
+        own = inspect.getsource(sys.modules[cls.__module__])
+    except (OSError, TypeError, KeyError):
+        try:
+            own = inspect.getsource(cls)
+        except (OSError, TypeError):
+            own = cls.__qualname__
+    parts = [f"{cls.__module__}.{cls.__qualname__}\n{own}"]
+    for dep in sorted(dependency_modules):
+        parts.append(f"{dep}\n{_module_source(dep)}")
+    return hash_text("\n--dep--\n".join(parts))
 
 
 def _strict_json(obj: object) -> str:

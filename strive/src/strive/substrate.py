@@ -40,10 +40,13 @@ is explicit (`repair`), never silent.
 from __future__ import annotations
 
 import fcntl
+import json
+import math
 import os
 import re
 import tempfile
 import uuid
+from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,7 +56,7 @@ from typing import Iterator, Mapping
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
-from strive.contracts import BudgetSpec
+from strive.contracts import BudgetSpec, BudgetUsage
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramingError
 from strive.runtime import (
@@ -86,6 +89,28 @@ _CAUSE_COMPAT: dict[str, set[str]] = {
     "observation-recorded@2": {"EvaluateFork"},
     "change-confirmed@2": {"ConfirmChange"},
     "change-revised@2": {"RequestRefinement"},
+}
+
+# the EXACT mandatory effect tokens a SUCCESSFUL command must cause (a token is
+# an observation_kind for fork observations, else the body kind). A change may
+# have been proposed by an EARLIER command (one proposal per change id), so a
+# proposal caused by THIS command is optional.
+_OK_EFFECTS: dict[str, dict[str, int]] = {
+    "ApplyChange": {"change-applied@2": 1},
+    "RevertChange": {"change-reverted@2": 1},
+    "EvaluateFork": {
+        "fork-attempt-dispatch": 2,
+        "fork-attempt-result": 2,
+        "fork-evaluation": 1,
+    },
+    "ConfirmChange": {"change-confirmed@2": 1},
+    "ScheduleTrigger": {},
+    "StopAdaptation": {},
+}
+_OPTIONAL_OK_EFFECTS = {"change-proposed@2"}
+_SUCCESS_TOKENS = {
+    "change-applied@2", "change-reverted@2", "change-confirmed@2",
+    "change-revised@2", "fork-evaluation",
 }
 
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -1172,6 +1197,8 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
         cfg = codec.loads(sub.objects.get_text(bound.config_ref), ConfigBlob)
         if cfg.encoding != ENCODING:
             errors.append(f"bound config encoding {cfg.encoding!r} != {ENCODING!r}")
+        if not _canonical_json_ok(cfg.json):
+            errors.append("bound config json is malformed or noncanonical")
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
         errors.append(f"bound config ref does not decode: {exc}")
     try:
@@ -1205,6 +1232,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
     reverted_ids: set[str] = set()
     applied_changes: dict[str, CompositeChange] = {}
     proposals: dict[str, str] = {}  # change_id -> change_ref (one per change id)
+    consumed_cmds: set[str] = set()  # a command is reduced by AT MOST one checkpoint
 
     for env, body in zip(envelopes[1:], bodies[1:], strict=True):
         kind = env.body_kind
@@ -1227,6 +1255,11 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     errors.append(f"envelope {env.seq}: payload command_id disagrees")
                 if payload.kind != body.command_kind:
                     errors.append(f"envelope {env.seq}: payload kind disagrees with intent")
+                if not _canonical_json_ok(payload.json):
+                    errors.append(
+                        f"envelope {env.seq}: command payload json is malformed or "
+                        "noncanonical"
+                    )
                 payloads.setdefault(body.command_id, payload)
             except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
                 errors.append(f"envelope {env.seq}: command payload does not decode: {exc}")
@@ -1325,6 +1358,10 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                         f"envelope {env.seq}: policy-state encoding {st.encoding!r} "
                         f"!= {ENCODING!r}"
                     )
+                if not _canonical_json_ok(st.json):
+                    errors.append(
+                        f"envelope {env.seq}: policy-state json is malformed or noncanonical"
+                    )
             except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
                 errors.append(f"envelope {env.seq}: policy-state ref does not decode: {exc}")
             if body.state_ref != (state_ref or ""):
@@ -1344,6 +1381,12 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                         f"envelope {env.seq}: checkpoint must be caused by the command "
                         "it reduced"
                     )
+                if consumed in consumed_cmds:
+                    errors.append(
+                        f"envelope {env.seq}: command {consumed!r} is consumed by more "
+                        "than one checkpoint"
+                    )
+                consumed_cmds.add(consumed)
         elif isinstance(body, ObservationRecorded):
             _verify_observation(sub, body, env, cause_payload, proposals, errors)
         elif isinstance(body, ChangeProposed):
@@ -1379,6 +1422,13 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                 errors.append(
                     f"envelope {env.seq}: OperationFailed command_id must equal caused_by"
                 )
+
+    # the per-command CLOSED state machine: exact effect grammar per kind +
+    # outcome, no effect after terminal, matching StoredResult, and a
+    # well-formed fork-attempt lifecycle.
+    _verify_command_lifecycles(
+        sub, envelopes, bodies, bound, issued, completed, payloads, proposals, errors
+    )
 
     # validate the FINAL folded state's surface content too (catches corruption
     # or preexisting-invalid content surviving into current state)
@@ -1423,6 +1473,296 @@ def _decode_change(
     except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
         errors.append(f"envelope {env.seq}: change ref does not decode: {exc}")
         return None
+
+
+def _canonical_json_ok(text: str) -> bool:
+    """True iff `text` parses AND is the exact canonical serialization
+    (sorted keys, tight separators). Rejects malformed OR noncanonical JSON."""
+    try:
+        parsed = json.loads(text)
+    except (ValueError, TypeError):
+        return False
+    return json.dumps(parsed, sort_keys=True, separators=(",", ":")) == text
+
+
+def _usage_errors(usage: BudgetUsage, where: str) -> list[str]:
+    """Every BudgetUsage dimension must be finite and nonnegative."""
+    out: list[str] = []
+    for name in (
+        "wall_time_s", "executions", "model_calls", "tokens", "output_bytes",
+        "cost", "recursion_depth",
+    ):
+        value = getattr(usage, name)
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            out.append(f"{where}: {name} is not finite")
+        if value < 0:
+            out.append(f"{where}: {name} is negative ({value})")
+    return out
+
+
+def _effect_token(env: EventEnvelope, body: object) -> str:
+    """The grammar token for one caused effect: an observation's kind for fork
+    observations, else the body schema kind."""
+    if isinstance(body, ObservationRecorded):
+        return body.observation_kind
+    return env.body_kind
+
+
+def _verify_command_lifecycles(
+    sub: Substrate,
+    envelopes: list[EventEnvelope],
+    bodies: list[object],
+    bound: PolicyBound,
+    issued: dict[str, PolicyCommandIssued],
+    completed: dict[str, PolicyCommandCompleted],
+    payloads: dict[str, CommandPayload],
+    proposals: dict[str, str],
+    errors: list[str],
+) -> None:
+    """The per-command CLOSED state machine: every command's caused events must
+    form the exact grammar for its kind + outcome, with no effect before intent
+    (already enforced) or after terminal, the right required/failure effects,
+    a StoredResult that matches its effects, and a well-formed fork-attempt
+    lifecycle."""
+    caused: dict[str, list[tuple[EventEnvelope, object]]] = {}
+    for env, body in zip(envelopes, bodies, strict=True):
+        c = env.caused_by
+        # a checkpoint is caused by the command it REDUCES and legitimately
+        # follows that command's terminal — it is reduction bookkeeping (checked
+        # in the main fold), not a command EFFECT, so exclude it from the
+        # per-command effect grammar / effect-after-terminal check.
+        if c is None or isinstance(body, (PolicyCommandIssued, PolicyCheckpointed)):
+            continue
+        caused.setdefault(c, []).append((env, body))
+
+    for cid, issue in issued.items():
+        events = caused.get(cid, [])
+        _check_effect_after_terminal(cid, events, errors)
+        _check_fork_lifecycle(sub, cid, payloads.get(cid), events, bound, errors)
+        terminal = completed.get(cid)
+        if terminal is not None:
+            _check_command_grammar(
+                sub, cid, issue.command_kind, terminal, events, errors
+            )
+
+
+def _check_effect_after_terminal(
+    cid: str, events: list[tuple[EventEnvelope, object]], errors: list[str]
+) -> None:
+    term_seq: int | None = None
+    for env, body in events:
+        if isinstance(body, PolicyCommandCompleted):
+            term_seq = env.seq
+    if term_seq is None:
+        return
+    for env, body in events:
+        if isinstance(body, PolicyCommandCompleted):
+            continue
+        if env.seq > term_seq:
+            errors.append(
+                f"command {cid!r}: effect {env.body_kind} at #{env.seq} appears "
+                "AFTER its terminal completion"
+            )
+
+
+def _check_command_grammar(
+    sub: Substrate,
+    cid: str,
+    kind: str,
+    terminal: PolicyCommandCompleted,
+    events: list[tuple[EventEnvelope, object]],
+    errors: list[str],
+) -> None:
+    tokens = [
+        _effect_token(env, body)
+        for env, body in events
+        if not isinstance(body, PolicyCommandCompleted)
+    ]
+    if terminal.outcome == "ok":
+        if terminal.result_ref is None:
+            errors.append(f"command {cid!r}: a successful terminal has no StoredResult")
+        required = _OK_EFFECTS.get(kind)
+        if required is None:
+            errors.append(f"command {cid!r}: kind {kind!r} cannot succeed")
+            return
+        mandatory = Counter(t for t in tokens if t not in _OPTIONAL_OK_EFFECTS)
+        optional = Counter(t for t in tokens if t in _OPTIONAL_OK_EFFECTS)
+        if mandatory != Counter(required):
+            errors.append(
+                f"command {cid!r} ({kind} ok): effects {dict(mandatory)} do not "
+                f"equal the required grammar {required}"
+            )
+        if any(count > 1 for count in optional.values()):
+            errors.append(f"command {cid!r}: duplicate optional (proposal) effect")
+        # ordering: a proposal (if present) comes first; a fork summary is last
+        non_terminal = tokens
+        if "change-proposed@2" in non_terminal and non_terminal[0] != "change-proposed@2":
+            errors.append(f"command {cid!r}: proposal must precede its command's effects")
+        if kind == "EvaluateFork" and non_terminal and non_terminal[-1] != "fork-evaluation":
+            errors.append(f"command {cid!r}: fork summary must be the last effect")
+        _check_stored_result(sub, cid, kind, terminal, events, errors)
+    else:  # failed | indeterminate: a failure record and NO success effect
+        counts = Counter(tokens)
+        if counts.get("operation-failed@2", 0) != 1:
+            errors.append(
+                f"command {cid!r} ({terminal.outcome}): needs exactly one failure record"
+            )
+        for token in _SUCCESS_TOKENS:
+            if counts.get(token, 0):
+                errors.append(
+                    f"command {cid!r} ({terminal.outcome}): has a success effect "
+                    f"{token!r}"
+                )
+
+
+def _check_stored_result(
+    sub: Substrate,
+    cid: str,
+    kind: str,
+    terminal: PolicyCommandCompleted,
+    events: list[tuple[EventEnvelope, object]],
+    errors: list[str],
+) -> None:
+    if terminal.result_ref is None:
+        return
+    try:
+        stored = codec.loads(sub.objects.get_text(terminal.result_ref), StoredResult)
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+        return  # the main fold already reported the decode failure
+    applied_ref: str | None = None
+    summary_event_ref: str | None = None  # the ObservationRecorded event body ref
+    summary_inner_ref: str | None = None  # the inner ForkObservation ref
+    for env, body in events:
+        if isinstance(body, ChangeApplied):
+            applied_ref = body.change_ref
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == FORK_SUMMARY:
+            summary_event_ref = env.body_ref
+            summary_inner_ref = body.observation_ref
+    expected_proposal = applied_ref if kind == "ApplyChange" else None
+    if stored.proposal_ref != expected_proposal:
+        errors.append(
+            f"command {cid!r}: StoredResult.proposal_ref does not match the "
+            "command's actual proposal/apply effect"
+        )
+    if kind == "EvaluateFork":
+        if stored.observation_ref != summary_event_ref:
+            errors.append(
+                f"command {cid!r}: StoredResult.observation_ref does not match the "
+                "fork summary event"
+            )
+        if summary_inner_ref is not None:
+            try:
+                fork = codec.loads(sub.objects.get_text(summary_inner_ref), ForkObservation)
+                expected = {
+                    "base_overall": fork.base_overall,
+                    "candidate_overall": fork.candidate_overall,
+                    "improved": 1.0 if fork.improved else 0.0,
+                }
+                if stored.metrics != expected:
+                    errors.append(
+                        f"command {cid!r}: StoredResult.metrics do not match the fork "
+                        "summary"
+                    )
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+                pass
+    else:
+        if stored.observation_ref is not None:
+            errors.append(f"command {cid!r}: StoredResult.observation_ref on a non-fork")
+        if stored.metrics:
+            errors.append(f"command {cid!r}: StoredResult.metrics on a non-fork")
+    errors.extend(_usage_errors(stored.usage, f"command {cid!r} StoredResult.usage"))
+
+
+def _check_fork_lifecycle(
+    sub: Substrate,
+    cid: str,
+    payload: CommandPayload | None,
+    events: list[tuple[EventEnvelope, object]],
+    bound: PolicyBound,
+    errors: list[str],
+) -> None:
+    dispatches: dict[str, AttemptDispatched] = {}
+    dispatch_seq: dict[str, int] = {}
+    results: dict[str, AttemptRecord] = {}
+    for env, body in events:  # events are in seq order
+        if not isinstance(body, ObservationRecorded):
+            continue
+        if body.observation_kind == FORK_DISPATCH:
+            try:
+                disp = codec.loads(sub.objects.get_text(body.observation_ref), AttemptDispatched)
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+                continue
+            if disp.label in dispatches:
+                errors.append(f"command {cid!r}: duplicate {disp.label!r} dispatch")
+            dispatches[disp.label] = disp
+            dispatch_seq.setdefault(disp.label, env.seq)
+            if disp.state_ref != body.subject_state_ref:
+                errors.append(
+                    f"command {cid!r}: dispatch state_ref != subject_state_ref"
+                )
+            errors.extend(_usage_errors(
+                BudgetUsage(
+                    wall_time_s=disp.reserved_wall_s,
+                    executions=disp.reserved_executions,
+                    output_bytes=disp.reserved_output_bytes,
+                ),
+                f"command {cid!r} {disp.label} reservation",
+            ))
+        elif body.observation_kind == FORK_RESULT:
+            try:
+                rec = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+                continue
+            if rec.label not in dispatches:
+                errors.append(f"command {cid!r}: {rec.label!r} result without a dispatch")
+            if rec.label in results:
+                errors.append(f"command {cid!r}: duplicate {rec.label!r} result")
+            results[rec.label] = rec
+            if rec.state_ref != body.subject_state_ref:
+                errors.append(f"command {cid!r}: result state_ref != subject_state_ref")
+            matched = dispatches.get(rec.label)
+            if matched is not None and matched.state_ref != rec.state_ref:
+                errors.append(
+                    f"command {cid!r}: {rec.label!r} result does not match its dispatch"
+                )
+            missing = [
+                cap for cap in bound.required_capabilities
+                if cap not in rec.provenance.enforced_capabilities
+            ]
+            if missing:
+                errors.append(
+                    f"command {cid!r}: {rec.label!r} provenance lacks required "
+                    f"capabilities {missing}"
+                )
+            errors.extend(_usage_errors(rec.usage, f"command {cid!r} {rec.label} usage"))
+        elif body.observation_kind == FORK_SUMMARY:
+            try:
+                summary = codec.loads(sub.objects.get_text(body.observation_ref), ForkObservation)
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+                continue
+            for label in ("base", "candidate"):
+                durable = results.get(label)
+                summ = summary.base if label == "base" else summary.candidate
+                if durable is None or summ != durable:
+                    errors.append(
+                        f"command {cid!r}: fork summary {label} != the durable "
+                        f"{label} result record"
+                    )
+            if payload is not None and payload.change_ref is not None:
+                try:
+                    change = codec.loads(
+                        sub.objects.get_text(payload.change_ref), CompositeChange
+                    )
+                    if change.change_id != summary.candidate_change_id:
+                        errors.append(
+                            f"command {cid!r}: fork summary candidate does not equal "
+                            "the issued candidate change"
+                        )
+                except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+                    pass  # the main fold reports payload/ref decode failures
+    if "base" in dispatch_seq and "candidate" in dispatch_seq:
+        if dispatch_seq["base"] >= dispatch_seq["candidate"]:
+            errors.append(f"command {cid!r}: base must be dispatched before candidate")
 
 
 def _require_pinned_deltas(

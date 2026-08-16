@@ -1404,3 +1404,60 @@ lifecycles (issue a typed CommandPayload + propose before apply), added the full
 area-6 matrix (test_adversarial), cumulative wall/output unit tests
 (test_budget), and test_substrate_only (fresh-interpreter verify). Kept the
 mandatory build/install/real-console-script test.
+
+## vNext Phase A — command/attempt state-machine pass (before merge)
+
+Narrow correctness pass on PR #50. Preserved the vNext thesis, promotion-era
+deletion, pure append preflight, derived binding index, pinned surface
+descriptors, run lease, and result-driven policy API. Did NOT begin
+continual-refine@1 or Pareto. 212 tests pass; `uv run mypy` clean over 38
+files.
+
+Area 1 — closed per-command state machine (`substrate._verify_command_lifecycles`
++ helpers). After the main fold, each command's caused events (excluding the
+self-issue and its reduction checkpoint) are grouped and checked against the
+EXACT grammar for its kind+outcome (`_OK_EFFECTS` / `_OPTIONAL_OK_EFFECTS` /
+`_SUCCESS_TOKENS`): ok requires the precise mandatory effect multiset (proposal
+optional, since one-proposal-per-change-id lets Apply reuse the fork's
+proposal); failed/indeterminate require exactly one OperationFailed and NO
+success token; effects after the terminal are rejected; an ok terminal must
+carry a StoredResult; a checkpoint consumes its command at most once.
+
+Area 2 — typed command/result semantics. `_canonical_json_ok` rejects
+malformed/noncanonical `CommandPayload.json`, `ConfigBlob.json`,
+`PolicyStateBlob.json`. `_check_stored_result` matches the StoredResult's
+proposal_ref (== the applied change for Apply, else None), observation_ref (==
+the fork SUMMARY event body ref, else None), and metrics (== the summary's
+base/candidate/improved), and validates usage finiteness. The fork's
+`observation_ref` was made consistent between the fresh and reused paths (the
+ObservationRecorded EVENT body ref, via `_fork_summary`), so initial and
+reconstructed results are byte-for-byte equal. `expected_state_ref` stays in
+the durable identity (unchanged).
+
+Area 3 — fork-attempt lifecycle (`_check_fork_lifecycle`). Per (command,label):
+one dispatch → ≤1 result, no result without a dispatch, no duplicate labels,
+base dispatched before candidate; dispatch/result `state_ref` == the
+ObservationRecorded `subject_state_ref`; result matches its dispatch's
+state_ref; the summary's base/candidate equal the durable FORK_RESULT records
+and its candidate_change_id equals the issued candidate change; actual
+provenance's enforced_capabilities ⊇ `PolicyBound.required_capabilities`; every
+BudgetUsage/reservation field finite+nonnegative.
+
+Area 4 — honest budgets + CandidateExecutor fix. `run_protected_suite` now
+aggregates and returns the ACTUAL backend wall + captured stdout bytes;
+`execute_suite` uses them (was `wall_time_s=0.0` and `stdout_bytes=len(error)`).
+`AttemptDispatched` (v2) carries `reserved_wall_s` + `reserved_output_bytes`;
+`_evaluate_fork` sets a conservative per-attempt reservation across all three
+dimensions; `_seed_meter` absorbs executions+wall+output for an OPEN dispatch.
+`_run_attempt` accumulates real per-case stdout/wall.
+
+Area 5 — pinned evaluation + policy package. `Task.fingerprint` now also hashes
+`selection_cases` (case-selection) and `strive.evaluate.evaluate`/`_aggregate`
+(aggregate evaluator). `PolicyDescriptor.dependency_modules` (default empty) is
+an explicit policy-package manifest folded into `_policy_digest`.
+
+Tests: new `test_state_machine.py` (19 forge/behavior tests) covering the full
+area-6 list; existing suites updated for the stricter grammar (e.g. the
+duplicate-terminal test now completes a valid StopAdaptation with a StoredResult).
+Kept the build/install/real-console-script test and the fresh-interpreter
+substrate-only verify.
