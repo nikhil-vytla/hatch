@@ -6,7 +6,39 @@ Strive is a policy-neutral, revision-native mechanism substrate plus a
 result-driven, resumable policy kernel. Comparative evaluation is an optional
 mechanism a policy requests, never a universal activation gate.
 
-### Correctness pass 2 (what changed since the last review)
+### Semantic-atomicity pass (what changed since the last review)
+
+- **No append can turn a valid run invalid.** Every authority append runs a
+  PURE candidate-event preflight (`_fold_view` over the resulting stream) and
+  is refused unless the POST-event view is fully valid; a refused append leaves
+  the journal byte-for-byte unchanged (only an orphan CAS body may remain).
+- **Runtime records are a neutral, closed contracts module** (`strive.runtime`)
+  imported directly by the substrate — verification no longer depends on kernel
+  import order (proved by a fresh-interpreter test). Verify decodes each ref as
+  its EXPECTED type and matches command id/kind/outcome/encoding; requires ONE
+  proposal per change id; and matches an applied/forked change to BOTH its
+  proposal and its issued command payload's `change_ref`, not a kind string.
+  `OperationFailed.command_id == caused_by`; confirm/revise must target an
+  existing change and revised refs must decode.
+- **Mutation is confined to the run's PINNED surface set.** A run may only
+  touch surfaces pinned in its `PolicyBound`, resolved + validated through the
+  pinned descriptors even for content already in shared CAS. Growing the live
+  catalog keeps old runs READABLE, but mutating a newly-added surface needs an
+  explicit rebind/new run.
+- **Command preconditions are durable.** `expected_state_ref` is part of the
+  command's durable identity (a changed precondition is a changed command and
+  fails closed); the manual policy derives it from the STABLE seed-state ref,
+  not whichever state exists after a crash.
+- **Attempts + budgets are truthful at every crash point.** A fork journals
+  each base/candidate DISPATCH then RESULT separately; an open dispatch (result
+  never written) is reconciled as `indeterminate`, never implicitly re-run.
+  Failed/partial attempts still record actual provenance/failure/denials/usage.
+  The meter is REBUILT fresh from the durable per-attempt ledger on every entry
+  (no repeated absorption into a reused `KernelServices`); wall is cumulative
+  active time; output is enforced cumulatively across cases (each case's cap is
+  the remaining allowance).
+
+### Correctness pass 2 (earlier in this PR)
 
 - **Verification is closed AND deep.** Every envelope's run AND task scope is
   checked; a duplicate intent is rejected even with the same digest; every
@@ -109,6 +141,11 @@ mechanism a policy requests, never a universal activation gate.
   `SurfaceDescriptorSnapshot` (validator name + implementation digest) PER
   surface, so catalog growth never invalidates old runs and validator drift is
   detected.
+- **`strive.runtime`** — the NEUTRAL, closed runtime contracts shared by the
+  substrate and kernel: `CommandPayload`, `StoredResult`, `ConfigBlob`,
+  `PolicyStateBlob`, `AttemptDispatched`, `AttemptRecord`, `ForkObservation`.
+  A leaf module (imports only `codec`/`contracts`/`sandboxes`) so verification
+  never depends on kernel import order.
 - **`strive.policy`** — `AdaptationPolicy[Config, State]` (`next_command` +
   `reduce`, `decode_state`) and `SurfaceStrategy`; the closed command
   vocabulary; immutable `RunView`; injected immutable `PolicyCatalog` with a
@@ -136,27 +173,28 @@ model refiner arrive with `continual-refine@1`.
 
 ### Verification
 
-- `uv run pytest` — 178 tests. The Phase-A floor plus the adversarial matrix:
-  CAS traversal / corrupt-but-present / preexisting-corrupt / invalid-UTF-8 /
-  concurrent-writers (`test_cas`); surface validators + catalog digest
-  (`test_surfaces`); and `test_adversarial` — task-scope forgery (envelope +
-  reopen), traversal run ids, hyphenated-task discovery, binding
-  divergence-quarantine and publication-crash rebuild, closed-body-union
-  refusal, corrupt config/result refs hiding state, verify purity,
-  arbitrary/duplicate revert, command/effect kind mismatch, duplicate intents,
-  concurrent runners (lease), failed-command budget persistence, indeterminate
-  effect + no-retry, exact result/head reconstruction, catalog extension +
-  validator drift, task/scorer fingerprint drift, and preexisting-invalid
-  shared surface content. `test_packaging` BUILDS + INSTALLS the wheel in an
-  isolated venv and runs the real `strive` script (never skipped).
-- `uv run mypy` — clean, `--strict`, over 35 files (src + tests).
+- `uv run pytest` — 193 tests. The Phase-A floor plus the adversarial matrix
+  (`test_cas`, `test_surfaces`, `test_adversarial`, `test_budget`): CAS
+  traversal / corrupt / concurrent-writers; surface validators + drift; and —
+  from the semantic-atomicity pass — preflight-no-append (byte-for-byte
+  unchanged), type-substituted refs, applied-change / proposal / payload
+  mismatch, duplicate + different proposals, ghost confirm/revise, noncanonical
+  + duplicate seed bindings, old-run mutation of a newly-added surface,
+  crash-after-dispatch → indeterminate (never re-run), failure-before-terminal
+  budget persistence, same-services reseed, and cumulative wall/output.
+  `test_substrate_only` verifies a kernel-driven run in a FRESH interpreter
+  that never imports the kernel. `test_packaging` BUILDS + INSTALLS the wheel
+  in an isolated venv and runs the real `strive` script (never skipped).
+- `uv run mypy` — clean, `--strict`, over 37 files (src + tests).
 - `uv run strive` — installed console script; verified in tests and smoke.
 
 ### The Phase-A claim
 
-Strive's event/CAS substrate is pure-verifiable and crash-recoverable; command
-causation, run identity, surfaces, budgets, and external effects remain exact
-or explicitly indeterminate across concurrency, corruption, and restart.
+Every accepted append preserves a semantically valid run; command intent fully
+determines effects and preconditions; pinned surfaces cannot expand implicitly;
+and external attempts plus every budget dimension are durably accounted, safely
+reconciled, or explicitly indeterminate — across concurrency, corruption, and
+restart, with verification pure and independent of kernel import order.
 
 ### Next
 

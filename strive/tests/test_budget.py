@@ -82,3 +82,34 @@ def test_recursion_depth_zero_denies_any_delegation() -> None:
     meter = BudgetMeter(BudgetSpec(max_recursion_depth=0))
     assert meter.enter_recursion(1) is not None
     assert meter.enter_recursion(0) is None
+
+
+# -- durable/cumulative semantics (final semantic-atomicity pass) -----------------------------------
+
+
+def test_output_cap_is_cumulative_across_cases() -> None:
+    """The per-execution output cap is the REMAINING cumulative allowance, so
+    successive cases cannot each spend the full cap independently."""
+    meter = BudgetMeter(BudgetSpec(executions=UNLIMITED, output_bytes=100))
+    assert meter.execution_output_cap() == 100
+    meter.note_output_bytes(40)
+    assert meter.execution_output_cap() == 60  # decremented cumulatively
+    meter.note_output_bytes(60)
+    assert meter.execution_output_cap() == 1  # floored, never negative
+    # cumulative output at/over the ceiling denies the next execution
+    denial = meter.request_execution()
+    assert denial is not None and "output" in denial.detail
+
+
+def test_durable_wall_is_cumulative_across_restarts() -> None:
+    """Absorbing prior usage resumes wall time as cumulative ACTIVE time, so a
+    run cannot buy unbounded wall by restarting."""
+    from strive.contracts import BudgetUsage
+
+    meter = BudgetMeter(BudgetSpec(wall_time_s=10.0, executions=UNLIMITED))
+    assert meter.remaining_wall_s() > 9.0
+    meter.absorb(BudgetUsage(wall_time_s=10.05))  # prior process's active time
+    assert meter.remaining_wall_s() < 0.1
+    # wall is exhausted: the next execution is denied on wall-time
+    denial = meter.request_execution()
+    assert denial is not None and "wall" in denial.detail

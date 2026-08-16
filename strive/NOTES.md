@@ -1344,3 +1344,63 @@ New tests: expanded `test_cas`, `test_surfaces`, `test_adversarial` (full
 matrix), rewrote `test_packaging`. Updated substrate/kernel/codec tests for the
 new causation discipline (direct callers must issue a compatible, CAS-backed
 command first) and the `expected_state_ref` rename.
+
+## vNext Phase A — semantic-atomicity pass (before merge)
+
+Final correctness pass on PR #50. Thesis + deletions + result-driven API +
+derived binding index + run lease + optional evaluation preserved. Did NOT
+begin continual-refine@1 or Pareto. 193 tests pass; `uv run mypy` clean over
+37 files.
+
+Area 1 — atomic append. Refactored substrate `_verify` into a pure
+`_fold_view(sub, head, envelopes, framing_errors)`. `_emit` now builds the
+candidate envelope, folds `view.envelopes + [candidate]`, and REFUSES the
+append unless the post-event view is ok — so an accepted append can never make
+a valid run invalid, and a refused one leaves `events.jsonl` byte-for-byte
+unchanged (only an orphan CAS body may remain). Tests assert this for
+malformed seed, ghost confirm, duplicate seed bindings, etc.
+
+Area 2 — neutral contracts. New `strive/runtime.py` (leaf: codec + contracts +
+sandboxes) holds CommandPayload, StoredResult, ConfigBlob, PolicyStateBlob,
+AttemptDispatched, AttemptRecord, ForkObservation. Substrate imports it, so
+verify decodes every ref as its expected TYPE (not has()): command payload
+(match id/kind), stored result (match id/kind/outcome), config/policy-state
+(match encoding), observation (dispatch/result/summary by kind). Added: one
+proposal per change id; applied/forked change must equal BOTH its proposal ref
+AND its issued CommandPayload.change_ref; OperationFailed.command_id==caused_by;
+confirm/revise must target a proposed change and revised refs decode. Proven
+kernel-import-independent by test_substrate_only (fresh interpreter).
+
+Area 3 — pinned-surface mutation. Split `validate_change` into `_shape_check`
+(catalog-independent) + membership. `apply`/`revert`/`stage_change_closure`
+resolve the run's PINNED `SurfaceDescriptorSnapshot`s from PolicyBound and
+validate content through them (even shared CAS); a delta on a non-pinned
+surface is refused. Verify's replay uses `_apply_deltas` (shape-only) +
+per-delta pinned-membership check, so a grown catalog keeps old runs readable
+while mutating a newly-added surface requires a rebind.
+
+Area 4 — durable preconditions. `_command_identity_json` no longer excludes
+`expected_state_ref` — the full command (incl. precondition) is the durable
+identity; CommandPayload carries `change_ref` + full json. RunView gained
+`seed_state_ref`; manual-change@1 sets `expected_state_ref=view.seed_state_ref`
+(stable across resume), so re-derivation is identical and a changed precondition
+fails closed via the existing digest check.
+
+Area 5 — truthful attempts/budgets. Fork now journals per attempt a
+`FORK_DISPATCH` (AttemptDispatched, reserved executions) then a `FORK_RESULT`
+(AttemptRecord with actual provenance/failure/denials/usage), then a
+`FORK_SUMMARY` (ForkObservation). `_evaluate_fork` reconciles: reuse a recorded
+result, fresh-run an unstarted attempt, and raise `IndeterminateEffect` for an
+OPEN dispatch (never implicit re-run). `_seed_meter` REBUILDS a fresh
+`BudgetMeter` from the durable attempt ledger (results, or reservations for open
+dispatches) and assigns it to services — no repeated absorption into a reused
+meter. BudgetMeter wall is now cumulative active time (`_absorbed_wall`), and
+`_run_attempt` runs CASE-BY-CASE so output/wall caps come from the REMAINING
+budget (cumulative across cases), preserving actual provenance/failure for
+partial/denied attempts.
+
+Tests: rewrote the low-level substrate/adversarial tests to build valid command
+lifecycles (issue a typed CommandPayload + propose before apply), added the full
+area-6 matrix (test_adversarial), cumulative wall/output unit tests
+(test_budget), and test_substrate_only (fresh-interpreter verify). Kept the
+mandatory build/install/real-console-script test.

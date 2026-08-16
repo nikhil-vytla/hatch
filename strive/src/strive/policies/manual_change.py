@@ -154,9 +154,11 @@ class ManualChangePolicy:
                     change=change,
                     strategy_ref=STRATEGY_REF,
                     content_blobs=blobs,
-                    # the LOGICAL state the change was built against — robust to
-                    # the kernel's own intervening proposal event.
-                    expected_state_ref=view.state_ref,
+                    # a STABLE base precondition: the change is built against the
+                    # SEED state, so the precondition is the seed ref (durable and
+                    # identical across resume — never "whichever state exists
+                    # after a crash").
+                    expected_state_ref=view.seed_state_ref,
                 )
             return StopAdaptation(
                 command_id=f"{rid}:stop-noimprove",

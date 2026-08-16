@@ -26,6 +26,7 @@ from strive.kernel import (
 )
 from strive.policies import manual_change as mc
 from strive.policy import StopAdaptation, default_catalog
+from strive.runtime import ENCODING, CommandPayload, ConfigBlob
 from strive.substrate import (
     EMPTY_STATE,
     ChangeApplied,
@@ -67,13 +68,27 @@ def _bound_sub(root: Path, run_id: str, *, task: str = "sum-integers") -> Substr
     )
     sub.bind_policy(
         task_fingerprint="fp", policy_ref="p@1", policy_digest="pd",
-        config_ref=sub.objects.put_text("cfg"),
+        config_ref=sub.put(ConfigBlob(ENCODING, "{}")),
         prompt_refs={"refine": sub.objects.put_text("prompt-md")},
         seed=1, seed_state=seed,
         budget_ref=sub.put(BudgetSpec()),
         required_capabilities=(), run_metadata={},
     )
     return sub
+
+
+def _issue(sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None) -> None:
+    change_ref = sub.put(change) if change is not None else None
+    ref = sub.put(CommandPayload(command_id=cid, kind=kind, encoding=ENCODING,
+                                 change_ref=change_ref, json="{}"))
+    sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
+
+
+def _apply(sub: Substrate, cid: str, change: CompositeChange, blobs: dict[str, str]) -> None:
+    _issue(sub, cid, "ApplyChange", change)
+    sub.record_proposal(change=change, strategy_ref="t", caused_by=cid)
+    sub.stage_change_closure(change, blobs)
+    sub.apply(change=change, caused_by=cid)
 
 
 def _drive(root: Path, run_id: str, *, executions: int = 128) -> object:
@@ -217,13 +232,9 @@ def test_verify_is_pure_no_readside_cas_writes(tmp_path: Path) -> None:
         ),
         summary="x",
     )
-    sub.stage_change_closure(
-        change,
-        {code_after: "def solve(input_text: str) -> int:\n    return 5\n",
-         prompt_after: "revised template"},
-    )
-    sub.issue_command(command_id="cmd", command_kind="ApplyChange", command_ref=sub.objects.put_text("pl-cmd"))
-    sub.apply(change=change, caused_by="cmd")
+    _apply(sub, "cmd", change,
+           {code_after: "def solve(input_text: str) -> int:\n    return 5\n",
+            prompt_after: "revised template"})
     before = _object_files(tmp_path)
     for _ in range(5):
         assert sub.verify().ok
@@ -250,11 +261,10 @@ def test_double_revert_refused(tmp_path: Path) -> None:
         deltas=(SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after),),
         summary="x",
     )
-    sub.stage_change_closure(change, {code_after: "def solve(input_text: str) -> int:\n    return 7\n"})
-    sub.issue_command(command_id="a", command_kind="ApplyChange", command_ref=sub.objects.put_text("pl-a"))
-    sub.apply(change=change, caused_by="a")
-    sub.issue_command(command_id="r1", command_kind="RevertChange", command_ref=sub.objects.put_text("pl-r1"))
+    _apply(sub, "a", change, {code_after: "def solve(input_text: str) -> int:\n    return 7\n"})
+    _issue(sub, "r1", "RevertChange")
     sub.revert(change_id="c1", caused_by="r1")
+    _issue(sub, "r2", "RevertChange")
     with pytest.raises(SubstrateError, match="already reverted"):
         sub.revert(change_id="c1", caused_by="r2")
 
@@ -268,9 +278,14 @@ def test_kernel_refuses_changed_rederived_command(tmp_path: Path) -> None:
     services = KernelServices.open(tmp_path, TASK, run, budget=BudgetSpec(executions=8))
     sub = services.substrate
     command = StopAdaptation(command_id=f"{run}:x", reason="r")
-    # an intent already recorded under a DIFFERENT payload digest
+    # a VALID intent, but recorded under a DIFFERENT payload identity than the
+    # command re-derives (a changed precondition/payload)
+    bogus = sub.put(CommandPayload(
+        command_id=command.command_id, kind="StopAdaptation", encoding=ENCODING,
+        change_ref=None, json='{"reason":"DIFFERENT"}',
+    ))
     sub.issue_command(command_id=command.command_id, command_kind="StopAdaptation",
-                      command_ref=sub.objects.put_text("bogus-payload"))
+                      command_ref=bogus)
     view = sub.verify()
     with pytest.raises(KernelError, match="different payload digest"):
         kernel._run_command(services, view, command)
@@ -311,7 +326,7 @@ def test_bind_rejects_structurally_invalid_seed_code(tmp_path: Path) -> None:
     with pytest.raises(SubstrateError, match="seed binding.*invalid"):
         sub.bind_policy(
             task_fingerprint="fp", policy_ref="p@1", policy_digest="pd",
-            config_ref=sub.objects.put_text("cfg"),
+            config_ref=sub.put(ConfigBlob(ENCODING, "{}")),
             prompt_refs={"refine": sub.objects.put_text("md")},
             seed=1, seed_state=seed, budget_ref=sub.put(BudgetSpec()),
             required_capabilities=(), run_metadata={},
@@ -383,7 +398,7 @@ def test_command_effect_kind_mismatch_refused(tmp_path: Path) -> None:
     run = new_run_id()
     sub = _bound_sub(tmp_path, run)
     # issue an EvaluateFork intent, then forge a ChangeApplied caused by it
-    sub.issue_command(command_id="k", command_kind="EvaluateFork", command_ref=sub.objects.put_text("pl-k"))
+    _issue(sub, "k", "EvaluateFork")
     view = sub.verify()
     seed = view.seed_state.as_map()
     code_after = hash_text("def solve(input_text: str) -> int:\n    return 4\n")
@@ -468,9 +483,10 @@ def test_indeterminate_effect_is_recorded_and_not_retried(
     """A dispatch with no recoverable durable result is recorded `indeterminate`
     and is NEVER silently re-dispatched on resume."""
     calls = {"n": 0}
-    real = kernel._run_attempt
 
-    def boom(services: object, label: str, state: object, state_ref: str) -> object:
+    def boom(
+        services: object, cid: str, label: str, state: object, state_ref: str
+    ) -> object:
         calls["n"] += 1
         raise IndeterminateEffect("dispatched; result unknown")
 
@@ -588,3 +604,253 @@ def test_preexisting_invalid_shared_content_rejected_by_stage(tmp_path: Path) ->
     )
     with pytest.raises(SubstrateError, match="invalid"):
         sub.stage_change_closure(change, {})  # no blobs: content is already shared
+
+
+# -- final semantic-atomicity pass: preflight, typed refs, durable attempts -------------------------
+
+
+class _Boom(Exception):
+    pass
+
+
+def _journal_bytes(root: Path, run_id: str) -> bytes:
+    path = root / "runs" / f"{run_id}.events.jsonl"
+    return path.read_bytes() if path.exists() else b""
+
+
+def test_preflight_refuses_and_leaves_stream_byte_for_byte_unchanged(tmp_path: Path) -> None:
+    """An append whose POST-event view would be invalid is refused, and the
+    journal is left byte-for-byte unchanged (confirm_change relies on the pure
+    candidate-event preflight in _emit — it does not pre-check itself)."""
+    run = new_run_id()
+    sub = _bound_sub(tmp_path, run)
+    before = _journal_bytes(tmp_path, run)
+    with pytest.raises(SubstrateError, match="refusing to append"):
+        sub.confirm_change(change_id="ghost", rationale="r", caused_by="ghost-cmd")
+    assert _journal_bytes(tmp_path, run) == before  # not one byte appended
+
+
+def test_malformed_seed_state_preflight_no_append(tmp_path: Path) -> None:
+    """A bind whose seed content is structurally invalid is refused BEFORE any
+    event is written."""
+    run = new_run_id()
+    sub = Substrate.open(tmp_path, "sum-integers", run)
+    code_ref = sub.objects.put_text("def solve(t):\n    return 0\n")  # invalid
+    prompt_ref = sub.objects.put_text("p")
+    seed = canonical_state(
+        {("strategy-code", "solve"): code_ref, ("prompt", "proposal-template"): prompt_ref}
+    )
+    before = _journal_bytes(tmp_path, run)
+    with pytest.raises(SubstrateError):
+        sub.bind_policy(
+            task_fingerprint="fp", policy_ref="p@1", policy_digest="pd",
+            config_ref=sub.put(ConfigBlob(ENCODING, "{}")),
+            prompt_refs={"refine": sub.objects.put_text("md")},
+            seed=1, seed_state=seed, budget_ref=sub.put(BudgetSpec()),
+            required_capabilities=(), run_metadata={},
+        )
+    assert _journal_bytes(tmp_path, run) == before
+
+
+def test_noncanonical_seed_bindings_refused(tmp_path: Path) -> None:
+    run = new_run_id()
+    sub = Substrate.open(tmp_path, "sum-integers", run)
+    code_ref = sub.objects.put_text("def solve(input_text: str) -> int:\n    return 0\n")
+    prompt_ref = sub.objects.put_text("p")
+    from strive.substrate import HarnessState, SurfaceBinding
+
+    # deliberately NON-canonical order (canonical is prompt < strategy-code)
+    seed = HarnessState(bindings=(
+        SurfaceBinding("strategy-code", "solve", code_ref),
+        SurfaceBinding("prompt", "proposal-template", prompt_ref),
+    ))
+    with pytest.raises(SubstrateError):
+        sub.bind_policy(
+            task_fingerprint="fp", policy_ref="p@1", policy_digest="pd",
+            config_ref=sub.put(ConfigBlob(ENCODING, "{}")),
+            prompt_refs={"refine": sub.objects.put_text("md")},
+            seed=1, seed_state=seed, budget_ref=sub.put(BudgetSpec()),
+            required_capabilities=(), run_metadata={},
+        )
+
+
+def test_type_substituted_budget_ref_refused(tmp_path: Path) -> None:
+    """A budget_ref that decodes as the WRONG type (a CompositeChange) is
+    rejected — type substitution never slips through."""
+    run = new_run_id()
+    sub = Substrate.open(tmp_path, "sum-integers", run)
+    code_ref = sub.objects.put_text("def solve(input_text: str) -> int:\n    return 0\n")
+    prompt_ref = sub.objects.put_text("p")
+    seed = canonical_state(
+        {("strategy-code", "solve"): code_ref, ("prompt", "proposal-template"): prompt_ref}
+    )
+    wrong = sub.put(CompositeChange("x", (SurfaceDelta("prompt", "proposal-template", None, "aa" * 32),), "x"))
+    with pytest.raises(SubstrateError, match="budget"):
+        sub.bind_policy(
+            task_fingerprint="fp", policy_ref="p@1", policy_digest="pd",
+            config_ref=sub.put(ConfigBlob(ENCODING, "{}")),
+            prompt_refs={"refine": sub.objects.put_text("md")},
+            seed=1, seed_state=seed, budget_ref=wrong,  # a CompositeChange, not a BudgetSpec
+            required_capabilities=(), run_metadata={},
+        )
+
+
+def test_type_substituted_command_payload_refused(tmp_path: Path) -> None:
+    run = new_run_id()
+    sub = _bound_sub(tmp_path, run)
+    # a command_ref pointing at a BudgetSpec object (not a CommandPayload)
+    wrong = sub.put(BudgetSpec())
+    with pytest.raises(SubstrateError, match="refusing to append|does not decode"):
+        sub.issue_command(command_id="k", command_kind="ConfirmChange", command_ref=wrong)
+    assert sub.verify().ok  # stream stayed valid
+
+
+def test_ghost_confirm_and_revise_refused(tmp_path: Path) -> None:
+    run = new_run_id()
+    sub = _bound_sub(tmp_path, run)
+    _issue(sub, "k", "ConfirmChange")
+    with pytest.raises(SubstrateError, match="refusing to append"):
+        sub.confirm_change(change_id="never-proposed", rationale="r", caused_by="k")
+    assert sub.verify().ok
+
+
+def test_old_run_cannot_mutate_a_newly_added_surface(tmp_path: Path) -> None:
+    """A run pins its surfaces at bind. Growing the live catalog keeps the run
+    READABLE, but the run may not mutate the newly-added surface (that needs a
+    rebind/new run)."""
+    run = new_run_id()
+    _bound_sub(tmp_path, run)  # pinned under the default 2-surface catalog
+    grown = _extended_catalog()  # adds note/misc
+    sub = Substrate.open(tmp_path, "sum-integers", run, catalog=grown)
+    assert sub.verify().ok  # still readable under the grown catalog
+    note = sub.objects.put_text("a note")
+    change = CompositeChange("c1", (SurfaceDelta("note", "misc", None, note),), "x")
+    _issue(sub, "k", "ApplyChange", change)
+    with pytest.raises(SubstrateError, match="not pinned"):
+        sub.stage_change_closure(change, {})
+
+
+def test_same_services_reseed_does_not_double_count_budget(tmp_path: Path) -> None:
+    """Driving the SAME KernelServices twice rebuilds a fresh meter from the
+    durable ledger each time — never repeatedly absorbing into a reused meter."""
+    run = new_run_id()
+    services = KernelServices.open(
+        tmp_path, TASK, run, seed=7, budget=BudgetSpec(executions=128)
+    )
+
+    def once() -> object:
+        objects = services.substrate.objects
+        return run_policy(
+            services, default_catalog(), "manual-change@1",
+            mc.load_config(mc.DEFAULT_CONFIG_PATH),
+            prompt_refs=mc.prompt_refs(objects),
+            seed_state=mc.seed_state(objects, code=_BASELINE, prompt="base proposal template"),
+            run_metadata={},
+        )
+
+    r1 = once()
+    r2 = once()  # resume on the SAME services object
+    assert r2.usage.executions == r1.usage.executions  # type: ignore[attr-defined]
+
+
+def test_open_dispatch_on_resume_is_indeterminate_not_rerun(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A crash AFTER an attempt's dispatch was journaled but BEFORE its result
+    is an OPEN dispatch: on resume it becomes `indeterminate`, never an implicit
+    re-run of the attempt."""
+    calls = {"n": 0}
+    real = kernel._run_attempt
+
+    def flaky(services: object, cid: str, label: str, state: object, state_ref: str) -> object:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise _Boom("crash after dispatch, before result")
+        return real(services, cid, label, state, state_ref)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(kernel, "_run_attempt", flaky)
+    run = new_run_id()
+    with pytest.raises(_Boom):
+        _drive(tmp_path, run)
+    monkeypatch.undo()
+    _drive(tmp_path, run)  # resume
+    # the open base dispatch short-circuited to indeterminate — never re-run
+    assert calls["n"] == 1
+    sub = Substrate.discover(tmp_path, run)
+    terminal = next(iter(sub.verify().completed.values()))
+    assert terminal.outcome == "indeterminate"
+
+
+def test_applied_change_must_match_proposal_and_payload(tmp_path: Path) -> None:
+    """A ChangeApplied whose change ref differs from BOTH its proposal and its
+    issued command payload is refused (not matched by a mere kind string)."""
+    from strive.substrate import apply_change
+
+    run = new_run_id()
+    sub = _bound_sub(tmp_path, run)
+    seed = sub.verify().seed_state.as_map()
+    code_after = hash_text("def solve(input_text: str) -> int:\n    return 5\n")
+    delta = SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after)
+    a = CompositeChange("c1", (delta,), "summary A")
+    b = CompositeChange("c1", (delta,), "summary B")  # same deltas, DIFFERENT ref
+    _issue(sub, "k", "ApplyChange", a)  # payload.change_ref = ref(a)
+    sub.record_proposal(change=a, strategy_ref="t", caused_by="k")  # proposal = ref(a)
+    sub.stage_change_closure(a, {code_after: "def solve(input_text: str) -> int:\n    return 5\n"})
+    v = sub.verify()
+    after = sub.put_state(apply_change(v.state, a, sub.catalog))
+    forged = ChangeApplied("c1", sub.put(b), v.state_ref or "", after)  # change_ref = ref(b)
+    env = EventEnvelope(
+        event_id=f"{run}#{v.seq + 1}", run_id=run, task_id="sum-integers", seq=v.seq + 1,
+        caused_by="k", body_kind=codec.schema_of(ChangeApplied),
+        body_ref=sub.put(forged), at=now_iso(),
+    )
+    sub.journal.append_batch([env], expected_head=v.head)
+    after_view = sub.verify()
+    assert not after_view.ok
+    assert any("does not match" in e for e in after_view.errors)
+
+
+def test_duplicate_or_different_proposal_refused(tmp_path: Path) -> None:
+    from strive.substrate import ChangeProposed
+
+    run = new_run_id()
+    sub = _bound_sub(tmp_path, run)
+    seed = sub.verify().seed_state.as_map()
+    code_after = hash_text("def solve(input_text: str) -> int:\n    return 6\n")
+    a = CompositeChange("c1", (SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after),), "A")
+    _issue(sub, "k", "EvaluateFork", a)
+    sub.record_proposal(change=a, strategy_ref="t", caused_by="k")  # first proposal for c1
+    b = CompositeChange("c1", (SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after),), "B")
+    v = sub.verify()
+    forged = ChangeProposed("c1", sub.put(b), "t")  # a SECOND proposal for c1
+    env = EventEnvelope(
+        event_id=f"{run}#{v.seq + 1}", run_id=run, task_id="sum-integers", seq=v.seq + 1,
+        caused_by="k", body_kind=codec.schema_of(ChangeProposed),
+        body_ref=sub.put(forged), at=now_iso(),
+    )
+    sub.journal.append_batch([env], expected_head=v.head)
+    after = sub.verify()
+    assert not after.ok
+    assert any("more than one proposal" in e for e in after.errors)
+
+
+def test_duplicate_seed_bindings_refused(tmp_path: Path) -> None:
+    from strive.substrate import HarnessState, SurfaceBinding
+
+    run = new_run_id()
+    sub = Substrate.open(tmp_path, "sum-integers", run)
+    code_ref = sub.objects.put_text("def solve(input_text: str) -> int:\n    return 0\n")
+    seed = HarnessState(bindings=(
+        SurfaceBinding("strategy-code", "solve", code_ref),
+        SurfaceBinding("strategy-code", "solve", code_ref),  # DUPLICATE surface key
+    ))
+    before = _journal_bytes(tmp_path, run)
+    with pytest.raises(SubstrateError):
+        sub.bind_policy(
+            task_fingerprint="fp", policy_ref="p@1", policy_digest="pd",
+            config_ref=sub.put(ConfigBlob(ENCODING, "{}")),
+            prompt_refs={"refine": sub.objects.put_text("md")},
+            seed=1, seed_state=seed, budget_ref=sub.put(BudgetSpec()),
+            required_capabilities=(), run_metadata={},
+        )
+    assert _journal_bytes(tmp_path, run) == before

@@ -48,10 +48,14 @@ exactly resumable**:
   append-only, crash-framed, hash-chained stream of `EventEnvelope`s (stable
   id, run/task scope, command causation, timestamp). Nothing mutates over an
   unverified log: `verify()` is pure (it never writes CAS) and closed (only the
-  known body union), decodes/hash-verifies every referenced object, replays
-  every apply/revert exactly, requires each effect to cite an issued compatible
-  command and each revert to be the exact inverse of one unreverted apply, and
-  on any error refuses every mutation and exposes no active state.
+  known body union), decodes/hash-verifies every referenced object as its
+  EXPECTED type, replays every apply/revert exactly, requires each effect to
+  cite an issued compatible command (matched to its proposal AND its command
+  payload, not a kind string) and each revert to be the exact inverse of one
+  unreverted apply, and on any error refuses every mutation and exposes no
+  active state. Appends are ATOMIC: a candidate event is preflighted through
+  the same pure fold and refused unless the resulting run is valid, so an
+  accepted append can never turn a valid run invalid.
 - **A resumable kernel.** One command at a time — one intent, one effect
   (performed or reconciled), one terminal result — then `reduce` and
   checkpoint. State never advances before the outcome; a crash at any

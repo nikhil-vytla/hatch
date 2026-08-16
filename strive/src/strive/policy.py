@@ -53,6 +53,7 @@ class RunView:
     state: HarnessState
     state_ref: str | None
     seed_state: HarnessState
+    seed_state_ref: str | None  # STABLE across resume — a durable base precondition
     head: str
     seed: int
     bodies: tuple[object, ...]
@@ -65,6 +66,7 @@ class RunView:
             state=view.state,
             state_ref=view.state_ref,
             seed_state=view.seed_state,
+            seed_state_ref=view.bound.seed_state_ref if view.bound is not None else None,
             head=view.head,
             seed=seed,
             bodies=view.bodies,
