@@ -251,6 +251,32 @@ lifecycle:
   declare an explicit `dependency_modules` manifest folded into the policy
   digest.
 
+## Phase-A intent-to-effect binding pass
+
+The final pass binds every durable command field to its exact effect:
+
+- **Explicit typed intent.** `CommandPayload` normalizes every consequential
+  field (target change id/ref, `expected_state_ref`, the fork's
+  `issue_state_ref`, prompt role/context, trigger delay, stop reason) instead of
+  hiding them in an opaque JSON blob. Verify binds Confirm/Revert to the named
+  change and requires an Apply/Revert effect to satisfy the ISSUED
+  `expected_state_ref`, not merely the folded state.
+- **Fork evidence anchored to state.** Base is the state ref recorded at issue;
+  candidate is recomputed by applying the issued candidate change to that base;
+  attempt dispatch/result refs and the summary subject must equal those states;
+  `improved` is recomputed, never asserted.
+- **Exactly-reconstructable terminals.** ok/failed/indeterminate all require a
+  typed `StoredResult` (no None fallback); verify checks its
+  id/kind/outcome/refs/metrics/usage and the exact pre-terminal semantic head. A
+  pre-terminal failure record RECONCILES into a terminal with the same outcome
+  (never re-running), and partial prefixes admit at most one failure/effect.
+- **Live budget == durable ledger.** The meter is rebuilt from the durable
+  attempt ledger after every terminal/reconciliation before the next command; an
+  indeterminate dispatch reserves executions, wall, AND output immediately.
+- **Preserved execution evidence.** Each `AttemptRecord` references the exact
+  `ExecutionReport` and `Evaluation`, distinguishing a completed evaluation with
+  candidate errors from a sandbox/infra failure.
+
 ## Sources: borrowed / rejected / deferred
 
 - **Borrowed** — exo (note 04): durable adaptation mechanisms + journaled

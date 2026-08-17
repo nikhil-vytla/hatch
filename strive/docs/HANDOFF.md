@@ -6,7 +6,39 @@ Strive is a policy-neutral, revision-native mechanism substrate plus a
 result-driven, resumable policy kernel. Comparative evaluation is an optional
 mechanism a policy requests, never a universal activation gate.
 
-### Command/attempt state-machine pass (what changed since the last review)
+### Intent-to-effect binding pass (what changed since the last review)
+
+- **Durable command intent is explicit and typed.** `CommandPayload` is now a
+  NEUTRAL, normalized record — not an opaque JSON blob — carrying every
+  consequential field (target change id, change ref, `expected_state_ref`, the
+  fork's `issue_state_ref`, prompt role/context, trigger delay, stop reason).
+  Verify binds each effect to exactly what the command named: Confirm/Revert
+  target the change the command names, and an Apply/Revert effect must satisfy
+  the ISSUED `expected_state_ref`, not merely the folded state at effect time.
+- **Fork evidence is derived from the issued states.** The base state is
+  anchored to the state ref recorded at issue; the candidate state is recomputed
+  by applying the issued candidate change to that base; every attempt
+  dispatch/result and the summary subject must equal those exact refs; and
+  `improved` is recomputed (`candidate.overall > base.overall`), never trusted
+  as asserted.
+- **Every terminal reconstructs exactly.** ok/failed/indeterminate ALL require a
+  typed `StoredResult` (no `result_ref=None` fallback); verify matches its
+  id/kind/outcome, proposal/observation refs, metrics, usage, and the exact
+  pre-terminal SEMANTIC head (`"<seq>:<state_ref>"`). A failure recorded before
+  a crash is RECONCILED into a terminal with the same outcome — the operation is
+  never re-run — and a legal partial prefix admits at most one failure/effect.
+- **Live budget == durable ledger.** After every terminal/reconciliation the
+  meter is rebuilt from the durable attempt ledger before the policy may emit
+  the next command; an indeterminate dispatch reserves executions AND wall AND
+  output immediately, in-process and after restart.
+- **Full execution evidence is preserved.** Each `AttemptRecord` references the
+  exact `ExecutionReport` (per-case outputs/errors, backend failure,
+  wall/output) and `Evaluation` (per-case scores) — a completed evaluation with
+  candidate errors is distinguished from a sandbox/infra failure, neither
+  collapsed to only an aggregate score. `CandidateExecutor` preserves the actual
+  backend wall/output (fixed earlier).
+
+### Command/attempt state-machine pass (earlier in this PR)
 
 - **Each command is a CLOSED state machine.** `verify()` now checks the exact
   per-kind + per-outcome effect grammar: ApplyChange(ok) = a matching proposal
@@ -208,28 +240,28 @@ model refiner arrive with `continual-refine@1`.
 
 ### Verification
 
-- `uv run pytest` — 212 tests. The Phase-A floor plus the adversarial matrix
+- `uv run pytest` — 223 tests. The Phase-A floor plus the adversarial matrix
   (`test_cas`, `test_surfaces`, `test_adversarial`, `test_budget`,
-  `test_state_machine`): CAS/surface/identity/budget attacks PLUS the
-  command/attempt state machine — ok-without-effect, effect-after-terminal,
-  failed-with-success-effect, null/wrong stored result, duplicate checkpoint,
-  result-before-dispatch, duplicate/mismatched attempts, forged summary,
-  subject-state mismatch, weaker-than-required provenance, negative/NaN usage,
-  open-dispatch wall+output reservation, actual-stdout accounting (a printing
-  strategy), and evaluator-selection drift. `test_substrate_only` verifies a
-  kernel-driven run in a FRESH interpreter that never imports the kernel;
-  `test_packaging` BUILDS + INSTALLS the wheel in an isolated venv and runs the
-  real `strive` script (never skipped).
+  `test_state_machine`): CAS/surface/identity/budget/state-machine attacks PLUS
+  the intent-to-effect bindings — Confirm/Revert target mismatch, apply
+  expected-state mismatch, unrelated fork states, forged `improved`,
+  summary-subject mismatch, failed/null result, forged stored head, crash after
+  failure-before-terminal (reconcile, no re-run), same-process indeterminate
+  wall/output reservation, and preserved backend/candidate-error evidence.
+  `test_substrate_only` verifies a kernel-driven run in a FRESH interpreter that
+  never imports the kernel; `test_packaging` BUILDS + INSTALLS the wheel in an
+  isolated venv and runs the real `strive` script (never skipped).
 - `uv run mypy` — clean, `--strict`, over 38 files (src + tests).
 - `uv run strive` — installed console script; verified in tests and smoke.
 
 ### The Phase-A claim
 
-Every command and external attempt has one verifiable lifecycle; successful
-terminals prove their required effects, summaries equal durable attempts,
-capabilities and all budget dimensions are checked, and no accepted history can
-claim work that did not occur — across concurrency, corruption, and restart,
-with verification pure and independent of kernel import order.
+Every durable command field is bound to its exact effect; fork evidence is
+derived from the issued base and candidate states; every outcome reconstructs
+exactly; and the live budget always equals the durable external-effect ledger —
+with each command and attempt a single verifiable lifecycle across concurrency,
+corruption, and restart, verification pure and independent of kernel import
+order.
 
 ### Next
 

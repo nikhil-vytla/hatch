@@ -1461,3 +1461,53 @@ area-6 list; existing suites updated for the stricter grammar (e.g. the
 duplicate-terminal test now completes a valid StopAdaptation with a StoredResult).
 Kept the build/install/real-console-script test and the fresh-interpreter
 substrate-only verify.
+
+## vNext Phase A — intent-to-effect binding pass (before merge)
+
+Bind every durable command field to its exact effect. Preserved the vNext
+architecture, command grammar, attempt ledger, append preflight, pinned
+surfaces, run lease, and optional evaluation. Did NOT begin continual-refine@1
+or Pareto. 223 tests pass; `uv run mypy` clean over 38 files.
+
+Area 1 — explicit typed intent. `CommandPayload` (v3) is now a NEUTRAL
+normalized record: change_ref, target_change_id, expected_state_ref,
+issue_state_ref (fork base anchor), prompt_role, context_ref, after_seconds,
+reason, plus the full `json` identity. Kernel `_command_payload(sub, view, cmd)`
+builds it per kind. Verify binds Confirm/Revert to `target_change_id`, and
+Apply/Revert `before_state_ref` to the ISSUED `expected_state_ref` (not just the
+folded state).
+
+Area 2 — fork anchored to real state. The fork payload records
+`issue_state_ref` (folded state at issue). `_fork_expected_states` derives
+base==issue_state and candidate==apply(issue_state, issued candidate); every
+dispatch/result state_ref and the summary subject must equal those, and
+`improved` is recomputed (`candidate.overall > base.overall`).
+
+Area 3 — exactly-reconstructable terminals. EVERY terminal (ok/failed/
+indeterminate) now requires a `StoredResult` (removed the `result_ref=None`
+fallback in verify + `_reconstruct`); verify matches its
+id/kind/outcome/refs/metrics/usage AND the pre-terminal SEMANTIC head
+(`"<seq>:<state_ref>"`, replacing the non-reconstructable framing head).
+`OperationFailed` (v3) gained `outcome`; a pre-terminal failure is RECONCILED
+into the terminal (`kernel._reconcile_failure`) with the same outcome, never
+re-running; `_check_prefix_invariants` rejects >1 failure/effect even before a
+terminal and binds failure.outcome == terminal.outcome.
+
+Area 4 — live budget == durable ledger. The run loop calls `_seed_meter` after
+EVERY command (rebuilding the meter from durable attempt results/open
+reservations before the next `next_command`); the reservation for an open
+dispatch spans executions+wall+output.
+
+Area 5 — preserved evidence. `AttemptRecord` (v2) gained `report_ref` +
+`evaluation_ref`; `_run_attempt` persists the exact `ExecutionReport` +
+`Evaluation`; verify decodes them. A completed evaluation with candidate errors
+(ok=True, failure=None, per-case errors in the report) is distinguished from a
+sandbox/infra failure (ok=False).
+
+Tests: extended `test_state_machine.py` (Confirm/Revert target mismatch, apply
+expected-state mismatch, unrelated fork states, forged improved, summary-subject
+mismatch, failed/null result, forged stored head) and `test_adversarial.py`
+(crash-after-failure reconcile with no re-run, same-process indeterminate
+wall/output reservation, preserved backend/candidate-error evidence). Updated
+the CommandPayload/AttemptRecord/OperationFailed constructors across tests.
+Kept the fresh-interpreter and installed-wheel tests.

@@ -33,12 +33,25 @@ from strive.events import now_iso
 TASK = "sum-integers"
 
 
+def _mk_payload(
+    sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None,
+    *, issue_state_ref: str | None = None, json: str = "{}",
+) -> CommandPayload:
+    """Mirror the kernel's normalized CommandPayload for direct-substrate tests."""
+    return CommandPayload(
+        command_id=cid, kind=kind, encoding=ENCODING,
+        change_ref=sub.put(change) if change is not None else None,
+        target_change_id=change.change_id if change is not None else None,
+        expected_state_ref=None, issue_state_ref=issue_state_ref,
+        prompt_role=None, context_ref=None, after_seconds=None, reason=None, json=json,
+    )
+
+
 def _issue(sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None) -> None:
     """Issue a command with a REAL typed CommandPayload (the substrate now
     decodes and matches it), returning nothing."""
-    change_ref = sub.put(change) if change is not None else None
-    ref = sub.put(CommandPayload(command_id=cid, kind=kind, encoding=ENCODING,
-                                 change_ref=change_ref, json="{}"))
+    issue = sub.verify().state_ref if kind == "EvaluateFork" else None
+    ref = sub.put(_mk_payload(sub, cid, kind, change, issue_state_ref=issue))
     sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
 
 
@@ -178,8 +191,8 @@ def test_stage_closure_rejects_mismatched_content(tmp_path: Path) -> None:
 def test_command_id_reuse_with_different_payload_fails_closed(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    p1 = sub.put(CommandPayload("k", "ConfirmChange", ENCODING, None, '{"a":1}'))
-    p2 = sub.put(CommandPayload("k", "ConfirmChange", ENCODING, None, '{"a":2}'))
+    p1 = sub.put(_mk_payload(sub, "k", "ConfirmChange", json='{"a":1}'))
+    p2 = sub.put(_mk_payload(sub, "k", "ConfirmChange", json='{"a":2}'))
     sub.issue_command(command_id="k", command_kind="ConfirmChange", command_ref=p1)
     with pytest.raises(SubstrateError, match="reused with a different payload"):
         sub.issue_command(command_id="k", command_kind="ConfirmChange", command_ref=p2)
@@ -191,8 +204,10 @@ def test_duplicate_terminal_completion_refused(tmp_path: Path) -> None:
     # a minimal VALID completed command: StopAdaptation(ok) has no state effect
     # but a successful terminal still requires a StoredResult.
     _issue(sub, "k", "StopAdaptation")
+    v = sub.verify()
+    head = f"{v.seq}:{v.state_ref or ''}"  # the exact pre-terminal semantic head
     result = StoredResult(
-        command_id="k", kind="StopAdaptation", outcome="ok", head="0:x", detail="",
+        command_id="k", kind="StopAdaptation", outcome="ok", head=head, detail="",
         proposal_ref=None, observation_ref=None, metrics={}, usage=BudgetUsage(),
     )
     sub.complete_command(command_id="k", outcome="ok", result=result)
