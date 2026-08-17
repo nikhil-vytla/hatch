@@ -39,6 +39,7 @@ from typing import Callable, Protocol, Sequence
 from strive.codec import register
 from strive.contracts import (
     FAILURE_CRASH,
+    FAILURE_TIMEOUT,
     CaseOutcome,
     ExecutionReport,
     FailureRecord,
@@ -351,23 +352,30 @@ class CandidateExecutor:
         return a case-ordered `ExecutionReport` plus the boundary provenance.
         Failure-as-data: a case the boundary refused or crashed on carries
         its error at the floor, never raising into the controller."""
-        outcomes, provenance, denials, wall_time_s, stdout_bytes = run_protected_suite(
-            self._backend,
-            strategy_source,
-            cases,
-            generation_id=generation_id,
-            limits=limits,
+        outcomes, provenance, denials, wall_time_s, stdout_bytes, failure = (
+            run_protected_suite(
+                self._backend,
+                strategy_source,
+                cases,
+                generation_id=generation_id,
+                limits=limits,
+            )
         )
         ordered = tuple(
             outcomes[case.case_id]
             for case in cases
             if case.case_id in outcomes
         )
+        # A boundary/infrastructure fault (timeout, crash, refusal, malformed
+        # runner output) surfaces as an aggregate `ok=False` report carrying the
+        # `failure` — NOT as an ordinary per-case error. A candidate exception or
+        # a wrong answer is caught inside the runner (`ok=True`, per-case `error`)
+        # and stays a completed per-case evaluation.
         report = ExecutionReport(
-            ok=True,
+            ok=failure is None,
             generation_id=generation_id,
             outcomes=ordered,
-            failure=None,
+            failure=failure,
             wall_time_s=wall_time_s,      # ACTUAL aggregated backend wall time
             stdout_bytes=stdout_bytes,    # ACTUAL captured output bytes
         )
@@ -384,13 +392,19 @@ def run_protected_suite(
     *,
     generation_id: str,
     limits: SandboxLimits | None = None,
-) -> tuple[dict[str, CaseOutcome], SandboxProvenance, tuple[str, ...], float, int]:
+) -> tuple[
+    dict[str, CaseOutcome], SandboxProvenance, tuple[str, ...], float, int,
+    FailureRecord | None,
+]:
     """Execute EACH protected case in a FRESH sandbox, in isolation: the
     candidate sees only that case's `input_text`, and no candidate state
     survives between cases. The parent retains case id, split, expected
     output, and the rest of the suite. Enforces the ABSOLUTE suite deadline
     across cases. Returns (outcomes by case id, provenance, denial notes, the
-    ACTUAL aggregated backend wall time, and the ACTUAL captured output bytes).
+    ACTUAL aggregated backend wall time, the ACTUAL captured output bytes, and
+    the first BOUNDARY failure — a timeout/crash/refusal/malformed-runner fault
+    the backend reported as `ok=False`, distinct from a candidate exception the
+    runner caught and returned as an `ok=True` per-case error).
 
     Kept as the per-case primitive `CandidateExecutor.execute_suite` builds
     on; callers outside the executor and backend tests should not use it."""
@@ -399,6 +413,7 @@ def run_protected_suite(
     outcomes: dict[str, CaseOutcome] = {}
     denials: list[str] = []
     provenance: SandboxProvenance | None = None
+    boundary_failure: FailureRecord | None = None
     effective_limits = limits or SandboxLimits()
     total_wall_s = 0.0
     total_stdout_bytes = 0
@@ -412,6 +427,13 @@ def run_protected_suite(
                 f"suite deadline {effective_limits.suite_deadline_s}s exhausted "
                 f"before case {case.case_id}"
             )
+            # an exhausted suite deadline is a BOUNDARY timeout, not a candidate
+            # error — surface it as the aggregate failure.
+            if boundary_failure is None:
+                boundary_failure = FailureRecord(
+                    kind=FAILURE_TIMEOUT,
+                    detail=f"suite deadline {effective_limits.suite_deadline_s}s exhausted",
+                )
             outcomes[case.case_id] = CaseOutcome(
                 case_id=case.case_id,
                 output=None,
@@ -436,9 +458,13 @@ def run_protected_suite(
             for outcome in result.report.outcomes:
                 outcomes[outcome.case_id] = outcome
         else:
+            # a boundary/infrastructure fault: record a per-case error AND raise
+            # it to the aggregate so the attempt is classified as ok=False.
             failure = result.report.failure or FailureRecord(
                 kind=FAILURE_CRASH, detail="protected execution failed"
             )
+            if boundary_failure is None:
+                boundary_failure = failure
             outcomes[case.case_id] = CaseOutcome(
                 case_id=case.case_id,
                 output=None,
@@ -447,7 +473,10 @@ def run_protected_suite(
             )
     if provenance is None:  # empty suite (or all deadline-skipped)
         provenance = backend.provenance(effective_limits)
-    return outcomes, provenance, tuple(denials), round(total_wall_s, 6), total_stdout_bytes
+    return (
+        outcomes, provenance, tuple(denials), round(total_wall_s, 6),
+        total_stdout_bytes, boundary_failure,
+    )
 
 
 __all__ = [

@@ -27,6 +27,7 @@ from strive.kernel import (
 from strive.policies import manual_change as mc
 from strive.policy import StopAdaptation, default_catalog
 from strive.runtime import ENCODING, CommandPayload, ConfigBlob
+from _payloads import coherent_payload
 from strive.substrate import (
     EMPTY_STATE,
     ChangeApplied,
@@ -77,14 +78,15 @@ def _bound_sub(root: Path, run_id: str, *, task: str = "sum-integers") -> Substr
     return sub
 
 
-def _issue(sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None) -> None:
+def _issue(
+    sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None,
+    *, target: str | None = None,
+) -> None:
     issue = sub.verify().state_ref if kind == "EvaluateFork" else None
-    ref = sub.put(CommandPayload(
-        command_id=cid, kind=kind, encoding=ENCODING,
-        change_ref=sub.put(change) if change is not None else None,
-        target_change_id=change.change_id if change is not None else None,
-        expected_state_ref=None, issue_state_ref=issue, prompt_role=None,
-        context_ref=None, after_seconds=None, reason=None, json="{}",
+    if target is None and change is None and kind in ("ConfirmChange", "RevertChange"):
+        target = "target"
+    ref = sub.put(coherent_payload(
+        sub, cid, kind, change=change, target=target, issue_state_ref=issue,
     ))
     sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
 
@@ -267,9 +269,9 @@ def test_double_revert_refused(tmp_path: Path) -> None:
         summary="x",
     )
     _apply(sub, "a", change, {code_after: "def solve(input_text: str) -> int:\n    return 7\n"})
-    _issue(sub, "r1", "RevertChange")
+    _issue(sub, "r1", "RevertChange", target="c1")
     sub.revert(change_id="c1", caused_by="r1")
-    _issue(sub, "r2", "RevertChange")
+    _issue(sub, "r2", "RevertChange", target="c1")
     with pytest.raises(SubstrateError, match="already reverted"):
         sub.revert(change_id="c1", caused_by="r2")
 
@@ -285,11 +287,8 @@ def test_kernel_refuses_changed_rederived_command(tmp_path: Path) -> None:
     command = StopAdaptation(command_id=f"{run}:x", reason="r")
     # a VALID intent, but recorded under a DIFFERENT payload identity than the
     # command re-derives (a changed precondition/payload)
-    bogus = sub.put(CommandPayload(
-        command_id=command.command_id, kind="StopAdaptation", encoding=ENCODING,
-        change_ref=None, target_change_id=None, expected_state_ref=None,
-        issue_state_ref=None, prompt_role=None, context_ref=None,
-        after_seconds=None, reason="DIFFERENT", json='{"reason":"DIFFERENT"}',
+    bogus = sub.put(coherent_payload(
+        sub, command.command_id, "StopAdaptation", reason="DIFFERENT",
     ))
     sub.issue_command(command_id=command.command_id, command_kind="StopAdaptation",
                       command_ref=bogus)
@@ -404,14 +403,14 @@ def test_corrupt_result_ref_refused(tmp_path: Path) -> None:
 def test_command_effect_kind_mismatch_refused(tmp_path: Path) -> None:
     run = new_run_id()
     sub = _bound_sub(tmp_path, run)
-    # issue an EvaluateFork intent, then forge a ChangeApplied caused by it
-    _issue(sub, "k", "EvaluateFork")
-    view = sub.verify()
-    seed = view.seed_state.as_map()
+    seed = sub.verify().seed_state.as_map()
     code_after = hash_text("def solve(input_text: str) -> int:\n    return 4\n")
     change = CompositeChange(
         "c1", (SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after),), "x"
     )
+    # issue an EvaluateFork intent, then forge a ChangeApplied caused by it
+    _issue(sub, "k", "EvaluateFork", change)
+    view = sub.verify()
     sub.objects.put_text("def solve(input_text: str) -> int:\n    return 4\n")
     after_state = sub.put_state(
         canonical_state({

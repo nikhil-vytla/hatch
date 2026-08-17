@@ -50,7 +50,6 @@ full CAS closure staged (and structurally validated) before apply; and
 
 from __future__ import annotations
 
-import dataclasses
 import inspect
 import json
 from dataclasses import dataclass
@@ -88,6 +87,8 @@ from strive.runtime import (
     ForkObservation,
     PolicyStateBlob,
     StoredResult,
+    combine_usage,
+    strict_encode,
 )
 from strive.sandboxes import (
     CandidateExecutor,
@@ -385,6 +386,40 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
     services.meter = fresh
 
 
+def _reconciled_usage(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> BudgetUsage:
+    """The honest usage a command spent, reconstructed from its DURABLE attempt
+    ledger (never a live meter delta, which a resume would undercount, and never
+    zero): each completed attempt's actual usage, plus each OPEN dispatch's
+    worst-case reservation. Non-fork commands spend nothing. This is exactly the
+    per-command contribution `_seed_meter` folds into the live budget, so a
+    terminal's recorded usage equals what the budget actually charged."""
+    substrate = services.substrate
+    results: dict[str, BudgetUsage] = {}
+    dispatched: dict[str, AttemptDispatched] = {}
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if env.caused_by != cid or not isinstance(body, ObservationRecorded):
+            continue
+        if body.observation_kind == FORK_RESULT:
+            rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
+            results[rec.label] = rec.usage
+        elif body.observation_kind == FORK_DISPATCH:
+            disp = codec.loads(
+                substrate.objects.get_text(body.observation_ref), AttemptDispatched
+            )
+            dispatched[disp.label] = disp
+    usages = list(results.values())
+    for label, disp in dispatched.items():
+        if label not in results:  # open dispatch: reserve the worst case
+            usages.append(BudgetUsage(
+                executions=disp.reserved_executions,
+                wall_time_s=disp.reserved_wall_s,
+                output_bytes=disp.reserved_output_bytes,
+            ))
+    return combine_usage(usages)
+
+
 def _fork_attempts(
     services: KernelServices, view: VerifiedSubstrateView, cid: str
 ) -> dict[str, tuple[str, AttemptRecord | None]]:
@@ -490,24 +525,30 @@ def _run_command(
     # `issue_command` is idempotent (same id+digest is a read, not a 2nd intent)
     substrate.issue_command(command_id=cid, command_kind=kind, command_ref=command_ref)
 
-    before_usage = services.meter.usage()
     try:
         result = _perform(services, substrate.verify(), command)
         outcome, detail = "ok", result.detail
     except IndeterminateEffect as exc:
         # dispatched, but no durable result is recoverable: record it honestly
-        # and REQUIRE an explicit retry — never silently re-dispatch.
+        # and REQUIRE an explicit retry — never silently re-dispatch. The stored
+        # detail is the SAME string as the recorded failure (verify binds them).
+        indeterminate_detail = f"indeterminate: {exc}"
         substrate.record_failure(
-            command_id=cid, kind=kind, detail=f"indeterminate: {exc}",
+            command_id=cid, kind=kind, detail=indeterminate_detail,
             outcome="indeterminate",
         )
-        result = CommandResult(cid, kind, "indeterminate", "", detail=str(exc))
-        outcome, detail = "indeterminate", str(exc)
+        result = CommandResult(cid, kind, "indeterminate", "", detail=indeterminate_detail)
+        outcome, detail = "indeterminate", indeterminate_detail
     except (SubstrateError, KernelError) as exc:
         substrate.record_failure(command_id=cid, kind=kind, detail=str(exc), outcome="failed")
         result = CommandResult(cid, kind, "failed", "", detail=str(exc))
         outcome, detail = "failed", str(exc)
-    charged = _usage_delta(before_usage, services.meter.usage())
+    # a terminal's recorded usage is ALWAYS the reconciled durable attempt
+    # ledger — each completed attempt's actual usage plus each open dispatch's
+    # reservation (zero for a non-fork command, which runs no sandbox). This is
+    # exactly what `_seed_meter` folds into the live budget, so recorded ==
+    # charged for every outcome, and a crashed partial fork is never lost.
+    charged = _reconciled_usage(services, substrate.verify(), cid)
 
     # the command's canonical SEMANTIC head — position + folded state — just
     # before the terminal; both the initial run and a reconstruction return it.
@@ -550,7 +591,10 @@ def _reconcile_failure(
     services: KernelServices, command: KernelCommand, failure: OperationFailed
 ) -> CommandResult:
     """Complete a command whose failure was durably recorded before a crash —
-    with the recorded outcome — WITHOUT re-running the operation."""
+    with the recorded outcome — WITHOUT re-running the operation. Its usage is
+    reconciled from the durable attempt ledger (completed attempts + open
+    reservations), never written as zero, so a crashed partial fork is still
+    charged for the work it actually did."""
     substrate = services.substrate
     cid = command.command_id
     kind = type(command).__name__
@@ -558,7 +602,7 @@ def _reconcile_failure(
     stored = StoredResult(
         command_id=cid, kind=kind, outcome=failure.outcome, head=head,
         detail=failure.detail, proposal_ref=None, observation_ref=None,
-        metrics={}, usage=BudgetUsage(),
+        metrics={}, usage=_reconciled_usage(services, substrate.verify(), cid),
     )
     substrate.complete_command(command_id=cid, outcome=failure.outcome, result=stored)
     return CommandResult(cid, kind, failure.outcome, head, detail=failure.detail)
@@ -927,14 +971,16 @@ def _policy_digest(
 
 
 def _strict_json(obj: object) -> str:
-    return json.dumps(_strict_encode(obj), sort_keys=True, separators=(",", ":"))
+    return json.dumps(strict_encode(obj), sort_keys=True, separators=(",", ":"))
 
 
 def _command_identity_json(command: object) -> str:
     """The FULL canonical command is its durable identity — INCLUDING its
     `expected_state_ref` precondition. A changed precondition before an effect
-    is a changed command and fails closed."""
-    return json.dumps(_strict_encode(command), sort_keys=True, separators=(",", ":"))
+    is a changed command and fails closed. It uses the SAME `strict_encode` the
+    substrate re-derives with, so verify can prove the payload's normalized
+    fields agree with these exact bytes."""
+    return json.dumps(strict_encode(command), sort_keys=True, separators=(",", ":"))
 
 
 def _command_payload(
@@ -980,31 +1026,6 @@ def _command_payload(
         prompt_role=prompt_role, context_ref=context_ref,
         after_seconds=after_seconds, reason=reason,
         json=_command_identity_json(command),
-    )
-
-
-def _strict_encode(value: object) -> object:
-    if isinstance(value, bool) or value is None or isinstance(value, (int, float, str)):
-        return value
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {
-            f.name: _strict_encode(getattr(value, f.name))
-            for f in dataclasses.fields(value)
-        }
-    if isinstance(value, (list, tuple)):
-        return [_strict_encode(item) for item in value]
-    if isinstance(value, dict):
-        out: dict[str, object] = {}
-        for key, val in value.items():
-            if not isinstance(key, str):
-                raise KernelError(
-                    f"cannot canonically encode a non-string dict key {key!r}"
-                )
-            out[key] = _strict_encode(val)
-        return out
-    raise KernelError(
-        f"cannot canonically encode a value of type {type(value).__name__} "
-        "(strict encoding refuses to coerce)"
     )
 
 

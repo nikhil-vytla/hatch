@@ -14,6 +14,9 @@ imports only `strive.substrate` can still verify a stream end to end.
 
 from __future__ import annotations
 
+import dataclasses
+import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from strive.codec import register
@@ -22,6 +25,62 @@ from strive.sandboxes import SandboxProvenance
 
 # the canonical encoding tag for the JSON-in-blob envelopes below
 ENCODING = "strict-json@1"
+
+
+def strict_encode(value: object) -> object:
+    """The ONE canonical, schema-tagless projection of a value into JSON-safe
+    primitives — shared by the kernel (which builds command-payload JSON) and
+    the substrate (which re-derives it to prove a payload's normalized fields
+    agree with its canonical JSON). Because both sides call THIS function, the
+    proof cannot drift: verification reconstructs bytes the kernel actually
+    wrote. Refuses to coerce anything it does not understand."""
+    if isinstance(value, bool) or value is None or isinstance(value, (int, float, str)):
+        return value
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {
+            f.name: strict_encode(getattr(value, f.name))
+            for f in dataclasses.fields(value)
+        }
+    if isinstance(value, (list, tuple)):
+        return [strict_encode(item) for item in value]
+    if isinstance(value, dict):
+        out: dict[str, object] = {}
+        for key, val in value.items():
+            if not isinstance(key, str):
+                raise ValueError(f"cannot canonically encode a non-string dict key {key!r}")
+            out[key] = strict_encode(val)
+        return out
+    raise ValueError(
+        f"cannot canonically encode a value of type {type(value).__name__} "
+        "(strict encoding refuses to coerce)"
+    )
+
+
+def strict_json(value: object) -> str:
+    """The canonical serialization (sorted keys, tight separators) of
+    `strict_encode(value)` — the exact bytes stored as command-payload JSON."""
+    return json.dumps(strict_encode(value), sort_keys=True, separators=(",", ":"))
+
+
+def combine_usage(usages: Iterable[BudgetUsage]) -> BudgetUsage:
+    """Sum per-attempt usage into one reconciled total — the SAME accounting the
+    `BudgetMeter` performs when it seeds from the durable ledger (additive on
+    every countable dimension, cumulative wall, and MAX recursion depth). Both
+    the kernel (which writes a crashed command's reconciled failure usage from
+    its durable attempt ledger, never zero) and the substrate (which re-derives
+    and cross-checks that same total) call THIS function, so they cannot drift."""
+    total = BudgetUsage()
+    for u in usages:
+        total = BudgetUsage(
+            wall_time_s=total.wall_time_s + u.wall_time_s,
+            executions=total.executions + u.executions,
+            model_calls=total.model_calls + u.model_calls,
+            tokens=total.tokens + u.tokens,
+            output_bytes=total.output_bytes + u.output_bytes,
+            cost=total.cost + u.cost,
+            recursion_depth=max(total.recursion_depth, u.recursion_depth),
+        )
+    return dataclasses.replace(total, wall_time_s=round(total.wall_time_s, 6))
 
 
 @register("command-payload", 3)
@@ -170,4 +229,7 @@ __all__ = [
     "ForkObservation",
     "PolicyStateBlob",
     "StoredResult",
+    "combine_usage",
+    "strict_encode",
+    "strict_json",
 ]

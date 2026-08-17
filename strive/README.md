@@ -77,6 +77,16 @@ exactly resumable**:
   capabilities, checkpoints/rollback, crash recovery, and explicit (never
   silent) repair. Operator mutations (e.g. `strive revert`) go through the
   same durable command path as a policy.
+- **One unambiguous intent, internally-consistent evidence.** A command's
+  normalized anchors are reconciled against its canonical JSON (one shared
+  encoder both sides use), so no effect binds to a field the issued command did
+  not name. Every terminal outcome is validated identically and reconstructs
+  exactly; a crashed command's failure usage is reconciled from its durable
+  attempt ledger, never zero. Each retained AttemptRecord is bound to the exact
+  ExecutionReport + Evaluation it references, so the score policy consumes is
+  the one the evidence supports. A backend fault (timeout/crash/refusal) is an
+  infrastructure failure (`ok=False`); a candidate exception stays a completed
+  per-case evaluation — the two are never conflated.
 
 ## Layout
 

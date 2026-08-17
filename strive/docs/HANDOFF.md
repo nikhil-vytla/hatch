@@ -240,28 +240,42 @@ model refiner arrive with `continual-refine@1`.
 
 ### Verification
 
-- `uv run pytest` — 223 tests. The Phase-A floor plus the adversarial matrix
+- `uv run pytest` — 241 tests. The Phase-A floor plus the adversarial matrix
   (`test_cas`, `test_surfaces`, `test_adversarial`, `test_budget`,
   `test_state_machine`): CAS/surface/identity/budget/state-machine attacks PLUS
   the intent-to-effect bindings — Confirm/Revert target mismatch, apply
   expected-state mismatch, unrelated fork states, forged `improved`,
   summary-subject mismatch, failed/null result, forged stored head, crash after
   failure-before-terminal (reconcile, no re-run), same-process indeterminate
-  wall/output reservation, and preserved backend/candidate-error evidence.
-  `test_substrate_only` verifies a kernel-driven run in a FRESH interpreter that
-  never imports the kernel; `test_packaging` BUILDS + INSTALLS the wheel in an
-  isolated venv and runs the real `strive` script (never skipped).
-- `uv run mypy` — clean, `--strict`, over 38 files (src + tests).
+  wall/output reservation, and preserved backend/candidate-error evidence. The
+  internal-consistency pass adds: command-payload coherence (missing/forbidden
+  anchor, target=None bypass, JSON/normalized disagreement, wrong encoding,
+  extra JSON key, change_ref↔subtree disagreement); failed-terminal StoredResult
+  forgery (metrics, detail, nonzero usage), effect-after-failure, reconciled
+  partial-fork usage (accepted vs zeroed); AttemptRecord↔report/evaluation
+  disagreement; and REAL boundary faults (`test_sandbox_backend`: a crashed /
+  timed-out child is ok=False+failure, a candidate exception stays a completed
+  per-case evaluation). `test_substrate_only` verifies a kernel-driven run in a
+  FRESH interpreter that never imports the kernel; `test_packaging` BUILDS +
+  INSTALLS the wheel in an isolated venv and runs the real `strive` script
+  (never skipped).
+- `uv run mypy` — clean, `--strict`, over 39 files (src + tests).
 - `uv run strive` — installed console script; verified in tests and smoke.
 
 ### The Phase-A claim
 
-Every durable command field is bound to its exact effect; fork evidence is
-derived from the issued base and candidate states; every outcome reconstructs
-exactly; and the live budget always equals the durable external-effect ledger —
-with each command and attempt a single verifiable lifecycle across concurrency,
-corruption, and restart, verification pure and independent of kernel import
-order.
+Every durable command field is bound to its exact effect; command intent has
+ONE unambiguous representation (normalized anchors reconciled against the
+canonical JSON through a single shared `strict_encode`); fork evidence is
+derived from the issued base and candidate states and every AttemptRecord is
+bound to its exact ExecutionReport + Evaluation; every terminal outcome is
+validated identically and reconstructs exactly, with failure usage reconciled
+from the durable attempt ledger (never zero); candidate failures stay distinct
+from infrastructure failures (a boundary fault propagates as ok=False, a
+candidate exception stays a completed per-case evaluation); and the live budget
+always equals the durable external-effect ledger — with each command and
+attempt a single verifiable lifecycle across concurrency, corruption, and
+restart, verification pure and independent of kernel import order.
 
 ### Next
 
