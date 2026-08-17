@@ -15,7 +15,8 @@ from strive import codec
 from strive.cas import hash_text
 from strive.contracts import BudgetSpec
 from strive.contracts import BudgetUsage
-from strive.runtime import ENCODING, CommandPayload, ConfigBlob, StoredResult
+from strive.runtime import ENCODING, ConfigBlob, StoredResult
+from _payloads import coherent_payload
 from strive.substrate import (
     ChangeApplied,
     CompositeChange,
@@ -33,25 +34,16 @@ from strive.events import now_iso
 TASK = "sum-integers"
 
 
-def _mk_payload(
+def _issue(
     sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None,
-    *, issue_state_ref: str | None = None, json: str = "{}",
-) -> CommandPayload:
-    """Mirror the kernel's normalized CommandPayload for direct-substrate tests."""
-    return CommandPayload(
-        command_id=cid, kind=kind, encoding=ENCODING,
-        change_ref=sub.put(change) if change is not None else None,
-        target_change_id=change.change_id if change is not None else None,
-        expected_state_ref=None, issue_state_ref=issue_state_ref,
-        prompt_role=None, context_ref=None, after_seconds=None, reason=None, json=json,
-    )
-
-
-def _issue(sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None) -> None:
-    """Issue a command with a REAL typed CommandPayload (the substrate now
-    decodes and matches it), returning nothing."""
+    *, target: str | None = None,
+) -> None:
+    """Issue a command with a REAL, COHERENT typed CommandPayload (the substrate
+    now reconciles its normalized anchors against its canonical JSON)."""
     issue = sub.verify().state_ref if kind == "EvaluateFork" else None
-    ref = sub.put(_mk_payload(sub, cid, kind, change, issue_state_ref=issue))
+    ref = sub.put(coherent_payload(
+        sub, cid, kind, change=change, target=target, issue_state_ref=issue,
+    ))
     sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
 
 
@@ -66,7 +58,7 @@ def _apply(sub: Substrate, cid: str, change: CompositeChange, blobs: dict[str, s
 
 
 def _revert(sub: Substrate, cid: str, change_id: str) -> None:
-    _issue(sub, cid, "RevertChange")
+    _issue(sub, cid, "RevertChange", target=change_id)
     sub.revert(change_id=change_id, caused_by=cid)
 
 
@@ -191,8 +183,8 @@ def test_stage_closure_rejects_mismatched_content(tmp_path: Path) -> None:
 def test_command_id_reuse_with_different_payload_fails_closed(tmp_path: Path) -> None:
     sub = _open(tmp_path)
     _bind(sub)
-    p1 = sub.put(_mk_payload(sub, "k", "ConfirmChange", json='{"a":1}'))
-    p2 = sub.put(_mk_payload(sub, "k", "ConfirmChange", json='{"a":2}'))
+    p1 = sub.put(coherent_payload(sub, "k", "ConfirmChange", target="c1"))
+    p2 = sub.put(coherent_payload(sub, "k", "ConfirmChange", target="c2"))
     sub.issue_command(command_id="k", command_kind="ConfirmChange", command_ref=p1)
     with pytest.raises(SubstrateError, match="reused with a different payload"):
         sub.issue_command(command_id="k", command_kind="ConfirmChange", command_ref=p2)

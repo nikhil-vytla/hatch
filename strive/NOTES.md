@@ -1511,3 +1511,123 @@ mismatch, failed/null result, forged stored head) and `test_adversarial.py`
 wall/output reservation, preserved backend/candidate-error evidence). Updated
 the CommandPayload/AttemptRecord/OperationFailed constructors across tests.
 Kept the fresh-interpreter and installed-wheel tests.
+
+## 2026-08-17 — internal-consistency pass (PR #50, pass 7)
+
+Goal: one final internal-consistency pass — four areas, no new features
+(no `continual-refine@1`, no Pareto). Update PR #50 and STOP; do not merge.
+
+### Area 1 — CommandPayload is ONE coherent intent (DONE)
+
+Added `strict_encode`/`strict_json` to the NEUTRAL `strive.runtime` leaf and
+made the kernel import them (deleting its private `_strict_encode`), so the
+kernel that WRITES a command payload's canonical JSON and the substrate that
+RE-DERIVES it now share one encoder — the coherence proof cannot drift.
+
+New verify check `_check_command_payload_coherence` (invoked in the
+PolicyCommandIssued branch), driven by a CLOSED per-kind spec `_PAYLOAD_SPECS`:
+- `encoding == ENCODING` (else refuse);
+- required (non-null) / optional / FORBIDDEN normalized anchors per kind
+  (Confirm/Revert require a non-null target; EvaluateFork requires
+  change_ref + target + issue_state_ref; Apply requires change_ref + target,
+  expected_state_ref optional);
+- the canonical JSON must be an object carrying EXACTLY that kind's keys
+  (rejects extra/missing keys) and its `command_id`/`change_id`/`target`/
+  scalar anchors must equal the normalized fields;
+- for change-bearing kinds, decode `change_ref` and prove `strict_encode` of
+  the stored CompositeChange equals the JSON's `change`/`candidate` subtree.
+
+Gotcha: `EvaluateFork` has a 4th field `detail` — its json_keys must include
+it (found via a real kernel run failing the key-set check).
+
+Tests: added shared builder `tests/_payloads.py::coherent_payload` (mirrors the
+kernel exactly) and routed every direct-substrate forge helper (`_issue`,
+`_issue_target`, `_mk_payload`→removed, `_revert`, `_apply`) through it, so an
+issued command is coherent by construction. Confirm/Revert `_issue` now takes a
+`target`; the reuse/expected-state/re-derivation tests build coherent payloads.
+
+### Area 2 — every terminal outcome verified identically (DONE)
+
+Added `combine_usage` to `strive.runtime` (the SAME additive/cumulative-wall/
+max-recursion accounting the `BudgetMeter` uses when seeding from the ledger).
+
+Kernel: new `_reconciled_usage(view, cid)` reconstructs a command's honest usage
+from its DURABLE attempt ledger — each completed AttemptRecord's usage plus each
+OPEN dispatch's worst-case reservation (zero for a non-fork). EVERY terminal now
+records this (OK, failed, indeterminate), replacing both the OK meter-delta and
+`_reconcile_failure`'s zero usage — so a crashed partial fork is charged, not
+lost, and recorded == what `_seed_meter` folds into the live budget. Fixed the
+indeterminate branch so StoredResult.detail is the SAME string as the recorded
+failure (was `str(exc)` vs `"indeterminate: {exc}"`).
+
+Substrate verify: `_check_stored_result` now runs for ALL outcomes and always
+checks finite/nonneg usage. New `_check_failed_stored_result` (non-ok mirror
+rule: no proposal/observation/metrics; detail == the OperationFailed detail;
+usage == `_reconciled_usage_from_events`, the verify twin of the kernel helper,
+both via `combine_usage`). OK forks are now also cross-checked against the
+reconciled ledger; non-fork OK usage must be exactly zero. New
+`_check_effect_after_failure`: once an OperationFailed is recorded, the only
+later event a command may cause is its matching terminal (checkpoint already
+excluded) — no success effect, observation, or second failure.
+
+### Area 3 — real execution failure classification preserved (DONE)
+
+The gap: `run_protected_suite` collapsed a backend `ok=False` fault into a
+per-case CaseOutcome error, and `CandidateExecutor.execute_suite` hardcoded the
+aggregate `ExecutionReport(ok=True, failure=None)` — so a genuine boundary fault
+(timeout/crash/refusal/malformed-runner output) was indistinguishable from a
+candidate exception. `_run_attempt` already keys `ok`/`failure` off
+`result.report.failure`, so it only needed the report to carry it.
+
+Fix: `run_protected_suite` now tracks the FIRST boundary failure (a backend
+`ok=False`, or an exhausted suite deadline = a boundary TIMEOUT) and returns it
+as a 6th tuple element; `execute_suite` sets `ok = failure is None` and carries
+the `failure`. A candidate exception / wrong answer is still caught inside the
+runner (`ok=True`, per-case `error`) and stays a completed per-case evaluation.
+Backend tests use `*_` for the trailing tuple, so they were unaffected.
+
+### Area 4 — AttemptRecord bound to its evidence (DONE)
+
+New verify helper `_check_attempt_evidence` (called per FORK_RESULT, replacing
+the decode-only check) binds each AttemptRecord to the EXACT refs it carries:
+`overall == Evaluation.overall_score`; `ok == ExecutionReport.ok`;
+`failure == ExecutionReport.failure`; `ok == (failure is None)`;
+`Evaluation.failure == ExecutionReport.failure`; the report's `generation_id`
+is `fork-<label>`; `usage.output_bytes == ExecutionReport.stdout_bytes`; and the
+attempt's real wall is at least the report's aggregated backend wall (1e-3
+slack for independent rounding of two real timings). The fork summary already
+binds base/candidate to the durable records, so it now transitively uses
+evidence-verified values. Updated the `_attempt` forge helper to be
+evidence-consistent (label-matched report, evaluation overall == the record's).
+
+### Area 5 — adversarial tests + tooling (DONE)
+
+Shared helper `tests/_payloads.py::coherent_payload`; new forge helpers in
+`test_state_machine.py` (`_raw_payload`, `_forge_issue`, `_canon_json`) plant
+ONE incoherence and prove verify refuses it. Added:
+- payload: missing required anchor; target=None bypass (ApplyChange, null
+  target); forbidden field on a Stop; JSON/normalized change_id disagreement;
+  wrong encoding; extra JSON key; change_ref/JSON-subtree disagreement.
+- failed terminal: forged metrics; forged detail (≠ failure record); forged
+  nonzero usage on a non-fork failure; an effect after the failure was recorded.
+- reconciled partial fork usage: a crash after base RESULT + open candidate
+  DISPATCH reconciles to (base usage + candidate reservation) — ACCEPTED; the
+  same stream with zeroed usage is REFUSED.
+- AttemptRecord evidence: overall ≠ Evaluation.overall_score; ok ≠
+  ExecutionReport.ok.
+- REAL backend faults (`test_sandbox_backend.py`, process-fault-only@1, always
+  available): a module-level `os._exit` crash → ok=False+CRASH; a non-returning
+  strategy → ok=False+TIMEOUT; and the CONTRAST — a candidate `raise ValueError`
+  stays ok=True with a per-case error (a completed evaluation, NOT infra).
+
+Final: `uv run pytest` = 241 passed (was 223); `uv run mypy` clean over 39
+files. Fresh-interpreter (`test_substrate_only`) and installed-wheel
+(`test_packaging`) tests retained and green.
+
+Exit claim holds: command intent has ONE unambiguous representation (normalized
+anchors reconciled against canonical JSON via a shared `strict_encode`); every
+terminal and attempt is internally consistent (uniform StoredResult validation,
+reconciled ledger usage, effect-after-failure freeze, AttemptRecord bound to its
+report+evaluation); candidate failures stay distinct from infrastructure
+failures (boundary ok=False propagated; candidate exceptions stay per-case); and
+retained evaluation evidence exactly supports the scores policy uses.

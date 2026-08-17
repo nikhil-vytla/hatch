@@ -21,11 +21,12 @@ from pathlib import Path
 
 import pytest
 
-from strive.contracts import TaskCase
+from strive.contracts import FAILURE_CRASH, FAILURE_TIMEOUT, TaskCase
 from strive.sandboxes import (
     SECURE_EXECUTION_CAPABILITIES,
     CandidateExecutor,
     SandboxError,
+    SandboxLimits,
     SandboxRequest,
     conformance_violations,
     default_catalog,
@@ -34,6 +35,11 @@ from strive.sandboxes import (
 
 CATALOG = default_catalog()
 DENO = CATALOG.create("deno-pyodide@1")
+# a REAL, always-available executor over the process-fault-only backend (a true
+# child process), used to prove genuine BOUNDARY faults (a crashed/timed-out
+# child) are classified as infrastructure failures — never faked with a
+# candidate exception, which the runner catches as an ordinary per-case error.
+PFO = CandidateExecutor.from_catalog(CATALOG, "process-fault-only@1", trusted=True)
 _available, _reason = DENO.available()
 requires_deno = pytest.mark.skipif(
     not _available, reason=f"deno-pyodide unavailable: {_reason}"
@@ -391,3 +397,40 @@ def test_resource_limit_caps_cpu_runaway() -> None:
     )
     assert outcomes["c"].output is None
     assert any("wall time" in d for d in denials) or outcomes["c"].error
+
+
+# -- real boundary faults are classified as infrastructure failures (PR #50) ---------------------
+
+
+def test_real_backend_crash_surfaces_as_infra_failure() -> None:
+    # a strategy that CRASHES the child interpreter itself (module-level
+    # os._exit) — a genuine boundary fault, not an exception the runner catches
+    src = "import os\nos._exit(7)\n\n\ndef solve(t):\n    return 0\n"
+    outcome = PFO.execute_suite(src, (_case(),), generation_id="fork-base")
+    assert outcome.report.ok is False
+    assert outcome.report.failure is not None
+    assert outcome.report.failure.kind == FAILURE_CRASH
+
+
+def test_real_backend_timeout_surfaces_as_infra_failure() -> None:
+    # a strategy that never returns — the boundary hard-kills it; the aggregate
+    # report is a TIMEOUT infrastructure failure, never a completed evaluation
+    src = "def solve(t):\n    while True:\n        pass\n"
+    outcome = PFO.execute_suite(
+        src, (_case(),), generation_id="fork-base",
+        limits=SandboxLimits(wall_time_s=1.0, suite_deadline_s=3.0),
+    )
+    assert outcome.report.ok is False
+    assert outcome.report.failure is not None
+    assert outcome.report.failure.kind == FAILURE_TIMEOUT
+
+
+def test_candidate_exception_stays_a_completed_evaluation() -> None:
+    # by contrast, a candidate that RAISES is caught inside the runner: the
+    # report stays ok=True with a per-case error — a completed evaluation, NOT
+    # an infrastructure failure (so it must NOT be used as the infra-failure fixture)
+    src = "def solve(t):\n    raise ValueError('boom')\n"
+    outcome = PFO.execute_suite(src, (_case(),), generation_id="fork-base")
+    assert outcome.report.ok is True
+    assert outcome.report.failure is None
+    assert outcome.report.outcomes[0].error is not None
