@@ -56,7 +56,7 @@ from typing import Iterator, Mapping
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
-from strive.contracts import BudgetSpec, BudgetUsage
+from strive.contracts import BudgetSpec, BudgetUsage, Evaluation, ExecutionReport
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramingError
 from strive.runtime import (
@@ -437,14 +437,19 @@ class ChangeReverted:
     after_state_ref: str
 
 
-@register("operation-failed", 2)
+@register("operation-failed", 3)
 @dataclass(frozen=True)
 class OperationFailed:
-    """AUTHORITY bookkeeping. A kernel operation failed, recorded fail-closed."""
+    """AUTHORITY bookkeeping. A kernel operation failed (or is indeterminate),
+    recorded fail-closed. `outcome` (``failed`` | ``indeterminate``) is the
+    terminal outcome this failure reconciles into, so a crash between the
+    failure record and the terminal resumes to the SAME outcome without
+    re-running the operation."""
 
     command_id: str
     kind: str
     detail: str
+    outcome: str
 
 
 @register("event-envelope", 1)
@@ -1050,11 +1055,14 @@ class Substrate:
             caused_by=caused_by, view=view,
         )
 
-    def record_failure(self, *, command_id: str, kind: str, detail: str) -> VerifiedSubstrateView:
+    def record_failure(
+        self, *, command_id: str, kind: str, detail: str, outcome: str = "failed",
+    ) -> VerifiedSubstrateView:
         view = self.verify()
         self._require_ok(view, "record-failure")
         return self._emit(
-            OperationFailed(command_id, kind, detail), caused_by=command_id, view=view
+            OperationFailed(command_id, kind, detail, outcome),
+            caused_by=command_id, view=view,
         )
 
     # -- recovery ---------------------------------------------------------
@@ -1292,7 +1300,10 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                 errors.append(f"envelope {env.seq}: completion must be self-caused")
             if body.outcome not in ("ok", "failed", "indeterminate"):
                 errors.append(f"envelope {env.seq}: unknown outcome {body.outcome!r}")
-            if body.result_ref is not None:
+            # EVERY terminal — ok, failed, OR indeterminate — has a StoredResult
+            if body.result_ref is None:
+                errors.append(f"envelope {env.seq}: terminal has no StoredResult")
+            else:
                 try:
                     stored = codec.loads(sub.objects.get_text(body.result_ref), StoredResult)
                     if stored.command_id != body.command_id:
@@ -1302,6 +1313,13 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     issue = issued.get(body.command_id)
                     if issue is not None and stored.kind != issue.command_kind:
                         errors.append(f"envelope {env.seq}: result kind disagrees with intent")
+                    # the EXACT pre-terminal semantic head: position + folded state
+                    expected_head = f"{env.seq - 1}:{state_ref or ''}"
+                    if stored.head != expected_head:
+                        errors.append(
+                            f"envelope {env.seq}: result head {stored.head!r} != the "
+                            f"pre-terminal semantic head {expected_head!r}"
+                        )
                 except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
                     errors.append(f"envelope {env.seq}: result ref does not decode: {exc}")
             completed[body.command_id] = body
@@ -1324,11 +1342,27 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                 errors.append(
                     f"envelope {env.seq}: applied change does not match its proposal"
                 )
-            if cause_payload is not None and cause_payload.change_ref != body.change_ref:
-                errors.append(
-                    f"envelope {env.seq}: applied change does not match the issued "
-                    "command payload"
-                )
+            if cause_payload is not None:
+                if cause_payload.change_ref != body.change_ref:
+                    errors.append(
+                        f"envelope {env.seq}: applied change does not match the issued "
+                        "command payload"
+                    )
+                if cause_payload.target_change_id not in (None, cid):
+                    errors.append(
+                        f"envelope {env.seq}: applied change id != the command's "
+                        "named target"
+                    )
+                # the effect must satisfy the ISSUED expected_state_ref, not
+                # merely the folded state at apply time
+                if (
+                    cause_payload.expected_state_ref is not None
+                    and body.before_state_ref != cause_payload.expected_state_ref
+                ):
+                    errors.append(
+                        f"envelope {env.seq}: apply before-state does not satisfy the "
+                        "issued expected_state_ref"
+                    )
         elif isinstance(body, ChangeReverted):
             new_ref, new_state = _replay(sub, state, state_ref, body, env, errors)
             state, state_ref = new_state, new_ref
@@ -1348,6 +1382,20 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     errors.append(
                         f"envelope {env.seq}: revert is not the EXACT inverse of the "
                         f"applied change {cid!r}"
+                    )
+            if cause_payload is not None:
+                if cause_payload.target_change_id not in (None, cid):
+                    errors.append(
+                        f"envelope {env.seq}: revert targets {cid!r} but the command "
+                        f"named {cause_payload.target_change_id!r}"
+                    )
+                if (
+                    cause_payload.expected_state_ref is not None
+                    and body.before_state_ref != cause_payload.expected_state_ref
+                ):
+                    errors.append(
+                        f"envelope {env.seq}: revert before-state does not satisfy the "
+                        "issued expected_state_ref"
                     )
         elif isinstance(body, PolicyCheckpointed):
             latest_checkpoint = body
@@ -1410,17 +1458,36 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
                     "never proposed"
                 )
+            if cause_payload is not None and cause_payload.target_change_id not in (
+                None, body.change_id
+            ):
+                errors.append(
+                    f"envelope {env.seq}: confirm targets {body.change_id!r} but the "
+                    f"command named {cause_payload.target_change_id!r}"
+                )
         elif isinstance(body, ChangeRevised):
             if body.change_id not in proposals:
                 errors.append(
                     f"envelope {env.seq}: revise of change {body.change_id!r} that was "
                     "never proposed"
                 )
+            if cause_payload is not None and cause_payload.target_change_id not in (
+                None, body.change_id
+            ):
+                errors.append(
+                    f"envelope {env.seq}: revise targets {body.change_id!r} but the "
+                    f"command named {cause_payload.target_change_id!r}"
+                )
             _decode_change(sub, body.new_change_ref, env, errors)
         elif isinstance(body, OperationFailed):
             if body.command_id != cause:
                 errors.append(
                     f"envelope {env.seq}: OperationFailed command_id must equal caused_by"
+                )
+            if body.outcome not in ("failed", "indeterminate"):
+                errors.append(
+                    f"envelope {env.seq}: OperationFailed outcome {body.outcome!r} "
+                    "must be 'failed' or 'indeterminate'"
                 )
 
     # the per-command CLOSED state machine: exact effect grammar per kind +
@@ -1540,10 +1607,40 @@ def _verify_command_lifecycles(
         _check_effect_after_terminal(cid, events, errors)
         _check_fork_lifecycle(sub, cid, payloads.get(cid), events, bound, errors)
         terminal = completed.get(cid)
+        _check_prefix_invariants(cid, events, terminal, errors)
         if terminal is not None:
             _check_command_grammar(
                 sub, cid, issue.command_kind, terminal, events, errors
             )
+
+
+def _check_prefix_invariants(
+    cid: str,
+    events: list[tuple[EventEnvelope, object]],
+    terminal: PolicyCommandCompleted | None,
+    errors: list[str],
+) -> None:
+    """Legal PARTIAL prefixes (even before a terminal): a command accumulates at
+    most one failure record and at most one of each success effect, and a
+    terminal's outcome must equal any recorded failure's outcome (so a crash
+    after the failure reconciles to the SAME outcome)."""
+    tokens = [
+        _effect_token(env, body)
+        for env, body in events
+        if not isinstance(body, PolicyCommandCompleted)
+    ]
+    counts = Counter(tokens)
+    if counts.get("operation-failed@3", 0) > 1:
+        errors.append(f"command {cid!r}: more than one failure record")
+    for token in _SUCCESS_TOKENS:
+        if counts.get(token, 0) > 1:
+            errors.append(f"command {cid!r}: duplicate success effect {token!r}")
+    failures = [b for _e, b in events if isinstance(b, OperationFailed)]
+    if failures and terminal is not None and failures[0].outcome != terminal.outcome:
+        errors.append(
+            f"command {cid!r}: terminal outcome {terminal.outcome!r} disagrees with "
+            f"its failure record outcome {failures[0].outcome!r}"
+        )
 
 
 def _check_effect_after_terminal(
@@ -1603,7 +1700,7 @@ def _check_command_grammar(
         _check_stored_result(sub, cid, kind, terminal, events, errors)
     else:  # failed | indeterminate: a failure record and NO success effect
         counts = Counter(tokens)
-        if counts.get("operation-failed@2", 0) != 1:
+        if counts.get("operation-failed@3", 0) != 1:
             errors.append(
                 f"command {cid!r} ({terminal.outcome}): needs exactly one failure record"
             )
@@ -1673,6 +1770,27 @@ def _check_stored_result(
     errors.extend(_usage_errors(stored.usage, f"command {cid!r} StoredResult.usage"))
 
 
+def _fork_expected_states(
+    sub: Substrate, payload: CommandPayload | None
+) -> dict[str, str] | None:
+    """Derive the EXACT states a fork's attempts must use, ANCHORED to the
+    issued command: base == the state ref recorded at issue; candidate ==
+    applying the issued candidate change to that base. Returns None when the
+    anchor cannot be reconstructed (a separate error is already reported)."""
+    if payload is None or payload.issue_state_ref is None or payload.change_ref is None:
+        return None
+    try:
+        base_state = sub._load_state(payload.issue_state_ref)
+        candidate = codec.loads(sub.objects.get_text(payload.change_ref), CompositeChange)
+        candidate_state = apply_change(base_state, candidate, sub.catalog)
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError, SubstrateError):
+        return None
+    return {
+        "base": payload.issue_state_ref,
+        "candidate": hash_text(codec.dumps(candidate_state)),
+    }
+
+
 def _check_fork_lifecycle(
     sub: Substrate,
     cid: str,
@@ -1681,6 +1799,7 @@ def _check_fork_lifecycle(
     bound: PolicyBound,
     errors: list[str],
 ) -> None:
+    expected = _fork_expected_states(sub, payload)  # base/candidate anchored to issue
     dispatches: dict[str, AttemptDispatched] = {}
     dispatch_seq: dict[str, int] = {}
     results: dict[str, AttemptRecord] = {}
@@ -1699,6 +1818,11 @@ def _check_fork_lifecycle(
             if disp.state_ref != body.subject_state_ref:
                 errors.append(
                     f"command {cid!r}: dispatch state_ref != subject_state_ref"
+                )
+            if expected is not None and disp.state_ref != expected.get(disp.label):
+                errors.append(
+                    f"command {cid!r}: {disp.label!r} dispatch state is not the "
+                    "issued base/candidate state"
                 )
             errors.extend(_usage_errors(
                 BudgetUsage(
@@ -1725,6 +1849,11 @@ def _check_fork_lifecycle(
                 errors.append(
                     f"command {cid!r}: {rec.label!r} result does not match its dispatch"
                 )
+            if expected is not None and rec.state_ref != expected.get(rec.label):
+                errors.append(
+                    f"command {cid!r}: {rec.label!r} result state is not the issued "
+                    "base/candidate state"
+                )
             missing = [
                 cap for cap in bound.required_capabilities
                 if cap not in rec.provenance.enforced_capabilities
@@ -1735,6 +1864,16 @@ def _check_fork_lifecycle(
                     f"capabilities {missing}"
                 )
             errors.extend(_usage_errors(rec.usage, f"command {cid!r} {rec.label} usage"))
+            # the FULL execution evidence must decode (per-case outputs/errors,
+            # backend failure, wall/output) and its evaluation
+            try:
+                codec.loads(sub.objects.get_text(rec.report_ref), ExecutionReport)
+                codec.loads(sub.objects.get_text(rec.evaluation_ref), Evaluation)
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                errors.append(
+                    f"command {cid!r}: {rec.label!r} execution evidence does not "
+                    f"decode: {exc}"
+                )
         elif body.observation_kind == FORK_SUMMARY:
             try:
                 summary = codec.loads(sub.objects.get_text(body.observation_ref), ForkObservation)
@@ -1748,6 +1887,17 @@ def _check_fork_lifecycle(
                         f"command {cid!r}: fork summary {label} != the durable "
                         f"{label} result record"
                     )
+            # the summary event subject must equal the candidate state
+            if expected is not None and body.subject_state_ref != expected.get("candidate"):
+                errors.append(
+                    f"command {cid!r}: fork summary subject is not the candidate state"
+                )
+            # recompute `improved` — it is derived, never asserted
+            if summary.improved != (summary.candidate.overall > summary.base.overall):
+                errors.append(
+                    f"command {cid!r}: fork summary `improved` disagrees with the "
+                    "recomputed comparison"
+                )
             if payload is not None and payload.change_ref is not None:
                 try:
                     change = codec.loads(

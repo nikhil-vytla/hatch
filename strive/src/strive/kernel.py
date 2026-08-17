@@ -98,6 +98,7 @@ from strive.substrate import (
     CompositeChange,
     HarnessState,
     ObservationRecorded,
+    OperationFailed,
     PolicyCommandCompleted,
     Substrate,
     SubstrateError,
@@ -274,6 +275,10 @@ def run_policy(
                 stopped_reason = "done"
                 break
             result = _run_command(services, view, command)
+            # after every terminal/reconciliation, rebuild the live meter from
+            # the DURABLE external-effect ledger BEFORE the policy emits another
+            # command — the live budget always equals the durable ledger.
+            _seed_meter(services, substrate.verify())
             if command.command_id != consumed:
                 state = policy.reduce(config, state, result)
                 substrate.checkpoint(
@@ -462,13 +467,7 @@ def _run_command(
     # issued digest — BEFORE both the already-completed and already-issued
     # paths — so a changed re-derivation fails closed rather than reconciling
     # against a different intent.
-    command_ref = substrate.put(
-        CommandPayload(
-            command_id=cid, kind=kind, encoding=_ENCODING,
-            change_ref=_command_change_ref(substrate, command),
-            json=_command_identity_json(command),
-        )
-    )
+    command_ref = substrate.put(_command_payload(substrate, view, command))
     issued = view.issued.get(cid)
     if issued is not None and issued.command_ref != command_ref:
         raise KernelError(
@@ -481,43 +480,88 @@ def _run_command(
     if terminal is not None:
         return _reconstruct(services, command, terminal)
 
+    # a prior process recorded a failure/indeterminate but crashed before the
+    # terminal: RECONCILE it into the terminal with the SAME outcome — never
+    # re-run the operation.
+    existing_failure = _existing_failure(view, cid)
+    if existing_failure is not None:
+        return _reconcile_failure(services, command, existing_failure)
+
     # `issue_command` is idempotent (same id+digest is a read, not a 2nd intent)
     substrate.issue_command(command_id=cid, command_kind=kind, command_ref=command_ref)
 
     before_usage = services.meter.usage()
     try:
         result = _perform(services, substrate.verify(), command)
+        outcome, detail = "ok", result.detail
     except IndeterminateEffect as exc:
         # dispatched, but no durable result is recoverable: record it honestly
         # and REQUIRE an explicit retry — never silently re-dispatch.
-        substrate.record_failure(command_id=cid, kind=kind, detail=f"indeterminate: {exc}")
-        result = CommandResult(cid, kind, "indeterminate", substrate.verify().head, detail=str(exc))
+        substrate.record_failure(
+            command_id=cid, kind=kind, detail=f"indeterminate: {exc}",
+            outcome="indeterminate",
+        )
+        result = CommandResult(cid, kind, "indeterminate", "", detail=str(exc))
+        outcome, detail = "indeterminate", str(exc)
     except (SubstrateError, KernelError) as exc:
-        substrate.record_failure(command_id=cid, kind=kind, detail=str(exc))
-        result = CommandResult(cid, kind, "failed", substrate.verify().head, detail=str(exc))
+        substrate.record_failure(command_id=cid, kind=kind, detail=str(exc), outcome="failed")
+        result = CommandResult(cid, kind, "failed", "", detail=str(exc))
+        outcome, detail = "failed", str(exc)
     charged = _usage_delta(before_usage, services.meter.usage())
 
-    # the command's canonical head is the head AFTER its effect but BEFORE its
-    # terminal completion — a stable logical point both the initial run and a
-    # reconstruction return identically.
-    head = substrate.verify().head
+    # the command's canonical SEMANTIC head — position + folded state — just
+    # before the terminal; both the initial run and a reconstruction return it.
+    head = _semantic_head(substrate)
     stored = StoredResult(
         command_id=cid,
         kind=kind,
-        outcome=result.outcome,
+        outcome=outcome,
         head=head,
-        detail=result.detail,
+        detail=detail,
         proposal_ref=substrate.put(result.proposal) if result.proposal else None,
         observation_ref=result.observation_ref,
         metrics=dict(result.metrics),
         usage=charged,
     )
-    substrate.complete_command(command_id=cid, outcome=result.outcome, result=stored)
+    substrate.complete_command(command_id=cid, outcome=outcome, result=stored)
     return CommandResult(
-        cid, kind, result.outcome, head, detail=result.detail,
+        cid, kind, outcome, head, detail=detail,
         proposal=result.proposal, observation_ref=result.observation_ref,
         metrics=result.metrics,
     )
+
+
+def _semantic_head(substrate: Substrate) -> str:
+    """The pre-terminal semantic head: ``"<seq>:<state_ref>"`` — position and
+    folded state, deterministic and reconstructable by verify (unlike the
+    framing head, whose frame hashes fold in wall-clock timestamps)."""
+    v = substrate.verify()
+    return f"{v.seq}:{v.state_ref or ''}"
+
+
+def _existing_failure(view: VerifiedSubstrateView, cid: str) -> OperationFailed | None:
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if env.caused_by == cid and isinstance(body, OperationFailed):
+            return body
+    return None
+
+
+def _reconcile_failure(
+    services: KernelServices, command: KernelCommand, failure: OperationFailed
+) -> CommandResult:
+    """Complete a command whose failure was durably recorded before a crash —
+    with the recorded outcome — WITHOUT re-running the operation."""
+    substrate = services.substrate
+    cid = command.command_id
+    kind = type(command).__name__
+    head = _semantic_head(substrate)
+    stored = StoredResult(
+        command_id=cid, kind=kind, outcome=failure.outcome, head=head,
+        detail=failure.detail, proposal_ref=None, observation_ref=None,
+        metrics={}, usage=BudgetUsage(),
+    )
+    substrate.complete_command(command_id=cid, outcome=failure.outcome, result=stored)
+    return CommandResult(cid, kind, failure.outcome, head, detail=failure.detail)
 
 
 def _perform(
@@ -726,13 +770,18 @@ def _run_attempt(
     failure, denials, and the usage it actually charged — so charges and
     provenance survive to the next crash point (`ok=False` on any failure)."""
     meter = services.meter
+    substrate = services.substrate
     before = meter.usage()
     code_ref = state.content_ref("strategy-code", "solve")
     if code_ref is None:
+        empty = ExecutionReport(ok=True, generation_id=f"fork-{label}", outcomes=())
+        evaluation = evaluate(services.task, empty, services.task.selection_cases())
         return AttemptRecord(
-            command_id=cid, label=label, state_ref=state_ref, overall=0.0, ok=True,
+            command_id=cid, label=label, state_ref=state_ref,
+            overall=evaluation.overall_score, ok=True,
             provenance=services.executor.provenance(), failure=None, denials=(),
             usage=_usage_delta(before, meter.usage()),
+            report_ref=substrate.put(empty), evaluation_ref=substrate.put(evaluation),
         )
     source = services.substrate.objects.get_text(code_ref)
     cases = services.task.selection_cases()
@@ -770,11 +819,15 @@ def _run_attempt(
         stdout_bytes=total_stdout,  # ACTUAL captured output, not error-string length
     )
     evaluation = evaluate(services.task, report, cases)
+    # preserve the FULL evidence: the exact ExecutionReport (per-case
+    # outputs/errors, backend failure, wall/output) and its Evaluation
+    # (per-case scores/feedback) — never collapsed to only the aggregate.
     return AttemptRecord(
         command_id=cid, label=label, state_ref=state_ref,
         overall=evaluation.overall_score, ok=failure is None,
         provenance=provenance, failure=failure, denials=tuple(denials),
         usage=_usage_delta(before, meter.usage()),
+        report_ref=substrate.put(report), evaluation_ref=substrate.put(evaluation),
     )
 
 
@@ -810,8 +863,8 @@ def _reconstruct(
     assert isinstance(terminal, PolicyCommandCompleted)
     cid = command.command_id
     kind = type(command).__name__
-    if terminal.result_ref is None:
-        return CommandResult(cid, kind, terminal.outcome, substrate.verify().head)
+    # verify guarantees EVERY terminal has a StoredResult — no None fallback
+    assert terminal.result_ref is not None
     stored = codec.loads(substrate.objects.get_text(terminal.result_ref), StoredResult)
     proposal: CompositeChange | None = None
     if stored.proposal_ref is not None:
@@ -884,14 +937,50 @@ def _command_identity_json(command: object) -> str:
     return json.dumps(_strict_encode(command), sort_keys=True, separators=(",", ":"))
 
 
-def _command_change_ref(substrate: Substrate, command: KernelCommand) -> str | None:
-    """The CAS ref of the CompositeChange a change-bearing command targets, so
-    verification can match an effect to its command's ACTUAL change."""
+def _command_payload(
+    substrate: Substrate, view: VerifiedSubstrateView, command: KernelCommand
+) -> CommandPayload:
+    """Build the NEUTRAL typed intent record for a command: every consequential
+    field is normalized out of the opaque `json` so verification can bind each
+    effect to exactly what the command named."""
+    kind = type(command).__name__
+    change_ref: str | None = None
+    target_change_id: str | None = None
+    expected_state_ref: str | None = None
+    issue_state_ref: str | None = None
+    prompt_role: str | None = None
+    context_ref: str | None = None
+    after_seconds: float | None = None
+    reason: str | None = None
     if isinstance(command, ApplyChange):
-        return substrate.put(command.change)
-    if isinstance(command, EvaluateFork):
-        return substrate.put(command.candidate)
-    return None
+        change_ref = substrate.put(command.change)
+        target_change_id = command.change.change_id
+        expected_state_ref = command.expected_state_ref
+    elif isinstance(command, EvaluateFork):
+        change_ref = substrate.put(command.candidate)
+        target_change_id = command.candidate.change_id
+        issue_state_ref = view.state_ref  # the fork's base anchor, at issue
+    elif isinstance(command, RevertChange):
+        target_change_id = command.change_id
+        expected_state_ref = command.expected_state_ref
+    elif isinstance(command, ConfirmChange):
+        target_change_id = command.change_id
+    elif isinstance(command, RequestRefinement):
+        prompt_role = command.prompt_role
+        context_ref = command.context_ref
+    elif isinstance(command, ScheduleTrigger):
+        after_seconds = command.after_seconds
+        reason = command.reason
+    elif isinstance(command, StopAdaptation):
+        reason = command.reason
+    return CommandPayload(
+        command_id=command.command_id, kind=kind, encoding=_ENCODING,
+        change_ref=change_ref, target_change_id=target_change_id,
+        expected_state_ref=expected_state_ref, issue_state_ref=issue_state_ref,
+        prompt_role=prompt_role, context_ref=context_ref,
+        after_seconds=after_seconds, reason=reason,
+        json=_command_identity_json(command),
+    )
 
 
 def _strict_encode(value: object) -> object:

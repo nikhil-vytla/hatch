@@ -24,20 +24,37 @@ from strive.sandboxes import SandboxProvenance
 ENCODING = "strict-json@1"
 
 
-@register("command-payload", 2)
+@register("command-payload", 3)
 @dataclass(frozen=True)
 class CommandPayload:
-    """The canonical, content-addressable command intent. Its CAS ref is the
-    command digest binding a `command_id` to ONE payload. `json` is the FULL
-    canonical command (INCLUDING its `expected_state_ref` precondition — a
-    changed precondition is a changed command). `change_ref` is the CAS ref of
-    the `CompositeChange` a change-bearing command (Apply/Evaluate) targets, so
-    an effect can be matched to its command's actual change, not a kind string."""
+    """The canonical, content-addressable command intent — a NEUTRAL, typed
+    record of every consequential field, not an opaque JSON blob the substrate
+    cannot read. Its CAS ref is the command digest binding a `command_id` to
+    ONE payload; `json` remains the full canonical command (the identity a
+    changed precondition perturbs). The normalized fields let verification bind
+    each effect to exactly what the issued command named:
+
+    - `change_ref` — the CAS ref of the CompositeChange an Apply/Evaluate targets
+    - `target_change_id` — the change id an Apply/Evaluate/Confirm/Revert names
+    - `expected_state_ref` — the Apply/Revert precondition (an effect must
+      satisfy THIS, not merely the folded state)
+    - `issue_state_ref` — the folded state ref at issue (the fork's base anchor)
+    - `prompt_role` / `context_ref` — a RequestRefinement's model inputs
+    - `after_seconds` — a ScheduleTrigger's delay
+    - `reason` — a Schedule/Stop reason
+    """
 
     command_id: str
     kind: str
     encoding: str
     change_ref: str | None
+    target_change_id: str | None
+    expected_state_ref: str | None
+    issue_state_ref: str | None
+    prompt_role: str | None
+    context_ref: str | None
+    after_seconds: float | None
+    reason: str | None
     json: str
 
 
@@ -89,13 +106,17 @@ class AttemptDispatched:
     reserved_output_bytes: int
 
 
-@register("execution-attempt", 1)
+@register("execution-attempt", 2)
 @dataclass(frozen=True)
 class AttemptRecord:
-    """The durable RESULT of one base/candidate attempt, with the ACTUAL
-    returned provenance, any failure, denials, the metered usage THIS attempt
-    charged, and the state ref it scored — recorded even for a partial/failed
-    attempt so charges and provenance survive to the next crash point."""
+    """The durable RESULT of one base/candidate attempt. It preserves the FULL
+    execution evidence — CAS refs to the exact `ExecutionReport` (`report_ref`:
+    per-case outputs/errors, backend failure, wall/output bytes) and the exact
+    `Evaluation` (`evaluation_ref`: per-case scores/feedback) — plus the actual
+    returned provenance, denials, the metered usage, and the state ref it
+    scored. `ok` distinguishes a COMPLETED evaluation (candidate errors are
+    scored, `failure is None`, `ok=True`) from a SANDBOX/INFRA failure
+    (`failure` set, `ok=False`) — neither is collapsed to an aggregate score."""
 
     command_id: str
     label: str  # "base" | "candidate"
@@ -106,6 +127,8 @@ class AttemptRecord:
     failure: FailureRecord | None
     denials: tuple[str, ...]
     usage: BudgetUsage
+    report_ref: str       # CAS ref to the exact ExecutionReport
+    evaluation_ref: str   # CAS ref to the exact Evaluation
 
 
 @register("fork-observation", 4)

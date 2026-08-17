@@ -78,9 +78,14 @@ def _bound_sub(root: Path, run_id: str, *, task: str = "sum-integers") -> Substr
 
 
 def _issue(sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None) -> None:
-    change_ref = sub.put(change) if change is not None else None
-    ref = sub.put(CommandPayload(command_id=cid, kind=kind, encoding=ENCODING,
-                                 change_ref=change_ref, json="{}"))
+    issue = sub.verify().state_ref if kind == "EvaluateFork" else None
+    ref = sub.put(CommandPayload(
+        command_id=cid, kind=kind, encoding=ENCODING,
+        change_ref=sub.put(change) if change is not None else None,
+        target_change_id=change.change_id if change is not None else None,
+        expected_state_ref=None, issue_state_ref=issue, prompt_role=None,
+        context_ref=None, after_seconds=None, reason=None, json="{}",
+    ))
     sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
 
 
@@ -282,7 +287,9 @@ def test_kernel_refuses_changed_rederived_command(tmp_path: Path) -> None:
     # command re-derives (a changed precondition/payload)
     bogus = sub.put(CommandPayload(
         command_id=command.command_id, kind="StopAdaptation", encoding=ENCODING,
-        change_ref=None, json='{"reason":"DIFFERENT"}',
+        change_ref=None, target_change_id=None, expected_state_ref=None,
+        issue_state_ref=None, prompt_role=None, context_ref=None,
+        after_seconds=None, reason="DIFFERENT", json='{"reason":"DIFFERENT"}',
     ))
     sub.issue_command(command_id=command.command_id, command_kind="StopAdaptation",
                       command_ref=bogus)
@@ -854,3 +861,111 @@ def test_duplicate_seed_bindings_refused(tmp_path: Path) -> None:
             required_capabilities=(), run_metadata={},
         )
     assert _journal_bytes(tmp_path, run) == before
+
+
+# -- intent-to-effect binding pass: reconciliation, budget, evidence --------------------------------
+
+
+def test_reconcile_failure_after_crash_before_terminal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A crash AFTER the failure record but BEFORE the terminal reconciles to
+    the SAME outcome on resume — never re-running the operation."""
+    run = new_run_id()
+    per = len(TASK.selection_cases())
+    real_complete = Substrate.complete_command
+    fired = {"v": False}
+
+    def flaky(self: Substrate, *, command_id: str, outcome: str, result: object) -> object:
+        if command_id.endswith(":fork") and not fired["v"]:
+            fired["v"] = True
+            raise _Boom("crash after failure record, before terminal")
+        return real_complete(self, command_id=command_id, outcome=outcome, result=result)
+
+    monkeypatch.setattr(Substrate, "complete_command", flaky)
+    with pytest.raises(_Boom):
+        _drive(tmp_path, run, executions=per)  # base runs, candidate denied -> fail -> crash
+    monkeypatch.undo()
+
+    calls = {"n": 0}
+    real_attempt = kernel._run_attempt
+
+    def counting(*a: object, **k: object) -> object:
+        calls["n"] += 1
+        return real_attempt(*a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(kernel, "_run_attempt", counting)
+    _drive(tmp_path, run, executions=per)  # resume: reconcile the recorded failure
+    assert calls["n"] == 0  # the operation is NEVER re-run
+    sub = Substrate.discover(tmp_path, run)
+    fork_terminal = next(
+        t for cid, t in sub.verify().completed.items() if cid.endswith(":fork")
+    )
+    assert fork_terminal.outcome == "failed"
+
+
+def test_same_process_indeterminate_reserves_all_dimensions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An indeterminate dispatch reserves executions AND wall AND output
+    IMMEDIATELY in the current process (the live budget equals the durable
+    ledger after every command)."""
+    from strive.sandboxes import SandboxLimits
+
+    def boom(services: object, cid: str, label: str, state: object, state_ref: str) -> object:
+        raise IndeterminateEffect("dispatched; result unknown")
+
+    monkeypatch.setattr(kernel, "_run_attempt", boom)
+    run = new_run_id()
+    report = _drive(tmp_path, run)
+    n = len(TASK.selection_cases())
+    cap = SandboxLimits()
+    assert report.usage.executions >= n  # type: ignore[attr-defined]
+    assert report.usage.output_bytes >= n * cap.output_bytes  # type: ignore[attr-defined]
+    assert report.usage.wall_time_s >= n * cap.wall_time_s  # type: ignore[attr-defined]
+
+
+def test_backend_failure_evidence_is_preserved(tmp_path: Path) -> None:
+    """A completed evaluation whose candidate ERRORS per-case is preserved with
+    full evidence (report + evaluation refs) and is NOT an infra failure — the
+    two are distinguished, neither collapsed to only an aggregate score."""
+    from strive.contracts import Evaluation, ExecutionReport
+    from strive.runtime import AttemptRecord, FORK_RESULT
+    from strive.substrate import ObservationRecorded
+
+    run = new_run_id()
+    erroring = (
+        "def solve(input_text: str) -> int:\n    raise ValueError('candidate boom')\n"
+    )
+    cfg = mc.ManualChangeConfig(
+        summary="an erroring candidate", target_prompt="err proposal template",
+        target_strategy=erroring,
+    )
+    services = KernelServices.open(tmp_path, TASK, run, seed=7, budget=BudgetSpec(executions=128))
+    objects = services.substrate.objects
+    run_policy(
+        services, default_catalog(), "manual-change@1", cfg,
+        prompt_refs=mc.prompt_refs(objects),
+        seed_state=mc.seed_state(objects, code=_BASELINE, prompt="base proposal template"),
+        run_metadata={},
+    )
+    sub = Substrate.discover(tmp_path, run)
+    view = sub.verify()
+    attempts: dict[str, AttemptRecord] = {}
+    for env, body in zip(view.envelopes, view.bodies):
+        if isinstance(body, ObservationRecorded) and body.observation_kind == FORK_RESULT:
+            rec = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
+            attempts[rec.label] = rec
+    candidate = attempts["candidate"]
+    # a COMPLETED evaluation (candidate errors are scored), NOT an infra failure
+    assert candidate.ok is True and candidate.failure is None
+    report = codec.loads(sub.objects.get_text(candidate.report_ref), ExecutionReport)
+    evaluation = codec.loads(sub.objects.get_text(candidate.evaluation_ref), Evaluation)
+    assert report.outcomes and all(o.error for o in report.outcomes)  # per-case errors kept
+    assert evaluation.case_evaluations and all(
+        not ce.passed for ce in evaluation.case_evaluations
+    )
+    # the base attempt's evidence is DISTINCT (clean run, no per-case exceptions)
+    base = attempts["base"]
+    base_report = codec.loads(sub.objects.get_text(base.report_ref), ExecutionReport)
+    assert any(o.error is None for o in base_report.outcomes)

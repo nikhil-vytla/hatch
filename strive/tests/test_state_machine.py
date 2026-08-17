@@ -14,7 +14,8 @@ import pytest
 
 from strive import kernel
 from strive.cas import hash_text
-from strive.contracts import BudgetSpec, BudgetUsage
+from strive.contracts import BudgetSpec, BudgetUsage, ExecutionReport
+from strive.evaluate import evaluate
 from strive.events import now_iso
 from strive.kernel import KernelServices, run_policy
 from strive.policies import manual_change as mc
@@ -75,8 +76,14 @@ def _bound(root: Path, run: str, *, required: tuple[str, ...] = ()) -> Substrate
 
 
 def _issue(sub: Substrate, cid: str, kind: str, change: CompositeChange | None = None) -> None:
-    change_ref = sub.put(change) if change is not None else None
-    ref = sub.put(CommandPayload(cid, kind, ENCODING, change_ref, "{}"))
+    issue = sub.verify().state_ref if kind == "EvaluateFork" else None
+    ref = sub.put(CommandPayload(
+        command_id=cid, kind=kind, encoding=ENCODING,
+        change_ref=sub.put(change) if change is not None else None,
+        target_change_id=change.change_id if change is not None else None,
+        expected_state_ref=None, issue_state_ref=issue, prompt_role=None,
+        context_ref=None, after_seconds=None, reason=None, json="{}",
+    ))
     sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
 
 
@@ -136,13 +143,28 @@ def _fork_setup(sub: Substrate) -> tuple[CompositeChange, str, str]:
     return candidate, base_ref, candidate_ref
 
 
-def _attempt(cid: str, label: str, state_ref: str, *, usage: BudgetUsage | None = None,
+def _attempt(sub: Substrate, cid: str, label: str, state_ref: str, *,
+             overall: float = 1.0, usage: BudgetUsage | None = None,
              caps: tuple[str, ...] = ()) -> AttemptRecord:
+    report = ExecutionReport(ok=True, generation_id="fork", outcomes=())
+    evaluation = evaluate(TASK, report, TASK.selection_cases())
     return AttemptRecord(
-        command_id=cid, label=label, state_ref=state_ref, overall=1.0, ok=True,
+        command_id=cid, label=label, state_ref=state_ref, overall=overall, ok=True,
         provenance=_prov(caps), failure=None, denials=(),
         usage=usage or BudgetUsage(executions=1),
+        report_ref=sub.put(report), evaluation_ref=sub.put(evaluation),
     )
+
+
+def _issue_target(sub: Substrate, cid: str, kind: str, target: str) -> None:
+    """Issue a command whose NAMED target differs from what an effect will
+    later claim — to attack the target-binding checks."""
+    ref = sub.put(CommandPayload(
+        command_id=cid, kind=kind, encoding=ENCODING, change_ref=None,
+        target_change_id=target, expected_state_ref=None, issue_state_ref=None,
+        prompt_role=None, context_ref=None, after_seconds=None, reason=None, json="{}",
+    ))
+    sub.issue_command(command_id=cid, command_kind=kind, command_ref=ref)
 
 
 # -- command grammar --------------------------------------------------------------------------------
@@ -180,11 +202,11 @@ def test_failed_with_success_effect_refused(tmp_path: Path) -> None:
     cand, base_ref, cand_ref = _fork_setup(sub)  # EvaluateFork k + proposed candidate
     # a fork SUMMARY (a success token) under a FAILED terminal is contradictory
     summary = ForkObservation(
-        "cand", _attempt("k", "base", base_ref), _attempt("k", "candidate", cand_ref),
+        "cand", _attempt(sub, "k", "base", base_ref), _attempt(sub, "k", "candidate", cand_ref),
         improved=False, detail="",
     )
     _forge_obs(sub, FORK_SUMMARY, summary, cand_ref, "k")
-    _forge(sub, OperationFailed("k", "EvaluateFork", "boom"), "k")
+    _forge(sub, OperationFailed("k", "EvaluateFork", "boom", "failed"), "k")
     result = StoredResult("k", "EvaluateFork", "failed", "0:x", "", None, None, {}, BudgetUsage())
     _forge(sub, PolicyCommandCompleted("k", "failed", sub.put(result)), "k")
     assert any("has a success effect" in e for e in _errors(sub))
@@ -219,7 +241,7 @@ def test_duplicate_checkpoint_of_one_command_refused(tmp_path: Path) -> None:
 def test_result_before_dispatch_refused(tmp_path: Path) -> None:
     sub = _bound(tmp_path, new_run_id())
     _, base_ref, _ = _fork_setup(sub)
-    _forge_obs(sub, FORK_RESULT, _attempt("k", "base", base_ref), base_ref, "k")  # no dispatch
+    _forge_obs(sub, FORK_RESULT, _attempt(sub, "k", "base", base_ref), base_ref, "k")  # no dispatch
     assert any("result without a dispatch" in e for e in _errors(sub))
 
 
@@ -246,21 +268,21 @@ def test_result_mismatched_to_dispatch_refused(tmp_path: Path) -> None:
     _, base_ref, cand_ref = _fork_setup(sub)
     _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "base", base_ref, 1, 1.0, 1), base_ref, "k")
     # result for the same label but a DIFFERENT state ref
-    _forge_obs(sub, FORK_RESULT, _attempt("k", "base", cand_ref), cand_ref, "k")
+    _forge_obs(sub, FORK_RESULT, _attempt(sub, "k", "base", cand_ref), cand_ref, "k")
     assert any("does not match its dispatch" in e for e in _errors(sub))
 
 
 def test_forged_summary_disagreeing_with_results_refused(tmp_path: Path) -> None:
     sub = _bound(tmp_path, new_run_id())
     cand, base_ref, cand_ref = _fork_setup(sub)
-    base = _attempt("k", "base", base_ref)
-    candidate = _attempt("k", "candidate", cand_ref)
+    base = _attempt(sub, "k", "base", base_ref)
+    candidate = _attempt(sub, "k", "candidate", cand_ref)
     _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "base", base_ref, 1, 1.0, 1), base_ref, "k")
     _forge_obs(sub, FORK_RESULT, base, base_ref, "k")
     _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "candidate", cand_ref, 1, 1.0, 1), cand_ref, "k")
     _forge_obs(sub, FORK_RESULT, candidate, cand_ref, "k")
     # a summary whose base record disagrees with the durable base result
-    forged_base = _attempt("k", "base", base_ref, usage=BudgetUsage(executions=999))
+    forged_base = _attempt(sub, "k", "base", base_ref, usage=BudgetUsage(executions=999))
     summary = ForkObservation("cand", forged_base, candidate, improved=False, detail="")
     _forge_obs(sub, FORK_SUMMARY, summary, cand_ref, "k")
     assert any("summary base != the durable base result" in e for e in _errors(sub))
@@ -279,7 +301,7 @@ def test_weaker_than_required_provenance_refused(tmp_path: Path) -> None:
     _, base_ref, _ = _fork_setup(sub)
     _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "base", base_ref, 1, 1.0, 1), base_ref, "k")
     # a result whose provenance does NOT enforce the run's required capability
-    _forge_obs(sub, FORK_RESULT, _attempt("k", "base", base_ref, caps=()), base_ref, "k")
+    _forge_obs(sub, FORK_RESULT, _attempt(sub, "k", "base", base_ref, caps=()), base_ref, "k")
     assert any("lacks required capabilities" in e for e in _errors(sub))
 
 
@@ -292,7 +314,7 @@ def test_negative_or_nonfinite_usage_refused(tmp_path: Path, bad: BudgetUsage) -
     sub = _bound(tmp_path, new_run_id())
     _, base_ref, _ = _fork_setup(sub)
     _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "base", base_ref, 1, 1.0, 1), base_ref, "k")
-    _forge_obs(sub, FORK_RESULT, _attempt("k", "base", base_ref, usage=bad), base_ref, "k")
+    _forge_obs(sub, FORK_RESULT, _attempt(sub, "k", "base", base_ref, usage=bad), base_ref, "k")
     errs = _errors(sub)
     assert any("is negative" in e or "is not finite" in e for e in errs)
 
@@ -391,3 +413,107 @@ def test_selection_drift_rejected_on_resume(tmp_path: Path) -> None:
             seed_state=mc.seed_state(o2, code=_BASELINE, prompt="base proposal template"),
             run_metadata={},
         )
+
+
+# -- intent-to-effect binding (this pass) -----------------------------------------------------------
+
+
+def test_confirm_target_mismatch_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    _fork_setup(sub)  # proposes "cand"
+    _issue_target(sub, "kc", "ConfirmChange", "wrong")  # names a DIFFERENT target
+    with pytest.raises(SubstrateError, match="confirm targets"):
+        sub.confirm_change(change_id="cand", rationale="r", caused_by="kc")
+
+
+def test_revert_target_mismatch_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    v = sub.verify()
+    seed = v.seed_state.as_map()
+    code_after = hash_text("def solve(input_text: str) -> int:\n    return 3\n")
+    change = CompositeChange(
+        "c1", (SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after),), "x"
+    )
+    _issue(sub, "a", "ApplyChange", change)
+    sub.record_proposal(change=change, strategy_ref="t", caused_by="a")
+    sub.stage_change_closure(change, {code_after: "def solve(input_text: str) -> int:\n    return 3\n"})
+    sub.apply(change=change, caused_by="a")
+    _issue_target(sub, "r", "RevertChange", "wrong")  # names a DIFFERENT target
+    with pytest.raises(SubstrateError, match="revert targets"):
+        sub.revert(change_id="c1", caused_by="r")
+
+
+def test_apply_expected_state_mismatch_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    v = sub.verify()
+    seed = v.seed_state.as_map()
+    code_after = hash_text("def solve(input_text: str) -> int:\n    return 4\n")
+    change = CompositeChange(
+        "c1", (SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after),), "x"
+    )
+    # issue with a WRONG expected_state_ref pinned into the durable intent
+    ref = sub.put(CommandPayload(
+        command_id="a", kind="ApplyChange", encoding=ENCODING,
+        change_ref=sub.put(change), target_change_id="c1",
+        expected_state_ref="0" * 64, issue_state_ref=None, prompt_role=None,
+        context_ref=None, after_seconds=None, reason=None, json="{}",
+    ))
+    sub.issue_command(command_id="a", command_kind="ApplyChange", command_ref=ref)
+    sub.record_proposal(change=change, strategy_ref="t", caused_by="a")
+    sub.stage_change_closure(change, {code_after: "def solve(input_text: str) -> int:\n    return 4\n"})
+    with pytest.raises(SubstrateError, match="does not satisfy the issued expected_state_ref"):
+        sub.apply(change=change, caused_by="a")  # before-state != issued expected
+
+
+def test_unrelated_fork_state_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    _fork_setup(sub)  # issue_state_ref anchors base to the seed
+    unrelated = sub.put_state(canonical_state({}))  # a state NOT the issued base
+    _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "base", unrelated, 1, 1.0, 1), unrelated, "k")
+    assert any("is not the issued base/candidate state" in e for e in _errors(sub))
+
+
+def test_forged_improved_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    cand, base_ref, cand_ref = _fork_setup(sub)
+    base = _attempt(sub, "k", "base", base_ref, overall=0.0)
+    candidate = _attempt(sub, "k", "candidate", cand_ref, overall=1.0)  # actually improved
+    _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "base", base_ref, 1, 1.0, 1), base_ref, "k")
+    _forge_obs(sub, FORK_RESULT, base, base_ref, "k")
+    _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "candidate", cand_ref, 1, 1.0, 1), cand_ref, "k")
+    _forge_obs(sub, FORK_RESULT, candidate, cand_ref, "k")
+    summary = ForkObservation("cand", base, candidate, improved=False, detail="")  # LIE
+    _forge_obs(sub, FORK_SUMMARY, summary, cand_ref, "k")
+    assert any("`improved` disagrees" in e for e in _errors(sub))
+
+
+def test_summary_subject_mismatch_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    cand, base_ref, cand_ref = _fork_setup(sub)
+    base = _attempt(sub, "k", "base", base_ref)
+    candidate = _attempt(sub, "k", "candidate", cand_ref)
+    _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "base", base_ref, 1, 1.0, 1), base_ref, "k")
+    _forge_obs(sub, FORK_RESULT, base, base_ref, "k")
+    _forge_obs(sub, FORK_DISPATCH, AttemptDispatched("k", "candidate", cand_ref, 1, 1.0, 1), cand_ref, "k")
+    _forge_obs(sub, FORK_RESULT, candidate, cand_ref, "k")
+    summary = ForkObservation("cand", base, candidate, improved=False, detail="")
+    _forge_obs(sub, FORK_SUMMARY, summary, base_ref, "k")  # subject != candidate state
+    assert any("summary subject is not the candidate state" in e for e in _errors(sub))
+
+
+def test_failed_terminal_without_stored_result_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    _issue(sub, "k", "StopAdaptation")
+    from strive.substrate import OperationFailed
+
+    _forge(sub, OperationFailed("k", "StopAdaptation", "boom", "failed"), "k")
+    _forge(sub, PolicyCommandCompleted("k", "failed", None), "k")  # NULL result
+    assert any("terminal has no StoredResult" in e for e in _errors(sub))
+
+
+def test_forged_stored_head_refused(tmp_path: Path) -> None:
+    sub = _bound(tmp_path, new_run_id())
+    _issue(sub, "k", "StopAdaptation")
+    result = StoredResult("k", "StopAdaptation", "ok", "9:deadbeef", "", None, None, {}, BudgetUsage())
+    _forge(sub, PolicyCommandCompleted("k", "ok", sub.put(result)), "k")
+    assert any("!= the pre-terminal semantic head" in e for e in _errors(sub))
