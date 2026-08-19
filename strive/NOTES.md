@@ -1736,3 +1736,54 @@ malformed output, adapter error, exhausted model budget (no effect), open
 dispatch -> indeterminate (not re-run), unavailable secure backend, NaN
 uncertainty, and crash-and-resume after every command boundary. Real-model runs
 are opt-in. pytest 257, mypy 43 files, wheel smoke retained.
+
+## 2026-08-19 — Phase B correction (PR #51): truly-continual, secure, bounded
+
+Corrected PR #51 across five areas; preserved Phase A, policy neutrality,
+immediate model-led adaptation, and OPTIONAL EvaluateFork. No Pareto, no gate.
+
+1. Truly continual loop. New `ObserveCurrentState` command runs the ACTIVE
+   harness once through `CandidateExecutor` and journals a typed state-scoped
+   AttemptRecord (OBSERVE_RESULT) — feedback, not a gate; reconciled into the
+   budget ledger and evidence-bound like a fork attempt (gen_prefix "observe").
+   Policy alternates warm-up/operate → refine → immediate apply → post-change
+   observation window → review → next cycle (max_cycles); strict TOML for
+   trigger_mode/warmup/review_window/max_cycles; dead `change_id_prefix`
+   removed. Contexts are built from REAL observations (scores + the exact
+   failing cases), prior rationale/citations/expected-outcomes, changes, usage,
+   and failures.
+
+2. Full review. keep→ConfirmChange, revert→exact rollback, defer→gather more +
+   re-review (defer-scoped review id, capped, never terminates), revise→new
+   atomic change with lineage in the annotation. Durable RequestRefinement
+   constraints (required_change_id, edit_limit, enabled_surfaces, edit_rule)
+   are enforced in `decode_proposal` as failure-as-data; role-specific edits
+   (refine requires edits; keep/revert/defer none; revise edits).
+
+3. Exact + bounded model effects. A `ModelBinding` event pins
+   adapter/model/config_digest; resume refuses to switch models after issue.
+   Model lifecycle verification parallel to forks: issue-state subject,
+   control+active-template+context → exact prompt ref, binding→dispatch→result
+   ordering + adapter/model agreement, finite usage, known finish reason, and
+   proposal == strict decode of the response under the issued constraints. Open
+   dispatches reserve input+output tokens, wall, AND estimated cost; a finite
+   cost budget with a non-reporting/non-estimating adapter fails closed.
+   `config.model_role` wired.
+
+4. Boundaries restored. `RunView.objects` (ObjectStore) → a mechanically
+   read-only `ContentReader` (cas.ReadOnlyContent). Proposals decode against
+   RUN-PINNED descriptors + policy-enabled surfaces, not the live catalog.
+   `PolicyDescriptor.requires_secure_execution` + a kernel guard: production
+   continual-refine@1 refuses an insecure backend (only a test-only
+   `allow_insecure_execution` opt-in permits fault-only); the CLI defaults it to
+   a secure backend + trusted=False + secure caps and seeds a behavioral
+   (non-fix-revealing) prompt.
+
+5. E2E. The seed prompt hides the fix; the harness is operated weak first
+   (negative failures recorded), the refiner cites them, and behavior is
+   operated again after apply to prove the change. Covers two cycles,
+   manual/cadence, all four verdicts, restart at every command boundary,
+   model-binding drift (fail closed), decode-constraint rejections, edit-limit
+   failure-as-data, cost-fail-closed, insecure-backend rejection, and the
+   optional-fork-is-observation invariant. 265 tests, mypy clean over 43 files,
+   fresh-interpreter + installed-wheel smoke retained.

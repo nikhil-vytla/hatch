@@ -310,14 +310,44 @@ promotion gate.
   one in-flight command (terminal+checkpoint before the next issue) is enforced
   at the kernel boundary; canonical JSON rejects NaN/Infinity; every declared
   dependency is imported before hashing.
+
+### Phase B correction pass (truly-continual, secure, honestly-bounded)
+
+- **A truly continual loop.** A policy-neutral `ObserveCurrentState` command
+  operates the ACTIVE harness through the executor and journals a typed
+  state-scoped observation (report/evaluation/usage) — feedback, not a gate. The
+  policy alternates warm-up/operate → refine → immediate apply → post-change
+  observation window → review → next cycle (`max_cycles`); its contexts are
+  built from REAL observations (scores + the exact failing cases), prior
+  rationale/citations/expected outcomes, changes, usage, and failures.
+- **Full review.** `keep`→`ConfirmChange`, `revert`→exact rollback,
+  `defer`→gather more and re-review (never terminates), `revise`→a new atomic
+  change with lineage. Durable `RequestRefinement` constraints
+  (required change id, edit limit, enabled/run-pinned surfaces, role edit rule)
+  are enforced at decode as failure-as-data.
+- **Exact + bounded model effects.** A `ModelBinding` event pins
+  adapter/model/config digest; resume refuses to switch models after issue.
+  Model lifecycle verification parallels forks (issue-state subject;
+  control+active-template+context → exact prompt ref; binding→dispatch→result
+  ordering + adapter/model agreement; finite usage; known finish reason;
+  proposal == strict decode of the response under the issued constraints). Open
+  dispatches reserve input+output tokens, wall, and estimated cost; a finite
+  cost budget against a non-reporting/non-estimating adapter fails closed.
+- **Boundaries restored.** `RunView` hands the policy a mechanically read-only
+  `ContentReader` (never an `ObjectStore`); proposals decode against run-pinned
+  descriptors + policy-enabled surfaces, not the live catalog; production
+  `continual-refine@1` requires a secure backend (`trusted=False`) and refuses
+  fault-only unless a test-only opt-in is set.
 - **Proof.** `test_continual_refine` drives the E2E with a deterministic fake
-  model through the exact production adapter path (real-model runs opt-in via
-  `STRIVE_MODEL_*`): seed `\d+` weakness → coupled proposal → immediate apply →
-  negatives sum correctly → restart with no duplicate call → review keep/revert
-  → exact rollback, an ablation proving the active prompt causally determines
-  the proposal, and an adversarial battery (malformed/failing model, exhausted
-  budget, indeterminate dispatch, unavailable secure backend, crash at every
-  boundary). `uv run pytest` = 257; `uv run mypy` clean over 43 files.
+  through the exact production adapter path (real-model opt-in via
+  `STRIVE_MODEL_*`): the seed prompt hides the fix, the weak harness is operated
+  first (negative failures recorded), the refiner cites them, apply is immediate,
+  and the harness is operated again to prove changed behavior before a review.
+  Covers two cycles, manual/cadence, all four verdicts, restart at every command
+  boundary, model-binding drift, decode-constraint rejections, edit-limit
+  failure-as-data, cost-fail-closed, insecure-backend rejection, and the
+  optional-fork-is-observation invariant. `uv run pytest` = 265; `uv run mypy`
+  clean over 43 files; fresh-interpreter + installed-wheel smoke retained.
 
 ### Next
 
