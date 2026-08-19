@@ -1184,14 +1184,26 @@ def _policy_digest(
     source of every explicitly-declared `dependency_modules` (strategy/helper
     modules the policy relies on OUTSIDE its own module). A change to any part
     of the manifest shifts the digest and is detected on resume."""
+    import importlib
     import sys
 
     cls = type(policy)
 
     def _module_source(name: str) -> str:
+        # IMPORT every declared dependency before hashing, so its digest is the
+        # real source — never a fallback to the bare name because it happened
+        # not to be imported yet (which would blind resume to a dep change).
         module = sys.modules.get(name)
+        if module is None:
+            try:
+                module = importlib.import_module(name)
+            except ImportError as exc:
+                raise KernelError(
+                    f"declared policy dependency module {name!r} cannot be "
+                    f"imported for hashing: {exc}"
+                ) from None
         try:
-            return inspect.getsource(module) if module is not None else name
+            return inspect.getsource(module)
         except (OSError, TypeError):
             return name
 

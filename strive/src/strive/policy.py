@@ -292,9 +292,10 @@ def conformance_violations(descriptor: PolicyDescriptor) -> list[str]:
 
 
 def default_catalog() -> PolicyCatalog:
+    from strive.policies.continual_refine import DESCRIPTOR as CONTINUAL_REFINE
     from strive.policies.manual_change import DESCRIPTOR as MANUAL_CHANGE
 
-    return PolicyCatalog([MANUAL_CHANGE])
+    return PolicyCatalog([MANUAL_CHANGE, CONTINUAL_REFINE])
 
 
 __all__ = [
