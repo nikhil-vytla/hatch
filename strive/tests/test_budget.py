@@ -1,13 +1,9 @@
 """Trusted budget enforcement: every enforced limit is tested; zero-limit
 semantics are defined (0 = nothing allowed, -1 = accounting only)."""
 
-from pathlib import Path
 
 from strive.budget import UNLIMITED, BudgetMeter
 from strive.contracts import FAILURE_BUDGET_EXHAUSTED, BudgetSpec
-from strive.loop import LoopConfig, run_cycle
-from strive.store import Store
-from strive.tasks import SUM_INTEGERS_TASK
 
 
 def test_meter_denies_beyond_execution_ceiling() -> None:
@@ -88,33 +84,32 @@ def test_recursion_depth_zero_denies_any_delegation() -> None:
     assert meter.enter_recursion(0) is None
 
 
-def test_cycle_with_execution_budget_one_rejects_candidate_as_data(tmp_path: Path) -> None:
-    """One execution allowed: the baseline runs, the candidate validation is
-    denied by the trusted meter and recorded as a rejection — no exception."""
-    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
-    config = LoopConfig(budget=BudgetSpec(executions=1))
-    report = run_cycle(store, SUM_INTEGERS_TASK, config)
-
-    assert report.diagnosis is not None  # baseline ran and was diagnosed
-    assert report.candidate_evaluation is not None
-    assert report.candidate_evaluation.failure is not None
-    assert report.candidate_evaluation.failure.kind == FAILURE_BUDGET_EXHAUSTED
-    assert report.decision is not None and not report.decision.accepted
-    assert "budget" in report.decision.reason
-
-    # the rejected candidate is still retained with its decision
-    active = store.active_generation()
-    assert active is not None and active.generation_id == report.generation_before
+# -- durable/cumulative semantics (final semantic-atomicity pass) -----------------------------------
 
 
-def test_cycle_with_zero_wall_budget_records_floor_evaluation(tmp_path: Path) -> None:
-    store = Store(tmp_path / "artifacts", SUM_INTEGERS_TASK.task_id)
-    config = LoopConfig(budget=BudgetSpec(wall_time_s=0.0))
-    report = run_cycle(store, SUM_INTEGERS_TASK, config)
+def test_output_cap_is_cumulative_across_cases() -> None:
+    """The per-execution output cap is the REMAINING cumulative allowance, so
+    successive cases cannot each spend the full cap independently."""
+    meter = BudgetMeter(BudgetSpec(executions=UNLIMITED, output_bytes=100))
+    assert meter.execution_output_cap() == 100
+    meter.note_output_bytes(40)
+    assert meter.execution_output_cap() == 60  # decremented cumulatively
+    meter.note_output_bytes(60)
+    assert meter.execution_output_cap() == 1  # floored, never negative
+    # cumulative output at/over the ceiling denies the next execution
+    denial = meter.request_execution()
+    assert denial is not None and "output" in denial.detail
 
-    assert report.evaluation.failure is not None
-    assert report.evaluation.failure.kind == FAILURE_BUDGET_EXHAUSTED
-    assert report.evaluation.overall_score == 0.0
-    assert report.diagnosis is None  # nothing passed, diagnosis abstains
-    # the cycle was journaled with its usage despite total exhaustion
-    assert store.cycles()[-1].usage.executions == 0
+
+def test_durable_wall_is_cumulative_across_restarts() -> None:
+    """Absorbing prior usage resumes wall time as cumulative ACTIVE time, so a
+    run cannot buy unbounded wall by restarting."""
+    from strive.contracts import BudgetUsage
+
+    meter = BudgetMeter(BudgetSpec(wall_time_s=10.0, executions=UNLIMITED))
+    assert meter.remaining_wall_s() > 9.0
+    meter.absorb(BudgetUsage(wall_time_s=10.05))  # prior process's active time
+    assert meter.remaining_wall_s() < 0.1
+    # wall is exhausted: the next execution is denied on wall-time
+    denial = meter.request_execution()
+    assert denial is not None and "wall" in denial.detail

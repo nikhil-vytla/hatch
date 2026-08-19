@@ -1,10 +1,19 @@
-"""Command-line interface.
+"""The vNext command-line interface (`uv run strive`).
 
-Commands: run, status, inspect, compare, lineage, replay, promote, rollback,
-history, resume. Every command supports ``--json`` for a machine-readable
-envelope ``{"ok": bool, "command": str, "data"| "error": ...}``; store-level
-failures (corrupt ledgers, unknown ids, refused promotions) exit 1 with a
-clean diagnostic — never a traceback.
+Minimal, run-scoped operator surface over the substrate + kernel:
+
+    strive run       — bind/resume a manual-change@1 run and drive it
+    strive runs      — list runs under an artifact root
+    strive status    — the verified view: policy, head, ok/errors, budget
+    strive view      — the current composite HarnessState (surfaces + refs)
+    strive history   — the ordered event stream (id, kind, causation, time)
+    strive inspect   — decode one event body (or CAS object) as JSON
+    strive revert    — revert an applied change exactly (operator action)
+    strive repair    — quarantine + truncate an unverifiable journal tail
+    strive sandbox   — report sandbox backends and enforced capabilities
+
+Every command is `--json`-able. There is no promotion gate, no migration,
+and no legacy mode.
 """
 
 from __future__ import annotations
@@ -15,1374 +24,255 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from strive import codec, lifecycle
-from strive.cas import ObjectCorruption, ObjectMissing
-from strive.contracts import (
-    Activation,
-    BudgetSpec,
-    CycleRecord,
-    Generation,
-    Intervention,
-    INTERVENTION_RESUME,
+from strive import codec
+from strive.cas import InvalidRef, ObjectCorruption, ObjectMissing
+from strive.contracts import BudgetSpec
+from strive.kernel import KernelError, KernelServices, operator_revert, run_policy
+from strive.policy import default_catalog
+from strive.policies import manual_change as mc
+from strive.sandboxes import SandboxError
+from strive.substrate import Substrate, SubstrateError, new_run_id
+from strive.surfaces import SurfaceValidationError
+from strive.tasks import TASKS
+
+_BASELINE_PROMPT = (
+    "Return ONLY a JSON object with keys `summary` and `source` describing the "
+    "revised solve() strategy."
 )
-from strive.diagnose import EvidenceDiagnoser
-from strive.events import EventLog, now_iso
-from strive.fakemodel import scripted_fixture_adapter
-from strive.loop import (
-    LoopConfig,
-    audit_generation,
-    compare_generations,
-    ensure_seeded,
-    promote_generation,
-    replay_run,
-    rollback_generation,
-    run_cycle,
-)
-from strive.dualwrite import (
-    MirrorError,
-    ParityError,
-    parity_status,
-    rebuild_mirror,
-    run_backfill_operation,
-)
-from strive.reader import (
-    MODE_CANARY,
-    MODE_NATIVE,
-    MODE_SHADOW,
-    ReaderError,
-    StateReader,
-    clear_breaker,
-    cutover_eligibility,
-    enable_canary,
-    force_native,
-    kill_switch,
-    lift_force_native,
-    quarantine_reader_journal,
-    read_coverage,
-    reader_state,
-    set_mode,
-    verify_revision_snapshot,
-)
-from strive.migrate import migrate_legacy_ledger
-from strive.migrations import apply_pending, pending_migrations
-from strive.revisions import delta_label
-from strive.model import ModelConfigError, adapter_from_env
-from strive.model_proposer import ModelProposer
-from strive.store import Store, StoreError
-from strive.tasks import SUM_INTEGERS_TASK, TASKS, Task
 
 
 class CliError(Exception):
-    """User-facing CLI failure with a clean message."""
+    """A user-facing CLI error (clean message, no traceback)."""
 
 
-def _emit(as_json: bool, command: str, data: dict[str, Any], human: str) -> None:
-    if as_json:
-        print(json.dumps({"ok": True, "command": command, "data": data}, sort_keys=True))
-    else:
-        print(human, end="" if human.endswith("\n") else "\n")
+def _latest_run(root: Path) -> str:
+    runs = Substrate.list_runs(root)
+    if not runs:
+        raise CliError(f"no runs under {root}; start one with `strive run`")
+    return runs[-1]
 
 
-def _task(name: str) -> Task:
-    if name not in TASKS:
-        raise CliError(f"unknown task {name!r}; known: {sorted(TASKS)}")
-    return TASKS[name]
+def _resolve_run(root: Path, run: str | None) -> str:
+    return run if run else _latest_run(root)
 
 
-def _generation_data(store: Store, generation: Generation) -> dict[str, Any]:
-    data = codec.encode(generation)
-    data["active"] = (
-        store.active_generation() is not None
-        and store.active_generation().generation_id == generation.generation_id  # type: ignore[union-attr]
-    )
-    return data
-
-
-def _cmd_run(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    from strive.loop import _backend_is_secure
-
-    backend = args.sandbox_backend
-    if args.proposer == "model":
-        adapter = adapter_from_env()
-        if adapter is not None:
-            if not args.unsafe_model_code:
-                raise CliError(
-                    "a real model provider is configured "
-                    "(STRIVE_MODEL_PROVIDER); real-model-generated executable "
-                    "code runs untrusted. Re-run with --unsafe-model-code to "
-                    "acknowledge, or unset STRIVE_MODEL_PROVIDER to use the "
-                    "offline scripted fixture."
-                )
-            if not _backend_is_secure(backend):
-                raise CliError(
-                    f"real model-authored code requires a SECURE sandbox "
-                    f"backend; {backend!r} is not secure. Pass "
-                    "--sandbox-backend deno-pyodide@1 (see `strive sandbox`)."
-                )
-            adapter_note = (
-                f"real (env-configured; --unsafe-model-code acknowledged; "
-                f"contained by {backend})"
-            )
-            unsafe = True
-        else:
-            adapter = scripted_fixture_adapter()
-            adapter_note = (
-                "scripted fixture (offline; proves the pipeline, not model "
-                "capability — set STRIVE_MODEL_PROVIDER for a real model)"
-            )
-            unsafe = False
-        config = LoopConfig(
-            sandbox_timeout_s=args.timeout,
-            proposer=ModelProposer(),
-            diagnoser=EvidenceDiagnoser(),
-            model_adapter=adapter,
-            budget=BudgetSpec(model_calls=4),
-            acknowledge_task_drift=args.acknowledge_task_drift,
-            unsafe_model_code=unsafe,
-            sandbox_backend=backend,
-        )
-    else:
-        adapter_note = None
-        config = LoopConfig(
-            sandbox_timeout_s=args.timeout,
-            acknowledge_task_drift=args.acknowledge_task_drift,
-            sandbox_backend=backend,
-        )
-    report = run_cycle(store, task, config)
-    data: dict[str, Any] = {
-        "run_id": report.run_id,
-        "proposer": args.proposer,
-        "model_adapter": adapter_note,
-        "generation_before": report.generation_before,
-        "generation_after": report.generation_after,
-        "frozen": report.frozen,
-        "overall_score": report.evaluation.overall_score,
-        "split_scores": report.evaluation.split_scores,
-        "feedback": report.evaluation.feedback,
-        "weakness_id": report.diagnosis.weakness_id if report.diagnosis else None,
-        "proposal": codec.encode(report.proposal) if report.proposal else None,
-        "proposal_failure": (
-            codec.encode(report.proposal_failure) if report.proposal_failure else None
-        ),
-        "decision": codec.encode(report.decision) if report.decision else None,
-        "diagnostics": list(store.diagnostics),
-    }
-    lines = [
-        f"run:      {report.run_id}",
-        f"proposer: {args.proposer}"
-        + (f" — model adapter: {adapter_note}" if adapter_note else ""),
-        f"active:   {report.generation_before} -> {report.generation_after}",
-        f"score:    {report.evaluation.overall_score:.3f} "
-        + " ".join(f"{k}={v:.3f}" for k, v in sorted(report.evaluation.split_scores.items())),
-    ]
-    if report.frozen:
-        lines.append("frozen:   adaptation is frozen (see `strive resume`)")
-    if report.diagnosis:
-        lines.append(f"weakness: {report.diagnosis.weakness_id}")
-    if report.proposal:
-        lines.append(f"proposal: {report.proposal.summary}")
-    if report.proposal_failure:
-        lines.append(
-            f"proposal: rejected [{report.proposal_failure.kind}] "
-            f"— {report.proposal_failure.detail}"
-        )
-    if report.decision:
-        verdict = "ACCEPTED" if report.decision.accepted else "REJECTED"
-        lines.append(
-            f"decision: {verdict} [{report.decision.policy}@{report.decision.policy_version}] "
-            f"— {report.decision.reason}"
-        )
-    elif not report.frozen and report.diagnosis is None:
-        lines.append("decision: no weakness detected; nothing proposed")
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_status(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    ensure_seeded(store, task)
-    # the status/restart read, routed through the read boundary; the output
-    # itself derives from the reader's coherent capture
-    from strive.store import derive_active_activation, derive_adaptation_frozen
-
-    reader = StateReader(store, "status")
+def _cmd_run(args: argparse.Namespace) -> dict[str, Any]:
+    task = TASKS.get(args.task)
+    if task is None:
+        raise CliError(f"unknown task {args.task!r}; known: {sorted(TASKS)}")
+    run_id = args.run or new_run_id()
+    trusted = args.backend == "process-fault-only@1"
     try:
-        active = reader.read_active("status-active")
-        activation = derive_active_activation(reader.ledger_entries())
-        frozen = derive_adaptation_frozen(reader.ledger_entries())
-        reader.add_fact("restart")  # a fresh process's first state read
-    finally:
-        reader.finish(None)
-    assert active is not None and activation is not None
-    data = {
-        "active_generation": codec.encode(active),
-        "activation": codec.encode(activation),
-        "frozen": codec.encode(frozen) if frozen else None,
-        "diagnostics": list(store.diagnostics),
-    }
-    lines = [
-        f"active generation: {active.generation_id} (origin={active.origin}, "
-        f"mode={activation.mode})",
-    ]
-    if frozen:
-        lines.append(f"ADAPTATION FROZEN: {frozen.reason}")
-    for note in store.diagnostics:
-        lines.append(f"diagnostic: {note}")
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_lineage(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    ensure_seeded(store, task)
-    reader = StateReader(store, "lineage")
-    try:
-        chain = reader.read_lineage("status-lineage")
-    finally:
-        reader.finish(None)
-    data = {"lineage": [codec.encode(g) for g in chain]}
-    lines = ["lineage (active -> seed):"]
-    for generation in chain:
-        weakness = f" weakness={generation.weakness_id}" if generation.weakness_id else ""
-        lines.append(
-            f"  {generation.generation_id} origin={generation.origin}{weakness} "
-            f"source={generation.source_ref[:12]}"
+        services = KernelServices.open(
+            args.root, task, run_id, seed=args.seed,
+            sandbox_backend=args.backend, trusted=trusted,
+            budget=BudgetSpec(executions=args.executions),
         )
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_inspect(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    if args.generation:
-        generation = store.generation(args.generation)
-        source = store.source_of(generation)
-        data: dict[str, Any] = {
-            "generation": _generation_data(store, generation),
-            "source": source,
-        }
-        lines = [
-            f"generation {generation.generation_id} origin={generation.origin} "
-            f"parent={generation.parent_id}",
-            f"source_ref: {generation.source_ref}",
-        ]
-        if generation.decision:
-            lines.append(
-                f"decision: {'accepted' if generation.decision.accepted else 'rejected'} "
-                f"[{generation.decision.policy}@{generation.decision.policy_version}] "
-                f"— {generation.decision.reason}"
-            )
-        lines.append("--- source ---")
-        lines.append(source.rstrip("\n"))
-        return {"data": data, "human": "\n".join(lines)}
-    if args.run:
-        cycle = store.cycle(args.run)
-        events = EventLog(store.runs_dir / args.run / "events.jsonl", args.run).read_all()
-        if args.type:
-            events = [event for event in events if event.type == args.type]
-        data = {
-            "cycle": codec.encode(cycle),
-            "events": [codec.encode(e) for e in events],
-        }
-        lines = [
-            f"run {cycle.run_id} generation={cycle.generation_id} "
-            f"score={cycle.overall_score:.3f} accepted={cycle.accepted}",
-            f"usage: wall={cycle.usage.wall_time_s:.3f}s "
-            f"executions={cycle.usage.executions} model_calls={cycle.usage.model_calls} "
-            f"tokens={cycle.usage.tokens} output={cycle.usage.output_bytes}B",
-            f"events{f' (type={args.type})' if args.type else ''}:",
-        ]
-        for event in events:
-            detail = ""
-            if event.type == "model_call":
-                detail = (
-                    f" adapter={event.payload.get('adapter')} "
-                    f"model={event.payload.get('model_id')} "
-                    f"latency_ms={event.payload.get('latency_ms')} "
-                    f"prompt_ref={str(event.payload.get('prompt_ref'))[:12]}"
-                )
-            elif event.type == "proposal_rejected":
-                failure = event.payload.get("failure")
-                if isinstance(failure, dict):
-                    detail = f" kind={failure.get('kind')}"
-            lines.append(f"  {event.ts} {event.type}{detail}")
-        return {"data": data, "human": "\n".join(lines)}
-    raise CliError("inspect requires --generation ID or --run ID")
-
-
-def _cmd_compare(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = compare_generations(
-        store, task, args.baseline, args.candidate,
-        LoopConfig(sandbox_backend=args.sandbox_backend),
-    )
-    data: dict[str, Any] = {
-        "baseline": {"id": report.left_id, "scores": report.left.split_scores,
-                     "overall": report.left.overall_score},
-        "candidate": {"id": report.right_id, "scores": report.right.split_scores,
-                      "overall": report.right.overall_score},
-        "decision": codec.encode(report.decision),
-    }
-    verdict = "candidate WINS" if report.decision.accepted else "candidate LOSES"
-    lines = [
-        f"baseline  {report.left_id}: overall={report.left.overall_score:.3f} "
-        + " ".join(f"{k}={v:.3f}" for k, v in sorted(report.left.split_scores.items())),
-        f"candidate {report.right_id}: overall={report.right.overall_score:.3f} "
-        + " ".join(f"{k}={v:.3f}" for k, v in sorted(report.right.split_scores.items())),
-        f"{verdict} [{report.decision.policy}@{report.decision.policy_version}]: "
-        f"{report.decision.reason}",
-    ]
-    # RECORDED evidence: derive the candidate's stored verdict from its
-    # selection envelope (bundles/decisions, versions resolved exactly)
-    recorded = _recorded_selection_for_generation(store, args.candidate)
-    data["recorded_selection"] = recorded
-    if recorded is not None:
-        lines.append(
-            f"recorded: {recorded['disposition'].upper()} by "
-            f"{recorded['policy_ref']} (roles: {', '.join(recorded['roles'])}"
-            + (", synthetic" if recorded["synthetic"] else "")
-            + f") — {recorded['rationale']}"
-        )
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _recorded_selection_for_generation(
-    store: Store, generation_id: str
-) -> dict[str, Any] | None:
-    """The latest recorded SelectionDecision envelope for a generation's
-    lifecycle identity, derived from bundles/decisions — never recomputed."""
-    from strive.evidence import SelectionDecision
-
-    st = lifecycle.state(store)
-    if st.journal_errors:
-        return None
-    result: dict[str, Any] | None = None
-    for revision_id, linked_generation in st.links.items():
-        if linked_generation != generation_id:
-            continue
-        for link in st.evidence_links.get(revision_id, ()):
-            if link.kind != "selection":
-                continue
-            try:
-                decision: SelectionDecision = codec.loads(
-                    store.objects.get_text(link.envelope_ref), SelectionDecision
-                )
-            except Exception:  # noqa: BLE001 — inspection: skip unreadable
-                continue
-            result = {
-                "revision_id": revision_id,
-                "selection_ref": link.envelope_ref,
-                "policy_ref": decision.policy_ref,
-                "disposition": decision.disposition,
-                "roles": [e.role for e in decision.evidence],
-                "rationale": decision.rationale,
-                "synthetic": link.synthetic,
-            }
-    return result
-
-
-def _cmd_replay(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = replay_run(
-        store, task, args.run_id, LoopConfig(sandbox_backend=args.sandbox_backend)
+        config = mc.load_config(args.config or mc.DEFAULT_CONFIG_PATH)
+    except (KernelError, SandboxError, SubstrateError, SurfaceValidationError) as exc:
+        raise CliError(str(exc)) from None
+    objects = services.substrate.objects
+    seed_state = mc.seed_state(objects, code=task.seed_source, prompt=_BASELINE_PROMPT)
+    report = run_policy(
+        services, default_catalog(), "manual-change@1", config,
+        prompt_refs=mc.prompt_refs(objects), seed_state=seed_state,
+        run_metadata={"backend": args.backend, "seed": str(args.seed)},
     )
     data = {
-        "run_id": report.run_id,
-        "generation_id": report.generation_id,
-        "task_drift": report.task_drift,
-        "recorded_score": report.recorded_score,
-        "replayed_score": report.replayed_score,
-        "matches": report.matches,
-        "split_diffs": report.split_diffs,
-        "candidate_generation_id": report.candidate_generation_id,
-        "candidate_replayed_score": report.candidate_replayed_score,
-        "decision_matches": report.decision_matches,
-        "bundle_checked": report.bundle_checked,
-        "bundle_metric_diffs": report.bundle_metric_diffs,
-        "bundle_matches": report.bundle_matches,
+        "run_id": report.run_id, "task_id": report.task_id,
+        "policy_ref": report.policy_ref, "commands": report.commands,
+        "stopped_reason": report.stopped_reason, "resumed": report.resumed,
+        "head": report.head, "usage": codec.encode(report.usage),
     }
-    lines = [
-        f"replay of {report.run_id} (generation {report.generation_id}):",
-        f"  recorded={report.recorded_score:.3f} replayed={report.replayed_score:.3f} "
-        f"match={report.matches}",
-    ]
-    if report.candidate_generation_id is not None:
-        lines.append(
-            f"  candidate {report.candidate_generation_id}: "
-            f"replayed={report.candidate_replayed_score:.3f} "
-            f"decision_reproduced={report.decision_matches}"
-            if report.candidate_replayed_score is not None
-            else f"  candidate {report.candidate_generation_id}: not replayed"
-        )
-    if report.bundle_checked:
-        diffs = report.bundle_metric_diffs or {}
-        nonzero = {k: v for k, v in diffs.items() if v != 0.0}
-        lines.append(
-            "  evidence bundle: recomputed candidate metrics "
-            + ("MATCH the recorded envelope" if report.bundle_matches
-               else f"DIFFER from the recorded envelope: {nonzero}")
-        )
-    if report.task_drift:
-        lines.append("  WARNING: task fingerprint drifted since this run was recorded")
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_promote(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    activation, decision = promote_generation(
-        store,
-        task,
-        args.generation_id,
-        provisional=args.provisional,
-        expires_after_cycles=args.expires,
-        config=LoopConfig(
-            acknowledge_task_drift=args.acknowledge_task_drift,
-            sandbox_backend=args.sandbox_backend,
-        ),
+    human = (
+        f"run {report.run_id} [{report.policy_ref}] "
+        f"{'resumed' if report.resumed else 'started'}: "
+        f"{report.commands} command(s), stopped: {report.stopped_reason}; "
+        f"executions charged: {report.usage.executions}"
     )
-    data = {
-        "activation": codec.encode(activation),
-        "decision": codec.encode(decision) if decision else None,
-    }
-    if activation.mode == "provisional":
-        human = (
-            f"provisionally activated {activation.generation_id} "
-            f"(expires after {activation.expires_after_cycles} cycles unless confirmed)"
-        )
-    else:
-        human = f"promoted {activation.generation_id} with paired evidence"
     return {"data": data, "human": human}
 
 
-def _cmd_audit(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = audit_generation(
-        store, task, args.generation,
-        LoopConfig(sandbox_backend=args.sandbox_backend),
-    )
+def _cmd_runs(args: argparse.Namespace) -> dict[str, Any]:
+    runs = Substrate.list_runs(args.root)
+    return {"data": {"runs": runs}, "human": "\n".join(runs) or "(no runs)"}
+
+
+def _open_view(root: Path, run: str | None) -> tuple[Substrate, Any]:
+    run_id = _resolve_run(root, run)
+    # discover the run's task from its binding index — NEVER by string-parsing
+    # the (opaque) run id.
+    try:
+        sub = Substrate.discover(root, run_id)
+    except SubstrateError as exc:
+        raise CliError(str(exc)) from None
+    return sub, sub.verify()
+
+
+def _cmd_status(args: argparse.Namespace) -> dict[str, Any]:
+    sub, view = _open_view(args.root, args.run)
     data = {
-        "generation_id": report.generation_id,
-        "audit_score": report.evaluation.overall_score,
-        "feedback": report.evaluation.feedback,
-        "cases": [codec.encode(ce) for ce in report.evaluation.case_evaluations],
+        "run_id": view.run_id, "task_id": view.task_id, "head": view.head,
+        "verified": view.ok, "errors": list(view.errors), "events": view.seq,
+        "policy_ref": view.bound.policy_ref if view.bound else None,
+        "seed": view.bound.seed if view.bound else None,
+        "run_metadata": dict(view.bound.run_metadata) if view.bound else {},
+        "surfaces": [[b.kind, b.name] for b in view.state.bindings],
     }
     lines = [
-        f"audit of {report.generation_id} (final holdout — never used in selection):",
-        f"  score={report.evaluation.overall_score:.3f} — {report.evaluation.feedback}",
+        f"run {view.run_id} ({'VERIFIED' if view.ok else 'UNVERIFIABLE'})",
+        f"  policy: {data['policy_ref']}  seed: {data['seed']}  events: {view.seq}",
+        f"  head: {view.head}",
+        f"  surfaces: {', '.join(f'{k}/{n}' for k, n in data['surfaces']) or '(none)'}",
     ]
+    for err in view.errors:
+        lines.append(f"  ERROR: {err}")
     return {"data": data, "human": "\n".join(lines)}
 
 
-def _cmd_rollback(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    generation = rollback_generation(store)
-    return {
-        "data": {"active_generation": codec.encode(generation)},
-        "human": f"rolled back; active generation is now {generation.generation_id}",
-    }
-
-
-def _cmd_resume(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    frozen = store.adaptation_frozen()
-    if frozen is None:
-        raise CliError("adaptation is not frozen")
-    store.append(
-        Intervention(
-            kind=INTERVENTION_RESUME,
-            reason=f"operator resume (was: {frozen.reason})",
-            at=now_iso(),
-        )
-    )
-    return {
-        "data": {"resumed": True, "was": codec.encode(frozen)},
-        "human": "adaptation resumed",
-    }
-
-
-def _cmd_migrate_legacy(task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    report = migrate_legacy_ledger(args.artifacts, task)
-    data = {
-        "migrated_entries": report.migrated_entries,
-        "generations": report.generations,
-        "activations": report.activations,
-        "cycles": report.cycles,
-        "interventions": report.interventions,
-        "legacy_sha256": report.legacy_sha256,
-        "task_fingerprint_used": report.task_fingerprint_used,
-        "fingerprint_drifted": report.fingerprint_drifted,
-    }
-    lines = [
-        f"migrated {report.migrated_entries} legacy entries to the "
-        f"{task.task_id!r} ledger ({report.generations} generations, "
-        f"{report.activations} activations, {report.cycles} cycles, "
-        f"{report.interventions} interventions)",
-        f"original ledger.jsonl preserved (sha256 {report.legacy_sha256[:12]}…)",
+def _cmd_view(args: argparse.Namespace) -> dict[str, Any]:
+    sub, view = _open_view(args.root, args.run)
+    surfaces = [
+        {"kind": b.kind, "name": b.name, "content_ref": b.content_ref}
+        for b in view.state.bindings
     ]
-    if report.fingerprint_drifted:
-        lines.append(
-            "NOTE: the task definition has drifted since the legacy ledger was "
-            "written; mutating commands will require --acknowledge-task-drift"
-        )
-    return {"data": data, "human": "\n".join(lines)}
+    lines = [f"composite state @ {view.head} (verified={view.ok}):"]
+    for s in surfaces:
+        lines.append(f"  {s['kind']}/{s['name']} -> {s['content_ref'][:16]}…")
+    return {"data": {"state_ref": view.state_ref, "surfaces": surfaces},
+            "human": "\n".join(lines)}
 
 
-def _cmd_parity(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    rebuild_info: dict[str, Any] | None = None
-    if args.rebuild:
-        rebuilt = rebuild_mirror(store)
-        report = rebuilt.report
-        action = "rebuilt"
-        rebuild_info = {
-            "quarantine_path": rebuilt.quarantine_path,
-            "prior_mirror_sha256": rebuilt.prior_mirror_sha256,
-        }
-    elif args.repair:
-        report = run_backfill_operation(store, "parity-repair")
-        action = "repaired"
-    else:
-        report = parity_status(store)  # read-only
-        action = "checked"
-    data = {
-        "complete": report.complete,
-        "generations": report.generations,
-        "activations": report.activations,
-        "revision_mirrors": report.revision_mirrors,
-        "activation_mirrors": report.activation_mirrors,
-        "missing_source_ordinals": list(report.missing_source_ordinals),
-        "mismatched": list(report.mismatched),
-        "missing_objects": list(report.missing_objects),
-        "closure_issues": list(report.closure_issues),
-        "rebuild": rebuild_info,
-        "diagnostics": list(store.diagnostics),
-    }
-    lines = [
-        f"parity {action}: {'COMPLETE' if report.complete else 'INCOMPLETE'}",
-        f"  generations={report.generations} activations={report.activations} "
-        f"revision_mirrors={report.revision_mirrors} "
-        f"activation_mirrors={report.activation_mirrors}",
+def _cmd_history(args: argparse.Namespace) -> dict[str, Any]:
+    sub, view = _open_view(args.root, args.run)
+    events = [
+        {"event_id": e.event_id, "seq": e.seq, "kind": e.body_kind,
+         "caused_by": e.caused_by, "at": e.at}
+        for e in view.envelopes
     ]
-    if report.missing_source_ordinals:
-        lines.append(
-            f"  missing mirrors for source ordinals: "
-            f"{list(report.missing_source_ordinals)}"
-        )
-    for ref in report.missing_objects:
-        lines.append(f"  missing derived object (repairable): {ref}")
-    for issue in report.closure_issues:
-        lines.append(f"  CLOSURE: {issue}")
-    for issue in report.mismatched:
-        lines.append(f"  AMBIGUOUS: {issue}")
-    if rebuild_info:
-        lines.append(
-            f"  quarantined prior mirror: {rebuild_info['quarantine_path']} "
-            f"(sha256 {rebuild_info['prior_mirror_sha256'][:12]}…)"
-        )
-    return {"data": data, "human": "\n".join(lines)}
+    lines = [f"{e['seq']:>3} {e['kind']:<24} caused_by={e['caused_by']}" for e in events]
+    return {"data": {"events": events, "verified": view.ok},
+            "human": "\n".join(lines) or "(no events)"}
 
 
-def _cmd_revisions(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    revisions = store.revisions()
-    activations = store.revision_activations()
-    view = verify_revision_snapshot(store)
-    # never report an active revision while the verified snapshot is unavailable
-    active_revision = view.active_revision_id()
-    data = {
-        "active_revision": active_revision,
-        "revisions": [codec.encode(r) for r in revisions],
-        "revision_activations": [codec.encode(a) for a in activations],
-    }
-    header = (
-        f"revision mirrors (active: {active_revision}):"
-        if view.available
-        else f"revision mirrors (active: unavailable — {view.reason}):"
-    )
-    lines = [header]
-    for revision in revisions:
-        labels = ",".join(delta_label(d) for d in revision.deltas)
-        base = revision.base_parent.revision_id if revision.base_parent else None
-        lines.append(
-            f"  {revision.ref.revision_id} base={base} deltas=[{labels}] "
-            f"proposer={revision.proposer}"
-        )
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_lifecycle(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    """Inspect, roll back, or repair the canonical native-revision lifecycle:
-    retained revisions, their evidence records, the active revision, the
-    compatibility projection, and lifecycle/compatibility parity."""
-    repaired: str | None = None
-    if args.action == "repair":
-        repaired = lifecycle.lifecycle(store).journal.repair_to_verified(
-            "operator repair"
-        )
-    ensure_seeded(store, task)  # reconciles + syncs the lifecycle
-    if args.action == "rollback":
-        lifecycle.rollback(store)
-
-    st = lifecycle.state(store)
-    resolved = lifecycle.materialize_active(store) if not st.journal_errors else None
-    projection = (
-        lifecycle.compatibility_projection(store) if not st.journal_errors else None
-    )
-    parity = lifecycle.compat_parity(store)
-    retained = [st.retained[rid] for rid in sorted(st.retained)]
-    data = {
-        "active_revision": st.active_revision_id,
-        "breaker_open": st.breaker_open,
-        "breaker_reason": st.breaker_reason,
-        "journal_errors": st.journal_errors,
-        "open_intents": [i.op_id for i in st.open_intents],
-        "repaired_quarantine": repaired,
-        "lineage": list(lifecycle.lineage(store)),
-        "compat_parity": {
-            "ok": parity.ok,
-            "lifecycle_active": parity.lifecycle_active,
-            "linked_generation": parity.linked_generation,
-            "generation_active": parity.generation_active,
-            "reason": parity.reason,
-        },
-        "retained": [
-            {
-                "revision_id": r.revision_id,
-                "revision_ref": r.revision_ref,
-                "base_parent_id": r.base_parent_id,
-                "generation": st.links.get(r.revision_id),
-                "evaluations": len(st.evaluations.get(r.revision_id, ())),
-                "selections": [
-                    {
-                        "accepted": s.accepted,
-                        "baseline": s.baseline_revision_id,
-                        "policy_ref": s.policy_ref,
-                        "decision_ref": s.decision_ref,
-                    }
-                    for s in st.selections.get(r.revision_id, ())
-                ],
-                "overrides": len(st.overrides.get(r.revision_id, ())),
-            }
-            for r in retained
-        ],
-        "effective_surfaces": (
-            [[b.kind, b.name] for b in resolved.effective] if resolved else []
-        ),
-        "compatibility_projection": (
-            {
-                "active_revision_id": projection.active_revision_id,
-                "strategy_source_ref": projection.strategy_source_ref,
-                "other_surfaces": [list(s) for s in projection.other_surfaces],
-                "derived": projection.derived,
-            }
-            if projection
-            else None
-        ),
-    }
-    header = (
-        f"native revision lifecycle (active: {st.active_revision_id}"
-        + (f", BREAKER OPEN: {st.breaker_reason}" if st.breaker_open else "")
-        + "):"
-    )
-    lines = [header]
-    for r in retained:
-        star = "*" if r.revision_id == st.active_revision_id else " "
-        selections = st.selections.get(r.revision_id, ())
-        if selections:
-            latest = selections[-1]
-            verdict = (
-                f"{'accepted' if latest.accepted else 'rejected'} vs "
-                f"{latest.baseline_revision_id} by {latest.policy_ref}"
-            )
-        else:
-            verdict = "no selection evidence"
-        lines.append(
-            f" {star}{r.revision_id} base={r.base_parent_id} "
-            f"gen={st.links.get(r.revision_id) or '-'} "
-            f"evals={len(st.evaluations.get(r.revision_id, ()))} [{verdict}]"
-        )
-    if resolved is not None:
-        surfaces = ", ".join(f"{b.kind}/{b.name}" for b in resolved.effective)
-        lines.append(f"  active manifest surfaces: {surfaces}")
-    if projection is not None:
-        others = (
-            ", ".join(f"{k}/{n}" for k, n in projection.other_surfaces) or "(none)"
-        )
-        lines.append(
-            f"  compatibility projection (derived, strategy-only): "
-            f"source={projection.strategy_source_ref[:12]} "
-            f"non-projected surfaces={others}"
-        )
-    lines.append(
-        f"  compat parity: {'OK' if parity.ok else 'DIVERGED'} — {parity.reason}"
-    )
-    if repaired:
-        lines.append(f"  repaired: quarantined unverified region at {repaired}")
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_evidence(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    """Inspect the versioned evidence envelopes for one revision (default:
-    the active revision): the dataset revision, evaluation manifests,
-    validation bundles with their roles and validators, selection decisions,
-    and the activation-readiness verdict with every stale/blocking reason."""
-    from strive import validators as validator_registry
-    from strive.datasets import current_dataset_revision, load_dataset_revisions
-    from strive.evidence import EvaluationManifest, SelectionDecision, ValidationBundle
-
-    ensure_seeded(store, task)
-    st = lifecycle.state(store)
-    revision_id = args.revision or st.active_revision_id
-    if revision_id is None:
-        raise CliError("no active revision and no --revision given")
-    if revision_id not in st.retained:
-        raise CliError(f"revision {revision_id!r} is not retained")
-
-    dataset_revisions = load_dataset_revisions(store)
-    current_dataset = current_dataset_revision(store)
-    links = st.evidence_links.get(revision_id, ())
-
-    bundles: list[dict[str, Any]] = []
-    selections: list[dict[str, Any]] = []
-    for link in links:
-        entry: dict[str, Any] = {
-            "kind": link.kind,
-            "original_ref": link.original_ref,
-            "envelope_ref": link.envelope_ref,
-            "synthetic": link.synthetic,
-        }
+def _cmd_inspect(args: argparse.Namespace) -> dict[str, Any]:
+    sub, view = _open_view(args.root, args.run)
+    if args.ref:
         try:
-            if link.kind == "selection":
-                decision: SelectionDecision = codec.loads(
-                    store.objects.get_text(link.envelope_ref), SelectionDecision
-                )
-                entry.update(
-                    policy_ref=decision.policy_ref,
-                    disposition=decision.disposition,
-                    incumbent=(
-                        decision.incumbent.revision_id
-                        if decision.incumbent is not None
-                        else None
-                    ),
-                    roles=[
-                        {"role": e.role, "bundle_ref": e.bundle_ref}
-                        for e in decision.evidence
-                    ],
-                    rationale=decision.rationale,
-                )
-                selections.append(entry)
-                continue
-            bundle: ValidationBundle = codec.loads(
-                store.objects.get_text(link.envelope_ref), ValidationBundle
-            )
-            manifest: EvaluationManifest = codec.loads(
-                store.objects.get_text(bundle.evaluation_manifest_ref),
-                EvaluationManifest,
-            )
-            stale = (
-                current_dataset is not None
-                and manifest.dataset_fingerprint != current_dataset.fingerprint
-            )
-            entry.update(
-                role=bundle.role,
-                manifest={
-                    "dataset_fingerprint": manifest.dataset_fingerprint,
-                    "task_fingerprint": manifest.task_fingerprint,
-                    "environment": manifest.environment,
-                    "scorer": manifest.scorer,
-                    "runtime": manifest.runtime,
-                    "validators": list(manifest.validators),
-                    "stale_dataset": stale,
-                },
-                results=[
-                    {
-                        "validator": r.validator,
-                        "subject_role": r.subject_role,
-                        "status": r.status,
-                        "metrics": r.metrics,
-                        "detail": r.detail,
-                    }
-                    for r in bundle.results
-                ],
-            )
-            bundles.append(entry)
-        except Exception as exc:  # noqa: BLE001 — inspection reports, never hides
-            entry["error"] = f"{type(exc).__name__}: {exc}"
-            (selections if link.kind == "selection" else bundles).append(entry)
+            raw = sub.objects.get_text(args.ref)
+        except (ObjectMissing, ObjectCorruption) as exc:
+            raise CliError(str(exc)) from None
+        return {"data": {"ref": args.ref, "content": raw}, "human": raw}
+    if args.event is None:
+        raise CliError("inspect requires --event SEQ or --ref CAS_REF")
+    match = [e for e in view.envelopes if e.seq == args.event]
+    if not match:
+        raise CliError(f"no event with seq {args.event} in run {view.run_id}")
+    env = match[0]
+    body = codec.encode(sub.load_body(env))
+    data = {"envelope": codec.encode(env), "body": body}
+    return {"data": data, "human": json.dumps(data, indent=2, sort_keys=True)}
 
-    readiness = lifecycle.activation_readiness(store, revision_id)
-    data: dict[str, Any] = {
-        "revision_id": revision_id,
-        "dataset": {
-            "current": codec.encode(current_dataset) if current_dataset else None,
-            "revisions": [codec.encode(r) for r in dataset_revisions],
-        },
-        "validators_known": sorted(validator_registry.registry()),
-        "bundles": bundles,
-        "selections": selections,
-        "readiness": {
-            "ok": readiness.ok,
-            "selection_ref": readiness.selection_ref,
-            "reasons": list(readiness.reasons),
-        },
+
+def _cmd_revert(args: argparse.Namespace) -> dict[str, Any]:
+    sub, view = _open_view(args.root, args.run)
+    if not view.ok:
+        raise CliError(f"run is unverifiable; repair first: {'; '.join(view.errors[:2])}")
+    if view.bound is None:
+        raise CliError("run is not bound to a policy; nothing to revert")
+    task = TASKS.get(view.task_id)
+    if task is None:
+        raise CliError(f"run's task {view.task_id!r} is unknown to this build")
+    # route the mutation through the durable command path (issue → perform →
+    # terminal), NOT a direct Substrate.revert.
+    try:
+        services = KernelServices.open(args.root, task, view.run_id)
+        result = operator_revert(services, args.change)
+    except (KernelError, SubstrateError) as exc:
+        raise CliError(str(exc)) from None
+    if result.outcome != "ok":
+        raise CliError(f"revert failed: {result.detail}")
+    updated = sub.verify()
+    return {
+        "data": {"reverted": args.change, "command_id": result.command_id,
+                 "head": updated.head, "state_ref": updated.state_ref},
+        "human": f"reverted {args.change} via {result.command_id}; state @ {updated.head}",
     }
-    lines = [f"evidence for {revision_id}:"]
-    if current_dataset is not None:
-        lines.append(
-            f"  dataset r{current_dataset.revision} "
-            f"({current_dataset.fingerprint[:12]}…) — {current_dataset.reason}; "
-            f"splits: "
-            + " ".join(
-                f"{s}={n}" for s, n in sorted(current_dataset.split_counts.items())
-            )
+
+
+def _cmd_repair(args: argparse.Namespace) -> dict[str, Any]:
+    sub, view = _open_view(args.root, args.run)
+    quarantine = sub.repair("operator repair")
+    if quarantine is None:
+        note = (
+            "nothing to repair (journal has no torn/forged tail). NOTE: a log "
+            "that is intact but SEMANTICALLY invalid is refused, not "
+            "auto-quarantined — inspect the errors and start a new run."
+            if not view.ok else "journal is clean and verified"
         )
-    else:
-        lines.append("  dataset: NO revision recorded")
-    for entry in bundles:
-        if "error" in entry:
-            lines.append(f"  bundle [{entry['kind']}] UNREADABLE: {entry['error']}")
-            continue
-        statuses = ", ".join(
-            f"{r['validator']}({r['subject_role']})={r['status']}"
-            for r in entry["results"]
-        )
-        stale_note = " STALE-DATASET" if entry["manifest"]["stale_dataset"] else ""
-        synthetic_note = " synthetic" if entry["synthetic"] else ""
-        lines.append(
-            f"  bundle role={entry['role']}{synthetic_note}{stale_note}: {statuses}"
-        )
-    for entry in selections:
-        if "error" in entry:
-            lines.append(f"  selection UNREADABLE: {entry['error']}")
-            continue
-        roles = ", ".join(r["role"] for r in entry["roles"])
-        lines.append(
-            f"  selection {entry['disposition'].upper()} by {entry['policy_ref']} "
-            f"vs {entry['incumbent']} (evidence roles: {roles})"
-            + (" [synthetic]" if entry["synthetic"] else "")
-        )
-    lines.append(
-        f"  activation readiness: {'OK' if readiness.ok else 'BLOCKED'}"
-    )
-    for reason in readiness.reasons:
-        lines.append(f"    - {reason}")
-    return {"data": data, "human": "\n".join(lines)}
+        return {"data": {"quarantine": None, "verified": view.ok, "errors": list(view.errors)},
+                "human": note}
+    return {"data": {"quarantine": quarantine},
+            "human": f"quarantined the unverified tail to {quarantine} and truncated"}
 
 
-def _cmd_experiment(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    """The Stage-3C.1 prompt-surface composite experiment: matched arms over
-    the deterministic prompt-sensitive fixture (pipeline-wiring proof), plus
-    an opt-in real-model run of the proposer arms."""
-    from strive import experiment
+def _cmd_sandbox(args: argparse.Namespace) -> dict[str, Any]:
+    from strive.sandboxes import default_catalog as sandbox_catalog
 
-    root = store.root / "experiment"
-    if args.real_model:
-        if not args.unsafe_model_code:
-            raise CliError(
-                "--real-model runs model-generated code without confinement; "
-                "acknowledge with --unsafe-model-code (lifecycle/canary "
-                "authority stays refused for these runs regardless)"
-            )
-        from datetime import datetime, timezone
-
-        reports = experiment.run_real_model_arms(
-            root / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-        )
-        real_data: dict[str, Any] = {
-            "real_model": [
-                {
-                    "arm": rm.arm, "model_id": rm.model_id, "trials": rm.trials,
-                    "proposal_valid": rm.proposal_valid,
-                    "failure_kind": rm.failure_kind, "accepted": rm.accepted,
-                    "model_calls": rm.model_calls, "tokens": rm.tokens,
-                    "latency_ms": rm.latency_ms, "cost": rm.cost,
-                    "parameters": rm.parameters, "notes": rm.notes,
-                }
-                for rm in reports
-            ]
-        }
-        lines = [
-            "real-model proposer arms (SINGLE-TRIAL, honest outcomes; the "
-            "gate is unchanged):"
-        ]
-        for rm in reports:
-            lines.append(
-                f"  arm {rm.arm} [{rm.model_id}] n={rm.trials}: "
-                f"proposal_valid={rm.proposal_valid} "
-                f"failure={rm.failure_kind or '-'} accepted={rm.accepted} "
-                f"calls={rm.model_calls} tokens={rm.tokens} "
-                f"latency_ms={rm.latency_ms} cost={rm.cost} [{rm.parameters}]"
-            )
-            lines.append(f"    {rm.notes}")
-        return {"data": real_data, "human": "\n".join(lines)}
-
-    from datetime import datetime, timezone
-
-    run_dir = root / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    report = experiment.run_prompt_experiment(run_dir)
-    two = report.two_stage
-    data: dict[str, Any] = {
-        "run_dir": str(run_dir),
-        "arms": {
-            arm: {
-                "description": r.description,
-                "proposal_valid": r.proposal_valid,
-                "failure_kind": r.failure_kind,
-                "accepted": r.accepted,
-                "candidate_overall": r.candidate_overall,
-                "candidate_split_scores": r.candidate_split_scores,
-                "regressed_cases": r.regressed_cases,
-                "executions": r.executions,
-                "model_calls": r.model_calls,
-                "tokens": r.tokens,
-                "latency_ms": r.latency_ms,
-                "cost": r.cost,
-                "prompt_ref": r.prompt_ref,
-                "prompt_contained_input_excerpts": r.prompt_contained_input_excerpts,
-                "revision_id": r.revision_id,
-            }
-            for arm, r in report.arms.items()
-        },
-        "two_stage": (
-            {
-                "proposed_revision_id": two.proposed_revision_id,
-                "retained_revision_id": two.retained_revision_id,
-                "activated_revision_id": two.activated_revision_id,
-                "task_accepted": two.task_accepted,
-                "prompt_improved": two.prompt_improved,
-                "composite_accepted": two.composite_accepted,
-                "restart_serves_p1": two.restart_serves_p1,
-                "replay_matches": two.replay_matches,
-                "rollback_restores_incumbent": two.rollback_restores_incumbent,
-            }
-            if two
-            else None
-        ),
-        "causal_prompt_effect": report.causal_prompt_effect,
-        "prompt_consumed": report.prompt_consumed,
-        "matched_configuration": report.matched_configuration,
-        "offline_fixture": report.offline,
-        "passed": report.passed,
-    }
-    lines = [
-        "prompt-surface composite experiment (deterministic offline fixture —",
-        "proves causal pipeline wiring, NOT model capability):",
-        f"run dir: {run_dir}",
-    ]
-    for arm, r in report.arms.items():
-        overall = f"{r.candidate_overall:.3f}" if r.candidate_overall is not None else "-"
-        lines.append(
-            f"  {arm}: accepted={r.accepted} overall={overall} "
-            f"model_calls={r.model_calls} excerpts_in_prompt="
-            f"{r.prompt_contained_input_excerpts} — {r.description}"
-        )
-    lines.append(
-        f"causal prompt effect (A fails, B passes): {report.causal_prompt_effect}"
-    )
-    if two:
-        lines.append(
-            "two-stage self-produced composite: "
-            f"task_gate={two.task_accepted} prompt_gate={two.prompt_improved} "
-            f"composite={two.composite_accepted}; identity "
-            f"{two.proposed_revision_id} == retained == "
-            f"activated({two.activated_revision_id}); "
-            f"restart={two.restart_serves_p1} replay={two.replay_matches} "
-            f"rollback={two.rollback_restores_incumbent}"
-        )
-    lines.append(f"prompt artifact consumption proven: {report.prompt_consumed}")
-    lines.append(f"matched configuration: {report.matched_configuration}")
-    lines.append(f"OVERALL: {'PASSED' if report.passed else 'FAILED'}")
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_reader(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    action = args.action
-    quarantined: str | None = None
-    if action == "shadow":
-        set_mode(store, MODE_SHADOW, reason="operator: begin shadow burn-in")
-    elif action == "native":
-        set_mode(store, MODE_NATIVE, reason="operator: return to native reads")
-    elif action == "kill":
-        kill_switch(store, reason="operator kill switch")
-    elif action == "canary":
-        enable_canary(store)  # raises ReaderError with reasons when ineligible
-    elif action == "clear-breaker":
-        clear_breaker(store, reason="operator: breaker cleared after repair")
-    elif action == "force-native":
-        # the emergency override: independent of the reader journal
-        force_native(store, "operator force-native override")
-    elif action == "lift-force":
-        lift_force_native(store)
-    elif action == "reset-journal":
-        quarantined = quarantine_reader_journal(
-            store, "operator reset after journal corruption"
-        )
-    elif action != "status":
-        raise CliError(f"unknown reader action {action!r}")
-
-    state = reader_state(store)
-    verdict = cutover_eligibility(store)
-    coverage = verdict.coverage
-    data = {
-        "mode": state.mode,
-        "configured_mode": state.configured_mode,
-        "forced_native": state.forced_native,
-        "journal_head": state.journal_head,
-        "quarantined": quarantined,
-        "breaker_open": state.breaker_open,
-        "breaker_reason": state.breaker_reason,
-        "epoch": state.epoch,
-        "journal_errors": coverage.journal_errors,
-        "coverage": {
-            "total": coverage.total,
-            "agreed": coverage.agreed,
-            "diverged": coverage.diverged,
-            "unavailable": coverage.unavailable,
-            "missing": coverage.missing,
-            "not_applicable": coverage.not_applicable,
-            "native_only": coverage.native_only,
-            "by_subject": coverage.by_subject,
-            "facts": list(coverage.facts),
-        },
-        "cutover": {
-            "eligible": verdict.eligible,
-            "parity_complete": verdict.parity_complete,
-            "reasons": list(verdict.reasons),
-        },
-    }
-    lines = [
-        f"reader mode: {state.mode}"
-        + (" [FORCE-NATIVE OVERRIDE]" if state.forced_native else "")
-        + (f" (BREAKER OPEN: {state.breaker_reason})" if state.breaker_open else ""),
-        f"epoch: {state.epoch or '(none for this reader/projector version)'}",
-        f"current-epoch checks: total={coverage.total} agreed={coverage.agreed} "
-        f"diverged={coverage.diverged} unavailable={coverage.unavailable} "
-        f"missing={coverage.missing} not_applicable={coverage.not_applicable}",
-        f"observed paths: {', '.join(coverage.facts) if coverage.facts else '(none)'}",
-    ]
-    if verdict.eligible:
-        lines.append("cutover: ELIGIBLE (current epoch)")
-    else:
-        lines.append("cutover: NOT ELIGIBLE")
-        for reason in verdict.reasons:
-            lines.append(f"  - {reason}")
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_sandbox(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    """Report the pluggable sandbox backends: which are available on this
-    host and exactly which capabilities each mechanically enforces (never a
-    silent downgrade — an unavailable requested backend fails closed)."""
-    from strive.sandboxes import default_catalog
-
-    catalog = default_catalog()
+    catalog = sandbox_catalog()
     backends: list[dict[str, Any]] = []
-    lines: list[str] = ["sandbox backends:"]
+    lines = ["sandbox backends:"]
     for name in catalog.names():
         backend = catalog.resolve(name, require_available=False)
         available, reason = backend.available()
         caps = backend.capabilities()
-        backends.append(
-            {
-                "backend": name,
-                "available": available,
-                "reason": reason,
-                "secure": caps.secure,
-                "enforced": list(caps.enforced),
-                "not_enforced": list(caps.not_enforced),
-                "detail": caps.detail,
-            }
+        backends.append({
+            "backend": name, "available": available, "reason": reason,
+            "secure": caps.secure, "enforced": list(caps.enforced),
+        })
+        lines.append(
+            f"  {name} [{'OK' if available else 'unavailable'}, "
+            f"{'SECURE' if caps.secure else 'not-secure'}]: "
+            f"{', '.join(caps.enforced) or '(none)'}"
         )
-        marker = "OK" if available else "unavailable"
-        secure = "SECURE" if caps.secure else "not-secure"
-        lines.append(f"  {name} [{marker}, {secure}]: {reason}")
-        lines.append(f"    enforces: {', '.join(caps.enforced) or '(none)'}")
-        if caps.not_enforced:
-            lines.append(f"    does NOT enforce: {', '.join(caps.not_enforced)}")
     return {"data": {"backends": backends}, "human": "\n".join(lines)}
 
 
-def _cmd_capability(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    """Run the model-capability lane: repeated seeded trials (real model, or
-    the deterministic fixture control) executed inside the secure sandbox
-    backend, with honest aggregate evidence."""
-    from strive.capability import run_capability_trials
-    from strive.loop import _new_run_id
-
-    root = args.artifacts / "capability" / _new_run_id("cap")
-    report = run_capability_trials(
-        root,
-        task,
-        trials=args.trials,
-        sandbox_backend=args.sandbox_backend,
-        use_fixture=args.fixture,
-    )
-    data = {
-        "task_id": report.task_id,
-        "source": report.source,
-        "model_id": report.model_id,
-        "parameters": report.parameters,
-        "sandbox_backend": report.sandbox_backend,
-        "sandbox_secure": report.sandbox_secure,
-        "n": report.n,
-        "acceptance_rate": report.acceptance_rate,
-        "clean_acceptance_rate": report.clean_acceptance_rate,
-        "total_failures": report.total_failures,
-        "verdict": report.verdict,
-        "notes": report.notes,
-        "trials": [
-            {
-                "trial": t.trial, "seed": t.seed, "accepted": t.accepted,
-                "regressions": t.regressions, "failure_kind": t.failure_kind,
-                "model_calls": t.model_calls, "tokens": t.tokens,
-                "sandbox_backend": t.sandbox_backend, "run_id": t.run_id,
-            }
-            for t in report.trials
-        ],
-    }
-    lines = [
-        f"capability lane [{report.source}] model={report.model_id} "
-        f"backend={report.sandbox_backend} "
-        f"({'secure' if report.sandbox_secure else 'NOT secure'})",
-        f"  trials={report.n} acceptance={report.acceptance_rate:.2f} "
-        f"clean={report.clean_acceptance_rate:.2f} failures={report.total_failures}",
-        f"  VERDICT: {report.verdict.upper()} — {report.notes}",
-    ]
-    return {"data": data, "human": "\n".join(lines)}
-
-
-def _cmd_history(store: Store, task: Task, args: argparse.Namespace) -> dict[str, Any]:
-    entries = store.entries()
-    data = {"entries": [codec.encode(e) for e in entries]}
-    lines = []
-    for entry in entries:
-        if isinstance(entry, Generation):
-            verdict = (
-                "seed"
-                if entry.decision is None
-                else ("accepted" if entry.decision.accepted else "rejected")
-            )
-            lines.append(
-                f"generation {entry.generation_id} parent={entry.parent_id} "
-                f"origin={entry.origin} [{verdict}]"
-            )
-        elif isinstance(entry, Activation):
-            lines.append(
-                f"activation {entry.generation_id} reason={entry.reason} mode={entry.mode}"
-            )
-        elif isinstance(entry, CycleRecord):
-            lines.append(
-                f"cycle {entry.run_id} gen={entry.generation_id} "
-                f"score={entry.overall_score:.3f} accepted={entry.accepted}"
-            )
-        elif isinstance(entry, Intervention):
-            lines.append(f"intervention {entry.kind}: {entry.reason}")
-    return {"data": data, "human": "\n".join(lines) if lines else "(empty ledger)"}
-
-
 _COMMANDS = {
-    "run": _cmd_run,
-    "status": _cmd_status,
-    "lineage": _cmd_lineage,
-    "inspect": _cmd_inspect,
-    "compare": _cmd_compare,
-    "replay": _cmd_replay,
-    "audit": _cmd_audit,
-    "promote": _cmd_promote,
-    "rollback": _cmd_rollback,
-    "resume": _cmd_resume,
-    "history": _cmd_history,
-    "parity": _cmd_parity,
-    "revisions": _cmd_revisions,
-    "lifecycle": _cmd_lifecycle,
-    "evidence": _cmd_evidence,
-    "reader": _cmd_reader,
-    "sandbox": _cmd_sandbox,
-    "capability": _cmd_capability,
-    "experiment": _cmd_experiment,
+    "run": _cmd_run, "runs": _cmd_runs, "status": _cmd_status, "view": _cmd_view,
+    "history": _cmd_history, "inspect": _cmd_inspect, "revert": _cmd_revert,
+    "repair": _cmd_repair, "sandbox": _cmd_sandbox,
 }
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="strive", description=__doc__)
-    parser.add_argument("--artifacts", type=Path, default=Path("artifacts"))
-    parser.add_argument("--task", default=SUM_INTEGERS_TASK.task_id)
+    parser.add_argument("--root", type=Path, default=Path("artifacts"))
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = sub.add_parser("run", help="run one evolution cycle")
-    run_parser.add_argument("--timeout", type=float, default=10.0)
-    run_parser.add_argument(
-        "--proposer",
-        choices=("registry", "model"),
-        default="registry",
-        help="proposal source: deterministic registry, or model-backed "
-        "(offline scripted fixture unless STRIVE_MODEL_PROVIDER is configured)",
-    )
-    run_parser.add_argument(
-        "--acknowledge-task-drift",
-        action="store_true",
-        help="proceed although the task definition changed since the active "
-        "generation was created (journaled)",
-    )
-    run_parser.add_argument(
-        "--unsafe-model-code",
-        action="store_true",
-        help="required acknowledgement when a REAL model provider is "
-        "configured: model-generated code is untrusted (must run under a "
-        "secure --sandbox-backend)",
-    )
-    run_parser.add_argument(
-        "--sandbox-backend",
-        default="process-fault-only@1",
-        help="the sandbox boundary candidate code executes under (see "
-        "`strive sandbox`); real model code requires a secure backend "
-        "(e.g. deno-pyodide@1)",
-    )
-    sub.add_parser("status", help="active generation, freeze state, diagnostics")
-    sub.add_parser("lineage", help="chain from active generation to seed")
-    inspect_parser = sub.add_parser("inspect", help="details of a generation or run")
-    inspect_parser.add_argument("--generation")
-    inspect_parser.add_argument("--run")
-    inspect_parser.add_argument(
-        "--type", help="filter run events by type (e.g. model_call, proposal)"
-    )
-    _backend_help = (
-        "the sandbox boundary candidate code executes under (see "
-        "`strive sandbox`; default the fault-only boundary for trusted code)"
-    )
-    compare_parser = sub.add_parser("compare", help="paired evaluation of two generations")
-    compare_parser.add_argument("baseline")
-    compare_parser.add_argument("candidate")
-    compare_parser.add_argument(
-        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
-    )
-    replay_parser = sub.add_parser(
-        "replay",
-        help="execution-and-decision replay: re-execute a recorded run's "
-        "generations and re-check the recorded decision (not a full-cycle "
-        "replay of diagnosis/prompt/proposal)",
-    )
-    replay_parser.add_argument("run_id")
-    replay_parser.add_argument(
-        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
-    )
-    audit_parser = sub.add_parser(
-        "audit",
-        help="evaluate a generation on the final audit holdout (on demand; "
-        "never part of routine selection)",
-    )
-    audit_parser.add_argument("--generation", help="default: the active generation")
-    audit_parser.add_argument(
-        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
-    )
-    promote_parser = sub.add_parser("promote", help="activate a retained generation")
-    promote_parser.add_argument("generation_id")
-    promote_parser.add_argument("--provisional", action="store_true")
-    promote_parser.add_argument("--expires", type=int, default=3)
-    promote_parser.add_argument("--acknowledge-task-drift", action="store_true")
-    promote_parser.add_argument(
-        "--sandbox-backend", default="process-fault-only@1", help=_backend_help
-    )
-    sub.add_parser("rollback", help="reactivate the parent of the active generation")
-    sub.add_parser("resume", help="lift a stall freeze")
-    sub.add_parser("history", help="dump the full ledger journal")
-    parity_parser = sub.add_parser(
-        "parity",
-        help="check (or --repair) generation/revision mirror parity",
-    )
-    parity_parser.add_argument("--repair", action="store_true")
-    parity_parser.add_argument(
-        "--rebuild",
-        action="store_true",
-        help="quarantine the mirror journal byte-for-byte and rebuild it from "
-        "canonical history (never touches the task ledger)",
-    )
-    sub.add_parser(
-        "revisions",
-        help="inspect the stage-3B revision mirrors and active revision",
-    )
-    lifecycle_parser = sub.add_parser(
-        "lifecycle",
-        help="the canonical native-revision lifecycle: retained revisions, "
-        "evidence, active revision, compatibility projection, and "
-        "whole-revision rollback",
-    )
-    lifecycle_parser.add_argument(
-        "action",
-        nargs="?",
-        default="status",
-        choices=("status", "rollback", "repair"),
-        help="status (default) | rollback (whole-revision, drives BOTH the "
-        "lifecycle and served compatibility behavior) | repair (quarantine "
-        "and truncate an unverified journal region)",
-    )
-    evidence_parser = sub.add_parser(
-        "evidence",
-        help="inspect the versioned evidence envelopes for a revision: the "
-        "dataset revision, evaluation manifests, validation bundles with "
-        "roles and validators, selection decisions, and the "
-        "activation-readiness verdict with stale-evidence reasons",
-    )
-    evidence_parser.add_argument(
-        "revision",
-        nargs="?",
-        default=None,
-        help="revision id (default: the active revision)",
-    )
-    sub.add_parser(
-        "sandbox",
-        help="report pluggable sandbox backends: availability and the exact "
-        "capabilities each mechanically enforces (never a silent downgrade)",
-    )
-    capability_parser = sub.add_parser(
-        "capability",
-        help="the model-capability lane: repeated seeded trials (real model, "
-        "or --fixture control) executed inside the secure sandbox backend, "
-        "with honest aggregate evidence (single trials/fixtures are never "
-        "capability evidence)",
-    )
-    capability_parser.add_argument("--trials", type=int, default=3)
-    capability_parser.add_argument(
-        "--sandbox-backend", default="deno-pyodide@1",
-        help="the secure backend real trials execute under (default "
-        "deno-pyodide@1); an insecure backend is refused for real model code",
-    )
-    capability_parser.add_argument(
-        "--fixture", action="store_true",
-        help="use the deterministic scripted adapter (labeled inconclusive; "
-        "a CI control, never capability evidence)",
-    )
-    experiment_parser = sub.add_parser(
-        "experiment",
-        help="the stage-3C.1 prompt-surface composite experiment: matched "
-        "arms A-E over the deterministic prompt-sensitive fixture "
-        "(pipeline-wiring proof); --real-model runs the proposer arms with "
-        "the env-configured adapter",
-    )
-    experiment_parser.add_argument("--real-model", action="store_true")
-    experiment_parser.add_argument(
-        "--unsafe-model-code",
-        action="store_true",
-        help="required acknowledgement for --real-model",
-    )
-    reader_parser = sub.add_parser(
-        "reader",
-        help="the read boundary: status, mode changes (native/shadow), "
-        "eligibility-gated canary enablement, the kill switch, and breaker "
-        "recovery",
-    )
-    reader_parser.add_argument(
-        "action",
-        nargs="?",
-        default="status",
-        choices=(
-            "status", "native", "shadow", "canary", "kill", "clear-breaker",
-            "force-native", "lift-force", "reset-journal",
-        ),
-        help="status (default) | native | shadow | canary (requires "
-        "current-epoch eligibility) | kill (immediate return to native) | "
-        "clear-breaker (requires native/shadow mode, complete parity, and a "
-        "fresh epoch) | force-native (emergency override independent of the "
-        "reader journal) | lift-force | reset-journal (quarantine a corrupt "
-        "reader journal and start fresh in native mode)",
-    )
-    sub.add_parser(
-        "migrate",
-        help="apply pending registry migrations in order (0001 legacy ledger, "
-        "0002 revision backfill)",
-    )
-    sub.add_parser(
-        "migrate-legacy",
-        help="convert a stage-2a ledger/ledger.jsonl into this task's "
-        "task-scoped ledger (original preserved)",
-    )
+    run_p = sub.add_parser("run", help="bind/resume a manual-change@1 run and drive it")
+    run_p.add_argument("--task", default="sum-integers")
+    run_p.add_argument("--run", default=None, help="resume this run id (default: new)")
+    run_p.add_argument("--seed", type=int, default=0)
+    run_p.add_argument("--config", default=None, help="policy TOML (default: bundled)")
+    run_p.add_argument("--backend", default="process-fault-only@1")
+    run_p.add_argument("--executions", type=int, default=64)
+
+    sub.add_parser("runs", help="list runs under the artifact root")
+    for name in ("status", "view", "history"):
+        p = sub.add_parser(name)
+        p.add_argument("--run", default=None)
+    insp = sub.add_parser("inspect", help="decode one event body or CAS object")
+    insp.add_argument("--run", default=None)
+    insp.add_argument("--event", type=int, default=None, help="event seq")
+    insp.add_argument("--ref", default=None, help="a CAS ref")
+    rev = sub.add_parser("revert", help="revert an applied change exactly")
+    rev.add_argument("change", help="the change id to revert")
+    rev.add_argument("--run", default=None)
+    rep = sub.add_parser("repair", help="quarantine + truncate an unverified journal tail")
+    rep.add_argument("--run", default=None)
+    sub.add_parser("sandbox", help="report sandbox backends and capabilities")
     return parser
 
 
@@ -1390,58 +280,26 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        task = _task(args.task)
-        if args.command == "migrate-legacy":
-            # must run before Store construction, which refuses legacy roots
-            result = _cmd_migrate_legacy(task, args)
-            _emit(args.json, args.command, result["data"], result["human"])
-            return 0
-        if args.command == "migrate":
-            reports = apply_pending(args.artifacts, task)
-            data = {
-                "applied": [
-                    {"migration_id": r.migration_id, "applied": r.applied,
-                     "detail": r.detail}
-                    for r in reports
-                ],
-                "pending_after": [
-                    m.migration_id for m in pending_migrations(args.artifacts, task)
-                ],
-            }
-            human = (
-                "\n".join(f"{r.migration_id}: {r.detail}" for r in reports)
-                if reports
-                else "no pending migrations"
-            )
-            _emit(args.json, args.command, data, human)
-            return 0
-        store = Store(args.artifacts, task.task_id)
-        result = _COMMANDS[args.command](store, task, args)
-        _emit(args.json, args.command, result["data"], result["human"])
-        return 0
+        result = _COMMANDS[args.command](args)
     except (
-        StoreError,
-        CliError,
-        codec.SchemaError,
-        ObjectMissing,
-        ObjectCorruption,
-        ModelConfigError,
-        ParityError,
-        MirrorError,
-        ReaderError,
-        lifecycle.LifecycleError,
+        CliError, SubstrateError, KernelError, codec.SchemaError,
+        ObjectCorruption, ObjectMissing, InvalidRef, SurfaceValidationError,
+        SandboxError,
     ) as exc:
         message = f"{type(exc).__name__}: {exc}"
         if args.json:
-            print(
-                json.dumps(
-                    {"ok": False, "command": args.command, "error": message},
-                    sort_keys=True,
-                )
-            )
+            print(json.dumps({"ok": False, "command": args.command, "error": message}))
         else:
             print(f"error: {message}", file=sys.stderr)
         return 1
+    if args.json:
+        print(json.dumps(
+            {"ok": True, "command": args.command, "data": result["data"]},
+            sort_keys=True,
+        ))
+    else:
+        print(result["human"])
+    return 0
 
 
 if __name__ == "__main__":

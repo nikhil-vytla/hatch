@@ -1,7 +1,7 @@
 [project]
 name = "strive"
-version = "0.1.0"
-description = "A self-evolving agent harness: execute, observe, evaluate, diagnose, propose, validate, accept/reject, retain, repeat."
+version = "0.2.0"
+description = "Durable mechanisms for model-led adaptation: a run-scoped, semantically-verified event/CAS substrate and a result-driven resumable policy kernel."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
