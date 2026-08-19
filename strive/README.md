@@ -102,16 +102,23 @@ design decision.
 the fork through its reducer — applies then reverts it exactly. It is the
 substrate proof; its fork scores the code surface.
 
-`continual-refine@1` is the real continual, model-led policy. At a trigger it
-`RequestRefinement`s — the kernel renders the prompt from the per-role pinned
-control prompt plus the ACTIVE proposal-template surface and the policy's
-context, calls the model through an injected immutable `ModelCatalog`, journals
-the call (a dispatch then a result, exactly-once and restart-safe), and
-STRICTLY decodes a typed `RefinementProposal` (malformed output is
+`continual-refine@1` is the real continual, model-led policy. It alternates
+OPERATION and REFINEMENT over a continuing trajectory: it operates the active
+harness (`ObserveCurrentState`, journaling real behavior as feedback), then
+`RequestRefinement`s — the kernel binds a model, renders the prompt from the
+per-role pinned control prompt + the ACTIVE proposal template + a context of
+real observations/prior rationale/changes/usage/failures, calls the model
+through an injected immutable `ModelCatalog`, and STRICTLY decodes a typed
+`RefinementProposal` under durable constraints (malformed output is
 failure-as-data). Its surface strategies assemble ONE atomic coupled prompt+code
-change, which it applies immediately under the kernel floor; comparative
-evaluation happens only when it requests `EvaluateFork`. It then observes and at
-a review checkpoint keeps, revises, reverts, or defers — no mandatory tribunal,
-no automatic expiry. The active prompt genuinely shapes the proposal (proved by
-an ablation). CI drives it with a deterministic fake model through the exact
+change, applied immediately under the kernel floor; `EvaluateFork` is an
+OPTIONAL observation, never a gate. It operates again to see the changed
+behavior, then reviews — keep (`ConfirmChange`), revert (exact rollback), defer
+(observe more), or revise (a new atomic change with lineage) — across cycles.
+Model calls are durably bound and budgeted (a resume can't switch models after
+issue; open dispatches reserve tokens/wall/cost; a finite cost budget against a
+non-reporting adapter fails closed); model-authored code stays inside the
+SECURE executor (`trusted=False`, secure capabilities — production never
+defaults to fault-only); and the policy gets only a mechanically read-only
+content view. CI drives it with a deterministic fake model through the exact
 production adapter path; real-model runs are opt-in (`STRIVE_MODEL_*`).

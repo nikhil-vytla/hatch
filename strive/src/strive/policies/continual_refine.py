@@ -261,9 +261,7 @@ class ContinualRefinePolicy:
         return f"{view.run_id}:revise-change:{cycle}"
 
     def _enabled_surface_specs(self, config: ContinualRefineConfig) -> tuple[str, ...]:
-        return tuple(
-            f"{_SURFACE_KEY[s][0]}/{_SURFACE_KEY[s][1]}" for s in config.enabled_strategies
-        )
+        return _surface_specs(config)
 
     # -- the loop -----------------------------------------------------------------
 
@@ -413,6 +411,11 @@ class ContinualRefinePolicy:
         if k == "ObserveCurrentState":
             if state.phase == "warmup":
                 return _with(state, obs_done=state.obs_done + 1)
+            if state.phase == "cycle_end":
+                # the first warm-up observation of the NEXT cycle
+                return ContinualRefineState(
+                    phase="warmup", cycle=state.cycle + 1, obs_done=1,
+                )
             if state.phase in ("observe_post", "reviewed"):
                 # a fresh post/deferred observation window
                 bumped = state.obs_done + 1 if state.phase == "observe_post" else 1
@@ -475,6 +478,12 @@ def _with(state: ContinualRefineState, **changes: object) -> ContinualRefineStat
     return replace(state, **changes)  # type: ignore[arg-type]
 
 
+def _surface_specs(config: ContinualRefineConfig) -> tuple[str, ...]:
+    return tuple(
+        f"{_SURFACE_KEY[s][0]}/{_SURFACE_KEY[s][1]}" for s in config.enabled_strategies
+    )
+
+
 # -- context rendering (deterministic; excludes the in-flight command's events) -------------------
 
 
@@ -516,6 +525,10 @@ def _build_refine_context(
     excludes the in-flight refine's own events so the payload digest is stable
     across a crash-forced re-derivation."""
     lines = [f"cycle: {cycle}", f"trigger: {config.trigger_mode}"]
+    lines.append("=== constraints (your proposal MUST satisfy these) ===")
+    lines.append(f"required_change_id: {view.run_id}:refine-change:{cycle}")
+    lines.append(f"enabled_surfaces: {list(_surface_specs(config))}")
+    lines.append(f"edit_limit: {config.edit_limit}")
     code_ref = view.state.content_ref("strategy-code", "solve")
     lines.append("=== active strategy ===")
     lines.append(view.read_text(code_ref) if code_ref else "<none>")
@@ -560,6 +573,9 @@ def _build_review_context(
     exclude_cid: str, cycle: int
 ) -> str:
     lines = [f"cycle: {cycle}", f"reviewing change: {change_id}"]
+    lines.append("=== constraints (a revise MUST use these) ===")
+    lines.append(f"required_change_id: {view.run_id}:revise-change:{cycle}")
+    lines.append(f"enabled_surfaces: {list(_surface_specs(config))}")
     obs = _observations(view, exclude_cid)[-config.trajectory_window:]
     lines.append("=== behavior AFTER the change ===")
     for rec, ev in obs:
