@@ -28,7 +28,9 @@ from strive import codec
 from strive.cas import InvalidRef, ObjectCorruption, ObjectMissing
 from strive.contracts import BudgetSpec
 from strive.kernel import KernelError, KernelServices, operator_revert, run_policy
+from strive.model import ModelCatalog
 from strive.policy import default_catalog
+from strive.policies import continual_refine as cr
 from strive.policies import manual_change as mc
 from strive.sandboxes import SandboxError
 from strive.substrate import Substrate, SubstrateError, new_run_id
@@ -56,28 +58,70 @@ def _resolve_run(root: Path, run: str | None) -> str:
     return run if run else _latest_run(root)
 
 
+def _model_catalog(role: str) -> ModelCatalog | None:
+    """A real model catalog from `STRIVE_MODEL_*` env (opt-in), or None when
+    unset. `continual-refine@1` requires this; running it offline is a clean
+    error rather than a silent fake."""
+    from strive.model import adapter_from_env
+
+    adapter = adapter_from_env()
+    return ModelCatalog({role: adapter}) if adapter is not None else None
+
+
 def _cmd_run(args: argparse.Namespace) -> dict[str, Any]:
     task = TASKS.get(args.task)
     if task is None:
         raise CliError(f"unknown task {args.task!r}; known: {sorted(TASKS)}")
+    if args.policy not in default_catalog().names():
+        raise CliError(
+            f"unknown policy {args.policy!r}; known: {list(default_catalog().names())}"
+        )
     run_id = args.run or new_run_id()
     trusted = args.backend == "process-fault-only@1"
+    continual = args.policy == "continual-refine@1"
+    model_role = "refine"
+    models = _model_catalog(model_role) if continual else None
+    if continual and models is None:
+        raise CliError(
+            "continual-refine@1 needs a model: set STRIVE_MODEL_PROVIDER / "
+            "STRIVE_MODEL_BASE_URL / STRIVE_MODEL_API_KEY / STRIVE_MODEL_ID "
+            "(real-model runs are opt-in; offline CI drives it with a fake "
+            "through the test harness)"
+        )
     try:
         services = KernelServices.open(
             args.root, task, run_id, seed=args.seed,
             sandbox_backend=args.backend, trusted=trusted,
-            budget=BudgetSpec(executions=args.executions),
+            budget=BudgetSpec(
+                executions=args.executions,
+                model_calls=args.model_calls if continual else 0,
+            ),
+            models=models, model_role=model_role,
         )
-        config = mc.load_config(args.config or mc.DEFAULT_CONFIG_PATH)
     except (KernelError, SandboxError, SubstrateError, SurfaceValidationError) as exc:
         raise CliError(str(exc)) from None
     objects = services.substrate.objects
-    seed_state = mc.seed_state(objects, code=task.seed_source, prompt=_BASELINE_PROMPT)
-    report = run_policy(
-        services, default_catalog(), "manual-change@1", config,
-        prompt_refs=mc.prompt_refs(objects), seed_state=seed_state,
-        run_metadata={"backend": args.backend, "seed": str(args.seed)},
-    )
+    policy_mod = cr if continual else mc
+    try:
+        config = policy_mod.load_config(args.config or policy_mod.DEFAULT_CONFIG_PATH)
+    except (SubstrateError, SurfaceValidationError) as exc:
+        raise CliError(str(exc)) from None
+    seed_state = policy_mod.seed_state(objects, code=task.seed_source, prompt=_BASELINE_PROMPT)
+    try:
+        report = run_policy(
+            services, default_catalog(), args.policy, config,
+            prompt_refs=policy_mod.prompt_refs(objects), seed_state=seed_state,
+            run_metadata={
+                "backend": args.backend, "seed": str(args.seed),
+                "policy": args.policy,
+                "model": (
+                    services.models.resolve(model_role).model_id
+                    if services.models else "none"
+                ),
+            },
+        )
+    except (KernelError, SubstrateError) as exc:
+        raise CliError(str(exc)) from None
     data = {
         "run_id": report.run_id, "task_id": report.task_id,
         "policy_ref": report.policy_ref, "commands": report.commands,
@@ -251,13 +295,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run_p = sub.add_parser("run", help="bind/resume a manual-change@1 run and drive it")
+    run_p = sub.add_parser("run", help="bind/resume a policy run and drive it")
     run_p.add_argument("--task", default="sum-integers")
     run_p.add_argument("--run", default=None, help="resume this run id (default: new)")
     run_p.add_argument("--seed", type=int, default=0)
+    run_p.add_argument(
+        "--policy", default="manual-change@1",
+        help="policy name (manual-change@1 | continual-refine@1)",
+    )
     run_p.add_argument("--config", default=None, help="policy TOML (default: bundled)")
     run_p.add_argument("--backend", default="process-fault-only@1")
     run_p.add_argument("--executions", type=int, default=64)
+    run_p.add_argument("--model-calls", type=int, default=4,
+                       help="model-call budget for continual-refine@1")
 
     sub.add_parser("runs", help="list runs under the artifact root")
     for name in ("status", "view", "history"):

@@ -616,8 +616,19 @@ def _run_refinement(
         context = substrate.objects.get_text(command.context_ref)
     except (ObjectMissing, ObjectCorruption) as exc:
         raise KernelError(f"refinement context ref unreadable: {exc}") from None
+    # the pinned CONTROL prompt for this role (refine.md / review.md), from the
+    # authoritative PolicyBound — a role with no pinned prompt is a hard error
+    if view.bound is None:
+        raise KernelError("cannot refine before the policy is bound")
+    control_ref = view.bound.prompt_refs.get(command.prompt_role)
+    if control_ref is None:
+        raise KernelError(
+            f"no pinned control prompt for role {command.prompt_role!r} "
+            f"(pinned roles: {sorted(view.bound.prompt_refs)})"
+        )
+    control = substrate.objects.get_text(control_ref)
     template = _active_prompt_template(view, substrate)
-    prompt = render_prompt(template, context)
+    prompt = render_prompt(control, template, context)
     prompt_ref = substrate.objects.put_text(prompt)
 
     # budget FIRST (deterministic, re-derivable): a pre-call denial fails the
@@ -735,6 +746,33 @@ def operator_revert(services: KernelServices, change_id: str) -> CommandResult:
 # -- one command: intent → effect/reconcile → terminal ---------------------------------------------
 
 
+def _require_settled_before_issue(view: VerifiedSubstrateView, cid: str) -> None:
+    """Refuse a new issue unless every prior command is SETTLED: it has a
+    terminal AND a checkpoint consumed it. This is the loop's one-in-flight
+    discipline (issue → terminal → checkpoint → next issue) enforced at the
+    kernel boundary, so a policy bug can never leave two commands open."""
+    from strive.substrate import PolicyCheckpointed
+
+    prior_issued = set(view.issued) - {cid}
+    open_prior = prior_issued - set(view.completed)
+    if open_prior:
+        raise KernelError(
+            f"cannot issue {cid!r} while prior command(s) {sorted(open_prior)} "
+            "have no terminal (one in-flight command at a time)"
+        )
+    consumed = {
+        body.consumed_command_id
+        for body in view.bodies
+        if isinstance(body, PolicyCheckpointed) and body.consumed_command_id is not None
+    }
+    unchecked = prior_issued - consumed
+    if unchecked:
+        raise KernelError(
+            f"cannot issue {cid!r} while prior command(s) {sorted(unchecked)} "
+            "lack a consuming checkpoint (terminal+checkpoint required first)"
+        )
+
+
 def _run_command(
     services: KernelServices, view: VerifiedSubstrateView, command: KernelCommand
 ) -> CommandResult:
@@ -766,6 +804,11 @@ def _run_command(
     if existing_failure is not None:
         return _reconcile_failure(services, command, existing_failure)
 
+    # ONE in-flight command: a genuinely NEW issue is refused while any prior
+    # command lacks a terminal, or any completed command lacks a checkpoint —
+    # so the loop can only ever advance issue → terminal → checkpoint → issue.
+    if cid not in view.issued:
+        _require_settled_before_issue(view, cid)
     # `issue_command` is idempotent (same id+digest is a read, not a 2nd intent)
     substrate.issue_command(command_id=cid, command_kind=kind, command_ref=command_ref)
 

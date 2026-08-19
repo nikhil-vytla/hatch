@@ -95,10 +95,23 @@ the thesis and floor, `docs/ROADMAP.md` for what's next
 (`continual-refine@1`), and `docs/adrs/0008-vnext-substrate.md` for the
 design decision.
 
-## The proof policy
+## The policies
 
 `manual-change@1` (deterministic) builds one coupled prompt+code change,
 `EvaluateFork`s it (the optional comparative mechanism), and — reacting to
-the fork through its reducer — applies then reverts it exactly. Honest
-scope: the fork scores the code surface; the prompt surface is round-trip
-only until `continual-refine@1` adds a real prompt consumer.
+the fork through its reducer — applies then reverts it exactly. It is the
+substrate proof; its fork scores the code surface.
+
+`continual-refine@1` is the real continual, model-led policy. At a trigger it
+`RequestRefinement`s — the kernel renders the prompt from the per-role pinned
+control prompt plus the ACTIVE proposal-template surface and the policy's
+context, calls the model through an injected immutable `ModelCatalog`, journals
+the call (a dispatch then a result, exactly-once and restart-safe), and
+STRICTLY decodes a typed `RefinementProposal` (malformed output is
+failure-as-data). Its surface strategies assemble ONE atomic coupled prompt+code
+change, which it applies immediately under the kernel floor; comparative
+evaluation happens only when it requests `EvaluateFork`. It then observes and at
+a review checkpoint keeps, revises, reverts, or defers — no mandatory tribunal,
+no automatic expiry. The active prompt genuinely shapes the proposal (proved by
+an ablation). CI drives it with a deterministic fake model through the exact
+production adapter path; real-model runs are opt-in (`STRIVE_MODEL_*`).
