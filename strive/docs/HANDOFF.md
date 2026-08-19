@@ -126,8 +126,9 @@ mechanism a policy requests, never a universal activation gate.
   issue is an idempotent read (no second intent); the initial and reconstructed
   `CommandResult` (including `head`) are identical (the command's canonical head
   is a stable pre-terminal point); `expected_state_ref` is a LOGICAL
-  harness-state precondition (robust to intervening non-state events) and is
-  excluded from the command's identity digest so re-derivation stays stable.
+  harness-state precondition (robust to intervening non-state events) that is
+  part of the command's durable identity (a changed precondition is a changed
+  command and fails closed).
 - **Honest budgets/effects.** Per-command usage (including failed/partial) is
   persisted in the terminal result and re-seeded from EVERY completed command
   on restart — no reset, no double-absorption; sandbox limits are capped by
