@@ -62,6 +62,30 @@ def strict_json(value: object) -> str:
     return json.dumps(strict_encode(value), sort_keys=True, separators=(",", ":"))
 
 
+def model_result_usage(result: "ModelResult") -> BudgetUsage:
+    """The honest budget a COMPLETED model call charged: one model call, its
+    exact tokens/cost, and its latency as active wall. Shared by the kernel
+    (which records a refinement terminal's usage) and the substrate (which
+    re-derives and cross-checks it), so they cannot drift."""
+    return BudgetUsage(
+        model_calls=1,
+        tokens=result.input_tokens + result.output_tokens,
+        cost=result.cost,
+        wall_time_s=result.latency_ms / 1000.0,
+    )
+
+
+def model_dispatch_reservation(dispatch: "ModelDispatch") -> BudgetUsage:
+    """The worst case an OPEN model dispatch (crashed before a result) charges:
+    one model call, its requested token cap, and its wall cap — so a crash-loop
+    can never expand any budget dimension."""
+    return BudgetUsage(
+        model_calls=1,
+        tokens=dispatch.reserved_tokens,
+        wall_time_s=dispatch.reserved_wall_s,
+    )
+
+
 def combine_usage(usages: Iterable[BudgetUsage]) -> BudgetUsage:
     """Sum per-attempt usage into one reconciled total — the SAME accounting the
     `BudgetMeter` performs when it seeds from the durable ledger (additive on
@@ -216,6 +240,93 @@ FORK_DISPATCH = "fork-attempt-dispatch"
 FORK_RESULT = "fork-attempt-result"
 FORK_SUMMARY = "fork-evaluation"
 
+# observation_kind tags carried by ObservationRecorded for a RequestRefinement:
+# a model call is journaled as a DISPATCH (before the call, durable) then a
+# RESULT (after), exactly like a fork attempt — so a crash between them is an
+# OPEN dispatch, reconciled as `indeterminate` and never silently re-called.
+REFINE_DISPATCH = "refine-model-dispatch"
+REFINE_RESULT = "refine-model-result"
+
+# the closed vocabulary of surfaces an edit may name and review verdicts
+REVIEW_VERDICTS = ("keep", "revise", "revert", "defer")
+
+
+@register("surface-edit", 1)
+@dataclass(frozen=True)
+class SurfaceEdit:
+    """One exact, full-replacement edit a refinement proposes: the pinned
+    surface it names and the CAS ref of its new content (a pure content
+    address; the content itself travels in the command's `content_blobs`)."""
+
+    surface_kind: str
+    surface_name: str
+    after_ref: str
+
+
+@register("refinement-proposal", 1)
+@dataclass(frozen=True)
+class RefinementProposal:
+    """The STRICTLY-decoded typed output of a model refinement. Malformed model
+    output never becomes one of these — it is failure-as-data. `edits` is the
+    exact coupled change (one or both surfaces); `review_hint` carries a review
+    verdict when this proposal was produced under the review role."""
+
+    change_id: str
+    edits: tuple[SurfaceEdit, ...]
+    rationale: str
+    cited_evidence: tuple[str, ...]
+    expected_outcomes: tuple[str, ...]
+    uncertainty: float
+    review_hint: str  # one of REVIEW_VERDICTS
+
+
+@register("model-dispatch", 1)
+@dataclass(frozen=True)
+class ModelDispatch:
+    """Journaled BEFORE a model call runs (durable). Pins the resolved model,
+    sampling, the rendered prompt (CAS ref), and a stable idempotency key so a
+    provider that supports it can dedupe a retried call; without provider
+    support an unresolved dispatch becomes `indeterminate`. The reservation
+    (one model call, the requested token cap, the wall cap) is the worst case
+    an OPEN dispatch charges, so a crash-loop can never expand any budget
+    dimension — exactly like a fork attempt's reservation."""
+
+    command_id: str
+    prompt_role: str
+    prompt_ref: str
+    adapter_name: str
+    model_id: str
+    max_tokens: int
+    temperature: float
+    seed: int
+    idempotency_key: str
+    reserved_tokens: int
+    reserved_wall_s: float
+
+
+@register("model-result", 1)
+@dataclass(frozen=True)
+class ModelResult:
+    """Journaled AFTER a model call returns (durable). Records the resolved
+    model, usage/latency, normalized finish reason, provider extras, the raw
+    completion (CAS ref), any failure (adapter error / budget / malformed
+    decode) as data, and — on success — the CAS ref of the decoded
+    `RefinementProposal`."""
+
+    command_id: str
+    prompt_role: str
+    adapter_name: str
+    model_id: str
+    response_ref: str | None
+    input_tokens: int
+    output_tokens: int
+    cost: float
+    latency_ms: float
+    finish_reason: str
+    provider_extras: dict[str, str]
+    failure: FailureRecord | None
+    proposal_ref: str | None
+
 
 __all__ = [
     "AttemptDispatched",
@@ -227,9 +338,18 @@ __all__ = [
     "FORK_RESULT",
     "FORK_SUMMARY",
     "ForkObservation",
+    "ModelDispatch",
+    "ModelResult",
     "PolicyStateBlob",
+    "REFINE_DISPATCH",
+    "REFINE_RESULT",
+    "REVIEW_VERDICTS",
+    "RefinementProposal",
     "StoredResult",
+    "SurfaceEdit",
     "combine_usage",
+    "model_dispatch_reservation",
+    "model_result_usage",
     "strict_encode",
     "strict_json",
 ]

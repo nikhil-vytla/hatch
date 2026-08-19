@@ -64,14 +64,20 @@ from strive.runtime import (
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
+    REFINE_DISPATCH,
+    REFINE_RESULT,
     AttemptDispatched,
     AttemptRecord,
     CommandPayload,
     ConfigBlob,
     ForkObservation,
+    ModelDispatch,
+    ModelResult,
     PolicyStateBlob,
     StoredResult,
     combine_usage,
+    model_dispatch_reservation,
+    model_result_usage,
     strict_encode,
 )
 from strive.surfaces import (
@@ -88,7 +94,7 @@ _CAUSE_COMPAT: dict[str, set[str]] = {
     "change-proposed@2": {"ApplyChange", "EvaluateFork", "RequestRefinement"},
     "change-applied@2": {"ApplyChange"},
     "change-reverted@2": {"RevertChange"},
-    "observation-recorded@2": {"EvaluateFork"},
+    "observation-recorded@2": {"EvaluateFork", "RequestRefinement"},
     "change-confirmed@2": {"ConfirmChange"},
     "change-revised@2": {"RequestRefinement"},
 }
@@ -106,6 +112,7 @@ _OK_EFFECTS: dict[str, dict[str, int]] = {
         "fork-evaluation": 1,
     },
     "ConfirmChange": {"change-confirmed@2": 1},
+    "RequestRefinement": {"refine-model-dispatch": 1, "refine-model-result": 1},
     "ScheduleTrigger": {},
     "StopAdaptation": {},
 }
@@ -159,7 +166,7 @@ _PAYLOAD_SPECS: dict[
     "RequestRefinement": (
         frozenset({"prompt_role", "context_ref"}),
         frozenset(),
-        frozenset({"command_id", "prompt_role", "context_ref"}),
+        frozenset({"command_id", "prompt_role", "context_ref", "content_blobs"}),
         None,
     ),
     "ScheduleTrigger": (
@@ -1834,11 +1841,15 @@ def _check_effect_after_failure(
 def _reconciled_usage_from_events(
     sub: Substrate, events: list[tuple[EventEnvelope, object]]
 ) -> BudgetUsage:
-    """The usage a command's DURABLE attempt ledger accounts for: each completed
-    attempt's actual usage plus each OPEN dispatch's worst-case reservation —
-    exactly the kernel's `_reconciled_usage` (both call `combine_usage`)."""
+    """The usage a command's DURABLE ledger accounts for: each completed fork
+    attempt's actual usage OR each completed model call's usage, plus each OPEN
+    dispatch's worst-case reservation — exactly the kernel's `_reconciled_usage`
+    (both call `combine_usage`). A command is either a fork or a refinement, so
+    the two ledgers never overlap for one command."""
     results: dict[str, BudgetUsage] = {}
     dispatched: dict[str, AttemptDispatched] = {}
+    model_results: list[ModelResult] = []
+    model_dispatches: list[ModelDispatch] = []
     for env, body in events:
         if not isinstance(body, ObservationRecorded):
             continue
@@ -1851,8 +1862,16 @@ def _reconciled_usage_from_events(
                     sub.objects.get_text(body.observation_ref), AttemptDispatched
                 )
                 dispatched[disp.label] = disp
+            elif body.observation_kind == REFINE_RESULT:
+                model_results.append(
+                    codec.loads(sub.objects.get_text(body.observation_ref), ModelResult)
+                )
+            elif body.observation_kind == REFINE_DISPATCH:
+                model_dispatches.append(
+                    codec.loads(sub.objects.get_text(body.observation_ref), ModelDispatch)
+                )
         except (ObjectMissing, ObjectCorruption, codec.SchemaError):
-            continue  # decode failures are reported by the fork-lifecycle check
+            continue  # decode failures are reported by the lifecycle checks
     usages = list(results.values())
     for label, disp in dispatched.items():
         if label not in results:
@@ -1861,6 +1880,12 @@ def _reconciled_usage_from_events(
                 wall_time_s=disp.reserved_wall_s,
                 output_bytes=disp.reserved_output_bytes,
             ))
+    # a completed model call charges its actual usage; an OPEN model dispatch
+    # (no result) reserves the worst case — a result overrides its dispatch.
+    if model_results:
+        usages.extend(model_result_usage(r) for r in model_results)
+    else:
+        usages.extend(model_dispatch_reservation(d) for d in model_dispatches)
     return combine_usage(usages)
 
 
@@ -1899,6 +1924,15 @@ def _check_command_grammar(
             errors.append(f"command {cid!r}: proposal must precede its command's effects")
         if kind == "EvaluateFork" and non_terminal and non_terminal[-1] != "fork-evaluation":
             errors.append(f"command {cid!r}: fork summary must be the last effect")
+        if (
+            kind == "RequestRefinement"
+            and REFINE_DISPATCH in non_terminal
+            and REFINE_RESULT in non_terminal
+            and non_terminal.index(REFINE_DISPATCH) > non_terminal.index(REFINE_RESULT)
+        ):
+            errors.append(
+                f"command {cid!r}: model dispatch must precede the model result"
+            )
         _check_stored_result(sub, cid, kind, terminal, events, errors)
     else:  # failed | indeterminate: a failure record and NO success effect
         counts = Counter(tokens)
@@ -1941,12 +1975,15 @@ def _check_stored_result(
     applied_ref: str | None = None
     summary_event_ref: str | None = None  # the ObservationRecorded event body ref
     summary_inner_ref: str | None = None  # the inner ForkObservation ref
+    refine_result_ref: str | None = None  # the REFINE_RESULT event body ref
     for env, body in events:
         if isinstance(body, ChangeApplied):
             applied_ref = body.change_ref
         elif isinstance(body, ObservationRecorded) and body.observation_kind == FORK_SUMMARY:
             summary_event_ref = env.body_ref
             summary_inner_ref = body.observation_ref
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == REFINE_RESULT:
+            refine_result_ref = env.body_ref
     expected_proposal = applied_ref if kind == "ApplyChange" else None
     if stored.proposal_ref != expected_proposal:
         errors.append(
@@ -1974,19 +2011,29 @@ def _check_stored_result(
                     )
             except (ObjectMissing, ObjectCorruption, codec.SchemaError):
                 pass
+    elif kind == "RequestRefinement":
+        # a refinement's result points at its model-result event; it carries no
+        # metrics; its usage is the reconciled model-call ledger
+        if stored.observation_ref != refine_result_ref:
+            errors.append(
+                f"command {cid!r}: StoredResult.observation_ref does not match the "
+                "model result event"
+            )
+        if stored.metrics:
+            errors.append(f"command {cid!r}: StoredResult.metrics on a refinement")
     else:
         if stored.observation_ref is not None:
             errors.append(f"command {cid!r}: StoredResult.observation_ref on a non-fork")
         if stored.metrics:
             errors.append(f"command {cid!r}: StoredResult.metrics on a non-fork")
-    # an OK terminal's usage equals the reconciled attempt ledger for a fork; a
-    # non-fork OK command spends nothing.
-    if kind == "EvaluateFork":
+    # an OK terminal's usage equals the reconciled ledger for a fork or a
+    # refinement; any other OK command spends nothing.
+    if kind in ("EvaluateFork", "RequestRefinement"):
         expected_usage = _reconciled_usage_from_events(sub, events)
         if stored.usage != expected_usage:
             errors.append(
                 f"command {cid!r}: StoredResult.usage does not equal the reconciled "
-                "fork attempt ledger"
+                "ledger"
             )
     elif stored.usage != BudgetUsage():
         errors.append(
@@ -2258,6 +2305,21 @@ def _verify_observation(
                 errors.append(
                     f"envelope {env.seq}: fork candidate does not match the proposed / "
                     "issued change"
+                )
+        elif body.observation_kind == REFINE_DISPATCH:
+            mdisp = codec.loads(sub.objects.get_text(body.observation_ref), ModelDispatch)
+            if mdisp.command_id != cause:
+                errors.append(f"envelope {env.seq}: model dispatch command_id disagrees")
+        elif body.observation_kind == REFINE_RESULT:
+            res = codec.loads(sub.objects.get_text(body.observation_ref), ModelResult)
+            if res.command_id != cause:
+                errors.append(f"envelope {env.seq}: model result command_id disagrees")
+            # a successful result carries a decoded proposal; a failed one a
+            # failure — never both, never neither
+            if (res.proposal_ref is None) == (res.failure is None):
+                errors.append(
+                    f"envelope {env.seq}: model result must carry exactly one of "
+                    "a proposal (ok) or a failure"
                 )
         else:
             errors.append(

@@ -71,6 +71,30 @@ class CompletingAdapter(Protocol):
     def complete(self, request: ModelRequest) -> ModelResponse | FailureRecord: ...
 
 
+class ModelCatalog:
+    """An immutable, injected set of model adapters keyed by ROLE (e.g.
+    ``"refine"``), resolved by exact name, fail-closed. The policy never sees
+    an adapter — it only emits `RequestRefinement`; the kernel resolves the
+    role's adapter here, so there are no provider branches in policy code."""
+
+    def __init__(self, adapters: dict[str, ModelAdapter]) -> None:
+        if not adapters:
+            raise ModelConfigError("a model catalog must contain at least one adapter")
+        self._by_role: dict[str, ModelAdapter] = dict(adapters)
+
+    def roles(self) -> tuple[str, ...]:
+        return tuple(sorted(self._by_role))
+
+    def resolve(self, role: str) -> ModelAdapter:
+        adapter = self._by_role.get(role)
+        if adapter is None:
+            raise ModelConfigError(
+                f"no model adapter for role {role!r}; known: {list(self.roles())} — "
+                "refusing to substitute a different model"
+            )
+        return adapter
+
+
 class FakeModelAdapter:
     """Deterministic offline adapter.
 

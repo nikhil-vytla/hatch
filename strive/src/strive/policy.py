@@ -33,6 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol, Sequence, TypeVar
 
+from strive.cas import ObjectStore
 from strive.substrate import CompositeChange, HarnessState, VerifiedSubstrateView
 
 Config = TypeVar("Config", contravariant=True)
@@ -46,7 +47,12 @@ State = TypeVar("State")
 class RunView:
     """The immutable read a policy is handed each step: the run/task scope,
     the current composite state, the pinned seed state (stable across
-    resume), the journal head, and the ordered event bodies (read-only)."""
+    resume), the journal head, and the ordered event bodies (read-only).
+
+    `objects` is a READ-ONLY content-addressed store: a policy may resolve a
+    ref it sees in `bodies` (e.g. a decoded `RefinementProposal` behind a
+    `ModelResult`, or an edit's content) to build its next change. It exposes
+    no mutation — the kernel remains the only writer."""
 
     run_id: str
     task_id: str
@@ -57,9 +63,19 @@ class RunView:
     head: str
     seed: int
     bodies: tuple[object, ...]
+    objects: ObjectStore | None = None
+
+    def read_text(self, ref: str) -> str:
+        """Resolve a CAS ref to its content (read-only). Raises if no store is
+        attached (a policy built without one cannot resolve refs)."""
+        if self.objects is None:
+            raise RuntimeError("RunView has no object store attached")
+        return self.objects.get_text(ref)
 
     @staticmethod
-    def of(seed: int, view: VerifiedSubstrateView) -> "RunView":
+    def of(
+        seed: int, view: VerifiedSubstrateView, objects: ObjectStore | None = None
+    ) -> "RunView":
         return RunView(
             run_id=view.run_id,
             task_id=view.task_id,
@@ -70,6 +86,7 @@ class RunView:
             head=view.head,
             seed=seed,
             bodies=view.bodies,
+            objects=objects,
         )
 
 
@@ -79,12 +96,16 @@ class RunView:
 @dataclass(frozen=True)
 class RequestRefinement:
     """Ask the kernel to run the model under a pinned prompt role and decode a
-    strict typed proposal. The kernel performs and journals the model call
-    once, so a restart never repeats it."""
+    strict typed proposal. The kernel renders the prompt from the ACTIVE
+    proposal-template surface plus the policy's context (`context_ref`, staged
+    via `content_blobs`), performs and journals the model call once, so a
+    restart never repeats it. `context_ref` MUST be a key of `content_blobs`
+    (the policy supplies the exact context bytes it addresses)."""
 
     command_id: str
     prompt_role: str
     context_ref: str
+    content_blobs: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
