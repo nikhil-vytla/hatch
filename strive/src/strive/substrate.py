@@ -1339,6 +1339,17 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                         "noncanonical"
                     )
                 _check_command_payload_coherence(sub, env, payload, errors)
+                # a fork's issue_state_ref is the base anchor: it MUST equal the
+                # state folded at the moment the fork was issued — not an
+                # arbitrary ref the policy chose.
+                if (
+                    payload.kind == "EvaluateFork"
+                    and payload.issue_state_ref != state_ref
+                ):
+                    errors.append(
+                        f"envelope {env.seq}: fork issue_state_ref does not equal the "
+                        "folded state at issue"
+                    )
                 payloads.setdefault(body.command_id, payload)
             except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
                 errors.append(f"envelope {env.seq}: command payload does not decode: {exc}")
@@ -1613,14 +1624,26 @@ def _decode_change(
         return None
 
 
+def _reject_nonfinite(_token: str) -> object:
+    raise ValueError("non-finite number (NaN/Infinity) is not canonical JSON")
+
+
 def _canonical_json_ok(text: str) -> bool:
     """True iff `text` parses AND is the exact canonical serialization
-    (sorted keys, tight separators). Rejects malformed OR noncanonical JSON."""
+    (sorted keys, tight separators). Rejects malformed OR noncanonical JSON,
+    AND rejects NaN/Infinity — which `json` would otherwise round-trip — so no
+    non-finite number can hide inside a canonical payload/config/state blob."""
     try:
-        parsed = json.loads(text)
+        parsed = json.loads(text, parse_constant=_reject_nonfinite)
     except (ValueError, TypeError):
         return False
-    return json.dumps(parsed, sort_keys=True, separators=(",", ":")) == text
+    try:
+        canonical = json.dumps(
+            parsed, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+    except ValueError:
+        return False
+    return canonical == text
 
 
 def _check_command_payload_coherence(

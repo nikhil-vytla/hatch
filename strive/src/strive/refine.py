@@ -32,11 +32,15 @@ _TOP_KEYS = {
 _EDIT_KEYS = {"surface_kind", "surface_name", "content"}
 
 
-def render_prompt(active_template: str, context: str) -> str:
-    """Assemble the model prompt from the ACTIVE proposal-template surface and
-    the policy's context. Deterministic: the same inputs render the same bytes,
-    so a resumed refinement re-derives the identical prompt."""
+def render_prompt(control_prompt: str, active_template: str, context: str) -> str:
+    """Assemble the model prompt from THREE parts: the pinned CONTROL prompt for
+    the role (the versioned refine/review instructions), the ACTIVE
+    proposal-template surface (the evolvable prompt that genuinely shapes a
+    refinement), and the policy's context. Deterministic: the same inputs render
+    the same bytes, so a resumed refinement re-derives the identical prompt."""
     return (
+        f"{control_prompt.strip()}\n\n"
+        "=== active proposal template ===\n"
         f"{active_template.strip()}\n\n"
         "=== refinement context ===\n"
         f"{context.strip()}\n"

@@ -278,12 +278,52 @@ always equals the durable external-effect ledger — with each command and
 attempt a single verifiable lifecycle across concurrency, corruption, and
 restart, verification pure and independent of kernel import order.
 
+## Phase B — `continual-refine@1` (the real continual policy)
+
+Phase B implements the Prime-Agent / Continual-Harness-style continual,
+model-led policy on the Phase A substrate. No Pareto search; no universal
+promotion gate.
+
+- **`RequestRefinement` is real and exactly-once.** The kernel renders the
+  prompt from the per-role PINNED control prompt (`refine.md` / `review.md`,
+  from `PolicyBound.prompt_refs`) + the ACTIVE `prompt/proposal-template`
+  surface + the policy's context, resolves an adapter from an injected,
+  immutable `ModelCatalog` (no provider branches in policy code), and journals
+  the call as a durable model DISPATCH then RESULT — exactly like a fork
+  attempt. A crash between them is an OPEN dispatch reconciled as
+  `indeterminate` (explicit retry, never silently re-called); a pre-call budget
+  denial fails with no effect; adapter error / token+cost overrun / malformed
+  decode are failure-as-data with a durable model result. Model-call usage is
+  folded into the durable ledger, so model budgets survive restart.
+- **Strict typed proposals.** `strive.refine.decode_proposal` decodes a
+  `RefinementProposal` (edits, rationale, cited evidence, expected outcomes,
+  uncertainty, review hint) and rejects NaN/Infinity, unknown/missing keys, and
+  off-limits or structurally-invalid surfaces.
+- **The policy** (`strive.policies.continual_refine`) assembles ONE atomic
+  coupled prompt+code change through prompt/strategy-code `SurfaceStrategy`
+  implementations (a pinned `dependency_module`), applies structurally-valid
+  changes immediately, optionally `EvaluateFork`s (observation, not a gate),
+  and at a review checkpoint keeps / revises / reverts / defers. A deterministic
+  run+cycle-scoped state machine and an event-excluding context builder make
+  resume byte-exact.
+- **Hardening.** A fork's `issue_state_ref` must equal the folded issue state;
+  one in-flight command (terminal+checkpoint before the next issue) is enforced
+  at the kernel boundary; canonical JSON rejects NaN/Infinity; every declared
+  dependency is imported before hashing.
+- **Proof.** `test_continual_refine` drives the E2E with a deterministic fake
+  model through the exact production adapter path (real-model runs opt-in via
+  `STRIVE_MODEL_*`): seed `\d+` weakness → coupled proposal → immediate apply →
+  negatives sum correctly → restart with no duplicate call → review keep/revert
+  → exact rollback, an ablation proving the active prompt causally determines
+  the proposal, and an adversarial battery (malformed/failing model, exhausted
+  budget, indeterminate dispatch, unavailable secure backend, crash at every
+  boundary). `uv run pytest` = 257; `uv run mypy` clean over 43 files.
+
 ### Next
 
-After review + merge: begin the Prime-Agent / Continual-Harness-style
-`continual-refine@1` end-to-end policy (a real model refiner behind
-`RequestRefinement`, a real prompt consumer, optional composed fork
-evaluation). See `docs/ROADMAP.md`.
+After review + merge: a real prompt CONSUMER at acting time beyond proposal
+shaping, multi-cycle cadence experiments, and richer review evidence. See
+`docs/ROADMAP.md`.
 
 The promotion-era handoff is archived at
 `docs/archive/HANDOFF-stage1-3c.md`.

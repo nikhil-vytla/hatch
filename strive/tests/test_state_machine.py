@@ -481,6 +481,26 @@ def test_unrelated_fork_state_refused(tmp_path: Path) -> None:
     assert any("is not the issued base/candidate state" in e for e in _errors(sub))
 
 
+def test_fork_issue_state_ref_must_equal_folded_state(tmp_path: Path) -> None:
+    # a fork's issue_state_ref is the base anchor: forging one that is NOT the
+    # folded state at issue is refused
+    sub = _bound(tmp_path, new_run_id())
+    seed = sub.verify().seed_state.as_map()
+    code_after = hash_text("def solve(input_text: str) -> int:\n    return 1\n")
+    cand = CompositeChange(
+        "cand",
+        (SurfaceDelta("strategy-code", "solve", seed[("strategy-code", "solve")], code_after),),
+        "candidate",
+    )
+    payload = coherent_payload(
+        sub, "k", "EvaluateFork", change=cand, issue_state_ref="0" * 64,
+    )
+    _forge_issue(sub, "k", "EvaluateFork", payload)
+    assert any(
+        "fork issue_state_ref does not equal the folded state" in e for e in _errors(sub)
+    )
+
+
 def test_forged_improved_refused(tmp_path: Path) -> None:
     sub = _bound(tmp_path, new_run_id())
     cand, base_ref, cand_ref = _fork_setup(sub)

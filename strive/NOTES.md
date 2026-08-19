@@ -1668,3 +1668,71 @@ Drafted policy prompts: `prompts/continual_refine_refine@1.md` and
 `RefinementProposal` (change_id, rationale, cited_evidence, expected_outcomes,
 uncertainty in [0,1], review_hint in {keep,revise,revert,defer}, edits[]).
 Review reuses the same decode type via `review_hint`.
+
+## 2026-08-18 — Phase B implementation: continual-refine@1
+
+Built the real continual, model-led policy over the Phase A substrate.
+
+### Kernel RequestRefinement (`_run_refinement`)
+Journals a model DISPATCH then RESULT as ObservationRecorded (REFINE_DISPATCH/
+REFINE_RESULT), mirroring the fork attempt lifecycle:
+- reuse a durable ModelResult across a crash before the terminal; an OPEN
+  dispatch (no result) → IndeterminateEffect (explicit retry, never re-called);
+- budget checked FIRST (a pre-call denial fails with NO dispatch/result, so
+  nothing is charged/replayed); then dispatch (durable) → adapter.complete →
+  result (durable);
+- adapter error / token+cost overrun / malformed decode → failed terminal with
+  a durable ModelResult recording the failure (failure-as-data);
+- the prompt is rendered from the per-role pinned CONTROL prompt (refine.md /
+  review.md, from PolicyBound.prompt_refs) + the ACTIVE proposal-template
+  surface + the policy context — so the active prompt genuinely shapes the call.
+
+Restart-safe model budget: `_seed_meter` and `_reconciled_usage` fold model
+results (model_result_usage) and open dispatch reservations
+(model_dispatch_reservation) into the durable ledger, alongside fork usage.
+
+### Substrate verify
+- `_OK_EFFECTS["RequestRefinement"]` = one dispatch + one result (ordered);
+  cause-compat for its observations; `_verify_observation` decodes
+  ModelDispatch/ModelResult (command_id == cause; a result carries exactly one
+  of proposal|failure); per-outcome StoredResult checks (ok: observation_ref ==
+  the model-result event, no metrics, usage == reconciled model ledger).
+- Hardening: a fork's `issue_state_ref` must equal the folded state at issue;
+  `_canonical_json_ok` now rejects NaN/Infinity (parse_constant + allow_nan);
+  `_policy_digest` imports each declared dependency module before hashing.
+- One-in-flight discipline enforced at the KERNEL boundary
+  (`_require_settled_before_issue`): a new issue is refused while a prior
+  command lacks a terminal or a consuming checkpoint. (Left OUT of substrate
+  verify on purpose — the substrate is a general mechanism and direct-substrate
+  tests legitimately issue multiple uncompleted commands.)
+
+### Policy package
+- `continual_refine.py`: strict TOML config (triggers, trajectory window, edit
+  limit, enabled strategies, model role, review mode/cadence, optional
+  EvaluateFork, max cycles); deterministic run+cycle-scoped state machine; a
+  context builder that EXCLUDES the in-flight refine's own events so a resumed
+  re-derivation is byte-identical (the payload digest is stable).
+- `continual_refine_strategies.py` (a declared dependency_module, pinned into
+  the digest): prompt & strategy-code SurfaceStrategy impls that turn a
+  RefinementProposal into per-surface deltas, skipping no-op edits; the
+  orchestrator merges them into ONE atomic coupled change. Rationale ->
+  change.summary; strategy set -> ApplyChange.strategy_ref (annotations bound).
+- `runtime` gained SurfaceEdit, RefinementProposal, ModelDispatch (with
+  reservation), ModelResult; `strive.refine` renders the prompt and STRICTLY
+  decodes the proposal (rejects NaN/Infinity, unknown/missing keys, off-limits
+  or structurally-invalid surfaces). `strive.model.ModelCatalog` is the
+  injected, immutable, fail-closed role->adapter.
+- RunView gained a READ-ONLY ObjectStore so a policy can resolve a proposal ref
+  to build its next change (no mutation exposed).
+- CLI `run --policy continual-refine@1` wires a real adapter from
+  STRIVE_MODEL_* env (opt-in); offline it is a clean error (never a silent fake).
+
+### E2E (deterministic FakeModelAdapter through the real ModelCatalog path)
+seed \d+ weakness -> refine -> typed coupled proposal -> immediate apply ->
+negatives now sum correctly -> restart resumes with NO duplicate model call ->
+review keeps or (model/auto) reverts -> rollback restores the EXACT seed. An
+ablation proves the ACTIVE PROMPT causally determines the proposal. Adversarial:
+malformed output, adapter error, exhausted model budget (no effect), open
+dispatch -> indeterminate (not re-run), unavailable secure backend, NaN
+uncertainty, and crash-and-resume after every command boundary. Real-model runs
+are opt-in. pytest 257, mypy 43 files, wheel smoke retained.

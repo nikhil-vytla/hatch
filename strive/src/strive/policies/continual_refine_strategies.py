@@ -58,6 +58,8 @@ class SurfaceRefinementStrategy:
         if edit is None:
             return None
         before = view.state.content_ref(*self.surface)
+        if before == edit.after_ref:
+            return None  # a no-op edit (unchanged content) is not a delta
         return SurfaceDelta(self.surface[0], self.surface[1], before, edit.after_ref)
 
     def propose(self, view: RunView) -> CompositeChange | None:
