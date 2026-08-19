@@ -58,9 +58,10 @@ from pathlib import Path
 from typing import Any
 
 from strive import codec
-from strive.budget import BudgetMeter
+from strive.budget import UNLIMITED, BudgetMeter
 from strive.cas import ObjectCorruption, ObjectMissing, hash_text
 from strive.contracts import (
+    FAILURE_COST_UNAVAILABLE,
     FAILURE_MALFORMED_OUTPUT,
     FAILURE_MODEL_ERROR,
     BudgetSpec,
@@ -78,6 +79,7 @@ from strive.policy import (
     ConfirmChange,
     EvaluateFork,
     KernelCommand,
+    ObserveCurrentState,
     PolicyCatalog,
     RequestRefinement,
     RevertChange,
@@ -92,6 +94,9 @@ from strive.runtime import (
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
+    OBSERVE_LABEL,
+    OBSERVE_RESULT,
+    REFINE_BINDING,
     REFINE_DISPATCH,
     REFINE_RESULT,
     AttemptDispatched,
@@ -99,6 +104,7 @@ from strive.runtime import (
     CommandPayload,
     ConfigBlob,
     ForkObservation,
+    ModelBinding,
     ModelDispatch,
     ModelResult,
     PolicyStateBlob,
@@ -160,6 +166,10 @@ class KernelServices:
     # `RequestRefinement` resolves its adapter here — the policy never sees one.
     models: ModelCatalog | None = None
     model_role: str = "refine"
+    # a TEST-ONLY escape hatch: drive a `requires_secure_execution` policy on an
+    # insecure (fault-only) backend. Production never sets this, so a policy that
+    # runs model-authored code can never silently downgrade off a secure backend.
+    allow_insecure_execution: bool = False
 
     @staticmethod
     def open(
@@ -175,6 +185,7 @@ class KernelServices:
         surface_catalog: SurfaceCatalog | None = None,
         models: ModelCatalog | None = None,
         model_role: str = "refine",
+        allow_insecure_execution: bool = False,
     ) -> "KernelServices":
         executor = CandidateExecutor.from_catalog(
             default_sandbox_catalog(), sandbox_backend, trusted=trusted
@@ -192,6 +203,7 @@ class KernelServices:
             required_capabilities=required_capabilities,
             models=models,
             model_role=model_role,
+            allow_insecure_execution=allow_insecure_execution,
         )
 
 
@@ -238,6 +250,19 @@ def run_policy(
     substrate = services.substrate
     descriptor = catalog.descriptor(policy_name)
     policy = descriptor.factory()
+
+    # a policy that runs model-authored code inside the harness (e.g.
+    # continual-refine@1) REQUIRES a mechanically-secure executor; production
+    # never defaults to fault-only for it. Only the explicit test-only opt-in
+    # permits an insecure backend.
+    if descriptor.requires_secure_execution and not services.executor.capabilities().secure:
+        if not services.allow_insecure_execution:
+            raise KernelError(
+                f"policy {policy_name!r} requires secure execution but the backend "
+                f"{services.executor.backend_name!r} is not secure — refusing to run "
+                "model-authored code on an insecure backend (production must use a "
+                "secure backend; tests opt in explicitly)"
+            )
 
     config_ref = _config_ref(config)
     policy_digest = _policy_digest(policy, descriptor.dependency_modules)
@@ -290,7 +315,7 @@ def run_policy(
             consumed = checkpoint.consumed_command_id
         else:
             state = policy.initial_state(
-                config, RunView.of(services.seed, view, substrate.objects)
+                config, RunView.of(services.seed, view, substrate.objects.reader())
             )
             consumed = None
 
@@ -299,7 +324,7 @@ def run_policy(
         while commands < max_commands:
             view = substrate.verify()
             substrate._require_ok(view, "run")
-            run_view = RunView.of(services.seed, view, substrate.objects)
+            run_view = RunView.of(services.seed, view, substrate.objects.reader())
             command = policy.next_command(config, state, run_view)
             if command is None:
                 stopped_reason = "done"
@@ -406,6 +431,9 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[(disp.command_id, disp.label)] = disp
+        elif body.observation_kind == OBSERVE_RESULT:
+            rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
+            results[(rec.command_id, rec.label)] = rec.usage
         elif body.observation_kind == REFINE_RESULT:
             res = codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
             model_results[res.command_id] = res
@@ -454,6 +482,9 @@ def _reconciled_usage(
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[disp.label] = disp
+        elif body.observation_kind == OBSERVE_RESULT:
+            rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
+            results[rec.label] = rec.usage
         elif body.observation_kind == REFINE_RESULT:
             model_results.append(
                 codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
@@ -557,6 +588,26 @@ def _refinement_dispatched(
     )
 
 
+def _refinement_binding(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> ModelBinding | None:
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == REFINE_BINDING
+        ):
+            return codec.loads(
+                services.substrate.objects.get_text(body.observation_ref), ModelBinding
+            )
+    return None
+
+
+def _parse_surface(spec: str) -> tuple[str, str]:
+    kind, _, name = spec.partition("/")
+    return kind, name
+
+
 def _active_prompt_template(view: VerifiedSubstrateView, substrate: Substrate) -> str:
     """The ACTIVE proposal-template surface content — the prompt that genuinely
     shapes this refinement. Missing/unreadable content is a hard error (a
@@ -606,8 +657,31 @@ def _run_refinement(
         )
     adapter: ModelAdapter = services.models.resolve(services.model_role)
 
-    # stage the policy's context bytes, then render the prompt from the ACTIVE
-    # template + that context
+    # MODEL BINDING: pin (or, on resume, verify) the resolved model+config —
+    # a run can never silently switch models after the binding is journaled.
+    bound_model = _refinement_binding(services, view, cid)
+    now_binding = (adapter.adapter_name, adapter.model_id, adapter.config_digest)
+    if bound_model is not None:
+        if (bound_model.adapter_name, bound_model.model_id, bound_model.config_digest) != now_binding:
+            raise KernelError(
+                f"refinement {cid!r} was bound to "
+                f"{bound_model.adapter_name}/{bound_model.model_id} but the injected "
+                f"model is {adapter.adapter_name}/{adapter.model_id} — refusing to "
+                "switch models after issue"
+            )
+    subject = view.state_ref or ""
+    if bound_model is None:
+        substrate.record_observation(
+            observation_kind=REFINE_BINDING,
+            observation=ModelBinding(
+                command_id=cid, adapter_name=adapter.adapter_name,
+                model_id=adapter.model_id, config_digest=adapter.config_digest,
+            ),
+            subject_state_ref=subject, caused_by=cid,
+        )
+
+    # stage the policy's context bytes, then render the prompt from the pinned
+    # control prompt + the ACTIVE template + that context
     for ref, content in command.content_blobs.items():
         if hash_text(content) != ref:
             raise KernelError(f"refinement context does not hash to its ref {ref[:12]}…")
@@ -616,8 +690,6 @@ def _run_refinement(
         context = substrate.objects.get_text(command.context_ref)
     except (ObjectMissing, ObjectCorruption) as exc:
         raise KernelError(f"refinement context ref unreadable: {exc}") from None
-    # the pinned CONTROL prompt for this role (refine.md / review.md), from the
-    # authoritative PolicyBound — a role with no pinned prompt is a hard error
     if view.bound is None:
         raise KernelError("cannot refine before the policy is bound")
     control_ref = view.bound.prompt_refs.get(command.prompt_role)
@@ -631,22 +703,31 @@ def _run_refinement(
     prompt = render_prompt(control, template, context)
     prompt_ref = substrate.objects.put_text(prompt)
 
+    meter = services.meter
+    max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS)
+    est_input = max(1, len(prompt) // 4)  # the input-token estimate we reserve
+    est_cost = adapter.estimate_cost(est_input, max_tokens)
+    # COST FAILS CLOSED: a finite cost budget against an adapter that cannot
+    # report OR estimate cost is refused before any call happens.
+    if meter.spec.cost != UNLIMITED and not adapter.reports_cost and est_cost is None:
+        raise KernelError(
+            f"a finite cost budget is set but adapter {adapter.adapter_name!r} "
+            "cannot report or estimate cost — refusing the call"
+        )
     # budget FIRST (deterministic, re-derivable): a pre-call denial fails the
     # command with NO dispatch/result effects, so nothing is charged or replayed
-    meter = services.meter
     denial = meter.request_model_call()
     if denial is not None:
         raise KernelError(denial.detail)
     timeout = meter.model_call_timeout_s(_DEFAULT_MODEL_TIMEOUT_S)
-    max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS)
 
-    subject = view.state_ref or ""
     dispatch = ModelDispatch(
         command_id=cid, prompt_role=command.prompt_role, prompt_ref=prompt_ref,
         adapter_name=adapter.adapter_name, model_id=adapter.model_id,
         max_tokens=max_tokens, temperature=0.0, seed=services.seed,
         idempotency_key=f"{substrate.run_id}:{cid}",
-        reserved_tokens=max_tokens, reserved_wall_s=round(timeout, 6),
+        reserved_tokens=est_input + max_tokens, reserved_wall_s=round(timeout, 6),
+        reserved_cost=est_cost if est_cost is not None else 0.0,
     )
     substrate.record_observation(
         observation_kind=REFINE_DISPATCH, observation=dispatch,
@@ -684,9 +765,17 @@ def _run_refinement(
             failure = overrun
         else:
             try:
+                # decode STRICTLY under the issued durable constraints, against
+                # the RUN-PINNED descriptors + policy-enabled surfaces
                 proposal, blobs = decode_proposal(
-                    response.text, catalog=substrate.catalog,
-                    allowed_surfaces=frozenset(substrate.catalog.keys()),
+                    response.text,
+                    validate=substrate.pinned_validator(view),
+                    enabled_surfaces=frozenset(
+                        _parse_surface(s) for s in command.enabled_surfaces
+                    ),
+                    required_change_id=command.required_change_id,
+                    edit_limit=command.edit_limit,
+                    edit_rule=command.edit_rule,
                 )
                 for ref, content in blobs.items():
                     substrate.objects.put_text(content)
@@ -927,6 +1016,9 @@ def _perform(
     if isinstance(command, EvaluateFork):
         return _evaluate_fork(services, view, command)
 
+    if isinstance(command, ObserveCurrentState):
+        return _run_observation(services, view, command)
+
     if isinstance(command, ConfirmChange):
         if not _caused(view, cid, "change-confirmed@2"):
             substrate.confirm_change(
@@ -1051,6 +1143,59 @@ def _fork_metrics(base: float, candidate: float, improved: bool) -> dict[str, fl
     }
 
 
+def _observation_result(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> tuple[str, AttemptRecord] | None:
+    """The state-observation's durable result, if present: (the
+    ObservationRecorded EVENT body ref, the decoded AttemptRecord)."""
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == OBSERVE_RESULT
+        ):
+            rec = codec.loads(
+                services.substrate.objects.get_text(body.observation_ref), AttemptRecord
+            )
+            return env.body_ref, rec
+    return None
+
+
+def _run_observation(
+    services: KernelServices, view: VerifiedSubstrateView, command: ObserveCurrentState
+) -> CommandResult:
+    """Execute the ACTIVE harness once and journal a single typed, state-scoped
+    result (an AttemptRecord, label "current"). This is FEEDBACK — never a gate:
+    the command SUCCEEDS whatever the harness scored; the record carries the
+    behavior (score, per-case errors, any sandbox failure). Deterministic and
+    re-runnable, so a crash before the result just re-observes on resume."""
+    substrate = services.substrate
+    cid = command.command_id
+    kind = "ObserveCurrentState"
+    existing = _observation_result(services, view, cid)
+    if existing is not None:
+        event_ref, _ = existing
+        return CommandResult(
+            cid, kind, "ok", view.head, observation_ref=event_ref,
+            detail="state already observed",
+        )
+    rec = _run_attempt(
+        services, cid, OBSERVE_LABEL, view.state, view.state_ref or "",
+        gen_prefix="observe",
+    )
+    substrate.record_observation(
+        observation_kind=OBSERVE_RESULT, observation=rec,
+        subject_state_ref=view.state_ref or "", caused_by=cid,
+    )
+    found = _observation_result(services, substrate.verify(), cid)
+    assert found is not None  # just journaled
+    event_ref, _ = found
+    return CommandResult(
+        cid, kind, "ok", substrate.verify().head,
+        observation_ref=event_ref, detail="state observed",
+    )
+
+
 def _usage_delta(before: BudgetUsage, after: BudgetUsage) -> BudgetUsage:
     return BudgetUsage(
         wall_time_s=round(max(0.0, after.wall_time_s - before.wall_time_s), 6),
@@ -1086,20 +1231,24 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
 
 
 def _run_attempt(
-    services: KernelServices, cid: str, label: str, state: HarnessState, state_ref: str
+    services: KernelServices, cid: str, label: str, state: HarnessState, state_ref: str,
+    *, gen_prefix: str = "fork",
 ) -> AttemptRecord:
-    """Execute one base/candidate attempt CASE-BY-CASE, enforcing CUMULATIVE
-    output and wall across cases (each case's sandbox caps come from the
-    REMAINING budget, not a fresh per-case cap). Returns an AttemptRecord even
-    when the attempt is denied/fails mid-suite — with the ACTUAL provenance,
-    failure, denials, and the usage it actually charged — so charges and
-    provenance survive to the next crash point (`ok=False` on any failure)."""
+    """Execute one attempt (a fork base/candidate, or an ObserveCurrentState of
+    the active harness) CASE-BY-CASE, enforcing CUMULATIVE output and wall
+    across cases (each case's sandbox caps come from the REMAINING budget, not a
+    fresh per-case cap). Returns an AttemptRecord even when the attempt is
+    denied/fails mid-suite — with the ACTUAL provenance, failure, denials, and
+    the usage it actually charged — so charges and provenance survive to the
+    next crash point (`ok=False` on any failure). `gen_prefix` labels the
+    report's generation (`fork` / `observe`) so verify binds it to its role."""
     meter = services.meter
     substrate = services.substrate
+    gen = f"{gen_prefix}-{label}"
     before = meter.usage()
     code_ref = state.content_ref("strategy-code", "solve")
     if code_ref is None:
-        empty = ExecutionReport(ok=True, generation_id=f"fork-{label}", outcomes=())
+        empty = ExecutionReport(ok=True, generation_id=gen, outcomes=())
         evaluation = evaluate(services.task, empty, services.task.selection_cases())
         return AttemptRecord(
             command_id=cid, label=label, state_ref=state_ref,
@@ -1122,7 +1271,7 @@ def _run_attempt(
             failure = denial
             break
         result = services.executor.execute_suite(
-            source, [case], generation_id=f"fork-{label}",
+            source, [case], generation_id=gen,
             limits=_budget_limits(services),  # caps from REMAINING budget
         )
         meter.note_output_bytes(result.report.stdout_bytes)  # ACTUAL captured bytes
@@ -1137,7 +1286,7 @@ def _run_attempt(
         provenance = services.executor.provenance()
     report = ExecutionReport(
         ok=failure is None,
-        generation_id=f"fork-{label}",
+        generation_id=gen,
         outcomes=tuple(outcomes),
         failure=failure,
         wall_time_s=round(total_wall, 6),

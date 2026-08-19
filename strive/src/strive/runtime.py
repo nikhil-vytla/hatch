@@ -77,12 +77,13 @@ def model_result_usage(result: "ModelResult") -> BudgetUsage:
 
 def model_dispatch_reservation(dispatch: "ModelDispatch") -> BudgetUsage:
     """The worst case an OPEN model dispatch (crashed before a result) charges:
-    one model call, its requested token cap, and its wall cap — so a crash-loop
-    can never expand any budget dimension."""
+    one model call, its estimated input+output tokens, its wall cap, and its
+    estimated cost — so a crash-loop can never expand any budget dimension."""
     return BudgetUsage(
         model_calls=1,
         tokens=dispatch.reserved_tokens,
         wall_time_s=dispatch.reserved_wall_s,
+        cost=dispatch.reserved_cost,
     )
 
 
@@ -241,11 +242,21 @@ FORK_RESULT = "fork-attempt-result"
 FORK_SUMMARY = "fork-evaluation"
 
 # observation_kind tags carried by ObservationRecorded for a RequestRefinement:
-# a model call is journaled as a DISPATCH (before the call, durable) then a
-# RESULT (after), exactly like a fork attempt — so a crash between them is an
-# OPEN dispatch, reconciled as `indeterminate` and never silently re-called.
+# a model call is journaled as a BINDING (pinning the resolved model, first) →
+# a DISPATCH (before the call, durable) → a RESULT (after), exactly like a fork
+# attempt — so a crash between them is an OPEN dispatch, reconciled as
+# `indeterminate` and never silently re-called, and the model can never be
+# switched after the binding.
+REFINE_BINDING = "refine-model-binding"
 REFINE_DISPATCH = "refine-model-dispatch"
 REFINE_RESULT = "refine-model-result"
+
+# observation_kind for an ObserveCurrentState command: it executes the ACTIVE
+# harness once through the secure executor and journals a single typed,
+# state-scoped result (an AttemptRecord, label "current"). This is FEEDBACK the
+# refiner reacts to — never an acceptance gate.
+OBSERVE_RESULT = "observe-state-result"
+OBSERVE_LABEL = "current"
 
 # the closed vocabulary of surfaces an edit may name and review verdicts
 REVIEW_VERDICTS = ("keep", "revise", "revert", "defer")
@@ -280,6 +291,21 @@ class RefinementProposal:
     review_hint: str  # one of REVIEW_VERDICTS
 
 
+@register("model-binding", 1)
+@dataclass(frozen=True)
+class ModelBinding:
+    """Journaled as the FIRST effect of a refinement (before the dispatch): the
+    resolved adapter, model, and config digest this command is committed to.
+    On resume the kernel re-resolves and refuses to proceed if the injected
+    model no longer matches — a run cannot silently switch models after issue.
+    Verification binds the dispatch/result adapter+model to this record."""
+
+    command_id: str
+    adapter_name: str
+    model_id: str
+    config_digest: str
+
+
 @register("model-dispatch", 1)
 @dataclass(frozen=True)
 class ModelDispatch:
@@ -300,8 +326,9 @@ class ModelDispatch:
     temperature: float
     seed: int
     idempotency_key: str
-    reserved_tokens: int
+    reserved_tokens: int  # estimated input + capped output tokens
     reserved_wall_s: float
+    reserved_cost: float
 
 
 @register("model-result", 1)
@@ -338,9 +365,13 @@ __all__ = [
     "FORK_RESULT",
     "FORK_SUMMARY",
     "ForkObservation",
+    "ModelBinding",
     "ModelDispatch",
     "ModelResult",
+    "OBSERVE_LABEL",
+    "OBSERVE_RESULT",
     "PolicyStateBlob",
+    "REFINE_BINDING",
     "REFINE_DISPATCH",
     "REFINE_RESULT",
     "REVIEW_VERDICTS",
