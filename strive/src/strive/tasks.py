@@ -73,19 +73,44 @@ class Task:
         return self.cases_in(AUDIT)
 
     def fingerprint(self) -> str:
-        """Content hash of the task's cases + scoring version, for drift detection."""
+        """A RECONSTRUCTABLE identity of the task AND its full evaluation
+        semantics: id, version, signature, primitive catalog, every case, the
+        per-case scorer (`score_case`), the CASE-SELECTION rule
+        (`selection_cases` — which cases a fork scores), AND the AGGREGATE
+        evaluator (`strive.evaluate.evaluate` + `_aggregate`). Two tasks that
+        select or aggregate differently fingerprint differently, so a resumed
+        run detects an evaluation-semantics swap, not only a scorer or
+        case-set change."""
+        import inspect
+
+        from strive import evaluate as _eval
+
+        def _src(obj: object) -> str:
+            try:
+                return inspect.getsource(obj)  # type: ignore[arg-type]
+            except (OSError, TypeError):
+                return getattr(obj, "__qualname__", repr(obj))
+
+        def _digest(text: str) -> str:
+            return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
         canonical = json.dumps(
             {
                 "task_id": self.task_id,
                 "version": self.version,
+                "signature": self.signature,
+                "primitive_catalog": list(self.primitive_catalog),
                 "cases": [
                     [c.case_id, c.input_text, c.expected, c.split] for c in self.cases
                 ],
+                "scorer_impl": _digest(_src(type(self).score_case)),
+                "selection_impl": _digest(_src(type(self).selection_cases)),
+                "evaluator_impl": _digest(_src(_eval.evaluate) + _src(_eval._aggregate)),
             },
             sort_keys=True,
             separators=(",", ":"),
         )
-        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return _digest(canonical)
 
     def score_case(
         self, case: TaskCase, output: int | None, error: str | None

@@ -1126,3 +1126,508 @@ accepted-and-current at resume time.
   refuses insecure backend.
 
 336 tests (300 non-deno + 36 deno-gated), mypy strict clean (63 files).
+
+## vNext Phase A — policy-neutral revision-native substrate (architecture reset)
+
+- New thesis: durable mechanisms for model-led adaptation (Exo lineage);
+  comparative evaluation is an OPTIONAL mechanism a policy requests
+  (EvaluateFork), NOT a universal activation gate. The AcceptancePolicy /
+  empirical-promotion ceremony is retired.
+- New core: strive.substrate (append-only framed event stream + CAS as the
+  SOLE harness state; native composite state = allowlisted surface bindings
+  with exact before/after CAS refs; 11 typed records; state folded from
+  authority events; exact revert by change inversion; expected-head checks).
+  strive.policy (AdaptationPolicy[Config,State] + SurfaceStrategy protocols;
+  closed command vocabulary; immutable RunView; injected immutable
+  PolicyCatalog). strive.kernel (resumable command loop; journals
+  intent/result; content-addressed policy-state checkpoints; idempotent
+  across crashes via completed-command set + authority-effect detection).
+  strive.policies.manual_change (manual-change@1 proof + TOML config +
+  versioned prompt md).
+- Deleted (compat/migration out of scope): lifecycle, loop, reader,
+  dualwrite, experiment, selection, evidence, validators, datasets,
+  promptgate, migrations, migrate, capability, store, stage3_contracts,
+  monitors, propose, model_proposer, diagnose, revisions, old policy,
+  fakemodel, cli; + promotion wire types in contracts.
+- Kept: codec, cas, framing, contracts (primitives), tasks, evaluate,
+  budget, model, and the whole secure sandbox stack (CandidateExecutor).
+- Gotchas: (1) RunView must carry the pinned SEED state, not just current —
+  the policy builds its change against the seed so resume-after-apply
+  re-derives the same change and the kernel's idempotency skips re-applying.
+  (2) The kernel dedups identical consecutive checkpoints so repeated
+  resumes of a completed run are side-effect-free. (3) Substrate.put stores
+  registered contracts or raw strings only (no unversioned dict blobs).
+- 99 tests, mypy strict clean (28 src files). Default sandbox stays
+  process-fault-only@1; deno-pyodide@1 + adversarial suite unchanged.
+- PR opened for review; NOT merged (per the goal).
+
+## vNext Phase A — CORRECTED (PR #50 correction pass)
+
+- Run-scoped substrate: one artifact root, many runs
+  (`<root>/runs/<run_id>.events`), CAS shared at `<root>/objects`. Every
+  event is an EventEnvelope (stable id `<run_id>#<seq>`, run/task scope,
+  caused_by, seq, at, body_kind, body_ref); typed bodies live in CAS. No
+  count-based/fixed ids. command_id bound to one canonical payload digest;
+  reuse-with-different-payload fails closed.
+- VerifiedSubstrateView (`verify()`): framing + exactly-one-leading
+  PolicyBound + CAS closure + canonical/allowlisted/existing bindings +
+  EXACT apply/revert replay (before==prior, decodes, deterministic
+  apply==after, effect cites a command) + command lifecycle/one-terminal +
+  checkpoint agreement + change-id uniqueness. ok=False refuses every
+  authority append. repair() quarantines ONLY a torn/forged tail; semantic
+  corruption is refused, not auto-quarantined.
+- Result-driven kernel: next_command + reduce (replaced Step). Per command:
+  one intent, perform/reconcile one effect, one terminal result, reduce,
+  checkpoint(state + consumed_command_id cursor). Never advance before the
+  outcome; restart reconstructs the exact result (fork metrics reconstructed
+  from the recorded ForkObservation so the reducer reacts identically).
+  Idempotency by change-id (proposal/apply), reverted-set (revert),
+  caused-by-observation (fork), and completed-set (terminal).
+- Floor: bound identity authoritative on resume (config-digest/prompt/seed
+  mismatch → KernelError); BudgetMeter charges executions (per fork case);
+  required sandbox capabilities checked, exact SandboxProvenance recorded;
+  stage_change_closure stages EXACTLY the change's refs and apply requires
+  full closure; EvaluateFork captures base+candidate refs before execution
+  and records both.
+- manual-change@1: emits ChangeProposed, run-scoped unique ids
+  (`<run_id>:fork|apply|revert|stop-*`), reacts to fork improved/not through
+  reduce. Honest: fork scores CODE; prompt is round-trip only until
+  continual-refine@1.
+- CLI (`strive`): run/runs/status/view/history/inspect/revert/repair/sandbox;
+  entry point strive.cli:main; pyproject 0.2.0.
+- Docs: PROJECT_CHARTER/ARCHITECTURE/ROADMAP/HANDOFF/README/ADR-0008 rewritten
+  as current vNext; Stage 1-3C prose archived under docs/archive/. Next phase
+  = continual-refine@1 (NOT Pareto).
+- Gotchas fixed: (1) ChangeProposed double-emit (fork + apply) → idempotent
+  by change_id globally. (2) fork-crash resume returned empty metrics → the
+  reducer misread "not improved"; now reconstructs metrics from the recorded
+  ForkObservation. (3) apply allowlist check must precede CAS-closure check.
+
+115 tests, mypy strict clean (30 files). PR updated; NOT merged.
+
+## vNext Phase A — correction pass #3 (hardening before merge)
+
+Goal: correct PR #50 across six areas, preserve the vNext thesis and the
+deletion of promotion-era compatibility, do NOT begin continual-refine@1 or
+Pareto, update the PR and STOP for review (no merge).
+
+New module: `strive/surfaces.py` — injected immutable `SurfaceCatalog`
+(`SurfaceDescriptor` per legal surface + `descriptor_digest()`) and trusted
+structural validators (`validate_solve_code` requires exactly one top-level
+`solve(input_text)`; `validate_prompt` requires non-empty). Threaded through
+the substrate (`validate_change`/`apply_change`/`stage_change_closure`/
+`bind_policy`/`_verify_state` take/consult the catalog).
+
+Area 1 — exact run identity. `new_run_id()` is now opaque (`run-<uuid>`; no
+task encoded); `validate_run_id` rejects separators/`..`/empty/oversize.
+`PolicyBound` bumped to v3 and now pins task_id + task_fingerprint,
+policy_ref + policy_digest (inspect.getsource of the policy class), config,
+prompts, seed + seed_state, budget_ref, required_capabilities,
+surface_catalog_digest. New `RunBinding` (v1) is a discovery index written to
+`<root>/runs/<run>.binding.json` (write-once, atomic), cross-checked against
+the in-stream PolicyBound on every verify. `Substrate.discover()` opens a run
+by reading the binding (never string-parsing the id). Kernel `_enforce_identity`
+checks all pinned fields on resume.
+
+Area 2 — pure/closed/complete verify. `_replay` recomputes expected refs with
+`hash_text(codec.dumps(...))` (NO put_state — verify never writes). Closed
+`_BODY_UNION` (anything else → error). Added completion-causation,
+revert-after-unreverted-apply and no-duplicate-revert, observation-body and
+binding-agreement checks. The failure path returns EMPTY state (never exposes
+active state from an unverifiable stream).
+
+Area 3 — identity + codecs + immutability. `_run_command` re-derives the
+command payload digest and compares it to the issued digest BEFORE both the
+already-completed and already-issued paths. Strict typed JSON encoder replaces
+`json.dumps(default=str)` (refuses to coerce unknown types). `_ConfigBlob`/
+`_PolicyStateBlob` bumped to v2 with an `encoding` field (checked on load).
+`_StoredResult` bumped to v2 to persist the original `head`. TOML load uses a
+strict `_require_str` (no `str()` coercion). `VerifiedSubstrateView.issued/
+completed` are `MappingProxyType`.
+
+Area 4 — honest effects + budgets. `ForkObservation` bumped to v3 with a
+`usage: BudgetUsage` field; `_seed_meter` re-seeds cumulative spend from the
+durable per-fork usage on resume; `BudgetMeter.absorb` added; budget spec is
+put to CAS + pinned in PolicyBound (budget_ref); resume with a different
+budget is rejected. `_score` now also notes cumulative output bytes (wall +
+executions already gated pre-request). Documented that durable state effects
+reconcile exactly, a completed fork is reused (not re-run/re-charged), and
+model calls (deferred) must record `indeterminate` on dispatch-without-result.
+
+Area 5 — hardened CAS. Canonical sha256 ref validation (traversal-safe
+`_path`), hash-verified reads, `has(verify=True)`, concurrent-writer-safe
+publication (mkstemp per writer + fsync + atomic replace + dir fsync).
+
+Area 6 — command-path mutation. `kernel.operator_revert(services, change_id)`
+issues a durable `RevertChange` operator command (with a precheck so operators
+get an honest error, not a silent no-op) through `_run_command`; the CLI
+`revert` calls it instead of `Substrate.revert`. CLI `_open_view` uses
+`Substrate.discover` (no id parsing); top-level error handling catches CAS +
+surface-validation errors. manual-change@1: `reduce` routes any non-ok
+outcome to a terminal `failed` phase; `{parent_generation_id}` removed from
+the TOML target prompt and the CLI baseline prompt.
+
+Adversarial tests added: `test_cas.py` (traversal, corrupt-but-present,
+concurrent writers), `test_surfaces.py` (validators + catalog digest),
+`test_adversarial.py` (run/task spoofing, traversal ids, hyphenated-task
+discovery, binding tamper, unknown body kinds, corrupt CAS hides state, verify
+purity, arbitrary/duplicate revert, changed re-derived command, budget
+reset/expansion refusal, invalid seed + staged content), `test_packaging.py`
+(built wheel ships the toml + prompt and declares the console script).
+
+Result: 159 tests pass (was 115), `uv run mypy` clean over 35 files (src +
+tests). CLI smoke confirms opaque ids, binding discovery, and budget re-seed
+on resume. PR to be updated; NOT merged — stop for review.
+
+## vNext Phase A — correctness pass 2 (before merge)
+
+Second correctness pass on PR #50. Thesis + promotion-era deletion unchanged;
+did NOT begin continual-refine@1 or Pareto. 178 tests pass; `uv run mypy`
+clean over 35 files.
+
+Area 1 — closed verification (substrate `_verify`). Added per-envelope task
+scope check; duplicate-intent rejection (even same digest); a general
+causation gate (`_CAUSE_COMPAT`) requiring every effect/annotation/terminal/
+checkpoint to cite an ISSUED, kind-compatible command appearing earlier;
+decode/hash-verify of every ref via `get_text`/`codec.loads` (command payload,
+result, policy-state, observation, proposal, config[opaque hash-verify],
+budget[BudgetSpec], prompt, surface content, state) — `has()` no longer
+trusted; proposal/change id↔ref agreement; revert == exact inverse of the one
+unreverted apply (decode both, compare `applied.invert()`); checkpoint cursor
+must be a completed command and self-caused. Still pure (no CAS writes) and
+returns EMPTY state on error.
+
+Area 2 — crash-safe discovery. `RunBinding` is now DERIVED: verify no longer
+errors on a missing/divergent index. New `Substrate.ensure_binding()` reads
+the authoritative in-stream `PolicyBound`, rebuilds a missing index, and
+quarantines (`os.replace` to `.quarantine-*`) a divergent one before
+rewriting. `discover()` learns scope from `_stream_policy_bound()` then
+reconciles; falls back to the index only when its `run_id` matches. `run_policy`
+calls `ensure_binding` on entry. `bind_policy` preflights config/budget/prompt
+refs + validates seed content before appending.
+
+Area 3 — command exactness + concurrency. `Substrate.run_lease()` — non-
+blocking `fcntl.flock` on `<run>.lease`; `run_policy`/`operator_revert` hold it.
+`issue_command` is idempotent for same id+digest (returns the view, no second
+intent). `_run_command` now returns the pre-terminal `head` (stable), stored in
+`_StoredResult.head`, so initial == reconstructed. `expected_head` →
+`expected_state_ref` (logical composite-state ref), compared to `view.state_ref`
+in apply/revert; excluded from the command IDENTITY digest via
+`_command_identity_json` so re-derivation is stable even though the guard value
+advances.
+
+Area 4 — honest budgets/effects. `_StoredResult.usage` (v3) persists per-command
+spend incl. failed/partial; `_seed_meter` sums EVERY completed command's usage
+(not just forks) — no reset/double. `ForkObservation` (v4) now holds two
+`AttemptRecord`s (base/candidate) each with ACTUAL provenance, failure, denials,
+usage, state ref. `_budget_limits` caps `SandboxLimits` by remaining wall/output.
+New `IndeterminateEffect`: `_run_command` records a durable `indeterminate`
+terminal and never silently re-dispatches. Reconcile path absorbs recorded
+usage so the live meter matches durable spend.
+
+Area 5 — CAS + extensibility. `put_text` verifies a preexisting object
+(ObjectCorruption); `get_text` maps invalid UTF-8 → ObjectCorruption.
+`stage_change_closure` rejects unrelated blobs and validates every referenced
+after-content even when already shared. `SurfaceDescriptorSnapshot` (codec) +
+`SurfaceCatalog.snapshots()`/`resolve_pinned()` pin validator NAME + impl digest
+per surface; `PolicyBound.surface_descriptor_refs` (v4) replaces the whole-
+catalog digest, so adding a surface doesn't invalidate old runs and validator
+drift is caught. `Task.fingerprint()` now includes signature/primitive_catalog/
+scorer source; `_policy_digest` hashes the whole policy MODULE.
+
+Area 6 — papercuts. CLI `_cmd_run` + top-level catch SandboxError; TOML config
+rejects unknown keys; `decode_state` strictly validates. `test_packaging` now
+builds the wheel, installs it into an isolated `uv venv`, and runs the real
+`strive` script end to end (fails, never skips, on build/install error).
+
+New tests: expanded `test_cas`, `test_surfaces`, `test_adversarial` (full
+matrix), rewrote `test_packaging`. Updated substrate/kernel/codec tests for the
+new causation discipline (direct callers must issue a compatible, CAS-backed
+command first) and the `expected_state_ref` rename.
+
+## vNext Phase A — semantic-atomicity pass (before merge)
+
+Final correctness pass on PR #50. Thesis + deletions + result-driven API +
+derived binding index + run lease + optional evaluation preserved. Did NOT
+begin continual-refine@1 or Pareto. 193 tests pass; `uv run mypy` clean over
+37 files.
+
+Area 1 — atomic append. Refactored substrate `_verify` into a pure
+`_fold_view(sub, head, envelopes, framing_errors)`. `_emit` now builds the
+candidate envelope, folds `view.envelopes + [candidate]`, and REFUSES the
+append unless the post-event view is ok — so an accepted append can never make
+a valid run invalid, and a refused one leaves `events.jsonl` byte-for-byte
+unchanged (only an orphan CAS body may remain). Tests assert this for
+malformed seed, ghost confirm, duplicate seed bindings, etc.
+
+Area 2 — neutral contracts. New `strive/runtime.py` (leaf: codec + contracts +
+sandboxes) holds CommandPayload, StoredResult, ConfigBlob, PolicyStateBlob,
+AttemptDispatched, AttemptRecord, ForkObservation. Substrate imports it, so
+verify decodes every ref as its expected TYPE (not has()): command payload
+(match id/kind), stored result (match id/kind/outcome), config/policy-state
+(match encoding), observation (dispatch/result/summary by kind). Added: one
+proposal per change id; applied/forked change must equal BOTH its proposal ref
+AND its issued CommandPayload.change_ref; OperationFailed.command_id==caused_by;
+confirm/revise must target a proposed change and revised refs decode. Proven
+kernel-import-independent by test_substrate_only (fresh interpreter).
+
+Area 3 — pinned-surface mutation. Split `validate_change` into `_shape_check`
+(catalog-independent) + membership. `apply`/`revert`/`stage_change_closure`
+resolve the run's PINNED `SurfaceDescriptorSnapshot`s from PolicyBound and
+validate content through them (even shared CAS); a delta on a non-pinned
+surface is refused. Verify's replay uses `_apply_deltas` (shape-only) +
+per-delta pinned-membership check, so a grown catalog keeps old runs readable
+while mutating a newly-added surface requires a rebind.
+
+Area 4 — durable preconditions. `_command_identity_json` no longer excludes
+`expected_state_ref` — the full command (incl. precondition) is the durable
+identity; CommandPayload carries `change_ref` + full json. RunView gained
+`seed_state_ref`; manual-change@1 sets `expected_state_ref=view.seed_state_ref`
+(stable across resume), so re-derivation is identical and a changed precondition
+fails closed via the existing digest check.
+
+Area 5 — truthful attempts/budgets. Fork now journals per attempt a
+`FORK_DISPATCH` (AttemptDispatched, reserved executions) then a `FORK_RESULT`
+(AttemptRecord with actual provenance/failure/denials/usage), then a
+`FORK_SUMMARY` (ForkObservation). `_evaluate_fork` reconciles: reuse a recorded
+result, fresh-run an unstarted attempt, and raise `IndeterminateEffect` for an
+OPEN dispatch (never implicit re-run). `_seed_meter` REBUILDS a fresh
+`BudgetMeter` from the durable attempt ledger (results, or reservations for open
+dispatches) and assigns it to services — no repeated absorption into a reused
+meter. BudgetMeter wall is now cumulative active time (`_absorbed_wall`), and
+`_run_attempt` runs CASE-BY-CASE so output/wall caps come from the REMAINING
+budget (cumulative across cases), preserving actual provenance/failure for
+partial/denied attempts.
+
+Tests: rewrote the low-level substrate/adversarial tests to build valid command
+lifecycles (issue a typed CommandPayload + propose before apply), added the full
+area-6 matrix (test_adversarial), cumulative wall/output unit tests
+(test_budget), and test_substrate_only (fresh-interpreter verify). Kept the
+mandatory build/install/real-console-script test.
+
+## vNext Phase A — command/attempt state-machine pass (before merge)
+
+Narrow correctness pass on PR #50. Preserved the vNext thesis, promotion-era
+deletion, pure append preflight, derived binding index, pinned surface
+descriptors, run lease, and result-driven policy API. Did NOT begin
+continual-refine@1 or Pareto. 212 tests pass; `uv run mypy` clean over 38
+files.
+
+Area 1 — closed per-command state machine (`substrate._verify_command_lifecycles`
++ helpers). After the main fold, each command's caused events (excluding the
+self-issue and its reduction checkpoint) are grouped and checked against the
+EXACT grammar for its kind+outcome (`_OK_EFFECTS` / `_OPTIONAL_OK_EFFECTS` /
+`_SUCCESS_TOKENS`): ok requires the precise mandatory effect multiset (proposal
+optional, since one-proposal-per-change-id lets Apply reuse the fork's
+proposal); failed/indeterminate require exactly one OperationFailed and NO
+success token; effects after the terminal are rejected; an ok terminal must
+carry a StoredResult; a checkpoint consumes its command at most once.
+
+Area 2 — typed command/result semantics. `_canonical_json_ok` rejects
+malformed/noncanonical `CommandPayload.json`, `ConfigBlob.json`,
+`PolicyStateBlob.json`. `_check_stored_result` matches the StoredResult's
+proposal_ref (== the applied change for Apply, else None), observation_ref (==
+the fork SUMMARY event body ref, else None), and metrics (== the summary's
+base/candidate/improved), and validates usage finiteness. The fork's
+`observation_ref` was made consistent between the fresh and reused paths (the
+ObservationRecorded EVENT body ref, via `_fork_summary`), so initial and
+reconstructed results are byte-for-byte equal. `expected_state_ref` stays in
+the durable identity (unchanged).
+
+Area 3 — fork-attempt lifecycle (`_check_fork_lifecycle`). Per (command,label):
+one dispatch → ≤1 result, no result without a dispatch, no duplicate labels,
+base dispatched before candidate; dispatch/result `state_ref` == the
+ObservationRecorded `subject_state_ref`; result matches its dispatch's
+state_ref; the summary's base/candidate equal the durable FORK_RESULT records
+and its candidate_change_id equals the issued candidate change; actual
+provenance's enforced_capabilities ⊇ `PolicyBound.required_capabilities`; every
+BudgetUsage/reservation field finite+nonnegative.
+
+Area 4 — honest budgets + CandidateExecutor fix. `run_protected_suite` now
+aggregates and returns the ACTUAL backend wall + captured stdout bytes;
+`execute_suite` uses them (was `wall_time_s=0.0` and `stdout_bytes=len(error)`).
+`AttemptDispatched` (v2) carries `reserved_wall_s` + `reserved_output_bytes`;
+`_evaluate_fork` sets a conservative per-attempt reservation across all three
+dimensions; `_seed_meter` absorbs executions+wall+output for an OPEN dispatch.
+`_run_attempt` accumulates real per-case stdout/wall.
+
+Area 5 — pinned evaluation + policy package. `Task.fingerprint` now also hashes
+`selection_cases` (case-selection) and `strive.evaluate.evaluate`/`_aggregate`
+(aggregate evaluator). `PolicyDescriptor.dependency_modules` (default empty) is
+an explicit policy-package manifest folded into `_policy_digest`.
+
+Tests: new `test_state_machine.py` (19 forge/behavior tests) covering the full
+area-6 list; existing suites updated for the stricter grammar (e.g. the
+duplicate-terminal test now completes a valid StopAdaptation with a StoredResult).
+Kept the build/install/real-console-script test and the fresh-interpreter
+substrate-only verify.
+
+## vNext Phase A — intent-to-effect binding pass (before merge)
+
+Bind every durable command field to its exact effect. Preserved the vNext
+architecture, command grammar, attempt ledger, append preflight, pinned
+surfaces, run lease, and optional evaluation. Did NOT begin continual-refine@1
+or Pareto. 223 tests pass; `uv run mypy` clean over 38 files.
+
+Area 1 — explicit typed intent. `CommandPayload` (v3) is now a NEUTRAL
+normalized record: change_ref, target_change_id, expected_state_ref,
+issue_state_ref (fork base anchor), prompt_role, context_ref, after_seconds,
+reason, plus the full `json` identity. Kernel `_command_payload(sub, view, cmd)`
+builds it per kind. Verify binds Confirm/Revert to `target_change_id`, and
+Apply/Revert `before_state_ref` to the ISSUED `expected_state_ref` (not just the
+folded state).
+
+Area 2 — fork anchored to real state. The fork payload records
+`issue_state_ref` (folded state at issue). `_fork_expected_states` derives
+base==issue_state and candidate==apply(issue_state, issued candidate); every
+dispatch/result state_ref and the summary subject must equal those, and
+`improved` is recomputed (`candidate.overall > base.overall`).
+
+Area 3 — exactly-reconstructable terminals. EVERY terminal (ok/failed/
+indeterminate) now requires a `StoredResult` (removed the `result_ref=None`
+fallback in verify + `_reconstruct`); verify matches its
+id/kind/outcome/refs/metrics/usage AND the pre-terminal SEMANTIC head
+(`"<seq>:<state_ref>"`, replacing the non-reconstructable framing head).
+`OperationFailed` (v3) gained `outcome`; a pre-terminal failure is RECONCILED
+into the terminal (`kernel._reconcile_failure`) with the same outcome, never
+re-running; `_check_prefix_invariants` rejects >1 failure/effect even before a
+terminal and binds failure.outcome == terminal.outcome.
+
+Area 4 — live budget == durable ledger. The run loop calls `_seed_meter` after
+EVERY command (rebuilding the meter from durable attempt results/open
+reservations before the next `next_command`); the reservation for an open
+dispatch spans executions+wall+output.
+
+Area 5 — preserved evidence. `AttemptRecord` (v2) gained `report_ref` +
+`evaluation_ref`; `_run_attempt` persists the exact `ExecutionReport` +
+`Evaluation`; verify decodes them. A completed evaluation with candidate errors
+(ok=True, failure=None, per-case errors in the report) is distinguished from a
+sandbox/infra failure (ok=False).
+
+Tests: extended `test_state_machine.py` (Confirm/Revert target mismatch, apply
+expected-state mismatch, unrelated fork states, forged improved, summary-subject
+mismatch, failed/null result, forged stored head) and `test_adversarial.py`
+(crash-after-failure reconcile with no re-run, same-process indeterminate
+wall/output reservation, preserved backend/candidate-error evidence). Updated
+the CommandPayload/AttemptRecord/OperationFailed constructors across tests.
+Kept the fresh-interpreter and installed-wheel tests.
+
+## 2026-08-17 — internal-consistency pass (PR #50, pass 7)
+
+Goal: one final internal-consistency pass — four areas, no new features
+(no `continual-refine@1`, no Pareto). Update PR #50 and STOP; do not merge.
+
+### Area 1 — CommandPayload is ONE coherent intent (DONE)
+
+Added `strict_encode`/`strict_json` to the NEUTRAL `strive.runtime` leaf and
+made the kernel import them (deleting its private `_strict_encode`), so the
+kernel that WRITES a command payload's canonical JSON and the substrate that
+RE-DERIVES it now share one encoder — the coherence proof cannot drift.
+
+New verify check `_check_command_payload_coherence` (invoked in the
+PolicyCommandIssued branch), driven by a CLOSED per-kind spec `_PAYLOAD_SPECS`:
+- `encoding == ENCODING` (else refuse);
+- required (non-null) / optional / FORBIDDEN normalized anchors per kind
+  (Confirm/Revert require a non-null target; EvaluateFork requires
+  change_ref + target + issue_state_ref; Apply requires change_ref + target,
+  expected_state_ref optional);
+- the canonical JSON must be an object carrying EXACTLY that kind's keys
+  (rejects extra/missing keys) and its `command_id`/`change_id`/`target`/
+  scalar anchors must equal the normalized fields;
+- for change-bearing kinds, decode `change_ref` and prove `strict_encode` of
+  the stored CompositeChange equals the JSON's `change`/`candidate` subtree.
+
+Gotcha: `EvaluateFork` has a 4th field `detail` — its json_keys must include
+it (found via a real kernel run failing the key-set check).
+
+Tests: added shared builder `tests/_payloads.py::coherent_payload` (mirrors the
+kernel exactly) and routed every direct-substrate forge helper (`_issue`,
+`_issue_target`, `_mk_payload`→removed, `_revert`, `_apply`) through it, so an
+issued command is coherent by construction. Confirm/Revert `_issue` now takes a
+`target`; the reuse/expected-state/re-derivation tests build coherent payloads.
+
+### Area 2 — every terminal outcome verified identically (DONE)
+
+Added `combine_usage` to `strive.runtime` (the SAME additive/cumulative-wall/
+max-recursion accounting the `BudgetMeter` uses when seeding from the ledger).
+
+Kernel: new `_reconciled_usage(view, cid)` reconstructs a command's honest usage
+from its DURABLE attempt ledger — each completed AttemptRecord's usage plus each
+OPEN dispatch's worst-case reservation (zero for a non-fork). EVERY terminal now
+records this (OK, failed, indeterminate), replacing both the OK meter-delta and
+`_reconcile_failure`'s zero usage — so a crashed partial fork is charged, not
+lost, and recorded == what `_seed_meter` folds into the live budget. Fixed the
+indeterminate branch so StoredResult.detail is the SAME string as the recorded
+failure (was `str(exc)` vs `"indeterminate: {exc}"`).
+
+Substrate verify: `_check_stored_result` now runs for ALL outcomes and always
+checks finite/nonneg usage. New `_check_failed_stored_result` (non-ok mirror
+rule: no proposal/observation/metrics; detail == the OperationFailed detail;
+usage == `_reconciled_usage_from_events`, the verify twin of the kernel helper,
+both via `combine_usage`). OK forks are now also cross-checked against the
+reconciled ledger; non-fork OK usage must be exactly zero. New
+`_check_effect_after_failure`: once an OperationFailed is recorded, the only
+later event a command may cause is its matching terminal (checkpoint already
+excluded) — no success effect, observation, or second failure.
+
+### Area 3 — real execution failure classification preserved (DONE)
+
+The gap: `run_protected_suite` collapsed a backend `ok=False` fault into a
+per-case CaseOutcome error, and `CandidateExecutor.execute_suite` hardcoded the
+aggregate `ExecutionReport(ok=True, failure=None)` — so a genuine boundary fault
+(timeout/crash/refusal/malformed-runner output) was indistinguishable from a
+candidate exception. `_run_attempt` already keys `ok`/`failure` off
+`result.report.failure`, so it only needed the report to carry it.
+
+Fix: `run_protected_suite` now tracks the FIRST boundary failure (a backend
+`ok=False`, or an exhausted suite deadline = a boundary TIMEOUT) and returns it
+as a 6th tuple element; `execute_suite` sets `ok = failure is None` and carries
+the `failure`. A candidate exception / wrong answer is still caught inside the
+runner (`ok=True`, per-case `error`) and stays a completed per-case evaluation.
+Backend tests use `*_` for the trailing tuple, so they were unaffected.
+
+### Area 4 — AttemptRecord bound to its evidence (DONE)
+
+New verify helper `_check_attempt_evidence` (called per FORK_RESULT, replacing
+the decode-only check) binds each AttemptRecord to the EXACT refs it carries:
+`overall == Evaluation.overall_score`; `ok == ExecutionReport.ok`;
+`failure == ExecutionReport.failure`; `ok == (failure is None)`;
+`Evaluation.failure == ExecutionReport.failure`; the report's `generation_id`
+is `fork-<label>`; `usage.output_bytes == ExecutionReport.stdout_bytes`; and the
+attempt's real wall is at least the report's aggregated backend wall (1e-3
+slack for independent rounding of two real timings). The fork summary already
+binds base/candidate to the durable records, so it now transitively uses
+evidence-verified values. Updated the `_attempt` forge helper to be
+evidence-consistent (label-matched report, evaluation overall == the record's).
+
+### Area 5 — adversarial tests + tooling (DONE)
+
+Shared helper `tests/_payloads.py::coherent_payload`; new forge helpers in
+`test_state_machine.py` (`_raw_payload`, `_forge_issue`, `_canon_json`) plant
+ONE incoherence and prove verify refuses it. Added:
+- payload: missing required anchor; target=None bypass (ApplyChange, null
+  target); forbidden field on a Stop; JSON/normalized change_id disagreement;
+  wrong encoding; extra JSON key; change_ref/JSON-subtree disagreement.
+- failed terminal: forged metrics; forged detail (≠ failure record); forged
+  nonzero usage on a non-fork failure; an effect after the failure was recorded.
+- reconciled partial fork usage: a crash after base RESULT + open candidate
+  DISPATCH reconciles to (base usage + candidate reservation) — ACCEPTED; the
+  same stream with zeroed usage is REFUSED.
+- AttemptRecord evidence: overall ≠ Evaluation.overall_score; ok ≠
+  ExecutionReport.ok.
+- REAL backend faults (`test_sandbox_backend.py`, process-fault-only@1, always
+  available): a module-level `os._exit` crash → ok=False+CRASH; a non-returning
+  strategy → ok=False+TIMEOUT; and the CONTRAST — a candidate `raise ValueError`
+  stays ok=True with a per-case error (a completed evaluation, NOT infra).
+
+Final: `uv run pytest` = 241 passed (was 223); `uv run mypy` clean over 39
+files. Fresh-interpreter (`test_substrate_only`) and installed-wheel
+(`test_packaging`) tests retained and green.
+
+Exit claim holds: command intent has ONE unambiguous representation (normalized
+anchors reconciled against canonical JSON via a shared `strict_encode`); every
+terminal and attempt is internally consistent (uniform StoredResult validation,
+reconciled ledger usage, effect-after-failure freeze, AttemptRecord bound to its
+report+evaluation); candidate failures stay distinct from infrastructure
+failures (boundary ok=False propagated; candidate exceptions stay per-case); and
+retained evaluation evidence exactly supports the scores policy uses.
