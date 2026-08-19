@@ -14,11 +14,15 @@ content its surface validator would reject.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Callable
 
 from strive.cas import hash_text
 from strive.runtime import REVIEW_VERDICTS, RefinementProposal, SurfaceEdit
-from strive.surfaces import SurfaceCatalog, SurfaceValidationError
+from strive.surfaces import SurfaceValidationError
+
+# a pinned-descriptor validator: (kind, name, content) -> None, raising
+# SurfaceValidationError on structurally-invalid content
+SurfaceValidator = Callable[[str, str, str], None]
 
 
 class RefinementDecodeError(Exception):
@@ -69,13 +73,26 @@ def _require_str_tuple(obj: dict[str, Any], key: str) -> tuple[str, ...]:
 def decode_proposal(
     text: str,
     *,
-    catalog: SurfaceCatalog,
-    allowed_surfaces: frozenset[tuple[str, str]],
+    validate: SurfaceValidator,
+    enabled_surfaces: frozenset[tuple[str, str]],
+    required_change_id: str,
+    edit_limit: int,
+    edit_rule: str,
 ) -> tuple[RefinementProposal, dict[str, str]]:
-    """Strictly decode `text` into a `(RefinementProposal, content_blobs)` pair.
+    """Strictly decode `text` into a `(RefinementProposal, content_blobs)` pair
+    UNDER the issued durable constraints, so a deviation is failure-as-data:
+
+    - the proposal must use exactly `required_change_id` (deterministic,
+      cycle-scoped);
+    - it may touch at most `edit_limit` surfaces, each in `enabled_surfaces`
+      (the policy-enabled, run-pinned subset);
+    - the role's edit rule: `"refine"` requires ≥1 edit; `"review"` requires
+      edits IFF the verdict is `revise`, and forbids them for keep/revert/defer;
+    - each edit's content is validated through the PINNED descriptor (`validate`),
+      never the live catalog.
+
     Each edit's content is content-addressed (`after_ref = hash_text(content)`)
-    and returned in `content_blobs` for the kernel to stage. Raises
-    `RefinementDecodeError` on any deviation."""
+    and returned in `content_blobs` for the kernel to stage."""
     try:
         data = json.loads(text, parse_constant=_reject_nonfinite)
     except json.JSONDecodeError as exc:
@@ -90,6 +107,11 @@ def decode_proposal(
         raise RefinementDecodeError(f"missing field(s): {sorted(missing)}")
 
     change_id = _require_str(data, "change_id")
+    if change_id != required_change_id:
+        raise RefinementDecodeError(
+            f"change_id {change_id!r} != the required cycle-scoped id "
+            f"{required_change_id!r}"
+        )
     rationale = _require_str(data, "rationale")
     cited = _require_str_tuple(data, "cited_evidence")
     outcomes = _require_str_tuple(data, "expected_outcomes")
@@ -105,12 +127,28 @@ def decode_proposal(
     if not (0.0 <= uncertainty <= 1.0):
         raise RefinementDecodeError("uncertainty must be within [0, 1]")
 
+    if edit_rule == "refine":
+        require_edits = True
+    elif edit_rule == "review":
+        require_edits = review_hint == "revise"
+    else:
+        raise RefinementDecodeError(f"unknown edit_rule {edit_rule!r}")
+
     raw_edits = data.get("edits")
     if not isinstance(raw_edits, list):
         raise RefinementDecodeError("edits must be a list")
-    # The decoder is role-agnostic: the refine role uses `edits` (with a `keep`
-    # hint), the review role uses `review_hint` (edits only for `revise`). The
-    # POLICY enforces the edit/hint coupling per role, not the kernel decoder.
+    if len(raw_edits) > edit_limit:
+        raise RefinementDecodeError(
+            f"proposal has {len(raw_edits)} edits, over the edit_limit {edit_limit}"
+        )
+    if require_edits and not raw_edits:
+        raise RefinementDecodeError(
+            f"the {edit_rule!r} rule (verdict {review_hint!r}) requires ≥1 edit"
+        )
+    if not require_edits and raw_edits:
+        raise RefinementDecodeError(
+            f"the {edit_rule!r} rule (verdict {review_hint!r}) requires no edits"
+        )
 
     edits: list[SurfaceEdit] = []
     blobs: dict[str, str] = {}
@@ -123,15 +161,15 @@ def decode_proposal(
         content = raw["content"]
         if not (isinstance(kind, str) and isinstance(name, str) and isinstance(content, str)):
             raise RefinementDecodeError("edit fields must be strings")
-        if (kind, name) not in allowed_surfaces:
+        if (kind, name) not in enabled_surfaces:
             raise RefinementDecodeError(
-                f"edit names surface {(kind, name)} not pinned for this run"
+                f"edit names surface {(kind, name)} not enabled/pinned for this run"
             )
         if (kind, name) in seen:
             raise RefinementDecodeError(f"duplicate edit for surface {(kind, name)}")
         seen.add((kind, name))
         try:
-            catalog.validate_content(kind, name, content)
+            validate(kind, name, content)
         except SurfaceValidationError as exc:
             raise RefinementDecodeError(
                 f"edit content for {(kind, name)} is structurally invalid: {exc}"
@@ -152,4 +190,9 @@ def decode_proposal(
     return proposal, blobs
 
 
-__all__ = ["RefinementDecodeError", "decode_proposal", "render_prompt"]
+__all__ = [
+    "RefinementDecodeError",
+    "SurfaceValidator",
+    "decode_proposal",
+    "render_prompt",
+]

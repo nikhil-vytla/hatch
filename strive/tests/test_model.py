@@ -88,6 +88,10 @@ def test_metered_adapter_caps_timeout_to_remaining_wall(tmp_path: Path) -> None:
         adapter_name = "probe"
         model_id = "probe-v1"
         reports_cost = True
+        config_digest = "probe-config"
+
+        def estimate_cost(self, i: int, o: int) -> float | None:
+            return 0.0
 
         def __init__(self) -> None:
             self.seen_timeout: float | None = None
@@ -115,6 +119,10 @@ def test_adapter_error_is_contained_and_journaled(tmp_path: Path) -> None:
         adapter_name = "exploding"
         model_id = "exploding-v1"
         reports_cost = True
+        config_digest = "exploding-config"
+
+        def estimate_cost(self, i: int, o: int) -> float | None:
+            return 0.0
 
         def complete(self, request: ModelRequest) -> ModelResponse:
             raise OSError("connection refused")
@@ -172,6 +180,10 @@ def test_requested_output_tokens_are_capped_to_remaining_allowance(
         adapter_name = "probe"
         model_id = "probe-v1"
         reports_cost = True
+        config_digest = "cap-probe-config"
+
+        def estimate_cost(self, i: int, o: int) -> float | None:
+            return 0.0
 
         def __init__(self) -> None:
             self.seen_max_tokens: int | None = None
@@ -199,6 +211,10 @@ def test_token_overrun_rejects_the_completion_and_is_journaled(tmp_path: Path) -
         adapter_name = "huge"
         model_id = "huge-v1"
         reports_cost = True
+        config_digest = "huge-config"
+
+        def estimate_cost(self, i: int, o: int) -> float | None:
+            return 0.0
 
         def complete(self, request: ModelRequest) -> ModelResponse:
             return ModelResponse(
@@ -229,6 +245,10 @@ def test_cost_limit_fails_closed_when_adapter_cannot_report_cost(
         adapter_name = "no-cost"
         model_id = "no-cost-v1"
         reports_cost = False
+        config_digest = "no-cost-config"
+
+        def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
+            return None
 
         def complete(self, request: ModelRequest) -> ModelResponse:
             raise AssertionError("must never be called under a cost limit")
@@ -249,6 +269,10 @@ def test_any_ordinary_adapter_exception_becomes_model_error(tmp_path: Path) -> N
         adapter_name = "weird"
         model_id = "weird-v1"
         reports_cost = True
+        config_digest = "weird-config"
+
+        def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
+            return 0.0
 
         def complete(self, request: ModelRequest) -> ModelResponse:
             raise RuntimeError("unexpected provider tantrum")
@@ -268,6 +292,10 @@ def test_keyboard_interrupt_propagates_through_the_wrapper(tmp_path: Path) -> No
         adapter_name = "interrupted"
         model_id = "interrupted-v1"
         reports_cost = True
+        config_digest = "interrupted-config"
+
+        def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
+            return 0.0
 
         def complete(self, request: ModelRequest) -> ModelResponse:
             raise KeyboardInterrupt
@@ -300,6 +328,10 @@ class _CostingAdapter:
     adapter_name = "costing"
     model_id = "costing-v1"
     reports_cost = True
+    config_digest = "costing-config"
+
+    def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
+        return self._cost
 
     def __init__(self, cost_per_call: float) -> None:
         self._cost = cost_per_call

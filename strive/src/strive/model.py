@@ -51,15 +51,26 @@ class ModelAdapter(Protocol):
     """A provider-neutral completion interface.
 
     ``reports_cost`` declares whether ``ModelResponse.cost`` is trustworthy;
-    adapters that cannot model provider pricing must say so, and the metered
-    wrapper fails closed when a cost limit is configured against them.
+    adapters that cannot model provider pricing must say so, and the kernel
+    fails closed when a cost limit is configured against them.
+
+    ``config_digest`` is a stable identity of the adapter's configuration
+    (base URL / model / pricing) — bound into each refinement so a resume
+    cannot silently switch models after issue.
+
+    ``estimate_cost`` upper-bounds a call's cost from its token caps for the
+    OPEN-dispatch reservation; it returns None when the adapter cannot estimate
+    (a finite cost budget against such an adapter then fails closed).
     """
 
     adapter_name: str
     model_id: str
     reports_cost: bool
+    config_digest: str
 
     def complete(self, request: ModelRequest) -> ModelResponse: ...
+
+    def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None: ...
 
 
 class CompletingAdapter(Protocol):
@@ -107,6 +118,7 @@ class FakeModelAdapter:
     adapter_name = "fake"
     model_id = "fake-deterministic-v1"
     reports_cost = True  # its 0.0 is truthful: the fake costs nothing
+    config_digest = "fake-config@1"
     # the fake genuinely varies its digest reply by seed (prompt|seed), so a
     # seeded trial is honestly seeded here
     seed_support = "deterministic-by-seed"
@@ -118,6 +130,9 @@ class FakeModelAdapter:
     ) -> None:
         self._script = dict(script or {})
         self._responder = responder
+
+    def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
+        return 0.0  # the fake costs nothing, and reports so truthfully
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         if request.prompt in self._script:
@@ -173,6 +188,14 @@ class OpenAICompatAdapter:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self.model_id = model_id
+        # identity of the resolved endpoint+model (NOT the secret key), bound
+        # into each refinement so a resume cannot silently switch models
+        self.config_digest = hashlib.sha256(
+            f"openai-compatible|{self._base_url}|{model_id}".encode("utf-8")
+        ).hexdigest()[:16]
+
+    def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
+        return None  # provider pricing is not modeled; cost cannot be estimated
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         body = json.dumps(

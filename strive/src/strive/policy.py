@@ -33,7 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol, Sequence, TypeVar
 
-from strive.cas import ObjectStore
+from strive.cas import ContentReader
 from strive.substrate import CompositeChange, HarnessState, VerifiedSubstrateView
 
 Config = TypeVar("Config", contravariant=True)
@@ -49,10 +49,10 @@ class RunView:
     the current composite state, the pinned seed state (stable across
     resume), the journal head, and the ordered event bodies (read-only).
 
-    `objects` is a READ-ONLY content-addressed store: a policy may resolve a
+    `reader` is a MECHANICALLY read-only content view: a policy may resolve a
     ref it sees in `bodies` (e.g. a decoded `RefinementProposal` behind a
-    `ModelResult`, or an edit's content) to build its next change. It exposes
-    no mutation — the kernel remains the only writer."""
+    `ModelResult`, or an edit's content) to build its next change. It has no
+    method that mutates the store — the kernel remains the only writer."""
 
     run_id: str
     task_id: str
@@ -63,18 +63,18 @@ class RunView:
     head: str
     seed: int
     bodies: tuple[object, ...]
-    objects: ObjectStore | None = None
+    reader: ContentReader | None = None
 
     def read_text(self, ref: str) -> str:
-        """Resolve a CAS ref to its content (read-only). Raises if no store is
+        """Resolve a CAS ref to its content (read-only). Raises if no reader is
         attached (a policy built without one cannot resolve refs)."""
-        if self.objects is None:
-            raise RuntimeError("RunView has no object store attached")
-        return self.objects.get_text(ref)
+        if self.reader is None:
+            raise RuntimeError("RunView has no content reader attached")
+        return self.reader.get_text(ref)
 
     @staticmethod
     def of(
-        seed: int, view: VerifiedSubstrateView, objects: ObjectStore | None = None
+        seed: int, view: VerifiedSubstrateView, reader: ContentReader | None = None
     ) -> "RunView":
         return RunView(
             run_id=view.run_id,
@@ -86,7 +86,7 @@ class RunView:
             head=view.head,
             seed=seed,
             bodies=view.bodies,
-            objects=objects,
+            reader=reader,
         )
 
 
@@ -100,11 +100,23 @@ class RequestRefinement:
     proposal-template surface plus the policy's context (`context_ref`, staged
     via `content_blobs`), performs and journals the model call once, so a
     restart never repeats it. `context_ref` MUST be a key of `content_blobs`
-    (the policy supplies the exact context bytes it addresses)."""
+    (the policy supplies the exact context bytes it addresses).
+
+    The DURABLE proposal constraints travel in the command so a violation is
+    failure-as-data (a `failed` refinement), never a policy exception: the
+    proposal must use exactly `required_change_id`, touch at most `edit_limit`
+    surfaces, and only surfaces in `enabled_surfaces` (each `"kind/name"`, a
+    subset of the run-pinned surfaces). `edit_rule` encodes the role's
+    edit requirement — `"refine"` (edits required) or `"review"` (edits iff the
+    verdict is `revise`; keep/revert/defer forbid them)."""
 
     command_id: str
     prompt_role: str
     context_ref: str
+    required_change_id: str
+    edit_limit: int
+    enabled_surfaces: tuple[str, ...]
+    edit_rule: str  # "refine" | "review"
     content_blobs: dict[str, str] = field(default_factory=dict)
 
 
@@ -134,6 +146,18 @@ class EvaluateFork:
     command_id: str
     candidate: CompositeChange
     content_blobs: dict[str, str] = field(default_factory=dict)
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class ObserveCurrentState:
+    """Execute the ACTIVE harness once through the secure executor and journal a
+    typed, state-scoped observation (report + evaluation + usage). This is
+    FEEDBACK a policy gathers from continuing operation — never an acceptance
+    gate. Deterministic and re-runnable, so a crash mid-observation just
+    re-observes on resume (its cost stays bounded by the executions budget)."""
+
+    command_id: str
     detail: str = ""
 
 
@@ -168,6 +192,7 @@ KernelCommand = (
     RequestRefinement
     | ApplyChange
     | EvaluateFork
+    | ObserveCurrentState
     | ScheduleTrigger
     | ConfirmChange
     | RevertChange
@@ -235,7 +260,12 @@ class PolicyDescriptor:
     (`dependency_modules`), i.e. any strategy/helper module the policy relies on
     OUTSIDE its own module. The kernel folds these module sources into the
     pinned policy digest, so a change to a declared dependency is detected on
-    resume even though it lives elsewhere."""
+    resume even though it lives elsewhere.
+
+    `requires_secure_execution` marks a policy whose model-authored code MUST
+    run under a mechanically-secure executor: the kernel refuses to drive it on
+    an insecure (fault-only) backend unless the caller EXPLICITLY opts in
+    (a test-only escape hatch), so production never silently downgrades."""
 
     name: str
     factory: Callable[[], "AdaptationPolicy[Any, Any]"]
@@ -243,6 +273,7 @@ class PolicyDescriptor:
     default_config_path: str
     prompt_files: dict[str, str] = field(default_factory=dict)
     dependency_modules: tuple[str, ...] = ()
+    requires_secure_execution: bool = False
 
 
 class PolicyCatalog:
@@ -305,6 +336,7 @@ __all__ = [
     "ConfirmChange",
     "EvaluateFork",
     "KernelCommand",
+    "ObserveCurrentState",
     "PolicyCatalog",
     "PolicyDescriptor",
     "RequestRefinement",

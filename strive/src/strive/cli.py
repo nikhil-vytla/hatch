@@ -37,9 +37,13 @@ from strive.substrate import Substrate, SubstrateError, new_run_id
 from strive.surfaces import SurfaceValidationError
 from strive.tasks import TASKS
 
+# a control-compatible BEHAVIORAL seed prompt for the evolvable proposal
+# template — it describes what a good solve() must do, WITHOUT revealing any
+# specific planted fix (the refiner must learn that from observed failures).
 _BASELINE_PROMPT = (
-    "Return ONLY a JSON object with keys `summary` and `source` describing the "
-    "revised solve() strategy."
+    "You improve a Python strategy solve(input_text: str) -> int for its task. "
+    "Return exactly one solve() that is correct across the observed cases; react "
+    "to the concrete failures reported in the refinement context."
 )
 
 
@@ -77,35 +81,49 @@ def _cmd_run(args: argparse.Namespace) -> dict[str, Any]:
             f"unknown policy {args.policy!r}; known: {list(default_catalog().names())}"
         )
     run_id = args.run or new_run_id()
-    trusted = args.backend == "process-fault-only@1"
     continual = args.policy == "continual-refine@1"
-    model_role = "refine"
-    models = _model_catalog(model_role) if continual else None
-    if continual and models is None:
-        raise CliError(
-            "continual-refine@1 needs a model: set STRIVE_MODEL_PROVIDER / "
-            "STRIVE_MODEL_BASE_URL / STRIVE_MODEL_API_KEY / STRIVE_MODEL_ID "
-            "(real-model runs are opt-in; offline CI drives it with a fake "
-            "through the test harness)"
-        )
-    try:
-        services = KernelServices.open(
-            args.root, task, run_id, seed=args.seed,
-            sandbox_backend=args.backend, trusted=trusted,
-            budget=BudgetSpec(
-                executions=args.executions,
-                model_calls=args.model_calls if continual else 0,
-            ),
-            models=models, model_role=model_role,
-        )
-    except (KernelError, SandboxError, SubstrateError, SurfaceValidationError) as exc:
-        raise CliError(str(exc)) from None
-    objects = services.substrate.objects
     policy_mod = cr if continual else mc
     try:
         config = policy_mod.load_config(args.config or policy_mod.DEFAULT_CONFIG_PATH)
     except (SubstrateError, SurfaceValidationError) as exc:
         raise CliError(str(exc)) from None
+    # PRODUCTION continual-refine@1 runs model-authored code, so it uses a
+    # SECURE backend + trusted=False + secure capabilities, and never defaults
+    # to fault-only. (The offline test harness opts into fault-only explicitly.)
+    required_caps: tuple[str, ...] = ()
+    if continual:
+        from strive.sandboxes import SECURE_EXECUTION_CAPABILITIES
+
+        backend = args.backend if args.backend != "process-fault-only@1" else "deno-pyodide@1"
+        trusted = False
+        required_caps = SECURE_EXECUTION_CAPABILITIES
+        model_role = getattr(config, "model_role", "refine")
+        models = _model_catalog(model_role)
+        if models is None:
+            raise CliError(
+                "continual-refine@1 needs a model: set STRIVE_MODEL_PROVIDER / "
+                "STRIVE_MODEL_BASE_URL / STRIVE_MODEL_API_KEY / STRIVE_MODEL_ID "
+                "(real-model runs are opt-in; offline CI drives it with a fake "
+                "through the test harness)"
+            )
+    else:
+        backend = args.backend
+        trusted = args.backend == "process-fault-only@1"
+        model_role, models = "refine", None
+    try:
+        services = KernelServices.open(
+            args.root, task, run_id, seed=args.seed,
+            sandbox_backend=backend, trusted=trusted,
+            budget=BudgetSpec(
+                executions=args.executions,
+                model_calls=args.model_calls if continual else 0,
+            ),
+            required_capabilities=required_caps,
+            models=models, model_role=model_role,
+        )
+    except (KernelError, SandboxError, SubstrateError, SurfaceValidationError) as exc:
+        raise CliError(str(exc)) from None
+    objects = services.substrate.objects
     seed_state = policy_mod.seed_state(objects, code=task.seed_source, prompt=_BASELINE_PROMPT)
     try:
         report = run_policy(
