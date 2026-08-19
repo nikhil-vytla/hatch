@@ -52,14 +52,24 @@ from __future__ import annotations
 
 import inspect
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from strive import codec
 from strive.budget import BudgetMeter
-from strive.cas import hash_text
-from strive.contracts import BudgetSpec, BudgetUsage, CaseOutcome, ExecutionReport
+from strive.cas import ObjectCorruption, ObjectMissing, hash_text
+from strive.contracts import (
+    FAILURE_MALFORMED_OUTPUT,
+    FAILURE_MODEL_ERROR,
+    BudgetSpec,
+    BudgetUsage,
+    CaseOutcome,
+    ExecutionReport,
+    FailureRecord,
+    ModelRequest,
+)
 from strive.evaluate import evaluate
 from strive.policy import (
     AdaptationPolicy,
@@ -75,19 +85,28 @@ from strive.policy import (
     ScheduleTrigger,
     StopAdaptation,
 )
+from strive.model import ModelAdapter, ModelCatalog
+from strive.refine import RefinementDecodeError, decode_proposal, render_prompt
 from strive.runtime import (
     ENCODING as _ENCODING,
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
+    REFINE_DISPATCH,
+    REFINE_RESULT,
     AttemptDispatched,
     AttemptRecord,
     CommandPayload,
     ConfigBlob,
     ForkObservation,
+    ModelDispatch,
+    ModelResult,
     PolicyStateBlob,
+    RefinementProposal,
     StoredResult,
     combine_usage,
+    model_dispatch_reservation,
+    model_result_usage,
     strict_encode,
 )
 from strive.sandboxes import (
@@ -137,6 +156,10 @@ class KernelServices:
     seed: int
     meter: BudgetMeter
     required_capabilities: tuple[str, ...] = ()
+    # the injected, immutable model-adapter catalog and the run's model role;
+    # `RequestRefinement` resolves its adapter here — the policy never sees one.
+    models: ModelCatalog | None = None
+    model_role: str = "refine"
 
     @staticmethod
     def open(
@@ -150,6 +173,8 @@ class KernelServices:
         budget: BudgetSpec | None = None,
         required_capabilities: tuple[str, ...] = (),
         surface_catalog: SurfaceCatalog | None = None,
+        models: ModelCatalog | None = None,
+        model_role: str = "refine",
     ) -> "KernelServices":
         executor = CandidateExecutor.from_catalog(
             default_sandbox_catalog(), sandbox_backend, trusted=trusted
@@ -165,6 +190,8 @@ class KernelServices:
             seed=seed,
             meter=BudgetMeter(budget or BudgetSpec()),
             required_capabilities=required_capabilities,
+            models=models,
+            model_role=model_role,
         )
 
 
@@ -262,7 +289,9 @@ def run_policy(
             )
             consumed = checkpoint.consumed_command_id
         else:
-            state = policy.initial_state(config, RunView.of(services.seed, view))
+            state = policy.initial_state(
+                config, RunView.of(services.seed, view, substrate.objects)
+            )
             consumed = None
 
         commands = 0
@@ -270,7 +299,7 @@ def run_policy(
         while commands < max_commands:
             view = substrate.verify()
             substrate._require_ok(view, "run")
-            run_view = RunView.of(services.seed, view)
+            run_view = RunView.of(services.seed, view, substrate.objects)
             command = policy.next_command(config, state, run_view)
             if command is None:
                 stopped_reason = "done"
@@ -353,16 +382,19 @@ def _enforce_identity(
 
 
 def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
-    """Rebuild a FRESH meter from the DURABLE per-attempt ledger (never absorb
-    repeatedly into a reused meter). Each fork attempt is counted exactly once:
-    its actual usage if a RESULT was journaled, else its worst-case reservation
-    if only a DISPATCH is on record (an open dispatch — spend conservatively
-    reserved so a crash-loop can never expand the budget). Non-fork commands
-    spend nothing."""
+    """Rebuild a FRESH meter from the DURABLE ledger (never absorb repeatedly
+    into a reused meter). Each fork attempt AND each model call is counted
+    exactly once: its actual usage if a RESULT was journaled, else its
+    worst-case reservation if only a DISPATCH is on record (an open dispatch —
+    spend conservatively reserved so a crash-loop can never expand any budget
+    dimension, including model calls). Commands with no external effect spend
+    nothing."""
     substrate = services.substrate
     fresh = BudgetMeter(services.meter.spec)
     results: dict[tuple[str, str], BudgetUsage] = {}
     dispatched: dict[tuple[str, str], AttemptDispatched] = {}
+    model_results: dict[str, ModelResult] = {}
+    model_dispatches: dict[str, ModelDispatch] = {}
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if not isinstance(body, ObservationRecorded):
             continue
@@ -374,15 +406,26 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[(disp.command_id, disp.label)] = disp
+        elif body.observation_kind == REFINE_RESULT:
+            res = codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
+            model_results[res.command_id] = res
+        elif body.observation_kind == REFINE_DISPATCH:
+            mdisp = codec.loads(substrate.objects.get_text(body.observation_ref), ModelDispatch)
+            model_dispatches[mdisp.command_id] = mdisp
     for usage in results.values():
         fresh.absorb(usage)
     for key, disp in dispatched.items():
-        if key not in results:  # OPEN dispatch: reserve the worst case (all dims)
+        if key not in results:  # OPEN fork dispatch: reserve the worst case (all dims)
             fresh.absorb(BudgetUsage(
                 executions=disp.reserved_executions,
                 wall_time_s=disp.reserved_wall_s,
                 output_bytes=disp.reserved_output_bytes,
             ))
+    for res in model_results.values():
+        fresh.absorb(model_result_usage(res))
+    for cid, mdisp in model_dispatches.items():
+        if cid not in model_results:  # OPEN model dispatch: reserve the worst case
+            fresh.absorb(model_dispatch_reservation(mdisp))
     services.meter = fresh
 
 
@@ -398,6 +441,8 @@ def _reconciled_usage(
     substrate = services.substrate
     results: dict[str, BudgetUsage] = {}
     dispatched: dict[str, AttemptDispatched] = {}
+    model_results: list[ModelResult] = []
+    model_dispatches: list[ModelDispatch] = []
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if env.caused_by != cid or not isinstance(body, ObservationRecorded):
             continue
@@ -409,14 +454,28 @@ def _reconciled_usage(
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[disp.label] = disp
+        elif body.observation_kind == REFINE_RESULT:
+            model_results.append(
+                codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
+            )
+        elif body.observation_kind == REFINE_DISPATCH:
+            model_dispatches.append(
+                codec.loads(substrate.objects.get_text(body.observation_ref), ModelDispatch)
+            )
     usages = list(results.values())
     for label, disp in dispatched.items():
-        if label not in results:  # open dispatch: reserve the worst case
+        if label not in results:  # open fork dispatch: reserve the worst case
             usages.append(BudgetUsage(
                 executions=disp.reserved_executions,
                 wall_time_s=disp.reserved_wall_s,
                 output_bytes=disp.reserved_output_bytes,
             ))
+    # a completed model call charges its actual usage; an OPEN model dispatch
+    # reserves the worst case (a result overrides its dispatch)
+    if model_results:
+        usages.extend(model_result_usage(r) for r in model_results)
+    else:
+        usages.extend(model_dispatch_reservation(d) for d in model_dispatches)
     return combine_usage(usages)
 
 
@@ -459,6 +518,191 @@ def _fork_summary(
             )
             return env.body_ref, fork
     return None
+
+
+# -- RequestRefinement: model call → typed proposal, journaled once ---------------------------------
+
+_PROMPT_TEMPLATE_SURFACE = ("prompt", "proposal-template")
+_DEFAULT_MODEL_MAX_TOKENS = 1024
+_DEFAULT_MODEL_TIMEOUT_S = 60.0
+
+
+def _refinement_result(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> tuple[str, ModelResult] | None:
+    """The refinement's durable model result, if present: (the
+    ObservationRecorded EVENT body ref, the decoded ModelResult). The event
+    body ref is what `StoredResult.observation_ref` records."""
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == REFINE_RESULT
+        ):
+            res = codec.loads(
+                services.substrate.objects.get_text(body.observation_ref), ModelResult
+            )
+            return env.body_ref, res
+    return None
+
+
+def _refinement_dispatched(
+    view: VerifiedSubstrateView, cid: str
+) -> bool:
+    return any(
+        env.caused_by == cid
+        and isinstance(body, ObservationRecorded)
+        and body.observation_kind == REFINE_DISPATCH
+        for env, body in zip(view.envelopes, view.bodies, strict=True)
+    )
+
+
+def _active_prompt_template(view: VerifiedSubstrateView, substrate: Substrate) -> str:
+    """The ACTIVE proposal-template surface content — the prompt that genuinely
+    shapes this refinement. Missing/unreadable content is a hard error (a
+    refinement cannot run without its control surface)."""
+    ref = view.state.content_ref(*_PROMPT_TEMPLATE_SURFACE)
+    if ref is None:
+        raise KernelError(
+            f"active state has no {_PROMPT_TEMPLATE_SURFACE} surface to render a prompt"
+        )
+    return substrate.objects.get_text(ref)
+
+
+def _run_refinement(
+    services: KernelServices, view: VerifiedSubstrateView, command: RequestRefinement
+) -> CommandResult:
+    """Perform ONE model refinement, journaled exactly like a fork attempt: a
+    DISPATCH (durable, before the call) then a RESULT (durable, after). The
+    prompt is rendered from the ACTIVE proposal-template surface + the policy's
+    context, so the active prompt genuinely shapes the proposal. A crash
+    between dispatch and result is an OPEN dispatch — reconciled as
+    `indeterminate`, never silently re-called. A model error, budget denial,
+    overrun, or malformed output is failure-as-data (a `failed` terminal with a
+    durable model result recording the failure)."""
+    substrate = services.substrate
+    cid = command.command_id
+    kind = "RequestRefinement"
+
+    # reuse a durable result across a crash between the result and the terminal
+    existing = _refinement_result(services, view, cid)
+    if existing is not None:
+        result_event_ref, prior = existing
+        if prior.failure is not None:
+            raise KernelError(prior.failure.detail)  # → failed terminal (same outcome)
+        return CommandResult(
+            cid, kind, "ok", view.head, observation_ref=result_event_ref,
+            detail="refinement already observed",
+        )
+    # an OPEN dispatch (dispatched but no durable result): never silently re-call
+    if _refinement_dispatched(view, cid):
+        raise IndeterminateEffect(
+            "model dispatched without a durable result — explicit retry required"
+        )
+
+    if services.models is None:
+        raise KernelError(
+            "RequestRefinement requires an injected model catalog (none bound)"
+        )
+    adapter: ModelAdapter = services.models.resolve(services.model_role)
+
+    # stage the policy's context bytes, then render the prompt from the ACTIVE
+    # template + that context
+    for ref, content in command.content_blobs.items():
+        if hash_text(content) != ref:
+            raise KernelError(f"refinement context does not hash to its ref {ref[:12]}…")
+        substrate.objects.put_text(content)
+    try:
+        context = substrate.objects.get_text(command.context_ref)
+    except (ObjectMissing, ObjectCorruption) as exc:
+        raise KernelError(f"refinement context ref unreadable: {exc}") from None
+    template = _active_prompt_template(view, substrate)
+    prompt = render_prompt(template, context)
+    prompt_ref = substrate.objects.put_text(prompt)
+
+    # budget FIRST (deterministic, re-derivable): a pre-call denial fails the
+    # command with NO dispatch/result effects, so nothing is charged or replayed
+    meter = services.meter
+    denial = meter.request_model_call()
+    if denial is not None:
+        raise KernelError(denial.detail)
+    timeout = meter.model_call_timeout_s(_DEFAULT_MODEL_TIMEOUT_S)
+    max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS)
+
+    subject = view.state_ref or ""
+    dispatch = ModelDispatch(
+        command_id=cid, prompt_role=command.prompt_role, prompt_ref=prompt_ref,
+        adapter_name=adapter.adapter_name, model_id=adapter.model_id,
+        max_tokens=max_tokens, temperature=0.0, seed=services.seed,
+        idempotency_key=f"{substrate.run_id}:{cid}",
+        reserved_tokens=max_tokens, reserved_wall_s=round(timeout, 6),
+    )
+    substrate.record_observation(
+        observation_kind=REFINE_DISPATCH, observation=dispatch,
+        subject_state_ref=subject, caused_by=cid,
+    )
+
+    request = ModelRequest(
+        prompt=prompt, max_tokens=max_tokens, temperature=0.0,
+        seed=services.seed, timeout_s=timeout,
+    )
+    started = time.monotonic()
+    response = None
+    failure: FailureRecord | None = None
+    try:
+        response = adapter.complete(request)
+    except Exception as exc:  # noqa: BLE001 — any adapter error is data
+        failure = FailureRecord(
+            kind=FAILURE_MODEL_ERROR, detail=f"{type(exc).__name__}: {exc}"
+        )
+    latency_ms = round((time.monotonic() - started) * 1000.0, 3)
+
+    proposal_ref: str | None = None
+    response_ref: str | None = None
+    input_tokens = output_tokens = 0
+    cost = 0.0
+    finish_reason = "error"
+    model_id = adapter.model_id
+    if response is not None:
+        input_tokens, output_tokens = response.input_tokens, response.output_tokens
+        cost, finish_reason, model_id = response.cost, response.finish_reason, response.model_id
+        meter.note_model_usage(tokens=input_tokens + output_tokens, cost=cost)
+        response_ref = substrate.objects.put_text(response.text)
+        overrun = meter.tokens_overrun() or meter.cost_overrun()
+        if overrun is not None:
+            failure = overrun
+        else:
+            try:
+                proposal, blobs = decode_proposal(
+                    response.text, catalog=substrate.catalog,
+                    allowed_surfaces=frozenset(substrate.catalog.keys()),
+                )
+                for ref, content in blobs.items():
+                    substrate.objects.put_text(content)
+                proposal_ref = substrate.put(proposal)
+            except RefinementDecodeError as exc:
+                failure = FailureRecord(kind=FAILURE_MALFORMED_OUTPUT, detail=str(exc))
+
+    result = ModelResult(
+        command_id=cid, prompt_role=command.prompt_role, adapter_name=adapter.adapter_name,
+        model_id=model_id, response_ref=response_ref, input_tokens=input_tokens,
+        output_tokens=output_tokens, cost=cost, latency_ms=latency_ms,
+        finish_reason=finish_reason, provider_extras={}, failure=failure,
+        proposal_ref=proposal_ref,
+    )
+    substrate.record_observation(
+        observation_kind=REFINE_RESULT, observation=result,
+        subject_state_ref=subject, caused_by=cid,
+    )
+    if failure is not None:
+        raise KernelError(failure.detail)  # → failed terminal (usage still reconciled)
+    found = _refinement_result(services, substrate.verify(), cid)
+    assert found is not None  # just journaled
+    result_event_ref, _ = found
+    return CommandResult(
+        cid, kind, "ok", substrate.verify().head,
+        observation_ref=result_event_ref, detail="refinement observed",
+    )
 
 
 def operator_revert(services: KernelServices, change_id: str) -> CommandResult:
@@ -656,13 +900,7 @@ def _perform(
         return CommandResult(cid, kind, "ok", view.head, detail=command.reason)
 
     if isinstance(command, RequestRefinement):
-        # Phase A ships no model refiner; a policy needing one must supply it.
-        # A real implementation must give the model call an idempotency key and
-        # record `indeterminate` on a dispatch-without-durable-result crash.
-        raise KernelError(
-            "RequestRefinement is unimplemented in Phase A (no model refiner "
-            "bound; manual-change@1 constructs its typed change directly)"
-        )
+        return _run_refinement(services, view, command)
     raise KernelError(f"unknown command {kind}")
 
 

@@ -1631,3 +1631,40 @@ reconciled ledger usage, effect-after-failure freeze, AttemptRecord bound to its
 report+evaluation); candidate failures stay distinct from infrastructure
 failures (boundary ok=False propagated; candidate exceptions stay per-case); and
 retained evaluation evidence exactly supports the scores policy uses.
+
+## 2026-08-18 — Phase B kickoff: continual-refine@1
+
+Phase A closed: fixed the contradictory `expected_state_ref` HANDOFF text (it
+IS part of the durable command identity, per `_command_identity_json`),
+refreshed PR #50 body to 241 tests / final head, verified green
+(pytest 241, mypy 39 files, wheel smoke), and MERGED #50. Branched
+`strive-vnext-phaseB` off the updated main.
+
+Design orientation (Phase A recap):
+- Policy protocol (`strive.policy`): `AdaptationPolicy` (initial_state/decode_state/
+  next_command/reduce), `SurfaceStrategy.propose(view)->CompositeChange|None`,
+  `PolicyDescriptor` (factory, config_loader, prompt_files, dependency_modules),
+  injected `PolicyCatalog`. Result-driven loop in `kernel.run_policy`.
+- `RequestRefinement(command_id, prompt_role, context_ref)` exists but `_perform`
+  raises KernelError ("unimplemented in Phase A").
+- Model infra (`strive.model`): `ModelAdapter` protocol, `FakeModelAdapter`
+  (script/responder/digest), `OpenAICompatAdapter`, `adapter_from_env`,
+  `MeteredJournalingAdapter` — BUT the metered wrapper journals to the OLD
+  `EventLog`, not the vNext substrate. Phase B needs a substrate-journaling
+  model path (typed ModelDispatch/ModelResult events + CAS).
+- Budget meter (`strive.budget`): request_model_call / note_model_usage /
+  model_call_timeout_s / cap_output_tokens / tokens_overrun / cost_overrun
+  exist. `BudgetSpec.model_calls` defaults to 0 (nothing allowed) — the policy
+  budget must raise it. `_seed_meter` currently rebuilds only fork usage;
+  must also absorb durable model-call usage for restart-safe model budgets.
+- Surfaces: `strategy-code/solve` (python, one top-level solve), `prompt/
+  proposal-template` (non-empty text). The active prompt must genuinely shape
+  the model prompt (causal), not round-trip only.
+- Task `sum-integers` planted weakness: baseline `\d+` drops minus signs;
+  fix is `-?\d+`. Negative cases (visible + held-out) fail until fixed.
+
+Drafted policy prompts: `prompts/continual_refine_refine@1.md` and
+`prompts/continual_refine_review@1.md`, both describing ONE strict JSON
+`RefinementProposal` (change_id, rationale, cited_evidence, expected_outcomes,
+uncertainty in [0,1], review_hint in {keep,revise,revert,defer}, edits[]).
+Review reuses the same decode type via `review_hint`.
