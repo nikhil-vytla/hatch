@@ -251,12 +251,15 @@ REFINE_BINDING = "refine-model-binding"
 REFINE_DISPATCH = "refine-model-dispatch"
 REFINE_RESULT = "refine-model-result"
 
-# observation_kind for an ObserveCurrentState command: it executes the ACTIVE
-# harness once through the secure executor and journals a single typed,
-# state-scoped result (an AttemptRecord, label "current"). This is FEEDBACK the
-# refiner reacts to — never an acceptance gate.
-OBSERVE_RESULT = "observe-state-result"
-OBSERVE_LABEL = "current"
+# observation_kind tags for an ObserveCurrentState command: operating the ACTIVE
+# harness through the injected OperationDriver is journaled as a DISPATCH (before
+# execution, durable, with a reservation) then a RESULT (an AttemptRecord, label
+# "current"), exactly like a fork attempt — so a crash between them is an OPEN
+# dispatch, reconciled as `indeterminate`, never silently re-run. This is
+# FEEDBACK the refiner reacts to — never an acceptance gate.
+OPERATION_DISPATCH = "operation-dispatch"
+OPERATION_RESULT = "operation-result"
+OPERATION_LABEL = "current"
 
 # the closed vocabulary of surfaces an edit may name and review verdicts
 REVIEW_VERDICTS = ("keep", "revise", "revert", "defer")
@@ -289,6 +292,23 @@ class RefinementProposal:
     expected_outcomes: tuple[str, ...]
     uncertainty: float
     review_hint: str  # one of REVIEW_VERDICTS
+
+
+@register("operation-dispatched", 1)
+@dataclass(frozen=True)
+class OperationDispatched:
+    """Journaled BEFORE the active harness is operated (durable). Names the
+    driver, the issue-state it operates against, and a CONSERVATIVE reservation
+    across every countable dimension, so an OPEN dispatch (crash before the
+    result) reserves the worst case and a crash-loop can never expand any budget
+    dimension — exactly like a fork attempt's reservation."""
+
+    command_id: str
+    driver_name: str
+    state_ref: str
+    reserved_executions: int
+    reserved_wall_s: float
+    reserved_output_bytes: int
 
 
 @register("model-binding", 1)
@@ -368,8 +388,10 @@ __all__ = [
     "ModelBinding",
     "ModelDispatch",
     "ModelResult",
-    "OBSERVE_LABEL",
-    "OBSERVE_RESULT",
+    "OPERATION_DISPATCH",
+    "OPERATION_LABEL",
+    "OPERATION_RESULT",
+    "OperationDispatched",
     "PolicyStateBlob",
     "REFINE_BINDING",
     "REFINE_DISPATCH",

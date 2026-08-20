@@ -46,7 +46,7 @@ from strive.policy import (
     StopAdaptation,
 )
 from strive.runtime import (
-    OBSERVE_RESULT,
+    OPERATION_RESULT,
     REFINE_RESULT,
     AttemptRecord,
     ModelResult,
@@ -490,7 +490,7 @@ def _surface_specs(config: ContinualRefineConfig) -> tuple[str, ...]:
 def _observations(view: RunView, exclude_cid: str) -> list[tuple[AttemptRecord, Evaluation]]:
     out: list[tuple[AttemptRecord, Evaluation]] = []
     for body in view.bodies:
-        if not (isinstance(body, ObservationRecorded) and body.observation_kind == OBSERVE_RESULT):
+        if not (isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT):
             continue
         from strive import codec
 

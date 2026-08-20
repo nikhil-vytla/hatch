@@ -53,9 +53,9 @@ from __future__ import annotations
 import inspect
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from strive import codec
 from strive.budget import UNLIMITED, BudgetMeter
@@ -70,6 +70,7 @@ from strive.contracts import (
     ExecutionReport,
     FailureRecord,
     ModelRequest,
+    TaskCase,
 )
 from strive.evaluate import evaluate
 from strive.policy import (
@@ -88,14 +89,16 @@ from strive.policy import (
     StopAdaptation,
 )
 from strive.model import ModelAdapter, ModelCatalog
+from strive.operate import OperationDriver, default_operation_driver
 from strive.refine import RefinementDecodeError, decode_proposal, render_prompt
 from strive.runtime import (
     ENCODING as _ENCODING,
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
-    OBSERVE_LABEL,
-    OBSERVE_RESULT,
+    OPERATION_DISPATCH,
+    OPERATION_LABEL,
+    OPERATION_RESULT,
     REFINE_BINDING,
     REFINE_DISPATCH,
     REFINE_RESULT,
@@ -107,6 +110,7 @@ from strive.runtime import (
     ModelBinding,
     ModelDispatch,
     ModelResult,
+    OperationDispatched,
     PolicyStateBlob,
     RefinementProposal,
     StoredResult,
@@ -166,6 +170,9 @@ class KernelServices:
     # `RequestRefinement` resolves its adapter here — the policy never sees one.
     models: ModelCatalog | None = None
     model_role: str = "refine"
+    # the injected, versioned driver that operates the harness for feedback —
+    # it exposes ONLY policy-visible cases (never the hidden evaluator splits).
+    operation_driver: OperationDriver = field(default_factory=default_operation_driver)
     # a TEST-ONLY escape hatch: drive a `requires_secure_execution` policy on an
     # insecure (fault-only) backend. Production never sets this, so a policy that
     # runs model-authored code can never silently downgrade off a secure backend.
@@ -185,6 +192,7 @@ class KernelServices:
         surface_catalog: SurfaceCatalog | None = None,
         models: ModelCatalog | None = None,
         model_role: str = "refine",
+        operation_driver: OperationDriver | None = None,
         allow_insecure_execution: bool = False,
     ) -> "KernelServices":
         executor = CandidateExecutor.from_catalog(
@@ -203,6 +211,7 @@ class KernelServices:
             required_capabilities=required_capabilities,
             models=models,
             model_role=model_role,
+            operation_driver=operation_driver or default_operation_driver(),
             allow_insecure_execution=allow_insecure_execution,
         )
 
@@ -417,13 +426,13 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
     substrate = services.substrate
     fresh = BudgetMeter(services.meter.spec)
     results: dict[tuple[str, str], BudgetUsage] = {}
-    dispatched: dict[tuple[str, str], AttemptDispatched] = {}
+    dispatched: dict[tuple[str, str], AttemptDispatched | OperationDispatched] = {}
     model_results: dict[str, ModelResult] = {}
     model_dispatches: dict[str, ModelDispatch] = {}
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if not isinstance(body, ObservationRecorded):
             continue
-        if body.observation_kind == FORK_RESULT:
+        if body.observation_kind in (FORK_RESULT, OPERATION_RESULT):
             rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
             results[(rec.command_id, rec.label)] = rec.usage
         elif body.observation_kind == FORK_DISPATCH:
@@ -431,9 +440,11 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[(disp.command_id, disp.label)] = disp
-        elif body.observation_kind == OBSERVE_RESULT:
-            rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
-            results[(rec.command_id, rec.label)] = rec.usage
+        elif body.observation_kind == OPERATION_DISPATCH:
+            odisp = codec.loads(
+                substrate.objects.get_text(body.observation_ref), OperationDispatched
+            )
+            dispatched[(odisp.command_id, OPERATION_LABEL)] = odisp
         elif body.observation_kind == REFINE_RESULT:
             res = codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
             model_results[res.command_id] = res
@@ -442,12 +453,12 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
             model_dispatches[mdisp.command_id] = mdisp
     for usage in results.values():
         fresh.absorb(usage)
-    for key, disp in dispatched.items():
-        if key not in results:  # OPEN fork dispatch: reserve the worst case (all dims)
+    for key, open_disp in dispatched.items():
+        if key not in results:  # OPEN dispatch: reserve the worst case (all dims)
             fresh.absorb(BudgetUsage(
-                executions=disp.reserved_executions,
-                wall_time_s=disp.reserved_wall_s,
-                output_bytes=disp.reserved_output_bytes,
+                executions=open_disp.reserved_executions,
+                wall_time_s=open_disp.reserved_wall_s,
+                output_bytes=open_disp.reserved_output_bytes,
             ))
     for res in model_results.values():
         fresh.absorb(model_result_usage(res))
@@ -468,13 +479,13 @@ def _reconciled_usage(
     terminal's recorded usage equals what the budget actually charged."""
     substrate = services.substrate
     results: dict[str, BudgetUsage] = {}
-    dispatched: dict[str, AttemptDispatched] = {}
+    dispatched: dict[str, AttemptDispatched | OperationDispatched] = {}
     model_results: list[ModelResult] = []
     model_dispatches: list[ModelDispatch] = []
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if env.caused_by != cid or not isinstance(body, ObservationRecorded):
             continue
-        if body.observation_kind == FORK_RESULT:
+        if body.observation_kind in (FORK_RESULT, OPERATION_RESULT):
             rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
             results[rec.label] = rec.usage
         elif body.observation_kind == FORK_DISPATCH:
@@ -482,9 +493,11 @@ def _reconciled_usage(
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[disp.label] = disp
-        elif body.observation_kind == OBSERVE_RESULT:
-            rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
-            results[rec.label] = rec.usage
+        elif body.observation_kind == OPERATION_DISPATCH:
+            odisp = codec.loads(
+                substrate.objects.get_text(body.observation_ref), OperationDispatched
+            )
+            dispatched[OPERATION_LABEL] = odisp
         elif body.observation_kind == REFINE_RESULT:
             model_results.append(
                 codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
@@ -494,12 +507,12 @@ def _reconciled_usage(
                 codec.loads(substrate.objects.get_text(body.observation_ref), ModelDispatch)
             )
     usages = list(results.values())
-    for label, disp in dispatched.items():
-        if label not in results:  # open fork dispatch: reserve the worst case
+    for label, open_disp in dispatched.items():
+        if label not in results:  # open dispatch: reserve the worst case
             usages.append(BudgetUsage(
-                executions=disp.reserved_executions,
-                wall_time_s=disp.reserved_wall_s,
-                output_bytes=disp.reserved_output_bytes,
+                executions=open_disp.reserved_executions,
+                wall_time_s=open_disp.reserved_wall_s,
+                output_bytes=open_disp.reserved_output_bytes,
             ))
     # a completed model call charges its actual usage; an OPEN model dispatch
     # reserves the worst case (a result overrides its dispatch)
@@ -1143,16 +1156,16 @@ def _fork_metrics(base: float, candidate: float, improved: bool) -> dict[str, fl
     }
 
 
-def _observation_result(
+def _operation_result(
     services: KernelServices, view: VerifiedSubstrateView, cid: str
 ) -> tuple[str, AttemptRecord] | None:
-    """The state-observation's durable result, if present: (the
-    ObservationRecorded EVENT body ref, the decoded AttemptRecord)."""
+    """The operation's durable result, if present: (the ObservationRecorded
+    EVENT body ref, the decoded AttemptRecord)."""
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if (
             env.caused_by == cid
             and isinstance(body, ObservationRecorded)
-            and body.observation_kind == OBSERVE_RESULT
+            and body.observation_kind == OPERATION_RESULT
         ):
             rec = codec.loads(
                 services.substrate.objects.get_text(body.observation_ref), AttemptRecord
@@ -1161,38 +1174,70 @@ def _observation_result(
     return None
 
 
+def _operation_dispatched(view: VerifiedSubstrateView, cid: str) -> bool:
+    return any(
+        env.caused_by == cid
+        and isinstance(body, ObservationRecorded)
+        and body.observation_kind == OPERATION_DISPATCH
+        for env, body in zip(view.envelopes, view.bodies, strict=True)
+    )
+
+
 def _run_observation(
     services: KernelServices, view: VerifiedSubstrateView, command: ObserveCurrentState
 ) -> CommandResult:
-    """Execute the ACTIVE harness once and journal a single typed, state-scoped
-    result (an AttemptRecord, label "current"). This is FEEDBACK — never a gate:
-    the command SUCCEEDS whatever the harness scored; the record carries the
-    behavior (score, per-case errors, any sandbox failure). Deterministic and
-    re-runnable, so a crash before the result just re-observes on resume."""
+    """Operate the ACTIVE harness once through the injected OperationDriver over
+    POLICY-VISIBLE cases only, journaled crash-honestly like a fork attempt: a
+    DISPATCH (durable, with a reservation) then a RESULT (an AttemptRecord). A
+    crash between them is an OPEN dispatch — reconciled as `indeterminate`,
+    never silently re-run, its reservation retained. This is FEEDBACK, never a
+    gate: the command SUCCEEDS whatever the harness scored; the record carries
+    the behavior (score, per-case errors, any sandbox failure)."""
     substrate = services.substrate
     cid = command.command_id
     kind = "ObserveCurrentState"
-    existing = _observation_result(services, view, cid)
+
+    existing = _operation_result(services, view, cid)
     if existing is not None:
         event_ref, _ = existing
         return CommandResult(
             cid, kind, "ok", view.head, observation_ref=event_ref,
-            detail="state already observed",
+            detail="operation already observed",
         )
+    if _operation_dispatched(view, cid):
+        raise IndeterminateEffect(
+            "operation dispatched without a durable result — explicit retry required"
+        )
+
+    driver = services.operation_driver
+    cases = driver.operation_cases(services.task)
+    subject = view.state_ref or ""
+    # DISPATCH first (durable): reserve the worst case across every dimension
+    cap = SandboxLimits()
+    substrate.record_observation(
+        observation_kind=OPERATION_DISPATCH,
+        observation=OperationDispatched(
+            command_id=cid, driver_name=driver.name, state_ref=subject,
+            reserved_executions=len(cases),
+            reserved_wall_s=round(len(cases) * cap.wall_time_s, 6),
+            reserved_output_bytes=len(cases) * cap.output_bytes,
+        ),
+        subject_state_ref=subject, caused_by=cid,
+    )
     rec = _run_attempt(
-        services, cid, OBSERVE_LABEL, view.state, view.state_ref or "",
-        gen_prefix="observe",
+        services, cid, OPERATION_LABEL, view.state, subject,
+        gen_prefix="operation", cases=cases,
     )
     substrate.record_observation(
-        observation_kind=OBSERVE_RESULT, observation=rec,
-        subject_state_ref=view.state_ref or "", caused_by=cid,
+        observation_kind=OPERATION_RESULT, observation=rec,
+        subject_state_ref=subject, caused_by=cid,
     )
-    found = _observation_result(services, substrate.verify(), cid)
+    found = _operation_result(services, substrate.verify(), cid)
     assert found is not None  # just journaled
     event_ref, _ = found
     return CommandResult(
         cid, kind, "ok", substrate.verify().head,
-        observation_ref=event_ref, detail="state observed",
+        observation_ref=event_ref, detail="harness operated",
     )
 
 
@@ -1232,24 +1277,26 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
 
 def _run_attempt(
     services: KernelServices, cid: str, label: str, state: HarnessState, state_ref: str,
-    *, gen_prefix: str = "fork",
+    *, gen_prefix: str = "fork", cases: "Sequence[TaskCase] | None" = None,
 ) -> AttemptRecord:
-    """Execute one attempt (a fork base/candidate, or an ObserveCurrentState of
-    the active harness) CASE-BY-CASE, enforcing CUMULATIVE output and wall
-    across cases (each case's sandbox caps come from the REMAINING budget, not a
-    fresh per-case cap). Returns an AttemptRecord even when the attempt is
-    denied/fails mid-suite — with the ACTUAL provenance, failure, denials, and
-    the usage it actually charged — so charges and provenance survive to the
-    next crash point (`ok=False` on any failure). `gen_prefix` labels the
-    report's generation (`fork` / `observe`) so verify binds it to its role."""
+    """Execute one attempt (a fork base/candidate over the SELECTION cases, or an
+    operation over the driver's POLICY-VISIBLE cases) CASE-BY-CASE, enforcing
+    CUMULATIVE output and wall across cases (each case's sandbox caps come from
+    the REMAINING budget, not a fresh per-case cap). Returns an AttemptRecord
+    even when the attempt is denied/fails mid-suite — with the ACTUAL provenance,
+    failure, denials, and the usage it actually charged — so charges and
+    provenance survive to the next crash point (`ok=False` on any failure).
+    `gen_prefix` labels the report's generation (`fork` / `operation`) so verify
+    binds it to its role; `cases` defaults to the task's selection cases."""
     meter = services.meter
     substrate = services.substrate
     gen = f"{gen_prefix}-{label}"
+    run_cases = tuple(cases) if cases is not None else services.task.selection_cases()
     before = meter.usage()
     code_ref = state.content_ref("strategy-code", "solve")
     if code_ref is None:
         empty = ExecutionReport(ok=True, generation_id=gen, outcomes=())
-        evaluation = evaluate(services.task, empty, services.task.selection_cases())
+        evaluation = evaluate(services.task, empty, run_cases)
         return AttemptRecord(
             command_id=cid, label=label, state_ref=state_ref,
             overall=evaluation.overall_score, ok=True,
@@ -1258,7 +1305,7 @@ def _run_attempt(
             report_ref=substrate.put(empty), evaluation_ref=substrate.put(evaluation),
         )
     source = services.substrate.objects.get_text(code_ref)
-    cases = services.task.selection_cases()
+    cases = run_cases
     outcomes: list[CaseOutcome] = []
     denials: list[str] = []
     provenance = None
