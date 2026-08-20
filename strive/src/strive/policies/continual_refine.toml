@@ -9,10 +9,6 @@ summary = "continual model-led refinement of the strategy + proposal template"
 # which model-adapter ROLE the kernel resolves from the injected catalog
 model_role = "refine"
 
-# "manual" = refine once per cycle after warm-up; "cadence" = the same cadence
-# expressed as an automatic trigger after `warmup_observations` observations
-trigger_mode = "manual"
-
 # operate (observe) the active harness this many times before refining, so the
 # refiner reacts to REAL observed behavior
 warmup_observations = 1

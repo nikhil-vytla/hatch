@@ -46,9 +46,11 @@ from strive.policy import (
     StopAdaptation,
 )
 from strive.runtime import (
+    FORK_SUMMARY,
     OPERATION_RESULT,
     REFINE_RESULT,
     AttemptRecord,
+    ForkObservation,
     ModelResult,
     RefinementProposal,
 )
@@ -82,8 +84,10 @@ class ContinualRefineConfig:
 
     summary: str
     model_role: str = "refine"
-    trigger_mode: str = "manual"  # "manual" | "cadence"
-    warmup_observations: int = 1  # operate the harness this many times before refining
+    # how many times to operate (observe) the harness before each refinement.
+    # (There is no external trigger mechanism yet, so a separate manual/cadence
+    # "mode" would be fiction — a run refines after this many observations.)
+    warmup_observations: int = 1
     review_window: int = 1  # post-change observations gathered before a review
     trajectory_window: int = 8
     edit_limit: int = 2
@@ -94,7 +98,7 @@ class ContinualRefineConfig:
 
 
 _ALLOWED_KEYS = frozenset({
-    "summary", "model_role", "trigger_mode", "warmup_observations",
+    "summary", "model_role", "warmup_observations",
     "review_window", "trajectory_window", "edit_limit", "enabled_strategies",
     "use_fork", "review_mode", "max_cycles",
 })
@@ -154,16 +158,12 @@ def load_config(path: str) -> ContinualRefineConfig:
         )
     if not strategies:
         raise SubstrateError("continual_refine 'enabled_strategies' must be non-empty")
-    trigger_mode = _req_str(section, "trigger_mode", "manual")
-    if trigger_mode not in ("manual", "cadence"):
-        raise SubstrateError("continual_refine 'trigger_mode' must be 'manual' or 'cadence'")
     review_mode = _req_str(section, "review_mode", "auto")
     if review_mode not in ("auto", "model"):
         raise SubstrateError("continual_refine 'review_mode' must be 'auto' or 'model'")
     return ContinualRefineConfig(
         summary=_req_str(section, "summary"),
         model_role=_req_str(section, "model_role", "refine"),
-        trigger_mode=trigger_mode,
         warmup_observations=_req_int(section, "warmup_observations", 1, minimum=1),
         review_window=_req_int(section, "review_window", 1, minimum=1),
         trajectory_window=_req_int(section, "trajectory_window", 8),
@@ -194,10 +194,12 @@ class ContinualRefineState:
     fork_improved: bool | None = None
     verdict: str | None = None
     defers: int = 0
+    revised: int = 0  # 1 once a revise change has been applied this cycle
 
 
 _STATE_KEYS = {
-    "phase", "cycle", "obs_done", "change_id", "fork_improved", "verdict", "defers",
+    "phase", "cycle", "obs_done", "change_id", "fork_improved", "verdict",
+    "defers", "revised",
 }
 
 
@@ -246,7 +248,7 @@ class ContinualRefinePolicy:
         return ContinualRefineState(
             phase=phase, cycle=_int("cycle"), obs_done=_int("obs_done"),
             change_id=change_id, fork_improved=improved, verdict=verdict,
-            defers=_int("defers"),
+            defers=_int("defers"), revised=_int("revised"),
         )
 
     # -- deterministic ids --------------------------------------------------------
@@ -273,7 +275,7 @@ class ContinualRefinePolicy:
             if n < config.warmup_observations:
                 return ObserveCurrentState(
                     command_id=self._cid(view, f"warmup:{c}:{n}"),
-                    detail=f"{config.trigger_mode} warm-up observation",
+                    detail="warm-up observation",
                 )
             return self._refine_command(config, view, c)
         if state.phase == "proposed":
@@ -302,23 +304,17 @@ class ContinualRefinePolicy:
         if state.phase == "observe_post":
             if n < config.review_window:
                 return ObserveCurrentState(
-                    command_id=self._cid(view, f"post:{c}:{state.defers}:{n}"),
+                    command_id=self._cid(view, f"post:{c}:{state.revised}:{state.defers}:{n}"),
                     detail="post-change observation",
                 )
             if config.review_mode == "model":
-                return self._review_command(config, view, c, state.defers)
-            verdict = "revert" if state.fork_improved is False else "keep"
-            return self._act_on_verdict(config, state, view, verdict)
+                return self._review_command(config, view, c, state.defers, state.revised)
+            return self._act_on_verdict(config, state, view, self._auto_verdict(config, state, view))
         if state.phase == "reviewed":
-            proposal = strat.proposal_for(view, self._cid(view, f"review:{c}:{state.defers}"))
-            verdict = proposal.review_hint if proposal is not None else "keep"
+            rcid = self._cid(view, f"review:{c}:{state.revised}:{state.defers}")
+            proposal = strat.proposal_for(view, rcid)
+            verdict = proposal.review_hint if proposal is not None else "defer"
             return self._act_on_verdict(config, state, view, verdict)
-        if state.phase == "revised":
-            assert state.change_id is not None
-            return ConfirmChange(
-                command_id=self._cid(view, f"confirm-revise:{c}"),
-                change_id=state.change_id, rationale="revised",
-            )
         if state.phase == "cycle_end":
             if c + 1 < config.max_cycles:
                 return ObserveCurrentState(
@@ -347,11 +343,17 @@ class ContinualRefinePolicy:
         )
 
     def _review_command(
-        self, config: ContinualRefineConfig, view: RunView, cycle: int, defers: int
+        self, config: ContinualRefineConfig, view: RunView, cycle: int,
+        defers: int, revised: int,
     ) -> RequestRefinement:
-        rcid = self._cid(view, f"review:{cycle}:{defers}")
+        rcid = self._cid(view, f"review:{cycle}:{revised}:{defers}")
+        reviewing = (
+            self._revise_change_id(view, cycle) if revised
+            else self._refine_change_id(view, cycle)
+        )
         context = _build_review_context(
-            view, config, change_id=self._refine_change_id(view, cycle),
+            view, config, change_id=reviewing,
+            refine_cid=self._cid(view, f"refine:{cycle}"),
             exclude_cid=rcid, cycle=cycle,
         )
         ref = hash_text(context)
@@ -363,6 +365,19 @@ class ContinualRefinePolicy:
             enabled_surfaces=self._enabled_surface_specs(config), edit_rule="review",
         )
 
+    def _auto_verdict(
+        self, config: ContinualRefineConfig, state: ContinualRefineState, view: RunView
+    ) -> str:
+        """Auto review NEVER blindly keeps: with a fork, it uses the comparative
+        result; otherwise it compares the pre-change and post-change operational
+        observations and keeps ONLY on a measured improvement."""
+        if config.use_fork and state.fork_improved is not None:
+            return "keep" if state.fork_improved else "revert"
+        pre, post = _pre_post_overall(view, state.change_id)
+        if pre is not None and post is not None and post > pre:
+            return "keep"
+        return "revert"  # no measured improvement over pre-change behavior
+
     def _act_on_verdict(
         self, config: ContinualRefineConfig, state: ContinualRefineState,
         view: RunView, verdict: str,
@@ -372,11 +387,11 @@ class ContinualRefinePolicy:
             return RevertChange(
                 command_id=self._cid(view, f"revert:{c}"), change_id=state.change_id
             )
-        if verdict == "revise":
+        if verdict == "revise" and state.revised == 0:  # one revise per cycle
+            rcid = self._cid(view, f"review:{c}:{state.revised}:{state.defers}")
             change = self._assemble(
                 config, view, self._revise_change_id(view, c),
-                refine_cid=self._cid(view, f"review:{c}:{state.defers}"),
-                superseded=state.change_id,
+                refine_cid=rcid, superseded=state.change_id,
             )
             if change is not None:
                 return ApplyChange(
@@ -384,18 +399,25 @@ class ContinualRefinePolicy:
                     strategy_ref=f"{self._strategy_ref(config)}:revises={state.change_id}",
                     expected_state_ref=view.state_ref,
                 )
-            # a revise with no assemblable change degrades to keep
+            verdict = "defer"  # an unassemblable revise gathers more instead
+        elif verdict == "revise":  # already revised once this cycle — bounded
             verdict = "keep"
-        if verdict == "defer" and state.defers < _MAX_DEFERS:
-            return ObserveCurrentState(
-                command_id=self._cid(view, f"post:{c}:{state.defers + 1}:0"),
-                detail="deferred: gathering more observations",
+        if verdict == "defer":
+            if state.defers < _MAX_DEFERS:
+                return ObserveCurrentState(
+                    command_id=self._cid(view, f"post:{c}:{state.revised}:{state.defers + 1}:0"),
+                    detail="deferred: gathering more observations",
+                )
+            # an EXHAUSTED defer stays UNRESOLVED — it does NOT silently confirm
+            return StopAdaptation(
+                command_id=self._cid(view, f"stop-unresolved:{c}"),
+                reason=f"review unresolved after {state.defers} defer(s) — left unconfirmed",
             )
-        # keep (or a capped defer) confirms the applied change and ends the cycle
-        if state.change_id is not None:
+        # keep: confirm the applied change with its REAL rationale (not the verdict)
+        if verdict == "keep" and state.change_id is not None:
             return ConfirmChange(
                 command_id=self._cid(view, f"confirm:{c}"), change_id=state.change_id,
-                rationale=f"review verdict: {verdict}",
+                rationale=_applied_rationale(view, self._cid(view, f"refine:{c}")),
             )
         return StopAdaptation(
             command_id=self._cid(view, f"stop:{c}"), reason=f"review verdict: {verdict}",
@@ -436,9 +458,13 @@ class ContinualRefinePolicy:
             if state.phase in ("proposed", "forked"):
                 # the initial apply: operate again over the review window
                 return _with(state, phase="observe_post", obs_done=0, change_id=change_id)
-            # a revise-apply: the new change is applied; now confirm it (lineage
-            # to the superseded change lives in the change's annotation)
-            return _with(state, phase="revised", change_id=change_id, verdict="revise")
+            # a revise-apply: OBSERVE the revised state and REVIEW it before
+            # confirming (lineage to the superseded change is in the annotation);
+            # reset the defer budget for the revised change's review
+            return _with(
+                state, phase="observe_post", obs_done=0, defers=0, revised=1,
+                change_id=change_id, verdict="revise",
+            )
         if k == "ConfirmChange":
             return _with(state, phase="cycle_end", verdict=state.verdict or "keep")
         if k == "RevertChange":
@@ -524,7 +550,7 @@ def _build_refine_context(
     expected outcomes, applied/reverted changes, usage counts, and failures. It
     excludes the in-flight refine's own events so the payload digest is stable
     across a crash-forced re-derivation."""
-    lines = [f"cycle: {cycle}", f"trigger: {config.trigger_mode}"]
+    lines = [f"cycle: {cycle}"]
     lines.append("=== constraints (your proposal MUST satisfy these) ===")
     lines.append(f"required_change_id: {view.run_id}:refine-change:{cycle}")
     lines.append(f"enabled_surfaces: {list(_surface_specs(config))}")
@@ -568,17 +594,85 @@ def _build_refine_context(
     return "\n".join(lines) + "\n"
 
 
+def _post_apply_observations(
+    view: RunView, change_id: str | None
+) -> list[tuple[AttemptRecord, Evaluation]]:
+    """Operation observations recorded AFTER the given change was applied — the
+    only feedback a review of that change may consider."""
+    from strive import codec
+
+    out: list[tuple[AttemptRecord, Evaluation]] = []
+    seen_apply = change_id is None
+    for body in view.bodies:
+        if isinstance(body, ChangeApplied) and body.change_id == change_id:
+            seen_apply = True
+        elif (
+            seen_apply
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == OPERATION_RESULT
+        ):
+            rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
+            ev = codec.loads(view.read_text(rec.evaluation_ref), Evaluation)
+            out.append((rec, ev))
+    return out
+
+
+def _pre_post_overall(
+    view: RunView, change_id: str | None
+) -> tuple[float | None, float | None]:
+    """The last operation overall BEFORE and AFTER the change was applied."""
+    from strive import codec
+
+    pre: float | None = None
+    post: float | None = None
+    seen_apply = False
+    for body in view.bodies:
+        if isinstance(body, ChangeApplied) and body.change_id == change_id:
+            seen_apply = True
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT:
+            rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
+            if seen_apply:
+                post = rec.overall
+            else:
+                pre = rec.overall
+    return pre, post
+
+
+def _applied_rationale(view: RunView, refine_cid: str) -> str:
+    """The ORIGINAL rationale a `keep` confirms with — the refinement's own
+    rationale, never the bare verdict string."""
+    proposal = strat.proposal_for(view, refine_cid)
+    return proposal.rationale if proposal is not None else "kept after review"
+
+
 def _build_review_context(
     view: RunView, config: ContinualRefineConfig, *, change_id: str | None,
-    exclude_cid: str, cycle: int
+    refine_cid: str, exclude_cid: str, cycle: int
 ) -> str:
+    """Deterministic review context: the exact applied change with its ORIGINAL
+    rationale/citations/expected outcomes, any fork evidence, and ONLY the
+    operation observations recorded AFTER the change was applied."""
+    from strive import codec
+
     lines = [f"cycle: {cycle}", f"reviewing change: {change_id}"]
     lines.append("=== constraints (a revise MUST use these) ===")
     lines.append(f"required_change_id: {view.run_id}:revise-change:{cycle}")
     lines.append(f"enabled_surfaces: {list(_surface_specs(config))}")
-    obs = _observations(view, exclude_cid)[-config.trajectory_window:]
+    proposal = strat.proposal_for(view, refine_cid)
+    if proposal is not None:
+        lines.append("=== the applied change ===")
+        lines.append(f"rationale: {proposal.rationale}")
+        lines.append(f"cited_evidence: {list(proposal.cited_evidence)}")
+        lines.append(f"expected_outcomes: {list(proposal.expected_outcomes)}")
+    for body in view.bodies:  # optional fork evidence, if the policy gathered it
+        if isinstance(body, ObservationRecorded) and body.observation_kind == FORK_SUMMARY:
+            fork = codec.loads(view.read_text(body.observation_ref), ForkObservation)
+            lines.append(
+                f"fork evidence: base={fork.base_overall:.4f} "
+                f"candidate={fork.candidate_overall:.4f} improved={fork.improved}"
+            )
     lines.append("=== behavior AFTER the change ===")
-    for rec, ev in obs:
+    for rec, ev in _post_apply_observations(view, change_id)[-config.trajectory_window:]:
         failing = [ce.case_id for ce in ev.case_evaluations if not ce.passed]
         lines.append(f"observation overall={rec.overall:.4f} failing={failing}")
     return "\n".join(lines) + "\n"

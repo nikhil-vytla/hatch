@@ -144,7 +144,7 @@ _SUCCESS_TOKENS = {
 # every normalized anchor a CommandPayload may carry
 _PAYLOAD_FIELDS = (
     "change_ref", "target_change_id", "expected_state_ref", "issue_state_ref",
-    "prompt_role", "context_ref", "after_seconds", "reason",
+    "prompt_role", "context_ref", "after_seconds", "reason", "model_binding",
 )
 
 # The CLOSED per-kind command-intent spec: which normalized anchors are
@@ -183,11 +183,12 @@ _PAYLOAD_SPECS: dict[
         None,
     ),
     "RequestRefinement": (
-        frozenset({"prompt_role", "context_ref"}),
+        frozenset({"prompt_role", "context_ref", "model_binding"}),
         frozenset(),
         frozenset({
             "command_id", "prompt_role", "context_ref", "content_blobs",
             "required_change_id", "edit_limit", "enabled_surfaces", "edit_rule",
+            "model_binding",
         }),
         None,
     ),
@@ -1773,7 +1774,10 @@ def _check_command_payload_coherence(
     elif "change_id" in json_keys and parsed.get("change_id") != payload.target_change_id:
         errors.append(f"{where} json change_id disagrees with target_change_id")
     # the remaining scalar anchors that ARE carried verbatim in the JSON
-    for name in ("expected_state_ref", "prompt_role", "context_ref", "after_seconds", "reason"):
+    for name in (
+        "expected_state_ref", "prompt_role", "context_ref", "after_seconds",
+        "reason", "model_binding",
+    ):
         if name in json_keys and parsed.get(name) != getattr(payload, name):
             errors.append(f"{where} json {name} disagrees with the normalized {name}")
 
