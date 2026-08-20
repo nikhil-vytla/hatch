@@ -47,6 +47,13 @@ class ModelConfigError(Exception):
     """Missing or invalid real-adapter configuration (clean CLI error)."""
 
 
+class ModelTransportError(Exception):
+    """A transport failure where a call MAY have been dispatched to the provider
+    (so spend is UNKNOWN). An adapter raises this instead of a plain exception
+    when it cannot prove no request left; the kernel then marks the refinement
+    `indeterminate` and retains the reservation, rather than assuming zero spend."""
+
+
 class ModelAdapter(Protocol):
     """A provider-neutral completion interface.
 

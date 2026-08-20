@@ -130,7 +130,9 @@ def _cmd_run(args: argparse.Namespace) -> dict[str, Any]:
             services, default_catalog(), args.policy, config,
             prompt_refs=policy_mod.prompt_refs(objects), seed_state=seed_state,
             run_metadata={
-                "backend": args.backend, "seed": str(args.seed),
+                # the ACTUAL resolved backend the run executed under (not the
+                # requested one — continual-refine@1 upgrades to a secure backend)
+                "backend": services.executor.backend_name, "seed": str(args.seed),
                 "policy": args.policy,
                 "model": (
                     services.models.resolve(model_role).model_id

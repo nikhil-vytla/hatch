@@ -88,7 +88,7 @@ from strive.policy import (
     ScheduleTrigger,
     StopAdaptation,
 )
-from strive.model import ModelAdapter, ModelCatalog
+from strive.model import ModelAdapter, ModelCatalog, ModelTransportError
 from strive.operate import OperationDriver, default_operation_driver
 from strive.refine import RefinementDecodeError, decode_proposal, render_prompt
 from strive.runtime import (
@@ -149,6 +149,13 @@ class IndeterminateEffect(Exception):
     result is recoverable and there is no idempotency key. The kernel records
     the command `indeterminate` (durable) and requires an EXPLICIT retry — it
     never silently re-dispatches and claims exactly-once."""
+
+
+class ModelBindingMismatch(KernelError):
+    """The injected model no longer matches the model a refinement was bound to
+    at issue. This REFUSES to resume (it propagates, unlike an ordinary command
+    failure) rather than permanently failing the command — restore the bound
+    model and the command resumes."""
 
 
 # -- services -------------------------------------------------------------------------------------
@@ -569,6 +576,8 @@ def _fork_summary(
 _PROMPT_TEMPLATE_SURFACE = ("prompt", "proposal-template")
 _DEFAULT_MODEL_MAX_TOKENS = 1024
 _DEFAULT_MODEL_TIMEOUT_S = 60.0
+# finish reasons whose completion cannot be a usable proposal (truncated/errored)
+_UNUSABLE_FINISH = {"length", "error"}
 
 
 def _refinement_result(
@@ -676,7 +685,9 @@ def _run_refinement(
     now_binding = (adapter.adapter_name, adapter.model_id, adapter.config_digest)
     if bound_model is not None:
         if (bound_model.adapter_name, bound_model.model_id, bound_model.config_digest) != now_binding:
-            raise KernelError(
+            # a HARD refusal (propagates, not a failed terminal): resume is
+            # blocked until the bound model is restored — never re-bound.
+            raise ModelBindingMismatch(
                 f"refinement {cid!r} was bound to "
                 f"{bound_model.adapter_name}/{bound_model.model_id} but the injected "
                 f"model is {adapter.adapter_name}/{adapter.model_id} — refusing to "
@@ -720,12 +731,13 @@ def _run_refinement(
     max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS)
     est_input = max(1, len(prompt) // 4)  # the input-token estimate we reserve
     est_cost = adapter.estimate_cost(est_input, max_tokens)
-    # COST FAILS CLOSED: a finite cost budget against an adapter that cannot
-    # report OR estimate cost is refused before any call happens.
-    if meter.spec.cost != UNLIMITED and not adapter.reports_cost and est_cost is None:
+    # COST FAILS CLOSED: with a FINITE cost budget the adapter MUST supply a
+    # conservative preflight estimate (even when actual cost is reported later) —
+    # otherwise the reservation would understate spend. No estimate → refuse.
+    if meter.spec.cost != UNLIMITED and est_cost is None:
         raise KernelError(
             f"a finite cost budget is set but adapter {adapter.adapter_name!r} "
-            "cannot report or estimate cost — refusing the call"
+            "cannot estimate cost for the reservation — refusing the call"
         )
     # budget FIRST (deterministic, re-derivable): a pre-call denial fails the
     # command with NO dispatch/result effects, so nothing is charged or replayed
@@ -738,7 +750,6 @@ def _run_refinement(
         command_id=cid, prompt_role=command.prompt_role, prompt_ref=prompt_ref,
         adapter_name=adapter.adapter_name, model_id=adapter.model_id,
         max_tokens=max_tokens, temperature=0.0, seed=services.seed,
-        idempotency_key=f"{substrate.run_id}:{cid}",
         reserved_tokens=est_input + max_tokens, reserved_wall_s=round(timeout, 6),
         reserved_cost=est_cost if est_cost is not None else 0.0,
     )
@@ -756,7 +767,14 @@ def _run_refinement(
     failure: FailureRecord | None = None
     try:
         response = adapter.complete(request)
-    except Exception as exc:  # noqa: BLE001 — any adapter error is data
+    except ModelTransportError as exc:
+        # a call MAY have been dispatched — spend is UNKNOWN. Leave the dispatch
+        # OPEN (its reservation stands) and require explicit retry; never assume
+        # zero spend by recording a completed result.
+        raise IndeterminateEffect(
+            f"model transport error (possible dispatch, unknown spend): {exc}"
+        ) from None
+    except Exception as exc:  # noqa: BLE001 — a proven-no-call error is data
         failure = FailureRecord(
             kind=FAILURE_MODEL_ERROR, detail=f"{type(exc).__name__}: {exc}"
         )
@@ -776,6 +794,12 @@ def _run_refinement(
         overrun = meter.tokens_overrun() or meter.cost_overrun()
         if overrun is not None:
             failure = overrun
+        elif finish_reason in _UNUSABLE_FINISH:
+            # a truncated/errored completion is not a usable proposal
+            failure = FailureRecord(
+                kind=FAILURE_MALFORMED_OUTPUT,
+                detail=f"unusable finish reason {finish_reason!r}",
+            )
         else:
             try:
                 # decode STRICTLY under the issued durable constraints, against
@@ -886,13 +910,14 @@ def _run_command(
     # issued digest — BEFORE both the already-completed and already-issued
     # paths — so a changed re-derivation fails closed rather than reconciling
     # against a different intent.
-    command_ref = substrate.put(_command_payload(substrate, view, command))
+    command_ref = substrate.put(_command_payload(services, view, command))
     issued = view.issued.get(cid)
     if issued is not None and issued.command_ref != command_ref:
         raise KernelError(
             f"command {cid!r} re-derived a different payload digest than the "
             f"issued intent ({issued.command_ref[:12]}… vs {command_ref[:12]}…) — "
-            "refusing to reconcile against a changed command"
+            "refusing to reconcile against a changed command (e.g. a switched "
+            "model, whose resolved identity is pinned in the intent)"
         )
 
     terminal = view.completed.get(cid)
@@ -917,6 +942,10 @@ def _run_command(
     try:
         result = _perform(services, substrate.verify(), command)
         outcome, detail = "ok", result.detail
+    except ModelBindingMismatch:
+        # a hard refusal: do NOT record a terminal — resume is blocked until the
+        # bound model is restored (the command stays resumable, never failed).
+        raise
     except IndeterminateEffect as exc:
         # dispatched, but no durable result is recoverable: record it honestly
         # and REQUIRE an explicit retry — never silently re-dispatch. The stored
@@ -1472,12 +1501,26 @@ def _command_identity_json(command: object) -> str:
     return json.dumps(strict_encode(command), sort_keys=True, separators=(",", ":"))
 
 
+def _resolve_model_binding(services: KernelServices) -> str:
+    """The RESOLVED model identity a refinement is bound to at issue:
+    ``model_role|adapter|requested_model|config_digest``. Pinned into the
+    command's durable intent so a resume that resolves a different model
+    re-derives a different digest and is refused."""
+    if services.models is None:
+        raise KernelError(
+            "RequestRefinement requires an injected model catalog (none bound)"
+        )
+    adapter = services.models.resolve(services.model_role)
+    return f"{services.model_role}|{adapter.adapter_name}|{adapter.model_id}|{adapter.config_digest}"
+
+
 def _command_payload(
-    substrate: Substrate, view: VerifiedSubstrateView, command: KernelCommand
+    services: KernelServices, view: VerifiedSubstrateView, command: KernelCommand
 ) -> CommandPayload:
     """Build the NEUTRAL typed intent record for a command: every consequential
     field is normalized out of the opaque `json` so verification can bind each
     effect to exactly what the command named."""
+    substrate = services.substrate
     kind = type(command).__name__
     change_ref: str | None = None
     target_change_id: str | None = None
@@ -1487,6 +1530,7 @@ def _command_payload(
     context_ref: str | None = None
     after_seconds: float | None = None
     reason: str | None = None
+    model_binding: str | None = None
     if isinstance(command, ApplyChange):
         change_ref = substrate.put(command.change)
         target_change_id = command.change.change_id
@@ -1503,18 +1547,26 @@ def _command_payload(
     elif isinstance(command, RequestRefinement):
         prompt_role = command.prompt_role
         context_ref = command.context_ref
+        model_binding = _resolve_model_binding(services)  # RESOLVED at issue
     elif isinstance(command, ScheduleTrigger):
         after_seconds = command.after_seconds
         reason = command.reason
     elif isinstance(command, StopAdaptation):
         reason = command.reason
+    # the model binding is part of a refinement's canonical identity JSON, so a
+    # different resolved model perturbs the digest (a refused resume)
+    identity = strict_encode(command)
+    assert isinstance(identity, dict)
+    if model_binding is not None:
+        identity = {**identity, "model_binding": model_binding}
+    payload_json = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return CommandPayload(
         command_id=command.command_id, kind=kind, encoding=_ENCODING,
         change_ref=change_ref, target_change_id=target_change_id,
         expected_state_ref=expected_state_ref, issue_state_ref=issue_state_ref,
         prompt_role=prompt_role, context_ref=context_ref,
         after_seconds=after_seconds, reason=reason,
-        json=_command_identity_json(command),
+        json=payload_json, model_binding=model_binding,
     )
 
 

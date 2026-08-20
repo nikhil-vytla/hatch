@@ -124,6 +124,11 @@ class CommandPayload:
       satisfy THIS, not merely the folded state)
     - `issue_state_ref` — the folded state ref at issue (the fork's base anchor)
     - `prompt_role` / `context_ref` — a RequestRefinement's model inputs
+    - `model_binding` — a RequestRefinement's RESOLVED model identity
+      (`model_role|adapter|requested_model|config_digest`), pinned into the
+      durable intent BEFORE issue: a resume that resolves a different model
+      re-derives a different digest and is refused, so a run can never bind
+      another model after issue — even in the issue→dispatch window
     - `after_seconds` — a ScheduleTrigger's delay
     - `reason` — a Schedule/Stop reason
     """
@@ -140,6 +145,7 @@ class CommandPayload:
     after_seconds: float | None
     reason: str | None
     json: str
+    model_binding: str | None = None
 
 
 @register("stored-result", 1)
@@ -330,12 +336,12 @@ class ModelBinding:
 @dataclass(frozen=True)
 class ModelDispatch:
     """Journaled BEFORE a model call runs (durable). Pins the resolved model,
-    sampling, the rendered prompt (CAS ref), and a stable idempotency key so a
-    provider that supports it can dedupe a retried call; without provider
-    support an unresolved dispatch becomes `indeterminate`. The reservation
-    (one model call, the requested token cap, the wall cap) is the worst case
-    an OPEN dispatch charges, so a crash-loop can never expand any budget
-    dimension — exactly like a fork attempt's reservation."""
+    sampling, and the rendered prompt (CAS ref). Without a provider idempotency
+    capability the semantics are AT-MOST-ONCE: an unresolved dispatch becomes
+    `indeterminate` and requires explicit retry (never silently re-called). The
+    reservation (one model call, estimated input+output tokens, wall, and cost)
+    is the worst case an OPEN dispatch charges, so a crash-loop can never expand
+    any budget dimension — exactly like a fork attempt's reservation."""
 
     command_id: str
     prompt_role: str
@@ -345,7 +351,6 @@ class ModelDispatch:
     max_tokens: int
     temperature: float
     seed: int
-    idempotency_key: str
     reserved_tokens: int  # estimated input + capped output tokens
     reserved_wall_s: float
     reserved_cost: float

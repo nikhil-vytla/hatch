@@ -1787,3 +1787,55 @@ immediate model-led adaptation, and OPTIONAL EvaluateFork. No Pareto, no gate.
    failure-as-data, cost-fail-closed, insecure-backend rejection, and the
    optional-fork-is-observation invariant. 265 tests, mypy clean over 43 files,
    fresh-interpreter + installed-wheel smoke retained.
+
+## 2026-08-20 — PR #51 correction round 2 (5 areas)
+
+1. **Non-leaky operation feedback (`strive.operate`).** An injected, versioned
+   `OperationDriver`; `task-suite@1` operates the harness over the VISIBLE split
+   RELABELLED with opaque `op-N` ids (an "operation" split). Hidden splits and
+   their answers never reach the Refiner; the E2E asserts operation evaluations
+   reference only `op-N` ids and no hidden case id.
+
+2. **Crash-honest operation.** ObserveCurrentState journals OperationDispatched
+   → OperationResult (AttemptRecord), reserved, subject-scoped; a crash between
+   them is an OPEN dispatch → indeterminate (never re-run; reservation retained).
+   `_run_attempt` takes an explicit `cases` set; verify + budget reconciliation
+   mirror forks.
+
+3. **Truthful review.** Removed the fake `trigger_mode` (no external trigger
+   exists). Auto review compares pre/post operation observations and never
+   blindly keeps (keep only on measured improvement, else revert). `keep`
+   confirms with the ORIGINAL rationale; exhausted `defer` stops UNRESOLVED
+   (unconfirmed, not silent keep); `revise` applies a new atomic change with
+   lineage, then OBSERVES and REVIEWS the revised state before confirming.
+   Review context carries the applied change + original rationale/citations/
+   expected outcomes + optional fork evidence + ONLY post-apply observations.
+
+4. **Model intent/recovery.** The RESOLVED model identity
+   (`model_role|adapter|requested_model|config_digest`) is pinned in the durable
+   CommandPayload intent BEFORE issue, so a wrong-model resume re-derives a
+   different digest and is REFUSED (hard error, before the try) without failing
+   the command — closing the issue→dispatch window too. Cost fails closed: a
+   finite cost budget requires a conservative preflight estimate; open dispatches
+   reserve input+output tokens, wall, and cost. A `ModelTransportError` (possible
+   dispatch, unknown spend) → indeterminate with the reservation retained;
+   a proven-no-call error → failed. Unusable finish reasons (length/error) are
+   failure-as-data. The unused `idempotency_key` was removed (at-most-once
+   documented).
+
+5. **E2E.** Non-leaky fixture derives the fix from observed (opaque id,
+   expected) feedback — a negative expected the harness got wrong → propose
+   `-?\d+` — never a case name or hard-coded answer. Covers hidden-split
+   isolation, crash-honest operation + indeterminate, restart-no-duplicate,
+   auto no-fork revert, real keep rationale, exhausted-defer-unresolved,
+   revise→observe→review, two-cycle evolved-prompt exercise, wrong-model resume
+   refusal, cost-fail-closed, unusable finish, transport-indeterminate, optional
+   fork, insecure-backend rejection, and a secure-backend run (skipped if deno
+   absent). 266 tests, mypy clean over 44 files.
+
+Honest nuances: model intent uses the payload digest (resolved model pinned pre
+-issue); the ModelBinding evidence event remains for verify (slight redundancy).
+Operation feedback exposes opaque ids + expected/got/errors (observed output);
+raw input text is not yet threaded into CaseOutcome/Evaluation evidence. The
+legacy `MeteredJournalingAdapter` (old EventLog path) was left in place, unused
+by the vNext kernel — consolidation deferred.
