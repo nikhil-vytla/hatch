@@ -349,6 +349,37 @@ promotion gate.
   optional-fork-is-observation invariant. `uv run pytest` = 265; `uv run mypy`
   clean over 43 files; fresh-interpreter + installed-wheel smoke retained.
 
+### Phase B correction round 2 (configurable, non-leaky, honestly-bounded)
+
+- **Operation feedback is generic + non-leaky.** An injected, versioned
+  `OperationDriver` (`strive.operate`, shipping `task-suite@1`) operates the
+  harness over the VISIBLE split relabelled with OPAQUE ids — hidden splits and
+  selection-only answers never reach the Refiner. Operating is journaled
+  crash-honestly (`OperationDispatched`→`OperationResult`): an open dispatch
+  reconciles to `indeterminate`, never re-run; verify mirrors forks.
+- **Truthful review.** The fake trigger mode was removed; auto review compares
+  pre/post operation observations (never blindly keeps); `keep` confirms with
+  the original rationale; an exhausted `defer` is left UNRESOLVED (unconfirmed);
+  `revise` applies a lineage-annotated change then OBSERVES and REVIEWS the
+  revised state before confirmation; review context is the applied change +
+  original rationale/citations/expected outcomes + optional fork evidence +
+  only post-apply observations.
+- **Model intent/recovery.** The RESOLVED model identity is pinned in the
+  durable command INTENT (payload digest) before issue, so a wrong-model resume
+  is refused (hard error) without failing the command — closing the
+  issue→dispatch window. Cost fails closed (finite budget requires a
+  conservative preflight estimate; reserve input+output tokens/wall/cost); a
+  `ModelTransportError` (possible dispatch) → indeterminate with the reservation
+  retained; unusable finish reasons are failure-as-data; the unused idempotency
+  key was removed (at-most-once).
+- **Proof.** A NON-LEAKY fixture derives the fix from observed (opaque id,
+  expected) feedback. `uv run pytest` = 266; `uv run mypy` clean over 44 files;
+  fresh-interpreter + installed-wheel smoke retained; a secure-backend E2E runs
+  when `deno-pyodide@1` is available.
+- **Deferred, noted honestly:** the legacy `MeteredJournalingAdapter` (old
+  EventLog path, unused by the vNext kernel) is not yet removed; operation
+  feedback exposes opaque ids + expected/got/errors but not raw input text.
+
 ### Next
 
 After review + merge: a real prompt CONSUMER at acting time beyond proposal
