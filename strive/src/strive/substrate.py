@@ -64,8 +64,9 @@ from strive.runtime import (
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
-    OBSERVE_LABEL,
-    OBSERVE_RESULT,
+    OPERATION_DISPATCH,
+    OPERATION_LABEL,
+    OPERATION_RESULT,
     REFINE_BINDING,
     REFINE_DISPATCH,
     REFINE_RESULT,
@@ -77,6 +78,7 @@ from strive.runtime import (
     ModelBinding,
     ModelDispatch,
     ModelResult,
+    OperationDispatched,
     PolicyStateBlob,
     RefinementProposal,
     StoredResult,
@@ -129,7 +131,7 @@ _OK_EFFECTS: dict[str, dict[str, int]] = {
         "refine-model-dispatch": 1,
         "refine-model-result": 1,
     },
-    "ObserveCurrentState": {"observe-state-result": 1},
+    "ObserveCurrentState": {"operation-dispatch": 1, "operation-result": 1},
     "ScheduleTrigger": {},
     "StopAdaptation": {},
 }
@@ -1832,7 +1834,9 @@ def _verify_command_lifecycles(
         _check_effect_after_terminal(cid, events, errors)
         _check_effect_after_failure(cid, events, errors)
         _check_fork_lifecycle(sub, cid, payloads.get(cid), events, bound, errors)
-        _check_observation_lifecycle(sub, cid, events, bound, errors)
+        _check_observation_lifecycle(
+            sub, cid, events, bound, issue_states.get(cid), errors
+        )
         _check_refinement_lifecycle(
             sub, cid, payloads.get(cid), events, bound, issue_states.get(cid), errors
         )
@@ -1849,35 +1853,64 @@ def _check_observation_lifecycle(
     cid: str,
     events: list[tuple[EventEnvelope, object]],
     bound: PolicyBound,
+    issue_state: str | None,
     errors: list[str],
 ) -> None:
-    """An ObserveCurrentState result binds to its evidence exactly like a fork
-    attempt: the state observation's AttemptRecord must be subject-scoped, carry
-    the run's required capabilities, finite usage, and match its ExecutionReport
-    + Evaluation (label "current", generation "observe-current")."""
+    """An ObserveCurrentState is journaled crash-honestly like a fork attempt:
+    a DISPATCH (subject-scoped to the ISSUE state, with a finite reservation)
+    then a RESULT whose AttemptRecord is subject-scoped, carries the run's
+    required capabilities and finite usage, and matches its ExecutionReport +
+    Evaluation (label "current", generation "operation-current")."""
+    dispatch: OperationDispatched | None = None
+    dispatch_subject: str | None = None
+    result: AttemptRecord | None = None
+    result_subject: str | None = None
+    dispatch_seq: int | None = None
+    result_seq: int | None = None
     for env, body in events:
-        if not (
-            isinstance(body, ObservationRecorded)
-            and body.observation_kind == OBSERVE_RESULT
-        ):
+        if not isinstance(body, ObservationRecorded):
             continue
         try:
-            rec = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
+            if body.observation_kind == OPERATION_DISPATCH:
+                dispatch = codec.loads(
+                    sub.objects.get_text(body.observation_ref), OperationDispatched
+                )
+                dispatch_subject, dispatch_seq = body.subject_state_ref, env.seq
+            elif body.observation_kind == OPERATION_RESULT:
+                result = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
+                result_subject, result_seq = body.subject_state_ref, env.seq
         except (ObjectMissing, ObjectCorruption, codec.SchemaError):
-            continue  # the main fold reports the decode failure
-        if rec.state_ref != body.subject_state_ref:
-            errors.append(f"command {cid!r}: observation state_ref != subject_state_ref")
+            return  # the main fold reports the decode failure
+    if dispatch is None and result is None:
+        return  # not an operation command
+    for what, subj in (("dispatch", dispatch_subject), ("result", result_subject)):
+        if subj is not None and issue_state is not None and subj != issue_state:
+            errors.append(f"command {cid!r}: operation {what} subject is not the issue state")
+    if dispatch is not None:
+        errors.extend(_usage_errors(
+            BudgetUsage(
+                executions=dispatch.reserved_executions,
+                wall_time_s=dispatch.reserved_wall_s,
+                output_bytes=dispatch.reserved_output_bytes,
+            ),
+            f"command {cid!r} operation reservation",
+        ))
+    if dispatch_seq is not None and result_seq is not None and dispatch_seq >= result_seq:
+        errors.append(f"command {cid!r}: operation dispatch must precede its result")
+    if result is not None:
+        if result.label != OPERATION_LABEL:
+            errors.append(f"command {cid!r}: operation result label {result.label!r}")
         missing = [
             cap for cap in bound.required_capabilities
-            if cap not in rec.provenance.enforced_capabilities
+            if cap not in result.provenance.enforced_capabilities
         ]
         if missing:
             errors.append(
-                f"command {cid!r}: observation provenance lacks required "
+                f"command {cid!r}: operation provenance lacks required "
                 f"capabilities {missing}"
             )
-        errors.extend(_usage_errors(rec.usage, f"command {cid!r} observation usage"))
-        _check_attempt_evidence(sub, cid, rec, errors, gen_prefix="observe")
+        errors.extend(_usage_errors(result.usage, f"command {cid!r} operation usage"))
+        _check_attempt_evidence(sub, cid, result, errors, gen_prefix="operation")
 
 
 _KNOWN_FINISH = {"stop", "length", "error", "unknown"}
@@ -2110,14 +2143,14 @@ def _reconciled_usage_from_events(
     (both call `combine_usage`). A command is either a fork or a refinement, so
     the two ledgers never overlap for one command."""
     results: dict[str, BudgetUsage] = {}
-    dispatched: dict[str, AttemptDispatched] = {}
+    dispatched: dict[str, AttemptDispatched | OperationDispatched] = {}
     model_results: list[ModelResult] = []
     model_dispatches: list[ModelDispatch] = []
     for env, body in events:
         if not isinstance(body, ObservationRecorded):
             continue
         try:
-            if body.observation_kind in (FORK_RESULT, OBSERVE_RESULT):
+            if body.observation_kind in (FORK_RESULT, OPERATION_RESULT):
                 rec = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
                 results[rec.label] = rec.usage
             elif body.observation_kind == FORK_DISPATCH:
@@ -2125,6 +2158,11 @@ def _reconciled_usage_from_events(
                     sub.objects.get_text(body.observation_ref), AttemptDispatched
                 )
                 dispatched[disp.label] = disp
+            elif body.observation_kind == OPERATION_DISPATCH:
+                odisp = codec.loads(
+                    sub.objects.get_text(body.observation_ref), OperationDispatched
+                )
+                dispatched[OPERATION_LABEL] = odisp
             elif body.observation_kind == REFINE_RESULT:
                 model_results.append(
                     codec.loads(sub.objects.get_text(body.observation_ref), ModelResult)
@@ -2136,12 +2174,12 @@ def _reconciled_usage_from_events(
         except (ObjectMissing, ObjectCorruption, codec.SchemaError):
             continue  # decode failures are reported by the lifecycle checks
     usages = list(results.values())
-    for label, disp in dispatched.items():
+    for label, open_disp in dispatched.items():
         if label not in results:
             usages.append(BudgetUsage(
-                executions=disp.reserved_executions,
-                wall_time_s=disp.reserved_wall_s,
-                output_bytes=disp.reserved_output_bytes,
+                executions=open_disp.reserved_executions,
+                wall_time_s=open_disp.reserved_wall_s,
+                output_bytes=open_disp.reserved_output_bytes,
             ))
     # a completed model call charges its actual usage; an OPEN model dispatch
     # (no result) reserves the worst case — a result overrides its dispatch.
@@ -2195,6 +2233,15 @@ def _check_command_grammar(
                 errors.append(
                     f"command {cid!r}: model binding → dispatch → result must be ordered"
                 )
+        if (
+            kind == "ObserveCurrentState"
+            and OPERATION_DISPATCH in non_terminal
+            and OPERATION_RESULT in non_terminal
+            and non_terminal.index(OPERATION_DISPATCH) > non_terminal.index(OPERATION_RESULT)
+        ):
+            errors.append(
+                f"command {cid!r}: operation dispatch must precede the operation result"
+            )
         _check_stored_result(sub, cid, kind, terminal, events, errors)
     else:  # failed | indeterminate: a failure record and NO success effect
         counts = Counter(tokens)
@@ -2238,7 +2285,7 @@ def _check_stored_result(
     summary_event_ref: str | None = None  # the ObservationRecorded event body ref
     summary_inner_ref: str | None = None  # the inner ForkObservation ref
     refine_result_ref: str | None = None  # the REFINE_RESULT event body ref
-    observe_result_ref: str | None = None  # the OBSERVE_RESULT event body ref
+    observe_result_ref: str | None = None  # the OPERATION_RESULT event body ref
     for env, body in events:
         if isinstance(body, ChangeApplied):
             applied_ref = body.change_ref
@@ -2247,7 +2294,7 @@ def _check_stored_result(
             summary_inner_ref = body.observation_ref
         elif isinstance(body, ObservationRecorded) and body.observation_kind == REFINE_RESULT:
             refine_result_ref = env.body_ref
-        elif isinstance(body, ObservationRecorded) and body.observation_kind == OBSERVE_RESULT:
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT:
             observe_result_ref = env.body_ref
     expected_proposal = applied_ref if kind == "ApplyChange" else None
     if stored.proposal_ref != expected_proposal:
@@ -2583,14 +2630,18 @@ def _verify_observation(
                     f"envelope {env.seq}: fork candidate does not match the proposed / "
                     "issued change"
                 )
-        elif body.observation_kind == OBSERVE_RESULT:
+        elif body.observation_kind == OPERATION_DISPATCH:
+            odisp = codec.loads(sub.objects.get_text(body.observation_ref), OperationDispatched)
+            if odisp.command_id != cause:
+                errors.append(f"envelope {env.seq}: operation dispatch command_id disagrees")
+        elif body.observation_kind == OPERATION_RESULT:
             obs = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
             if obs.command_id != cause:
-                errors.append(f"envelope {env.seq}: observation command_id disagrees")
-            if obs.label != OBSERVE_LABEL:
+                errors.append(f"envelope {env.seq}: operation result command_id disagrees")
+            if obs.label != OPERATION_LABEL:
                 errors.append(
-                    f"envelope {env.seq}: observation label {obs.label!r} != "
-                    f"{OBSERVE_LABEL!r}"
+                    f"envelope {env.seq}: operation label {obs.label!r} != "
+                    f"{OPERATION_LABEL!r}"
                 )
         elif body.observation_kind == REFINE_BINDING:
             binding = codec.loads(sub.objects.get_text(body.observation_ref), ModelBinding)
