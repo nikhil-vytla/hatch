@@ -17,30 +17,30 @@ Rules (D3, D7, D11):
 
 from __future__ import annotations
 
-import dataclasses
 import hashlib
 import json
 import os
-import time
+import socket
 import urllib.error
 import urllib.request
 from typing import Callable, Protocol
 
-from strive import codec
-from strive.budget import UNLIMITED, BudgetMeter
-from strive.cas import ObjectStore
 from strive.contracts import (
-    FAILURE_COST_UNAVAILABLE,
-    FAILURE_MODEL_ERROR,
     FINISH_ERROR,
     FINISH_LENGTH,
     FINISH_STOP,
     FINISH_UNKNOWN,
-    FailureRecord,
     ModelRequest,
     ModelResponse,
 )
-from strive.events import EventLog
+
+# a versioned identity for an adapter IMPLEMENTATION (bumped when its request/
+# response wiring changes) — pinned in a refinement's intent alongside the
+# resolved model + config so a changed adapter is detected on resume.
+ADAPTER_IMPL_VERSIONS = {
+    "fake": "fake@1",
+    "openai-compatible": "openai-compatible@1",
+}
 
 
 class ModelConfigError(Exception):
@@ -49,9 +49,14 @@ class ModelConfigError(Exception):
 
 class ModelTransportError(Exception):
     """A transport failure where a call MAY have been dispatched to the provider
-    (so spend is UNKNOWN). An adapter raises this instead of a plain exception
-    when it cannot prove no request left; the kernel then marks the refinement
-    `indeterminate` and retains the reservation, rather than assuming zero spend."""
+    (so spend is UNKNOWN). The kernel marks the refinement `indeterminate` and
+    retains the reservation, rather than assuming zero spend."""
+
+
+class ModelNoCallError(Exception):
+    """A failure PROVEN to have happened BEFORE any request left the process
+    (e.g. a refused connection or DNS failure): no spend occurred, so the kernel
+    may fail the refinement cleanly instead of marking it indeterminate."""
 
 
 class ModelAdapter(Protocol):
@@ -63,30 +68,31 @@ class ModelAdapter(Protocol):
 
     ``config_digest`` is a stable identity of the adapter's configuration
     (base URL / model / pricing) — bound into each refinement so a resume
-    cannot silently switch models after issue.
+    cannot silently switch models after issue. ``impl_version`` is the
+    versioned identity of the adapter IMPLEMENTATION, also pinned in intent.
 
-    ``estimate_cost`` upper-bounds a call's cost from its token caps for the
-    OPEN-dispatch reservation; it returns None when the adapter cannot estimate
+    ``estimate_input_tokens`` is a CONSERVATIVE (over-)bound on a prompt's input
+    tokens for the pre-call reservation. ``estimate_cost`` upper-bounds a call's
+    cost from its token caps; it returns None when the adapter cannot estimate
     (a finite cost budget against such an adapter then fails closed).
+
+    A failed ``complete`` raises ``ModelNoCallError`` only when NO request left
+    the process; any other failure (possible dispatch) raises
+    ``ModelTransportError`` or a plain exception, which the kernel treats as
+    indeterminate.
     """
 
     adapter_name: str
     model_id: str
     reports_cost: bool
     config_digest: str
+    impl_version: str
 
     def complete(self, request: ModelRequest) -> ModelResponse: ...
 
+    def estimate_input_tokens(self, prompt: str) -> int: ...
+
     def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None: ...
-
-
-class CompletingAdapter(Protocol):
-    """What proposers receive: a kernel-owned handle whose failures are data."""
-
-    @property
-    def model_id(self) -> str: ...
-
-    def complete(self, request: ModelRequest) -> ModelResponse | FailureRecord: ...
 
 
 class ModelCatalog:
@@ -126,6 +132,7 @@ class FakeModelAdapter:
     model_id = "fake-deterministic-v1"
     reports_cost = True  # its 0.0 is truthful: the fake costs nothing
     config_digest = "fake-config@1"
+    impl_version = ADAPTER_IMPL_VERSIONS["fake"]
     # the fake genuinely varies its digest reply by seed (prompt|seed), so a
     # seeded trial is honestly seeded here
     seed_support = "deterministic-by-seed"
@@ -137,6 +144,9 @@ class FakeModelAdapter:
     ) -> None:
         self._script = dict(script or {})
         self._responder = responder
+
+    def estimate_input_tokens(self, prompt: str) -> int:
+        return _conservative_input_tokens(prompt)
 
     def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
         return 0.0  # the fake costs nothing, and reports so truthfully
@@ -167,6 +177,13 @@ class FakeModelAdapter:
         )
 
 
+def _conservative_input_tokens(prompt: str) -> int:
+    """A CONSERVATIVE (over-)estimate of a prompt's input tokens for the pre-call
+    reservation — ~1 token / 3 chars over-bounds the common ~1/4 ratio, plus a
+    fixed envelope allowance, so the reservation never understates real usage."""
+    return (len(prompt) + 2) // 3 + 8
+
+
 _FINISH_NORMALIZATION = {
     "stop": FINISH_STOP,
     "end_turn": FINISH_STOP,
@@ -186,7 +203,8 @@ class OpenAICompatAdapter:
     """
 
     adapter_name = "openai-compatible"
-    reports_cost = False  # provider pricing is not modeled; cost is always 0.0
+    reports_cost = False  # provider pricing is not modeled; cost is unknown
+    impl_version = ADAPTER_IMPL_VERSIONS["openai-compatible"]
     # the seed is SENT on every request, but whether the remote provider
     # honors it is provider-dependent and not verifiable from here
     seed_support = "sent-honored-unverified"
@@ -201,8 +219,11 @@ class OpenAICompatAdapter:
             f"openai-compatible|{self._base_url}|{model_id}".encode("utf-8")
         ).hexdigest()[:16]
 
+    def estimate_input_tokens(self, prompt: str) -> int:
+        return _conservative_input_tokens(prompt)
+
     def estimate_cost(self, input_tokens: int, output_tokens: int) -> float | None:
-        return None  # provider pricing is not modeled; cost cannot be estimated
+        return None  # provider pricing is not modeled; cost is UNKNOWN (never 0)
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         body = json.dumps(
@@ -222,18 +243,37 @@ class OpenAICompatAdapter:
                 "Authorization": f"Bearer {self._api_key}",
             },
         )
-        with urllib.request.urlopen(http_request, timeout=request.timeout_s) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        usage = payload.get("usage", {})
-        raw_finish = str(payload["choices"][0].get("finish_reason", "unknown"))
-        return ModelResponse(
-            text=payload["choices"][0]["message"]["content"],
-            model_id=str(payload.get("model", self.model_id)),
-            input_tokens=int(usage.get("prompt_tokens", 0)),
-            output_tokens=int(usage.get("completion_tokens", 0)),
-            cost=0.0,  # provider pricing is not modeled here
-            finish_reason=_FINISH_NORMALIZATION.get(raw_finish, FINISH_UNKNOWN),
-        )
+        try:
+            with urllib.request.urlopen(http_request, timeout=request.timeout_s) as resp:
+                raw = resp.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            # the server RESPONDED (with an error status) — a call was dispatched
+            raise ModelTransportError(f"HTTP {exc.code} from provider") from exc
+        except urllib.error.URLError as exc:
+            reason = exc.reason
+            if isinstance(reason, (ConnectionRefusedError, socket.gaierror)):
+                # refused/DNS failure: PROVEN no request left the process
+                raise ModelNoCallError(f"connection not established: {reason}") from exc
+            # timeout / reset / other transport error AFTER connect: possible dispatch
+            raise ModelTransportError(f"transport error: {reason}") from exc
+        try:
+            payload = json.loads(raw)
+            choice = payload["choices"][0]
+            usage = payload.get("usage", {})
+            return ModelResponse(
+                text=choice["message"]["content"],
+                model_id=str(payload.get("model", self.model_id)),
+                input_tokens=int(usage.get("prompt_tokens", 0)),
+                output_tokens=int(usage.get("completion_tokens", 0)),
+                cost=0.0,  # provider pricing is not modeled here (cost unknown)
+                finish_reason=_FINISH_NORMALIZATION.get(
+                    str(choice.get("finish_reason", "unknown")), FINISH_UNKNOWN
+                ),
+            )
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as exc:
+            # a response WAS received but is unparseable: the call happened, so
+            # the outcome/spend is unknown — indeterminate, not a clean failure
+            raise ModelTransportError(f"unparseable provider response: {exc}") from exc
 
 
 _ENV_PROVIDER = "STRIVE_MODEL_PROVIDER"
@@ -265,96 +305,7 @@ def adapter_from_env() -> ModelAdapter | None:
         model_id=os.environ["STRIVE_MODEL_ID"],
     )
 
-
-class MeteredJournalingAdapter:
-    """Kernel-side wrapper: budget enforcement, wall-capped timeouts, error
-    containment, and compact journaling with content-addressed artifacts."""
-
-    def __init__(
-        self,
-        inner: ModelAdapter,
-        meter: BudgetMeter,
-        events: EventLog,
-        objects: ObjectStore,
-    ) -> None:
-        self._inner = inner
-        self._meter = meter
-        self._events = events
-        self._objects = objects
-
-    @property
-    def model_id(self) -> str:
-        return self._inner.model_id
-
-    def complete(self, request: ModelRequest) -> ModelResponse | FailureRecord:
-        if (
-            self._meter.spec.cost != UNLIMITED
-            and not getattr(self._inner, "reports_cost", False)
-        ):
-            # fail closed: a cost limit cannot be enforced against an adapter
-            # that does not report trustworthy cost
-            unavailable = FailureRecord(
-                kind=FAILURE_COST_UNAVAILABLE,
-                detail=(
-                    f"a cost budget is configured but adapter "
-                    f"{self._inner.adapter_name!r} does not report cost; "
-                    "enforcement is unavailable, refusing the call"
-                ),
-            )
-            self._events.emit("model_call_denied", failure=codec.encode(unavailable))
-            return unavailable
-        denial = self._meter.request_model_call()
-        if denial is not None:
-            self._events.emit("model_call_denied", failure=codec.encode(denial))
-            return denial
-        request = dataclasses.replace(
-            request,
-            timeout_s=self._meter.model_call_timeout_s(request.timeout_s),
-            max_tokens=self._meter.cap_output_tokens(request.max_tokens),
-        )
-        started = time.monotonic()
-        try:
-            response = self._inner.complete(request)
-        except Exception as exc:  # noqa: BLE001 — any adapter error becomes data;
-            # KeyboardInterrupt/SystemExit are BaseException and propagate
-            failure = FailureRecord(
-                kind=FAILURE_MODEL_ERROR,
-                detail=f"{type(exc).__name__}: {exc}",
-            )
-            self._events.emit(
-                "model_call_failed",
-                adapter=self._inner.adapter_name,
-                model_id=self._inner.model_id,
-                latency_ms=round((time.monotonic() - started) * 1000.0, 3),
-                failure=codec.encode(failure),
-            )
-            return failure
-        latency_ms = round((time.monotonic() - started) * 1000.0, 3)
-        self._meter.note_model_usage(
-            tokens=response.input_tokens + response.output_tokens,
-            cost=response.cost,
-        )
-        # compact metadata + CAS refs; contents live once in the object store
-        self._events.emit(
-            "model_call",
-            adapter=self._inner.adapter_name,
-            model_id=response.model_id,
-            latency_ms=latency_ms,
-            prompt_ref=self._objects.put_text(request.prompt),
-            completion_ref=self._objects.put_text(response.text),
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-            seed=request.seed,
-            timeout_s=request.timeout_s,
-            input_tokens=response.input_tokens,
-            output_tokens=response.output_tokens,
-            cost=response.cost,
-            finish_reason=response.finish_reason,
-        )
-        overrun = self._meter.tokens_overrun() or self._meter.cost_overrun()
-        if overrun is not None:
-            # the call happened and stays journaled/charged, but its
-            # completion must not become a proposal: reject before returning
-            self._events.emit("model_call_overrun", failure=codec.encode(overrun))
-            return overrun
-        return response
+# NOTE: the pre-vNext `MeteredJournalingAdapter` (an EventLog-journaling wrapper)
+# was REMOVED — the vNext kernel `_run_refinement` is the single model boundary
+# that meters, budgets, journals (as ModelDispatch/ModelResult), and contains
+# errors. There is exactly one place model calls cross the trust boundary.

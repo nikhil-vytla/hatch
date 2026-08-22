@@ -186,7 +186,7 @@ _PAYLOAD_SPECS: dict[
         frozenset({"prompt_role", "context_ref", "model_binding"}),
         frozenset(),
         frozenset({
-            "command_id", "prompt_role", "context_ref", "content_blobs",
+            "command_id", "prompt_role", "model_role", "context_ref", "content_blobs",
             "required_change_id", "edit_limit", "enabled_surfaces", "edit_rule",
             "model_binding",
         }),

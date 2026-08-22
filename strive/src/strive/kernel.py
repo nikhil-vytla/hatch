@@ -88,7 +88,7 @@ from strive.policy import (
     ScheduleTrigger,
     StopAdaptation,
 )
-from strive.model import ModelAdapter, ModelCatalog, ModelTransportError
+from strive.model import ModelAdapter, ModelCatalog, ModelNoCallError
 from strive.operate import OperationDriver, default_operation_driver
 from strive.refine import RefinementDecodeError, decode_proposal, render_prompt
 from strive.runtime import (
@@ -677,7 +677,7 @@ def _run_refinement(
         raise KernelError(
             "RequestRefinement requires an injected model catalog (none bound)"
         )
-    adapter: ModelAdapter = services.models.resolve(services.model_role)
+    adapter: ModelAdapter = services.models.resolve(command.model_role)
 
     # MODEL BINDING: pin (or, on resume, verify) the resolved model+config —
     # a run can never silently switch models after the binding is journaled.
@@ -729,7 +729,13 @@ def _run_refinement(
 
     meter = services.meter
     max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS)
-    est_input = max(1, len(prompt) // 4)  # the input-token estimate we reserve
+    # a CONSERVATIVE, adapter-supplied input-token bound (never len//4)
+    est_input = adapter.estimate_input_tokens(prompt)
+    if est_input < 1:
+        raise KernelError(
+            f"adapter {adapter.adapter_name!r} returned an invalid input-token "
+            f"estimate {est_input}"
+        )
     est_cost = adapter.estimate_cost(est_input, max_tokens)
     # COST FAILS CLOSED: with a FINITE cost budget the adapter MUST supply a
     # conservative preflight estimate (even when actual cost is reported later) —
@@ -739,6 +745,15 @@ def _run_refinement(
             f"a finite cost budget is set but adapter {adapter.adapter_name!r} "
             "cannot estimate cost for the reservation — refusing the call"
         )
+    # CONSERVATIVE preflight: deny BEFORE dispatch when the reservation
+    # (estimated input+output tokens, estimated cost) would exceed the remaining
+    # budget — a failed refinement with NO dispatch, not an overrun after spend.
+    reserved_tokens = est_input + max_tokens
+    over = meter.would_exceed_tokens(reserved_tokens) or meter.would_exceed_cost(
+        est_cost if est_cost is not None else 0.0
+    )
+    if over is not None:
+        raise KernelError(over.detail)
     # budget FIRST (deterministic, re-derivable): a pre-call denial fails the
     # command with NO dispatch/result effects, so nothing is charged or replayed
     denial = meter.request_model_call()
@@ -750,7 +765,7 @@ def _run_refinement(
         command_id=cid, prompt_role=command.prompt_role, prompt_ref=prompt_ref,
         adapter_name=adapter.adapter_name, model_id=adapter.model_id,
         max_tokens=max_tokens, temperature=0.0, seed=services.seed,
-        reserved_tokens=est_input + max_tokens, reserved_wall_s=round(timeout, 6),
+        reserved_tokens=reserved_tokens, reserved_wall_s=round(timeout, 6),
         reserved_cost=est_cost if est_cost is not None else 0.0,
     )
     substrate.record_observation(
@@ -767,17 +782,22 @@ def _run_refinement(
     failure: FailureRecord | None = None
     try:
         response = adapter.complete(request)
-    except ModelTransportError as exc:
-        # a call MAY have been dispatched — spend is UNKNOWN. Leave the dispatch
-        # OPEN (its reservation stands) and require explicit retry; never assume
-        # zero spend by recording a completed result.
-        raise IndeterminateEffect(
-            f"model transport error (possible dispatch, unknown spend): {exc}"
-        ) from None
-    except Exception as exc:  # noqa: BLE001 — a proven-no-call error is data
+    except ModelNoCallError as exc:
+        # PROVEN no request left the process (e.g. refused connection / DNS):
+        # no spend occurred, so the refinement fails cleanly as data. This is
+        # the ONLY class of adapter error that becomes a `failed` result.
         failure = FailureRecord(
-            kind=FAILURE_MODEL_ERROR, detail=f"{type(exc).__name__}: {exc}"
+            kind=FAILURE_MODEL_ERROR, detail=f"proven-no-call: {exc}"
         )
+    except Exception as exc:  # noqa: BLE001 — any other error is POSSIBLE dispatch
+        # after the durable dispatch record, an adapter exception defaults to
+        # INDETERMINATE: a call MAY have reached the provider, so spend is
+        # UNKNOWN. Leave the dispatch OPEN (its reservation stands) and require
+        # explicit retry; never assume zero spend by recording a result.
+        raise IndeterminateEffect(
+            f"model adapter error after dispatch (possible call, unknown spend): "
+            f"{type(exc).__name__}: {exc}"
+        ) from None
     latency_ms = round((time.monotonic() - started) * 1000.0, 3)
 
     proposal_ref: str | None = None
@@ -1501,17 +1521,20 @@ def _command_identity_json(command: object) -> str:
     return json.dumps(strict_encode(command), sort_keys=True, separators=(",", ":"))
 
 
-def _resolve_model_binding(services: KernelServices) -> str:
+def _resolve_model_binding(services: KernelServices, model_role: str) -> str:
     """The RESOLVED model identity a refinement is bound to at issue:
-    ``model_role|adapter|requested_model|config_digest``. Pinned into the
-    command's durable intent so a resume that resolves a different model
-    re-derives a different digest and is refused."""
+    ``model_role|adapter|impl_version|requested_model|config_digest``. Pinned
+    into the command's durable intent so a resume that resolves a different
+    model/adapter re-derives a different digest and is refused."""
     if services.models is None:
         raise KernelError(
             "RequestRefinement requires an injected model catalog (none bound)"
         )
-    adapter = services.models.resolve(services.model_role)
-    return f"{services.model_role}|{adapter.adapter_name}|{adapter.model_id}|{adapter.config_digest}"
+    adapter = services.models.resolve(model_role)
+    return (
+        f"{model_role}|{adapter.adapter_name}|{adapter.impl_version}"
+        f"|{adapter.model_id}|{adapter.config_digest}"
+    )
 
 
 def _command_payload(
@@ -1547,7 +1570,7 @@ def _command_payload(
     elif isinstance(command, RequestRefinement):
         prompt_role = command.prompt_role
         context_ref = command.context_ref
-        model_binding = _resolve_model_binding(services)  # RESOLVED at issue
+        model_binding = _resolve_model_binding(services, command.model_role)
     elif isinstance(command, ScheduleTrigger):
         after_seconds = command.after_seconds
         reason = command.reason
