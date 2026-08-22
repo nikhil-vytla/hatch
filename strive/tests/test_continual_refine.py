@@ -90,6 +90,14 @@ def _observed_failures(prompt: str) -> list[tuple[str, int]]:
     return [(cid, int(exp)) for cid, exp, _got in _FAIL_RE.findall(prompt)]
 
 
+def _reviewing(prompt: str) -> str:
+    """The change id a review prompt is reviewing (empty if not a review)."""
+    for line in prompt.splitlines():
+        if line.startswith("reviewing change:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
 def _proposal(change_id: str, *, code: str, prompt: str | None, cited: list[str],
               review_hint: str = "keep") -> str:
     edits = [{"surface_kind": "strategy-code", "surface_name": "solve", "content": code}]
@@ -113,9 +121,17 @@ def _responder(*, review_verdict: str = "keep") -> Callable[[ModelRequest], str]
         prompt = request.prompt
         change_id = _required_change_id(prompt)
         if "review @1" in prompt:  # the pinned review control prompt
-            if review_verdict == "revise":
+            if review_verdict == "revise" and "revise-change:" not in _reviewing(prompt):
+                # revise the ORIGINAL change once; the review of the revised
+                # change (below) then keeps it, so the revise-change is confirmed
                 return _proposal(change_id, code=_REVISED_CODE, prompt=None, cited=[],
                                  review_hint="revise")
+            if review_verdict == "revise":  # now reviewing the revised change
+                return json.dumps({
+                    "change_id": change_id, "rationale": "revised change is good",
+                    "cited_evidence": [], "expected_outcomes": [], "uncertainty": 0.0,
+                    "review_hint": "keep", "edits": [],
+                })
             return json.dumps({
                 "change_id": change_id, "rationale": f"verdict {review_verdict}",
                 "cited_evidence": [], "expected_outcomes": [], "uncertainty": 0.0,
@@ -388,6 +404,30 @@ def test_revise_observes_and_reviews_before_confirm(tmp_path: Path) -> None:
     assert _terminal(tmp_path, run, f"{run}:review:0:1:0") == "ok"
     assert _terminal(tmp_path, run, f"{run}:confirm:0") == "ok"
     assert "# revised" in _active_code(tmp_path, run)
+
+
+def test_second_revise_in_cycle_is_unresolved_never_kept(tmp_path: Path) -> None:
+    # a model that revises on EVERY review (including the review of the already-
+    # revised change): the one-revise-per-cycle bound must leave the change
+    # UNRESOLVED, never silently confirm it.
+    from strive.substrate import ChangeConfirmed
+
+    def always_revise(request: ModelRequest) -> str:
+        change_id = _required_change_id(request.prompt)
+        if "review @1" in request.prompt:
+            return _proposal(change_id, code=_REVISED_CODE, prompt=None, cited=[],
+                             review_hint="revise")
+        neg = [cid for cid, exp in _observed_failures(request.prompt) if exp < 0]
+        return _proposal(change_id, code=_FIXED_CODE, prompt=_IMPROVED_PROMPT, cited=neg)
+
+    run = new_run_id()
+    report = _drive(tmp_path, run, config=_config(review_mode="model"),
+                    models=_catalog(always_revise))
+    # the first revise applied; the SECOND revise resolved to unresolved-stop
+    applied = [b.change_id for b in _bodies(tmp_path, run) if isinstance(b, ChangeApplied)]
+    assert f"{run}:revise-change:0" in applied
+    assert not any(isinstance(b, ChangeConfirmed) for b in _bodies(tmp_path, run))
+    assert "unresolved" in report.stopped_reason
 
 
 # -- two cycles + active-prompt causality ---------------------------------------------------------
