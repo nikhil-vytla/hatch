@@ -556,6 +556,55 @@ def test_transport_error_is_indeterminate_unknown_spend(tmp_path: Path) -> None:
     assert _count_kind(tmp_path, run, REFINE_RESULT) == 0
 
 
+def test_proven_no_call_error_is_failed_not_indeterminate(tmp_path: Path) -> None:
+    from strive.model import ModelNoCallError
+
+    class Refused(FakeModelAdapter):
+        config_digest = "refused"
+
+        def complete(self, request: ModelRequest) -> ModelResponse:
+            raise ModelNoCallError("connection refused before any request left")
+
+    run = new_run_id()
+    _drive(tmp_path, run, models=ModelCatalog({"refine": Refused()}))
+    # a PROVEN-no-call (no spend) is a clean FAILED result, not indeterminate —
+    # the dispatch was journaled, then a result recorded carrying the failure
+    assert _terminal(tmp_path, run, f"{run}:refine:0") == "failed"
+    assert _count_kind(tmp_path, run, REFINE_DISPATCH) == 1
+    assert _count_kind(tmp_path, run, REFINE_RESULT) == 1
+
+
+def test_conservative_token_reservation_denies_before_dispatch(tmp_path: Path) -> None:
+    # a token budget too small to cover the adapter's CONSERVATIVE input+output
+    # reservation denies the call BEFORE any dispatch — nothing is spent.
+    run = new_run_id()
+    _drive(
+        tmp_path, run, models=_catalog(),
+        budget=BudgetSpec(model_calls=8, executions=512, tokens=5),
+    )
+    assert _terminal(tmp_path, run, f"{run}:refine:0") == "failed"
+    assert _count_kind(tmp_path, run, REFINE_DISPATCH) == 0  # denied pre-dispatch
+
+
+def test_command_model_role_is_authoritative_over_services_role(tmp_path: Path) -> None:
+    # the command's model_role (from config) drives adapter resolution — NOT a
+    # separately-aligned KernelServices.model_role. Bind KernelServices to a
+    # BOGUS role while the catalog carries the config's "refine" role: the run
+    # still resolves "refine" from the command and succeeds end to end.
+    run = new_run_id()
+    services = KernelServices.open(
+        tmp_path, TASK, run, seed=7,
+        sandbox_backend="process-fault-only@1", trusted=True,
+        allow_insecure_execution=True,
+        budget=BudgetSpec(model_calls=8, executions=512),
+        models=ModelCatalog({"refine": FakeModelAdapter(responder=_responder())}),
+        model_role="not-the-refine-role",  # deliberately misaligned; must be ignored
+    )
+    _drive(tmp_path, run, services=services)
+    assert _terminal(tmp_path, run, f"{run}:refine:0") == "ok"
+    assert "-?" in _active_code(tmp_path, run)
+
+
 # -- production rejects an insecure backend; secure backend runs when available -------------------
 
 
