@@ -402,8 +402,13 @@ class ContinualRefinePolicy:
                     expected_state_ref=view.state_ref,
                 )
             verdict = "defer"  # an unassemblable revise gathers more instead
-        elif verdict == "revise":  # already revised once this cycle — bounded
-            verdict = "keep"
+        elif verdict == "revise":  # a SECOND revise this cycle — bounded
+            # NEVER silently confirm: a repeated revise past the one-per-cycle
+            # bound leaves the change UNRESOLVED (unconfirmed), not kept.
+            return StopAdaptation(
+                command_id=self._cid(view, f"stop-unresolved:{c}"),
+                reason="second revise in one cycle — left unresolved, not confirmed",
+            )
         if verdict == "defer":
             if state.defers < _MAX_DEFERS:
                 return ObserveCurrentState(

@@ -620,6 +620,7 @@ class VerifiedSubstrateView:
     latest_checkpoint: PolicyCheckpointed | None
     applied_change_ids: frozenset[str]
     reverted_change_ids: frozenset[str]
+    superseded_change_ids: frozenset[str]
 
 
 # -- the substrate store --------------------------------------------------------------------------
@@ -1255,6 +1256,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
             issued=MappingProxyType({}), completed=MappingProxyType({}),
             latest_checkpoint=None,
             applied_change_ids=frozenset(), reverted_change_ids=frozenset(),
+            superseded_change_ids=frozenset(),
         )
 
     # envelope structure: monotonic seq, correct scope, stable id, CLOSED body
@@ -1296,6 +1298,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
             issued=MappingProxyType({}), completed=MappingProxyType({}),
             latest_checkpoint=None,
             applied_change_ids=frozenset(), reverted_change_ids=frozenset(),
+            superseded_change_ids=frozenset(),
         )
 
     # exactly one leading PolicyBound
@@ -1357,6 +1360,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
     latest_checkpoint: PolicyCheckpointed | None = None
     applied_ids: set[str] = set()
     reverted_ids: set[str] = set()
+    superseded_ids: set[str] = set()  # change ids retired by a later revision
     applied_changes: dict[str, CompositeChange] = {}
     proposals: dict[str, str] = {}  # change_id -> change_ref (one per change id)
     consumed_cmds: set[str] = set()  # a command is reduced by AT MOST one checkpoint
@@ -1590,6 +1594,24 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
                     "never proposed"
                 )
+            # TRUTHFUL CONFIRM: a confirm may only ratify a change that is
+            # CURRENTLY in effect — applied, not reverted, and not superseded by
+            # a later revision. Confirming an inactive change is a forged verdict.
+            elif body.change_id not in applied_ids:
+                errors.append(
+                    f"envelope {env.seq}: confirm of change {body.change_id!r} that is "
+                    "not applied"
+                )
+            elif body.change_id in reverted_ids:
+                errors.append(
+                    f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
+                    "already reverted"
+                )
+            elif body.change_id in superseded_ids:
+                errors.append(
+                    f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
+                    "superseded by a later revision"
+                )
             if cause_payload is not None and cause_payload.target_change_id not in (
                 None, body.change_id
             ):
@@ -1598,19 +1620,33 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     f"command named {cause_payload.target_change_id!r}"
                 )
         elif isinstance(body, ChangeRevised):
-            if body.change_id not in proposals:
+            # TYPED old->new supersession lineage: `change_id` is the change being
+            # retired; `new_change_ref` is the replacement. The retired change
+            # must be CURRENTLY in effect (applied, not already reverted or
+            # superseded), so a revision always retires a live change exactly once.
+            if body.change_id not in applied_ids:
+                errors.append(
+                    f"envelope {env.seq}: revise of change {body.change_id!r} that is "
+                    "not applied"
+                )
+            elif body.change_id in reverted_ids:
                 errors.append(
                     f"envelope {env.seq}: revise of change {body.change_id!r} that was "
-                    "never proposed"
+                    "already reverted"
                 )
-            if cause_payload is not None and cause_payload.target_change_id not in (
-                None, body.change_id
-            ):
+            elif body.change_id in superseded_ids:
                 errors.append(
-                    f"envelope {env.seq}: revise targets {body.change_id!r} but the "
-                    f"command named {cause_payload.target_change_id!r}"
+                    f"envelope {env.seq}: change {body.change_id!r} was already "
+                    "superseded (double revision)"
                 )
-            _decode_change(sub, body.new_change_ref, env, errors)
+            else:
+                superseded_ids.add(body.change_id)
+            new_change = _decode_change(sub, body.new_change_ref, env, errors)
+            if new_change is not None and new_change.change_id == body.change_id:
+                errors.append(
+                    f"envelope {env.seq}: revision's replacement reuses the retired "
+                    f"change id {body.change_id!r}"
+                )
         elif isinstance(body, OperationFailed):
             if body.command_id != cause:
                 errors.append(
@@ -1646,6 +1682,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
         latest_checkpoint=latest_checkpoint,
         applied_change_ids=frozenset(applied_ids),
         reverted_change_ids=frozenset(reverted_ids),
+        superseded_change_ids=frozenset(superseded_ids),
     )
 
 
