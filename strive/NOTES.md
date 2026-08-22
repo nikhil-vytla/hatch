@@ -1839,3 +1839,71 @@ Operation feedback exposes opaque ids + expected/got/errors (observed output);
 raw input text is not yet threaded into CaseOutcome/Evaluation evidence. The
 legacy `MeteredJournalingAdapter` (old EventLog path) was left in place, unused
 by the vNext kernel — consolidation deferred.
+
+---
+
+## PR #51 correction round 4 (Stage 3C.2A.2) — model intent/budgets, truthful confirm, adversarial proofs
+
+Focused, fully-green corrections; the full CAS-backed `OperationPlan`
+architectural rework (Area 1) is honestly deferred (see below).
+
+**Area 4 — model intent + budgets (done).**
+- `RequestRefinement` now carries `model_role` in its own durable intent; the
+  kernel resolves the adapter from `command.model_role`, NOT from a separately
+  aligned `KernelServices.model_role` (that field is now unused in the refine
+  path — proven by `test_command_model_role_is_authoritative_over_services_role`).
+- The pinned binding is `model_role|adapter|impl_version|requested_model|
+  config_digest`; `ADAPTER_IMPL_VERSIONS` + `adapter.impl_version` mean a changed
+  adapter IMPLEMENTATION (not just config) is detected on resume.
+- `adapter.estimate_input_tokens` supplies a CONSERVATIVE input-token bound
+  (~1 token / 3 chars + envelope), replacing `len(prompt)//4`; invalid (<1)
+  reservations are rejected.
+- Pre-dispatch budget denial via `BudgetMeter.would_exceed_tokens` /
+  `would_exceed_cost`: a reservation (est input + capped output; est cost) that
+  would exceed the remaining budget is denied BEFORE dispatch (nothing spent),
+  distinct from the post-call overrun checks. Cost unavailable is `None`, never
+  `0` (OpenAI adapter `estimate_cost` returns `None`).
+- Post-dispatch adapter exceptions default to `indeterminate`; ONLY a proven
+  `ModelNoCallError` becomes `failed` (inverted from the old default). The
+  OpenAI-compatible adapter classifies refused/DNS → `ModelNoCallError`;
+  timeout/HTTP/unparseable-response → `ModelTransportError`.
+- Removed the legacy `MeteredJournalingAdapter`/`CompletingAdapter`: the kernel
+  `_run_refinement` is the single metered/journaled model boundary.
+
+**Area 3 — truthful confirm + revision lineage (slice done).**
+- `ChangeConfirmed` verification now requires the target be CURRENTLY in effect:
+  applied, not reverted, and not superseded. Confirming an inactive/reverted/
+  superseded change is refused fail-closed (was: only checked "was proposed").
+- `ChangeRevised` folding enforces typed old→new supersession lineage (retired
+  change must be live; replacement may not reuse the retired id); the view now
+  exposes `superseded_change_ids`.
+- Policy: a SECOND revise in one cycle now leaves the change UNRESOLVED
+  (stop-unresolved) instead of silently confirming it (the old `verdict="keep"`
+  bug). The revise happy-path reviews the REVISED change with its own content
+  and confirms THAT, not the original.
+
+**Area 5 — adversarial proofs (added).** proven-no-call→failed vs transport→
+indeterminate; conservative-token reservation denies pre-dispatch; command
+model_role authoritative over services role; confirm-of-reverted and
+confirm-of-unapplied refused (substrate); second-revise-unresolved (policy).
+
+**Tooling.** `uv run mypy` clean (44 files); `uv run pytest` 266 passed;
+`test_packaging` (installed-wheel CLI smoke) + `test_substrate_only`
+(fresh interpreter) green.
+
+**Honestly deferred / not done this round.**
+- Area 1's full pluggable versioned `OperationDriver` + CAS-backed
+  `OperationPlan` with a pinned implementation+config digest and a policy-visible
+  result envelope is NOT rebuilt here; the existing `task-suite@1` driver
+  (opaque-id operation split) stands. This is the largest remaining architectural
+  item.
+- Area 3's UNIFIED typed `ReviewDecision` envelope (verdict+rationale+evidence+
+  optional replacement as one preserved record) is only partially realized:
+  rationale is preserved on confirm, supersession lineage is verifiable via
+  `ChangeRevised`, but `ChangeRevised` is not yet EMITTED by the policy through
+  the closed grammar (the revise applies a separate `ApplyChange`), so
+  `superseded_change_ids` is enforced-but-currently-unpopulated defensive
+  verification. Revert-returns-parent-to-explicit-unresolved is not specially
+  handled beyond the existing revert path.
+- Area 2 (behavior-vs-infrastructure outage isolation) was not revisited this
+  round.
