@@ -336,6 +336,7 @@ class ContinualRefinePolicy:
         ref = hash_text(context)
         return RequestRefinement(
             command_id=self._cid(view, f"refine:{cycle}"), prompt_role="refine",
+            model_role=config.model_role,
             context_ref=ref, content_blobs={ref: context},
             required_change_id=self._refine_change_id(view, cycle),
             edit_limit=config.edit_limit,
@@ -359,6 +360,7 @@ class ContinualRefinePolicy:
         ref = hash_text(context)
         return RequestRefinement(
             command_id=rcid, prompt_role="review",
+            model_role=config.model_role,
             context_ref=ref, content_blobs={ref: context},
             required_change_id=self._revise_change_id(view, cycle),
             edit_limit=config.edit_limit,

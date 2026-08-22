@@ -108,10 +108,15 @@ class RequestRefinement:
     surfaces, and only surfaces in `enabled_surfaces` (each `"kind/name"`, a
     subset of the run-pinned surfaces). `edit_rule` encodes the role's
     edit requirement — `"refine"` (edits required) or `"review"` (edits iff the
-    verdict is `revise`; keep/revert/defer forbid them)."""
+    verdict is `revise`; keep/revert/defer forbid them).
+
+    `model_role` names the model-catalog role the kernel resolves for this call:
+    it travels IN the command (part of its durable intent), so the kernel never
+    depends on a separately-aligned `KernelServices.model_role`."""
 
     command_id: str
     prompt_role: str
+    model_role: str
     context_ref: str
     required_change_id: str
     edit_limit: int

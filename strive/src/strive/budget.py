@@ -186,6 +186,36 @@ class BudgetMeter:
             )
         return None
 
+    def would_exceed_tokens(self, reserved_tokens: int) -> FailureRecord | None:
+        """CONSERVATIVE preflight: would committing ``reserved_tokens`` (a
+        call's estimated input + capped output) push cumulative tokens past the
+        hard limit? Denies BEFORE dispatch so nothing is spent — distinct from
+        the post-call ``tokens_overrun`` check."""
+        if not _limited(self.spec.tokens):
+            return None
+        projected = self._tokens + reserved_tokens
+        if projected > self.spec.tokens:
+            return self._exhausted(
+                "token",
+                f"{self.spec.tokens} allowed, {self._tokens} consumed + "
+                f"{reserved_tokens} reserved would reach {projected} — call denied",
+            )
+        return None
+
+    def would_exceed_cost(self, reserved_cost: float) -> FailureRecord | None:
+        """CONSERVATIVE preflight: would committing ``reserved_cost`` push
+        cumulative cost past the hard limit? Denies BEFORE dispatch."""
+        if not _limited(self.spec.cost):
+            return None
+        projected = self._cost + reserved_cost
+        if projected > self.spec.cost:
+            return self._exhausted(
+                "cost",
+                f"{self.spec.cost} allowed, {self._cost} spent + "
+                f"{reserved_cost} reserved would reach {projected} — call denied",
+            )
+        return None
+
     def request_model_call(self) -> FailureRecord | None:
         if _limited(self.spec.model_calls) and self._model_calls >= self.spec.model_calls:
             return self._exhausted("model-call", f"{self.spec.model_calls} allowed")
