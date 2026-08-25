@@ -40,6 +40,8 @@ from strive.contracts import (
     FAILURE_OUTPUT_LIMIT,
     FAILURE_SCHEMA_MISMATCH,
     FAILURE_TIMEOUT,
+    FAULT_CANDIDATE,
+    FAULT_INFRASTRUCTURE,
     CaseOutcome,
     ExecutionReport,
     FailureRecord,
@@ -88,6 +90,7 @@ def run_strategy(
         outcomes: tuple[CaseOutcome, ...] = (),
         failure: FailureRecord | None = None,
         stdout_bytes: int = 0,
+        fault_origin: str | None = None,
     ) -> ExecutionReport:
         return ExecutionReport(
             ok=ok,
@@ -96,6 +99,7 @@ def run_strategy(
             failure=failure,
             wall_time_s=round(time.monotonic() - started, 6),
             stdout_bytes=stdout_bytes,
+            fault_origin=fault_origin,
         )
 
     payload = json.dumps(
@@ -147,6 +151,7 @@ def run_strategy(
                         detail=f"stdout exceeded {output_bytes_cap} bytes",
                     ),
                     stdout_bytes=len(stdout),
+                    fault_origin=FAULT_CANDIDATE,  # the candidate flooded stdout
                 )
             proc.wait()
             stderr = _read_bounded(proc.stderr, 65536)
@@ -163,6 +168,7 @@ def run_strategy(
                 kind=FAILURE_TIMEOUT, detail=f"killed after {timeout_s}s"
             ),
             stdout_bytes=len(stdout),
+            fault_origin=FAULT_CANDIDATE,  # the candidate's OWN code ran past its cap
         )
     if proc.returncode == _EXIT_SCHEMA_MISMATCH:
         return report(
@@ -172,6 +178,7 @@ def run_strategy(
                 detail=stderr.decode("utf-8", "replace").strip() or "runner rejected payload",
             ),
             stdout_bytes=len(stdout),
+            fault_origin=FAULT_INFRASTRUCTURE,  # the RUNNER rejected the parent payload
         )
     if proc.returncode != 0:
         tail = stderr.decode("utf-8", "replace").strip().splitlines()[-5:]
@@ -182,6 +189,7 @@ def run_strategy(
                 detail=f"child exited {proc.returncode}: " + " | ".join(tail),
             ),
             stdout_bytes=len(stdout),
+            fault_origin=FAULT_CANDIDATE,  # the candidate crashed its own process
         )
 
     try:
@@ -208,6 +216,7 @@ def run_strategy(
                 kind=FAILURE_MALFORMED_OUTPUT, detail=f"runner output unparseable: {exc}"
             ),
             stdout_bytes=len(stdout),
+            fault_origin=FAULT_INFRASTRUCTURE,  # runner-protocol break, not the candidate
         )
 
     return report(ok=True, outcomes=outcomes, stdout_bytes=len(stdout))

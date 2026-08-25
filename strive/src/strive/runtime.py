@@ -196,7 +196,18 @@ class AttemptDispatched:
     reserved_output_bytes: int
 
 
-@register("execution-attempt", 2)
+# typed operation-outcome classes (Area 2). ONLY behavioral outcomes may steer
+# adaptation (enter refinement context or pre/post scoring). An infrastructure
+# outcome (sandbox outage/denial, or a run-resource shortfall that prevented a
+# clean evaluation) follows retry/defer/unresolved and never teaches a change or
+# triggers rollback. Indeterminate is the crash-between-dispatch-and-result case:
+# an OPEN dispatch that never produces a RESULT (reconciled separately).
+OP_BEHAVIORAL = "behavioral"
+OP_INFRASTRUCTURE = "infrastructure"
+OP_INDETERMINATE = "indeterminate"
+
+
+@register("execution-attempt", 3)
 @dataclass(frozen=True)
 class AttemptRecord:
     """The durable RESULT of one base/candidate attempt. It preserves the FULL
@@ -206,7 +217,14 @@ class AttemptRecord:
     returned provenance, denials, the metered usage, and the state ref it
     scored. `ok` distinguishes a COMPLETED evaluation (candidate errors are
     scored, `failure is None`, `ok=True`) from a SANDBOX/INFRA failure
-    (`failure` set, `ok=False`) — neither is collapsed to an aggregate score."""
+    (`failure` set, `ok=False`) — neither is collapsed to an aggregate score.
+
+    `origin` is the TRUSTED behavioral/infrastructure classification, derived
+    from the boundary's stamped fault origin (`report.fault_origin`) plus the
+    kernel's own run-budget denials — NOT a heuristic on the failure kind.
+    `origin_detail` is a short human reason. A clean run (`ok=True`) is always
+    behavioral; only a backend/launcher/runtime fault or a run-budget shortfall
+    is infrastructure."""
 
     command_id: str
     label: str  # "base" | "candidate"
@@ -219,6 +237,8 @@ class AttemptRecord:
     usage: BudgetUsage
     report_ref: str       # CAS ref to the exact ExecutionReport
     evaluation_ref: str   # CAS ref to the exact Evaluation
+    origin: str = OP_BEHAVIORAL  # OP_BEHAVIORAL | OP_INFRASTRUCTURE
+    origin_detail: str = ""
 
 
 @register("fork-observation", 4)
@@ -267,38 +287,18 @@ OPERATION_DISPATCH = "operation-dispatch"
 OPERATION_RESULT = "operation-result"
 OPERATION_LABEL = "current"
 
-# typed operation-outcome classes (Area 2). ONLY behavioral outcomes may steer
-# adaptation (enter refinement context or pre/post scoring). An infrastructure
-# outcome (sandbox outage/denial, or a run-resource shortfall that prevented a
-# clean evaluation) follows retry/defer/unresolved and never teaches a change or
-# triggers rollback. Indeterminate is the crash-between-dispatch-and-result case:
-# an OPEN dispatch that never produces a RESULT (reconciled separately).
-OP_BEHAVIORAL = "behavioral"
-OP_INFRASTRUCTURE = "infrastructure"
-OP_INDETERMINATE = "indeterminate"
-
-# failure kinds that mean the RUN/ENVIRONMENT could not deliver a clean
-# behavioral evaluation — NOT the candidate code's own quality. A candidate that
-# runs and is scored (even one whose code errors, times out, or crashes) is
-# BEHAVIORAL; only a resource shortfall / sandbox denial is INFRASTRUCTURE.
-_INFRA_FAILURE_KINDS = frozenset({"budget-exhausted"})
-
 
 def classify_operation(rec: "AttemptRecord") -> str:
-    """Classify a COMPLETED operation attempt (an `AttemptRecord`) as behavioral
-    vs infrastructure, purely from its durable fields. A sandbox denial or a
-    run-resource shortfall that prevented a clean evaluation is INFRASTRUCTURE
-    (never steers adaptation); everything the harness actually ran and scored —
-    including candidate errors/timeouts/crashes — is BEHAVIORAL."""
-    if rec.denials:
-        return OP_INFRASTRUCTURE  # the sandbox refused an operation (capability/policy)
-    if rec.failure is not None and rec.failure.kind in _INFRA_FAILURE_KINDS:
-        return OP_INFRASTRUCTURE  # a run-resource shortfall — an incomplete run
-    return OP_BEHAVIORAL
+    """The TRUSTED origin an operation attempt was stamped with at the execution
+    boundary. This is NOT a downstream heuristic on the failure kind or denials
+    (a candidate infinite-loop timeout and a backend launch fault can share a
+    kind); it is the `origin` the operation implementation recorded from trusted
+    boundary evidence, verified by the substrate."""
+    return rec.origin
 
 
 def is_behavioral_operation(rec: "AttemptRecord") -> bool:
-    return classify_operation(rec) == OP_BEHAVIORAL
+    return rec.origin == OP_BEHAVIORAL
 
 # the closed vocabulary of surfaces an edit may name and review verdicts
 REVIEW_VERDICTS = ("keep", "revise", "revert", "defer")

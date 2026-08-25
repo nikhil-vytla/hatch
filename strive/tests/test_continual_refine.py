@@ -354,20 +354,26 @@ def test_infrastructure_outage_never_teaches_or_reverts(tmp_path: Path) -> None:
     # context or the pre/post score, and MUST NOT trigger a rollback. With no
     # valid behavioral evidence the review defers and finally leaves the change
     # UNRESOLVED — never reverted because of infrastructure.
-    from strive.contracts import FAILURE_BUDGET_EXHAUSTED, ExecutionReport, FailureRecord
+    from strive.contracts import (
+        FAULT_INFRASTRUCTURE, FAILURE_CRASH, ExecutionReport, FailureRecord,
+    )
     from strive.sandboxes import CandidateExecutor, ExecutionOutcome
     from strive.substrate import ChangeReverted
-    from strive.runtime import AttemptRecord as _AR, is_behavioral_operation
+    from strive.runtime import (
+        OP_INFRASTRUCTURE, AttemptRecord as _AR, is_behavioral_operation,
+    )
 
     class OutageExecutor(CandidateExecutor):
         def execute_suite(self, source, cases, *, generation_id, limits=None):  # type: ignore[no-untyped-def]
+            # a genuine BACKEND fault: the boundary stamps FAULT_INFRASTRUCTURE
             return ExecutionOutcome(
                 report=ExecutionReport(
                     ok=False, generation_id=generation_id, outcomes=(),
-                    failure=FailureRecord(FAILURE_BUDGET_EXHAUSTED, "sandbox unavailable"),
+                    failure=FailureRecord(FAILURE_CRASH, "deno backend failed to launch"),
+                    fault_origin=FAULT_INFRASTRUCTURE,
                 ),
                 provenance=self.provenance(limits),
-                denials=("sandbox backend unavailable",),
+                denials=(),
             )
 
     run = new_run_id()
@@ -375,7 +381,7 @@ def test_infrastructure_outage_never_teaches_or_reverts(tmp_path: Path) -> None:
     services.executor = OutageExecutor(services.executor._backend, trusted=True)
     report = _drive(tmp_path, run, services=services)
 
-    # operations ran and were recorded, but EVERY one is infrastructure
+    # operations ran and were recorded, but EVERY one is TRUSTED-stamped infra
     sub = Substrate.discover(tmp_path, run)
     view = sub.verify()
     op_recs = [
@@ -383,7 +389,8 @@ def test_infrastructure_outage_never_teaches_or_reverts(tmp_path: Path) -> None:
         for b in view.bodies
         if isinstance(b, ObservationRecorded) and b.observation_kind == OPERATION_RESULT
     ]
-    assert op_recs and not any(is_behavioral_operation(r) for r in op_recs)
+    assert op_recs and all(r.origin == OP_INFRASTRUCTURE for r in op_recs)
+    assert not any(is_behavioral_operation(r) for r in op_recs)
     # infrastructure NEVER triggered a rollback, and the run ended UNRESOLVED
     assert not any(isinstance(b, ChangeReverted) for b in view.bodies)
     assert "unresolved" in report.stopped_reason

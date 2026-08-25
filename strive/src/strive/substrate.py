@@ -56,7 +56,13 @@ from typing import Callable, Iterator, Mapping
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
-from strive.contracts import BudgetSpec, BudgetUsage, Evaluation, ExecutionReport
+from strive.contracts import (
+    FAULT_CANDIDATE,
+    BudgetSpec,
+    BudgetUsage,
+    Evaluation,
+    ExecutionReport,
+)
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramingError
 from strive.runtime import (
@@ -64,6 +70,8 @@ from strive.runtime import (
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
+    OP_BEHAVIORAL,
+    OP_INFRASTRUCTURE,
     OPERATION_DISPATCH,
     OPERATION_LABEL,
     OPERATION_RESULT,
@@ -2487,6 +2495,23 @@ def _check_attempt_evidence(
         errors.append(f"{where} failure != the referenced ExecutionReport.failure")
     if rec.ok != (rec.failure is None):
         errors.append(f"{where} ok disagrees with whether a failure is present")
+    # the TRUSTED origin the attempt recorded must be exactly what the referenced
+    # report's fault-origin implies — never a free-floating classification. A
+    # clean run is behavioral; a candidate-stamped fault is behavioral; a
+    # backend/runtime fault (or an unstamped failure) is infrastructure.
+    if rec.origin not in (OP_BEHAVIORAL, OP_INFRASTRUCTURE):
+        errors.append(f"{where} origin {rec.origin!r} is not a known operation origin")
+    else:
+        expected_origin = (
+            OP_BEHAVIORAL
+            if report.failure is None or report.fault_origin == FAULT_CANDIDATE
+            else OP_INFRASTRUCTURE
+        )
+        if rec.origin != expected_origin:
+            errors.append(
+                f"{where} origin {rec.origin!r} disagrees with the report's "
+                f"fault_origin {report.fault_origin!r} (expected {expected_origin!r})"
+            )
     # the evaluation mirrors the report's failure (floored iff the report failed)
     if evaluation.failure != report.failure:
         errors.append(f"{where} Evaluation.failure != ExecutionReport.failure")
