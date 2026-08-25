@@ -1963,3 +1963,60 @@ remain deferred (below), consistent with prior rounds.
   inactive IS enforced). The typed `ModelBinding` struct replacing the pipe
   string was also not done — the resolved identity is still pinned as a
   deterministic string embedding role|adapter|impl|model|config.
+
+---
+
+## PR #51 correction round 6 (Stage 3C.2A.4) — separate behavior from infrastructure (Area 2)
+
+Landed Area 2 in full; Areas 1 and the Area-3 revision-lifecycle emission remain
+deferred (below), consistent with prior rounds.
+
+**Area 2 — infrastructure failures cannot steer adaptation (done).**
+- **Typed operation-outcome classification** (`strive.runtime.classify_operation`
+  → `behavioral` | `infrastructure`, plus the `indeterminate` open-dispatch case
+  handled separately). It is a PURE function of the durable `AttemptRecord`
+  fields (`denials`, `failure.kind`), so it is reproducible and verifiable
+  without a schema/version migration:
+  - a candidate that ran and was scored — even one whose code errors, times out,
+    or crashes — is **behavioral** (its own quality; a real lesson);
+  - a sandbox denial (`denials` non-empty) or a run-resource shortfall
+    (`budget-exhausted`, an incomplete run) is **infrastructure**.
+- **Only behavioral feedback steers adaptation.** `continual-refine`'s three
+  readers now skip infrastructure outcomes: the refiner context
+  (`_observations`), the auto pre/post score (`_pre_post_overall`), and review
+  evidence (`_post_apply_observations`).
+- **Infrastructure never reverts.** Auto review with no VALID behavioral
+  post-observation now DEFERS (bounded by `review_window + _MAX_DEFERS`) and then
+  leaves the change **UNRESOLVED** — it can no longer be misread as a regression
+  and rolled back. (This also fixed a latent auto-mode defer loop: the defer
+  counter only advanced in the model-review phase.)
+- Tests: `test_operation_outcomes.py` (classifier: behavioral for timeout/crash,
+  infrastructure for budget-shortfall/denial); an injected outage executor E2E
+  proving infra operations are recorded, never enter learning, never trigger a
+  rollback, and end the run unresolved.
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **277 passed**;
+`test_packaging` (installed-wheel CLI smoke) + `test_substrate_only` green.
+
+**Honestly deferred / NOT done this round.**
+- **Area 1** — the versioned `OperationDescriptor`/catalog + CAS-backed
+  `OperationPlan` (pinned impl/config digest + plan ref in `ObserveCurrentState`
+  intent, matched-plan pre/post, driver-owned preparation/execution/
+  interpretation/projection) is still NOT built; `task-suite@1` opaque-id split
+  stands. Largest remaining architectural item.
+- **Area 3** — the typed `ReviewDecision` annotation + a closed `ReviseChange`
+  lifecycle that EMITS verified `ChangeRevised` old→new lineage remain unwired
+  (confirm-of-reverted/inactive/superseded IS enforced; `superseded_change_ids`
+  stays enforced-but-unpopulated). Causal prompt-only shadow-refinement proof not
+  added.
+- **Area 4** — the typed `ModelBinding` struct replacing the pipe-string identity
+  was not done (the resolved identity is a deterministic string embedding
+  role|adapter|impl|model|config); the `basis` (`actual`/`reservation`/`unknown`)
+  typing of usage is expressed via `provider_extras` flags rather than a typed
+  field.
+
+Note on the goal's operation-outcome storage split ("policy-visible observation
+separate from protected runtime/evaluation evidence"): this already holds — the
+`AttemptRecord` keeps `report_ref` (full ExecutionReport) and `evaluation_ref`
+distinct, and the refiner context only ever surfaces opaque case ids +
+expected/got, never raw inputs.
