@@ -267,6 +267,39 @@ OPERATION_DISPATCH = "operation-dispatch"
 OPERATION_RESULT = "operation-result"
 OPERATION_LABEL = "current"
 
+# typed operation-outcome classes (Area 2). ONLY behavioral outcomes may steer
+# adaptation (enter refinement context or pre/post scoring). An infrastructure
+# outcome (sandbox outage/denial, or a run-resource shortfall that prevented a
+# clean evaluation) follows retry/defer/unresolved and never teaches a change or
+# triggers rollback. Indeterminate is the crash-between-dispatch-and-result case:
+# an OPEN dispatch that never produces a RESULT (reconciled separately).
+OP_BEHAVIORAL = "behavioral"
+OP_INFRASTRUCTURE = "infrastructure"
+OP_INDETERMINATE = "indeterminate"
+
+# failure kinds that mean the RUN/ENVIRONMENT could not deliver a clean
+# behavioral evaluation — NOT the candidate code's own quality. A candidate that
+# runs and is scored (even one whose code errors, times out, or crashes) is
+# BEHAVIORAL; only a resource shortfall / sandbox denial is INFRASTRUCTURE.
+_INFRA_FAILURE_KINDS = frozenset({"budget-exhausted"})
+
+
+def classify_operation(rec: "AttemptRecord") -> str:
+    """Classify a COMPLETED operation attempt (an `AttemptRecord`) as behavioral
+    vs infrastructure, purely from its durable fields. A sandbox denial or a
+    run-resource shortfall that prevented a clean evaluation is INFRASTRUCTURE
+    (never steers adaptation); everything the harness actually ran and scored —
+    including candidate errors/timeouts/crashes — is BEHAVIORAL."""
+    if rec.denials:
+        return OP_INFRASTRUCTURE  # the sandbox refused an operation (capability/policy)
+    if rec.failure is not None and rec.failure.kind in _INFRA_FAILURE_KINDS:
+        return OP_INFRASTRUCTURE  # a run-resource shortfall — an incomplete run
+    return OP_BEHAVIORAL
+
+
+def is_behavioral_operation(rec: "AttemptRecord") -> bool:
+    return classify_operation(rec) == OP_BEHAVIORAL
+
 # the closed vocabulary of surfaces an edit may name and review verdicts
 REVIEW_VERDICTS = ("keep", "revise", "revert", "defer")
 

@@ -53,6 +53,7 @@ from strive.runtime import (
     ForkObservation,
     ModelResult,
     RefinementProposal,
+    is_behavioral_operation,
 )
 from strive.contracts import Evaluation
 from strive.substrate import (
@@ -309,7 +310,22 @@ class ContinualRefinePolicy:
                 )
             if config.review_mode == "model":
                 return self._review_command(config, view, c, state.defers, state.revised)
-            return self._act_on_verdict(config, state, view, self._auto_verdict(config, state, view))
+            verdict = self._auto_verdict(config, state, view)
+            if verdict == "defer":
+                # Area 2: no VALID behavioral post-observation yet (e.g. the whole
+                # window was infrastructure). Gather more, BOUNDED — then leave the
+                # change UNRESOLVED. Infrastructure never reverts.
+                if n < config.review_window + _MAX_DEFERS:
+                    return ObserveCurrentState(
+                        command_id=self._cid(view, f"post:{c}:{state.revised}:0:{n}"),
+                        detail="deferred: awaiting a behavioral observation",
+                    )
+                return StopAdaptation(
+                    command_id=self._cid(view, f"stop-unresolved:{c}"),
+                    reason="review unresolved: no behavioral observations "
+                    "(infrastructure only) — left unconfirmed, not reverted",
+                )
+            return self._act_on_verdict(config, state, view, verdict)
         if state.phase == "reviewed":
             rcid = self._cid(view, f"review:{c}:{state.revised}:{state.defers}")
             proposal = strat.proposal_for(view, rcid)
@@ -372,13 +388,20 @@ class ContinualRefinePolicy:
     ) -> str:
         """Auto review NEVER blindly keeps: with a fork, it uses the comparative
         result; otherwise it compares the pre-change and post-change operational
-        observations and keeps ONLY on a measured improvement."""
+        observations and keeps ONLY on a measured improvement.
+
+        Area 2: a MISSING behavioral post-observation (e.g. the review window saw
+        only infrastructure failures) is NOT evidence of regression — it defers
+        (gathers more, then leaves unresolved), never reverts. Infrastructure can
+        never trigger rollback."""
         if config.use_fork and state.fork_improved is not None:
             return "keep" if state.fork_improved else "revert"
         pre, post = _pre_post_overall(view, state.change_id)
-        if pre is not None and post is not None and post > pre:
+        if post is None:
+            return "defer"  # no valid behavioral post-observation yet — gather more
+        if pre is not None and post > pre:
             return "keep"
-        return "revert"  # no measured improvement over pre-change behavior
+        return "revert"  # a real, MEASURED lack of improvement over pre-change
 
     def _act_on_verdict(
         self, config: ContinualRefineConfig, state: ContinualRefineState,
@@ -530,6 +553,8 @@ def _observations(view: RunView, exclude_cid: str) -> list[tuple[AttemptRecord, 
         rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
         if rec.command_id == exclude_cid:
             continue
+        if not is_behavioral_operation(rec):
+            continue  # Area 2: infrastructure failures never enter refiner context
         ev = codec.loads(view.read_text(rec.evaluation_ref), Evaluation)
         out.append((rec, ev))
     return out
@@ -605,7 +630,9 @@ def _post_apply_observations(
     view: RunView, change_id: str | None
 ) -> list[tuple[AttemptRecord, Evaluation]]:
     """Operation observations recorded AFTER the given change was applied — the
-    only feedback a review of that change may consider."""
+    only feedback a review of that change may consider. Only BEHAVIORAL outcomes
+    count: an infrastructure failure in the review window is never review
+    evidence (Area 2)."""
     from strive import codec
 
     out: list[tuple[AttemptRecord, Evaluation]] = []
@@ -619,6 +646,8 @@ def _post_apply_observations(
             and body.observation_kind == OPERATION_RESULT
         ):
             rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
+            if not is_behavioral_operation(rec):
+                continue
             ev = codec.loads(view.read_text(rec.evaluation_ref), Evaluation)
             out.append((rec, ev))
     return out
@@ -627,7 +656,9 @@ def _post_apply_observations(
 def _pre_post_overall(
     view: RunView, change_id: str | None
 ) -> tuple[float | None, float | None]:
-    """The last operation overall BEFORE and AFTER the change was applied."""
+    """The last BEHAVIORAL operation overall BEFORE and AFTER the change was
+    applied. Infrastructure outcomes are skipped — a sandbox outage must never
+    look like a pre/post score change (Area 2)."""
     from strive import codec
 
     pre: float | None = None
@@ -638,6 +669,8 @@ def _pre_post_overall(
             seen_apply = True
         elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT:
             rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
+            if not is_behavioral_operation(rec):
+                continue
             if seen_apply:
                 post = rec.overall
             else:
