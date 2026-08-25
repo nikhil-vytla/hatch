@@ -173,10 +173,10 @@ class KernelServices:
     seed: int
     meter: BudgetMeter
     required_capabilities: tuple[str, ...] = ()
-    # the injected, immutable model-adapter catalog and the run's model role;
-    # `RequestRefinement` resolves its adapter here — the policy never sees one.
+    # the injected, immutable model-adapter catalog. Each `RequestRefinement`
+    # carries its OWN `model_role`, which the kernel resolves against this
+    # catalog — so there is no separately-aligned services-level role to drift.
     models: ModelCatalog | None = None
-    model_role: str = "refine"
     # the injected, versioned driver that operates the harness for feedback —
     # it exposes ONLY policy-visible cases (never the hidden evaluator splits).
     operation_driver: OperationDriver = field(default_factory=default_operation_driver)
@@ -198,7 +198,6 @@ class KernelServices:
         required_capabilities: tuple[str, ...] = (),
         surface_catalog: SurfaceCatalog | None = None,
         models: ModelCatalog | None = None,
-        model_role: str = "refine",
         operation_driver: OperationDriver | None = None,
         allow_insecure_execution: bool = False,
     ) -> "KernelServices":
@@ -217,7 +216,6 @@ class KernelServices:
             meter=BudgetMeter(budget or BudgetSpec()),
             required_capabilities=required_capabilities,
             models=models,
-            model_role=model_role,
             operation_driver=operation_driver or default_operation_driver(),
             allow_insecure_execution=allow_insecure_execution,
         )
@@ -728,14 +726,24 @@ def _run_refinement(
     prompt_ref = substrate.objects.put_text(prompt)
 
     meter = services.meter
-    max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS)
-    # a CONSERVATIVE, adapter-supplied input-token bound (never len//4)
+    # ESTIMATE INPUT FIRST (a CONSERVATIVE, adapter-supplied bound, never len//4),
+    # then cap output to what remains AFTER the input reservation — so a viable
+    # finite token budget yields a usable, non-exceeding reservation.
     est_input = adapter.estimate_input_tokens(prompt)
     if est_input < 1:
         raise KernelError(
             f"adapter {adapter.adapter_name!r} returned an invalid input-token "
             f"estimate {est_input}"
         )
+    remaining_tokens = meter.remaining_tokens()
+    if remaining_tokens is not None and est_input >= remaining_tokens:
+        # the input estimate alone leaves no room for even one output token —
+        # deny before any dispatch (nothing spent)
+        raise KernelError(
+            f"token budget exhausted: input estimate {est_input} leaves no room "
+            f"in the remaining {remaining_tokens} tokens — call denied"
+        )
+    max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS, reserved_input=est_input)
     est_cost = adapter.estimate_cost(est_input, max_tokens)
     # COST FAILS CLOSED: with a FINITE cost budget the adapter MUST supply a
     # conservative preflight estimate (even when actual cost is reported later) —
@@ -806,9 +814,32 @@ def _run_refinement(
     cost = 0.0
     finish_reason = "error"
     model_id = adapter.model_id
+    provider_extras: dict[str, str] = {}
     if response is not None:
-        input_tokens, output_tokens = response.input_tokens, response.output_tokens
-        cost, finish_reason, model_id = response.cost, response.finish_reason, response.model_id
+        finish_reason, model_id = response.finish_reason, response.model_id
+        # UNKNOWN usage is NEVER charged as 0: when the adapter does not report
+        # trustworthy token/cost usage (or the provider omits it), retain the
+        # CONSERVATIVE dispatch reservation so a finite budget is never
+        # understated. The raw provider-reported values are preserved for audit.
+        reported_tokens = response.input_tokens + response.output_tokens
+        trusted_tokens = adapter.reports_usage and reported_tokens > 0
+        if trusted_tokens:
+            input_tokens, output_tokens = response.input_tokens, response.output_tokens
+        else:
+            input_tokens, output_tokens = est_input, max_tokens  # reserve, don't trust 0
+        trusted_cost = adapter.reports_cost
+        cost = response.cost if trusted_cost else (est_cost if est_cost is not None else 0.0)
+        provider_extras = {
+            "requested_model_id": adapter.model_id,
+            "resolved_model_id": response.model_id,
+            "reported_input_tokens": str(response.input_tokens),
+            "reported_output_tokens": str(response.output_tokens),
+            "reported_cost": repr(response.cost),
+            "usage_trusted": str(trusted_tokens),
+            "cost_trusted": str(trusted_cost),
+        }
+        # charge the meter the SAME values recorded in the ModelResult below, so
+        # the live charge and the resume-time reconciliation cannot drift
         meter.note_model_usage(tokens=input_tokens + output_tokens, cost=cost)
         response_ref = substrate.objects.put_text(response.text)
         overrun = meter.tokens_overrun() or meter.cost_overrun()
@@ -844,7 +875,7 @@ def _run_refinement(
         command_id=cid, prompt_role=command.prompt_role, adapter_name=adapter.adapter_name,
         model_id=model_id, response_ref=response_ref, input_tokens=input_tokens,
         output_tokens=output_tokens, cost=cost, latency_ms=latency_ms,
-        finish_reason=finish_reason, provider_extras={}, failure=failure,
+        finish_reason=finish_reason, provider_extras=provider_extras, failure=failure,
         proposal_ref=proposal_ref,
     )
     substrate.record_observation(

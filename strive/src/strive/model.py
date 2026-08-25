@@ -1,14 +1,20 @@
 """Provider-neutral model interface.
 
-Rules (D3, D7, D11):
-- every request/response crosses the kernel and is journaled with adapter
-  name, model id, parameters, seed, normalized finish reason, usage, latency,
-  and content-addressed prompt/completion artifacts (compact metadata + CAS
-  refs — full contents are stored once in the object store, not duplicated
-  into every event);
-- calls, token usage, and cost are charged to the trusted budget meter, and
-  the HTTP timeout of a real call is capped by the cycle's remaining wall
-  time; exhaustion and adapter errors come back as ``FailureRecord`` data;
+An adapter is a THIN, pure request→response boundary: it never journals, meters,
+or budgets. The vNext kernel `_run_refinement` is the single place a model call
+crosses the trust boundary — it journals the dispatch/result, charges the meter
+(reserving conservatively when the adapter's usage/cost is untrusted), caps the
+HTTP timeout by the cycle's remaining wall time, and turns adapter failures into
+either an `indeterminate` open dispatch or a `failed`-as-data result.
+
+An adapter's contract here:
+- `complete` returns a `ModelResponse` (usage, normalized finish reason,
+  resolved model id) or raises `ModelNoCallError` (proven no request left the
+  process) / `ModelTransportError` (a call may have been dispatched);
+- it declares `reports_cost` / `reports_usage` honestly, and supplies a
+  CONSERVATIVE `estimate_input_tokens` and `estimate_cost` for the reservation;
+- it exposes a stable `config_digest` and `impl_version` (both pinned in a
+  refinement's durable intent so a switched model/impl is refused on resume);
 - the deterministic ``FakeModelAdapter`` ships in core so tests and default
   commands stay offline forever;
 - a real adapter is configured *only* through environment variables and
@@ -64,7 +70,10 @@ class ModelAdapter(Protocol):
 
     ``reports_cost`` declares whether ``ModelResponse.cost`` is trustworthy;
     adapters that cannot model provider pricing must say so, and the kernel
-    fails closed when a cost limit is configured against them.
+    fails closed when a cost limit is configured against them. ``reports_usage``
+    declares whether ``ModelResponse``'s token counts are trustworthy; when it is
+    False (or the provider omits usage), the kernel charges the CONSERVATIVE
+    dispatch reservation instead of a possibly-understated (or zero) count.
 
     ``config_digest`` is a stable identity of the adapter's configuration
     (base URL / model / pricing) — bound into each refinement so a resume
@@ -85,6 +94,7 @@ class ModelAdapter(Protocol):
     adapter_name: str
     model_id: str
     reports_cost: bool
+    reports_usage: bool
     config_digest: str
     impl_version: str
 
@@ -131,6 +141,7 @@ class FakeModelAdapter:
     adapter_name = "fake"
     model_id = "fake-deterministic-v1"
     reports_cost = True  # its 0.0 is truthful: the fake costs nothing
+    reports_usage = True  # its deterministic token counts are exact
     config_digest = "fake-config@1"
     impl_version = ADAPTER_IMPL_VERSIONS["fake"]
     # the fake genuinely varies its digest reply by seed (prompt|seed), so a
@@ -204,6 +215,7 @@ class OpenAICompatAdapter:
 
     adapter_name = "openai-compatible"
     reports_cost = False  # provider pricing is not modeled; cost is unknown
+    reports_usage = False  # provider usage is optional/untrusted — reserve instead
     impl_version = ADAPTER_IMPL_VERSIONS["openai-compatible"]
     # the seed is SENT on every request, but whether the remote provider
     # honors it is provider-dependent and not verifiable from here
