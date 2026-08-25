@@ -2020,3 +2020,51 @@ separate from protected runtime/evaluation evidence"): this already holds — th
 `AttemptRecord` keeps `report_ref` (full ExecutionReport) and `evaluation_ref`
 distinct, and the refiner context only ever surfaces opaque case ids +
 expected/got, never raw inputs.
+
+---
+
+## PR #51 correction round 7 (Stage 3C.2A.5) — TRUSTED operation-outcome origin (Area 2 fix)
+
+Directly corrects round 6: the `denials`/`failure.kind` heuristic is REPLACED by
+a trusted classification produced at the execution boundary, persisted, and
+verified. Rationale (from the goal): a candidate infinite-loop timeout and a
+backend launch fault can share a failure kind but never an origin, so a
+downstream heuristic on the kind is unsound.
+
+- **`ExecutionReport.fault_origin`** (`FAULT_CANDIDATE` | `FAULT_INFRASTRUCTURE`
+  | None), stamped by the sandbox — the only layer that knows whose fault an
+  `ok=False` was. (`execution-report@2`.)
+- **Boundary stamping.** `sandbox.py` (fault-only) and `sandbox_backends.py`
+  (deno-pyodide) stamp candidate faults — per-candidate timeout, non-zero exit
+  crash, stdout flood, pyodide `CodeExecutionError` (candidate exception /
+  forbidden action) — as `FAULT_CANDIDATE`; and backend/launcher faults and
+  runner-protocol breaks (schema-mismatch, malformed output) as
+  `FAULT_INFRASTRUCTURE`. `run_protected_suite` marks a suite-deadline
+  (run-budget) shortfall infrastructure and otherwise propagates the backend's
+  stamp. A candidate EXCEPTION stays a scored `ok=True` per-case error
+  (behavioral), unchanged.
+- **Kernel `_attempt_origin`** maps the trusted evidence to a typed
+  `AttemptRecord.origin` (+ `origin_detail`): clean run or candidate fault →
+  behavioral; backend fault, run-budget shortfall, or an UNSTAMPED failure →
+  infrastructure (conservative: never learn from an unclassified fault).
+  (`execution-attempt@3`.)
+- **Verification checks it.** `_check_attempt_evidence` recomputes the expected
+  origin from the referenced report's `fault_origin` and rejects any record
+  whose `origin` disagrees — so the classification can never float free of the
+  evidence.
+- **`classify_operation`** now simply returns the persisted trusted origin (no
+  heuristic). The policy gates learning/scoring/review on it exactly as before.
+- Tests: `test_operation_outcomes.py` proves candidate-timeout is stamped
+  candidate/behavioral, same-kind-different-origin, clean-run-has-no-origin, and
+  the `_attempt_origin` mapping; the outage E2E now injects a real
+  `FAULT_INFRASTRUCTURE` backend fault and asserts every operation is
+  trusted-stamped infrastructure, never teaches, never reverts, ends unresolved.
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **279 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Still deferred (unchanged):** Area 1 (CAS-backed `OperationPlan`), Area 3
+(typed `ReviewDecision` + `ReviseChange`/`ChangeRevised` emission), Area 4 typed
+`ModelBinding` struct. The typed operation ORIGIN landed here is a step toward
+Area 1's "typed policy-visible result", but the versioned `OperationDescriptor`/
+`OperationPlan` pinning is still not built.
