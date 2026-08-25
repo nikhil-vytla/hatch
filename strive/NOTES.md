@@ -1907,3 +1907,59 @@ confirm-of-unapplied refused (substrate); second-revise-unresolved (policy).
   handled beyond the existing revert path.
 - Area 2 (behavior-vs-infrastructure outage isolation) was not revisited this
   round.
+
+---
+
+## PR #51 correction round 5 (Stage 3C.2A.3) — budget-correct model accounting
+
+Landed Area 4 in full; Areas 1, 2, and the Area-3 revision-lifecycle emission
+remain deferred (below), consistent with prior rounds.
+
+**Area 4 — close model identity + accounting (done).**
+- **Finite-token preflight fixed.** The old order capped output to the FULL
+  remaining tokens and then added the input estimate on top, so a viable finite
+  budget was wrongly denied. Now: estimate input FIRST, deny pre-dispatch if the
+  input estimate alone exhausts the remaining budget, else cap output to
+  `remaining - input` (`BudgetMeter.remaining_tokens()` +
+  `cap_output_tokens(requested, reserved_input=)`). A viable finite budget now
+  succeeds; the reservation never spuriously exceeds.
+- **Unknown usage/cost is never charged as 0.** New adapter capability
+  `reports_usage` (fake=True, openai-compatible=False). When token/cost usage is
+  untrusted (or the provider omits it, or reports 0), the kernel charges the
+  CONSERVATIVE dispatch reservation instead of 0, and records those charged
+  values in the `ModelResult` so the resume-time reconciliation
+  (`model_result_usage`) matches the live charge exactly. Raw provider-reported
+  values are preserved in `provider_extras` for audit.
+- **Requested vs provider-resolved model ids recorded separately** (dispatch
+  carries the requested id; the result carries the resolved id; both also in
+  `provider_extras`). Verify already allows `result.model_id != dispatch.model_id`
+  (only the adapter name must agree).
+- **Removed the unused `KernelServices.model_role`** — the command's own
+  `model_role` is authoritative (CLI keeps a local role for catalog build +
+  display). Rewrote the stale Phase-A (D3/D7/D11) model-call docstring: the
+  adapter is a thin pure boundary; the kernel is the single metered/journaled
+  model boundary.
+- Adversarial tests: viable-finite-budget-succeeds; underestimated-reservation
+  rejected post-call (a lying adapter is still caught by the token overrun);
+  untrusted-usage charges the reservation, not 0; requested-vs-resolved ids;
+  budget-unit tests for the reordered preflight.
+
+**Tooling.** `uv run mypy` clean (44 files); `uv run pytest` **272 passed**;
+`test_packaging` (installed-wheel CLI smoke) + `test_substrate_only` green.
+
+**Honestly deferred / NOT done this round (unchanged from prior rounds).**
+- **Area 1** — the pluggable versioned `OperationDescriptor`/catalog + CAS-backed
+  `OperationPlan` (pinned impl/config digest + plan ref in `ObserveCurrentState`
+  intent, driver-owned preparation/execution/interpretation/projection) is NOT
+  built; the existing `task-suite@1` opaque-id operation split stands.
+- **Area 2** — distinguishing behavioral vs infrastructure vs indeterminate
+  operation outcomes (so a sandbox outage never becomes a code lesson/regression
+  score, with configurable retry/defer/unresolved and a policy-visible payload
+  split from protected evaluator detail) is NOT built.
+- **Area 3** — the typed `ReviewDecision` annotation and a closed `ReviseChange`
+  lifecycle that EMITS verified `ChangeRevised` old→new lineage are still not
+  wired through the closed grammar; `superseded_change_ids` remains
+  enforced-but-currently-unpopulated defensive verification (confirm-of-reverted/
+  inactive IS enforced). The typed `ModelBinding` struct replacing the pipe
+  string was also not done — the resolved identity is still pinned as a
+  deterministic string embedding role|adapter|impl|model|config.
