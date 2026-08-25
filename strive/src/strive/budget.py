@@ -157,11 +157,23 @@ class BudgetMeter:
             "recursion_depth": basic(self.spec.max_recursion_depth),
         }
 
-    def cap_output_tokens(self, requested: int) -> int:
-        """Cap requested completion tokens to the remaining token allowance."""
+    def remaining_tokens(self) -> int | None:
+        """The token allowance still unspent, or None when tokens are unlimited."""
+        if not _limited(self.spec.tokens):
+            return None
+        return self.spec.tokens - self._tokens
+
+    def cap_output_tokens(self, requested: int, reserved_input: int = 0) -> int:
+        """Cap requested completion tokens to what remains AFTER the call's
+        reserved input tokens. Estimating input FIRST and capping output to
+        ``remaining - reserved_input`` means a viable finite budget (enough room
+        for the input plus at least one output token) always yields a usable,
+        non-exceeding reservation — instead of capping output to the full
+        remaining and then adding input on top (which wrongly denies viable
+        budgets)."""
         if not _limited(self.spec.tokens):
             return requested
-        remaining = self.spec.tokens - self._tokens
+        remaining = self.spec.tokens - self._tokens - reserved_input
         return max(1, min(requested, remaining))
 
     def tokens_overrun(self) -> FailureRecord | None:

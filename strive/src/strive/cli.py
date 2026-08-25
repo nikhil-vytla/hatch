@@ -119,7 +119,7 @@ def _cmd_run(args: argparse.Namespace) -> dict[str, Any]:
                 model_calls=args.model_calls if continual else 0,
             ),
             required_capabilities=required_caps,
-            models=models, model_role=model_role,
+            models=models,
         )
     except (KernelError, SandboxError, SubstrateError, SurfaceValidationError) as exc:
         raise CliError(str(exc)) from None

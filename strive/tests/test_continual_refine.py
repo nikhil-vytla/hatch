@@ -166,7 +166,7 @@ def _services(
         sandbox_backend="process-fault-only@1", trusted=True,
         allow_insecure_execution=True,
         budget=budget or BudgetSpec(model_calls=8, executions=512),
-        models=models or _catalog(), model_role="refine",
+        models=models or _catalog(),
     )
 
 
@@ -210,6 +210,21 @@ def _terminal(root: Path, run_id: str, cid: str) -> str | None:
         if isinstance(b, PolicyCommandCompleted) and b.command_id == cid:
             return b.outcome
     return None
+
+
+def _model_result(root: Path, run_id: str, cid: str) -> "ModelResult":
+    from strive.runtime import ModelResult
+
+    sub = Substrate.discover(root, run_id)
+    view = sub.verify()
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == REFINE_RESULT
+        ):
+            return codec.loads(sub.objects.get_text(body.observation_ref), ModelResult)
+    raise AssertionError(f"no REFINE_RESULT for {cid!r}")
 
 
 def _active_code(root: Path, run_id: str) -> str:
@@ -586,11 +601,83 @@ def test_conservative_token_reservation_denies_before_dispatch(tmp_path: Path) -
     assert _count_kind(tmp_path, run, REFINE_DISPATCH) == 0  # denied pre-dispatch
 
 
-def test_command_model_role_is_authoritative_over_services_role(tmp_path: Path) -> None:
-    # the command's model_role (from config) drives adapter resolution — NOT a
-    # separately-aligned KernelServices.model_role. Bind KernelServices to a
-    # BOGUS role while the catalog carries the config's "refine" role: the run
-    # still resolves "refine" from the command and succeeds end to end.
+def test_viable_finite_token_budget_succeeds(tmp_path: Path) -> None:
+    # a finite token budget with room for the input estimate PLUS output tokens
+    # must succeed: input is estimated first, output capped to remaining-input,
+    # so the reservation never spuriously exceeds a viable budget.
+    run = new_run_id()
+    _drive(
+        tmp_path, run, models=_catalog(),
+        budget=BudgetSpec(model_calls=8, executions=512, tokens=100_000),
+    )
+    assert _terminal(tmp_path, run, f"{run}:refine:0") == "ok"
+    assert _count_kind(tmp_path, run, REFINE_RESULT) == 1
+    assert "-?" in _active_code(tmp_path, run)  # a real proposal was applied
+
+
+def test_underestimated_input_reservation_rejected_post_call(tmp_path: Path) -> None:
+    # an adapter that UNDER-estimates its input tokens can slip past the
+    # pre-dispatch reservation, but the post-call overrun check rejects the
+    # completion as failure-as-data (a finite token budget is still enforced).
+    class LiesLow(FakeModelAdapter):
+        config_digest = "lies-low"
+
+        def estimate_input_tokens(self, prompt: str) -> int:
+            return 1  # dishonestly tiny
+
+    run = new_run_id()
+    _drive(
+        tmp_path, run,
+        models=ModelCatalog({"refine": LiesLow(responder=_responder())}),
+        budget=BudgetSpec(model_calls=8, executions=512, tokens=40),
+    )
+    assert _terminal(tmp_path, run, f"{run}:refine:0") == "failed"
+    assert _active_code(tmp_path, run) == _WEAK_CODE  # nothing applied
+
+
+def test_untrusted_usage_charges_reservation_not_zero(tmp_path: Path) -> None:
+    # an adapter that does NOT report trustworthy usage (and returns 0 counts)
+    # must be charged the CONSERVATIVE reservation, never 0; raw provider values
+    # are preserved for audit.
+    class NoUsage(FakeModelAdapter):
+        config_digest = "no-usage"
+        reports_usage = False
+
+        def complete(self, request: ModelRequest) -> ModelResponse:
+            base = super().complete(request)
+            return dataclasses.replace(base, input_tokens=0, output_tokens=0)
+
+    run = new_run_id()
+    _drive(tmp_path, run, models=ModelCatalog({"refine": NoUsage(responder=_responder())}))
+    res = _model_result(tmp_path, run, f"{run}:refine:0")
+    assert res.input_tokens + res.output_tokens > 0  # reservation charged, not 0
+    assert res.provider_extras["usage_trusted"] == "False"
+    assert res.provider_extras["reported_input_tokens"] == "0"
+
+
+def test_requested_and_resolved_model_ids_recorded_separately(tmp_path: Path) -> None:
+    # the requested model id (dispatch) and the provider-resolved model id
+    # (result) are recorded separately, even when they differ.
+    class Redirects(FakeModelAdapter):
+        config_digest = "redirects"
+
+        def complete(self, request: ModelRequest) -> ModelResponse:
+            base = super().complete(request)
+            return dataclasses.replace(base, model_id="provider-resolved-v2")
+
+    run = new_run_id()
+    _drive(tmp_path, run, models=ModelCatalog({"refine": Redirects(responder=_responder())}))
+    res = _model_result(tmp_path, run, f"{run}:refine:0")
+    assert res.model_id == "provider-resolved-v2"  # resolved
+    assert res.provider_extras["requested_model_id"] == "fake-deterministic-v1"
+    assert res.provider_extras["resolved_model_id"] == "provider-resolved-v2"
+
+
+def test_command_model_role_drives_resolution_no_services_role(tmp_path: Path) -> None:
+    # there is NO services-level model role: KernelServices exposes no model_role
+    # field, and the command's own model_role (from config) drives adapter
+    # resolution. A catalog keyed ONLY by the config's "refine" role suffices.
+    assert not hasattr(KernelServices, "model_role")
     run = new_run_id()
     services = KernelServices.open(
         tmp_path, TASK, run, seed=7,
@@ -598,7 +685,6 @@ def test_command_model_role_is_authoritative_over_services_role(tmp_path: Path) 
         allow_insecure_execution=True,
         budget=BudgetSpec(model_calls=8, executions=512),
         models=ModelCatalog({"refine": FakeModelAdapter(responder=_responder())}),
-        model_role="not-the-refine-role",  # deliberately misaligned; must be ignored
     )
     _drive(tmp_path, run, services=services)
     assert _terminal(tmp_path, run, f"{run}:refine:0") == "ok"
@@ -613,7 +699,7 @@ def test_production_rejects_insecure_backend(tmp_path: Path) -> None:
         tmp_path, TASK, new_run_id(), seed=7,
         sandbox_backend="process-fault-only@1", trusted=True,  # NO opt-in
         budget=BudgetSpec(model_calls=4, executions=64),
-        models=_catalog(), model_role="refine",
+        models=_catalog(),
     )
     objects = services.substrate.objects
     with pytest.raises(KernelError, match="requires secure execution"):
@@ -638,7 +724,7 @@ def test_continual_refine_through_secure_backend(tmp_path: Path) -> None:
         sandbox_backend="deno-pyodide@1", trusted=False,
         required_capabilities=SECURE_EXECUTION_CAPABILITIES,
         budget=BudgetSpec(model_calls=8, executions=512),
-        models=_catalog(), model_role="refine",
+        models=_catalog(),
     )
     _drive(tmp_path, run, services=services)
     assert "-?" in _active_code(tmp_path, run)
