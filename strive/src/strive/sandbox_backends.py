@@ -32,6 +32,8 @@ from strive.contracts import (
     FAILURE_CRASH,
     FAILURE_MALFORMED_OUTPUT,
     FAILURE_TIMEOUT,
+    FAULT_CANDIDATE,
+    FAULT_INFRASTRUCTURE,
     CaseOutcome,
     ExecutionReport,
     FailureRecord,
@@ -350,6 +352,7 @@ class DenoPyodideBackend:
             return self._fail(
                 request, started, FAILURE_TIMEOUT,
                 f"killed after {request.limits.wall_time_s}s", denials,
+                fault_origin=FAULT_CANDIDATE,  # the candidate's OWN code ran too long
             )
         try:
             if "exc" in exc_holder:
@@ -360,11 +363,13 @@ class DenoPyodideBackend:
             return self._fail(
                 request, started, FAILURE_CRASH,
                 f"pyodide execution error: {str(exc)[:200]}", denials,
+                fault_origin=FAULT_CANDIDATE,  # candidate exception / forbidden action
             )
         except Exception as exc:  # noqa: BLE001 — never crash the controller
             return self._fail(
                 request, started, FAILURE_CRASH,
                 f"backend error: {str(exc)[:200]}", denials,
+                fault_origin=FAULT_INFRASTRUCTURE,  # the deno/pyodide BACKEND faulted
             )
         finally:
             self._shutdown(interp)
@@ -383,6 +388,8 @@ class DenoPyodideBackend:
         kind: str,
         detail: str,
         denials: list[str],
+        *,
+        fault_origin: str = FAULT_INFRASTRUCTURE,
     ) -> SandboxResult:
         return SandboxResult(
             report=ExecutionReport(
@@ -392,6 +399,7 @@ class DenoPyodideBackend:
                 failure=FailureRecord(kind=kind, detail=detail),
                 wall_time_s=round(time.monotonic() - started, 6),
                 stdout_bytes=0,
+                fault_origin=fault_origin,
             ),
             provenance=self.provenance(request.limits),
             denials=tuple(denials),
@@ -441,6 +449,7 @@ class DenoPyodideBackend:
                 failure=FailureRecord(kind=kind, detail=detail),
                 wall_time_s=round(time.monotonic() - started, 6),
                 stdout_bytes=len(str(raw)),
+                fault_origin=FAULT_INFRASTRUCTURE,  # a runner-protocol break, not the candidate
             )
 
         try:

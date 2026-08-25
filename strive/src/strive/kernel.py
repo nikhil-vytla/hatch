@@ -64,6 +64,8 @@ from strive.contracts import (
     FAILURE_COST_UNAVAILABLE,
     FAILURE_MALFORMED_OUTPUT,
     FAILURE_MODEL_ERROR,
+    FAULT_CANDIDATE,
+    FAULT_INFRASTRUCTURE,
     BudgetSpec,
     BudgetUsage,
     CaseOutcome,
@@ -96,6 +98,8 @@ from strive.runtime import (
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
+    OP_BEHAVIORAL,
+    OP_INFRASTRUCTURE,
     OPERATION_DISPATCH,
     OPERATION_LABEL,
     OPERATION_RESULT,
@@ -1355,6 +1359,23 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
     )
 
 
+def _attempt_origin(
+    failure: FailureRecord | None, fault_origin: str | None
+) -> tuple[str, str]:
+    """Map a completed attempt's TRUSTED boundary evidence to a typed operation
+    origin. A clean run is behavioral; a candidate-stamped fault stays behavioral
+    (its own code's fault); an infrastructure-stamped fault (or an unclassified
+    boundary fault, conservatively) is infrastructure and never steers learning."""
+    if failure is None:
+        return OP_BEHAVIORAL, ""
+    if fault_origin == FAULT_CANDIDATE:
+        return OP_BEHAVIORAL, f"candidate fault: {failure.kind}"
+    if fault_origin == FAULT_INFRASTRUCTURE:
+        return OP_INFRASTRUCTURE, f"infrastructure fault: {failure.kind}"
+    # a failed attempt with no trusted origin stamp: refuse to learn from it
+    return OP_INFRASTRUCTURE, f"unclassified boundary fault: {failure.kind}"
+
+
 def _run_attempt(
     services: KernelServices, cid: str, label: str, state: HarnessState, state_ref: str,
     *, gen_prefix: str = "fork", cases: "Sequence[TaskCase] | None" = None,
@@ -1390,12 +1411,14 @@ def _run_attempt(
     denials: list[str] = []
     provenance = None
     failure = None
+    fault_origin: str | None = None  # TRUSTED origin of the FIRST boundary fault
     total_stdout = 0
     total_wall = 0.0
     for case in cases:
         denial = meter.request_execution()  # cumulative executions + wall gate
         if denial is not None:
             failure = denial
+            fault_origin = FAULT_INFRASTRUCTURE  # a RUN-BUDGET shortfall, not the candidate
             break
         result = services.executor.execute_suite(
             source, [case], generation_id=gen,
@@ -1409,6 +1432,7 @@ def _run_attempt(
         outcomes.extend(result.report.outcomes)
         if result.report.failure is not None and failure is None:
             failure = result.report.failure
+            fault_origin = result.report.fault_origin  # the boundary's trusted stamp
     if provenance is None:  # denied before any case ran
         provenance = services.executor.provenance()
     report = ExecutionReport(
@@ -1418,8 +1442,10 @@ def _run_attempt(
         failure=failure,
         wall_time_s=round(total_wall, 6),
         stdout_bytes=total_stdout,  # ACTUAL captured output, not error-string length
+        fault_origin=fault_origin,
     )
     evaluation = evaluate(services.task, report, cases)
+    origin, origin_detail = _attempt_origin(failure, fault_origin)
     # preserve the FULL evidence: the exact ExecutionReport (per-case
     # outputs/errors, backend failure, wall/output) and its Evaluation
     # (per-case scores/feedback) — never collapsed to only the aggregate.
@@ -1429,6 +1455,7 @@ def _run_attempt(
         provenance=provenance, failure=failure, denials=tuple(denials),
         usage=_usage_delta(before, meter.usage()),
         report_ref=substrate.put(report), evaluation_ref=substrate.put(evaluation),
+        origin=origin, origin_detail=origin_detail,
     )
 
 

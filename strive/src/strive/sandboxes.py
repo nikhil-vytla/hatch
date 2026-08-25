@@ -40,6 +40,7 @@ from strive.codec import register
 from strive.contracts import (
     FAILURE_CRASH,
     FAILURE_TIMEOUT,
+    FAULT_INFRASTRUCTURE,
     CaseOutcome,
     ExecutionReport,
     FailureRecord,
@@ -352,7 +353,7 @@ class CandidateExecutor:
         return a case-ordered `ExecutionReport` plus the boundary provenance.
         Failure-as-data: a case the boundary refused or crashed on carries
         its error at the floor, never raising into the controller."""
-        outcomes, provenance, denials, wall_time_s, stdout_bytes, failure = (
+        outcomes, provenance, denials, wall_time_s, stdout_bytes, failure, fault_origin = (
             run_protected_suite(
                 self._backend,
                 strategy_source,
@@ -378,6 +379,7 @@ class CandidateExecutor:
             failure=failure,
             wall_time_s=wall_time_s,      # ACTUAL aggregated backend wall time
             stdout_bytes=stdout_bytes,    # ACTUAL captured output bytes
+            fault_origin=fault_origin,    # TRUSTED origin the boundary stamped
         )
         return ExecutionOutcome(report=report, provenance=provenance, denials=denials)
 
@@ -394,7 +396,7 @@ def run_protected_suite(
     limits: SandboxLimits | None = None,
 ) -> tuple[
     dict[str, CaseOutcome], SandboxProvenance, tuple[str, ...], float, int,
-    FailureRecord | None,
+    FailureRecord | None, str | None,
 ]:
     """Execute EACH protected case in a FRESH sandbox, in isolation: the
     candidate sees only that case's `input_text`, and no candidate state
@@ -414,6 +416,7 @@ def run_protected_suite(
     denials: list[str] = []
     provenance: SandboxProvenance | None = None
     boundary_failure: FailureRecord | None = None
+    boundary_fault_origin: str | None = None
     effective_limits = limits or SandboxLimits()
     total_wall_s = 0.0
     total_stdout_bytes = 0
@@ -434,6 +437,8 @@ def run_protected_suite(
                     kind=FAILURE_TIMEOUT,
                     detail=f"suite deadline {effective_limits.suite_deadline_s}s exhausted",
                 )
+                # a RUN-BUDGET shortfall enforced by the parent, not the candidate
+                boundary_fault_origin = FAULT_INFRASTRUCTURE
             outcomes[case.case_id] = CaseOutcome(
                 case_id=case.case_id,
                 output=None,
@@ -465,6 +470,8 @@ def run_protected_suite(
             )
             if boundary_failure is None:
                 boundary_failure = failure
+                # carry the backend's TRUSTED origin stamp (candidate vs backend)
+                boundary_fault_origin = result.report.fault_origin
             outcomes[case.case_id] = CaseOutcome(
                 case_id=case.case_id,
                 output=None,
@@ -475,7 +482,7 @@ def run_protected_suite(
         provenance = backend.provenance(effective_limits)
     return (
         outcomes, provenance, tuple(denials), round(total_wall_s, 6),
-        total_stdout_bytes, boundary_failure,
+        total_stdout_bytes, boundary_failure, boundary_fault_origin,
     )
 
 

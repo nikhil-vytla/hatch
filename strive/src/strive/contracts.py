@@ -39,6 +39,14 @@ FAILURE_SCHEMA_MISMATCH = "schema-mismatch"
 FAILURE_MODEL_ERROR = "model-error"
 FAILURE_COST_UNAVAILABLE = "cost-limit-unavailable"
 
+# TRUSTED fault origin, stamped at the execution boundary (only the sandbox knows
+# whether an ok=False fault was the CANDIDATE's own code or the sandbox/runtime
+# itself). Used to classify an operation as behavioral vs infrastructure WITHOUT
+# a downstream heuristic on the failure kind (a candidate infinite-loop timeout
+# and a backend launch fault can share a kind, but never an origin).
+FAULT_CANDIDATE = "candidate"            # the candidate's own code (behavioral)
+FAULT_INFRASTRUCTURE = "infrastructure"  # backend/launcher/runtime or run-budget
+
 # proposal-pipeline rejection kinds, each journaled distinctly
 
 
@@ -77,13 +85,20 @@ class CaseOutcome:
     duration_ms: float
 
 
-@register("execution-report", 1)
+@register("execution-report", 2)
 @dataclass(frozen=True)
 class ExecutionReport:
     """Outcome of one sandboxed run over a case suite.
 
     ``failure`` is set (and ``outcomes`` empty) when the child process itself
     failed: timeout, crash, output limit, schema mismatch, budget exhaustion.
+
+    ``fault_origin`` is the TRUSTED classification the boundary stamps on a
+    failure (``FAULT_CANDIDATE`` when the candidate's own code caused it, e.g. a
+    per-candidate timeout/crash/output-flood; ``FAULT_INFRASTRUCTURE`` when the
+    sandbox/runtime/launcher faulted or a runner-protocol break occurred). It is
+    None on a clean run. Downstream classification reads THIS, never the bare
+    failure kind.
     """
 
     ok: bool
@@ -92,6 +107,7 @@ class ExecutionReport:
     failure: FailureRecord | None = None
     wall_time_s: float = 0.0
     stdout_bytes: int = 0
+    fault_origin: str | None = None
 
 
 # -- evaluation ------------------------------------------------------------------
