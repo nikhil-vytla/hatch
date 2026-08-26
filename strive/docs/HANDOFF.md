@@ -353,12 +353,24 @@ promotion gate.
 
 ### Phase B correction round 2 (configurable, non-leaky, honestly-bounded)
 
-- **Operation feedback is generic + non-leaky.** An injected, versioned
-  `OperationDriver` (`strive.operate`, shipping `task-suite@1`) operates the
-  harness over the VISIBLE split relabelled with OPAQUE ids — hidden splits and
-  selection-only answers never reach the Refiner. Operating is journaled
-  crash-honestly (`OperationDispatched`→`OperationResult`): an open dispatch
-  reconciles to `indeterminate`, never re-run; verify mirrors forks.
+- **Operation feedback is a pinned, policy-neutral CAS plan (Area 1).** An
+  injected, versioned `OperationCatalog` of `OperationDescriptor`s (`strive.operate`,
+  shipping `task-suite@1`) replaces the thin `operation_cases(Task)` driver. A
+  descriptor receives ONLY a `PolicyVisibleOperationContext` (visible cases +
+  seed + task/environment fingerprints), never the full `Task`, and
+  deterministically builds an immutable, CAS-backed `OperationPlan` (descriptor/
+  config identity, opaque manifest, execution regime, projection schema, resource
+  envelope, `all-required`|`partial-allowed` validity). The `plan_ref` is pinned
+  in the `ObserveCurrentState` intent BEFORE issue, so a descriptor/config/plan
+  drift re-derives a different `plan_ref` and is refused on resume. The kernel
+  owns execution/budget/journaling and records DISPATCH→RESULT (protected
+  `AttemptRecord`)→PROJECTION; the descriptor interprets the protected evidence
+  into a SEPARATE policy-visible `OperationProjection` — the ONLY thing policy/
+  review consumes. Matched pre/post review compares only VALID projections under
+  the SAME `plan_ref`. An open dispatch reconciles to `indeterminate`; a crash
+  between result and projection is finished from the durable result (no re-run).
+  (Areas 4 — typed `ReviewDecision`/`ReviseChange` — and 5 — typed model
+  binding/usage — are separate next rounds.)
 - **Truthful review.** The fake trigger mode was removed; auto review compares
   pre/post operation observations (never blindly keeps); `keep` confirms with
   the original rationale; an exhausted `defer` is left UNRESOLVED (unconfirmed);
