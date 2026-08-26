@@ -447,6 +447,58 @@ def test_missing_post_evidence_defers_and_never_reverts(tmp_path: Path) -> None:
     assert "unresolved" in report.stopped_reason
 
 
+def test_model_review_outage_emits_no_verdict(tmp_path: Path) -> None:
+    # MODEL review must not even be dispatched (let alone emit keep/revise/revert)
+    # without matched behavioral baseline+post: a post-apply outage leaves the
+    # change unresolved with NO review model call, confirm, or revert.
+    from strive.contracts import FAULT_INFRASTRUCTURE, FAILURE_CRASH, ExecutionReport, FailureRecord
+    from strive.sandboxes import CandidateExecutor, ExecutionOutcome
+    from strive.substrate import ChangeApplied, ChangeReverted, ChangeConfirmed
+
+    class OutageAfterApply(CandidateExecutor):
+        applied = False
+
+        def execute_suite(self, source, cases, *, generation_id, limits=None):  # type: ignore[no-untyped-def]
+            if self.applied:
+                return ExecutionOutcome(
+                    report=ExecutionReport(
+                        ok=False, generation_id=generation_id, outcomes=(),
+                        failure=FailureRecord(FAILURE_CRASH, "backend down post-apply"),
+                        fault_origin=FAULT_INFRASTRUCTURE,
+                    ),
+                    provenance=self.provenance(limits), denials=(),
+                )
+            return super().execute_suite(source, cases, generation_id=generation_id, limits=limits)
+
+    run = new_run_id()
+    services = _services(tmp_path, run)
+    outage = OutageAfterApply(services.executor._backend, trusted=True)
+    services.executor = outage
+
+    import strive.kernel as kmod
+    original = kmod._perform
+
+    def _perform(services_: KernelServices, view: object, command: object) -> object:
+        result = original(services_, view, command)  # type: ignore[arg-type]
+        if type(command).__name__ == "ApplyChange":
+            outage.applied = True
+        return result
+
+    kmod._perform = _perform  # type: ignore[assignment]
+    try:
+        report = _drive(tmp_path, run, config=_config(review_mode="model"), services=services)
+    finally:
+        kmod._perform = original
+
+    sub = Substrate.discover(tmp_path, run)
+    view = sub.verify()
+    assert any(isinstance(b, ChangeApplied) for b in view.bodies)
+    # exactly ONE model call (the refine); NO review model call was dispatched
+    assert _count_kind(tmp_path, run, REFINE_RESULT) == 1
+    assert not any(isinstance(b, (ChangeReverted, ChangeConfirmed)) for b in view.bodies)
+    assert "unresolved" in report.stopped_reason
+
+
 # -- truthful review ------------------------------------------------------------------------------
 
 

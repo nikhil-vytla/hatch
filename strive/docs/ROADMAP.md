@@ -21,7 +21,7 @@ one durable substrate.
 - `manual-change@1`: a deterministic proof policy — propose → OPTIONAL fork
   → (react through the reducer) apply → revert, exactly and resumably.
 
-## Phase B — `continual-refine@1` (next)
+## Phase B — `continual-refine@1` (IMPLEMENTED; under review in PR #51)
 
 A Prime-Agent / Continual-Harness-style **end-to-end refinement policy** over
 this substrate, UNCHANGED — NOT Pareto search:

@@ -30,10 +30,10 @@ recorded effect without a terminal is finished, not repeated. A fork's
 sandbox executions are deterministic and re-runnable, but their outcome is
 recorded durably (base/candidate state refs + metered usage) and REUSED on
 resume, so a completed fork never re-executes or re-charges. External model
-calls (`RequestRefinement`) are NOT exactly-once and are unimplemented in
-Phase A; when one is added, a dispatch-without-durable-result crash must be
-recorded `indeterminate` and require explicit retry, never silently
-duplicated.
+calls (`RequestRefinement`) are IMPLEMENTED (Phase B) and are AT-MOST-ONCE, NOT
+exactly-once: a dispatch-without-durable-result crash is recorded `indeterminate`
+and requires an EXPLICIT retry — the kernel never silently re-dispatches or
+claims exactly-once for a model call.
 
 Budgets survive restart: the pinned `BudgetSpec` is content-addressed in
 `PolicyBound` (a resumed caller with a different budget is rejected), and
@@ -1423,15 +1423,18 @@ def _run_attempt(
     outcomes: list[CaseOutcome] = []
     denials: list[str] = []
     provenance = None
-    failure = None
-    fault_origin: str | None = None  # TRUSTED origin of the FIRST boundary fault
+    # ORDERED per-case boundary faults: (failure, origin) in case order. The
+    # recorded failure AND origin are later derived from the SAME dominant item,
+    # so they are always self-consistent (never a first failure paired with a
+    # different case's origin).
+    faults: list[tuple[FailureRecord, str | None]] = []
     total_stdout = 0
     total_wall = 0.0
     for case in cases:
         denial = meter.request_execution()  # cumulative executions + wall gate
         if denial is not None:
-            failure = denial
-            fault_origin = FAULT_INFRASTRUCTURE  # a RUN-BUDGET shortfall, not the candidate
+            # a run-budget shortfall — a PROVEN infrastructure fault
+            faults.append((denial, FAULT_INFRASTRUCTURE))
             break
         result = services.executor.execute_suite(
             source, [case], generation_id=gen,
@@ -1444,12 +1447,14 @@ def _run_attempt(
         denials.extend(result.denials)
         outcomes.extend(result.report.outcomes)
         if result.report.failure is not None:
-            # keep the FIRST failure record, but let the DOMINANT origin across
-            # all cases win (infrastructure/unknown over candidate), so a later
-            # backend fault is never hidden behind an earlier candidate one
-            if failure is None:
-                failure = result.report.failure
-            fault_origin = _dominant_fault(fault_origin, result.report.fault_origin)
+            faults.append((result.report.failure, result.report.fault_origin))
+    # the DOMINANT fault (infrastructure > unknown > candidate); its failure and
+    # origin come from that ONE item, so event order can never hide a later
+    # backend fault AND the pair stays self-consistent.
+    failure: FailureRecord | None = None
+    fault_origin: str | None = None
+    if faults:
+        failure, fault_origin = max(faults, key=lambda fo: _FAULT_RANK.get(fo[1], 2))
     if provenance is None:  # denied before any case ran
         provenance = services.executor.provenance()
     report = ExecutionReport(
