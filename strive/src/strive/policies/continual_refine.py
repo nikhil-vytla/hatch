@@ -47,15 +47,14 @@ from strive.policy import (
 )
 from strive.runtime import (
     FORK_SUMMARY,
-    OPERATION_RESULT,
+    OP_BEHAVIORAL,
+    OPERATION_PROJECTION,
     REFINE_RESULT,
-    AttemptRecord,
     ForkObservation,
     ModelResult,
+    OperationProjection,
     RefinementProposal,
-    is_behavioral_operation,
 )
-from strive.contracts import Evaluation
 from strive.substrate import (
     ChangeApplied,
     ChangeReverted,
@@ -555,40 +554,39 @@ def _surface_specs(config: ContinualRefineConfig) -> tuple[str, ...]:
     )
 
 
-def _behavioral_op_count(view: RunView, cid_prefix: str) -> int:
-    """How many BEHAVIORAL operation observations were caused by commands whose
-    id starts with `cid_prefix`. Infrastructure/unknown outcomes do NOT count —
-    a window is only satisfied by observations that actually exercised behavior."""
+def _projections(view: RunView) -> list[OperationProjection]:
+    """Every POLICY-VISIBLE operation projection in order. Policy/review code
+    consumes ONLY these projections — never the protected AttemptRecord."""
     from strive import codec
 
-    count = 0
+    out: list[OperationProjection] = []
     for body in view.bodies:
-        if not (isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT):
-            continue
-        rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
-        if rec.command_id.startswith(cid_prefix) and is_behavioral_operation(rec):
-            count += 1
-    return count
+        if isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_PROJECTION:
+            out.append(codec.loads(view.read_text(body.observation_ref), OperationProjection))
+    return out
+
+
+def _behavioral_op_count(view: RunView, cid_prefix: str) -> int:
+    """How many VALID behavioral operation projections were caused by commands
+    whose id starts with `cid_prefix`. Infrastructure/unknown/incomplete outcomes
+    do NOT count — a window is only satisfied by comparable behavioral evidence."""
+    return sum(
+        1 for p in _projections(view)
+        if p.command_id.startswith(cid_prefix) and p.valid
+    )
 
 
 # -- context rendering (deterministic; excludes the in-flight command's events) -------------------
 
 
-def _observations(view: RunView, exclude_cid: str) -> list[tuple[AttemptRecord, Evaluation]]:
-    out: list[tuple[AttemptRecord, Evaluation]] = []
-    for body in view.bodies:
-        if not (isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT):
-            continue
-        from strive import codec
-
-        rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
-        if rec.command_id == exclude_cid:
-            continue
-        if not is_behavioral_operation(rec):
-            continue  # Area 2: infrastructure failures never enter refiner context
-        ev = codec.loads(view.read_text(rec.evaluation_ref), Evaluation)
-        out.append((rec, ev))
-    return out
+def _observations(view: RunView, exclude_cid: str) -> list[OperationProjection]:
+    """Behavioral operation PROJECTIONS the refiner may cite (Area 1: policy code
+    reads only the projection, never the protected evidence; Area 2:
+    infrastructure/unknown outcomes never enter refiner context)."""
+    return [
+        p for p in _projections(view)
+        if p.command_id != exclude_cid and p.origin == OP_BEHAVIORAL
+    ]
 
 
 def _prior_proposals(view: RunView, exclude_cid: str) -> list[RefinementProposal]:
@@ -624,13 +622,18 @@ def _build_refine_context(
 
     obs = _observations(view, exclude_cid)[-config.trajectory_window:]
     lines.append("=== observed behavior (operate the current harness) ===")
-    for rec, ev in obs:
-        failing = [ce for ce in ev.case_evaluations if not ce.passed]
-        lines.append(f"observation overall={rec.overall:.4f} ok={rec.ok}")
-        for ce in failing:
+    for proj in obs:
+        overall = "n/a" if proj.overall is None else f"{proj.overall:.4f}"
+        lines.append(
+            f"observation overall={overall} valid={proj.valid} "
+            f"coverage={proj.coverage_completed}/{proj.coverage_total}"
+        )
+        for vc in proj.cases:
+            if vc.passed:
+                continue
             lines.append(
-                f"  FAIL case {ce.case_id}: expected {ce.expected}, got {ce.output} "
-                f"({(ce.error or '').strip().splitlines()[-1] if ce.error else 'wrong'})"
+                f"  FAIL case {vc.case_id}: expected {vc.expected}, got {vc.got} "
+                f"({vc.error_kind or 'wrong'})"
             )
 
     priors = _prior_proposals(view, exclude_cid)[-config.trajectory_window:]
@@ -657,16 +660,15 @@ def _build_refine_context(
     return "\n".join(lines) + "\n"
 
 
-def _post_apply_observations(
+def _post_apply_projections(
     view: RunView, change_id: str | None
-) -> list[tuple[AttemptRecord, Evaluation]]:
-    """Operation observations recorded AFTER the given change was applied — the
-    only feedback a review of that change may consider. Only BEHAVIORAL outcomes
-    count: an infrastructure failure in the review window is never review
-    evidence (Area 2)."""
+) -> list[OperationProjection]:
+    """VALID behavioral projections recorded AFTER the given change was applied —
+    the only feedback a review of that change may consider. Invalid/incomplete or
+    infrastructure/unknown outcomes are never review evidence."""
     from strive import codec
 
-    out: list[tuple[AttemptRecord, Evaluation]] = []
+    out: list[OperationProjection] = []
     seen_apply = change_id is None
     for body in view.bodies:
         if isinstance(body, ChangeApplied) and body.change_id == change_id:
@@ -674,38 +676,43 @@ def _post_apply_observations(
         elif (
             seen_apply
             and isinstance(body, ObservationRecorded)
-            and body.observation_kind == OPERATION_RESULT
+            and body.observation_kind == OPERATION_PROJECTION
         ):
-            rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
-            if not is_behavioral_operation(rec):
-                continue
-            ev = codec.loads(view.read_text(rec.evaluation_ref), Evaluation)
-            out.append((rec, ev))
+            proj = codec.loads(view.read_text(body.observation_ref), OperationProjection)
+            if proj.valid:
+                out.append(proj)
     return out
 
 
 def _pre_post_overall(
     view: RunView, change_id: str | None
 ) -> tuple[float | None, float | None]:
-    """The last BEHAVIORAL operation overall BEFORE and AFTER the change was
-    applied. Infrastructure outcomes are skipped — a sandbox outage must never
-    look like a pre/post score change (Area 2)."""
+    """The last VALID behavioral projection overall BEFORE and AFTER the change
+    was applied, under the SAME pinned plan. An invalid/incomplete or
+    infrastructure/unknown outcome contributes no aggregate — a sandbox outage
+    can never look like a pre/post score change, and pre/post are comparable only
+    when both come from valid projections of the same plan."""
     from strive import codec
 
     pre: float | None = None
     post: float | None = None
+    pre_plan: str | None = None
+    post_plan: str | None = None
     seen_apply = False
     for body in view.bodies:
         if isinstance(body, ChangeApplied) and body.change_id == change_id:
             seen_apply = True
-        elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT:
-            rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
-            if not is_behavioral_operation(rec):
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_PROJECTION:
+            proj = codec.loads(view.read_text(body.observation_ref), OperationProjection)
+            if not proj.valid or proj.overall is None:
                 continue
             if seen_apply:
-                post = rec.overall
+                post, post_plan = proj.overall, proj.plan_ref
             else:
-                pre = rec.overall
+                pre, pre_plan = proj.overall, proj.plan_ref
+    # pre/post are comparable ONLY when measured under the SAME plan ref
+    if pre_plan is not None and post_plan is not None and pre_plan != post_plan:
+        return None, None
     return pre, post
 
 
@@ -743,9 +750,10 @@ def _build_review_context(
                 f"candidate={fork.candidate_overall:.4f} improved={fork.improved}"
             )
     lines.append("=== behavior AFTER the change ===")
-    for rec, ev in _post_apply_observations(view, change_id)[-config.trajectory_window:]:
-        failing = [ce.case_id for ce in ev.case_evaluations if not ce.passed]
-        lines.append(f"observation overall={rec.overall:.4f} failing={failing}")
+    for proj in _post_apply_projections(view, change_id)[-config.trajectory_window:]:
+        failing = [vc.case_id for vc in proj.cases if not vc.passed]
+        overall = "n/a" if proj.overall is None else f"{proj.overall:.4f}"
+        lines.append(f"observation overall={overall} failing={failing}")
     return "\n".join(lines) + "\n"
 
 

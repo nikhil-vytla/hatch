@@ -50,6 +50,7 @@ full CAS closure staged (and structurally validated) before apply; and
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 import json
 import time
@@ -70,6 +71,7 @@ from strive.contracts import (
     BudgetSpec,
     BudgetUsage,
     CaseOutcome,
+    Evaluation,
     ExecutionReport,
     FailureRecord,
     ModelRequest,
@@ -92,7 +94,12 @@ from strive.policy import (
     StopAdaptation,
 )
 from strive.model import ModelAdapter, ModelCatalog, ModelNoCallError
-from strive.operate import OperationDriver, default_operation_driver
+from strive.operate import (
+    DEFAULT_OPERATION_DESCRIPTOR,
+    OperationCatalog,
+    OperationDescriptor,
+    default_operation_catalog,
+)
 from strive.refine import RefinementDecodeError, decode_proposal, render_prompt
 from strive.runtime import (
     ENCODING as _ENCODING,
@@ -104,7 +111,11 @@ from strive.runtime import (
     OP_UNKNOWN,
     OPERATION_DISPATCH,
     OPERATION_LABEL,
+    OPERATION_PROJECTION,
     OPERATION_RESULT,
+    OperationPlan,
+    OperationProjection,
+    PolicyVisibleOperationContext,
     REFINE_BINDING,
     REFINE_DISPATCH,
     REFINE_RESULT,
@@ -183,9 +194,11 @@ class KernelServices:
     # carries its OWN `model_role`, which the kernel resolves against this
     # catalog — so there is no separately-aligned services-level role to drift.
     models: ModelCatalog | None = None
-    # the injected, versioned driver that operates the harness for feedback —
-    # it exposes ONLY policy-visible cases (never the hidden evaluator splits).
-    operation_driver: OperationDriver = field(default_factory=default_operation_driver)
+    # the injected, versioned operation catalog + the descriptor name pinned for
+    # this run. A descriptor produces a CAS-backed OperationPlan from a
+    # POLICY-VISIBLE context only (never the hidden evaluator splits).
+    operation_catalog: OperationCatalog = field(default_factory=default_operation_catalog)
+    operation_descriptor: str = DEFAULT_OPERATION_DESCRIPTOR
     # a TEST-ONLY escape hatch: drive a `requires_secure_execution` policy on an
     # insecure (fault-only) backend. Production never sets this, so a policy that
     # runs model-authored code can never silently downgrade off a secure backend.
@@ -204,7 +217,8 @@ class KernelServices:
         required_capabilities: tuple[str, ...] = (),
         surface_catalog: SurfaceCatalog | None = None,
         models: ModelCatalog | None = None,
-        operation_driver: OperationDriver | None = None,
+        operation_catalog: OperationCatalog | None = None,
+        operation_descriptor: str = DEFAULT_OPERATION_DESCRIPTOR,
         allow_insecure_execution: bool = False,
     ) -> "KernelServices":
         executor = CandidateExecutor.from_catalog(
@@ -222,7 +236,8 @@ class KernelServices:
             meter=BudgetMeter(budget or BudgetSpec()),
             required_capabilities=required_capabilities,
             models=models,
-            operation_driver=operation_driver or default_operation_driver(),
+            operation_catalog=operation_catalog or default_operation_catalog(),
+            operation_descriptor=operation_descriptor,
             allow_insecure_execution=allow_insecure_execution,
         )
 
@@ -1283,48 +1298,127 @@ def _run_observation(
     cid = command.command_id
     kind = "ObserveCurrentState"
 
-    existing = _operation_result(services, view, cid)
-    if existing is not None:
-        event_ref, _ = existing
+    # the PROJECTION is the terminal effect: if it exists, reconstruct verbatim
+    existing_proj = _operation_projection(view, cid)
+    if existing_proj is not None:
         return CommandResult(
-            cid, kind, "ok", view.head, observation_ref=event_ref,
+            cid, kind, "ok", view.head, observation_ref=existing_proj,
             detail="operation already observed",
         )
+    plan, plan_ref = _pinned_operation_plan(services, view, cid)
+    descriptor = services.operation_catalog.descriptor(plan.descriptor_ref)
+    subject = view.state_ref or ""
+
+    # crash between RESULT and PROJECTION: FINISH by deriving the projection from
+    # the DURABLE result — never re-execute or re-charge
+    existing_result = _operation_result(services, view, cid)
+    if existing_result is not None:
+        _, rec = existing_result
+        return _finish_projection(services, cid, kind, plan, plan_ref, descriptor, rec, subject)
     if _operation_dispatched(view, cid):
         raise IndeterminateEffect(
             "operation dispatched without a durable result — explicit retry required"
         )
 
-    driver = services.operation_driver
-    cases = driver.operation_cases(services.task)
-    subject = view.state_ref or ""
-    # DISPATCH first (durable): reserve the worst case across every dimension
-    cap = SandboxLimits()
+    # DISPATCH first (durable): name the descriptor + plan and reserve the plan's
+    # resource envelope, so an OPEN dispatch reserves the worst case
     substrate.record_observation(
         observation_kind=OPERATION_DISPATCH,
         observation=OperationDispatched(
-            command_id=cid, driver_name=driver.name, state_ref=subject,
-            reserved_executions=len(cases),
-            reserved_wall_s=round(len(cases) * cap.wall_time_s, 6),
-            reserved_output_bytes=len(cases) * cap.output_bytes,
+            command_id=cid, descriptor_ref=plan.descriptor_ref, plan_ref=plan_ref,
+            state_ref=subject,
+            reserved_executions=plan.reserved_executions,
+            reserved_wall_s=plan.reserved_wall_s,
+            reserved_output_bytes=plan.reserved_output_bytes,
         ),
         subject_state_ref=subject, caused_by=cid,
     )
+    # the kernel OWNS execution/budget/journaling; the descriptor only prepared
+    # the plan's manifest cases
     rec = _run_attempt(
         services, cid, OPERATION_LABEL, view.state, subject,
-        gen_prefix="operation", cases=cases,
+        gen_prefix="operation", cases=plan.manifest,
     )
     substrate.record_observation(
         observation_kind=OPERATION_RESULT, observation=rec,
         subject_state_ref=subject, caused_by=cid,
     )
-    found = _operation_result(services, substrate.verify(), cid)
-    assert found is not None  # just journaled
-    event_ref, _ = found
-    return CommandResult(
-        cid, kind, "ok", substrate.verify().head,
-        observation_ref=event_ref, detail="harness operated",
+    return _finish_projection(services, cid, kind, plan, plan_ref, descriptor, rec, subject)
+
+
+def _finish_projection(
+    services: KernelServices, cid: str, kind: str, plan: OperationPlan, plan_ref: str,
+    descriptor: OperationDescriptor, rec: AttemptRecord, subject: str,
+) -> CommandResult:
+    """Derive and record the POLICY-VISIBLE projection from the DURABLE protected
+    result (no re-execution). The descriptor interprets the protected evidence;
+    policy/review consume ONLY this projection."""
+    substrate = services.substrate
+    report = codec.loads(substrate.objects.get_text(rec.report_ref), ExecutionReport)
+    evaluation = codec.loads(substrate.objects.get_text(rec.evaluation_ref), Evaluation)
+    projection = descriptor.project(
+        plan, command_id=cid, state_ref=subject,
+        report=report, evaluation=evaluation, origin=rec.origin,
     )
+    projection = dataclasses.replace(projection, plan_ref=plan_ref)
+    updated = substrate.record_observation(
+        observation_kind=OPERATION_PROJECTION, observation=projection,
+        subject_state_ref=subject, caused_by=cid,
+    )
+    return CommandResult(
+        cid, kind, "ok", updated.head,
+        observation_ref=updated.envelopes[-1].body_ref, detail="harness operated",
+    )
+
+
+def _environment_fingerprint(services: KernelServices) -> str:
+    """The execution REGIME the plan pins: backend name + enforced capabilities.
+    A regime change (different backend/capabilities) yields a different plan and
+    thus a new comparison window."""
+    caps = services.executor.capabilities()
+    return f"{services.executor.backend_name}|{'+'.join(sorted(caps.enforced))}"
+
+
+def _operation_plan(
+    services: KernelServices,
+) -> tuple[OperationDescriptor, OperationPlan, str]:
+    """Deterministically build (descriptor, plan, plan_ref) from the run's
+    POLICY-VISIBLE operation context. Deterministic, so re-deriving on resume
+    yields the SAME plan_ref (drift → a different ref → a refused resume)."""
+    descriptor = services.operation_catalog.descriptor(services.operation_descriptor)
+    context = PolicyVisibleOperationContext(
+        task_fingerprint=services.task.fingerprint(),
+        environment_fingerprint=_environment_fingerprint(services),
+        seed=services.seed,
+        visible_cases=services.task.visible_cases(),
+    )
+    plan = descriptor.create_plan(context)
+    return descriptor, plan, services.substrate.put(plan)
+
+
+def _pinned_operation_plan(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> tuple[OperationPlan, str]:
+    """Load the EXACT plan pinned in the issued `ObserveCurrentState` intent."""
+    issued = view.issued.get(cid)
+    if issued is None:
+        raise KernelError(f"operation {cid!r} has no issued intent")
+    payload = codec.loads(services.substrate.objects.get_text(issued.command_ref), CommandPayload)
+    if payload.plan_ref is None:
+        raise KernelError(f"operation {cid!r} intent does not pin a plan_ref")
+    plan = codec.loads(services.substrate.objects.get_text(payload.plan_ref), OperationPlan)
+    return plan, payload.plan_ref
+
+
+def _operation_projection(view: VerifiedSubstrateView, cid: str) -> str | None:
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == OPERATION_PROJECTION
+        ):
+            return env.body_ref
+    return None
 
 
 def _usage_delta(before: BudgetUsage, after: BudgetUsage) -> BudgetUsage:
@@ -1634,6 +1728,7 @@ def _command_payload(
     after_seconds: float | None = None
     reason: str | None = None
     model_binding: str | None = None
+    plan_ref: str | None = None
     if isinstance(command, ApplyChange):
         change_ref = substrate.put(command.change)
         target_change_id = command.change.change_id
@@ -1651,6 +1746,11 @@ def _command_payload(
         prompt_role = command.prompt_role
         context_ref = command.context_ref
         model_binding = _resolve_model_binding(services, command.model_role)
+    elif isinstance(command, ObserveCurrentState):
+        # pin the CAS-backed operation PLAN ref (and, transitively, the
+        # descriptor/config identity it embeds) in the durable intent BEFORE
+        # issue: a resume that re-derives a different plan is refused
+        _, _, plan_ref = _operation_plan(services)
     elif isinstance(command, ScheduleTrigger):
         after_seconds = command.after_seconds
         reason = command.reason
@@ -1662,6 +1762,8 @@ def _command_payload(
     assert isinstance(identity, dict)
     if model_binding is not None:
         identity = {**identity, "model_binding": model_binding}
+    if plan_ref is not None:
+        identity = {**identity, "plan_ref": plan_ref}
     payload_json = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return CommandPayload(
         command_id=command.command_id, kind=kind, encoding=_ENCODING,
@@ -1669,7 +1771,7 @@ def _command_payload(
         expected_state_ref=expected_state_ref, issue_state_ref=issue_state_ref,
         prompt_role=prompt_role, context_ref=context_ref,
         after_seconds=after_seconds, reason=reason,
-        json=payload_json, model_binding=model_binding,
+        json=payload_json, model_binding=model_binding, plan_ref=plan_ref,
     )
 
 
