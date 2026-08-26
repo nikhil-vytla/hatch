@@ -284,7 +284,9 @@ Phase B implements the Prime-Agent / Continual-Harness-style continual,
 model-led policy on the Phase A substrate. No Pareto search; no universal
 promotion gate.
 
-- **`RequestRefinement` is real and exactly-once.** The kernel renders the
+- **`RequestRefinement` is real and AT-MOST-ONCE** (not exactly-once — a model
+  call that may have dispatched is reconciled `indeterminate`, never silently
+  re-called). The kernel renders the
   prompt from the per-role PINNED control prompt (`refine.md` / `review.md`,
   from `PolicyBound.prompt_refs`) + the ACTIVE `prompt/proposal-template`
   surface + the policy's context, resolves an adapter from an injected,

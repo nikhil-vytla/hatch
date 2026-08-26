@@ -318,24 +318,26 @@ class ContinualRefinePolicy:
                     command_id=self._cid(view, f"post:{c}:{state.revised}:{state.defers}:{n}"),
                     detail="post-change observation",
                 )
-            if config.review_mode == "model":
-                return self._review_command(config, view, c, state.defers, state.revised)
-            verdict = self._auto_verdict(config, state, view)
-            if verdict == "defer":
-                # Area 2: no VALID behavioral post-observation yet (e.g. the whole
-                # window was infrastructure). Gather more, BOUNDED — then leave the
-                # change UNRESOLVED. Infrastructure never reverts.
+            # MATCHED behavioral evidence gate for BOTH auto and model review: a
+            # behavioral baseline AND post must exist under the pinned window
+            # before ANY verdict is formed. Missing either side (e.g. an outage)
+            # defers — bounded — then leaves the change UNRESOLVED. Neither auto
+            # nor model review may keep/revise/revert without both sides.
+            pre, post = _pre_post_overall(view, state.change_id)
+            if pre is None or post is None:
                 if n < config.review_window + _MAX_DEFERS:
                     return ObserveCurrentState(
                         command_id=self._cid(view, f"post:{c}:{state.revised}:0:{n}"),
-                        detail="deferred: awaiting a behavioral observation",
+                        detail="deferred: awaiting matched behavioral evidence",
                     )
                 return StopAdaptation(
                     command_id=self._cid(view, f"stop-unresolved:{c}"),
-                    reason="review unresolved: no behavioral observations "
-                    "(infrastructure only) — left unconfirmed, not reverted",
+                    reason="review unresolved: no matched behavioral baseline/post "
+                    "(infrastructure/unknown only) — left unconfirmed, not reverted",
                 )
-            return self._act_on_verdict(config, state, view, verdict)
+            if config.review_mode == "model":
+                return self._review_command(config, view, c, state.defers, state.revised)
+            return self._act_on_verdict(config, state, view, self._auto_verdict(config, state, view))
         if state.phase == "reviewed":
             rcid = self._cid(view, f"review:{c}:{state.revised}:{state.defers}")
             proposal = strat.proposal_for(view, rcid)
