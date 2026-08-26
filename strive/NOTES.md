@@ -2068,3 +2068,58 @@ downstream heuristic on the kind is unsound.
 `ModelBinding` struct. The typed operation ORIGIN landed here is a step toward
 Area 1's "typed policy-visible result", but the versioned `OperationDescriptor`/
 `OperationPlan` pinning is still not built.
+
+---
+
+## PR #51 correction round 8 (Stage 3C.2A.6) — provable fault origin + behavioral windows (Areas 1 & 3)
+
+**Area 1 — fault origin is proven or UNKNOWN (done).** Corrects round 7's
+over-confident candidate stamping.
+- A THIRD origin `unknown` (`FAULT_UNKNOWN` / `OP_UNKNOWN`). `candidate` and
+  `infrastructure` are stamped ONLY when proven; every ambiguous boundary fault
+  is `unknown`.
+- Reclassified stamps: a Deno/Pyodide or fault-only WALL TIMEOUT, a generic
+  pyodide `CodeExecutionError`, a nonzero runner exit, and a malformed runner
+  protocol are now `unknown` (indistinguishable candidate-vs-backend). Only a
+  proven backend exception and a parent-enforced run-budget/suite-deadline
+  shortfall are `infrastructure`; a candidate stdout flood (a distinguishable
+  phase) stays `candidate`.
+- Per-case aggregation: `_dominant_fault` makes infrastructure/unknown DOMINATE
+  candidate, so event order can't hide a later backend fault behind an earlier
+  candidate one. Only clean/candidate (behavioral) evidence steers adaptation;
+  `unknown` never does (it's excluded by `is_behavioral_operation`).
+- Verify now requires: origin ∈ {behavioral, infrastructure, unknown}; a clean
+  report carries NO `fault_origin` and is behavioral; a failed report carries a
+  valid `fault_origin`; and the record's origin equals what the report's
+  `fault_origin` implies.
+
+**Area 3 — behavioral windows (done).**
+- Warm-up counts BEHAVIORAL observations (not successful commands): the window
+  is satisfied only by observations that actually exercised behavior. An
+  infrastructure/unknown-only warm-up retries (bounded by
+  `warmup_observations + _MAX_DEFERS`) then ends UNRESOLVED and NEVER invokes the
+  Refiner or applies a change.
+- Auto review requires a MATCHED behavioral baseline AND post; missing either
+  side defers (and finally leaves the change unresolved) — never reverts on
+  absence of evidence.
+- Proofs: an outage produces no proposal/apply/confirm/revert and ends
+  unresolved at warm-up; a post-apply outage defers and never reverts a change
+  that lacks behavioral post evidence; wall-timeout stamped unknown;
+  same-kind-different-origin (candidate/infrastructure/unknown); `_dominant_fault`
+  precedence.
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **281 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Still not built (the large architectural items, per repeated honest note):**
+- **Area 2** — the immutable `OperationDescriptor` catalog + CAS-backed
+  `OperationPlan` (impl/config digest + plan ref pinned in `ObserveCurrentState`
+  intent; matched pre/post uses the same plan; intent→dispatch→result plan
+  identity + manifest/provenance verified; drift refuses resume). The typed
+  origin + behavioral windows landed here are prerequisites, but the plan-pinning
+  itself is not done.
+- **Area 4** — typed `ReviewDecision` + a closed `ReviseChange` lifecycle
+  emitting `ChangeRevised` old→new supersession (confirm-of-inactive IS enforced);
+  prompt-only causal shadow-refinement proof.
+- **Area 5** — the typed `ModelBinding`/usage records replacing the pipe string
+  and `provider_extras` conventions (payload==binding==dispatch==result).
