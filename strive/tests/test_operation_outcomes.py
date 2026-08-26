@@ -17,14 +17,16 @@ from strive.contracts import (
     FAILURE_TIMEOUT,
     FAULT_CANDIDATE,
     FAULT_INFRASTRUCTURE,
+    FAULT_UNKNOWN,
     BudgetUsage,
     FailureRecord,
     TaskCase,
 )
-from strive.kernel import _attempt_origin
+from strive.kernel import _attempt_origin, _dominant_fault
 from strive.runtime import (
     OP_BEHAVIORAL,
     OP_INFRASTRUCTURE,
+    OP_UNKNOWN,
     AttemptRecord,
     classify_operation,
     is_behavioral_operation,
@@ -62,41 +64,51 @@ def test_classify_reads_the_persisted_origin() -> None:
 
 def test_attempt_origin_maps_from_trusted_fault_origin() -> None:
     assert _attempt_origin(None, None)[0] == OP_BEHAVIORAL  # a clean run
-    # a candidate-stamped fault stays behavioral (its own code's fault)
-    assert _attempt_origin(FailureRecord(FAILURE_TIMEOUT, "x"), FAULT_CANDIDATE)[0] == OP_BEHAVIORAL
+    # only a PROVEN candidate fault stays behavioral
     assert _attempt_origin(FailureRecord(FAILURE_CRASH, "x"), FAULT_CANDIDATE)[0] == OP_BEHAVIORAL
-    # a backend/runtime fault is infrastructure
+    # a PROVEN backend/runtime fault is infrastructure
     assert _attempt_origin(FailureRecord(FAILURE_CRASH, "x"), FAULT_INFRASTRUCTURE)[0] == OP_INFRASTRUCTURE
     # a run-budget shortfall is infrastructure
     assert _attempt_origin(FailureRecord(FAILURE_BUDGET_EXHAUSTED, "x"), FAULT_INFRASTRUCTURE)[0] == OP_INFRASTRUCTURE
-    # a failed attempt with NO trusted stamp is conservatively infrastructure
-    assert _attempt_origin(FailureRecord(FAILURE_MALFORMED_OUTPUT, "x"), None)[0] == OP_INFRASTRUCTURE
+    # an UNKNOWN-stamped fault, or a failed attempt with NO stamp, is unknown
+    assert _attempt_origin(FailureRecord(FAILURE_TIMEOUT, "x"), FAULT_UNKNOWN)[0] == OP_UNKNOWN
+    assert _attempt_origin(FailureRecord(FAILURE_MALFORMED_OUTPUT, "x"), None)[0] == OP_UNKNOWN
 
 
 def test_same_kind_different_origin() -> None:
-    # a FAILURE_CRASH is behavioral when the candidate caused it, infrastructure
-    # when the backend did — the KIND alone can never decide it.
+    # a FAILURE_CRASH is behavioral only when PROVEN candidate, infrastructure
+    # when proven backend, and unknown when unproven — the KIND never decides it.
     assert _attempt_origin(FailureRecord(FAILURE_CRASH, "x"), FAULT_CANDIDATE)[0] == OP_BEHAVIORAL
     assert _attempt_origin(FailureRecord(FAILURE_CRASH, "x"), FAULT_INFRASTRUCTURE)[0] == OP_INFRASTRUCTURE
+    assert _attempt_origin(FailureRecord(FAILURE_CRASH, "x"), FAULT_UNKNOWN)[0] == OP_UNKNOWN
 
 
-# -- the boundary stamps candidate-origin faults from real execution ------------------------------
+def test_dominant_fault_lets_infra_and_unknown_beat_candidate() -> None:
+    # aggregating across cases: a later backend/unknown fault must not be hidden
+    # behind an earlier candidate one.
+    assert _dominant_fault(FAULT_CANDIDATE, FAULT_UNKNOWN) == FAULT_UNKNOWN
+    assert _dominant_fault(FAULT_UNKNOWN, FAULT_INFRASTRUCTURE) == FAULT_INFRASTRUCTURE
+    assert _dominant_fault(FAULT_INFRASTRUCTURE, FAULT_CANDIDATE) == FAULT_INFRASTRUCTURE
+    assert _dominant_fault(None, FAULT_CANDIDATE) == FAULT_CANDIDATE
+
+
+# -- the boundary stamps origins from real execution ----------------------------------------------
 
 
 def _c(cid: str = "c") -> TaskCase:
     return TaskCase(cid, "1 2 3", 6, "operation")
 
 
-def test_boundary_stamps_candidate_timeout_as_candidate() -> None:
-    # the candidate's OWN code runs forever: the boundary kills it and stamps
-    # the timeout as a CANDIDATE fault (behavioral), never infrastructure.
+def test_boundary_stamps_wall_timeout_as_unknown_not_candidate() -> None:
+    # a wall timeout is NOT proven candidate (a hung child looks like a slow
+    # launcher): it must be stamped UNKNOWN, never candidate.
     report = run_strategy(
         "def solve(t):\n    while True:\n        pass\n",
         (_c(),), generation_id="op", timeout_s=1.0,
     )
     assert not report.ok and report.failure is not None
     assert report.failure.kind == FAILURE_TIMEOUT
-    assert report.fault_origin == FAULT_CANDIDATE
+    assert report.fault_origin == FAULT_UNKNOWN
 
 
 def test_boundary_marks_a_clean_run_with_no_fault_origin() -> None:

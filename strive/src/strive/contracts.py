@@ -44,8 +44,10 @@ FAILURE_COST_UNAVAILABLE = "cost-limit-unavailable"
 # itself). Used to classify an operation as behavioral vs infrastructure WITHOUT
 # a downstream heuristic on the failure kind (a candidate infinite-loop timeout
 # and a backend launch fault can share a kind, but never an origin).
-FAULT_CANDIDATE = "candidate"            # the candidate's own code (behavioral)
-FAULT_INFRASTRUCTURE = "infrastructure"  # backend/launcher/runtime or run-budget
+FAULT_CANDIDATE = "candidate"            # PROVEN the candidate's own code (behavioral)
+FAULT_INFRASTRUCTURE = "infrastructure"  # PROVEN backend/launcher/runtime or run-budget
+FAULT_UNKNOWN = "unknown"                # a boundary fault whose cause is NOT proven
+FAULT_ORIGINS = (FAULT_CANDIDATE, FAULT_INFRASTRUCTURE, FAULT_UNKNOWN)
 
 # proposal-pipeline rejection kinds, each journaled distinctly
 

@@ -202,9 +202,11 @@ class AttemptDispatched:
 # clean evaluation) follows retry/defer/unresolved and never teaches a change or
 # triggers rollback. Indeterminate is the crash-between-dispatch-and-result case:
 # an OPEN dispatch that never produces a RESULT (reconciled separately).
-OP_BEHAVIORAL = "behavioral"
-OP_INFRASTRUCTURE = "infrastructure"
-OP_INDETERMINATE = "indeterminate"
+OP_BEHAVIORAL = "behavioral"        # clean run or PROVEN candidate fault — MAY steer
+OP_INFRASTRUCTURE = "infrastructure"  # PROVEN backend/runtime/run-budget — never steers
+OP_UNKNOWN = "unknown"              # unproven boundary fault — never steers
+OP_INDETERMINATE = "indeterminate"  # crash between dispatch and result (open dispatch)
+OP_OPERATION_ORIGINS = (OP_BEHAVIORAL, OP_INFRASTRUCTURE, OP_UNKNOWN)
 
 
 @register("execution-attempt", 3)
