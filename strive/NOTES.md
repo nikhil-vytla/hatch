@@ -2123,3 +2123,47 @@ over-confident candidate stamping.
   prompt-only causal shadow-refinement proof.
 - **Area 5** — the typed `ModelBinding`/usage records replacing the pipe string
   and `provider_extras` conventions (payload==binding==dispatch==result).
+
+---
+
+## PR #51 correction round 9 (Stage 3C.2A.7) — self-consistent fault evidence, behavioral model review, docs
+
+**Area 2 — fault failure+origin self-consistency (done).** Corrects round 8,
+which paired the FIRST failure record with a LATER case's dominant origin.
+`_run_attempt` now records ORDERED per-case `(failure, origin)` evidence and
+derives BOTH the failure record and the origin from the SAME dominant item
+(precedence infrastructure > unknown > candidate). So the recorded failure and
+origin can never disagree, and a later backend fault still can't hide behind an
+earlier candidate one.
+
+**Area 3 — behavioral-evidence gate for BOTH auto and model review (done).**
+`observe_post` now requires a MATCHED behavioral baseline AND post (from the
+behavioral-only `_pre_post_overall`) before ANY verdict is formed — for auto AND
+model review. Missing either side defers (bounded by
+`review_window + _MAX_DEFERS`) then leaves the change UNRESOLVED. A model review
+is not even DISPATCHED without both sides, so it can never emit keep/revise/
+revert off an outage. Test: a post-apply outage under `review_mode="model"`
+produces no review model call, no confirm, no revert — unresolved.
+
+**Docs corrected (per the goal).** `RequestRefinement` is IMPLEMENTED (Phase B)
+and **AT-MOST-ONCE**, not exactly-once (kernel module docstring, `docs/HANDOFF.md`,
+`docs/adrs/0008-vnext-substrate.md`); `docs/ROADMAP.md` Phase B is now
+"IMPLEMENTED; under review in PR #51", not "next".
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **282 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Still not built (large architectural items):**
+- **Area 1** — the immutable `OperationDescriptor` catalog + CAS-backed
+  `OperationPlan` (impl/config digest + manifest + projection schema pinned in
+  `ObserveCurrentState` intent; matched pre/post uses the same plan/regime;
+  intent→dispatch→result plan identity verified; drift refuses resume). Also the
+  full unification of the `CandidateExecutor`/kernel aggregation layers and the
+  "don't floor unrelated completed cases" evaluate change are part of this (they
+  need the plan to declare attempt validity).
+- **Area 4** — typed `ReviewDecision` + a crash-safe `ReviseChange` effect
+  emitting `ChangeRevised` old→new supersession; revision-context/revert;
+  stale-fork clearing on candidate change; prompt-only causal proof.
+- **Area 5** — typed `ModelBinding`/usage records (basis actual|reservation|
+  unknown; payload==binding==dispatch==result) replacing the pipe string and
+  `provider_extras` conventions.
