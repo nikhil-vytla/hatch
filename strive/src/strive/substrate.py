@@ -58,6 +58,8 @@ from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
 from strive.contracts import (
     FAULT_CANDIDATE,
+    FAULT_INFRASTRUCTURE,
+    FAULT_ORIGINS,
     BudgetSpec,
     BudgetUsage,
     Evaluation,
@@ -72,6 +74,8 @@ from strive.runtime import (
     FORK_SUMMARY,
     OP_BEHAVIORAL,
     OP_INFRASTRUCTURE,
+    OP_OPERATION_ORIGINS,
+    OP_UNKNOWN,
     OPERATION_DISPATCH,
     OPERATION_LABEL,
     OPERATION_RESULT,
@@ -2496,17 +2500,26 @@ def _check_attempt_evidence(
     if rec.ok != (rec.failure is None):
         errors.append(f"{where} ok disagrees with whether a failure is present")
     # the TRUSTED origin the attempt recorded must be exactly what the referenced
-    # report's fault-origin implies — never a free-floating classification. A
-    # clean run is behavioral; a candidate-stamped fault is behavioral; a
-    # backend/runtime fault (or an unstamped failure) is infrastructure.
-    if rec.origin not in (OP_BEHAVIORAL, OP_INFRASTRUCTURE):
+    # report's fault-origin implies — never a free-floating classification.
+    #  - a clean report (ok) MUST carry no fault_origin and be behavioral;
+    #  - a failed report MUST carry a valid fault_origin (present, not absent);
+    #  - candidate → behavioral, infrastructure → infrastructure, unknown/None → unknown.
+    if rec.origin not in OP_OPERATION_ORIGINS:
         errors.append(f"{where} origin {rec.origin!r} is not a known operation origin")
+    elif report.ok:
+        if report.fault_origin is not None:
+            errors.append(f"{where} clean report must not carry a fault_origin")
+        if rec.origin != OP_BEHAVIORAL:
+            errors.append(f"{where} clean report must be behavioral, not {rec.origin!r}")
     else:
-        expected_origin = (
-            OP_BEHAVIORAL
-            if report.failure is None or report.fault_origin == FAULT_CANDIDATE
-            else OP_INFRASTRUCTURE
-        )
+        if report.fault_origin is None:
+            errors.append(f"{where} failed report must carry a fault_origin")
+        elif report.fault_origin not in FAULT_ORIGINS:
+            errors.append(f"{where} report fault_origin {report.fault_origin!r} is invalid")
+        expected_origin = {
+            FAULT_CANDIDATE: OP_BEHAVIORAL,
+            FAULT_INFRASTRUCTURE: OP_INFRASTRUCTURE,
+        }.get(report.fault_origin or "", OP_UNKNOWN)
         if rec.origin != expected_origin:
             errors.append(
                 f"{where} origin {rec.origin!r} disagrees with the report's "

@@ -273,12 +273,22 @@ class ContinualRefinePolicy:
     ) -> KernelCommand | None:
         c, n = state.cycle, state.obs_done
         if state.phase == "warmup":
-            if n < config.warmup_observations:
+            # the window is satisfied by BEHAVIORAL observations, not merely by
+            # successful commands: an infrastructure/unknown outage does not count.
+            behavioral = _behavioral_op_count(view, self._cid(view, f"warmup:{c}:"))
+            if behavioral >= config.warmup_observations:
+                return self._refine_command(config, view, c)
+            if n < config.warmup_observations + _MAX_DEFERS:  # bounded retries
                 return ObserveCurrentState(
                     command_id=self._cid(view, f"warmup:{c}:{n}"),
                     detail="warm-up observation",
                 )
-            return self._refine_command(config, view, c)
+            # infra/unknown-only warm-up: never invoke the Refiner or apply a change
+            return StopAdaptation(
+                command_id=self._cid(view, f"stop-warmup-unresolved:{c}"),
+                reason="warm-up produced no behavioral evidence "
+                "(infrastructure/unknown only) — unresolved, Refiner not invoked",
+            )
         if state.phase == "proposed":
             change = self._assemble(config, view, self._refine_change_id(view, c), refine_cid=self._cid(view, f"refine:{c}"))
             if change is None:
@@ -397,9 +407,12 @@ class ContinualRefinePolicy:
         if config.use_fork and state.fork_improved is not None:
             return "keep" if state.fork_improved else "revert"
         pre, post = _pre_post_overall(view, state.change_id)
-        if post is None:
-            return "defer"  # no valid behavioral post-observation yet — gather more
-        if pre is not None and post > pre:
+        if pre is None or post is None:
+            # a MATCHED behavioral baseline AND post are both required; missing
+            # either side (e.g. an outage on one side) is never a regression —
+            # defer/gather more, never revert on absence
+            return "defer"
+        if post > pre:
             return "keep"
         return "revert"  # a real, MEASURED lack of improvement over pre-change
 
@@ -538,6 +551,22 @@ def _surface_specs(config: ContinualRefineConfig) -> tuple[str, ...]:
     return tuple(
         f"{_SURFACE_KEY[s][0]}/{_SURFACE_KEY[s][1]}" for s in config.enabled_strategies
     )
+
+
+def _behavioral_op_count(view: RunView, cid_prefix: str) -> int:
+    """How many BEHAVIORAL operation observations were caused by commands whose
+    id starts with `cid_prefix`. Infrastructure/unknown outcomes do NOT count —
+    a window is only satisfied by observations that actually exercised behavior."""
+    from strive import codec
+
+    count = 0
+    for body in view.bodies:
+        if not (isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT):
+            continue
+        rec = codec.loads(view.read_text(body.observation_ref), AttemptRecord)
+        if rec.command_id.startswith(cid_prefix) and is_behavioral_operation(rec):
+            count += 1
+    return count
 
 
 # -- context rendering (deterministic; excludes the in-flight command's events) -------------------

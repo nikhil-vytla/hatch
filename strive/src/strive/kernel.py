@@ -66,6 +66,7 @@ from strive.contracts import (
     FAILURE_MODEL_ERROR,
     FAULT_CANDIDATE,
     FAULT_INFRASTRUCTURE,
+    FAULT_UNKNOWN,
     BudgetSpec,
     BudgetUsage,
     CaseOutcome,
@@ -100,6 +101,7 @@ from strive.runtime import (
     FORK_SUMMARY,
     OP_BEHAVIORAL,
     OP_INFRASTRUCTURE,
+    OP_UNKNOWN,
     OPERATION_DISPATCH,
     OPERATION_LABEL,
     OPERATION_RESULT,
@@ -1359,21 +1361,32 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
     )
 
 
+# precedence for aggregating per-case fault origins across a suite: a later
+# infrastructure/unknown fault must DOMINATE an earlier candidate one, so event
+# order can never hide a backend fault behind a candidate one.
+_FAULT_RANK = {None: 0, FAULT_CANDIDATE: 1, FAULT_UNKNOWN: 2, FAULT_INFRASTRUCTURE: 3}
+
+
+def _dominant_fault(a: str | None, b: str | None) -> str | None:
+    return a if _FAULT_RANK.get(a, 2) >= _FAULT_RANK.get(b, 2) else b
+
+
 def _attempt_origin(
     failure: FailureRecord | None, fault_origin: str | None
 ) -> tuple[str, str]:
     """Map a completed attempt's TRUSTED boundary evidence to a typed operation
-    origin. A clean run is behavioral; a candidate-stamped fault stays behavioral
-    (its own code's fault); an infrastructure-stamped fault (or an unclassified
-    boundary fault, conservatively) is infrastructure and never steers learning."""
+    origin. A clean run is behavioral; only a PROVEN candidate fault stays
+    behavioral; a proven infrastructure fault is infrastructure; and an
+    unproven/unstamped boundary fault is UNKNOWN. Only behavioral (clean or
+    proven-candidate) evidence may later steer adaptation."""
     if failure is None:
         return OP_BEHAVIORAL, ""
     if fault_origin == FAULT_CANDIDATE:
-        return OP_BEHAVIORAL, f"candidate fault: {failure.kind}"
+        return OP_BEHAVIORAL, f"proven candidate fault: {failure.kind}"
     if fault_origin == FAULT_INFRASTRUCTURE:
-        return OP_INFRASTRUCTURE, f"infrastructure fault: {failure.kind}"
-    # a failed attempt with no trusted origin stamp: refuse to learn from it
-    return OP_INFRASTRUCTURE, f"unclassified boundary fault: {failure.kind}"
+        return OP_INFRASTRUCTURE, f"proven infrastructure fault: {failure.kind}"
+    # FAULT_UNKNOWN, or a failed attempt with no trusted stamp: cause unproven
+    return OP_UNKNOWN, f"unproven boundary fault: {failure.kind}"
 
 
 def _run_attempt(
@@ -1430,9 +1443,13 @@ def _run_attempt(
         provenance = result.provenance
         denials.extend(result.denials)
         outcomes.extend(result.report.outcomes)
-        if result.report.failure is not None and failure is None:
-            failure = result.report.failure
-            fault_origin = result.report.fault_origin  # the boundary's trusted stamp
+        if result.report.failure is not None:
+            # keep the FIRST failure record, but let the DOMINANT origin across
+            # all cases win (infrastructure/unknown over candidate), so a later
+            # backend fault is never hidden behind an earlier candidate one
+            if failure is None:
+                failure = result.report.failure
+            fault_origin = _dominant_fault(fault_origin, result.report.fault_origin)
     if provenance is None:  # denied before any case ran
         provenance = services.executor.provenance()
     report = ExecutionReport(

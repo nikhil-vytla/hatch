@@ -41,7 +41,7 @@ from strive.contracts import (
     FAILURE_SCHEMA_MISMATCH,
     FAILURE_TIMEOUT,
     FAULT_CANDIDATE,
-    FAULT_INFRASTRUCTURE,
+    FAULT_UNKNOWN,
     CaseOutcome,
     ExecutionReport,
     FailureRecord,
@@ -168,7 +168,9 @@ def run_strategy(
                 kind=FAILURE_TIMEOUT, detail=f"killed after {timeout_s}s"
             ),
             stdout_bytes=len(stdout),
-            fault_origin=FAULT_CANDIDATE,  # the candidate's OWN code ran past its cap
+            # a wall timeout is NOT proven candidate (a hung child looks the same
+            # as a slow launcher) — the cause is UNKNOWN
+            fault_origin=FAULT_UNKNOWN,
         )
     if proc.returncode == _EXIT_SCHEMA_MISMATCH:
         return report(
@@ -178,7 +180,7 @@ def run_strategy(
                 detail=stderr.decode("utf-8", "replace").strip() or "runner rejected payload",
             ),
             stdout_bytes=len(stdout),
-            fault_origin=FAULT_INFRASTRUCTURE,  # the RUNNER rejected the parent payload
+            fault_origin=FAULT_UNKNOWN,  # a runner-protocol break; cause not proven
         )
     if proc.returncode != 0:
         tail = stderr.decode("utf-8", "replace").strip().splitlines()[-5:]
@@ -189,7 +191,9 @@ def run_strategy(
                 detail=f"child exited {proc.returncode}: " + " | ".join(tail),
             ),
             stdout_bytes=len(stdout),
-            fault_origin=FAULT_CANDIDATE,  # the candidate crashed its own process
+            # a nonzero exit could be the candidate crashing OR the launcher/
+            # runner failing to start — NOT distinguishable here, so UNKNOWN
+            fault_origin=FAULT_UNKNOWN,
         )
 
     try:
@@ -216,7 +220,7 @@ def run_strategy(
                 kind=FAILURE_MALFORMED_OUTPUT, detail=f"runner output unparseable: {exc}"
             ),
             stdout_bytes=len(stdout),
-            fault_origin=FAULT_INFRASTRUCTURE,  # runner-protocol break, not the candidate
+            fault_origin=FAULT_UNKNOWN,  # protocol break; candidate-flood vs runner-bug unproven
         )
 
     return report(ok=True, outcomes=outcomes, stdout_bytes=len(stdout))

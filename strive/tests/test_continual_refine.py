@@ -349,23 +349,19 @@ def test_operation_crash_before_result_is_indeterminate(tmp_path: Path) -> None:
 
 
 def test_infrastructure_outage_never_teaches_or_reverts(tmp_path: Path) -> None:
-    # every operation suffers a SANDBOX outage (a denial + a resource shortfall).
-    # These are infrastructure, not behavior: they must never enter the refiner
-    # context or the pre/post score, and MUST NOT trigger a rollback. With no
-    # valid behavioral evidence the review defers and finally leaves the change
-    # UNRESOLVED — never reverted because of infrastructure.
+    # every operation suffers a genuine BACKEND fault (stamped infrastructure).
+    # An infrastructure-only warm-up produces NO behavioral evidence, so the run
+    # must end UNRESOLVED at warm-up WITHOUT invoking the Refiner, applying a
+    # change, or reverting anything.
     from strive.contracts import (
         FAULT_INFRASTRUCTURE, FAILURE_CRASH, ExecutionReport, FailureRecord,
     )
     from strive.sandboxes import CandidateExecutor, ExecutionOutcome
-    from strive.substrate import ChangeReverted
-    from strive.runtime import (
-        OP_INFRASTRUCTURE, AttemptRecord as _AR, is_behavioral_operation,
-    )
+    from strive.substrate import ChangeApplied, ChangeConfirmed, ChangeReverted
+    from strive.runtime import OP_INFRASTRUCTURE, AttemptRecord as _AR, is_behavioral_operation
 
     class OutageExecutor(CandidateExecutor):
         def execute_suite(self, source, cases, *, generation_id, limits=None):  # type: ignore[no-untyped-def]
-            # a genuine BACKEND fault: the boundary stamps FAULT_INFRASTRUCTURE
             return ExecutionOutcome(
                 report=ExecutionReport(
                     ok=False, generation_id=generation_id, outcomes=(),
@@ -381,7 +377,6 @@ def test_infrastructure_outage_never_teaches_or_reverts(tmp_path: Path) -> None:
     services.executor = OutageExecutor(services.executor._backend, trusted=True)
     report = _drive(tmp_path, run, services=services)
 
-    # operations ran and were recorded, but EVERY one is TRUSTED-stamped infra
     sub = Substrate.discover(tmp_path, run)
     view = sub.verify()
     op_recs = [
@@ -389,10 +384,66 @@ def test_infrastructure_outage_never_teaches_or_reverts(tmp_path: Path) -> None:
         for b in view.bodies
         if isinstance(b, ObservationRecorded) and b.observation_kind == OPERATION_RESULT
     ]
+    # operations ran and are every one TRUSTED-stamped infrastructure
     assert op_recs and all(r.origin == OP_INFRASTRUCTURE for r in op_recs)
     assert not any(is_behavioral_operation(r) for r in op_recs)
-    # infrastructure NEVER triggered a rollback, and the run ended UNRESOLVED
-    assert not any(isinstance(b, ChangeReverted) for b in view.bodies)
+    # an outage produced NO proposal, apply, confirm, or revert — and no model call
+    assert _count_kind(tmp_path, run, REFINE_RESULT) == 0
+    assert not any(isinstance(b, (ChangeApplied, ChangeConfirmed, ChangeReverted)) for b in view.bodies)
+    assert "unresolved" in report.stopped_reason
+
+
+def test_missing_post_evidence_defers_and_never_reverts(tmp_path: Path) -> None:
+    # warm-up is BEHAVIORAL (a change is proposed + applied), but the review
+    # window then suffers an outage: with a baseline but NO behavioral post
+    # evidence, review must defer and finally leave the change UNRESOLVED —
+    # never reverted for lack of evidence.
+    from strive.contracts import FAULT_INFRASTRUCTURE, FAILURE_CRASH, ExecutionReport, FailureRecord
+    from strive.sandboxes import CandidateExecutor, ExecutionOutcome
+    from strive.substrate import ChangeApplied, ChangeReverted, ChangeConfirmed
+
+    class OutageAfterApply(CandidateExecutor):
+        applied = False  # flipped to True once a change is applied
+
+        def execute_suite(self, source, cases, *, generation_id, limits=None):  # type: ignore[no-untyped-def]
+            if self.applied:  # the review window: a genuine backend outage
+                return ExecutionOutcome(
+                    report=ExecutionReport(
+                        ok=False, generation_id=generation_id, outcomes=(),
+                        failure=FailureRecord(FAILURE_CRASH, "backend down post-apply"),
+                        fault_origin=FAULT_INFRASTRUCTURE,
+                    ),
+                    provenance=self.provenance(limits), denials=(),
+                )
+            return super().execute_suite(source, cases, generation_id=generation_id, limits=limits)
+
+    run = new_run_id()
+    services = _services(tmp_path, run)
+    outage = OutageAfterApply(services.executor._backend, trusted=True)
+    services.executor = outage
+
+    # flip to outage once the change is applied, so warm-up is behavioral but the
+    # review window is an outage
+    import strive.kernel as kmod
+    original = kmod._perform
+
+    def _perform(services_: KernelServices, view: object, command: object) -> object:
+        result = original(services_, view, command)  # type: ignore[arg-type]
+        if type(command).__name__ == "ApplyChange":
+            outage.applied = True
+        return result
+
+    kmod._perform = _perform  # type: ignore[assignment]
+    try:
+        report = _drive(tmp_path, run, services=services)
+    finally:
+        kmod._perform = original
+
+    sub = Substrate.discover(tmp_path, run)
+    view = sub.verify()
+    assert any(isinstance(b, ChangeApplied) for b in view.bodies)  # a change WAS applied
+    # missing behavioral post evidence: unresolved, never reverted or confirmed
+    assert not any(isinstance(b, (ChangeReverted, ChangeConfirmed)) for b in view.bodies)
     assert "unresolved" in report.stopped_reason
 
 
