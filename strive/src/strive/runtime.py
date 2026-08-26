@@ -20,7 +20,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from strive.codec import register
-from strive.contracts import BudgetUsage, FailureRecord
+from strive.contracts import BudgetUsage, FailureRecord, TaskCase
 from strive.sandboxes import SandboxProvenance
 
 # the canonical encoding tag for the JSON-in-blob envelopes below
@@ -146,6 +146,7 @@ class CommandPayload:
     reason: str | None
     json: str
     model_binding: str | None = None
+    plan_ref: str | None = None  # an ObserveCurrentState's pinned OperationPlan ref
 
 
 @register("stored-result", 1)
@@ -335,21 +336,106 @@ class RefinementProposal:
     review_hint: str  # one of REVIEW_VERDICTS
 
 
-@register("operation-dispatched", 1)
+@register("operation-dispatched", 2)
 @dataclass(frozen=True)
 class OperationDispatched:
     """Journaled BEFORE the active harness is operated (durable). Names the
-    driver, the issue-state it operates against, and a CONSERVATIVE reservation
-    across every countable dimension, so an OPEN dispatch (crash before the
-    result) reserves the worst case and a crash-loop can never expand any budget
-    dimension — exactly like a fork attempt's reservation."""
+    versioned operation descriptor, the CAS-backed PLAN ref it executes, the
+    issue-state it operates against, and a CONSERVATIVE reservation across every
+    countable dimension, so an OPEN dispatch (crash before the result) reserves
+    the worst case and a crash-loop can never expand any budget dimension —
+    exactly like a fork attempt's reservation. `descriptor_ref`/`plan_ref` must
+    match the pinned `ObserveCurrentState` intent (drift refuses resume)."""
 
     command_id: str
-    driver_name: str
+    descriptor_ref: str  # e.g. "task-suite@1"
+    plan_ref: str        # CAS ref of the OperationPlan
     state_ref: str
     reserved_executions: int
     reserved_wall_s: float
     reserved_output_bytes: int
+
+
+# -- the policy-neutral, pinned operation package (Area 1) ----------------------------------------
+
+OPERATION_PROJECTION = "operation-projection"  # the POLICY-VISIBLE result observation
+
+
+@register("policy-visible-op-context", 1)
+@dataclass(frozen=True)
+class PolicyVisibleOperationContext:
+    """The ONLY view an `OperationDescriptor` receives — NEVER the full `Task`.
+    It carries the allowed task/environment view (VISIBLE cases only: opaque-safe
+    inputs + expected), the run seed, and the task + environment fingerprints
+    (the comparison regime). Hidden / held-out / regression / adversarial / audit
+    data is structurally ABSENT from this API, so a plan can never select it."""
+
+    task_fingerprint: str
+    environment_fingerprint: str  # the execution regime (backend + capabilities)
+    seed: int
+    visible_cases: tuple[TaskCase, ...]
+
+
+@register("operation-plan", 1)
+@dataclass(frozen=True)
+class OperationPlan:
+    """An immutable, CAS-backed operation plan. It pins the descriptor + config
+    identity, an OPAQUE manifest (the operation-split cases), the environment
+    regime, the projection schema, the seed, the required surfaces/capabilities,
+    the resource envelope, and the attempt-validity rule. It is NOT bound to
+    harness content, so ONE plan ref measures both the pre- and post-change
+    states of the same run."""
+
+    descriptor_ref: str          # name@version
+    descriptor_impl: str         # implementation digest
+    config_digest: str
+    plan_schema_version: str
+    projection_schema_version: str
+    seed: int
+    task_fingerprint: str
+    regime: str                  # environment snapshot (backend + capabilities)
+    manifest: tuple[TaskCase, ...]  # OPAQUE operation-split cases
+    required_surfaces: tuple[str, ...]
+    required_capabilities: tuple[str, ...]
+    reserved_executions: int
+    reserved_wall_s: float
+    reserved_output_bytes: int
+    validity: str                # "all-required" | "partial-allowed"
+    indivisible: bool            # floor unrelated cases on any fault when True
+
+
+@register("visible-case-outcome", 1)
+@dataclass(frozen=True)
+class VisibleCaseOutcome:
+    """One case's POLICY-VISIBLE outcome: opaque id, expected, produced output,
+    pass/fail, and a SAFE error class (never raw protected text)."""
+
+    case_id: str
+    expected: int
+    got: int | None
+    passed: bool
+    error_kind: str | None
+
+
+@register("operation-projection", 1)
+@dataclass(frozen=True)
+class OperationProjection:
+    """The POLICY-VISIBLE result the descriptor derives from the protected
+    evidence. Policy and review code consume ONLY this — never the protected
+    `AttemptRecord`/`ExecutionReport`. `overall` is None for an invalid/
+    incomplete attempt (no normal aggregate is published); `origin` is the
+    trusted behavioral/infrastructure/unknown class; `coverage_*` records how
+    much of the plan actually produced behavioral outcomes."""
+
+    command_id: str
+    plan_ref: str
+    state_ref: str
+    origin: str                  # OP_BEHAVIORAL | OP_INFRASTRUCTURE | OP_UNKNOWN
+    valid: bool
+    coverage_completed: int
+    coverage_total: int
+    overall: float | None
+    cases: tuple[VisibleCaseOutcome, ...]
 
 
 @register("model-binding", 1)
@@ -430,8 +516,13 @@ __all__ = [
     "ModelResult",
     "OPERATION_DISPATCH",
     "OPERATION_LABEL",
+    "OPERATION_PROJECTION",
     "OPERATION_RESULT",
     "OperationDispatched",
+    "OperationPlan",
+    "OperationProjection",
+    "PolicyVisibleOperationContext",
+    "VisibleCaseOutcome",
     "PolicyStateBlob",
     "REFINE_BINDING",
     "REFINE_DISPATCH",

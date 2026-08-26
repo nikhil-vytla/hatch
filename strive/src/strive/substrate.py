@@ -77,6 +77,7 @@ from strive.runtime import (
     OP_OPERATION_ORIGINS,
     OP_UNKNOWN,
     OPERATION_DISPATCH,
+    OPERATION_PROJECTION,
     OPERATION_LABEL,
     OPERATION_RESULT,
     REFINE_BINDING,
@@ -91,6 +92,8 @@ from strive.runtime import (
     ModelDispatch,
     ModelResult,
     OperationDispatched,
+    OperationPlan,
+    OperationProjection,
     PolicyStateBlob,
     RefinementProposal,
     StoredResult,
@@ -143,7 +146,9 @@ _OK_EFFECTS: dict[str, dict[str, int]] = {
         "refine-model-dispatch": 1,
         "refine-model-result": 1,
     },
-    "ObserveCurrentState": {"operation-dispatch": 1, "operation-result": 1},
+    "ObserveCurrentState": {
+        "operation-dispatch": 1, "operation-result": 1, "operation-projection": 1,
+    },
     "ScheduleTrigger": {},
     "StopAdaptation": {},
 }
@@ -157,6 +162,7 @@ _SUCCESS_TOKENS = {
 _PAYLOAD_FIELDS = (
     "change_ref", "target_change_id", "expected_state_ref", "issue_state_ref",
     "prompt_role", "context_ref", "after_seconds", "reason", "model_binding",
+    "plan_ref",
 )
 
 # The CLOSED per-kind command-intent spec: which normalized anchors are
@@ -205,9 +211,9 @@ _PAYLOAD_SPECS: dict[
         None,
     ),
     "ObserveCurrentState": (
+        frozenset({"plan_ref"}),
         frozenset(),
-        frozenset(),
-        frozenset({"command_id", "detail"}),
+        frozenset({"command_id", "detail", "plan_ref"}),
         None,
     ),
     "ScheduleTrigger": (
@@ -1825,7 +1831,7 @@ def _check_command_payload_coherence(
     # the remaining scalar anchors that ARE carried verbatim in the JSON
     for name in (
         "expected_state_ref", "prompt_role", "context_ref", "after_seconds",
-        "reason", "model_binding",
+        "reason", "model_binding", "plan_ref",
     ):
         if name in json_keys and parsed.get(name) != getattr(payload, name):
             errors.append(f"{where} json {name} disagrees with the normalized {name}")
@@ -1888,7 +1894,7 @@ def _verify_command_lifecycles(
         _check_effect_after_failure(cid, events, errors)
         _check_fork_lifecycle(sub, cid, payloads.get(cid), events, bound, errors)
         _check_observation_lifecycle(
-            sub, cid, events, bound, issue_states.get(cid), errors
+            sub, cid, payloads.get(cid), events, bound, issue_states.get(cid), errors
         )
         _check_refinement_lifecycle(
             sub, cid, payloads.get(cid), events, bound, issue_states.get(cid), errors
@@ -1904,22 +1910,27 @@ def _verify_command_lifecycles(
 def _check_observation_lifecycle(
     sub: Substrate,
     cid: str,
+    payload: CommandPayload | None,
     events: list[tuple[EventEnvelope, object]],
     bound: PolicyBound,
     issue_state: str | None,
     errors: list[str],
 ) -> None:
     """An ObserveCurrentState is journaled crash-honestly like a fork attempt:
-    a DISPATCH (subject-scoped to the ISSUE state, with a finite reservation)
-    then a RESULT whose AttemptRecord is subject-scoped, carries the run's
-    required capabilities and finite usage, and matches its ExecutionReport +
-    Evaluation (label "current", generation "operation-current")."""
+    a DISPATCH (subject-scoped to the ISSUE state, naming the pinned descriptor +
+    plan, with a finite reservation), a RESULT whose AttemptRecord matches its
+    ExecutionReport + Evaluation, and a POLICY-VISIBLE PROJECTION derived from
+    that result. The DISPATCH plan must equal the intent's `plan_ref`; the
+    projection must name the same plan and derive from the same result."""
     dispatch: OperationDispatched | None = None
     dispatch_subject: str | None = None
     result: AttemptRecord | None = None
     result_subject: str | None = None
+    projection: OperationProjection | None = None
+    projection_subject: str | None = None
     dispatch_seq: int | None = None
     result_seq: int | None = None
+    projection_seq: int | None = None
     for env, body in events:
         if not isinstance(body, ObservationRecorded):
             continue
@@ -1932,13 +1943,24 @@ def _check_observation_lifecycle(
             elif body.observation_kind == OPERATION_RESULT:
                 result = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
                 result_subject, result_seq = body.subject_state_ref, env.seq
+            elif body.observation_kind == OPERATION_PROJECTION:
+                projection = codec.loads(
+                    sub.objects.get_text(body.observation_ref), OperationProjection
+                )
+                projection_subject, projection_seq = body.subject_state_ref, env.seq
         except (ObjectMissing, ObjectCorruption, codec.SchemaError):
             return  # the main fold reports the decode failure
-    if dispatch is None and result is None:
+    if dispatch is None and result is None and projection is None:
         return  # not an operation command
-    for what, subj in (("dispatch", dispatch_subject), ("result", result_subject)):
+    for what, subj in (
+        ("dispatch", dispatch_subject), ("result", result_subject),
+        ("projection", projection_subject),
+    ):
         if subj is not None and issue_state is not None and subj != issue_state:
             errors.append(f"command {cid!r}: operation {what} subject is not the issue state")
+    # the DISPATCH must name the pinned plan from the ObserveCurrentState intent,
+    # and the plan's descriptor must be the one the dispatch names
+    plan: OperationPlan | None = None
     if dispatch is not None:
         errors.extend(_usage_errors(
             BudgetUsage(
@@ -1948,8 +1970,25 @@ def _check_observation_lifecycle(
             ),
             f"command {cid!r} operation reservation",
         ))
+        if payload is not None and payload.plan_ref is not None:
+            if dispatch.plan_ref != payload.plan_ref:
+                errors.append(
+                    f"command {cid!r}: operation dispatch plan_ref disagrees with the "
+                    "issued intent plan_ref"
+                )
+            try:
+                plan = codec.loads(sub.objects.get_text(payload.plan_ref), OperationPlan)
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                errors.append(f"command {cid!r}: pinned plan does not decode: {exc}")
+            if plan is not None and dispatch.descriptor_ref != plan.descriptor_ref:
+                errors.append(
+                    f"command {cid!r}: dispatch descriptor {dispatch.descriptor_ref!r} "
+                    f"!= the plan's descriptor {plan.descriptor_ref!r}"
+                )
     if dispatch_seq is not None and result_seq is not None and dispatch_seq >= result_seq:
         errors.append(f"command {cid!r}: operation dispatch must precede its result")
+    if result_seq is not None and projection_seq is not None and result_seq >= projection_seq:
+        errors.append(f"command {cid!r}: operation result must precede its projection")
     if result is not None:
         if result.label != OPERATION_LABEL:
             errors.append(f"command {cid!r}: operation result label {result.label!r}")
@@ -1964,6 +2003,19 @@ def _check_observation_lifecycle(
             )
         errors.extend(_usage_errors(result.usage, f"command {cid!r} operation usage"))
         _check_attempt_evidence(sub, cid, result, errors, gen_prefix="operation")
+    # the POLICY-VISIBLE projection derives from the SAME plan and result: it
+    # names the pinned plan, carries the result's trusted origin, and only
+    # publishes an aggregate when the attempt is valid.
+    if projection is not None:
+        if payload is not None and payload.plan_ref is not None and projection.plan_ref != payload.plan_ref:
+            errors.append(f"command {cid!r}: projection plan_ref disagrees with the intent")
+        if result is not None and projection.origin != result.origin:
+            errors.append(f"command {cid!r}: projection origin disagrees with the result")
+        if not projection.valid and projection.overall is not None:
+            errors.append(
+                f"command {cid!r}: an invalid operation projection must not publish "
+                "an aggregate overall"
+            )
 
 
 _KNOWN_FINISH = {"stop", "length", "error", "unknown"}
@@ -2338,7 +2390,7 @@ def _check_stored_result(
     summary_event_ref: str | None = None  # the ObservationRecorded event body ref
     summary_inner_ref: str | None = None  # the inner ForkObservation ref
     refine_result_ref: str | None = None  # the REFINE_RESULT event body ref
-    observe_result_ref: str | None = None  # the OPERATION_RESULT event body ref
+    observe_projection_ref: str | None = None  # the OPERATION_PROJECTION event body ref
     for env, body in events:
         if isinstance(body, ChangeApplied):
             applied_ref = body.change_ref
@@ -2347,8 +2399,8 @@ def _check_stored_result(
             summary_inner_ref = body.observation_ref
         elif isinstance(body, ObservationRecorded) and body.observation_kind == REFINE_RESULT:
             refine_result_ref = env.body_ref
-        elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_RESULT:
-            observe_result_ref = env.body_ref
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_PROJECTION:
+            observe_projection_ref = env.body_ref
     expected_proposal = applied_ref if kind == "ApplyChange" else None
     if stored.proposal_ref != expected_proposal:
         errors.append(
@@ -2387,12 +2439,12 @@ def _check_stored_result(
         if stored.metrics:
             errors.append(f"command {cid!r}: StoredResult.metrics on a refinement")
     elif kind == "ObserveCurrentState":
-        # an observation's result points at its state-observation event; no
-        # metrics; its usage is the reconciled execution ledger
-        if stored.observation_ref != observe_result_ref:
+        # an observation's result points at its POLICY-VISIBLE projection event;
+        # no metrics; its usage is the reconciled execution ledger
+        if stored.observation_ref != observe_projection_ref:
             errors.append(
                 f"command {cid!r}: StoredResult.observation_ref does not match the "
-                "state observation event"
+                "operation projection event"
             )
         if stored.metrics:
             errors.append(f"command {cid!r}: StoredResult.metrics on an observation")
@@ -2722,6 +2774,14 @@ def _verify_observation(
                     f"envelope {env.seq}: operation label {obs.label!r} != "
                     f"{OPERATION_LABEL!r}"
                 )
+        elif body.observation_kind == OPERATION_PROJECTION:
+            proj = codec.loads(sub.objects.get_text(body.observation_ref), OperationProjection)
+            if proj.command_id != cause:
+                errors.append(f"envelope {env.seq}: operation projection command_id disagrees")
+            if proj.origin not in OP_OPERATION_ORIGINS:
+                errors.append(f"envelope {env.seq}: projection origin {proj.origin!r} invalid")
+            if proj.coverage_completed > proj.coverage_total or proj.coverage_completed < 0:
+                errors.append(f"envelope {env.seq}: projection coverage is out of range")
         elif body.observation_kind == REFINE_BINDING:
             binding = codec.loads(sub.objects.get_text(body.observation_ref), ModelBinding)
             if binding.command_id != cause:
