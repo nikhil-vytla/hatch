@@ -2167,3 +2167,53 @@ and **AT-MOST-ONCE**, not exactly-once (kernel module docstring, `docs/HANDOFF.m
 - **Area 5** — typed `ModelBinding`/usage records (basis actual|reservation|
   unknown; payload==binding==dispatch==result) replacing the pipe string and
   `provider_extras` conventions.
+
+---
+
+## PR #51 correction round 10 (Stage 3C.2B) — Area 1: policy-neutral pinned CAS operation plan
+
+The big architectural item, done in one round. The thin `operation_cases(Task)`
+driver is replaced by a versioned, injected operation PACKAGE.
+
+- **`strive.operate`**: `OperationDescriptor` protocol + `OperationCatalog`
+  (injected, fail-closed) + `TaskSuiteOperationDescriptor` (`task-suite@1`). A
+  descriptor pins ref/version, impl digest, config digest, plan/projection schema
+  versions, required surfaces/capabilities, and `all-required`|`partial-allowed`
+  validity.
+- **Policy-visible context only.** `create_plan` receives a
+  `PolicyVisibleOperationContext` (visible cases + seed + task/environment
+  fingerprints) — NEVER the full `Task`. Hidden/held-out/audit data is
+  structurally absent from the API and the opaque `op-N` plan manifest.
+- **CAS-backed plan pinned in intent.** The deterministic `OperationPlan`'s
+  `plan_ref` is pinned in the `ObserveCurrentState` `CommandPayload` before issue;
+  descriptor/config/plan drift → different `plan_ref` → payload-digest mismatch →
+  refused resume (no mutation). One plan measures pre- and post-change states.
+- **Semantics behind the descriptor; kernel owns the boundary.** The kernel loads
+  the pinned plan, runs its manifest through the `CandidateExecutor`, records
+  DISPATCH→RESULT (protected `AttemptRecord`)→PROJECTION; the descriptor derives
+  the SEPARATE policy-visible `OperationProjection`. A crash between result and
+  projection is finished from the durable result (no re-run); an open dispatch is
+  `indeterminate`.
+- **Policy reads only the projection.** `continual-refine`'s warm-up, refiner
+  context, pre/post scoring, and review consume `OperationProjection` only. Pre/
+  post are comparable only under the SAME `plan_ref`; an invalid/incomplete
+  attempt publishes no aggregate.
+- **Verify**: dispatch/projection subject-scoped; `dispatch.plan_ref` == intent
+  `plan_ref`; dispatch descriptor == plan descriptor; projection derives from the
+  same result and never aggregates when invalid; the terminal points at the
+  projection.
+- **Adversarial proof** (`test_operation_plan.py`, 8 tests): deterministic plan +
+  opaque manifest; no hidden cases in context/plan; regime change → new plan;
+  intent pins `plan_ref`; projection policy-visible only; all-required
+  complete→valid vs incomplete→no-aggregate; descriptor/config drift refuses
+  resume.
+
+**Tooling.** `uv run mypy` clean (46 files); `uv run pytest` **290 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Out of scope this round (separate next rounds, per the goal):** Area 4 (typed
+`ReviewDecision` + `ReviseChange`/`ChangeRevised`) and Area 5 (typed model
+binding/usage). Full unification of the CandidateExecutor+kernel per-case
+aggregation into one shared function was not done — the kernel still aggregates
+per-case self-consistently (round-9 dominant-item fix) and the descriptor
+consumes that evidence. Noted honestly.
