@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from parallax import checkpoint_runner
 from parallax.canonical import canonical_digest
 from parallax.checkpoint_evolution import (
+    CONTRACT,
     EMPTY_WORKSPACE,
     ReferenceBuild,
     SeedFamilyFixture,
@@ -14,38 +15,52 @@ from parallax.checkpoint_evolution import (
     VerifierError,
     Workspace,
     admit_family,
+    build_checkpoint_variants,
     run_case_trusted,
     verify_stage,
 )
 from parallax.checkpoint_runner import (
-    CE_ARMS,
     AdmittedFamily,
-    CeFamilyRecord,
-    CeManifestRecord,
-    CeRunRecord,
     CheckpointDelivery,
     FamilyRun,
     MeteredWorkspace,
     StageReceipt,
     StageUsage,
-    read_ce_jsonl,
-    run_ce_experiment,
     run_checkpoint_family,
 )
 from parallax.outcome import BudgetError, RunFailure
+from parallax.perturbation import Condition, Variant, VariantSet
+
+EVOLVED = Condition("evolved")
+CARRY = Condition("carry-reference")
+
+
+def built(fixture: SeedFamilyFixture) -> VariantSet:
+    return build_checkpoint_variants(fixture.family, fixture.references)
+
+
+def evolved_variant(fixture: SeedFamilyFixture) -> Variant:
+    return built(fixture).variant(EVOLVED)
+
+
+def carry_variant(fixture: SeedFamilyFixture) -> Variant:
+    return built(fixture).variant(CARRY)
 
 
 class ReferenceAgent:
     def __init__(self, fixture: SeedFamilyFixture) -> None:
-        self.by_spec = {
-            checkpoint.public_spec: fixture.references.stages[position]
+        # Keyed by checkpoint index rather than by delivered text: the delivery
+        # is the perturbation's material plus the agent contract, so matching on
+        # a bare spec string would silently stop matching.
+        self.by_index = {
+            checkpoint.index: fixture.references.stages[position]
             for position, checkpoint in enumerate(fixture.family.checkpoints)
         }
         self.deliveries: list[CheckpointDelivery] = []
 
     def __call__(self, delivery: CheckpointDelivery) -> Workspace:
         self.deliveries.append(delivery)
-        return self.by_spec[delivery.public_spec]
+        return self.by_index[delivery.index]
 
 
 class MyopicAgent(ReferenceAgent):
@@ -53,7 +68,7 @@ class MyopicAgent(ReferenceAgent):
         super().__init__(fixture)
         for position, checkpoint in enumerate(fixture.family.checkpoints):
             if position >= 1:
-                self.by_spec[checkpoint.public_spec] = broken_total_workspace(
+                self.by_index[checkpoint.index] = broken_total_workspace(
                     fixture.references.stages[position]
                 )
 
@@ -79,7 +94,9 @@ def test_evolved_arm_completes_and_chains_the_agents_own_workspace(
     seed_fixture, admitted
 ) -> None:
     agent = ReferenceAgent(seed_fixture)
-    run = run_checkpoint_family(admitted, agent, arm="evolved")
+    run = run_checkpoint_family(
+        admitted, agent, variants=built(seed_fixture), condition=EVOLVED
+    )
     assert len(run.receipts) == 3
     assert run.censored == ()
     assert run.failure is None
@@ -91,9 +108,16 @@ def test_evolved_arm_completes_and_chains_the_agents_own_workspace(
     for previous, current in zip(run.receipts, run.receipts[1:], strict=False):
         assert current.input_workspace_digest == previous.output_workspace_digest
     assert [delivery.index for delivery in agent.deliveries] == [1, 2, 3]
-    assert [delivery.public_spec for delivery in agent.deliveries] == [
-        checkpoint.public_spec for checkpoint in admitted.family.checkpoints
-    ]
+    assert [delivery.public_spec for delivery in agent.deliveries] == list(
+        built(seed_fixture).prompts(EVOLVED)
+    )
+    assert all(
+        checkpoint.public_spec in delivery.public_spec
+        and CONTRACT.instructions in delivery.public_spec
+        for checkpoint, delivery in zip(
+            admitted.family.checkpoints, agent.deliveries, strict=True
+        )
+    )
     assert agent.deliveries[1].workspace == seed_fixture.references.stages[0]
 
 
@@ -108,7 +132,9 @@ def test_delivery_is_public_material_only() -> None:
 
 def test_failing_verdicts_never_halt_the_family(seed_fixture, admitted) -> None:
     agent = MyopicAgent(seed_fixture)
-    run = run_checkpoint_family(admitted, agent, arm="evolved")
+    run = run_checkpoint_family(
+        admitted, agent, variants=built(seed_fixture), condition=EVOLVED
+    )
     assert len(run.receipts) == 3
     assert run.censored == ()
     outcomes = [receipt.outcome for receipt in run.receipts]
@@ -129,7 +155,9 @@ def test_carry_reference_arm_opens_every_stage_from_the_frozen_reference(
     seed_fixture, admitted
 ) -> None:
     agent = MyopicAgent(seed_fixture)
-    run = run_checkpoint_family(admitted, agent, arm="carry-reference")
+    run = run_checkpoint_family(
+        admitted, agent, variants=built(seed_fixture), condition=CARRY
+    )
     assert len(run.receipts) == 3
     assert run.receipts[0].input_workspace_digest == EMPTY_WORKSPACE.digest
     assert (
@@ -146,7 +174,8 @@ def test_carry_reference_arm_opens_every_stage_from_the_frozen_reference(
 def test_budget_fault_censors_evolved_but_not_carry_reference(
     seed_fixture, admitted
 ) -> None:
-    oversized = Workspace.from_files({"tally.py": "#" * 5000})
+    limit = evolved_variant(seed_fixture).turns[1].output_limit
+    oversized = Workspace.from_files({"tally.py": "#" * (limit + 1)})
 
     class OversizedAtTwo(ReferenceAgent):
         def __call__(self, delivery: CheckpointDelivery) -> Workspace:
@@ -155,7 +184,10 @@ def test_budget_fault_censors_evolved_but_not_carry_reference(
             return super().__call__(delivery)
 
     evolved = run_checkpoint_family(
-        admitted, OversizedAtTwo(seed_fixture), arm="evolved"
+        admitted,
+        OversizedAtTwo(seed_fixture),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
     )
     assert len(evolved.receipts) == 2
     assert evolved.censored == (3,)
@@ -165,7 +197,10 @@ def test_budget_fault_censors_evolved_but_not_carry_reference(
     assert evolved.receipts[1].output_workspace_digest is None
     assert evolved.receipts[1].output_bytes == 0
     carried = run_checkpoint_family(
-        admitted, OversizedAtTwo(seed_fixture), arm="carry-reference"
+        admitted,
+        OversizedAtTwo(seed_fixture),
+        variants=built(seed_fixture),
+        condition=CARRY,
     )
     assert len(carried.receipts) == 3
     assert isinstance(carried.receipts[1].outcome, RunFailure)
@@ -176,7 +211,8 @@ def test_agent_faults_are_run_failures_with_censoring(seed_fixture, admitted) ->
     crash = run_checkpoint_family(
         admitted,
         FailingAgent(seed_fixture, 2, RuntimeError("provider disconnected")),
-        arm="evolved",
+        variants=built(seed_fixture),
+        condition=EVOLVED,
     )
     assert crash.censored == (3,)
     fault = crash.receipts[1].outcome
@@ -184,7 +220,8 @@ def test_agent_faults_are_run_failures_with_censoring(seed_fixture, admitted) ->
     exhausted = run_checkpoint_family(
         admitted,
         FailingAgent(seed_fixture, 1, BudgetError("declared budget unusable")),
-        arm="evolved",
+        variants=built(seed_fixture),
+        condition=EVOLVED,
     )
     assert exhausted.censored == (2, 3)
     first = exhausted.receipts[0].outcome
@@ -200,7 +237,12 @@ def test_verifier_fault_is_infrastructure_and_family_continues(
         return verify_stage(family, index, workspace, execute=execute)
 
     monkeypatch.setattr(checkpoint_runner, "verify_stage", flaky)
-    run = run_checkpoint_family(admitted, ReferenceAgent(seed_fixture), arm="evolved")
+    run = run_checkpoint_family(
+        admitted,
+        ReferenceAgent(seed_fixture),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
+    )
     assert len(run.receipts) == 3
     assert run.censored == ()
     fault = run.receipts[1].outcome
@@ -239,11 +281,16 @@ def test_unadmitted_families_are_unrepresentable(seed_fixture) -> None:
 def test_grading_without_full_delivery_is_unrepresentable(
     seed_fixture, admitted
 ) -> None:
-    run = run_checkpoint_family(admitted, ReferenceAgent(seed_fixture), arm="evolved")
+    run = run_checkpoint_family(
+        admitted,
+        ReferenceAgent(seed_fixture),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
+    )
     with pytest.raises(ValidationError, match="contiguous from stage 1"):
         FamilyRun(
             admitted=admitted,
-            arm="evolved",
+            variant=evolved_variant(seed_fixture),
             receipts=run.receipts[1:],
             censored=(),
             failure=None,
@@ -251,7 +298,7 @@ def test_grading_without_full_delivery_is_unrepresentable(
     with pytest.raises(ValidationError, match="undelivered suffix"):
         FamilyRun(
             admitted=admitted,
-            arm="evolved",
+            variant=evolved_variant(seed_fixture),
             receipts=run.receipts[:2],
             censored=(),
             failure=None,
@@ -262,7 +309,7 @@ def test_grading_without_full_delivery_is_unrepresentable(
     with pytest.raises(ValidationError, match="drifted specification"):
         FamilyRun(
             admitted=admitted,
-            arm="evolved",
+            variant=evolved_variant(seed_fixture),
             receipts=(run.receipts[0], drifted, run.receipts[2]),
             censored=(),
             failure=None,
@@ -273,7 +320,7 @@ def test_grading_without_full_delivery_is_unrepresentable(
     with pytest.raises(ValidationError, match="own terminal workspace"):
         FamilyRun(
             admitted=admitted,
-            arm="evolved",
+            variant=evolved_variant(seed_fixture),
             receipts=(run.receipts[0], broken_chain, run.receipts[2]),
             censored=(),
             failure=None,
@@ -294,7 +341,7 @@ def test_grading_without_full_delivery_is_unrepresentable(
     with pytest.raises(ValidationError, match="obligation set"):
         FamilyRun(
             admitted=admitted,
-            arm="evolved",
+            variant=evolved_variant(seed_fixture),
             receipts=(
                 run.receipts[0].model_copy(update={"outcome": tampered_verification}),
                 *run.receipts[1:],
@@ -305,7 +352,7 @@ def test_grading_without_full_delivery_is_unrepresentable(
     with pytest.raises(ValidationError, match="pre-episode failure"):
         FamilyRun(
             admitted=admitted,
-            arm="evolved",
+            variant=evolved_variant(seed_fixture),
             receipts=(),
             censored=(1, 2, 3),
             failure=None,
@@ -314,12 +361,15 @@ def test_grading_without_full_delivery_is_unrepresentable(
 
 def test_carry_reference_runs_must_cover_every_stage(seed_fixture, admitted) -> None:
     run = run_checkpoint_family(
-        admitted, MyopicAgent(seed_fixture), arm="carry-reference"
+        admitted,
+        MyopicAgent(seed_fixture),
+        variants=built(seed_fixture),
+        condition=CARRY,
     )
     with pytest.raises(ValidationError, match="every checkpoint"):
         FamilyRun(
             admitted=admitted,
-            arm="carry-reference",
+            variant=carry_variant(seed_fixture),
             receipts=run.receipts[:2],
             censored=(3,),
             failure=None,
@@ -330,7 +380,7 @@ def test_carry_reference_runs_must_cover_every_stage(seed_fixture, admitted) -> 
     with pytest.raises(ValidationError, match="frozen"):
         FamilyRun(
             admitted=admitted,
-            arm="carry-reference",
+            variant=carry_variant(seed_fixture),
             receipts=(*run.receipts[:2], swapped),
             censored=(),
             failure=None,
@@ -340,7 +390,12 @@ def test_carry_reference_runs_must_cover_every_stage(seed_fixture, admitted) -> 
 def test_stage_receipt_guards_grading_and_budget_accounting(
     seed_fixture, admitted
 ) -> None:
-    run = run_checkpoint_family(admitted, ReferenceAgent(seed_fixture), arm="evolved")
+    run = run_checkpoint_family(
+        admitted,
+        ReferenceAgent(seed_fixture),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
+    )
     graded = run.receipts[0]
     with pytest.raises(ValidationError, match="without a produced workspace"):
         StageReceipt(
@@ -377,155 +432,6 @@ def test_stage_receipt_guards_grading_and_budget_accounting(
     )
 
 
-def test_experiment_writes_replayable_byte_stable_evidence(
-    seed_fixture, admitted, tmp_path
-) -> None:
-    def factory(family_id, arm, trial_seed):
-        if arm == "evolved":
-            return ReferenceAgent(seed_fixture)
-        return MyopicAgent(seed_fixture)
-
-    first_path = tmp_path / "first.jsonl"
-    runs = run_ce_experiment(
-        (admitted,),
-        factory,
-        trial_seeds=(11, 13),
-        agent_model="offline-scripted",
-        model_config={"temperature": 0},
-        output_path=first_path,
-    )
-    assert len(runs) == 4
-    assert {run.arm for run in runs} == set(CE_ARMS)
-    records = read_ce_jsonl(first_path)
-    manifests = [item for item in records if isinstance(item, CeManifestRecord)]
-    families = [item for item in records if isinstance(item, CeFamilyRecord)]
-    run_rows = [item for item in records if isinstance(item, CeRunRecord)]
-    assert len(manifests) == 1 and len(families) == 1 and len(run_rows) == 4
-    manifest = manifests[0]
-    assert len(manifest.units) == 2
-    assert {config.arm for config in manifest.arm_configs} == set(CE_ARMS)
-    assert families[0].family == seed_fixture.family
-    assert families[0].admission.decision == "admitted"
-    assert all(row.design_digest == manifest.design_digest for row in run_rows)
-    assert all(row.family_digest == seed_fixture.family.digest for row in run_rows)
-    scheduled = {(row.trial_index, row.arm) for row in run_rows}
-    assert scheduled == {
-        (0, "evolved"),
-        (0, "carry-reference"),
-        (1, "evolved"),
-        (1, "carry-reference"),
-    }
-    second_path = tmp_path / "second.jsonl"
-    run_ce_experiment(
-        (admitted,),
-        factory,
-        trial_seeds=(11, 13),
-        agent_model="offline-scripted",
-        model_config={"temperature": 0},
-        output_path=second_path,
-    )
-    assert first_path.read_bytes() == second_path.read_bytes()
-
-
-def test_factory_faults_become_recorded_pre_episode_failures(
-    seed_fixture, admitted, tmp_path
-) -> None:
-    def factory(family_id, arm, trial_seed):
-        if arm == "carry-reference":
-            raise RuntimeError("no credentials for the control arm")
-        return ReferenceAgent(seed_fixture)
-
-    runs = run_ce_experiment(
-        (admitted,),
-        factory,
-        trial_seeds=(7,),
-        agent_model="offline-scripted",
-        model_config={},
-        output_path=tmp_path / "evidence.jsonl",
-    )
-    control = next(run for run in runs if run.arm == "carry-reference")
-    assert control.receipts == ()
-    assert control.censored == (1, 2, 3)
-    assert control.failure is not None
-    assert control.failure.failure_kind == "agent"
-    records = read_ce_jsonl(tmp_path / "evidence.jsonl")
-    row = next(
-        item
-        for item in records
-        if isinstance(item, CeRunRecord) and item.arm == "carry-reference"
-    )
-    assert row.failure is not None and row.receipts == ()
-
-
-def test_manifest_preregistration_is_digest_bound(admitted, tmp_path) -> None:
-    runs = run_ce_experiment(
-        (admitted,),
-        lambda family_id, arm, seed: lambda delivery: EMPTY_WORKSPACE,
-        trial_seeds=(3,),
-        agent_model="offline-scripted",
-        model_config={},
-        output_path=tmp_path / "evidence.jsonl",
-    )
-    assert all(
-        isinstance(receipt.outcome, StageVerification)
-        and not receipt.outcome.strict_pass
-        for run in runs
-        for receipt in run.receipts
-    )
-    records = read_ce_jsonl(tmp_path / "evidence.jsonl")
-    manifest = next(item for item in records if isinstance(item, CeManifestRecord))
-    with pytest.raises(ValidationError, match="does not match its body"):
-        CeManifestRecord(
-            design_digest=canonical_digest("tampered"),
-            model_config_digest=manifest.model_config_digest,
-            units=manifest.units,
-            arm_configs=manifest.arm_configs,
-        )
-    with pytest.raises(ValidationError, match="must be unique"):
-        CeManifestRecord(
-            design_digest=manifest.design_digest,
-            model_config_digest=manifest.model_config_digest,
-            units=(*manifest.units, *manifest.units),
-            arm_configs=manifest.arm_configs,
-        )
-    with pytest.raises(ValidationError, match="differ from scheduled"):
-        CeManifestRecord(
-            design_digest=manifest.design_digest,
-            model_config_digest=manifest.model_config_digest,
-            units=manifest.units,
-            arm_configs=manifest.arm_configs[:1],
-        )
-
-
-def test_run_records_reject_incoherent_replay_shapes(
-    seed_fixture, admitted, tmp_path
-) -> None:
-    run_ce_experiment(
-        (admitted,),
-        lambda family_id, arm, seed: ReferenceAgent(seed_fixture),
-        trial_seeds=(5,),
-        agent_model="offline-scripted",
-        model_config={},
-        output_path=tmp_path / "evidence.jsonl",
-    )
-    records = read_ce_jsonl(tmp_path / "evidence.jsonl")
-    row = next(item for item in records if isinstance(item, CeRunRecord))
-
-    def rebuild(**updates: object) -> CeRunRecord:
-        fields = {name: getattr(row, name) for name in CeRunRecord.model_fields}
-        fields.pop("kind")
-        fields.pop("schema_version")
-        fields.update(updates)
-        return CeRunRecord.model_validate(fields)
-
-    with pytest.raises(ValidationError, match="contiguous"):
-        rebuild(receipts=row.receipts[1:])
-    with pytest.raises(ValidationError, match="undelivered suffix"):
-        rebuild(censored=(5,))
-    with pytest.raises(ValidationError, match="pre-episode failure"):
-        rebuild(receipts=())
-
-
 STAGE_USAGE = StageUsage(
     prompt_tokens=1200,
     completion_tokens=400,
@@ -545,7 +451,10 @@ def test_metered_agents_land_usage_in_every_stage_receipt(
     seed_fixture, admitted
 ) -> None:
     run = run_checkpoint_family(
-        admitted, MeteredReferenceAgent(seed_fixture), arm="evolved"
+        admitted,
+        MeteredReferenceAgent(seed_fixture),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
     )
     assert len(run.receipts) == 3
     for receipt in run.receipts:
@@ -554,7 +463,12 @@ def test_metered_agents_land_usage_in_every_stage_receipt(
 
 
 def test_unmetered_agents_leave_usage_absent(seed_fixture, admitted) -> None:
-    run = run_checkpoint_family(admitted, ReferenceAgent(seed_fixture), arm="evolved")
+    run = run_checkpoint_family(
+        admitted,
+        ReferenceAgent(seed_fixture),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
+    )
     assert all(receipt.usage is None for receipt in run.receipts)
 
 
@@ -564,7 +478,10 @@ def test_failed_stages_retain_usage_spent_before_the_fault(
     error = BudgetError("stage reply reached its output-token limit")
     error.stage_usage = STAGE_USAGE
     run = run_checkpoint_family(
-        admitted, FailingAgent(seed_fixture, 2, error), arm="evolved"
+        admitted,
+        FailingAgent(seed_fixture, 2, error),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
     )
     fault = run.receipts[1]
     assert isinstance(fault.outcome, RunFailure)
@@ -575,15 +492,42 @@ def test_failed_stages_retain_usage_spent_before_the_fault(
 
 
 def test_oversized_metered_workspaces_keep_their_usage(seed_fixture, admitted) -> None:
-    oversized = Workspace.from_files({"tally.py": "#" * 5000})
+    limit = evolved_variant(seed_fixture).turns[1].output_limit
+    oversized = Workspace.from_files({"tally.py": "#" * (limit + 1)})
 
     class OversizedMetered(ReferenceAgent):
         def __call__(self, delivery: CheckpointDelivery) -> MeteredWorkspace:
             produced = oversized if delivery.index == 2 else super().__call__(delivery)
             return MeteredWorkspace(workspace=produced, usage=STAGE_USAGE)
 
-    run = run_checkpoint_family(admitted, OversizedMetered(seed_fixture), arm="evolved")
+    run = run_checkpoint_family(
+        admitted,
+        OversizedMetered(seed_fixture),
+        variants=built(seed_fixture),
+        condition=EVOLVED,
+    )
     fault = run.receipts[1]
     assert isinstance(fault.outcome, RunFailure)
     assert fault.outcome.error_type == "WorkspaceBudgetExceeded"
     assert fault.usage == STAGE_USAGE
+
+
+def test_evolved_gets_its_carrying_cost_back_as_extra_limit(seed_fixture) -> None:
+    """The manipulation must not eat the allowance it is measured under.
+
+    Both conditions get the same headroom, and the evolved condition's limit is
+    larger by exactly the workspace it has to re-serialize. Screening handed
+    both a flat cap, so the evolved arm paid for its own manipulation and failed
+    10/10 on bytes instead of on the task.
+    """
+
+    variants = build_checkpoint_variants(seed_fixture.family, seed_fixture.references)
+    evolved = variants.variant(Condition("evolved"))
+    carry = variants.variant(Condition("carry-reference"))
+    assert evolved.total_headroom == carry.total_headroom
+    assert evolved.turns[0].output_limit == carry.turns[0].output_limit
+    for index, stage in enumerate(seed_fixture.references.stages[:-1], start=1):
+        assert (
+            evolved.turns[index].output_limit - carry.turns[index].output_limit
+            == stage.content_bytes
+        )

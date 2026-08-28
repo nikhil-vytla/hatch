@@ -1,26 +1,63 @@
+"""Reference-based perturbation: reach one task through an evolving intent.
+
+Every condition ends at the same task with the same total headroom, so the only
+difference is the route:
+
+- `base` states the fully revealed intent in one turn.
+- `matched` reveals one true argument per turn, so it is spread over the same
+  number of turns as `evolved` and information accumulates, but nothing is ever
+  wrong and the goal never moves. This is the offered control.
+- `evolved` starts from a plausible predecessor goal with counterfactual
+  argument values, then reveals, revises, and finally switches goals until it
+  has restored exactly the reference intent.
+
+`matched` is what makes a result mean something. A live 1,296-episode GSM8K
+round measured `evolved` at 0.109 below `base` with a 95% interval of
+[-0.160, -0.060]; against `matched` that decomposes into -0.086 from multi-turn
+presentation alone and -0.023 from intent evolution on top, the latter spanning
+zero. A two-arm design would have credited the entire drop to the manipulation.
+It is offered rather than required because at three sources the same control
+buys nothing but cost.
+
+This module knows nothing about which benchmark supplied the reference text.
+It previously imported `gsm8k.Problem` and typed its scripts against it, which
+is why "the generic strategy" only ever worked on one benchmark.
+"""
+
 from __future__ import annotations
 
 import json
 import random
 from collections.abc import Callable
-from typing import (
-    Annotated,
-    Literal,
-    Self,
-    TypeAlias,
-    TypeVar,
-    assert_never,
-)
+from typing import Annotated, Literal, Self, TypeAlias, TypeVar, assert_never
 
 from pydantic import Field, TypeAdapter, ValidationError, model_validator
 
-from .gsm8k import Problem
-from .types import ConstructionSeed, NonEmptyText, StrictModel
+from .canonical import canonical_bytes
+from .perturbation import (
+    Condition,
+    GenerationRecord,
+    Turn,
+    Variant,
+    VariantSet,
+)
+from .provider import Chat, Message, json_schema_instructions, unfence
+from .task import AgentContract
+from .types import (
+    ConstructionSeed,
+    DigestText,
+    NonEmptyText,
+    SourceId,
+    StrictModel,
+)
 
-Arm: TypeAlias = Literal["static", "matched", "evolved"]
-Role: TypeAlias = Literal["system", "user", "assistant"]
+ModelT = TypeVar("ModelT", bound=StrictModel)
+ValueT = TypeVar("ValueT")
+
+BASE = Condition("base")
+MATCHED = Condition("matched")
+EVOLVED = Condition("evolved")
 Stage: TypeAlias = Literal["extract-intent", "counterfactual", "predecessor"]
-PositiveBudget = Annotated[int, Field(gt=0)]
 
 
 class ConstructionError(ValueError):
@@ -29,14 +66,6 @@ class ConstructionError(ValueError):
 
 class ScheduleError(ConstructionError):
     pass
-
-
-class Message(StrictModel):
-    role: Role
-    content: str
-
-
-Chat: TypeAlias = Callable[[tuple[Message, ...], int], str]
 
 
 class Argument(StrictModel):
@@ -83,69 +112,6 @@ class Switch(StrictModel):
 Event: TypeAlias = Annotated[Reveal | Revise | Switch, Field(discriminator="kind")]
 
 
-class Turn(StrictModel):
-    text: str
-    events: tuple[Event, ...]
-    state_after: Intent
-
-
-class Script(StrictModel):
-    arm: Arm
-    problem: Problem
-    turns: tuple[Turn, ...]
-    max_output_tokens: tuple[PositiveBudget, ...]
-
-    @model_validator(mode="after")
-    def aligned_turn_budgets(self) -> Self:
-        if not self.turns or len(self.turns) != len(self.max_output_tokens):
-            raise ValueError("script turns and budgets must be non-empty and aligned")
-        return self
-
-
-class GenerationAttempt(StrictModel):
-    stage: Stage
-    target: str
-    model: str
-    output: str
-    accepted: bool
-    reason: str
-
-
-class ScriptFamily(StrictModel):
-    source_intent: Intent
-    static: Script
-    matched: Script
-    evolved: Script
-    construction_seed: ConstructionSeed
-    construction_model: str
-    fallback_model: str | None
-    attempts: tuple[GenerationAttempt, ...]
-
-    @model_validator(mode="after")
-    def controlled_arms(self) -> Self:
-        scripts = self.scripts
-        if tuple(script.arm for script in scripts) != (
-            "static",
-            "matched",
-            "evolved",
-        ):
-            raise ValueError(
-                "script family must contain static, matched, and evolved arms"
-            )
-        if any(script.problem != self.static.problem for script in scripts):
-            raise ValueError("script family arms must share one problem")
-        if (
-            len(self.matched.turns) != len(self.evolved.turns)
-            or self.matched.max_output_tokens != self.evolved.max_output_tokens
-        ):
-            raise ValueError("matched and evolved arms must share turn budgets")
-        return self
-
-    @property
-    def scripts(self) -> tuple[Script, Script, Script]:
-        return self.static, self.matched, self.evolved
-
-
 class _ExtractIntent(StrictModel):
     function: NonEmptyText
     arguments: tuple[Argument, ...]
@@ -169,16 +135,23 @@ class _Predecessor(StrictModel):
     rationale: str
 
 
-T = TypeVar("T")
-M = TypeVar("M", bound=StrictModel)
 _TEXT = TypeAdapter(str)
 
 
-def _request(chat: Chat, stage: Stage, payload: dict[str, object], budget: int) -> str:
+def _request(
+    chat: Chat,
+    stage: Stage,
+    payload: dict[str, object],
+    budget: int,
+    reply: type[StrictModel],
+) -> str:
     messages = (
         Message(
             role="system",
-            content=f"parallax-stage:{stage}\nReturn one strict JSON object.",
+            content=(
+                f"parallax-stage:{stage}\n"
+                + json_schema_instructions(reply, f"You are the {stage} stage.")
+            ),
         ),
         Message(
             role="user",
@@ -193,9 +166,9 @@ def _request(chat: Chat, stage: Stage, payload: dict[str, object], budget: int) 
         ) from error
 
 
-def _parse_model(model: type[M], output: str, stage: Stage) -> M:
+def _parse_model(model: type[ModelT], output: str, stage: Stage) -> ModelT:
     try:
-        return model.model_validate_json(output)
+        return model.model_validate_json(unfence(output))
     except ValidationError as error:
         detail = error.errors(include_url=False)[0]["msg"]
         raise ConstructionError(f"{stage}: {detail}") from error
@@ -206,20 +179,21 @@ def _attempt(
     target: str,
     payload: dict[str, object],
     providers: tuple[tuple[Chat, str, int], ...],
-    accept: Callable[[str], tuple[T, str]],
+    accept: Callable[[str], tuple[ValueT, str]],
     budget: int,
-) -> tuple[T, tuple[GenerationAttempt, ...]]:
-    evidence: list[GenerationAttempt] = []
+    reply: type[StrictModel],
+) -> tuple[ValueT, tuple[GenerationRecord, ...]]:
+    evidence: list[GenerationRecord] = []
     last_error = ""
     for provider, model, count in providers:
         for _ in range(count):
-            output = _request(provider, stage, payload, budget)
+            output = _request(provider, stage, payload, budget, reply)
             try:
                 candidate, reason = accept(output)
             except (ConstructionError, ValueError) as error:
                 last_error = str(error)
                 evidence.append(
-                    GenerationAttempt(
+                    GenerationRecord(
                         stage=stage,
                         target=target,
                         model=model,
@@ -230,7 +204,7 @@ def _attempt(
                 )
                 continue
             evidence.append(
-                GenerationAttempt(
+                GenerationRecord(
                     stage=stage,
                     target=target,
                     model=model,
@@ -420,69 +394,76 @@ def _render_event(before: Intent, event: Event, first: bool) -> str:
     assert_never(event)
 
 
-def _turns(initial: Intent, events: tuple[Event, ...]) -> tuple[Turn, ...]:
+def _texts(initial: Intent, events: tuple[Event, ...]) -> tuple[str, ...]:
     if not events:
         details = " ".join(
             f"Use {item.identifier.replace('_', ' ')}: {item.value}."
             for item in initial.arguments
         )
-        return (
-            Turn(
-                text=f"I need help with {initial.function}. {details}",
-                events=(),
-                state_after=initial,
-            ),
-        )
-    state, turns = initial, []
+        return (f"I need help with {initial.function}. {details}",)
+    state, texts = initial, []
     for index, event in enumerate(events):
-        text = _render_event(state, event, index == 0)
+        texts.append(_render_event(state, event, index == 0))
         state = _apply(state, event)
-        turns.append(Turn(text=text, events=(event,), state_after=state))
-    return tuple(turns)
+    return tuple(texts)
 
 
-def _matched_turns(source: Intent, count: int) -> tuple[Turn, ...]:
+def _matched_texts(source: Intent, count: int) -> tuple[str, ...]:
+    """Reveal one true argument per turn: same shape as evolved, no manipulation.
+
+    This is the reference semantics for a presentation-matched control, and it is
+    what the documented design always said. The SWE-bench adapter shipped its own
+    `matched` that delivered the whole issue statement in every turn, so nothing
+    accumulated and the arm measured nothing; the admission gate compared turn
+    counts and per-turn budgets, so it could not tell the two apart. Two
+    benchmarks diverged silently under one name — which is the argument for one
+    perturbation module rather than one per benchmark.
+    """
+
     state = Intent(
         function=source.function,
         arguments=source.arguments,
         revealed_identifiers=(),
     )
-    turns: list[Turn] = []
+    texts: list[str] = []
     for index in range(count):
         if index < len(source.arguments):
             argument = source.arguments[index]
             event = Reveal(identifier=argument.identifier, value=argument.value)
-            text = _render_event(state, event, index == 0)
+            texts.append(_render_event(state, event, index == 0))
             state = _apply(state, event)
-            turns.append(Turn(text=text, events=(event,), state_after=state))
         else:
-            turns.append(
-                Turn(
-                    text="Keep the same goal and values from the conversation.",
-                    events=(),
-                    state_after=state,
-                )
-            )
-    return tuple(turns)
+            texts.append("Keep the same goal and values from the conversation.")
+    return tuple(texts)
 
 
-def build_script_family(
-    problem: Problem,
+def build_intent_variants(
+    task_id: SourceId,
+    reference_text: str,
+    reference_digest: DigestText,
     primary: Chat,
     *,
     seed: int,
     construction_model: str,
+    agent_contract: AgentContract,
     fallback: Chat | None = None,
     fallback_model: str | None = None,
-    max_output_tokens: int = 64,
-) -> ScriptFamily:
+    headroom_per_turn: int = 64,
+) -> VariantSet:
+    """Build `base`, `matched`, and `evolved` for one reference task.
+
+    All three are constructed because constructing them is free; which of them
+    an experiment pays to run is `ExperimentConfig.conditions`.
+    """
+
     source, attempts = _attempt(
         "extract-intent",
-        problem.record_id,
-        {"question": problem.question},
+        task_id,
+        {"question": reference_text},
         ((primary, construction_model, 1),),
         _parse_intent,
         256,
+        _ExtractIntent,
     )
     counterfactuals: list[Argument] = []
     evidence = list(attempts)
@@ -498,6 +479,7 @@ def build_script_family(
             ((primary, construction_model, 2),),
             _counterfactual_parser(argument.identifier, argument.value),
             128,
+            _Counterfactual,
         )
         counterfactuals.append(candidate)
         evidence.extend(attempts)
@@ -514,6 +496,7 @@ def build_script_family(
         tuple(providers),
         _predecessor_parser(source),
         128,
+        _Predecessor,
     )
     evidence.extend(attempts)
     counterfactual_tuple = tuple(counterfactuals)
@@ -525,7 +508,7 @@ def build_script_family(
         construction_seed,
     )
     _validate_schedule(source, predecessor, counterfactual_tuple, events)
-    evolved_turns = _turns(
+    evolved_texts = _texts(
         Intent(
             function=predecessor,
             arguments=counterfactual_tuple,
@@ -533,36 +516,54 @@ def build_script_family(
         ),
         events,
     )
-    restored = _fully_revealed(source)
-    matched_turns = _matched_turns(source, len(evolved_turns))
-    budget = tuple(max_output_tokens for _ in evolved_turns)
-    static = Script(
-        arm="static",
-        problem=problem,
-        turns=_turns(restored, ()),
-        max_output_tokens=(sum(budget),),
-    )
-    matched = Script(
-        arm="matched",
-        problem=problem,
-        turns=matched_turns,
-        max_output_tokens=budget,
-    )
-    evolved = Script(
-        arm="evolved",
-        problem=problem,
-        turns=evolved_turns,
-        max_output_tokens=budget,
-    )
-    if matched.turns[-1].state_after != restored:
-        raise ConstructionError("matched trajectory did not reveal the source intent")
-    return ScriptFamily(
-        source_intent=source,
-        static=static,
-        matched=matched,
-        evolved=evolved,
+    turn_count = len(evolved_texts)
+    total_headroom = headroom_per_turn * turn_count
+
+    def condition(name: Condition, texts: tuple[str, ...]) -> Variant:
+        per_turn = total_headroom // len(texts)
+        return Variant(
+            condition=name,
+            turns=tuple(
+                Turn(
+                    text=text,
+                    headroom=(
+                        per_turn
+                        if index < len(texts) - 1
+                        else total_headroom - per_turn * (len(texts) - 1)
+                    ),
+                )
+                for index, text in enumerate(texts)
+            ),
+        )
+
+    return VariantSet(
+        task_id=task_id,
+        provenance="reference_based",
+        agent_contract=agent_contract,
+        reference_digest=reference_digest,
         construction_seed=construction_seed,
-        construction_model=construction_model,
-        fallback_model=fallback_model,
-        attempts=tuple(evidence),
+        variants=(
+            condition(BASE, _texts(_fully_revealed(source), ())),
+            condition(MATCHED, _matched_texts(source, turn_count)),
+            condition(EVOLVED, evolved_texts),
+        ),
+        control=MATCHED,
+        evidence=(
+            *evidence,
+            GenerationRecord(
+                stage="schedule",
+                target=str(task_id),
+                model=construction_model,
+                output="",
+                accepted=True,
+                reason=f"{len(events)} scheduled events restored the source intent",
+                payload=canonical_bytes(
+                    {
+                        "source_intent": source.model_dump(mode="json"),
+                        "predecessor": predecessor,
+                        "events": [event.model_dump(mode="json") for event in events],
+                    }
+                ).decode(),
+            ),
+        ),
     )

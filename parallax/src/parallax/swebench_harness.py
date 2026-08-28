@@ -10,8 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .canonical import atomic_write, canonical_bytes, canonical_digest
 from .outcome import Verdict, Verification
-from .specs import EnvSpecV1, TaskSpecV1
 from .swebench import SWE_BENCH_HARNESS_REVISION
+from .swebench_specs import SweEnvSpec, SweTaskSpec
 from .types import DigestText, NonEmptyText, StrictModel
 
 CommandRunner = Callable[
@@ -69,8 +69,8 @@ def _run(
     )
 
 
-def _dataset_row(task: TaskSpecV1) -> dict[str, object]:
-    source = task.public.source
+def _dataset_row(task: SweTaskSpec) -> dict[str, object]:
+    source = task.public
     sealed = task.sealed
     return {
         "instance_id": source.instance_id,
@@ -105,8 +105,8 @@ def _invoke(
 
 
 def run_official_harness(
-    task: TaskSpecV1,
-    environment: EnvSpecV1,
+    task: SweTaskSpec,
+    environment: SweEnvSpec,
     model_patch: str,
     *,
     model: str,
@@ -115,7 +115,7 @@ def run_official_harness(
     timeout_seconds: Annotated[int, Field(gt=0)] = 1800,
     runner: CommandRunner = _run,
 ) -> HarnessEvaluation:
-    source = task.public.source
+    source = task.public
     sealed = task.sealed
     run_directory = run_directory.resolve()
     run_id = f"parallax-{source.instance_id}"

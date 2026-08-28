@@ -8,29 +8,33 @@ from test_swebench import INSTANCE_ID, construction, row, runtime
 from parallax.admission import (
     GATE_ORDER,
     IDENTITY_PATCH,
-    AdmittedSweFamily,
-    admit_swe_family,
+    AdmissionError,
+    admit_swe_task,
+    check_admission,
     construction_rejection,
     read_admission_record,
     write_admission_record,
 )
 from parallax.canonical import canonical_digest
+from parallax.intent_phases import build_phase_variants
 from parallax.outcome import RunFailure, Verdict, Verification
-from parallax.screening import build_admitted_screening_plan
-from parallax.swebench import build_swe_script_family, load_swebench_rows
+from parallax.swebench import load_swebench_rows
 from parallax.swebench_harness import HarnessEvaluation, OfficialHarnessError
+from parallax.swebench_specs import freeze_swe_task
 
 
-def family():
-    problem = load_swebench_rows(
+def task():
+    return load_swebench_rows(
         (row(),),
         (INSTANCE_ID,),
         runtimes={INSTANCE_ID: runtime()},
     )[0]
-    return build_swe_script_family(
-        problem,
+
+
+def family():
+    return build_phase_variants(
+        task(),
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
@@ -54,20 +58,20 @@ def evaluation(
 
 
 def test_admission_runs_all_gates_in_pipeline_order(tmp_path: Path) -> None:
-    candidate = family()
+    candidate = task()
     patches = []
 
     def harness(task, environment, patch, run_directory):
         patches.append(patch)
         if patch == IDENTITY_PATCH:
             return evaluation(Verdict.WRONG)
-        assert patch == candidate.static.problem.verifier.gold_patch
+        assert patch == candidate.verifier.gold_patch
         return evaluation(
             Verdict.PASS,
-            fail_to_pass_success=candidate.static.problem.verifier.fail_to_pass,
+            fail_to_pass_success=candidate.verifier.fail_to_pass,
         )
 
-    record = admit_swe_family(
+    record, spec, environment = admit_swe_task(
         candidate,
         work_directory=tmp_path,
         run_harness=harness,
@@ -76,21 +80,10 @@ def test_admission_runs_all_gates_in_pipeline_order(tmp_path: Path) -> None:
     assert record.decision == "admitted"
     assert tuple(gate.gate for gate in record.gates) == GATE_ORDER
     assert all(gate.passed for gate in record.gates)
-    assert patches == [IDENTITY_PATCH, candidate.static.problem.verifier.gold_patch]
+    assert patches == [IDENTITY_PATCH, candidate.verifier.gold_patch]
     assert "test_patch" not in record.model_dump_json()
 
-    plan = build_admitted_screening_plan(
-        (AdmittedSweFamily(family=candidate, admission=record),),
-        model="boundary-model",
-        trial_seeds=(1, 2),
-        arms=("static", "evolved"),
-    )
-    assert tuple(unit.arm for unit in plan.units) == (
-        "static",
-        "evolved",
-        "static",
-        "evolved",
-    )
+    check_admission(spec, environment, record)
 
 
 def test_gold_retries_only_infrastructure_failures(tmp_path: Path) -> None:
@@ -108,8 +101,8 @@ def test_gold_retries_only_infrastructure_failures(tmp_path: Path) -> None:
             fail_to_pass_success=task.sealed.fail_to_pass,
         )
 
-    record = admit_swe_family(
-        family(),
+    record, _, _ = admit_swe_task(
+        task(),
         work_directory=tmp_path,
         run_harness=harness,
     )
@@ -129,8 +122,8 @@ def test_gold_wrong_is_terminal(tmp_path: Path) -> None:
         gold_calls += 1
         return evaluation(Verdict.WRONG)
 
-    record = admit_swe_family(
-        family(),
+    record, _, _ = admit_swe_task(
+        task(),
         work_directory=tmp_path,
         run_harness=harness,
     )
@@ -149,19 +142,19 @@ def test_noop_requires_applied_patch_and_real_f2p_failure(tmp_path: Path) -> Non
             fail_to_pass_success=task.sealed.fail_to_pass,
         )
 
-    record = admit_swe_family(
-        family(),
+    record, _, _ = admit_swe_task(
+        task(),
         work_directory=tmp_path,
         run_harness=harness,
     )
 
     assert record.decision == "rejected"
-    assert not record.gates[4].passed
+    assert not record.gates[0].passed
 
 
-def test_construction_failure_rejects_all_arms_uniformly() -> None:
+def test_construction_failure_rejects_every_gate_uniformly() -> None:
     record = construction_rejection(
-        family().static.problem.record_id,
+        task().record_id,
         ValueError("construction failed"),
     )
 
@@ -173,7 +166,7 @@ def test_construction_failure_rejects_all_arms_uniformly() -> None:
 
 def test_admission_evidence_is_idempotent_and_refuses_drift(tmp_path: Path) -> None:
     record = construction_rejection(
-        family().static.problem.record_id,
+        task().record_id,
         ValueError("construction failed"),
     )
     path = tmp_path / "admission.json"
@@ -183,8 +176,66 @@ def test_admission_evidence_is_idempotent_and_refuses_drift(tmp_path: Path) -> N
 
     assert read_admission_record(path) == record
     changed = construction_rejection(
-        family().static.problem.record_id,
+        task().record_id,
         ValueError("different failure"),
     )
     with pytest.raises(FileExistsError, match="differs"):
         write_admission_record(changed, path)
+
+
+def test_admission_survives_an_edit_to_an_unrelated_condition(tmp_path: Path) -> None:
+    """A retired or edited condition must not invalidate a committed admission.
+
+    Under the previous model the task spec hashed every arm's turn text, so
+    retiring the matched arm changed the identity of tasks whose own material
+    was untouched and orphaned their admission records.
+    """
+
+    def harness(patch_target, environment, patch, run_directory):
+        if patch == IDENTITY_PATCH:
+            return evaluation(Verdict.WRONG)
+        return evaluation(
+            Verdict.PASS,
+            fail_to_pass_success=patch_target.sealed.fail_to_pass,
+        )
+
+    record, spec, _ = admit_swe_task(
+        task(),
+        work_directory=tmp_path,
+        run_harness=harness,
+    )
+    narrower = build_phase_variants(
+        task(),
+        construction(),
+        total_agent_steps=6,
+        max_output_tokens=1024,
+    )
+
+    assert narrower.variants != family().variants
+    later_spec, later_environment = freeze_swe_task(task())
+    check_admission(later_spec, later_environment, record)
+    assert later_spec.spec_digest == spec.spec_digest
+
+
+def test_admission_still_refuses_a_task_whose_own_material_changed(
+    tmp_path: Path,
+) -> None:
+    def harness(patch_target, environment, patch, run_directory):
+        if patch == IDENTITY_PATCH:
+            return evaluation(Verdict.WRONG)
+        return evaluation(
+            Verdict.PASS,
+            fail_to_pass_success=patch_target.sealed.fail_to_pass,
+        )
+
+    record, _, environment = admit_swe_task(
+        task(),
+        work_directory=tmp_path,
+        run_harness=harness,
+    )
+    edited = task().model_copy(update={"problem_statement": "a different issue"})
+    edited_spec, edited_environment = freeze_swe_task(edited)
+
+    with pytest.raises(AdmissionError, match="spec digest"):
+        check_admission(edited_spec, edited_environment, record)
+    assert environment.digest == edited_environment.digest
