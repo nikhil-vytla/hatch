@@ -1,4 +1,4 @@
-# NOTES — upstream design audit
+# NOTES: upstream design audit
 
 Working notes for three questions about what the upstream papers/codebases
 actually do versus what Parallax layered on top. Primary sources:
@@ -20,13 +20,13 @@ actually do versus what Parallax layered on top. Primary sources:
 ## Setup log
 
 - Main checkout at /Users/nikhil/work/hatch is on someone else's branch
-  (parallax/spec-translation) — untouched. Created worktree
+  (parallax/spec-translation) and was left untouched. Created worktree
   /tmp/hatch-upstream-audit on new branch `research/upstream-design-audit`
   from origin/main.
 - Cloned both upstream repos read-only into /tmp. evolving-intent HEAD ==
   pinned 993d6be, so all reads are at the pin.
 
-## Q1 — experimental arms in the upstream evaluation
+## Q1: experimental arms in the upstream evaluation
 
 ### What the repo actually does
 
@@ -36,7 +36,7 @@ actually do versus what Parallax layered on top. Primary sources:
   `function_switch`, `combined` (lines 87-99). Each scenario is a separate
   run writing one results JSON keyed by task_id; the summary is aggregate
   accuracy = correct/total (lines 768-828). No pairing logic, no per-source
-  contrast, no uncertainty computation anywhere in the repo — `rg` for
+  contrast, no uncertainty computation anywhere in the repo. `rg` for
   ttest/wilcoxon/bootstrap/scipy/mcnemar/p-value across all .py files finds
   nothing (only docstring word matches like "paired_g1_n251.json", a data
   filename).
@@ -44,20 +44,20 @@ actually do versus what Parallax layered on top. Primary sources:
   `--task_ids_file` ("JSON file with task_ids to filter (for fair
   comparison)", run_experiment.py:928-929) points at fixed eval-index files
   (`intent_construction/eval_indices/*_task_ids.json`) so every scenario
-  runs the same source IDs. Comparison across scenarios is post-hoc — read
+  runs the same source IDs. Comparison across scenarios is post-hoc, read
   the two JSONs, compare mean accuracies.
 - Published eval scripts (`evaluation/scripts/run_gsm8k.sh:37-41`,
   `run_swe.sh:46-49`) run exactly TWO conditions per model:
   `single` (t=1,p=0,g=0) and `evolve` (t=7,p=2,g=2). No turn-matched arm in
   the published scripts. The `--run_plan` sweep (run_experiment.py:974-988)
-  covers 25 configs including under_specified t=2/4/8 — that's the closest
+  covers 25 configs including under_specified t=2/4/8. That's the closest
   thing to a turn-matched condition, and it's a *scenario in a sweep*, not a
   paired control.
 - Budget confound, SWE: run_swe.sh gives `single` step_limit 100/turn (1
   turn) and `evolve` 200 steps/turn × 7 turns (lines 16-17, 35-37). The
   paper (§5, experimental setup) says per-turn tool-call budget 100, raised
   to 200 for two models that hit limits. Either way the evolve arm gets
-  more total steps than single — upstream does NOT budget-match arms.
+  more total steps than single. Upstream does NOT budget-match arms.
 
 ### What the paper does
 
@@ -77,7 +77,7 @@ actually do versus what Parallax layered on top. Primary sources:
   continuity" turns.
 - Also F.5: preliminary GRPO training experiment (Qwen3-4B 64→76 on evolved
   GSM8K).
-- Sample sizes: GSM8K 200, BIRD 100, BrowseComp+ 100, SWE 50 — sampled
+- Sample sizes: GSM8K 200, BIRD 100, BrowseComp+ 100, SWE 50, sampled
   randomly from the verified pool "for cost-effective evaluation" (App. B,
   Filtering and sampling).
 
@@ -88,7 +88,7 @@ actually do versus what Parallax layered on top. Primary sources:
   trajectories), medians and per-checkpoint slopes vs a 473-repo human
   panel, and a prompt-intervention study. Descriptive statistics; no
   hypothesis tests found in src/ (rg for stats terms: no hits in code).
-  There are no "arms" at all in the Parallax sense — it's a benchmark, one
+  There are no "arms" at all in the Parallax sense. It's a benchmark, one
   condition per (agent, prompt-config).
 
 ### Verdict for Q1 (draft)
@@ -106,7 +106,7 @@ design), keep the matched arm as the first *add-on* rather than a
 launch blocker; the full three-arm paired machinery is warranted only once
 the screening delta reproduces.
 
-## Q2 — QC / admission practices
+## Q2: QC / admission practices
 
 ### evolving-intent (actual code)
 
@@ -116,7 +116,7 @@ anchoring:
   extractor produces an under-specified version") + solvability check
   (reference solver must produce same answer for rendered intent and
   original question, or match gold; App. D.1; GSM8kVerifier.verify_solvability,
-  dataset_impl/gsm8k/verifier.py:44-74 — num_runs majority).
+  dataset_impl/gsm8k/verifier.py:44-74, num_runs majority).
 - Counterfactuals: LLM verifier accepts only minimal localized value
   substitution; rejects additive/deletive edits; bounded length ratio
   (App. D.2).
@@ -128,7 +128,7 @@ anchoring:
 - Naturalizer validation: critical-token extraction (numbers, entities,
   quoted strings) checked against rule-based reference; retry then fall
   back to rule-based turn (App. C / naturalizer).
-- Post-hoc pool filter: `evaluation/scripts/filter_valid_samples.py` —
+- Post-hoc pool filter: `evaluation/scripts/filter_valid_samples.py`,
   intersection of quality flags (verification_passed AND
   independence_passed) and *simulation viability across all 23 eval
   configs* (sample must have enough arguments/functions for every config).
@@ -150,8 +150,8 @@ anchoring:
 - Reference solutions exist per checkpoint (solutions/checkpoint_N/) but
   KNOWN_ISSUES.md admits several reference solutions fail their own tests;
   they "prioritized test case accuracy over fixing all reference
-  solutions" — i.e., reference-solution verification is aspirational, tests
-  are the ground truth.
+  solutions", meaning reference-solution verification is aspirational and the
+  tests are the ground truth.
 - Paper §2 Problem Construction: authors drafted problems; each reviewed by
   ≥1 other author; proposal-phase culling (not design-testing or one-shot
   solvable); validation phase = write tests + attempt each checkpoint with
@@ -160,7 +160,7 @@ anchoring:
 
 ### Other efforts surveyed
 
-- SWE-smith (arXiv:2504.21798, NeurIPS 2025): execution-based validation —
+- SWE-smith (arXiv:2504.21798, NeurIPS 2025): execution-based validation,
   apply candidate bug patch, run suite, keep only if ≥1 previously passing
   test breaks (F2P), discard if runtime >2min. Problem statements
   LLM-generated; paper admits no checks for under-specified text or
@@ -169,12 +169,12 @@ anchoring:
 - SWE-Gym (arXiv:2412.21139): real PRs + executable environments; human +
   execution validation to configure environments (see search notes).
 - Prime Intellect Environments Hub / research-environments: strongest
-  operational QC found — no-op validation (tests must FAIL with zero
+  operational QC found. No-op validation (tests must FAIL with zero
   edits), gold-patch validation (reference fix must pass, up to 10×
   retries to separate flaky from broken), independent second passes,
   debug CLI, verified re-uploads with every exclusion persisted for audit.
   `uv run validate` = model-free gold + no-op checks.
-- Self-Instruct (arXiv:2212.10560): heuristic + similarity filtering —
+- Self-Instruct (arXiv:2212.10560): heuristic + similarity filtering,
   ROUGE-L <0.7 vs pool, keyword blacklist (image/picture/graph), length and
   format heuristics; no execution. (From memory of the paper; standard.)
 - Evolving-intent itself doubles as the LLM-judge-validation exemplar
@@ -182,16 +182,16 @@ anchoring:
 
 ### Classification table (draft in README)
 
-automated structural | execution-based | LLM-judge | human review —
+automated structural | execution-based | LLM-judge | human review,
 each effort classified; see README.
 
-## Q3 — upstream turn delivery + SWE harness
+## Q3: upstream turn delivery + SWE harness
 
 Definitive, at pinned commit 993d6be:
 
 - Turns are pre-scripted by the simulator BEFORE the agent runs.
   run_swe_mini_agent.py:104 `"_user_turns": [t["content"] for t in gs.turns
-  if t.get("role")=="user"]` — the mini-agent "receives the multi-turn
+  if t.get("role")=="user"]`, so the mini-agent "receives the multi-turn
   script verbatim" (comment at :92-94).
 - Delivery is harness-side interception, not an agent-callable tool:
   swe_minisweagent_scaffold.py module docstring (lines 6-25): "Strategy:
@@ -202,7 +202,7 @@ Definitive, at pinned commit 993d6be:
   accept the patch as final."
   Code: run loop lines 710-749 (`except Submitted` → if delivered <
   len(user_turns): synthesize tool-result fillers, `_wrap_intent_update`
-  ("Hold on — before you finalize, the user has new information... Do not
+  ("Hold on, before you finalize, the user has new information... Do not
   submit yet unless this update has been fully incorporated", lines
   408-424), append, continue; else accept).
 - Second trigger: per-turn step exhaustion. `except LimitsExceeded` lines
@@ -216,7 +216,7 @@ Definitive, at pinned commit 993d6be:
   control (only BASH_TOOL, lines 74, 264). The agent cannot terminate the
   episode early: an early submit is converted into the next user turn.
 - Generic (non-SWE) runner is likewise harness-side: run_experiment.py
-  run_multi_turn_conversation lines 281-348 — loop of sample.reset() /
+  run_multi_turn_conversation lines 281-348, a loop of sample.reset() /
   model call / sample.step(response) / sample.is_done(); simulator
   user_simulation.py step() (961-1023) just returns the next pre-built or
   naturalized turn; is_done() (1025-1027) = cursor past end. The model
@@ -244,7 +244,7 @@ Definitive, at pinned commit 993d6be:
   registered as a FastMCP tool on the in-container "turn director"
   (`_director`, line 31; capability added at 133-148). Pull model: the
   agent calls it to get the next turn + step budget. Nothing gates
-  `_grade()` (lines 64-109) on all turns having been delivered — an agent
+  `_grade()` (lines 64-109) on all turns having been delivered, so an agent
   can submit at turn 0 or drain all turns instantly.
 - Parallax SWE grading runs the sealed test patch + pinned test command
   inside the official image (swebench_env.py:48-109), not

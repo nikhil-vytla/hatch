@@ -6,8 +6,8 @@ observed agent failure to a bounded finding, how to rerun the evidence, and
 where the honest limits are. It assumes no prior context. The vocabulary it
 uses is defined in [`MODEL.md`](MODEL.md); the strategy it walks through is
 specified in [`methods/evolving-intent.md`](methods/evolving-intent.md). If
-you want the concrete version first — real inputs, exact commands, real
-output artifacts for every implemented flow — start with
+you want the concrete version first, with real inputs, exact commands, and real
+output artifacts for every implemented flow, start with
 [`PIPELINES.md`](PIPELINES.md) and come back here for the reasoning.
 
 ## The problem Parallax solves
@@ -141,13 +141,13 @@ the effect. A closed-form Hoeffding interval at 95% confidence, clustered by
 source, widens those bounds for sampling error.
 
 The report stops there. It states the point estimate, the interval, and the
-interval's half-width — the minimum detectable effect, the smallest effect a
-design of this size could have resolved. It does not convert those numbers
-into a verdict. That half-width is $\sqrt{2\ln 40 / n}$ for $n$ source
-clusters, so resolving even a 0.2 effect would take 185 sources against a
-published admissible pool of 50; a verdict computed at any sample size this
-harness can reach would report its own arithmetic rather than the evidence.
-Interpreting the interval is left to the reader, who can see how wide it is.
+interval's half-width, which is the minimum detectable effect: the smallest
+effect a design of this size could have resolved. It does not turn those numbers
+into a verdict. That half-width is $\sqrt{2\ln 40 / n}$ for $n$ source clusters,
+so resolving even a 0.2 effect would take 185 sources against a published
+admissible pool of 50. Any verdict this harness could compute would be reporting
+its own sample size back at you. Interpreting the interval is the reader's job,
+and the width is right there.
 
 ## Run it yourself
 
@@ -180,8 +180,8 @@ It contains exactly three record kinds:
   configuration;
 - one **family** record per source, holding the sealed answer, the extracted
   intent, all accepted and rejected construction attempts, and the three
-  scripts — the sealed answer appears here exactly once and never in run
-  rows;
+  scripts. The sealed answer appears here exactly once and never in a run
+  row;
 - one **run** record per scheduled (source, trial, arm), holding the full
   transcript, final answer, outcome, and usage.
 
@@ -206,7 +206,12 @@ future slices:
    recorded the simplifications that were rejected because they would weaken
    method or evidence fidelity.
 4. **Behavioral mutation testing**, which mutated contract-bearing lines and
-   required the test suite to kill every active mutant.
+   required the test suite to kill every active mutant. Two of those gauntlets
+   are committed and re-runnable
+   ([`mutation_gate.py`](../research/swebench-experiment-prerequisites-20260803/mutation_gate.py),
+   [`run_gauntlet.py`](../research/checkpoint-evolution-slice/mutants/run_gauntlet.py));
+   the earlier ones were run in-session and thrown away, which was a mistake.
+   Commit the gauntlet or the number means nothing.
 
 ## Why it is built this way
 
@@ -261,32 +266,32 @@ documented research phase, and each load-bearing choice has a citable origin.
   [`../NOTES.md`](../NOTES.md).
 
 The decision records behind this section live in
-[`decisions/`](decisions/README.md). The wider experimental archive — the
-formal-model ancestor of `MODEL.md`, the complete literature review, the
-arena candidate files, the typed knowledge base of source, concept, and
-synthesis notes, the timestamped decision log, and the full adversarial
-review — lives on the
+[`decisions/`](decisions/README.md). The wider experimental archive lives on the
 [archive branch](https://github.com/nikhil-vytla/hatch/tree/cursor/hard-repo-tasks-5fc8/hard-repo-tasks)
-of the superseded experiment that preceded this harness.
+of the superseded experiment that preceded this harness: the formal-model
+ancestor of `MODEL.md`, the complete literature review, the arena candidate
+files, the typed knowledge base of source, concept, and synthesis notes, the
+timestamped decision log, and the full adversarial review.
 
 ## Deliberately out of scope
 
-- **Real-model evidence.** All existing runs use scripted agents. No claim
-  about real agent behavior is supported yet; the harness exists so that the
-  first real-provider run is already controlled and auditable.
+- **Reproducible trials.** Every run records a trial seed and no run can replay
+  one, because the gateway accepts a `seed` parameter and ignores it. Trials are
+  temperature-1.0 samples, which is enough for clustered intervals and not enough
+  for exact replay.
 - **Paper reproduction.** Upstream generated pools and provider transcripts
   are not published, so Parallax makes no byte-identical dataset, provider
   replay, or paper-score reproduction claims.
-- **Other benchmarks.** GSM8K is the only implemented source pool. Harder
-  benchmarks require their own adapters and admission checks.
-- **Other strategies.** Checkpoint evolution is a separate strategy with its
-  own unwritten state machine; it is not an Evolving Intent stage.
+- **Other benchmarks.** GSM8K, SWE-bench Verified, and one hand-authored
+  checkpoint family are the implemented source pools. Anything else needs its
+  own adapter and admission checks.
 - **A command-line interface.** The entry points are the Python API and the
   test suite.
 
-> **TODO:** Run the preregistered matched-versus-evolved contrast with one
-> real model provider over a declared GSM8K sample, and report the point
-> estimate, the interval, and the minimum detectable effect it achieved. An
-> interval too wide to separate any plausible effect, or run failures that
-> leave the identification bounds uninformative, forces a design revision
-> before scaling.
+This loop has now closed once end to end. The preregistered contrast ran against a
+real provider over 144 declared GSM8K sources, returned evolved minus base at
+-0.109 with a 95% source-clustered interval of [-0.160, -0.060] and no run
+failures, and the matched arm split that gap into -0.086 for multi-turn
+presentation and -0.023 for intent evolution. Step 7 produced numbers a reader can
+argue with, and step 8 has its next question: whether the multi-turn cost transfers
+to a harder benchmark. See [`FINDINGS.md`](FINDINGS.md).

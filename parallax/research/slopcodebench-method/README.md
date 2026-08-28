@@ -1,7 +1,7 @@
 # Checkpoint evolution from SloP Code Bench: method design for Parallax
 
-This folder designs Parallax's second synthesis method — **checkpoint
-evolution** — from SlopCodeBench
+This folder designs Parallax's second synthesis method, **checkpoint
+evolution**, from SlopCodeBench
 ([arXiv:2603.24755](https://arxiv.org/abs/2603.24755);
 [SprocketLab/slop-code-bench](https://github.com/SprocketLab/slop-code-bench)
 at commit `8e3a8b69`), expressed in the vocabulary of
@@ -23,14 +23,14 @@ implementation code.
 
 **1. Checkpoint evolution is the structural dual of Evolving Intent.**
 Evolving Intent perturbs the intent schedule *within* one episode and ends
-with terminal restoration — the source verifier, sealed answer, and task are
+with terminal restoration, the source verifier, sealed answer, and task are
 recovered exactly, and nothing the agent did persists. Checkpoint evolution
 perturbs *across* episodes and never restores: the agent's own terminal
 workspace is the next stage's initial state ($\mu_{0,i+1} = \delta_{W_i}$), and sealed authority accumulates monotonically
 ($\Omega_i = \Omega_{i-1}\cup T_i$) instead of being restored. The
 integrity invariant dual to terminal restoration is **non-destructive
 accumulation**: no checkpoint may invalidate a prior sealed test. That single
-substitution — restore-the-end vs never-invalidate-the-past — generates the
+substitution, restore-the-end vs never-invalidate-the-past, generates the
 whole method.
 
 **2. The artifact is the only channel, so persistence is analyzable.** The
@@ -45,14 +45,14 @@ is mediated by the code the agent wrote.
 operator.** Checkpoint deltas come from a closed set (extension, refinement,
 input-source generalization, re-modality); what makes a sequence a *design*
 test is that a myopic-but-correct architecture at stage 1 pays a measurable
-downstream price. That property — which the paper asserts per-problem by
-author judgment — can be operationalized as a churn/cost ratio between naive
+downstream price. That property, which the paper asserts per-problem by
+author judgment, can be operationalized as a churn/cost ratio between naive
 and anticipatory reference builds, which turns it into an admission gate
 (G4) instead of a matter of taste.
 
 **4. "Maintainability" gets a native, sealed, behavioral price.** The future
-stages themselves — and probe variants (freeze $y_i$, let a pinned weaker
-agent attempt stage $i+1$) — price the quality of today's artifact in
+stages themselves, and probe variants (freeze $y_i$, let a pinned weaker
+agent attempt stage $i+1$), price the quality of today's artifact in
 verification and cost, with sealed authority. Static quality composites
 (erosion, verbosity) are sealable as pinned deterministic measurements but
 carry documented validity limits: the paper's own sensitivity analysis shows
@@ -65,8 +65,8 @@ policy.
 
 ## Strongest three research questions
 
-1. **Self-accumulation (RQ1).** Does building on one's *own* artifact —
-   versus a correctness-matched reference artifact — cause later-stage
+1. **Self-accumulation (RQ1).** Does building on one's *own* artifact,
+   versus a correctness-matched reference artifact, cause later-stage
    verification failure? This is the causal mechanism the entire benchmark
    asserts but never controls for; the `carry-reference` arm is the missing
    matched control, and any result is informative.
@@ -80,15 +80,15 @@ policy.
    artifact (wsff-style program design carried as declared public input
    across stages) change the degradation *slope*, where prompt-only
    interventions demonstrably change only the intercept? This converts the
-   most influential practitioner claim in the space — that quality decay is
-   a training problem no harness fixes — into a matched-arm slope estimand.
+   most influential practitioner claim in the space. That quality decay is
+   a training problem no harness fixes, into a matched-arm slope estimand.
 
 ## Honest assessment: agent-assisted vs hand-authored task quality
 
 The case for parity is stronger than expected going in. Upstream's
 hand-authoring process is mostly checklist-shaped (the repo publishes the
-checklists), and its one genuinely judgmental filter — "does this
-meaningfully test design decisions?" — is operationalizable as a measured
+checklists), and its one genuinely judgmental filter, "does this
+meaningfully test design decisions?", is operationalizable as a measured
 churn ratio (gate G4) that is arguably *more* rigorous than author
 intuition. The hand-authored baseline is also not defect-free:
 `KNOWN_ISSUES.md` records defective reference solutions on 5 of 36 problems
@@ -99,8 +99,8 @@ The honest residual doubt sits in seed taste and roadmap naturalness. The
 paper's problems are credible because the authors knew their seed domains
 deeply; a generated family can pass every mechanical gate and still be a
 sterile puzzle whose "evolution" no real product would undergo. That risk is
-not automatable away today — it is a construct-validity judgment with no
-computable oracle — which is why the workflow keeps humans at exactly two
+not automatable away today. It is a construct-validity judgment with no
+computable oracle, which is why the workflow keeps humans at exactly two
 points (design-pressure naturalness, residual semantic leakage) and treats
 generation as automatable but **admission as where honesty lives**.
 

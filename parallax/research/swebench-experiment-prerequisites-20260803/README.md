@@ -63,15 +63,18 @@ Claude Opus 4.8, static and evolved conditions, and three paired trials per
 source. Both conditions receive 12 total agent steps and 4096 output tokens.
 Static receives one 12-step phase. Evolved receives two 6-step phases.
 
-The same nine static units cost $0.908775 in Round 2. The cost estimate assigns
+The same nine static units cost \$0.908775 in Round 2. The cost estimate assigns
 the evolved units a conservative 2x multiplier for the second model turn and
-its repeated context. The resulting estimate is $2.726325. The proposed
-approval cap is $3.50.
+its repeated context. The resulting estimate is \$2.726325. The proposed
+approval cap is \$3.50.
 
 The design is recorded at
 `evidence/single-vs-evolved-design.json`, with design digest
-`e230043ce85483b90e636b594e828dd78f525ddd9fd4bc6a25bf11caeeda4eaa`.
-No experiment unit has run.
+`e230043ce85483b90e636b594e828dd78f525ddd9fd4bc6a25bf11caeeda4eaa`. No
+experiment unit ran in this folder; the approved run and its result live in
+[`../swebench-single-vs-evolved-20260803/`](../swebench-single-vs-evolved-20260803/README.md),
+and it came in at \$1.22 rather than the \$2.73 estimated here, because the
+evolved arm turned out cheaper than static rather than 2x.
 
 ## Evidence and verification
 
@@ -83,9 +86,11 @@ No experiment unit has run.
 - `mutation_gate.py` kills six focused delivery and admission mutants.
 
 Verification passed 136 tests under normal Python and 136 under `python -O`.
-The core mutation suite killed 28 of 28 mutants. The Slice 2 suite killed 48 of
-48. The focused suite killed 6 of 6. Ruff, Ruff format, `ty`, `uv build`, and
-`git diff --check` passed.
+Ruff, Ruff format, `ty`, `uv build`, and `git diff --check` passed. The focused
+gauntlet in [`mutation_gate.py`](mutation_gate.py) killed 6 of 6, and you can
+re-run it. The session also reported a core suite at 28/28 and a Slice 2 suite
+at 48/48, but neither gauntlet was committed, so those two numbers are **not
+reproducible from this repo** and should not be read as certifications.
 
 Reproduce the compute-only admission run with:
 
