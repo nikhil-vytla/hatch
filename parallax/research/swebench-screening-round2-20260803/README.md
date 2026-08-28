@@ -54,6 +54,13 @@ model-specific rates. Runtime pricing constants now use $5/$25 per million
 Opus input/output tokens and $1/$5 for Haiku. Sonnet 4.6 used its current
 introductory $2/$10 rate.
 
+The `estimated_cost_usd` fields inside `evidence/screening.jsonl` and
+`evidence/construction.jsonl` still hold the retired-rate values they were
+written with, so summing receipts across this folder's evidence gives
+$8.544627 — nearly three times the truth. $2.972512 is the token-derived
+figure and the one to quote; `research/spend-audit-20260803/` recomputes it
+from the retained tokens and reconciles it against these six components.
+
 ## Evidence
 
 - `round2-report.json` is the canonical combined result and cost receipt.
@@ -85,8 +92,9 @@ resume path used the immutable pinned parquet with a verified SHA-256 digest.
 
 - Normal tests: 124 passed.
 - Optimized tests: 124 passed under `PYTHONOPTIMIZE=1`.
-- Mutation gates: 28/28 Pydantic/core mutants and 49/49 Slice 2 mutants
-  killed.
+- Mutation gates: the scores originally reported here came from gauntlets
+  that were never committed. The reproducible gauntlet is
+  `tests/test_mutation_gauntlet.py` (`pytest -m mutation`).
 - Ruff: passed for `src`, `tests`, and both screening research directories.
 - `ty`: passed for `src`.
 - Package build: source distribution and wheel succeeded.

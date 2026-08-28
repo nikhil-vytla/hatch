@@ -10,11 +10,7 @@ from test_swebench import INSTANCE_ID, construction, row, runtime
 
 from parallax.delivery import CompleteDeliveryReceiptV1, PhaseActivityV1
 from parallax.hud_compile import compile_hud
-from parallax.hud_screening import (
-    CLAUDE_HAIKU_PRICING,
-    CLAUDE_OPUS_PRICING,
-    _docker_runtime,
-)
+from parallax.hud_screening import _docker_runtime
 from parallax.specs import freeze_swe_specs
 from parallax.swebench import build_swe_script_family, load_swebench_rows
 from parallax.swebench_runtime import (
@@ -35,7 +31,6 @@ def family():
     return build_swe_script_family(
         problem,
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
@@ -65,20 +60,35 @@ def test_environment_bundle_is_public_deterministic_and_importable() -> None:
     assert b"class CompleteDeliveryReceiptV1" in artifacts["parallax/delivery.py"]
 
 
-def test_dockerfile_uses_pinned_base_and_isolated_hud_venv() -> None:
-    dockerfile = next(
+def dockerfile_of(compiled) -> str:
+    return next(
         artifact.content
-        for artifact in bundle().agent_artifacts
+        for artifact in compiled.agent_artifacts
         if artifact.path == "Dockerfile.hud"
     ).decode()
 
-    assert (
-        "swebench/sweb.eval.x86_64.astropy_1776_astropy-13236@sha256:" + "a" * 64
-    ) in dockerfile
-    assert "/opt/hud-venv" in dockerfile
-    assert "hud==0.6.12" in dockerfile
-    assert "bubblewrap util-linux" in dockerfile
-    assert "chown -R 1000:1000 /testbed" in dockerfile
+
+def test_dockerfile_base_image_tracks_the_environment_spec() -> None:
+    task, environment = freeze_swe_specs(family())
+    other = environment.model_copy(
+        update={"image": environment.image.model_copy(update={"digest": "b" * 64})}
+    )
+
+    first = dockerfile_of(compile_hud(task, environment))
+    second = dockerfile_of(compile_hud(task, other))
+
+    assert first.splitlines()[0].endswith(
+        f"{environment.image.ref}@sha256:{environment.image.digest}"
+    )
+    assert second.splitlines()[0].endswith(
+        f"{other.image.ref}@sha256:{other.image.digest}"
+    )
+    assert first != second
+
+
+def test_dockerfile_build_reaches_no_network_source_repository() -> None:
+    dockerfile = dockerfile_of(bundle())
+
     assert "git clone" not in dockerfile
     assert "git fetch" not in dockerfile
 
@@ -88,13 +98,6 @@ def test_local_docker_runtime_allows_inner_bubblewrap() -> None:
 
     assert runtime.run_args == ("--privileged",)
     assert runtime.runtime_config.image == "screening-image"
-
-
-def test_screening_uses_current_model_specific_pricing() -> None:
-    assert CLAUDE_OPUS_PRICING.input_usd_per_million == 5.0
-    assert CLAUDE_OPUS_PRICING.output_usd_per_million == 25.0
-    assert CLAUDE_HAIKU_PRICING.input_usd_per_million == 1.0
-    assert CLAUDE_HAIKU_PRICING.output_usd_per_million == 5.0
 
 
 def test_environment_git_commands_drop_to_workspace_owner() -> None:

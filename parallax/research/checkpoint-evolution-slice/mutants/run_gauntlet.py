@@ -188,11 +188,10 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
         "        if False:\n",
     ),
     (
-        "M23 exact-fence unwrap disabled",
+        "M23 fence unwrap disabled",
         AGENT,
-        "    if payload.startswith(JSON_FENCE_PREFIX) and payload.endswith("
-        "JSON_FENCE_SUFFIX):\n",
-        "    if False:\n",
+        "    payload = strip_json_fence(text)\n",
+        "    payload = text\n",
     ),
     (
         "M24 live spend approval gate removed",

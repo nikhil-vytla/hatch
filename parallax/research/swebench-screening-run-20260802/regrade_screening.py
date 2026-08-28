@@ -11,6 +11,7 @@ from run_screening import (
 )
 
 from parallax.canonical import atomic_write, canonical_bytes
+from parallax.metering import meter
 from parallax.screening import (
     ScreeningPlan,
     ScreeningRun,
@@ -102,7 +103,6 @@ def main() -> None:
         family = build_swe_script_family(
             problem,
             construction,
-            seed=20260802,
             total_agent_steps=12,
             max_output_tokens=4096,
         )
@@ -124,15 +124,23 @@ def main() -> None:
             ),
             harness_source_directory=REGRADE_WORK / "swebench-harness-source",
         )
+        # Re-meter rather than carry the episode's recorded price: these
+        # episodes were paid for under the retired Opus rate card, and copying
+        # that figure into fresh evidence is how it spread in the first place.
+        usage = meter(
+            episode["reported_model"],
+            prompt_tokens=episode["prompt_tokens"],
+            completion_tokens=episode["completion_tokens"],
+        )
         run = ScreeningRun(
             design_digest=plan.design_digest,
             model_config_digest=plan.model_config_digest,
             reported_model=episode["reported_model"],
             unit=unit,
             outcome=evaluation.outcome,
-            prompt_tokens=episode["prompt_tokens"],
-            completion_tokens=episode["completion_tokens"],
-            estimated_cost_usd=episode["estimated_cost_usd"],
+            prompt_tokens=usage.prompt_tokens,
+            completion_tokens=usage.completion_tokens,
+            estimated_cost_usd=usage.cost_usd,
             verifier_report_digest=evaluation.report_digest,
             harness_revision=evaluation.harness_revision,
             image_digest=evaluation.image_digest,

@@ -1,19 +1,22 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import math
 import os
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated, Literal, Self, TypeAlias, assert_never
 
 from pydantic import Field, TypeAdapter, ValidationError, model_validator
 
-from .admission import AdmittedSweFamily
+from .admission import AdmittedSweFamily, assert_admission_identity
 from .canonical import atomic_write, canonical_digest
 from .delivery import CompleteDeliveryReceiptV1
 from .evolving_intent import Arm
+from .metering import MeteredUsage, total
 from .outcome import FailureKind, Outcome, RunFailure, Verdict, Verification
 from .swebench import SweBenchProblem
 from .types import (
@@ -25,13 +28,17 @@ from .types import (
     StrictModel,
     TrialIndex,
     TrialSeed,
+    Usd,
 )
 
-Usd = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 SCREENING_SPEND_CAP_USD = 5.0
 
 
 class SpendApprovalRequired(RuntimeError):
+    pass
+
+
+class EvidenceLockedError(RuntimeError):
     pass
 
 
@@ -42,16 +49,12 @@ class ScreeningExecutionError(RuntimeError):
         message: str,
         *,
         reported_model: str | None = None,
-        prompt_tokens: int = 0,
-        completion_tokens: int = 0,
-        estimated_cost_usd: float = 0.0,
+        usage: MeteredUsage | None = None,
     ) -> None:
         super().__init__(message)
         self.failure_kind = failure_kind
         self.reported_model = reported_model
-        self.prompt_tokens = prompt_tokens
-        self.completion_tokens = completion_tokens
-        self.estimated_cost_usd = estimated_cost_usd
+        self.usage = usage or MeteredUsage()
 
 
 class ScreeningCost(StrictModel):
@@ -149,13 +152,19 @@ class ScreeningRun(StrictModel):
             raise ValueError("verified evolved run requires complete turn delivery")
         return self
 
+    @property
+    def usage(self) -> MeteredUsage:
+        return MeteredUsage(
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
+            cost_usd=self.estimated_cost_usd,
+        )
+
 
 class ScreeningExecution(StrictModel):
     outcome: Outcome
     reported_model: NonEmptyText
-    prompt_tokens: Annotated[int, Field(ge=0)]
-    completion_tokens: Annotated[int, Field(ge=0)]
-    estimated_cost_usd: Usd
+    usage: MeteredUsage
     verifier_report_digest: str | None = None
     harness_revision: str | None = None
     image_digest: str | None = None
@@ -165,7 +174,7 @@ class ScreeningExecution(StrictModel):
     def consistent_usage(self) -> Self:
         if (
             isinstance(self.outcome, Verification)
-            and self.prompt_tokens + self.completion_tokens < 1
+            and self.usage.prompt_tokens + self.usage.completion_tokens < 1
         ):
             raise ValueError("screening usage must contain at least one token")
         return self
@@ -179,12 +188,38 @@ ScreeningExecutor: TypeAlias = Callable[[ScreeningUnit], ScreeningExecution]
 _SCREENING_RECORD = TypeAdapter(ScreeningRecord)
 
 
+OperatingPoint = Literal["floor", "boundary", "ceiling", "unknown"]
+FLOOR_PASS_RATE = 0.1
+CEILING_PASS_RATE = 0.9
+
+
+def classify_operating_point(pass_rate: float | None) -> OperatingPoint:
+    """Classify a source by how much headroom its pass rate leaves.
+
+    The margins are 0.1 and 0.9 rather than exact 0 and 1 so that a source one
+    trial away from the floor or ceiling is not called a boundary once trial
+    counts grow. A research driver carried a copy of this rule written as
+    `== 0` and `== 1`; the two rules agree for every pass rate reachable in
+    nine or fewer verified trials and first disagree at ten, so the copy
+    selected the same instances the package would have. It was a latent
+    divergence rather than a wrong selection, which is exactly why it survived
+    unnoticed, and why there is now one rule instead of two.
+    """
+    if pass_rate is None:
+        return "unknown"
+    if pass_rate <= FLOOR_PASS_RATE:
+        return "floor"
+    if pass_rate >= CEILING_PASS_RATE:
+        return "ceiling"
+    return "boundary"
+
+
 class ScreeningSourceResult(StrictModel):
     source_id: SourceId
     verified_trials: Annotated[int, Field(ge=0)]
     run_failures: Annotated[int, Field(ge=0)]
     pass_rate: Annotated[float, Field(ge=0, le=1)] | None
-    operating_point: Literal["floor", "boundary", "ceiling", "unknown"]
+    operating_point: OperatingPoint
 
 
 class ScreeningSummary(StrictModel):
@@ -288,6 +323,8 @@ def build_admitted_screening_plan(
     admitted = tuple(admitted_families)
     if not admitted:
         raise ValueError("scheduling requires at least one admitted family")
+    for item in admitted:
+        assert_admission_identity(item)
     return build_screening_plan(
         (item.family.static.problem for item in admitted),
         model=model,
@@ -316,6 +353,34 @@ def read_screening_jsonl(path: Path) -> tuple[ScreeningRecord, ...]:
 
 def _partial_path(output_path: Path) -> Path:
     return output_path.with_name(f"{output_path.name}.partial")
+
+
+@contextmanager
+def single_writer(output_path: Path) -> Iterator[None]:
+    """Hold an exclusive advisory lock on one evidence file for this process.
+
+    Two sessions once came within a judgment call of paying twice for the same
+    experiment, because "is the other session still alive?" was answered by a
+    human reading a process list. A second writer is now refused by the
+    kernel, and a lock left behind by a dead process is reclaimed
+    automatically because the flock dies with the file descriptor.
+    """
+    lock_path = output_path.with_name(f"{output_path.name}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("w")
+    try:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            raise EvidenceLockedError(
+                f"another process is already writing {output_path}; "
+                f"holder recorded in {lock_path}"
+            ) from error
+        handle.write(f"{os.getpid()}\n")
+        handle.flush()
+        yield
+    finally:
+        handle.close()
 
 
 def _append_fsync(path: Path, data: bytes, *, exclusive: bool = False) -> None:
@@ -369,6 +434,22 @@ def run_screening(
             f"screening requires approval for estimated "
             f"${plan.estimated_cost_lower_usd:.2f}-${upper:.2f}"
         )
+    with single_writer(output_path):
+        return _run_screening_locked(
+            plan,
+            executor,
+            output_path=output_path,
+            spend_cap_usd=spend_cap_usd,
+        )
+
+
+def _run_screening_locked(
+    plan: ScreeningPlan,
+    executor: ScreeningExecutor,
+    *,
+    output_path: Path,
+    spend_cap_usd: float,
+) -> tuple[ScreeningRun, ...]:
     initialize_screening_manifest(plan, output_path)
     partial_path = _partial_path(output_path)
     runs: list[ScreeningRun] = []
@@ -390,7 +471,7 @@ def run_screening(
         for run in runs
     ):
         raise ValueError("screening evidence identity differs from plan")
-    cumulative_cost = sum(run.estimated_cost_usd for run in runs)
+    cumulative_cost = total(run.usage for run in runs).cost_usd
     if cumulative_cost > spend_cap_usd:
         raise SpendApprovalRequired(
             f"observed cost ${cumulative_cost:.2f} exceeds ${spend_cap_usd:.2f} cap"
@@ -413,9 +494,7 @@ def run_screening(
                     message=str(error),
                 ),
                 reported_model=error.reported_model or plan.expected_response_model,
-                prompt_tokens=error.prompt_tokens,
-                completion_tokens=error.completion_tokens,
-                estimated_cost_usd=error.estimated_cost_usd,
+                usage=error.usage,
             )
         except Exception as error:
             execution = ScreeningExecution(
@@ -425,9 +504,7 @@ def run_screening(
                     message=str(error),
                 ),
                 reported_model=plan.expected_response_model,
-                prompt_tokens=0,
-                completion_tokens=0,
-                estimated_cost_usd=0.0,
+                usage=MeteredUsage(),
             )
         runs.append(
             ScreeningRun(
@@ -436,9 +513,9 @@ def run_screening(
                 unit=unit,
                 outcome=execution.outcome,
                 reported_model=execution.reported_model,
-                prompt_tokens=execution.prompt_tokens,
-                completion_tokens=execution.completion_tokens,
-                estimated_cost_usd=execution.estimated_cost_usd,
+                prompt_tokens=execution.usage.prompt_tokens,
+                completion_tokens=execution.usage.completion_tokens,
+                estimated_cost_usd=execution.usage.cost_usd,
                 verifier_report_digest=execution.verifier_report_digest,
                 harness_revision=execution.harness_revision,
                 image_digest=execution.image_digest,
@@ -458,7 +535,7 @@ def run_screening(
                     )
                 }
             )
-        cumulative_cost += execution.estimated_cost_usd
+        cumulative_cost += execution.usage.cost_usd
         _append_fsync(partial_path, _canonical_line(runs[-1]))
         if cumulative_cost > spend_cap_usd:
             raise SpendApprovalRequired(
@@ -506,22 +583,13 @@ def summarize_screening(
         passes = verdicts[Verdict.PASS]
         source_bounds.append((passes / total, (passes + failures) / total))
         pass_rate = verdicts[Verdict.PASS] / verified if verified else None
-        operating_point: Literal["floor", "boundary", "ceiling", "unknown"]
-        if pass_rate is None:
-            operating_point = "unknown"
-        elif pass_rate <= 0.1:
-            operating_point = "floor"
-        elif pass_rate >= 0.9:
-            operating_point = "ceiling"
-        else:
-            operating_point = "boundary"
         source_results.append(
             ScreeningSourceResult(
                 source_id=source_id,
                 verified_trials=verified,
                 run_failures=failures,
                 pass_rate=pass_rate,
-                operating_point=operating_point,
+                operating_point=classify_operating_point(pass_rate),
             )
         )
     boundary = tuple(

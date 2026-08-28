@@ -50,16 +50,28 @@ Replayed units carry their original cost into later evidence files, so
 
 | Session | New payments |
 |---|---|
-| Run 1 (delivery-wire defect) | $0 metered; ~4 episodes unmetered, est. $0.40-0.80 |
+| Run 1 (delivery-wire defect) | $0 metered; ~4 episodes unmetered, est. $0.31-0.52 |
 | Run 2 (frame-limit defect, incl. orphan) | $0.349545 |
 | Run 3 (gateway connection failures) | $0.681200 |
 | Run 4 (final recovery) | $0.188335 |
 | **Unique metered total** | **$1.219080** |
 
+The metered figures are token-derived at current rates: this run's receipts
+were written after the retired-rate pricing constant was fixed, and
+`research/spend-audit-20260803/` reproduces the same $1.219080 by re-metering
+every retained token count independently of the recorded dollar figures.
+
 The total reconciles exactly: final-file sum $1.105265 plus the destroyed
 run-2 evolved trial-0 episode ($0.045470) plus the five destroyed run-3
 xarray partials ($0.068345). With the run-1 unmetered estimate the all-in
-figure is roughly $1.62-2.02, well inside the $25 defect-stop cap.
+figure is $1.53-1.74, well inside the $25 defect-stop cap.
+
+Run 1's unmetered band was first published as $0.40-0.80, extrapolated from
+round-2 episode averages that were themselves priced at the retired Opus 4.1
+rate card. The band above instead prices the same three-to-four astropy
+episodes at what those exact units cost when they were re-run and metered
+($0.128415, $0.087925, $0.095215, $0.080445), with the upper end bounding four
+episodes at the most expensive episode this experiment recorded.
 
 ## Disposition of failure receipts
 
