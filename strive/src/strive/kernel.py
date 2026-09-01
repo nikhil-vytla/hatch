@@ -76,6 +76,7 @@ from strive.contracts import (
     FailureRecord,
     ModelRequest,
     TaskCase,
+    dominant_fault,
 )
 from strive.evaluate import evaluate
 from strive.policy import (
@@ -1455,16 +1456,6 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
     )
 
 
-# precedence for aggregating per-case fault origins across a suite: a later
-# infrastructure/unknown fault must DOMINATE an earlier candidate one, so event
-# order can never hide a backend fault behind a candidate one.
-_FAULT_RANK = {None: 0, FAULT_CANDIDATE: 1, FAULT_UNKNOWN: 2, FAULT_INFRASTRUCTURE: 3}
-
-
-def _dominant_fault(a: str | None, b: str | None) -> str | None:
-    return a if _FAULT_RANK.get(a, 2) >= _FAULT_RANK.get(b, 2) else b
-
-
 def _attempt_origin(
     failure: FailureRecord | None, fault_origin: str | None
 ) -> tuple[str, str]:
@@ -1544,11 +1535,9 @@ def _run_attempt(
             faults.append((result.report.failure, result.report.fault_origin))
     # the DOMINANT fault (infrastructure > unknown > candidate); its failure and
     # origin come from that ONE item, so event order can never hide a later
-    # backend fault AND the pair stays self-consistent.
-    failure: FailureRecord | None = None
-    fault_origin: str | None = None
-    if faults:
-        failure, fault_origin = max(faults, key=lambda fo: _FAULT_RANK.get(fo[1], 2))
+    # backend fault AND the pair stays self-consistent. `dominant_fault` is the
+    # SHARED aggregation rule the CandidateExecutor's per-suite pass also uses.
+    failure, fault_origin = dominant_fault(faults)
     if provenance is None:  # denied before any case ran
         provenance = services.executor.provenance()
     report = ExecutionReport(

@@ -22,7 +22,8 @@ from strive.contracts import (
     FailureRecord,
     TaskCase,
 )
-from strive.kernel import _attempt_origin, _dominant_fault
+from strive.kernel import _attempt_origin
+from strive.contracts import dominant_fault
 from strive.runtime import (
     OP_BEHAVIORAL,
     OP_INFRASTRUCTURE,
@@ -84,12 +85,20 @@ def test_same_kind_different_origin() -> None:
 
 
 def test_dominant_fault_lets_infra_and_unknown_beat_candidate() -> None:
-    # aggregating across cases: a later backend/unknown fault must not be hidden
-    # behind an earlier candidate one.
-    assert _dominant_fault(FAULT_CANDIDATE, FAULT_UNKNOWN) == FAULT_UNKNOWN
-    assert _dominant_fault(FAULT_UNKNOWN, FAULT_INFRASTRUCTURE) == FAULT_INFRASTRUCTURE
-    assert _dominant_fault(FAULT_INFRASTRUCTURE, FAULT_CANDIDATE) == FAULT_INFRASTRUCTURE
-    assert _dominant_fault(None, FAULT_CANDIDATE) == FAULT_CANDIDATE
+    # the SHARED aggregation rule: from ORDERED per-case faults, a later backend/
+    # unknown fault is never hidden behind an earlier candidate one, and the
+    # returned failure and origin come from the SAME dominant item.
+    cand = FailureRecord(FAILURE_CRASH, "candidate")
+    unk = FailureRecord(FAILURE_TIMEOUT, "unknown")
+    infra = FailureRecord(FAILURE_BUDGET_EXHAUSTED, "infra")
+    assert dominant_fault([(cand, FAULT_CANDIDATE), (unk, FAULT_UNKNOWN)]) == (unk, FAULT_UNKNOWN)
+    assert dominant_fault(
+        [(unk, FAULT_UNKNOWN), (infra, FAULT_INFRASTRUCTURE)]
+    ) == (infra, FAULT_INFRASTRUCTURE)
+    assert dominant_fault(
+        [(infra, FAULT_INFRASTRUCTURE), (cand, FAULT_CANDIDATE)]
+    ) == (infra, FAULT_INFRASTRUCTURE)
+    assert dominant_fault([]) == (None, None)
 
 
 # -- the boundary stamps origins from real execution ----------------------------------------------

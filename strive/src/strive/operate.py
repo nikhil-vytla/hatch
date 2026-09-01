@@ -143,30 +143,46 @@ class TaskSuiteOperationDescriptor:
         evaluation: Evaluation,
         origin: str,
     ) -> OperationProjection:
-        # policy-visible per-case outcomes: opaque id, expected, produced output,
-        # pass/fail, and a SAFE error CLASS — never raw protected text
-        cases = tuple(
-            VisibleCaseOutcome(
-                case_id=ce.case_id,
-                expected=ce.expected,
-                got=ce.output,
-                passed=ce.passed,
-                error_kind=_error_kind(ce.error),
-            )
-            for ce in evaluation.case_evaluations
-        )
+        # interpret the PROTECTED evidence into the policy-visible projection from
+        # the REPORT's real per-case outcomes (not the pre-floored evaluation), so
+        # completed cases keep their true result. A case "ran" iff it produced a
+        # sandbox outcome; an un-run case (a boundary fault stopped the suite) is
+        # marked, not floored.
+        by_id = {o.case_id: o for o in report.outcomes}
         total = len(plan.manifest)
-        # "completed" = cases that actually RAN (produced a sandbox outcome); a
-        # candidate that errors or answers wrong still RAN, so a normal
-        # behavioral run stays valid. Only a boundary fault leaves cases un-run.
         completed = len(report.outcomes)
         behavioral = origin == OP_BEHAVIORAL
+        incomplete = completed < total or not report.ok
+        # INDIVISIBLE: the plan declares the attempt atomic, so a partial/faulted
+        # attempt floors ALL cases (none are credited). Otherwise completed cases
+        # keep their real outcomes.
+        floored = plan.indivisible and (incomplete or not behavioral)
+
+        cases: list[VisibleCaseOutcome] = []
+        passes = 0
+        for mc in plan.manifest:
+            outcome = by_id.get(mc.case_id)
+            got = outcome.output if outcome is not None else None
+            if outcome is None:
+                error_kind: str | None = "did-not-run"
+            else:
+                error_kind = _error_kind(outcome.error)
+            passed = (
+                outcome is not None and outcome.error is None
+                and got == mc.expected and not floored
+            )
+            if passed:
+                passes += 1
+            cases.append(VisibleCaseOutcome(mc.case_id, mc.expected, got, passed, error_kind))
+
         if plan.validity == VALIDITY_ALL_REQUIRED:
-            valid = behavioral and completed == total and total > 0
-        else:  # partial-allowed
-            valid = behavioral and completed > 0
+            valid = behavioral and completed == total and total > 0 and not floored
+            denom = total  # every case must count
+        else:  # partial-allowed: score only the cases that RAN
+            valid = behavioral and completed > 0 and not floored
+            denom = completed
         # NO normal aggregate for an invalid/incomplete attempt
-        overall = evaluation.overall_score if valid else None
+        overall = (passes / denom) if (valid and denom > 0) else None
         return OperationProjection(
             command_id=command_id,
             plan_ref="",  # filled by the kernel (it owns the CAS ref)
@@ -176,7 +192,7 @@ class TaskSuiteOperationDescriptor:
             coverage_completed=completed,
             coverage_total=total,
             overall=overall,
-            cases=cases,
+            cases=tuple(cases),
         )
 
 

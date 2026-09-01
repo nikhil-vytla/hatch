@@ -226,3 +226,109 @@ def test_descriptor_config_drift_refuses_resume(tmp_path: Path) -> None:
     )
     with pytest.raises(KernelError, match="different payload digest"):
         _drive(tmp_path, run, services=b)
+
+
+# -- validity: partial-allowed vs indivisible -----------------------------------------------------
+
+
+class _PartialDescriptor(TaskSuiteOperationDescriptor):
+    name = "task-suite@1"  # resolvable; only validity differs for these unit tests
+    validity = "partial-allowed"
+
+
+class _IndivisibleDescriptor(TaskSuiteOperationDescriptor):
+    name = "task-suite@1"
+    indivisible = True
+
+
+def test_partial_allowed_scores_only_completed_cases() -> None:
+    # an incomplete attempt under partial-allowed is VALID and aggregates over the
+    # cases that RAN — un-run cases are excluded, never floored.
+    task = TASK
+    desc = _PartialDescriptor()
+    plan = desc.create_plan(_context(task))
+    n = len(plan.manifest)
+    assert n >= 2
+    # only the first two cases ran, both correct
+    outcomes = tuple(CaseOutcome(f"op-{i}", plan.manifest[i].expected, None, 1.0) for i in range(2))
+    proj = desc.project(
+        plan, command_id="c", state_ref="s",
+        report=_report(ok=False, outcomes=outcomes, fault="unknown"),
+        evaluation=_evaluation(0, n), origin=OP_BEHAVIORAL,
+    )
+    assert proj.valid  # partial-allowed with >=1 completed behavioral case
+    assert proj.overall == 1.0  # 2/2 completed cases passed — un-run excluded
+    assert proj.coverage_completed == 2 and proj.coverage_total == n
+
+
+def test_indivisible_floors_completed_cases_on_a_partial_attempt() -> None:
+    # an indivisible plan floors ALL cases when the attempt is partial/faulted:
+    # no case is credited and no aggregate is published.
+    task = TASK
+    desc = _IndivisibleDescriptor()
+    plan = desc.create_plan(_context(task))
+    n = len(plan.manifest)
+    outcomes = tuple(CaseOutcome(f"op-{i}", plan.manifest[i].expected, None, 1.0) for i in range(2))
+    proj = desc.project(
+        plan, command_id="c", state_ref="s",
+        report=_report(ok=False, outcomes=outcomes, fault="unknown"),
+        evaluation=_evaluation(0, n), origin=OP_BEHAVIORAL,
+    )
+    assert not proj.valid
+    assert proj.overall is None
+    assert not any(vc.passed for vc in proj.cases)  # completed cases floored
+
+
+# -- policy/review consumes only the projection ---------------------------------------------------
+
+
+def test_policy_reads_only_the_projection_never_protected_evidence() -> None:
+    # STRUCTURAL proof: the continual-refine policy's operation readers consume
+    # OperationProjection exclusively — they never decode the protected
+    # AttemptRecord or read OPERATION_RESULT.
+    import strive.policies.continual_refine as cr
+
+    src = Path(cr.__file__).read_text(encoding="utf-8")
+    assert "OperationProjection" in src
+    assert "OPERATION_PROJECTION" in src
+    # it never DECODES the protected AttemptRecord nor reads the OPERATION_RESULT
+    # observation (those live behind the kernel; only the projection is consumed)
+    assert ", AttemptRecord)" not in src  # no `codec.loads(..., AttemptRecord)`
+    assert "OPERATION_RESULT" not in src
+
+
+# -- plan corruption is refused, not silently run -------------------------------------------------
+
+
+def test_corrupted_pinned_plan_fails_closed(tmp_path: Path) -> None:
+    import strive.kernel as kmod
+    from strive.runtime import CommandPayload
+
+    run = new_run_id()
+    a = _services(tmp_path, run)
+    original = kmod._run_attempt
+
+    def _crash(*args: object, **kwargs: object) -> object:
+        if kwargs.get("gen_prefix") == "operation":
+            raise KeyboardInterrupt("crash before the operation result")
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    kmod._run_attempt = _crash  # type: ignore[assignment]
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            _drive(tmp_path, run, services=a)
+    finally:
+        kmod._run_attempt = original
+
+    # CORRUPT the pinned plan object in CAS, then resume: the observe must fail
+    # closed (never silently proceed on a corrupt plan)
+    sub = Substrate.discover(tmp_path, run)
+    view = sub.verify()
+    issued = next(i for i in view.issued.values() if i.command_kind == "ObserveCurrentState")
+    payload = codec.loads(sub.objects.get_text(issued.command_ref), CommandPayload)
+    assert payload.plan_ref is not None
+    plan_path = sub.objects._path(payload.plan_ref)
+    plan_path.write_text("{not a valid operation plan}", encoding="utf-8")
+
+    with pytest.raises(Exception):  # noqa: B017 — corruption must not silently pass
+        _drive(tmp_path, run)

@@ -8,6 +8,7 @@ fails loudly by design.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from strive.codec import register
@@ -48,6 +49,25 @@ FAULT_CANDIDATE = "candidate"            # PROVEN the candidate's own code (beha
 FAULT_INFRASTRUCTURE = "infrastructure"  # PROVEN backend/launcher/runtime or run-budget
 FAULT_UNKNOWN = "unknown"                # a boundary fault whose cause is NOT proven
 FAULT_ORIGINS = (FAULT_CANDIDATE, FAULT_INFRASTRUCTURE, FAULT_UNKNOWN)
+
+# precedence when aggregating per-case fault origins across an attempt: a later
+# infrastructure/unknown fault DOMINATES an earlier candidate one, so event order
+# can never hide a backend fault behind a candidate one. This is the ONE shared
+# aggregation rule the CandidateExecutor's per-suite pass and the kernel's
+# per-attempt pass both use (`dominant_fault`), so the recorded failure and its
+# origin always come from the SAME dominant per-case item.
+FAULT_RANK = {None: 0, FAULT_CANDIDATE: 1, FAULT_UNKNOWN: 2, FAULT_INFRASTRUCTURE: 3}
+
+
+def dominant_fault(
+    faults: "Sequence[tuple[FailureRecord, str | None]]",
+) -> "tuple[FailureRecord | None, str | None]":
+    """The dominant (failure, origin) pair from ORDERED per-case faults, or
+    (None, None) when there were none. Both come from the same item, so they are
+    always self-consistent."""
+    if not faults:
+        return None, None
+    return max(faults, key=lambda fo: FAULT_RANK.get(fo[1], 2))
 
 # proposal-pipeline rejection kinds, each journaled distinctly
 

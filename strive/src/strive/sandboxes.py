@@ -45,6 +45,7 @@ from strive.contracts import (
     ExecutionReport,
     FailureRecord,
     TaskCase,
+    dominant_fault,
 )
 
 FAULT_ONLY_BACKEND = "process-fault-only@1"
@@ -415,8 +416,10 @@ def run_protected_suite(
     outcomes: dict[str, CaseOutcome] = {}
     denials: list[str] = []
     provenance: SandboxProvenance | None = None
-    boundary_failure: FailureRecord | None = None
-    boundary_fault_origin: str | None = None
+    # ORDERED per-case boundary faults; the dominant one (via the SHARED
+    # `dominant_fault` rule) becomes the aggregate failure+origin, so this
+    # per-suite pass and the kernel's per-attempt pass aggregate identically.
+    faults: list[tuple[FailureRecord, str | None]] = []
     effective_limits = limits or SandboxLimits()
     total_wall_s = 0.0
     total_stdout_bytes = 0
@@ -431,14 +434,14 @@ def run_protected_suite(
                 f"before case {case.case_id}"
             )
             # an exhausted suite deadline is a BOUNDARY timeout, not a candidate
-            # error — surface it as the aggregate failure.
-            if boundary_failure is None:
-                boundary_failure = FailureRecord(
+            # error — a RUN-BUDGET shortfall enforced by the parent
+            faults.append((
+                FailureRecord(
                     kind=FAILURE_TIMEOUT,
                     detail=f"suite deadline {effective_limits.suite_deadline_s}s exhausted",
-                )
-                # a RUN-BUDGET shortfall enforced by the parent, not the candidate
-                boundary_fault_origin = FAULT_INFRASTRUCTURE
+                ),
+                FAULT_INFRASTRUCTURE,
+            ))
             outcomes[case.case_id] = CaseOutcome(
                 case_id=case.case_id,
                 output=None,
@@ -468,10 +471,8 @@ def run_protected_suite(
             failure = result.report.failure or FailureRecord(
                 kind=FAILURE_CRASH, detail="protected execution failed"
             )
-            if boundary_failure is None:
-                boundary_failure = failure
-                # carry the backend's TRUSTED origin stamp (candidate vs backend)
-                boundary_fault_origin = result.report.fault_origin
+            # carry the backend's TRUSTED origin stamp (candidate vs backend)
+            faults.append((failure, result.report.fault_origin))
             outcomes[case.case_id] = CaseOutcome(
                 case_id=case.case_id,
                 output=None,
@@ -480,6 +481,7 @@ def run_protected_suite(
             )
     if provenance is None:  # empty suite (or all deadline-skipped)
         provenance = backend.provenance(effective_limits)
+    boundary_failure, boundary_fault_origin = dominant_fault(faults)
     return (
         outcomes, provenance, tuple(denials), round(total_wall_s, 6),
         total_stdout_bytes, boundary_failure, boundary_fault_origin,
