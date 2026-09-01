@@ -147,8 +147,9 @@ thesis:
   spec is content-addressed in `PolicyBound` and cumulative spend is re-seeded
   from durable usage, so restart cannot reset or expand it; wall + cumulative
   output are enforced alongside execution count. External model calls
-  (`RequestRefinement`, deferred) are documented as not exactly-once and must
-  record `indeterminate` on a dispatch-without-durable-result crash.
+  (`RequestRefinement`, IMPLEMENTED in Phase B) are AT-MOST-ONCE — not
+  exactly-once — and record `indeterminate` on a dispatch-without-durable-result
+  crash, requiring an explicit retry.
 - **Hardened CAS + injected surface catalog.** Canonical sha256 ref
   validation (traversal safe), hash-verified reads, concurrent-writer-safe
   publication (unique temp + fsync + atomic replace); an injected immutable

@@ -95,10 +95,30 @@ the thesis and floor, `docs/ROADMAP.md` for what's next
 (`continual-refine@1`), and `docs/adrs/0008-vnext-substrate.md` for the
 design decision.
 
-## The proof policy
+## The policies
 
 `manual-change@1` (deterministic) builds one coupled prompt+code change,
 `EvaluateFork`s it (the optional comparative mechanism), and — reacting to
-the fork through its reducer — applies then reverts it exactly. Honest
-scope: the fork scores the code surface; the prompt surface is round-trip
-only until `continual-refine@1` adds a real prompt consumer.
+the fork through its reducer — applies then reverts it exactly. It is the
+substrate proof; its fork scores the code surface.
+
+`continual-refine@1` is the real continual, model-led policy. It alternates
+OPERATION and REFINEMENT over a continuing trajectory: it operates the active
+harness (`ObserveCurrentState`, journaling real behavior as feedback), then
+`RequestRefinement`s — the kernel binds a model, renders the prompt from the
+per-role pinned control prompt + the ACTIVE proposal template + a context of
+real observations/prior rationale/changes/usage/failures, calls the model
+through an injected immutable `ModelCatalog`, and STRICTLY decodes a typed
+`RefinementProposal` under durable constraints (malformed output is
+failure-as-data). Its surface strategies assemble ONE atomic coupled prompt+code
+change, applied immediately under the kernel floor; `EvaluateFork` is an
+OPTIONAL observation, never a gate. It operates again to see the changed
+behavior, then reviews — keep (`ConfirmChange`), revert (exact rollback), defer
+(observe more), or revise (a new atomic change with lineage) — across cycles.
+Model calls are durably bound and budgeted (a resume can't switch models after
+issue; open dispatches reserve tokens/wall/cost; a finite cost budget against a
+non-reporting adapter fails closed); model-authored code stays inside the
+SECURE executor (`trusted=False`, secure capabilities — production never
+defaults to fault-only); and the policy gets only a mechanically read-only
+content view. CI drives it with a deterministic fake model through the exact
+production adapter path; real-model runs are opt-in (`STRIVE_MODEL_*`).

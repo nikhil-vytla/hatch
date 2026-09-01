@@ -1631,3 +1631,625 @@ reconciled ledger usage, effect-after-failure freeze, AttemptRecord bound to its
 report+evaluation); candidate failures stay distinct from infrastructure
 failures (boundary ok=False propagated; candidate exceptions stay per-case); and
 retained evaluation evidence exactly supports the scores policy uses.
+
+## 2026-08-18 — Phase B kickoff: continual-refine@1
+
+Phase A closed: fixed the contradictory `expected_state_ref` HANDOFF text (it
+IS part of the durable command identity, per `_command_identity_json`),
+refreshed PR #50 body to 241 tests / final head, verified green
+(pytest 241, mypy 39 files, wheel smoke), and MERGED #50. Branched
+`strive-vnext-phaseB` off the updated main.
+
+Design orientation (Phase A recap):
+- Policy protocol (`strive.policy`): `AdaptationPolicy` (initial_state/decode_state/
+  next_command/reduce), `SurfaceStrategy.propose(view)->CompositeChange|None`,
+  `PolicyDescriptor` (factory, config_loader, prompt_files, dependency_modules),
+  injected `PolicyCatalog`. Result-driven loop in `kernel.run_policy`.
+- `RequestRefinement(command_id, prompt_role, context_ref)` exists but `_perform`
+  raises KernelError ("unimplemented in Phase A").
+- Model infra (`strive.model`): `ModelAdapter` protocol, `FakeModelAdapter`
+  (script/responder/digest), `OpenAICompatAdapter`, `adapter_from_env`,
+  `MeteredJournalingAdapter` — BUT the metered wrapper journals to the OLD
+  `EventLog`, not the vNext substrate. Phase B needs a substrate-journaling
+  model path (typed ModelDispatch/ModelResult events + CAS).
+- Budget meter (`strive.budget`): request_model_call / note_model_usage /
+  model_call_timeout_s / cap_output_tokens / tokens_overrun / cost_overrun
+  exist. `BudgetSpec.model_calls` defaults to 0 (nothing allowed) — the policy
+  budget must raise it. `_seed_meter` currently rebuilds only fork usage;
+  must also absorb durable model-call usage for restart-safe model budgets.
+- Surfaces: `strategy-code/solve` (python, one top-level solve), `prompt/
+  proposal-template` (non-empty text). The active prompt must genuinely shape
+  the model prompt (causal), not round-trip only.
+- Task `sum-integers` planted weakness: baseline `\d+` drops minus signs;
+  fix is `-?\d+`. Negative cases (visible + held-out) fail until fixed.
+
+Drafted policy prompts: `prompts/continual_refine_refine@1.md` and
+`prompts/continual_refine_review@1.md`, both describing ONE strict JSON
+`RefinementProposal` (change_id, rationale, cited_evidence, expected_outcomes,
+uncertainty in [0,1], review_hint in {keep,revise,revert,defer}, edits[]).
+Review reuses the same decode type via `review_hint`.
+
+## 2026-08-18 — Phase B implementation: continual-refine@1
+
+Built the real continual, model-led policy over the Phase A substrate.
+
+### Kernel RequestRefinement (`_run_refinement`)
+Journals a model DISPATCH then RESULT as ObservationRecorded (REFINE_DISPATCH/
+REFINE_RESULT), mirroring the fork attempt lifecycle:
+- reuse a durable ModelResult across a crash before the terminal; an OPEN
+  dispatch (no result) → IndeterminateEffect (explicit retry, never re-called);
+- budget checked FIRST (a pre-call denial fails with NO dispatch/result, so
+  nothing is charged/replayed); then dispatch (durable) → adapter.complete →
+  result (durable);
+- adapter error / token+cost overrun / malformed decode → failed terminal with
+  a durable ModelResult recording the failure (failure-as-data);
+- the prompt is rendered from the per-role pinned CONTROL prompt (refine.md /
+  review.md, from PolicyBound.prompt_refs) + the ACTIVE proposal-template
+  surface + the policy context — so the active prompt genuinely shapes the call.
+
+Restart-safe model budget: `_seed_meter` and `_reconciled_usage` fold model
+results (model_result_usage) and open dispatch reservations
+(model_dispatch_reservation) into the durable ledger, alongside fork usage.
+
+### Substrate verify
+- `_OK_EFFECTS["RequestRefinement"]` = one dispatch + one result (ordered);
+  cause-compat for its observations; `_verify_observation` decodes
+  ModelDispatch/ModelResult (command_id == cause; a result carries exactly one
+  of proposal|failure); per-outcome StoredResult checks (ok: observation_ref ==
+  the model-result event, no metrics, usage == reconciled model ledger).
+- Hardening: a fork's `issue_state_ref` must equal the folded state at issue;
+  `_canonical_json_ok` now rejects NaN/Infinity (parse_constant + allow_nan);
+  `_policy_digest` imports each declared dependency module before hashing.
+- One-in-flight discipline enforced at the KERNEL boundary
+  (`_require_settled_before_issue`): a new issue is refused while a prior
+  command lacks a terminal or a consuming checkpoint. (Left OUT of substrate
+  verify on purpose — the substrate is a general mechanism and direct-substrate
+  tests legitimately issue multiple uncompleted commands.)
+
+### Policy package
+- `continual_refine.py`: strict TOML config (triggers, trajectory window, edit
+  limit, enabled strategies, model role, review mode/cadence, optional
+  EvaluateFork, max cycles); deterministic run+cycle-scoped state machine; a
+  context builder that EXCLUDES the in-flight refine's own events so a resumed
+  re-derivation is byte-identical (the payload digest is stable).
+- `continual_refine_strategies.py` (a declared dependency_module, pinned into
+  the digest): prompt & strategy-code SurfaceStrategy impls that turn a
+  RefinementProposal into per-surface deltas, skipping no-op edits; the
+  orchestrator merges them into ONE atomic coupled change. Rationale ->
+  change.summary; strategy set -> ApplyChange.strategy_ref (annotations bound).
+- `runtime` gained SurfaceEdit, RefinementProposal, ModelDispatch (with
+  reservation), ModelResult; `strive.refine` renders the prompt and STRICTLY
+  decodes the proposal (rejects NaN/Infinity, unknown/missing keys, off-limits
+  or structurally-invalid surfaces). `strive.model.ModelCatalog` is the
+  injected, immutable, fail-closed role->adapter.
+- RunView gained a READ-ONLY ObjectStore so a policy can resolve a proposal ref
+  to build its next change (no mutation exposed).
+- CLI `run --policy continual-refine@1` wires a real adapter from
+  STRIVE_MODEL_* env (opt-in); offline it is a clean error (never a silent fake).
+
+### E2E (deterministic FakeModelAdapter through the real ModelCatalog path)
+seed \d+ weakness -> refine -> typed coupled proposal -> immediate apply ->
+negatives now sum correctly -> restart resumes with NO duplicate model call ->
+review keeps or (model/auto) reverts -> rollback restores the EXACT seed. An
+ablation proves the ACTIVE PROMPT causally determines the proposal. Adversarial:
+malformed output, adapter error, exhausted model budget (no effect), open
+dispatch -> indeterminate (not re-run), unavailable secure backend, NaN
+uncertainty, and crash-and-resume after every command boundary. Real-model runs
+are opt-in. pytest 257, mypy 43 files, wheel smoke retained.
+
+## 2026-08-19 — Phase B correction (PR #51): truly-continual, secure, bounded
+
+Corrected PR #51 across five areas; preserved Phase A, policy neutrality,
+immediate model-led adaptation, and OPTIONAL EvaluateFork. No Pareto, no gate.
+
+1. Truly continual loop. New `ObserveCurrentState` command runs the ACTIVE
+   harness once through `CandidateExecutor` and journals a typed state-scoped
+   AttemptRecord (OBSERVE_RESULT) — feedback, not a gate; reconciled into the
+   budget ledger and evidence-bound like a fork attempt (gen_prefix "observe").
+   Policy alternates warm-up/operate → refine → immediate apply → post-change
+   observation window → review → next cycle (max_cycles); strict TOML for
+   trigger_mode/warmup/review_window/max_cycles; dead `change_id_prefix`
+   removed. Contexts are built from REAL observations (scores + the exact
+   failing cases), prior rationale/citations/expected-outcomes, changes, usage,
+   and failures.
+
+2. Full review. keep→ConfirmChange, revert→exact rollback, defer→gather more +
+   re-review (defer-scoped review id, capped, never terminates), revise→new
+   atomic change with lineage in the annotation. Durable RequestRefinement
+   constraints (required_change_id, edit_limit, enabled_surfaces, edit_rule)
+   are enforced in `decode_proposal` as failure-as-data; role-specific edits
+   (refine requires edits; keep/revert/defer none; revise edits).
+
+3. Exact + bounded model effects. A `ModelBinding` event pins
+   adapter/model/config_digest; resume refuses to switch models after issue.
+   Model lifecycle verification parallel to forks: issue-state subject,
+   control+active-template+context → exact prompt ref, binding→dispatch→result
+   ordering + adapter/model agreement, finite usage, known finish reason, and
+   proposal == strict decode of the response under the issued constraints. Open
+   dispatches reserve input+output tokens, wall, AND estimated cost; a finite
+   cost budget with a non-reporting/non-estimating adapter fails closed.
+   `config.model_role` wired.
+
+4. Boundaries restored. `RunView.objects` (ObjectStore) → a mechanically
+   read-only `ContentReader` (cas.ReadOnlyContent). Proposals decode against
+   RUN-PINNED descriptors + policy-enabled surfaces, not the live catalog.
+   `PolicyDescriptor.requires_secure_execution` + a kernel guard: production
+   continual-refine@1 refuses an insecure backend (only a test-only
+   `allow_insecure_execution` opt-in permits fault-only); the CLI defaults it to
+   a secure backend + trusted=False + secure caps and seeds a behavioral
+   (non-fix-revealing) prompt.
+
+5. E2E. The seed prompt hides the fix; the harness is operated weak first
+   (negative failures recorded), the refiner cites them, and behavior is
+   operated again after apply to prove the change. Covers two cycles,
+   manual/cadence, all four verdicts, restart at every command boundary,
+   model-binding drift (fail closed), decode-constraint rejections, edit-limit
+   failure-as-data, cost-fail-closed, insecure-backend rejection, and the
+   optional-fork-is-observation invariant. 265 tests, mypy clean over 43 files,
+   fresh-interpreter + installed-wheel smoke retained.
+
+## 2026-08-20 — PR #51 correction round 2 (5 areas)
+
+1. **Non-leaky operation feedback (`strive.operate`).** An injected, versioned
+   `OperationDriver`; `task-suite@1` operates the harness over the VISIBLE split
+   RELABELLED with opaque `op-N` ids (an "operation" split). Hidden splits and
+   their answers never reach the Refiner; the E2E asserts operation evaluations
+   reference only `op-N` ids and no hidden case id.
+
+2. **Crash-honest operation.** ObserveCurrentState journals OperationDispatched
+   → OperationResult (AttemptRecord), reserved, subject-scoped; a crash between
+   them is an OPEN dispatch → indeterminate (never re-run; reservation retained).
+   `_run_attempt` takes an explicit `cases` set; verify + budget reconciliation
+   mirror forks.
+
+3. **Truthful review.** Removed the fake `trigger_mode` (no external trigger
+   exists). Auto review compares pre/post operation observations and never
+   blindly keeps (keep only on measured improvement, else revert). `keep`
+   confirms with the ORIGINAL rationale; exhausted `defer` stops UNRESOLVED
+   (unconfirmed, not silent keep); `revise` applies a new atomic change with
+   lineage, then OBSERVES and REVIEWS the revised state before confirming.
+   Review context carries the applied change + original rationale/citations/
+   expected outcomes + optional fork evidence + ONLY post-apply observations.
+
+4. **Model intent/recovery.** The RESOLVED model identity
+   (`model_role|adapter|requested_model|config_digest`) is pinned in the durable
+   CommandPayload intent BEFORE issue, so a wrong-model resume re-derives a
+   different digest and is REFUSED (hard error, before the try) without failing
+   the command — closing the issue→dispatch window too. Cost fails closed: a
+   finite cost budget requires a conservative preflight estimate; open dispatches
+   reserve input+output tokens, wall, and cost. A `ModelTransportError` (possible
+   dispatch, unknown spend) → indeterminate with the reservation retained;
+   a proven-no-call error → failed. Unusable finish reasons (length/error) are
+   failure-as-data. The unused `idempotency_key` was removed (at-most-once
+   documented).
+
+5. **E2E.** Non-leaky fixture derives the fix from observed (opaque id,
+   expected) feedback — a negative expected the harness got wrong → propose
+   `-?\d+` — never a case name or hard-coded answer. Covers hidden-split
+   isolation, crash-honest operation + indeterminate, restart-no-duplicate,
+   auto no-fork revert, real keep rationale, exhausted-defer-unresolved,
+   revise→observe→review, two-cycle evolved-prompt exercise, wrong-model resume
+   refusal, cost-fail-closed, unusable finish, transport-indeterminate, optional
+   fork, insecure-backend rejection, and a secure-backend run (skipped if deno
+   absent). 266 tests, mypy clean over 44 files.
+
+Honest nuances: model intent uses the payload digest (resolved model pinned pre
+-issue); the ModelBinding evidence event remains for verify (slight redundancy).
+Operation feedback exposes opaque ids + expected/got/errors (observed output);
+raw input text is not yet threaded into CaseOutcome/Evaluation evidence. The
+legacy `MeteredJournalingAdapter` (old EventLog path) was left in place, unused
+by the vNext kernel — consolidation deferred.
+
+---
+
+## PR #51 correction round 4 (Stage 3C.2A.2) — model intent/budgets, truthful confirm, adversarial proofs
+
+Focused, fully-green corrections; the full CAS-backed `OperationPlan`
+architectural rework (Area 1) is honestly deferred (see below).
+
+**Area 4 — model intent + budgets (done).**
+- `RequestRefinement` now carries `model_role` in its own durable intent; the
+  kernel resolves the adapter from `command.model_role`, NOT from a separately
+  aligned `KernelServices.model_role` (that field is now unused in the refine
+  path — proven by `test_command_model_role_is_authoritative_over_services_role`).
+- The pinned binding is `model_role|adapter|impl_version|requested_model|
+  config_digest`; `ADAPTER_IMPL_VERSIONS` + `adapter.impl_version` mean a changed
+  adapter IMPLEMENTATION (not just config) is detected on resume.
+- `adapter.estimate_input_tokens` supplies a CONSERVATIVE input-token bound
+  (~1 token / 3 chars + envelope), replacing `len(prompt)//4`; invalid (<1)
+  reservations are rejected.
+- Pre-dispatch budget denial via `BudgetMeter.would_exceed_tokens` /
+  `would_exceed_cost`: a reservation (est input + capped output; est cost) that
+  would exceed the remaining budget is denied BEFORE dispatch (nothing spent),
+  distinct from the post-call overrun checks. Cost unavailable is `None`, never
+  `0` (OpenAI adapter `estimate_cost` returns `None`).
+- Post-dispatch adapter exceptions default to `indeterminate`; ONLY a proven
+  `ModelNoCallError` becomes `failed` (inverted from the old default). The
+  OpenAI-compatible adapter classifies refused/DNS → `ModelNoCallError`;
+  timeout/HTTP/unparseable-response → `ModelTransportError`.
+- Removed the legacy `MeteredJournalingAdapter`/`CompletingAdapter`: the kernel
+  `_run_refinement` is the single metered/journaled model boundary.
+
+**Area 3 — truthful confirm + revision lineage (slice done).**
+- `ChangeConfirmed` verification now requires the target be CURRENTLY in effect:
+  applied, not reverted, and not superseded. Confirming an inactive/reverted/
+  superseded change is refused fail-closed (was: only checked "was proposed").
+- `ChangeRevised` folding enforces typed old→new supersession lineage (retired
+  change must be live; replacement may not reuse the retired id); the view now
+  exposes `superseded_change_ids`.
+- Policy: a SECOND revise in one cycle now leaves the change UNRESOLVED
+  (stop-unresolved) instead of silently confirming it (the old `verdict="keep"`
+  bug). The revise happy-path reviews the REVISED change with its own content
+  and confirms THAT, not the original.
+
+**Area 5 — adversarial proofs (added).** proven-no-call→failed vs transport→
+indeterminate; conservative-token reservation denies pre-dispatch; command
+model_role authoritative over services role; confirm-of-reverted and
+confirm-of-unapplied refused (substrate); second-revise-unresolved (policy).
+
+**Tooling.** `uv run mypy` clean (44 files); `uv run pytest` 266 passed;
+`test_packaging` (installed-wheel CLI smoke) + `test_substrate_only`
+(fresh interpreter) green.
+
+**Honestly deferred / not done this round.**
+- Area 1's full pluggable versioned `OperationDriver` + CAS-backed
+  `OperationPlan` with a pinned implementation+config digest and a policy-visible
+  result envelope is NOT rebuilt here; the existing `task-suite@1` driver
+  (opaque-id operation split) stands. This is the largest remaining architectural
+  item.
+- Area 3's UNIFIED typed `ReviewDecision` envelope (verdict+rationale+evidence+
+  optional replacement as one preserved record) is only partially realized:
+  rationale is preserved on confirm, supersession lineage is verifiable via
+  `ChangeRevised`, but `ChangeRevised` is not yet EMITTED by the policy through
+  the closed grammar (the revise applies a separate `ApplyChange`), so
+  `superseded_change_ids` is enforced-but-currently-unpopulated defensive
+  verification. Revert-returns-parent-to-explicit-unresolved is not specially
+  handled beyond the existing revert path.
+- Area 2 (behavior-vs-infrastructure outage isolation) was not revisited this
+  round.
+
+---
+
+## PR #51 correction round 5 (Stage 3C.2A.3) — budget-correct model accounting
+
+Landed Area 4 in full; Areas 1, 2, and the Area-3 revision-lifecycle emission
+remain deferred (below), consistent with prior rounds.
+
+**Area 4 — close model identity + accounting (done).**
+- **Finite-token preflight fixed.** The old order capped output to the FULL
+  remaining tokens and then added the input estimate on top, so a viable finite
+  budget was wrongly denied. Now: estimate input FIRST, deny pre-dispatch if the
+  input estimate alone exhausts the remaining budget, else cap output to
+  `remaining - input` (`BudgetMeter.remaining_tokens()` +
+  `cap_output_tokens(requested, reserved_input=)`). A viable finite budget now
+  succeeds; the reservation never spuriously exceeds.
+- **Unknown usage/cost is never charged as 0.** New adapter capability
+  `reports_usage` (fake=True, openai-compatible=False). When token/cost usage is
+  untrusted (or the provider omits it, or reports 0), the kernel charges the
+  CONSERVATIVE dispatch reservation instead of 0, and records those charged
+  values in the `ModelResult` so the resume-time reconciliation
+  (`model_result_usage`) matches the live charge exactly. Raw provider-reported
+  values are preserved in `provider_extras` for audit.
+- **Requested vs provider-resolved model ids recorded separately** (dispatch
+  carries the requested id; the result carries the resolved id; both also in
+  `provider_extras`). Verify already allows `result.model_id != dispatch.model_id`
+  (only the adapter name must agree).
+- **Removed the unused `KernelServices.model_role`** — the command's own
+  `model_role` is authoritative (CLI keeps a local role for catalog build +
+  display). Rewrote the stale Phase-A (D3/D7/D11) model-call docstring: the
+  adapter is a thin pure boundary; the kernel is the single metered/journaled
+  model boundary.
+- Adversarial tests: viable-finite-budget-succeeds; underestimated-reservation
+  rejected post-call (a lying adapter is still caught by the token overrun);
+  untrusted-usage charges the reservation, not 0; requested-vs-resolved ids;
+  budget-unit tests for the reordered preflight.
+
+**Tooling.** `uv run mypy` clean (44 files); `uv run pytest` **272 passed**;
+`test_packaging` (installed-wheel CLI smoke) + `test_substrate_only` green.
+
+**Honestly deferred / NOT done this round (unchanged from prior rounds).**
+- **Area 1** — the pluggable versioned `OperationDescriptor`/catalog + CAS-backed
+  `OperationPlan` (pinned impl/config digest + plan ref in `ObserveCurrentState`
+  intent, driver-owned preparation/execution/interpretation/projection) is NOT
+  built; the existing `task-suite@1` opaque-id operation split stands.
+- **Area 2** — distinguishing behavioral vs infrastructure vs indeterminate
+  operation outcomes (so a sandbox outage never becomes a code lesson/regression
+  score, with configurable retry/defer/unresolved and a policy-visible payload
+  split from protected evaluator detail) is NOT built.
+- **Area 3** — the typed `ReviewDecision` annotation and a closed `ReviseChange`
+  lifecycle that EMITS verified `ChangeRevised` old→new lineage are still not
+  wired through the closed grammar; `superseded_change_ids` remains
+  enforced-but-currently-unpopulated defensive verification (confirm-of-reverted/
+  inactive IS enforced). The typed `ModelBinding` struct replacing the pipe
+  string was also not done — the resolved identity is still pinned as a
+  deterministic string embedding role|adapter|impl|model|config.
+
+---
+
+## PR #51 correction round 6 (Stage 3C.2A.4) — separate behavior from infrastructure (Area 2)
+
+Landed Area 2 in full; Areas 1 and the Area-3 revision-lifecycle emission remain
+deferred (below), consistent with prior rounds.
+
+**Area 2 — infrastructure failures cannot steer adaptation (done).**
+- **Typed operation-outcome classification** (`strive.runtime.classify_operation`
+  → `behavioral` | `infrastructure`, plus the `indeterminate` open-dispatch case
+  handled separately). It is a PURE function of the durable `AttemptRecord`
+  fields (`denials`, `failure.kind`), so it is reproducible and verifiable
+  without a schema/version migration:
+  - a candidate that ran and was scored — even one whose code errors, times out,
+    or crashes — is **behavioral** (its own quality; a real lesson);
+  - a sandbox denial (`denials` non-empty) or a run-resource shortfall
+    (`budget-exhausted`, an incomplete run) is **infrastructure**.
+- **Only behavioral feedback steers adaptation.** `continual-refine`'s three
+  readers now skip infrastructure outcomes: the refiner context
+  (`_observations`), the auto pre/post score (`_pre_post_overall`), and review
+  evidence (`_post_apply_observations`).
+- **Infrastructure never reverts.** Auto review with no VALID behavioral
+  post-observation now DEFERS (bounded by `review_window + _MAX_DEFERS`) and then
+  leaves the change **UNRESOLVED** — it can no longer be misread as a regression
+  and rolled back. (This also fixed a latent auto-mode defer loop: the defer
+  counter only advanced in the model-review phase.)
+- Tests: `test_operation_outcomes.py` (classifier: behavioral for timeout/crash,
+  infrastructure for budget-shortfall/denial); an injected outage executor E2E
+  proving infra operations are recorded, never enter learning, never trigger a
+  rollback, and end the run unresolved.
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **277 passed**;
+`test_packaging` (installed-wheel CLI smoke) + `test_substrate_only` green.
+
+**Honestly deferred / NOT done this round.**
+- **Area 1** — the versioned `OperationDescriptor`/catalog + CAS-backed
+  `OperationPlan` (pinned impl/config digest + plan ref in `ObserveCurrentState`
+  intent, matched-plan pre/post, driver-owned preparation/execution/
+  interpretation/projection) is still NOT built; `task-suite@1` opaque-id split
+  stands. Largest remaining architectural item.
+- **Area 3** — the typed `ReviewDecision` annotation + a closed `ReviseChange`
+  lifecycle that EMITS verified `ChangeRevised` old→new lineage remain unwired
+  (confirm-of-reverted/inactive/superseded IS enforced; `superseded_change_ids`
+  stays enforced-but-unpopulated). Causal prompt-only shadow-refinement proof not
+  added.
+- **Area 4** — the typed `ModelBinding` struct replacing the pipe-string identity
+  was not done (the resolved identity is a deterministic string embedding
+  role|adapter|impl|model|config); the `basis` (`actual`/`reservation`/`unknown`)
+  typing of usage is expressed via `provider_extras` flags rather than a typed
+  field.
+
+Note on the goal's operation-outcome storage split ("policy-visible observation
+separate from protected runtime/evaluation evidence"): this already holds — the
+`AttemptRecord` keeps `report_ref` (full ExecutionReport) and `evaluation_ref`
+distinct, and the refiner context only ever surfaces opaque case ids +
+expected/got, never raw inputs.
+
+---
+
+## PR #51 correction round 7 (Stage 3C.2A.5) — TRUSTED operation-outcome origin (Area 2 fix)
+
+Directly corrects round 6: the `denials`/`failure.kind` heuristic is REPLACED by
+a trusted classification produced at the execution boundary, persisted, and
+verified. Rationale (from the goal): a candidate infinite-loop timeout and a
+backend launch fault can share a failure kind but never an origin, so a
+downstream heuristic on the kind is unsound.
+
+- **`ExecutionReport.fault_origin`** (`FAULT_CANDIDATE` | `FAULT_INFRASTRUCTURE`
+  | None), stamped by the sandbox — the only layer that knows whose fault an
+  `ok=False` was. (`execution-report@2`.)
+- **Boundary stamping.** `sandbox.py` (fault-only) and `sandbox_backends.py`
+  (deno-pyodide) stamp candidate faults — per-candidate timeout, non-zero exit
+  crash, stdout flood, pyodide `CodeExecutionError` (candidate exception /
+  forbidden action) — as `FAULT_CANDIDATE`; and backend/launcher faults and
+  runner-protocol breaks (schema-mismatch, malformed output) as
+  `FAULT_INFRASTRUCTURE`. `run_protected_suite` marks a suite-deadline
+  (run-budget) shortfall infrastructure and otherwise propagates the backend's
+  stamp. A candidate EXCEPTION stays a scored `ok=True` per-case error
+  (behavioral), unchanged.
+- **Kernel `_attempt_origin`** maps the trusted evidence to a typed
+  `AttemptRecord.origin` (+ `origin_detail`): clean run or candidate fault →
+  behavioral; backend fault, run-budget shortfall, or an UNSTAMPED failure →
+  infrastructure (conservative: never learn from an unclassified fault).
+  (`execution-attempt@3`.)
+- **Verification checks it.** `_check_attempt_evidence` recomputes the expected
+  origin from the referenced report's `fault_origin` and rejects any record
+  whose `origin` disagrees — so the classification can never float free of the
+  evidence.
+- **`classify_operation`** now simply returns the persisted trusted origin (no
+  heuristic). The policy gates learning/scoring/review on it exactly as before.
+- Tests: `test_operation_outcomes.py` proves candidate-timeout is stamped
+  candidate/behavioral, same-kind-different-origin, clean-run-has-no-origin, and
+  the `_attempt_origin` mapping; the outage E2E now injects a real
+  `FAULT_INFRASTRUCTURE` backend fault and asserts every operation is
+  trusted-stamped infrastructure, never teaches, never reverts, ends unresolved.
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **279 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Still deferred (unchanged):** Area 1 (CAS-backed `OperationPlan`), Area 3
+(typed `ReviewDecision` + `ReviseChange`/`ChangeRevised` emission), Area 4 typed
+`ModelBinding` struct. The typed operation ORIGIN landed here is a step toward
+Area 1's "typed policy-visible result", but the versioned `OperationDescriptor`/
+`OperationPlan` pinning is still not built.
+
+---
+
+## PR #51 correction round 8 (Stage 3C.2A.6) — provable fault origin + behavioral windows (Areas 1 & 3)
+
+**Area 1 — fault origin is proven or UNKNOWN (done).** Corrects round 7's
+over-confident candidate stamping.
+- A THIRD origin `unknown` (`FAULT_UNKNOWN` / `OP_UNKNOWN`). `candidate` and
+  `infrastructure` are stamped ONLY when proven; every ambiguous boundary fault
+  is `unknown`.
+- Reclassified stamps: a Deno/Pyodide or fault-only WALL TIMEOUT, a generic
+  pyodide `CodeExecutionError`, a nonzero runner exit, and a malformed runner
+  protocol are now `unknown` (indistinguishable candidate-vs-backend). Only a
+  proven backend exception and a parent-enforced run-budget/suite-deadline
+  shortfall are `infrastructure`; a candidate stdout flood (a distinguishable
+  phase) stays `candidate`.
+- Per-case aggregation: `_dominant_fault` makes infrastructure/unknown DOMINATE
+  candidate, so event order can't hide a later backend fault behind an earlier
+  candidate one. Only clean/candidate (behavioral) evidence steers adaptation;
+  `unknown` never does (it's excluded by `is_behavioral_operation`).
+- Verify now requires: origin ∈ {behavioral, infrastructure, unknown}; a clean
+  report carries NO `fault_origin` and is behavioral; a failed report carries a
+  valid `fault_origin`; and the record's origin equals what the report's
+  `fault_origin` implies.
+
+**Area 3 — behavioral windows (done).**
+- Warm-up counts BEHAVIORAL observations (not successful commands): the window
+  is satisfied only by observations that actually exercised behavior. An
+  infrastructure/unknown-only warm-up retries (bounded by
+  `warmup_observations + _MAX_DEFERS`) then ends UNRESOLVED and NEVER invokes the
+  Refiner or applies a change.
+- Auto review requires a MATCHED behavioral baseline AND post; missing either
+  side defers (and finally leaves the change unresolved) — never reverts on
+  absence of evidence.
+- Proofs: an outage produces no proposal/apply/confirm/revert and ends
+  unresolved at warm-up; a post-apply outage defers and never reverts a change
+  that lacks behavioral post evidence; wall-timeout stamped unknown;
+  same-kind-different-origin (candidate/infrastructure/unknown); `_dominant_fault`
+  precedence.
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **281 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Still not built (the large architectural items, per repeated honest note):**
+- **Area 2** — the immutable `OperationDescriptor` catalog + CAS-backed
+  `OperationPlan` (impl/config digest + plan ref pinned in `ObserveCurrentState`
+  intent; matched pre/post uses the same plan; intent→dispatch→result plan
+  identity + manifest/provenance verified; drift refuses resume). The typed
+  origin + behavioral windows landed here are prerequisites, but the plan-pinning
+  itself is not done.
+- **Area 4** — typed `ReviewDecision` + a closed `ReviseChange` lifecycle
+  emitting `ChangeRevised` old→new supersession (confirm-of-inactive IS enforced);
+  prompt-only causal shadow-refinement proof.
+- **Area 5** — the typed `ModelBinding`/usage records replacing the pipe string
+  and `provider_extras` conventions (payload==binding==dispatch==result).
+
+---
+
+## PR #51 correction round 9 (Stage 3C.2A.7) — self-consistent fault evidence, behavioral model review, docs
+
+**Area 2 — fault failure+origin self-consistency (done).** Corrects round 8,
+which paired the FIRST failure record with a LATER case's dominant origin.
+`_run_attempt` now records ORDERED per-case `(failure, origin)` evidence and
+derives BOTH the failure record and the origin from the SAME dominant item
+(precedence infrastructure > unknown > candidate). So the recorded failure and
+origin can never disagree, and a later backend fault still can't hide behind an
+earlier candidate one.
+
+**Area 3 — behavioral-evidence gate for BOTH auto and model review (done).**
+`observe_post` now requires a MATCHED behavioral baseline AND post (from the
+behavioral-only `_pre_post_overall`) before ANY verdict is formed — for auto AND
+model review. Missing either side defers (bounded by
+`review_window + _MAX_DEFERS`) then leaves the change UNRESOLVED. A model review
+is not even DISPATCHED without both sides, so it can never emit keep/revise/
+revert off an outage. Test: a post-apply outage under `review_mode="model"`
+produces no review model call, no confirm, no revert — unresolved.
+
+**Docs corrected (per the goal).** `RequestRefinement` is IMPLEMENTED (Phase B)
+and **AT-MOST-ONCE**, not exactly-once (kernel module docstring, `docs/HANDOFF.md`,
+`docs/adrs/0008-vnext-substrate.md`); `docs/ROADMAP.md` Phase B is now
+"IMPLEMENTED; under review in PR #51", not "next".
+
+**Tooling.** `uv run mypy` clean (45 files); `uv run pytest` **282 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Still not built (large architectural items):**
+- **Area 1** — the immutable `OperationDescriptor` catalog + CAS-backed
+  `OperationPlan` (impl/config digest + manifest + projection schema pinned in
+  `ObserveCurrentState` intent; matched pre/post uses the same plan/regime;
+  intent→dispatch→result plan identity verified; drift refuses resume). Also the
+  full unification of the `CandidateExecutor`/kernel aggregation layers and the
+  "don't floor unrelated completed cases" evaluate change are part of this (they
+  need the plan to declare attempt validity).
+- **Area 4** — typed `ReviewDecision` + a crash-safe `ReviseChange` effect
+  emitting `ChangeRevised` old→new supersession; revision-context/revert;
+  stale-fork clearing on candidate change; prompt-only causal proof.
+- **Area 5** — typed `ModelBinding`/usage records (basis actual|reservation|
+  unknown; payload==binding==dispatch==result) replacing the pipe string and
+  `provider_extras` conventions.
+
+---
+
+## PR #51 correction round 10 (Stage 3C.2B) — Area 1: policy-neutral pinned CAS operation plan
+
+The big architectural item, done in one round. The thin `operation_cases(Task)`
+driver is replaced by a versioned, injected operation PACKAGE.
+
+- **`strive.operate`**: `OperationDescriptor` protocol + `OperationCatalog`
+  (injected, fail-closed) + `TaskSuiteOperationDescriptor` (`task-suite@1`). A
+  descriptor pins ref/version, impl digest, config digest, plan/projection schema
+  versions, required surfaces/capabilities, and `all-required`|`partial-allowed`
+  validity.
+- **Policy-visible context only.** `create_plan` receives a
+  `PolicyVisibleOperationContext` (visible cases + seed + task/environment
+  fingerprints) — NEVER the full `Task`. Hidden/held-out/audit data is
+  structurally absent from the API and the opaque `op-N` plan manifest.
+- **CAS-backed plan pinned in intent.** The deterministic `OperationPlan`'s
+  `plan_ref` is pinned in the `ObserveCurrentState` `CommandPayload` before issue;
+  descriptor/config/plan drift → different `plan_ref` → payload-digest mismatch →
+  refused resume (no mutation). One plan measures pre- and post-change states.
+- **Semantics behind the descriptor; kernel owns the boundary.** The kernel loads
+  the pinned plan, runs its manifest through the `CandidateExecutor`, records
+  DISPATCH→RESULT (protected `AttemptRecord`)→PROJECTION; the descriptor derives
+  the SEPARATE policy-visible `OperationProjection`. A crash between result and
+  projection is finished from the durable result (no re-run); an open dispatch is
+  `indeterminate`.
+- **Policy reads only the projection.** `continual-refine`'s warm-up, refiner
+  context, pre/post scoring, and review consume `OperationProjection` only. Pre/
+  post are comparable only under the SAME `plan_ref`; an invalid/incomplete
+  attempt publishes no aggregate.
+- **Verify**: dispatch/projection subject-scoped; `dispatch.plan_ref` == intent
+  `plan_ref`; dispatch descriptor == plan descriptor; projection derives from the
+  same result and never aggregates when invalid; the terminal points at the
+  projection.
+- **Adversarial proof** (`test_operation_plan.py`, 8 tests): deterministic plan +
+  opaque manifest; no hidden cases in context/plan; regime change → new plan;
+  intent pins `plan_ref`; projection policy-visible only; all-required
+  complete→valid vs incomplete→no-aggregate; descriptor/config drift refuses
+  resume.
+
+**Tooling.** `uv run mypy` clean (46 files); `uv run pytest` **290 passed**;
+`test_packaging` + `test_substrate_only` green.
+
+**Out of scope this round (separate next rounds, per the goal):** Area 4 (typed
+`ReviewDecision` + `ReviseChange`/`ChangeRevised`) and Area 5 (typed model
+binding/usage). Full unification of the CandidateExecutor+kernel per-case
+aggregation into one shared function was not done — the kernel still aggregates
+per-case self-consistently (round-9 dominant-item fix) and the descriptor
+consumes that evidence. Noted honestly.
+
+---
+
+## PR #51 correction round 11 (Stage 3C.2B.2) — Area 1 finish: unified aggregation + validity flooring
+
+Closed the Area-1 sub-items explicitly deferred in round 10.
+
+- **Unified aggregation (one shared path).** `contracts.dominant_fault` derives
+  the (failure, origin) pair from ORDERED per-case faults (precedence
+  infrastructure > unknown > candidate). BOTH the `CandidateExecutor` per-suite
+  pass (`run_protected_suite`) and the kernel per-attempt pass (`_run_attempt`)
+  now call it — the suite pass no longer keeps the FIRST fault, so failure and
+  origin always come from the SAME dominant item across every layer.
+- **Validity + flooring behind the descriptor.** `TaskSuiteOperationDescriptor`
+  is `all-required`. `project()` now builds the policy-visible per-case outcomes
+  from the REPORT's real outcomes (not the pre-floored `Evaluation`), so
+  completed cases keep their true result:
+  - `all-required`: aggregate over ALL cases, valid only when every case ran;
+  - `partial-allowed`: aggregate over the cases that RAN (un-run excluded, never
+    floored);
+  - `indivisible`: floor ALL cases on a partial/faulted attempt (none credited).
+  An invalid/incomplete attempt still publishes no aggregate (`overall is None`).
+- **Adversarial proofs added** (`test_operation_plan.py`, now 12 tests):
+  partial-allowed scores only completed cases; indivisible floors completed
+  cases; a STRUCTURAL proof that the policy consumes only `OperationProjection`
+  (never decodes `AttemptRecord`/reads `OPERATION_RESULT`); a corrupted pinned
+  plan fails closed on resume. The dominant-fault unit test moved to the shared
+  list-based API.
+
+**Tooling.** `uv run mypy` clean (46 files); `uv run pytest` **294 passed**;
+`test_packaging` + `test_substrate_only` green. (The secure-backend E2E
+`test_continual_refine_through_secure_backend` runs when `deno` is available;
+it skips locally when the backend is absent.)
+
+**Area 1 is now complete.** Remaining separate rounds: typed `ReviewDecision` +
+`ReviseChange`/`ChangeRevised` (Area 4) and typed model binding/usage (Area 5).

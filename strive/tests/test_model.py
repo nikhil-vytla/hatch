@@ -1,50 +1,38 @@
-"""Model interface: deterministic fake, finish reasons, compact CAS-ref
-journaling, budget enforcement, env-adapter configuration errors."""
+"""Model interface: deterministic fake, finish reasons, conservative token
+bounds, OpenAI-compatible error classification, env-adapter configuration, and
+budget semantics. (The pre-vNext MeteredJournalingAdapter was removed — the
+kernel `_run_refinement` is the single metered/journaled model boundary.)"""
 
-import os
+from __future__ import annotations
+
+import urllib.error
 from pathlib import Path
 
 import pytest
 
-from strive.budget import BudgetMeter
-from strive.cas import ObjectStore
-from strive.contracts import (
-    FAILURE_BUDGET_EXHAUSTED,
-    FINISH_LENGTH,
-    FINISH_STOP,
-    BudgetSpec,
-    FailureRecord,
-    ModelRequest,
-    ModelResponse,
-)
-from strive.events import EventLog
+from strive.budget import UNLIMITED, BudgetMeter
+from strive.contracts import BudgetSpec, FINISH_LENGTH, FINISH_STOP, ModelRequest
 from strive.model import (
     FakeModelAdapter,
-    MeteredJournalingAdapter,
     ModelConfigError,
+    ModelNoCallError,
+    ModelTransportError,
+    OpenAICompatAdapter,
     adapter_from_env,
 )
 
 
-def _wrapped(
-    tmp_path: Path, spec: BudgetSpec
-) -> tuple[MeteredJournalingAdapter, BudgetMeter, EventLog, ObjectStore]:
-    meter = BudgetMeter(spec)
-    events = EventLog(tmp_path / "events.jsonl", "run-x")
-    objects = ObjectStore(tmp_path / "objects")
-    return MeteredJournalingAdapter(FakeModelAdapter(), meter, events, objects), meter, events, objects
+# -- the deterministic fake -----------------------------------------------------------------------
 
 
 def test_fake_adapter_is_deterministic() -> None:
     adapter = FakeModelAdapter()
     request = ModelRequest(prompt="improve this strategy", seed=7)
     first = adapter.complete(request)
-    second = adapter.complete(request)
-    assert first == second
+    assert first == adapter.complete(request)
     assert first.text.startswith("fake-completion:")
     assert first.finish_reason == FINISH_STOP
-    different_seed = adapter.complete(ModelRequest(prompt="improve this strategy", seed=8))
-    assert different_seed.text != first.text
+    assert adapter.complete(ModelRequest(prompt="improve this strategy", seed=8)).text != first.text
 
 
 def test_fake_adapter_reports_length_finish_on_truncation() -> None:
@@ -54,91 +42,22 @@ def test_fake_adapter_reports_length_finish_on_truncation() -> None:
     assert response.output_tokens == 10
 
 
-def test_metered_adapter_journals_compact_metadata_with_cas_refs(tmp_path: Path) -> None:
-    adapter, meter, events, objects = _wrapped(tmp_path, BudgetSpec(model_calls=1))
-    response = adapter.complete(ModelRequest(prompt="hello prompt"))
-    assert isinstance(response, ModelResponse)
-    assert meter.usage().model_calls == 1 and meter.usage().tokens > 0
-
-    journaled = [e for e in events.read_all() if e.type == "model_call"]
-    assert len(journaled) == 1
-    payload = journaled[0].payload
-    # compact metadata + CAS refs — no duplicated full contents in the event
-    assert "request" not in payload and "response" not in payload
-    assert payload["finish_reason"] == FINISH_STOP
-    assert payload["adapter"] == "fake"
-    assert isinstance(payload["latency_ms"], float)
-    assert objects.get_text(str(payload["prompt_ref"])) == "hello prompt"
-    assert objects.get_text(str(payload["completion_ref"])) == response.text
+def test_conservative_input_token_bound_over_estimates() -> None:
+    # the reservation bound must be >= the fake's actual reported input tokens
+    adapter = FakeModelAdapter()
+    prompt = "some prompt text of a few dozen characters to estimate" * 3
+    bound = adapter.estimate_input_tokens(prompt)
+    actual = adapter.complete(ModelRequest(prompt=prompt)).input_tokens
+    assert bound >= actual
 
 
-def test_metered_adapter_denies_beyond_call_budget(tmp_path: Path) -> None:
-    adapter, meter, events, _ = _wrapped(tmp_path, BudgetSpec(model_calls=1))
-    first = adapter.complete(ModelRequest(prompt="a"))
-    assert isinstance(first, ModelResponse)
-    second = adapter.complete(ModelRequest(prompt="b"))
-    assert isinstance(second, FailureRecord)
-    assert second.kind == FAILURE_BUDGET_EXHAUSTED
-    types = [e.type for e in events.read_all()]
-    assert types.count("model_call") == 1 and types.count("model_call_denied") == 1
-
-
-def test_metered_adapter_caps_timeout_to_remaining_wall(tmp_path: Path) -> None:
-    class TimeoutProbe:
-        adapter_name = "probe"
-        model_id = "probe-v1"
-        reports_cost = True
-
-        def __init__(self) -> None:
-            self.seen_timeout: float | None = None
-
-        def complete(self, request: ModelRequest) -> ModelResponse:
-            self.seen_timeout = request.timeout_s
-            return ModelResponse(
-                text="ok", model_id=self.model_id, input_tokens=1, output_tokens=1
-            )
-
-    probe = TimeoutProbe()
-    meter = BudgetMeter(BudgetSpec(model_calls=1, wall_time_s=5.0))
-    adapter = MeteredJournalingAdapter(
-        probe,
-        meter,
-        EventLog(tmp_path / "events.jsonl", "run-x"),
-        ObjectStore(tmp_path / "objects"),
-    )
-    adapter.complete(ModelRequest(prompt="p", timeout_s=600.0))
-    assert probe.seen_timeout is not None and probe.seen_timeout <= 5.0
-
-
-def test_adapter_error_is_contained_and_journaled(tmp_path: Path) -> None:
-    class ExplodingAdapter:
-        adapter_name = "exploding"
-        model_id = "exploding-v1"
-        reports_cost = True
-
-        def complete(self, request: ModelRequest) -> ModelResponse:
-            raise OSError("connection refused")
-
-    meter = BudgetMeter(BudgetSpec(model_calls=1))
-    events = EventLog(tmp_path / "events.jsonl", "run-x")
-    adapter = MeteredJournalingAdapter(
-        ExplodingAdapter(), meter, events, ObjectStore(tmp_path / "objects")
-    )
-    outcome = adapter.complete(ModelRequest(prompt="p"))
-    assert isinstance(outcome, FailureRecord)
-    assert outcome.kind == "model-error"
-    assert any(e.type == "model_call_failed" for e in events.read_all())
-
-
-# -- env-adapter configuration --------------------------------------------------
+# -- env-adapter configuration --------------------------------------------------------------------
 
 
 def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
-        "STRIVE_MODEL_PROVIDER",
-        "STRIVE_MODEL_BASE_URL",
-        "STRIVE_MODEL_API_KEY",
-        "STRIVE_MODEL_ID",
+        "STRIVE_MODEL_PROVIDER", "STRIVE_MODEL_BASE_URL",
+        "STRIVE_MODEL_API_KEY", "STRIVE_MODEL_ID",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -165,200 +84,74 @@ def test_missing_variables_are_a_clean_config_error(monkeypatch: pytest.MonkeyPa
         adapter_from_env()
 
 
-def test_requested_output_tokens_are_capped_to_remaining_allowance(
-    tmp_path: Path,
-) -> None:
-    class CapProbe:
-        adapter_name = "probe"
-        model_id = "probe-v1"
-        reports_cost = True
+# -- OpenAI-compatible adapter: error classification (no network) ---------------------------------
 
-        def __init__(self) -> None:
-            self.seen_max_tokens: int | None = None
 
-        def complete(self, request: ModelRequest) -> ModelResponse:
-            self.seen_max_tokens = request.max_tokens
-            return ModelResponse(
-                text="ok", model_id=self.model_id, input_tokens=1, output_tokens=1
-            )
-
-    probe = CapProbe()
-    meter = BudgetMeter(BudgetSpec(model_calls=2, tokens=50))
-    adapter = MeteredJournalingAdapter(
-        probe, meter, EventLog(tmp_path / "e.jsonl", "r"), ObjectStore(tmp_path / "o")
+def _openai() -> OpenAICompatAdapter:
+    return OpenAICompatAdapter(
+        base_url="http://localhost:1/v1", api_key="k", model_id="m",
     )
-    adapter.complete(ModelRequest(prompt="p", max_tokens=4096))
-    assert probe.seen_max_tokens == 50  # capped to remaining token allowance
 
 
-def test_token_overrun_rejects_the_completion_and_is_journaled(tmp_path: Path) -> None:
-    """Input tokens can overshoot a token limit in a single call; the overrun
-    is charged and journaled, and the completion never reaches a proposer."""
-
-    class HugeInputAdapter:
-        adapter_name = "huge"
-        model_id = "huge-v1"
-        reports_cost = True
-
-        def complete(self, request: ModelRequest) -> ModelResponse:
-            return ModelResponse(
-                text='{"would": "be a proposal"}',
-                model_id=self.model_id,
-                input_tokens=10_000,
-                output_tokens=1,
-            )
-
-    meter = BudgetMeter(BudgetSpec(model_calls=2, tokens=100))
-    events = EventLog(tmp_path / "e.jsonl", "r")
-    adapter = MeteredJournalingAdapter(
-        HugeInputAdapter(), meter, events, ObjectStore(tmp_path / "o")
-    )
-    outcome = adapter.complete(ModelRequest(prompt="p"))
-    assert isinstance(outcome, FailureRecord)
-    assert outcome.kind == FAILURE_BUDGET_EXHAUSTED
-    assert "overrunning call's completion is rejected" in outcome.detail
-    types = [e.type for e in events.read_all()]
-    assert "model_call" in types and "model_call_overrun" in types
-    assert meter.usage().tokens == 10_001  # the overrun is still accounted
+def _patch_urlopen(monkeypatch: pytest.MonkeyPatch, raiser) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr("strive.model.urllib.request.urlopen", raiser)
 
 
-def test_cost_limit_fails_closed_when_adapter_cannot_report_cost(
-    tmp_path: Path,
-) -> None:
-    class NoCostAdapter:
-        adapter_name = "no-cost"
-        model_id = "no-cost-v1"
-        reports_cost = False
-
-        def complete(self, request: ModelRequest) -> ModelResponse:
-            raise AssertionError("must never be called under a cost limit")
-
-    meter = BudgetMeter(BudgetSpec(model_calls=2, cost=5.0))
-    events = EventLog(tmp_path / "e.jsonl", "r")
-    adapter = MeteredJournalingAdapter(
-        NoCostAdapter(), meter, events, ObjectStore(tmp_path / "o")
-    )
-    outcome = adapter.complete(ModelRequest(prompt="p"))
-    assert isinstance(outcome, FailureRecord)
-    assert outcome.kind == "cost-limit-unavailable"
-    assert any(e.type == "model_call_denied" for e in events.read_all())
+def test_openai_cost_is_unknown_not_zero() -> None:
+    adapter = _openai()
+    assert adapter.reports_cost is False
+    assert adapter.estimate_cost(10, 10) is None  # UNKNOWN, never 0.0
+    assert adapter.impl_version == "openai-compatible@1"
 
 
-def test_any_ordinary_adapter_exception_becomes_model_error(tmp_path: Path) -> None:
-    class WeirdErrorAdapter:
-        adapter_name = "weird"
-        model_id = "weird-v1"
-        reports_cost = True
+def test_openai_connection_refused_is_proven_no_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refused(*a: object, **k: object) -> object:
+        raise urllib.error.URLError(ConnectionRefusedError("refused"))
 
-        def complete(self, request: ModelRequest) -> ModelResponse:
-            raise RuntimeError("unexpected provider tantrum")
-
-    meter = BudgetMeter(BudgetSpec(model_calls=1))
-    events = EventLog(tmp_path / "e.jsonl", "r")
-    adapter = MeteredJournalingAdapter(
-        WeirdErrorAdapter(), meter, events, ObjectStore(tmp_path / "o")
-    )
-    outcome = adapter.complete(ModelRequest(prompt="p"))
-    assert isinstance(outcome, FailureRecord) and outcome.kind == "model-error"
-    assert any(e.type == "model_call_failed" for e in events.read_all())
+    _patch_urlopen(monkeypatch, refused)
+    with pytest.raises(ModelNoCallError):
+        _openai().complete(ModelRequest(prompt="p"))
 
 
-def test_keyboard_interrupt_propagates_through_the_wrapper(tmp_path: Path) -> None:
-    class InterruptedAdapter:
-        adapter_name = "interrupted"
-        model_id = "interrupted-v1"
-        reports_cost = True
+def test_openai_http_error_is_possible_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    def http_error(*a: object, **k: object) -> object:
+        raise urllib.error.HTTPError("u", 503, "unavailable", {}, None)  # type: ignore[arg-type]
 
-        def complete(self, request: ModelRequest) -> ModelResponse:
-            raise KeyboardInterrupt
+    _patch_urlopen(monkeypatch, http_error)
+    with pytest.raises(ModelTransportError):
+        _openai().complete(ModelRequest(prompt="p"))
 
-    meter = BudgetMeter(BudgetSpec(model_calls=1))
-    adapter = MeteredJournalingAdapter(
-        InterruptedAdapter(),
-        meter,
-        EventLog(tmp_path / "e.jsonl", "r"),
-        ObjectStore(tmp_path / "o"),
-    )
-    with pytest.raises(KeyboardInterrupt):
-        adapter.complete(ModelRequest(prompt="p"))
+
+def test_openai_timeout_is_possible_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    def timeout(*a: object, **k: object) -> object:
+        raise urllib.error.URLError(TimeoutError("timed out"))
+
+    _patch_urlopen(monkeypatch, timeout)
+    with pytest.raises(ModelTransportError):
+        _openai().complete(ModelRequest(prompt="p"))
+
+
+def test_openai_unparseable_response_is_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Resp:
+        def __enter__(self) -> "_Resp":
+            return self
+
+        def __exit__(self, *a: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"not json at all"
+
+    _patch_urlopen(monkeypatch, lambda *a, **k: _Resp())
+    with pytest.raises(ModelTransportError):
+        _openai().complete(ModelRequest(prompt="p"))
+
+
+# -- budget semantics -----------------------------------------------------------------------------
 
 
 def test_budget_semantics_are_recorded_per_limit() -> None:
-    from strive.budget import UNLIMITED
-
-    semantics = BudgetMeter(
-        BudgetSpec(tokens=100, cost=UNLIMITED, model_calls=2)
-    ).semantics()
+    semantics = BudgetMeter(BudgetSpec(tokens=100, cost=UNLIMITED, model_calls=2)).semantics()
     assert semantics["tokens"] == "enforced-between-calls+output-cap"
     assert semantics["cost"] == "accounting-only"
     assert semantics["model_calls"] == "enforced"
-
-
-class _CostingAdapter:
-    """Reports a fixed trustworthy cost per call."""
-
-    adapter_name = "costing"
-    model_id = "costing-v1"
-    reports_cost = True
-
-    def __init__(self, cost_per_call: float) -> None:
-        self._cost = cost_per_call
-
-    def complete(self, request: ModelRequest) -> ModelResponse:
-        return ModelResponse(
-            text="{}",
-            model_id=self.model_id,
-            input_tokens=1,
-            output_tokens=1,
-            cost=self._cost,
-        )
-
-
-def test_cost_exactly_at_limit_succeeds_and_next_call_is_denied(
-    tmp_path: Path,
-) -> None:
-    meter = BudgetMeter(BudgetSpec(model_calls=5, cost=1.0))
-    events = EventLog(tmp_path / "e.jsonl", "r")
-    adapter = MeteredJournalingAdapter(
-        _CostingAdapter(1.0), meter, events, ObjectStore(tmp_path / "o")
-    )
-    first = adapter.complete(ModelRequest(prompt="p"))
-    assert isinstance(first, ModelResponse)  # reaching the limit exactly is fine
-    second = adapter.complete(ModelRequest(prompt="q"))
-    assert isinstance(second, FailureRecord)  # next call denied pre-call
-    assert "cost budget exhausted" in second.detail
-    assert meter.usage().cost == 1.0
-
-
-def test_post_call_cost_overrun_rejects_completion_and_stays_accounted(
-    tmp_path: Path,
-) -> None:
-    meter = BudgetMeter(BudgetSpec(model_calls=5, cost=1.0))
-    events = EventLog(tmp_path / "e.jsonl", "r")
-    adapter = MeteredJournalingAdapter(
-        _CostingAdapter(1.5), meter, events, ObjectStore(tmp_path / "o")
-    )
-    outcome = adapter.complete(ModelRequest(prompt="p"))
-    assert isinstance(outcome, FailureRecord)
-    assert outcome.kind == FAILURE_BUDGET_EXHAUSTED
-    assert "overrunning call's completion is rejected" in outcome.detail
-    assert meter.usage().cost == 1.5  # the spent call stays accounted
-    types = [e.type for e in events.read_all()]
-    assert "model_call" in types and "model_call_overrun" in types
-
-
-def test_unlimited_cost_is_accounting_only_even_with_reported_cost(
-    tmp_path: Path,
-) -> None:
-    from strive.budget import UNLIMITED
-
-    meter = BudgetMeter(BudgetSpec(model_calls=5, cost=UNLIMITED))
-    adapter = MeteredJournalingAdapter(
-        _CostingAdapter(100.0),
-        meter,
-        EventLog(tmp_path / "e.jsonl", "r"),
-        ObjectStore(tmp_path / "o"),
-    )
-    for _ in range(3):
-        assert isinstance(adapter.complete(ModelRequest(prompt="p")), ModelResponse)
-    assert meter.usage().cost == 300.0  # tracked, never enforced

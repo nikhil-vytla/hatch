@@ -30,10 +30,10 @@ recorded effect without a terminal is finished, not repeated. A fork's
 sandbox executions are deterministic and re-runnable, but their outcome is
 recorded durably (base/candidate state refs + metered usage) and REUSED on
 resume, so a completed fork never re-executes or re-charges. External model
-calls (`RequestRefinement`) are NOT exactly-once and are unimplemented in
-Phase A; when one is added, a dispatch-without-durable-result crash must be
-recorded `indeterminate` and require explicit retry, never silently
-duplicated.
+calls (`RequestRefinement`) are IMPLEMENTED (Phase B) and are AT-MOST-ONCE, NOT
+exactly-once: a dispatch-without-durable-result crash is recorded `indeterminate`
+and requires an EXPLICIT retry — the kernel never silently re-dispatches or
+claims exactly-once for a model call.
 
 Budgets survive restart: the pinned `BudgetSpec` is content-addressed in
 `PolicyBound` (a resumed caller with a different budget is rejected), and
@@ -50,16 +50,34 @@ full CAS closure staged (and structurally validated) before apply; and
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 import json
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from strive import codec
-from strive.budget import BudgetMeter
-from strive.cas import hash_text
-from strive.contracts import BudgetSpec, BudgetUsage, CaseOutcome, ExecutionReport
+from strive.budget import UNLIMITED, BudgetMeter
+from strive.cas import ObjectCorruption, ObjectMissing, hash_text
+from strive.contracts import (
+    FAILURE_COST_UNAVAILABLE,
+    FAILURE_MALFORMED_OUTPUT,
+    FAILURE_MODEL_ERROR,
+    FAULT_CANDIDATE,
+    FAULT_INFRASTRUCTURE,
+    FAULT_UNKNOWN,
+    BudgetSpec,
+    BudgetUsage,
+    CaseOutcome,
+    Evaluation,
+    ExecutionReport,
+    FailureRecord,
+    ModelRequest,
+    TaskCase,
+    dominant_fault,
+)
 from strive.evaluate import evaluate
 from strive.policy import (
     AdaptationPolicy,
@@ -68,6 +86,7 @@ from strive.policy import (
     ConfirmChange,
     EvaluateFork,
     KernelCommand,
+    ObserveCurrentState,
     PolicyCatalog,
     RequestRefinement,
     RevertChange,
@@ -75,19 +94,47 @@ from strive.policy import (
     ScheduleTrigger,
     StopAdaptation,
 )
+from strive.model import ModelAdapter, ModelCatalog, ModelNoCallError
+from strive.operate import (
+    DEFAULT_OPERATION_DESCRIPTOR,
+    OperationCatalog,
+    OperationDescriptor,
+    default_operation_catalog,
+)
+from strive.refine import RefinementDecodeError, decode_proposal, render_prompt
 from strive.runtime import (
     ENCODING as _ENCODING,
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
+    OP_BEHAVIORAL,
+    OP_INFRASTRUCTURE,
+    OP_UNKNOWN,
+    OPERATION_DISPATCH,
+    OPERATION_LABEL,
+    OPERATION_PROJECTION,
+    OPERATION_RESULT,
+    OperationPlan,
+    OperationProjection,
+    PolicyVisibleOperationContext,
+    REFINE_BINDING,
+    REFINE_DISPATCH,
+    REFINE_RESULT,
     AttemptDispatched,
     AttemptRecord,
     CommandPayload,
     ConfigBlob,
     ForkObservation,
+    ModelBinding,
+    ModelDispatch,
+    ModelResult,
+    OperationDispatched,
     PolicyStateBlob,
+    RefinementProposal,
     StoredResult,
     combine_usage,
+    model_dispatch_reservation,
+    model_result_usage,
     strict_encode,
 )
 from strive.sandboxes import (
@@ -122,6 +169,13 @@ class IndeterminateEffect(Exception):
     never silently re-dispatches and claims exactly-once."""
 
 
+class ModelBindingMismatch(KernelError):
+    """The injected model no longer matches the model a refinement was bound to
+    at issue. This REFUSES to resume (it propagates, unlike an ordinary command
+    failure) rather than permanently failing the command — restore the bound
+    model and the command resumes."""
+
+
 # -- services -------------------------------------------------------------------------------------
 
 
@@ -137,6 +191,19 @@ class KernelServices:
     seed: int
     meter: BudgetMeter
     required_capabilities: tuple[str, ...] = ()
+    # the injected, immutable model-adapter catalog. Each `RequestRefinement`
+    # carries its OWN `model_role`, which the kernel resolves against this
+    # catalog — so there is no separately-aligned services-level role to drift.
+    models: ModelCatalog | None = None
+    # the injected, versioned operation catalog + the descriptor name pinned for
+    # this run. A descriptor produces a CAS-backed OperationPlan from a
+    # POLICY-VISIBLE context only (never the hidden evaluator splits).
+    operation_catalog: OperationCatalog = field(default_factory=default_operation_catalog)
+    operation_descriptor: str = DEFAULT_OPERATION_DESCRIPTOR
+    # a TEST-ONLY escape hatch: drive a `requires_secure_execution` policy on an
+    # insecure (fault-only) backend. Production never sets this, so a policy that
+    # runs model-authored code can never silently downgrade off a secure backend.
+    allow_insecure_execution: bool = False
 
     @staticmethod
     def open(
@@ -150,6 +217,10 @@ class KernelServices:
         budget: BudgetSpec | None = None,
         required_capabilities: tuple[str, ...] = (),
         surface_catalog: SurfaceCatalog | None = None,
+        models: ModelCatalog | None = None,
+        operation_catalog: OperationCatalog | None = None,
+        operation_descriptor: str = DEFAULT_OPERATION_DESCRIPTOR,
+        allow_insecure_execution: bool = False,
     ) -> "KernelServices":
         executor = CandidateExecutor.from_catalog(
             default_sandbox_catalog(), sandbox_backend, trusted=trusted
@@ -165,6 +236,10 @@ class KernelServices:
             seed=seed,
             meter=BudgetMeter(budget or BudgetSpec()),
             required_capabilities=required_capabilities,
+            models=models,
+            operation_catalog=operation_catalog or default_operation_catalog(),
+            operation_descriptor=operation_descriptor,
+            allow_insecure_execution=allow_insecure_execution,
         )
 
 
@@ -211,6 +286,19 @@ def run_policy(
     substrate = services.substrate
     descriptor = catalog.descriptor(policy_name)
     policy = descriptor.factory()
+
+    # a policy that runs model-authored code inside the harness (e.g.
+    # continual-refine@1) REQUIRES a mechanically-secure executor; production
+    # never defaults to fault-only for it. Only the explicit test-only opt-in
+    # permits an insecure backend.
+    if descriptor.requires_secure_execution and not services.executor.capabilities().secure:
+        if not services.allow_insecure_execution:
+            raise KernelError(
+                f"policy {policy_name!r} requires secure execution but the backend "
+                f"{services.executor.backend_name!r} is not secure — refusing to run "
+                "model-authored code on an insecure backend (production must use a "
+                "secure backend; tests opt in explicitly)"
+            )
 
     config_ref = _config_ref(config)
     policy_digest = _policy_digest(policy, descriptor.dependency_modules)
@@ -262,7 +350,9 @@ def run_policy(
             )
             consumed = checkpoint.consumed_command_id
         else:
-            state = policy.initial_state(config, RunView.of(services.seed, view))
+            state = policy.initial_state(
+                config, RunView.of(services.seed, view, substrate.objects.reader())
+            )
             consumed = None
 
         commands = 0
@@ -270,7 +360,7 @@ def run_policy(
         while commands < max_commands:
             view = substrate.verify()
             substrate._require_ok(view, "run")
-            run_view = RunView.of(services.seed, view)
+            run_view = RunView.of(services.seed, view, substrate.objects.reader())
             command = policy.next_command(config, state, run_view)
             if command is None:
                 stopped_reason = "done"
@@ -353,20 +443,23 @@ def _enforce_identity(
 
 
 def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
-    """Rebuild a FRESH meter from the DURABLE per-attempt ledger (never absorb
-    repeatedly into a reused meter). Each fork attempt is counted exactly once:
-    its actual usage if a RESULT was journaled, else its worst-case reservation
-    if only a DISPATCH is on record (an open dispatch — spend conservatively
-    reserved so a crash-loop can never expand the budget). Non-fork commands
-    spend nothing."""
+    """Rebuild a FRESH meter from the DURABLE ledger (never absorb repeatedly
+    into a reused meter). Each fork attempt AND each model call is counted
+    exactly once: its actual usage if a RESULT was journaled, else its
+    worst-case reservation if only a DISPATCH is on record (an open dispatch —
+    spend conservatively reserved so a crash-loop can never expand any budget
+    dimension, including model calls). Commands with no external effect spend
+    nothing."""
     substrate = services.substrate
     fresh = BudgetMeter(services.meter.spec)
     results: dict[tuple[str, str], BudgetUsage] = {}
-    dispatched: dict[tuple[str, str], AttemptDispatched] = {}
+    dispatched: dict[tuple[str, str], AttemptDispatched | OperationDispatched] = {}
+    model_results: dict[str, ModelResult] = {}
+    model_dispatches: dict[str, ModelDispatch] = {}
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if not isinstance(body, ObservationRecorded):
             continue
-        if body.observation_kind == FORK_RESULT:
+        if body.observation_kind in (FORK_RESULT, OPERATION_RESULT):
             rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
             results[(rec.command_id, rec.label)] = rec.usage
         elif body.observation_kind == FORK_DISPATCH:
@@ -374,15 +467,31 @@ def _seed_meter(services: KernelServices, view: VerifiedSubstrateView) -> None:
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[(disp.command_id, disp.label)] = disp
+        elif body.observation_kind == OPERATION_DISPATCH:
+            odisp = codec.loads(
+                substrate.objects.get_text(body.observation_ref), OperationDispatched
+            )
+            dispatched[(odisp.command_id, OPERATION_LABEL)] = odisp
+        elif body.observation_kind == REFINE_RESULT:
+            res = codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
+            model_results[res.command_id] = res
+        elif body.observation_kind == REFINE_DISPATCH:
+            mdisp = codec.loads(substrate.objects.get_text(body.observation_ref), ModelDispatch)
+            model_dispatches[mdisp.command_id] = mdisp
     for usage in results.values():
         fresh.absorb(usage)
-    for key, disp in dispatched.items():
+    for key, open_disp in dispatched.items():
         if key not in results:  # OPEN dispatch: reserve the worst case (all dims)
             fresh.absorb(BudgetUsage(
-                executions=disp.reserved_executions,
-                wall_time_s=disp.reserved_wall_s,
-                output_bytes=disp.reserved_output_bytes,
+                executions=open_disp.reserved_executions,
+                wall_time_s=open_disp.reserved_wall_s,
+                output_bytes=open_disp.reserved_output_bytes,
             ))
+    for res in model_results.values():
+        fresh.absorb(model_result_usage(res))
+    for cid, mdisp in model_dispatches.items():
+        if cid not in model_results:  # OPEN model dispatch: reserve the worst case
+            fresh.absorb(model_dispatch_reservation(mdisp))
     services.meter = fresh
 
 
@@ -397,11 +506,13 @@ def _reconciled_usage(
     terminal's recorded usage equals what the budget actually charged."""
     substrate = services.substrate
     results: dict[str, BudgetUsage] = {}
-    dispatched: dict[str, AttemptDispatched] = {}
+    dispatched: dict[str, AttemptDispatched | OperationDispatched] = {}
+    model_results: list[ModelResult] = []
+    model_dispatches: list[ModelDispatch] = []
     for env, body in zip(view.envelopes, view.bodies, strict=True):
         if env.caused_by != cid or not isinstance(body, ObservationRecorded):
             continue
-        if body.observation_kind == FORK_RESULT:
+        if body.observation_kind in (FORK_RESULT, OPERATION_RESULT):
             rec = codec.loads(substrate.objects.get_text(body.observation_ref), AttemptRecord)
             results[rec.label] = rec.usage
         elif body.observation_kind == FORK_DISPATCH:
@@ -409,14 +520,33 @@ def _reconciled_usage(
                 substrate.objects.get_text(body.observation_ref), AttemptDispatched
             )
             dispatched[disp.label] = disp
+        elif body.observation_kind == OPERATION_DISPATCH:
+            odisp = codec.loads(
+                substrate.objects.get_text(body.observation_ref), OperationDispatched
+            )
+            dispatched[OPERATION_LABEL] = odisp
+        elif body.observation_kind == REFINE_RESULT:
+            model_results.append(
+                codec.loads(substrate.objects.get_text(body.observation_ref), ModelResult)
+            )
+        elif body.observation_kind == REFINE_DISPATCH:
+            model_dispatches.append(
+                codec.loads(substrate.objects.get_text(body.observation_ref), ModelDispatch)
+            )
     usages = list(results.values())
-    for label, disp in dispatched.items():
+    for label, open_disp in dispatched.items():
         if label not in results:  # open dispatch: reserve the worst case
             usages.append(BudgetUsage(
-                executions=disp.reserved_executions,
-                wall_time_s=disp.reserved_wall_s,
-                output_bytes=disp.reserved_output_bytes,
+                executions=open_disp.reserved_executions,
+                wall_time_s=open_disp.reserved_wall_s,
+                output_bytes=open_disp.reserved_output_bytes,
             ))
+    # a completed model call charges its actual usage; an OPEN model dispatch
+    # reserves the worst case (a result overrides its dispatch)
+    if model_results:
+        usages.extend(model_result_usage(r) for r in model_results)
+    else:
+        usages.extend(model_dispatch_reservation(d) for d in model_dispatches)
     return combine_usage(usages)
 
 
@@ -461,6 +591,330 @@ def _fork_summary(
     return None
 
 
+# -- RequestRefinement: model call → typed proposal, journaled once ---------------------------------
+
+_PROMPT_TEMPLATE_SURFACE = ("prompt", "proposal-template")
+_DEFAULT_MODEL_MAX_TOKENS = 1024
+_DEFAULT_MODEL_TIMEOUT_S = 60.0
+# finish reasons whose completion cannot be a usable proposal (truncated/errored)
+_UNUSABLE_FINISH = {"length", "error"}
+
+
+def _refinement_result(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> tuple[str, ModelResult] | None:
+    """The refinement's durable model result, if present: (the
+    ObservationRecorded EVENT body ref, the decoded ModelResult). The event
+    body ref is what `StoredResult.observation_ref` records."""
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == REFINE_RESULT
+        ):
+            res = codec.loads(
+                services.substrate.objects.get_text(body.observation_ref), ModelResult
+            )
+            return env.body_ref, res
+    return None
+
+
+def _refinement_dispatched(
+    view: VerifiedSubstrateView, cid: str
+) -> bool:
+    return any(
+        env.caused_by == cid
+        and isinstance(body, ObservationRecorded)
+        and body.observation_kind == REFINE_DISPATCH
+        for env, body in zip(view.envelopes, view.bodies, strict=True)
+    )
+
+
+def _refinement_binding(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> ModelBinding | None:
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == REFINE_BINDING
+        ):
+            return codec.loads(
+                services.substrate.objects.get_text(body.observation_ref), ModelBinding
+            )
+    return None
+
+
+def _parse_surface(spec: str) -> tuple[str, str]:
+    kind, _, name = spec.partition("/")
+    return kind, name
+
+
+def _active_prompt_template(view: VerifiedSubstrateView, substrate: Substrate) -> str:
+    """The ACTIVE proposal-template surface content — the prompt that genuinely
+    shapes this refinement. Missing/unreadable content is a hard error (a
+    refinement cannot run without its control surface)."""
+    ref = view.state.content_ref(*_PROMPT_TEMPLATE_SURFACE)
+    if ref is None:
+        raise KernelError(
+            f"active state has no {_PROMPT_TEMPLATE_SURFACE} surface to render a prompt"
+        )
+    return substrate.objects.get_text(ref)
+
+
+def _run_refinement(
+    services: KernelServices, view: VerifiedSubstrateView, command: RequestRefinement
+) -> CommandResult:
+    """Perform ONE model refinement, journaled exactly like a fork attempt: a
+    DISPATCH (durable, before the call) then a RESULT (durable, after). The
+    prompt is rendered from the ACTIVE proposal-template surface + the policy's
+    context, so the active prompt genuinely shapes the proposal. A crash
+    between dispatch and result is an OPEN dispatch — reconciled as
+    `indeterminate`, never silently re-called. A model error, budget denial,
+    overrun, or malformed output is failure-as-data (a `failed` terminal with a
+    durable model result recording the failure)."""
+    substrate = services.substrate
+    cid = command.command_id
+    kind = "RequestRefinement"
+
+    # reuse a durable result across a crash between the result and the terminal
+    existing = _refinement_result(services, view, cid)
+    if existing is not None:
+        result_event_ref, prior = existing
+        if prior.failure is not None:
+            raise KernelError(prior.failure.detail)  # → failed terminal (same outcome)
+        return CommandResult(
+            cid, kind, "ok", view.head, observation_ref=result_event_ref,
+            detail="refinement already observed",
+        )
+    # an OPEN dispatch (dispatched but no durable result): never silently re-call
+    if _refinement_dispatched(view, cid):
+        raise IndeterminateEffect(
+            "model dispatched without a durable result — explicit retry required"
+        )
+
+    if services.models is None:
+        raise KernelError(
+            "RequestRefinement requires an injected model catalog (none bound)"
+        )
+    adapter: ModelAdapter = services.models.resolve(command.model_role)
+
+    # MODEL BINDING: pin (or, on resume, verify) the resolved model+config —
+    # a run can never silently switch models after the binding is journaled.
+    bound_model = _refinement_binding(services, view, cid)
+    now_binding = (adapter.adapter_name, adapter.model_id, adapter.config_digest)
+    if bound_model is not None:
+        if (bound_model.adapter_name, bound_model.model_id, bound_model.config_digest) != now_binding:
+            # a HARD refusal (propagates, not a failed terminal): resume is
+            # blocked until the bound model is restored — never re-bound.
+            raise ModelBindingMismatch(
+                f"refinement {cid!r} was bound to "
+                f"{bound_model.adapter_name}/{bound_model.model_id} but the injected "
+                f"model is {adapter.adapter_name}/{adapter.model_id} — refusing to "
+                "switch models after issue"
+            )
+    subject = view.state_ref or ""
+    if bound_model is None:
+        substrate.record_observation(
+            observation_kind=REFINE_BINDING,
+            observation=ModelBinding(
+                command_id=cid, adapter_name=adapter.adapter_name,
+                model_id=adapter.model_id, config_digest=adapter.config_digest,
+            ),
+            subject_state_ref=subject, caused_by=cid,
+        )
+
+    # stage the policy's context bytes, then render the prompt from the pinned
+    # control prompt + the ACTIVE template + that context
+    for ref, content in command.content_blobs.items():
+        if hash_text(content) != ref:
+            raise KernelError(f"refinement context does not hash to its ref {ref[:12]}…")
+        substrate.objects.put_text(content)
+    try:
+        context = substrate.objects.get_text(command.context_ref)
+    except (ObjectMissing, ObjectCorruption) as exc:
+        raise KernelError(f"refinement context ref unreadable: {exc}") from None
+    if view.bound is None:
+        raise KernelError("cannot refine before the policy is bound")
+    control_ref = view.bound.prompt_refs.get(command.prompt_role)
+    if control_ref is None:
+        raise KernelError(
+            f"no pinned control prompt for role {command.prompt_role!r} "
+            f"(pinned roles: {sorted(view.bound.prompt_refs)})"
+        )
+    control = substrate.objects.get_text(control_ref)
+    template = _active_prompt_template(view, substrate)
+    prompt = render_prompt(control, template, context)
+    prompt_ref = substrate.objects.put_text(prompt)
+
+    meter = services.meter
+    # ESTIMATE INPUT FIRST (a CONSERVATIVE, adapter-supplied bound, never len//4),
+    # then cap output to what remains AFTER the input reservation — so a viable
+    # finite token budget yields a usable, non-exceeding reservation.
+    est_input = adapter.estimate_input_tokens(prompt)
+    if est_input < 1:
+        raise KernelError(
+            f"adapter {adapter.adapter_name!r} returned an invalid input-token "
+            f"estimate {est_input}"
+        )
+    remaining_tokens = meter.remaining_tokens()
+    if remaining_tokens is not None and est_input >= remaining_tokens:
+        # the input estimate alone leaves no room for even one output token —
+        # deny before any dispatch (nothing spent)
+        raise KernelError(
+            f"token budget exhausted: input estimate {est_input} leaves no room "
+            f"in the remaining {remaining_tokens} tokens — call denied"
+        )
+    max_tokens = meter.cap_output_tokens(_DEFAULT_MODEL_MAX_TOKENS, reserved_input=est_input)
+    est_cost = adapter.estimate_cost(est_input, max_tokens)
+    # COST FAILS CLOSED: with a FINITE cost budget the adapter MUST supply a
+    # conservative preflight estimate (even when actual cost is reported later) —
+    # otherwise the reservation would understate spend. No estimate → refuse.
+    if meter.spec.cost != UNLIMITED and est_cost is None:
+        raise KernelError(
+            f"a finite cost budget is set but adapter {adapter.adapter_name!r} "
+            "cannot estimate cost for the reservation — refusing the call"
+        )
+    # CONSERVATIVE preflight: deny BEFORE dispatch when the reservation
+    # (estimated input+output tokens, estimated cost) would exceed the remaining
+    # budget — a failed refinement with NO dispatch, not an overrun after spend.
+    reserved_tokens = est_input + max_tokens
+    over = meter.would_exceed_tokens(reserved_tokens) or meter.would_exceed_cost(
+        est_cost if est_cost is not None else 0.0
+    )
+    if over is not None:
+        raise KernelError(over.detail)
+    # budget FIRST (deterministic, re-derivable): a pre-call denial fails the
+    # command with NO dispatch/result effects, so nothing is charged or replayed
+    denial = meter.request_model_call()
+    if denial is not None:
+        raise KernelError(denial.detail)
+    timeout = meter.model_call_timeout_s(_DEFAULT_MODEL_TIMEOUT_S)
+
+    dispatch = ModelDispatch(
+        command_id=cid, prompt_role=command.prompt_role, prompt_ref=prompt_ref,
+        adapter_name=adapter.adapter_name, model_id=adapter.model_id,
+        max_tokens=max_tokens, temperature=0.0, seed=services.seed,
+        reserved_tokens=reserved_tokens, reserved_wall_s=round(timeout, 6),
+        reserved_cost=est_cost if est_cost is not None else 0.0,
+    )
+    substrate.record_observation(
+        observation_kind=REFINE_DISPATCH, observation=dispatch,
+        subject_state_ref=subject, caused_by=cid,
+    )
+
+    request = ModelRequest(
+        prompt=prompt, max_tokens=max_tokens, temperature=0.0,
+        seed=services.seed, timeout_s=timeout,
+    )
+    started = time.monotonic()
+    response = None
+    failure: FailureRecord | None = None
+    try:
+        response = adapter.complete(request)
+    except ModelNoCallError as exc:
+        # PROVEN no request left the process (e.g. refused connection / DNS):
+        # no spend occurred, so the refinement fails cleanly as data. This is
+        # the ONLY class of adapter error that becomes a `failed` result.
+        failure = FailureRecord(
+            kind=FAILURE_MODEL_ERROR, detail=f"proven-no-call: {exc}"
+        )
+    except Exception as exc:  # noqa: BLE001 — any other error is POSSIBLE dispatch
+        # after the durable dispatch record, an adapter exception defaults to
+        # INDETERMINATE: a call MAY have reached the provider, so spend is
+        # UNKNOWN. Leave the dispatch OPEN (its reservation stands) and require
+        # explicit retry; never assume zero spend by recording a result.
+        raise IndeterminateEffect(
+            f"model adapter error after dispatch (possible call, unknown spend): "
+            f"{type(exc).__name__}: {exc}"
+        ) from None
+    latency_ms = round((time.monotonic() - started) * 1000.0, 3)
+
+    proposal_ref: str | None = None
+    response_ref: str | None = None
+    input_tokens = output_tokens = 0
+    cost = 0.0
+    finish_reason = "error"
+    model_id = adapter.model_id
+    provider_extras: dict[str, str] = {}
+    if response is not None:
+        finish_reason, model_id = response.finish_reason, response.model_id
+        # UNKNOWN usage is NEVER charged as 0: when the adapter does not report
+        # trustworthy token/cost usage (or the provider omits it), retain the
+        # CONSERVATIVE dispatch reservation so a finite budget is never
+        # understated. The raw provider-reported values are preserved for audit.
+        reported_tokens = response.input_tokens + response.output_tokens
+        trusted_tokens = adapter.reports_usage and reported_tokens > 0
+        if trusted_tokens:
+            input_tokens, output_tokens = response.input_tokens, response.output_tokens
+        else:
+            input_tokens, output_tokens = est_input, max_tokens  # reserve, don't trust 0
+        trusted_cost = adapter.reports_cost
+        cost = response.cost if trusted_cost else (est_cost if est_cost is not None else 0.0)
+        provider_extras = {
+            "requested_model_id": adapter.model_id,
+            "resolved_model_id": response.model_id,
+            "reported_input_tokens": str(response.input_tokens),
+            "reported_output_tokens": str(response.output_tokens),
+            "reported_cost": repr(response.cost),
+            "usage_trusted": str(trusted_tokens),
+            "cost_trusted": str(trusted_cost),
+        }
+        # charge the meter the SAME values recorded in the ModelResult below, so
+        # the live charge and the resume-time reconciliation cannot drift
+        meter.note_model_usage(tokens=input_tokens + output_tokens, cost=cost)
+        response_ref = substrate.objects.put_text(response.text)
+        overrun = meter.tokens_overrun() or meter.cost_overrun()
+        if overrun is not None:
+            failure = overrun
+        elif finish_reason in _UNUSABLE_FINISH:
+            # a truncated/errored completion is not a usable proposal
+            failure = FailureRecord(
+                kind=FAILURE_MALFORMED_OUTPUT,
+                detail=f"unusable finish reason {finish_reason!r}",
+            )
+        else:
+            try:
+                # decode STRICTLY under the issued durable constraints, against
+                # the RUN-PINNED descriptors + policy-enabled surfaces
+                proposal, blobs = decode_proposal(
+                    response.text,
+                    validate=substrate.pinned_validator(view),
+                    enabled_surfaces=frozenset(
+                        _parse_surface(s) for s in command.enabled_surfaces
+                    ),
+                    required_change_id=command.required_change_id,
+                    edit_limit=command.edit_limit,
+                    edit_rule=command.edit_rule,
+                )
+                for ref, content in blobs.items():
+                    substrate.objects.put_text(content)
+                proposal_ref = substrate.put(proposal)
+            except RefinementDecodeError as exc:
+                failure = FailureRecord(kind=FAILURE_MALFORMED_OUTPUT, detail=str(exc))
+
+    result = ModelResult(
+        command_id=cid, prompt_role=command.prompt_role, adapter_name=adapter.adapter_name,
+        model_id=model_id, response_ref=response_ref, input_tokens=input_tokens,
+        output_tokens=output_tokens, cost=cost, latency_ms=latency_ms,
+        finish_reason=finish_reason, provider_extras=provider_extras, failure=failure,
+        proposal_ref=proposal_ref,
+    )
+    substrate.record_observation(
+        observation_kind=REFINE_RESULT, observation=result,
+        subject_state_ref=subject, caused_by=cid,
+    )
+    if failure is not None:
+        raise KernelError(failure.detail)  # → failed terminal (usage still reconciled)
+    found = _refinement_result(services, substrate.verify(), cid)
+    assert found is not None  # just journaled
+    result_event_ref, _ = found
+    return CommandResult(
+        cid, kind, "ok", substrate.verify().head,
+        observation_ref=result_event_ref, detail="refinement observed",
+    )
+
+
 def operator_revert(services: KernelServices, change_id: str) -> CommandResult:
     """Operator-initiated revert that goes through the SAME command path as a
     policy (issue → perform → terminal), never a direct `Substrate.revert`.
@@ -491,6 +945,33 @@ def operator_revert(services: KernelServices, change_id: str) -> CommandResult:
 # -- one command: intent → effect/reconcile → terminal ---------------------------------------------
 
 
+def _require_settled_before_issue(view: VerifiedSubstrateView, cid: str) -> None:
+    """Refuse a new issue unless every prior command is SETTLED: it has a
+    terminal AND a checkpoint consumed it. This is the loop's one-in-flight
+    discipline (issue → terminal → checkpoint → next issue) enforced at the
+    kernel boundary, so a policy bug can never leave two commands open."""
+    from strive.substrate import PolicyCheckpointed
+
+    prior_issued = set(view.issued) - {cid}
+    open_prior = prior_issued - set(view.completed)
+    if open_prior:
+        raise KernelError(
+            f"cannot issue {cid!r} while prior command(s) {sorted(open_prior)} "
+            "have no terminal (one in-flight command at a time)"
+        )
+    consumed = {
+        body.consumed_command_id
+        for body in view.bodies
+        if isinstance(body, PolicyCheckpointed) and body.consumed_command_id is not None
+    }
+    unchecked = prior_issued - consumed
+    if unchecked:
+        raise KernelError(
+            f"cannot issue {cid!r} while prior command(s) {sorted(unchecked)} "
+            "lack a consuming checkpoint (terminal+checkpoint required first)"
+        )
+
+
 def _run_command(
     services: KernelServices, view: VerifiedSubstrateView, command: KernelCommand
 ) -> CommandResult:
@@ -502,13 +983,14 @@ def _run_command(
     # issued digest — BEFORE both the already-completed and already-issued
     # paths — so a changed re-derivation fails closed rather than reconciling
     # against a different intent.
-    command_ref = substrate.put(_command_payload(substrate, view, command))
+    command_ref = substrate.put(_command_payload(services, view, command))
     issued = view.issued.get(cid)
     if issued is not None and issued.command_ref != command_ref:
         raise KernelError(
             f"command {cid!r} re-derived a different payload digest than the "
             f"issued intent ({issued.command_ref[:12]}… vs {command_ref[:12]}…) — "
-            "refusing to reconcile against a changed command"
+            "refusing to reconcile against a changed command (e.g. a switched "
+            "model, whose resolved identity is pinned in the intent)"
         )
 
     terminal = view.completed.get(cid)
@@ -522,12 +1004,21 @@ def _run_command(
     if existing_failure is not None:
         return _reconcile_failure(services, command, existing_failure)
 
+    # ONE in-flight command: a genuinely NEW issue is refused while any prior
+    # command lacks a terminal, or any completed command lacks a checkpoint —
+    # so the loop can only ever advance issue → terminal → checkpoint → issue.
+    if cid not in view.issued:
+        _require_settled_before_issue(view, cid)
     # `issue_command` is idempotent (same id+digest is a read, not a 2nd intent)
     substrate.issue_command(command_id=cid, command_kind=kind, command_ref=command_ref)
 
     try:
         result = _perform(services, substrate.verify(), command)
         outcome, detail = "ok", result.detail
+    except ModelBindingMismatch:
+        # a hard refusal: do NOT record a terminal — resume is blocked until the
+        # bound model is restored (the command stays resumable, never failed).
+        raise
     except IndeterminateEffect as exc:
         # dispatched, but no durable result is recoverable: record it honestly
         # and REQUIRE an explicit retry — never silently re-dispatch. The stored
@@ -640,6 +1131,9 @@ def _perform(
     if isinstance(command, EvaluateFork):
         return _evaluate_fork(services, view, command)
 
+    if isinstance(command, ObserveCurrentState):
+        return _run_observation(services, view, command)
+
     if isinstance(command, ConfirmChange):
         if not _caused(view, cid, "change-confirmed@2"):
             substrate.confirm_change(
@@ -656,13 +1150,7 @@ def _perform(
         return CommandResult(cid, kind, "ok", view.head, detail=command.reason)
 
     if isinstance(command, RequestRefinement):
-        # Phase A ships no model refiner; a policy needing one must supply it.
-        # A real implementation must give the model call an idempotency key and
-        # record `indeterminate` on a dispatch-without-durable-result crash.
-        raise KernelError(
-            "RequestRefinement is unimplemented in Phase A (no model refiner "
-            "bound; manual-change@1 constructs its typed change directly)"
-        )
+        return _run_refinement(services, view, command)
     raise KernelError(f"unknown command {kind}")
 
 
@@ -770,6 +1258,170 @@ def _fork_metrics(base: float, candidate: float, improved: bool) -> dict[str, fl
     }
 
 
+def _operation_result(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> tuple[str, AttemptRecord] | None:
+    """The operation's durable result, if present: (the ObservationRecorded
+    EVENT body ref, the decoded AttemptRecord)."""
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == OPERATION_RESULT
+        ):
+            rec = codec.loads(
+                services.substrate.objects.get_text(body.observation_ref), AttemptRecord
+            )
+            return env.body_ref, rec
+    return None
+
+
+def _operation_dispatched(view: VerifiedSubstrateView, cid: str) -> bool:
+    return any(
+        env.caused_by == cid
+        and isinstance(body, ObservationRecorded)
+        and body.observation_kind == OPERATION_DISPATCH
+        for env, body in zip(view.envelopes, view.bodies, strict=True)
+    )
+
+
+def _run_observation(
+    services: KernelServices, view: VerifiedSubstrateView, command: ObserveCurrentState
+) -> CommandResult:
+    """Operate the ACTIVE harness once through the injected OperationDriver over
+    POLICY-VISIBLE cases only, journaled crash-honestly like a fork attempt: a
+    DISPATCH (durable, with a reservation) then a RESULT (an AttemptRecord). A
+    crash between them is an OPEN dispatch — reconciled as `indeterminate`,
+    never silently re-run, its reservation retained. This is FEEDBACK, never a
+    gate: the command SUCCEEDS whatever the harness scored; the record carries
+    the behavior (score, per-case errors, any sandbox failure)."""
+    substrate = services.substrate
+    cid = command.command_id
+    kind = "ObserveCurrentState"
+
+    # the PROJECTION is the terminal effect: if it exists, reconstruct verbatim
+    existing_proj = _operation_projection(view, cid)
+    if existing_proj is not None:
+        return CommandResult(
+            cid, kind, "ok", view.head, observation_ref=existing_proj,
+            detail="operation already observed",
+        )
+    plan, plan_ref = _pinned_operation_plan(services, view, cid)
+    descriptor = services.operation_catalog.descriptor(plan.descriptor_ref)
+    subject = view.state_ref or ""
+
+    # crash between RESULT and PROJECTION: FINISH by deriving the projection from
+    # the DURABLE result — never re-execute or re-charge
+    existing_result = _operation_result(services, view, cid)
+    if existing_result is not None:
+        _, rec = existing_result
+        return _finish_projection(services, cid, kind, plan, plan_ref, descriptor, rec, subject)
+    if _operation_dispatched(view, cid):
+        raise IndeterminateEffect(
+            "operation dispatched without a durable result — explicit retry required"
+        )
+
+    # DISPATCH first (durable): name the descriptor + plan and reserve the plan's
+    # resource envelope, so an OPEN dispatch reserves the worst case
+    substrate.record_observation(
+        observation_kind=OPERATION_DISPATCH,
+        observation=OperationDispatched(
+            command_id=cid, descriptor_ref=plan.descriptor_ref, plan_ref=plan_ref,
+            state_ref=subject,
+            reserved_executions=plan.reserved_executions,
+            reserved_wall_s=plan.reserved_wall_s,
+            reserved_output_bytes=plan.reserved_output_bytes,
+        ),
+        subject_state_ref=subject, caused_by=cid,
+    )
+    # the kernel OWNS execution/budget/journaling; the descriptor only prepared
+    # the plan's manifest cases
+    rec = _run_attempt(
+        services, cid, OPERATION_LABEL, view.state, subject,
+        gen_prefix="operation", cases=plan.manifest,
+    )
+    substrate.record_observation(
+        observation_kind=OPERATION_RESULT, observation=rec,
+        subject_state_ref=subject, caused_by=cid,
+    )
+    return _finish_projection(services, cid, kind, plan, plan_ref, descriptor, rec, subject)
+
+
+def _finish_projection(
+    services: KernelServices, cid: str, kind: str, plan: OperationPlan, plan_ref: str,
+    descriptor: OperationDescriptor, rec: AttemptRecord, subject: str,
+) -> CommandResult:
+    """Derive and record the POLICY-VISIBLE projection from the DURABLE protected
+    result (no re-execution). The descriptor interprets the protected evidence;
+    policy/review consume ONLY this projection."""
+    substrate = services.substrate
+    report = codec.loads(substrate.objects.get_text(rec.report_ref), ExecutionReport)
+    evaluation = codec.loads(substrate.objects.get_text(rec.evaluation_ref), Evaluation)
+    projection = descriptor.project(
+        plan, command_id=cid, state_ref=subject,
+        report=report, evaluation=evaluation, origin=rec.origin,
+    )
+    projection = dataclasses.replace(projection, plan_ref=plan_ref)
+    updated = substrate.record_observation(
+        observation_kind=OPERATION_PROJECTION, observation=projection,
+        subject_state_ref=subject, caused_by=cid,
+    )
+    return CommandResult(
+        cid, kind, "ok", updated.head,
+        observation_ref=updated.envelopes[-1].body_ref, detail="harness operated",
+    )
+
+
+def _environment_fingerprint(services: KernelServices) -> str:
+    """The execution REGIME the plan pins: backend name + enforced capabilities.
+    A regime change (different backend/capabilities) yields a different plan and
+    thus a new comparison window."""
+    caps = services.executor.capabilities()
+    return f"{services.executor.backend_name}|{'+'.join(sorted(caps.enforced))}"
+
+
+def _operation_plan(
+    services: KernelServices,
+) -> tuple[OperationDescriptor, OperationPlan, str]:
+    """Deterministically build (descriptor, plan, plan_ref) from the run's
+    POLICY-VISIBLE operation context. Deterministic, so re-deriving on resume
+    yields the SAME plan_ref (drift → a different ref → a refused resume)."""
+    descriptor = services.operation_catalog.descriptor(services.operation_descriptor)
+    context = PolicyVisibleOperationContext(
+        task_fingerprint=services.task.fingerprint(),
+        environment_fingerprint=_environment_fingerprint(services),
+        seed=services.seed,
+        visible_cases=services.task.visible_cases(),
+    )
+    plan = descriptor.create_plan(context)
+    return descriptor, plan, services.substrate.put(plan)
+
+
+def _pinned_operation_plan(
+    services: KernelServices, view: VerifiedSubstrateView, cid: str
+) -> tuple[OperationPlan, str]:
+    """Load the EXACT plan pinned in the issued `ObserveCurrentState` intent."""
+    issued = view.issued.get(cid)
+    if issued is None:
+        raise KernelError(f"operation {cid!r} has no issued intent")
+    payload = codec.loads(services.substrate.objects.get_text(issued.command_ref), CommandPayload)
+    if payload.plan_ref is None:
+        raise KernelError(f"operation {cid!r} intent does not pin a plan_ref")
+    plan = codec.loads(services.substrate.objects.get_text(payload.plan_ref), OperationPlan)
+    return plan, payload.plan_ref
+
+
+def _operation_projection(view: VerifiedSubstrateView, cid: str) -> str | None:
+    for env, body in zip(view.envelopes, view.bodies, strict=True):
+        if (
+            env.caused_by == cid
+            and isinstance(body, ObservationRecorded)
+            and body.observation_kind == OPERATION_PROJECTION
+        ):
+            return env.body_ref
+    return None
+
+
 def _usage_delta(before: BudgetUsage, after: BudgetUsage) -> BudgetUsage:
     return BudgetUsage(
         wall_time_s=round(max(0.0, after.wall_time_s - before.wall_time_s), 6),
@@ -804,22 +1456,46 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
     )
 
 
+def _attempt_origin(
+    failure: FailureRecord | None, fault_origin: str | None
+) -> tuple[str, str]:
+    """Map a completed attempt's TRUSTED boundary evidence to a typed operation
+    origin. A clean run is behavioral; only a PROVEN candidate fault stays
+    behavioral; a proven infrastructure fault is infrastructure; and an
+    unproven/unstamped boundary fault is UNKNOWN. Only behavioral (clean or
+    proven-candidate) evidence may later steer adaptation."""
+    if failure is None:
+        return OP_BEHAVIORAL, ""
+    if fault_origin == FAULT_CANDIDATE:
+        return OP_BEHAVIORAL, f"proven candidate fault: {failure.kind}"
+    if fault_origin == FAULT_INFRASTRUCTURE:
+        return OP_INFRASTRUCTURE, f"proven infrastructure fault: {failure.kind}"
+    # FAULT_UNKNOWN, or a failed attempt with no trusted stamp: cause unproven
+    return OP_UNKNOWN, f"unproven boundary fault: {failure.kind}"
+
+
 def _run_attempt(
-    services: KernelServices, cid: str, label: str, state: HarnessState, state_ref: str
+    services: KernelServices, cid: str, label: str, state: HarnessState, state_ref: str,
+    *, gen_prefix: str = "fork", cases: "Sequence[TaskCase] | None" = None,
 ) -> AttemptRecord:
-    """Execute one base/candidate attempt CASE-BY-CASE, enforcing CUMULATIVE
-    output and wall across cases (each case's sandbox caps come from the
-    REMAINING budget, not a fresh per-case cap). Returns an AttemptRecord even
-    when the attempt is denied/fails mid-suite — with the ACTUAL provenance,
+    """Execute one attempt (a fork base/candidate over the SELECTION cases, or an
+    operation over the driver's POLICY-VISIBLE cases) CASE-BY-CASE, enforcing
+    CUMULATIVE output and wall across cases (each case's sandbox caps come from
+    the REMAINING budget, not a fresh per-case cap). Returns an AttemptRecord
+    even when the attempt is denied/fails mid-suite — with the ACTUAL provenance,
     failure, denials, and the usage it actually charged — so charges and
-    provenance survive to the next crash point (`ok=False` on any failure)."""
+    provenance survive to the next crash point (`ok=False` on any failure).
+    `gen_prefix` labels the report's generation (`fork` / `operation`) so verify
+    binds it to its role; `cases` defaults to the task's selection cases."""
     meter = services.meter
     substrate = services.substrate
+    gen = f"{gen_prefix}-{label}"
+    run_cases = tuple(cases) if cases is not None else services.task.selection_cases()
     before = meter.usage()
     code_ref = state.content_ref("strategy-code", "solve")
     if code_ref is None:
-        empty = ExecutionReport(ok=True, generation_id=f"fork-{label}", outcomes=())
-        evaluation = evaluate(services.task, empty, services.task.selection_cases())
+        empty = ExecutionReport(ok=True, generation_id=gen, outcomes=())
+        evaluation = evaluate(services.task, empty, run_cases)
         return AttemptRecord(
             command_id=cid, label=label, state_ref=state_ref,
             overall=evaluation.overall_score, ok=True,
@@ -828,20 +1504,25 @@ def _run_attempt(
             report_ref=substrate.put(empty), evaluation_ref=substrate.put(evaluation),
         )
     source = services.substrate.objects.get_text(code_ref)
-    cases = services.task.selection_cases()
+    cases = run_cases
     outcomes: list[CaseOutcome] = []
     denials: list[str] = []
     provenance = None
-    failure = None
+    # ORDERED per-case boundary faults: (failure, origin) in case order. The
+    # recorded failure AND origin are later derived from the SAME dominant item,
+    # so they are always self-consistent (never a first failure paired with a
+    # different case's origin).
+    faults: list[tuple[FailureRecord, str | None]] = []
     total_stdout = 0
     total_wall = 0.0
     for case in cases:
         denial = meter.request_execution()  # cumulative executions + wall gate
         if denial is not None:
-            failure = denial
+            # a run-budget shortfall — a PROVEN infrastructure fault
+            faults.append((denial, FAULT_INFRASTRUCTURE))
             break
         result = services.executor.execute_suite(
-            source, [case], generation_id=f"fork-{label}",
+            source, [case], generation_id=gen,
             limits=_budget_limits(services),  # caps from REMAINING budget
         )
         meter.note_output_bytes(result.report.stdout_bytes)  # ACTUAL captured bytes
@@ -850,19 +1531,26 @@ def _run_attempt(
         provenance = result.provenance
         denials.extend(result.denials)
         outcomes.extend(result.report.outcomes)
-        if result.report.failure is not None and failure is None:
-            failure = result.report.failure
+        if result.report.failure is not None:
+            faults.append((result.report.failure, result.report.fault_origin))
+    # the DOMINANT fault (infrastructure > unknown > candidate); its failure and
+    # origin come from that ONE item, so event order can never hide a later
+    # backend fault AND the pair stays self-consistent. `dominant_fault` is the
+    # SHARED aggregation rule the CandidateExecutor's per-suite pass also uses.
+    failure, fault_origin = dominant_fault(faults)
     if provenance is None:  # denied before any case ran
         provenance = services.executor.provenance()
     report = ExecutionReport(
         ok=failure is None,
-        generation_id=f"fork-{label}",
+        generation_id=gen,
         outcomes=tuple(outcomes),
         failure=failure,
         wall_time_s=round(total_wall, 6),
         stdout_bytes=total_stdout,  # ACTUAL captured output, not error-string length
+        fault_origin=fault_origin,
     )
     evaluation = evaluate(services.task, report, cases)
+    origin, origin_detail = _attempt_origin(failure, fault_origin)
     # preserve the FULL evidence: the exact ExecutionReport (per-case
     # outputs/errors, backend failure, wall/output) and its Evaluation
     # (per-case scores/feedback) — never collapsed to only the aggregate.
@@ -872,6 +1560,7 @@ def _run_attempt(
         provenance=provenance, failure=failure, denials=tuple(denials),
         usage=_usage_delta(before, meter.usage()),
         report_ref=substrate.put(report), evaluation_ref=substrate.put(evaluation),
+        origin=origin, origin_detail=origin_detail,
     )
 
 
@@ -946,14 +1635,26 @@ def _policy_digest(
     source of every explicitly-declared `dependency_modules` (strategy/helper
     modules the policy relies on OUTSIDE its own module). A change to any part
     of the manifest shifts the digest and is detected on resume."""
+    import importlib
     import sys
 
     cls = type(policy)
 
     def _module_source(name: str) -> str:
+        # IMPORT every declared dependency before hashing, so its digest is the
+        # real source — never a fallback to the bare name because it happened
+        # not to be imported yet (which would blind resume to a dep change).
         module = sys.modules.get(name)
+        if module is None:
+            try:
+                module = importlib.import_module(name)
+            except ImportError as exc:
+                raise KernelError(
+                    f"declared policy dependency module {name!r} cannot be "
+                    f"imported for hashing: {exc}"
+                ) from None
         try:
-            return inspect.getsource(module) if module is not None else name
+            return inspect.getsource(module)
         except (OSError, TypeError):
             return name
 
@@ -983,12 +1684,29 @@ def _command_identity_json(command: object) -> str:
     return json.dumps(strict_encode(command), sort_keys=True, separators=(",", ":"))
 
 
+def _resolve_model_binding(services: KernelServices, model_role: str) -> str:
+    """The RESOLVED model identity a refinement is bound to at issue:
+    ``model_role|adapter|impl_version|requested_model|config_digest``. Pinned
+    into the command's durable intent so a resume that resolves a different
+    model/adapter re-derives a different digest and is refused."""
+    if services.models is None:
+        raise KernelError(
+            "RequestRefinement requires an injected model catalog (none bound)"
+        )
+    adapter = services.models.resolve(model_role)
+    return (
+        f"{model_role}|{adapter.adapter_name}|{adapter.impl_version}"
+        f"|{adapter.model_id}|{adapter.config_digest}"
+    )
+
+
 def _command_payload(
-    substrate: Substrate, view: VerifiedSubstrateView, command: KernelCommand
+    services: KernelServices, view: VerifiedSubstrateView, command: KernelCommand
 ) -> CommandPayload:
     """Build the NEUTRAL typed intent record for a command: every consequential
     field is normalized out of the opaque `json` so verification can bind each
     effect to exactly what the command named."""
+    substrate = services.substrate
     kind = type(command).__name__
     change_ref: str | None = None
     target_change_id: str | None = None
@@ -998,6 +1716,8 @@ def _command_payload(
     context_ref: str | None = None
     after_seconds: float | None = None
     reason: str | None = None
+    model_binding: str | None = None
+    plan_ref: str | None = None
     if isinstance(command, ApplyChange):
         change_ref = substrate.put(command.change)
         target_change_id = command.change.change_id
@@ -1014,18 +1734,33 @@ def _command_payload(
     elif isinstance(command, RequestRefinement):
         prompt_role = command.prompt_role
         context_ref = command.context_ref
+        model_binding = _resolve_model_binding(services, command.model_role)
+    elif isinstance(command, ObserveCurrentState):
+        # pin the CAS-backed operation PLAN ref (and, transitively, the
+        # descriptor/config identity it embeds) in the durable intent BEFORE
+        # issue: a resume that re-derives a different plan is refused
+        _, _, plan_ref = _operation_plan(services)
     elif isinstance(command, ScheduleTrigger):
         after_seconds = command.after_seconds
         reason = command.reason
     elif isinstance(command, StopAdaptation):
         reason = command.reason
+    # the model binding is part of a refinement's canonical identity JSON, so a
+    # different resolved model perturbs the digest (a refused resume)
+    identity = strict_encode(command)
+    assert isinstance(identity, dict)
+    if model_binding is not None:
+        identity = {**identity, "model_binding": model_binding}
+    if plan_ref is not None:
+        identity = {**identity, "plan_ref": plan_ref}
+    payload_json = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return CommandPayload(
         command_id=command.command_id, kind=kind, encoding=_ENCODING,
         change_ref=change_ref, target_change_id=target_change_id,
         expected_state_ref=expected_state_ref, issue_state_ref=issue_state_ref,
         prompt_role=prompt_role, context_ref=context_ref,
         after_seconds=after_seconds, reason=reason,
-        json=_command_identity_json(command),
+        json=payload_json, model_binding=model_binding, plan_ref=plan_ref,
     )
 
 

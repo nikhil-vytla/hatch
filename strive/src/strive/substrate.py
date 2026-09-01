@@ -51,12 +51,20 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Iterator, Mapping
+from typing import Callable, Iterator, Mapping
 
 from strive import codec
 from strive.cas import ObjectCorruption, ObjectMissing, ObjectStore, hash_text
 from strive.codec import register
-from strive.contracts import BudgetSpec, BudgetUsage, Evaluation, ExecutionReport
+from strive.contracts import (
+    FAULT_CANDIDATE,
+    FAULT_INFRASTRUCTURE,
+    FAULT_ORIGINS,
+    BudgetSpec,
+    BudgetUsage,
+    Evaluation,
+    ExecutionReport,
+)
 from strive.events import now_iso
 from strive.framing import FramedJournal, FramingError
 from strive.runtime import (
@@ -64,15 +72,40 @@ from strive.runtime import (
     FORK_DISPATCH,
     FORK_RESULT,
     FORK_SUMMARY,
+    OP_BEHAVIORAL,
+    OP_INFRASTRUCTURE,
+    OP_OPERATION_ORIGINS,
+    OP_UNKNOWN,
+    OPERATION_DISPATCH,
+    OPERATION_PROJECTION,
+    OPERATION_LABEL,
+    OPERATION_RESULT,
+    REFINE_BINDING,
+    REFINE_DISPATCH,
+    REFINE_RESULT,
     AttemptDispatched,
     AttemptRecord,
     CommandPayload,
     ConfigBlob,
     ForkObservation,
+    ModelBinding,
+    ModelDispatch,
+    ModelResult,
+    OperationDispatched,
+    OperationPlan,
+    OperationProjection,
     PolicyStateBlob,
+    RefinementProposal,
     StoredResult,
     combine_usage,
+    model_dispatch_reservation,
+    model_result_usage,
     strict_encode,
+)
+from strive.refine import (
+    RefinementDecodeError,
+    decode_proposal,
+    render_prompt,
 )
 from strive.surfaces import (
     SurfaceCatalog,
@@ -88,7 +121,9 @@ _CAUSE_COMPAT: dict[str, set[str]] = {
     "change-proposed@2": {"ApplyChange", "EvaluateFork", "RequestRefinement"},
     "change-applied@2": {"ApplyChange"},
     "change-reverted@2": {"RevertChange"},
-    "observation-recorded@2": {"EvaluateFork"},
+    "observation-recorded@2": {
+        "EvaluateFork", "RequestRefinement", "ObserveCurrentState",
+    },
     "change-confirmed@2": {"ConfirmChange"},
     "change-revised@2": {"RequestRefinement"},
 }
@@ -106,6 +141,14 @@ _OK_EFFECTS: dict[str, dict[str, int]] = {
         "fork-evaluation": 1,
     },
     "ConfirmChange": {"change-confirmed@2": 1},
+    "RequestRefinement": {
+        "refine-model-binding": 1,
+        "refine-model-dispatch": 1,
+        "refine-model-result": 1,
+    },
+    "ObserveCurrentState": {
+        "operation-dispatch": 1, "operation-result": 1, "operation-projection": 1,
+    },
     "ScheduleTrigger": {},
     "StopAdaptation": {},
 }
@@ -118,7 +161,8 @@ _SUCCESS_TOKENS = {
 # every normalized anchor a CommandPayload may carry
 _PAYLOAD_FIELDS = (
     "change_ref", "target_change_id", "expected_state_ref", "issue_state_ref",
-    "prompt_role", "context_ref", "after_seconds", "reason",
+    "prompt_role", "context_ref", "after_seconds", "reason", "model_binding",
+    "plan_ref",
 )
 
 # The CLOSED per-kind command-intent spec: which normalized anchors are
@@ -157,9 +201,19 @@ _PAYLOAD_SPECS: dict[
         None,
     ),
     "RequestRefinement": (
-        frozenset({"prompt_role", "context_ref"}),
+        frozenset({"prompt_role", "context_ref", "model_binding"}),
         frozenset(),
-        frozenset({"command_id", "prompt_role", "context_ref"}),
+        frozenset({
+            "command_id", "prompt_role", "model_role", "context_ref", "content_blobs",
+            "required_change_id", "edit_limit", "enabled_surfaces", "edit_rule",
+            "model_binding",
+        }),
+        None,
+    ),
+    "ObserveCurrentState": (
+        frozenset({"plan_ref"}),
+        frozenset(),
+        frozenset({"command_id", "detail", "plan_ref"}),
         None,
     ),
     "ScheduleTrigger": (
@@ -584,6 +638,7 @@ class VerifiedSubstrateView:
     latest_checkpoint: PolicyCheckpointed | None
     applied_change_ids: frozenset[str]
     reverted_change_ids: frozenset[str]
+    superseded_change_ids: frozenset[str]
 
 
 # -- the substrate store --------------------------------------------------------------------------
@@ -968,6 +1023,25 @@ class Substrate:
                 f"descriptor: {exc}"
             ) from None
 
+    def pinned_validator(
+        self, view: VerifiedSubstrateView
+    ) -> Callable[[str, str, str], None]:
+        """A surface-content validator bound to the run's PINNED descriptors (not
+        the live catalog): `(kind, name, content) -> None`, raising
+        `SurfaceValidationError` for an off-limits surface or invalid content.
+        Used to decode a refinement proposal against run-pinned descriptors."""
+        pinned = self._pinned(view)
+
+        def validate(kind: str, name: str, content: str) -> None:
+            snap = pinned.get(f"{kind}/{name}")
+            if snap is None:
+                raise SurfaceValidationError(
+                    f"surface {(kind, name)} is not pinned in this run"
+                )
+            self.catalog.resolve_pinned(snap).validator(content)
+
+        return validate
+
     def stage_change_closure(self, change: CompositeChange, blobs: dict[str, str]) -> None:
         """Stage EXACTLY the CAS objects a change references, verifying each
         blob hashes to its ref. Reject any UNRELATED staged blob. Then validate
@@ -1200,6 +1274,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
             issued=MappingProxyType({}), completed=MappingProxyType({}),
             latest_checkpoint=None,
             applied_change_ids=frozenset(), reverted_change_ids=frozenset(),
+            superseded_change_ids=frozenset(),
         )
 
     # envelope structure: monotonic seq, correct scope, stable id, CLOSED body
@@ -1241,6 +1316,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
             issued=MappingProxyType({}), completed=MappingProxyType({}),
             latest_checkpoint=None,
             applied_change_ids=frozenset(), reverted_change_ids=frozenset(),
+            superseded_change_ids=frozenset(),
         )
 
     # exactly one leading PolicyBound
@@ -1296,11 +1372,13 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
     state = seed_state
     state_ref: str | None = bound.seed_state_ref
     issued: dict[str, PolicyCommandIssued] = {}
+    issue_states: dict[str, str | None] = {}  # folded state at each issue
     payloads: dict[str, CommandPayload] = {}
     completed: dict[str, PolicyCommandCompleted] = {}
     latest_checkpoint: PolicyCheckpointed | None = None
     applied_ids: set[str] = set()
     reverted_ids: set[str] = set()
+    superseded_ids: set[str] = set()  # change ids retired by a later revision
     applied_changes: dict[str, CompositeChange] = {}
     proposals: dict[str, str] = {}  # change_id -> change_ref (one per change id)
     consumed_cmds: set[str] = set()  # a command is reduced by AT MOST one checkpoint
@@ -1332,10 +1410,22 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                         "noncanonical"
                     )
                 _check_command_payload_coherence(sub, env, payload, errors)
+                # a fork's issue_state_ref is the base anchor: it MUST equal the
+                # state folded at the moment the fork was issued — not an
+                # arbitrary ref the policy chose.
+                if (
+                    payload.kind == "EvaluateFork"
+                    and payload.issue_state_ref != state_ref
+                ):
+                    errors.append(
+                        f"envelope {env.seq}: fork issue_state_ref does not equal the "
+                        "folded state at issue"
+                    )
                 payloads.setdefault(body.command_id, payload)
             except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
                 errors.append(f"envelope {env.seq}: command payload does not decode: {exc}")
             issued.setdefault(body.command_id, body)
+            issue_states.setdefault(body.command_id, state_ref)
             continue
 
         # every non-bound, non-issue event must cite an ISSUED command that
@@ -1522,6 +1612,24 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
                     "never proposed"
                 )
+            # TRUTHFUL CONFIRM: a confirm may only ratify a change that is
+            # CURRENTLY in effect — applied, not reverted, and not superseded by
+            # a later revision. Confirming an inactive change is a forged verdict.
+            elif body.change_id not in applied_ids:
+                errors.append(
+                    f"envelope {env.seq}: confirm of change {body.change_id!r} that is "
+                    "not applied"
+                )
+            elif body.change_id in reverted_ids:
+                errors.append(
+                    f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
+                    "already reverted"
+                )
+            elif body.change_id in superseded_ids:
+                errors.append(
+                    f"envelope {env.seq}: confirm of change {body.change_id!r} that was "
+                    "superseded by a later revision"
+                )
             if cause_payload is not None and cause_payload.target_change_id not in (
                 None, body.change_id
             ):
@@ -1530,19 +1638,33 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
                     f"command named {cause_payload.target_change_id!r}"
                 )
         elif isinstance(body, ChangeRevised):
-            if body.change_id not in proposals:
+            # TYPED old->new supersession lineage: `change_id` is the change being
+            # retired; `new_change_ref` is the replacement. The retired change
+            # must be CURRENTLY in effect (applied, not already reverted or
+            # superseded), so a revision always retires a live change exactly once.
+            if body.change_id not in applied_ids:
+                errors.append(
+                    f"envelope {env.seq}: revise of change {body.change_id!r} that is "
+                    "not applied"
+                )
+            elif body.change_id in reverted_ids:
                 errors.append(
                     f"envelope {env.seq}: revise of change {body.change_id!r} that was "
-                    "never proposed"
+                    "already reverted"
                 )
-            if cause_payload is not None and cause_payload.target_change_id not in (
-                None, body.change_id
-            ):
+            elif body.change_id in superseded_ids:
                 errors.append(
-                    f"envelope {env.seq}: revise targets {body.change_id!r} but the "
-                    f"command named {cause_payload.target_change_id!r}"
+                    f"envelope {env.seq}: change {body.change_id!r} was already "
+                    "superseded (double revision)"
                 )
-            _decode_change(sub, body.new_change_ref, env, errors)
+            else:
+                superseded_ids.add(body.change_id)
+            new_change = _decode_change(sub, body.new_change_ref, env, errors)
+            if new_change is not None and new_change.change_id == body.change_id:
+                errors.append(
+                    f"envelope {env.seq}: revision's replacement reuses the retired "
+                    f"change id {body.change_id!r}"
+                )
         elif isinstance(body, OperationFailed):
             if body.command_id != cause:
                 errors.append(
@@ -1558,7 +1680,8 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
     # outcome, no effect after terminal, matching StoredResult, and a
     # well-formed fork-attempt lifecycle.
     _verify_command_lifecycles(
-        sub, envelopes, bodies, bound, issued, completed, payloads, proposals, errors
+        sub, envelopes, bodies, bound, issued, completed, payloads, proposals,
+        issue_states, errors,
     )
 
     # validate the FINAL folded state's surface content too (catches corruption
@@ -1577,6 +1700,7 @@ def _fold_view(  # noqa: C901 — one place, exhaustive
         latest_checkpoint=latest_checkpoint,
         applied_change_ids=frozenset(applied_ids),
         reverted_change_ids=frozenset(reverted_ids),
+        superseded_change_ids=frozenset(superseded_ids),
     )
 
 
@@ -1606,14 +1730,26 @@ def _decode_change(
         return None
 
 
+def _reject_nonfinite(_token: str) -> object:
+    raise ValueError("non-finite number (NaN/Infinity) is not canonical JSON")
+
+
 def _canonical_json_ok(text: str) -> bool:
     """True iff `text` parses AND is the exact canonical serialization
-    (sorted keys, tight separators). Rejects malformed OR noncanonical JSON."""
+    (sorted keys, tight separators). Rejects malformed OR noncanonical JSON,
+    AND rejects NaN/Infinity — which `json` would otherwise round-trip — so no
+    non-finite number can hide inside a canonical payload/config/state blob."""
     try:
-        parsed = json.loads(text)
+        parsed = json.loads(text, parse_constant=_reject_nonfinite)
     except (ValueError, TypeError):
         return False
-    return json.dumps(parsed, sort_keys=True, separators=(",", ":")) == text
+    try:
+        canonical = json.dumps(
+            parsed, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+    except ValueError:
+        return False
+    return canonical == text
 
 
 def _check_command_payload_coherence(
@@ -1693,7 +1829,10 @@ def _check_command_payload_coherence(
     elif "change_id" in json_keys and parsed.get("change_id") != payload.target_change_id:
         errors.append(f"{where} json change_id disagrees with target_change_id")
     # the remaining scalar anchors that ARE carried verbatim in the JSON
-    for name in ("expected_state_ref", "prompt_role", "context_ref", "after_seconds", "reason"):
+    for name in (
+        "expected_state_ref", "prompt_role", "context_ref", "after_seconds",
+        "reason", "model_binding", "plan_ref",
+    ):
         if name in json_keys and parsed.get(name) != getattr(payload, name):
             errors.append(f"{where} json {name} disagrees with the normalized {name}")
 
@@ -1730,6 +1869,7 @@ def _verify_command_lifecycles(
     completed: dict[str, PolicyCommandCompleted],
     payloads: dict[str, CommandPayload],
     proposals: dict[str, str],
+    issue_states: dict[str, str | None],
     errors: list[str],
 ) -> None:
     """The per-command CLOSED state machine: every command's caused events must
@@ -1753,12 +1893,280 @@ def _verify_command_lifecycles(
         _check_effect_after_terminal(cid, events, errors)
         _check_effect_after_failure(cid, events, errors)
         _check_fork_lifecycle(sub, cid, payloads.get(cid), events, bound, errors)
+        _check_observation_lifecycle(
+            sub, cid, payloads.get(cid), events, bound, issue_states.get(cid), errors
+        )
+        _check_refinement_lifecycle(
+            sub, cid, payloads.get(cid), events, bound, issue_states.get(cid), errors
+        )
         terminal = completed.get(cid)
         _check_prefix_invariants(cid, events, terminal, errors)
         if terminal is not None:
             _check_command_grammar(
                 sub, cid, issue.command_kind, terminal, events, errors
             )
+
+
+def _check_observation_lifecycle(
+    sub: Substrate,
+    cid: str,
+    payload: CommandPayload | None,
+    events: list[tuple[EventEnvelope, object]],
+    bound: PolicyBound,
+    issue_state: str | None,
+    errors: list[str],
+) -> None:
+    """An ObserveCurrentState is journaled crash-honestly like a fork attempt:
+    a DISPATCH (subject-scoped to the ISSUE state, naming the pinned descriptor +
+    plan, with a finite reservation), a RESULT whose AttemptRecord matches its
+    ExecutionReport + Evaluation, and a POLICY-VISIBLE PROJECTION derived from
+    that result. The DISPATCH plan must equal the intent's `plan_ref`; the
+    projection must name the same plan and derive from the same result."""
+    dispatch: OperationDispatched | None = None
+    dispatch_subject: str | None = None
+    result: AttemptRecord | None = None
+    result_subject: str | None = None
+    projection: OperationProjection | None = None
+    projection_subject: str | None = None
+    dispatch_seq: int | None = None
+    result_seq: int | None = None
+    projection_seq: int | None = None
+    for env, body in events:
+        if not isinstance(body, ObservationRecorded):
+            continue
+        try:
+            if body.observation_kind == OPERATION_DISPATCH:
+                dispatch = codec.loads(
+                    sub.objects.get_text(body.observation_ref), OperationDispatched
+                )
+                dispatch_subject, dispatch_seq = body.subject_state_ref, env.seq
+            elif body.observation_kind == OPERATION_RESULT:
+                result = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
+                result_subject, result_seq = body.subject_state_ref, env.seq
+            elif body.observation_kind == OPERATION_PROJECTION:
+                projection = codec.loads(
+                    sub.objects.get_text(body.observation_ref), OperationProjection
+                )
+                projection_subject, projection_seq = body.subject_state_ref, env.seq
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+            return  # the main fold reports the decode failure
+    if dispatch is None and result is None and projection is None:
+        return  # not an operation command
+    for what, subj in (
+        ("dispatch", dispatch_subject), ("result", result_subject),
+        ("projection", projection_subject),
+    ):
+        if subj is not None and issue_state is not None and subj != issue_state:
+            errors.append(f"command {cid!r}: operation {what} subject is not the issue state")
+    # the DISPATCH must name the pinned plan from the ObserveCurrentState intent,
+    # and the plan's descriptor must be the one the dispatch names
+    plan: OperationPlan | None = None
+    if dispatch is not None:
+        errors.extend(_usage_errors(
+            BudgetUsage(
+                executions=dispatch.reserved_executions,
+                wall_time_s=dispatch.reserved_wall_s,
+                output_bytes=dispatch.reserved_output_bytes,
+            ),
+            f"command {cid!r} operation reservation",
+        ))
+        if payload is not None and payload.plan_ref is not None:
+            if dispatch.plan_ref != payload.plan_ref:
+                errors.append(
+                    f"command {cid!r}: operation dispatch plan_ref disagrees with the "
+                    "issued intent plan_ref"
+                )
+            try:
+                plan = codec.loads(sub.objects.get_text(payload.plan_ref), OperationPlan)
+            except (ObjectMissing, ObjectCorruption, codec.SchemaError) as exc:
+                errors.append(f"command {cid!r}: pinned plan does not decode: {exc}")
+            if plan is not None and dispatch.descriptor_ref != plan.descriptor_ref:
+                errors.append(
+                    f"command {cid!r}: dispatch descriptor {dispatch.descriptor_ref!r} "
+                    f"!= the plan's descriptor {plan.descriptor_ref!r}"
+                )
+    if dispatch_seq is not None and result_seq is not None and dispatch_seq >= result_seq:
+        errors.append(f"command {cid!r}: operation dispatch must precede its result")
+    if result_seq is not None and projection_seq is not None and result_seq >= projection_seq:
+        errors.append(f"command {cid!r}: operation result must precede its projection")
+    if result is not None:
+        if result.label != OPERATION_LABEL:
+            errors.append(f"command {cid!r}: operation result label {result.label!r}")
+        missing = [
+            cap for cap in bound.required_capabilities
+            if cap not in result.provenance.enforced_capabilities
+        ]
+        if missing:
+            errors.append(
+                f"command {cid!r}: operation provenance lacks required "
+                f"capabilities {missing}"
+            )
+        errors.extend(_usage_errors(result.usage, f"command {cid!r} operation usage"))
+        _check_attempt_evidence(sub, cid, result, errors, gen_prefix="operation")
+    # the POLICY-VISIBLE projection derives from the SAME plan and result: it
+    # names the pinned plan, carries the result's trusted origin, and only
+    # publishes an aggregate when the attempt is valid.
+    if projection is not None:
+        if payload is not None and payload.plan_ref is not None and projection.plan_ref != payload.plan_ref:
+            errors.append(f"command {cid!r}: projection plan_ref disagrees with the intent")
+        if result is not None and projection.origin != result.origin:
+            errors.append(f"command {cid!r}: projection origin disagrees with the result")
+        if not projection.valid and projection.overall is not None:
+            errors.append(
+                f"command {cid!r}: an invalid operation projection must not publish "
+                "an aggregate overall"
+            )
+
+
+_KNOWN_FINISH = {"stop", "length", "error", "unknown"}
+
+
+def _check_refinement_lifecycle(
+    sub: Substrate,
+    cid: str,
+    payload: CommandPayload | None,
+    events: list[tuple[EventEnvelope, object]],
+    bound: PolicyBound,
+    issue_state: str | None,
+    errors: list[str],
+) -> None:
+    """Model lifecycle verification, parallel to forks: the binding/dispatch/
+    result are subject-scoped to the ISSUE state; adapter+model agree across
+    binding → dispatch → result; usage is finite and the finish reason known;
+    the dispatch's prompt is EXACTLY control+active-template+context; and the
+    stored proposal is EXACTLY the strict decode of the recorded response under
+    the issued durable constraints — so a forged prompt/result/proposal linkage
+    cannot pass."""
+    binding: ModelBinding | None = None
+    dispatch: ModelDispatch | None = None
+    result: ModelResult | None = None
+    subjects: dict[str, str] = {}
+    for env, body in events:
+        if not isinstance(body, ObservationRecorded):
+            continue
+        try:
+            if body.observation_kind == REFINE_BINDING:
+                binding = codec.loads(sub.objects.get_text(body.observation_ref), ModelBinding)
+                subjects["binding"] = body.subject_state_ref
+            elif body.observation_kind == REFINE_DISPATCH:
+                dispatch = codec.loads(sub.objects.get_text(body.observation_ref), ModelDispatch)
+                subjects["dispatch"] = body.subject_state_ref
+            elif body.observation_kind == REFINE_RESULT:
+                result = codec.loads(sub.objects.get_text(body.observation_ref), ModelResult)
+                subjects["result"] = body.subject_state_ref
+        except (ObjectMissing, ObjectCorruption, codec.SchemaError):
+            return  # decode failures are reported by the main fold
+    if binding is None and dispatch is None and result is None:
+        return  # not a refinement command
+    where = f"command {cid!r} refinement"
+    # subject-scoped to the ISSUE state
+    for what, subj in subjects.items():
+        if issue_state is not None and subj != issue_state:
+            errors.append(f"{where}: {what} subject is not the issue state")
+    # adapter + model agree across binding → dispatch → result
+    if binding is not None and dispatch is not None:
+        if (dispatch.adapter_name, dispatch.model_id) != (binding.adapter_name, binding.model_id):
+            errors.append(f"{where}: dispatch adapter/model disagrees with the binding")
+    if dispatch is not None and result is not None:
+        if result.adapter_name != dispatch.adapter_name:
+            errors.append(f"{where}: result adapter disagrees with the dispatch")
+    # finite usage + known finish reason
+    if result is not None:
+        errors.extend(_usage_errors(
+            BudgetUsage(
+                tokens=result.input_tokens + result.output_tokens,
+                cost=result.cost, wall_time_s=result.latency_ms / 1000.0,
+            ),
+            f"{where} usage",
+        ))
+        if result.finish_reason not in _KNOWN_FINISH:
+            errors.append(f"{where}: unknown finish_reason {result.finish_reason!r}")
+    # the dispatch's prompt is EXACTLY control + active template + context
+    if dispatch is not None and payload is not None:
+        _check_refinement_prompt(sub, where, payload, bound, issue_state, dispatch, errors)
+    # the stored proposal is EXACTLY the strict decode of the response
+    if result is not None and result.failure is None and payload is not None:
+        _check_refinement_proposal(sub, where, payload, bound, result, errors)
+
+
+def _pinned_from_bound(
+    sub: Substrate, bound: PolicyBound
+) -> Callable[[str, str, str], None]:
+    pinned = {
+        key: codec.loads(sub.objects.get_text(ref), SurfaceDescriptorSnapshot)
+        for key, ref in bound.surface_descriptor_refs.items()
+    }
+
+    def validate(kind: str, name: str, content: str) -> None:
+        snap = pinned.get(f"{kind}/{name}")
+        if snap is None:
+            raise SurfaceValidationError(f"surface {(kind, name)} is not pinned")
+        sub.catalog.resolve_pinned(snap).validator(content)
+
+    return validate
+
+
+def _check_refinement_prompt(
+    sub: Substrate, where: str, payload: CommandPayload, bound: PolicyBound,
+    issue_state: str | None, dispatch: ModelDispatch, errors: list[str],
+) -> None:
+    if payload.prompt_role is None or payload.context_ref is None or issue_state is None:
+        return
+    try:
+        control_ref = bound.prompt_refs.get(payload.prompt_role)
+        if control_ref is None:
+            return
+        control = sub.objects.get_text(control_ref)
+        state = sub._load_state(issue_state)
+        template_ref = state.content_ref("prompt", "proposal-template")
+        if template_ref is None:
+            return
+        template = sub.objects.get_text(template_ref)
+        blobs = json.loads(payload.json).get("content_blobs", {})
+        if payload.context_ref not in blobs:
+            errors.append(f"{where}: context_ref is not among the command's content_blobs")
+            return
+        context = sub.objects.get_text(payload.context_ref)
+        expected = hash_text(render_prompt(control, template, context))
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError, SubstrateError, ValueError):
+        return  # decode/state failures are reported elsewhere
+    if dispatch.prompt_ref != expected:
+        errors.append(
+            f"{where}: dispatch prompt_ref is not control+active-template+context"
+        )
+
+
+def _check_refinement_proposal(
+    sub: Substrate, where: str, payload: CommandPayload, bound: PolicyBound,
+    result: ModelResult, errors: list[str],
+) -> None:
+    if result.response_ref is None or result.proposal_ref is None:
+        errors.append(f"{where}: an ok result must carry a response and a proposal")
+        return
+    try:
+        response = sub.objects.get_text(result.response_ref)
+        stored = codec.loads(sub.objects.get_text(result.proposal_ref), RefinementProposal)
+        spec = json.loads(payload.json)
+        enabled = frozenset(
+            (s.split("/", 1)[0], s.split("/", 1)[1])
+            for s in spec.get("enabled_surfaces", [])
+            if "/" in s
+        )
+        redecoded, _blobs = decode_proposal(
+            response,
+            validate=_pinned_from_bound(sub, bound),
+            enabled_surfaces=enabled,
+            required_change_id=spec.get("required_change_id", ""),
+            edit_limit=spec.get("edit_limit", 0),
+            edit_rule=spec.get("edit_rule", ""),
+        )
+    except RefinementDecodeError:
+        errors.append(f"{where}: stored proposal but the response does not strictly decode")
+        return
+    except (ObjectMissing, ObjectCorruption, codec.SchemaError, ValueError):
+        return  # reported elsewhere
+    if redecoded != stored:
+        errors.append(f"{where}: stored proposal != the strict decode of the response")
 
 
 def _check_prefix_invariants(
@@ -1834,16 +2242,20 @@ def _check_effect_after_failure(
 def _reconciled_usage_from_events(
     sub: Substrate, events: list[tuple[EventEnvelope, object]]
 ) -> BudgetUsage:
-    """The usage a command's DURABLE attempt ledger accounts for: each completed
-    attempt's actual usage plus each OPEN dispatch's worst-case reservation —
-    exactly the kernel's `_reconciled_usage` (both call `combine_usage`)."""
+    """The usage a command's DURABLE ledger accounts for: each completed fork
+    attempt's actual usage OR each completed model call's usage, plus each OPEN
+    dispatch's worst-case reservation — exactly the kernel's `_reconciled_usage`
+    (both call `combine_usage`). A command is either a fork or a refinement, so
+    the two ledgers never overlap for one command."""
     results: dict[str, BudgetUsage] = {}
-    dispatched: dict[str, AttemptDispatched] = {}
+    dispatched: dict[str, AttemptDispatched | OperationDispatched] = {}
+    model_results: list[ModelResult] = []
+    model_dispatches: list[ModelDispatch] = []
     for env, body in events:
         if not isinstance(body, ObservationRecorded):
             continue
         try:
-            if body.observation_kind == FORK_RESULT:
+            if body.observation_kind in (FORK_RESULT, OPERATION_RESULT):
                 rec = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
                 results[rec.label] = rec.usage
             elif body.observation_kind == FORK_DISPATCH:
@@ -1851,16 +2263,35 @@ def _reconciled_usage_from_events(
                     sub.objects.get_text(body.observation_ref), AttemptDispatched
                 )
                 dispatched[disp.label] = disp
+            elif body.observation_kind == OPERATION_DISPATCH:
+                odisp = codec.loads(
+                    sub.objects.get_text(body.observation_ref), OperationDispatched
+                )
+                dispatched[OPERATION_LABEL] = odisp
+            elif body.observation_kind == REFINE_RESULT:
+                model_results.append(
+                    codec.loads(sub.objects.get_text(body.observation_ref), ModelResult)
+                )
+            elif body.observation_kind == REFINE_DISPATCH:
+                model_dispatches.append(
+                    codec.loads(sub.objects.get_text(body.observation_ref), ModelDispatch)
+                )
         except (ObjectMissing, ObjectCorruption, codec.SchemaError):
-            continue  # decode failures are reported by the fork-lifecycle check
+            continue  # decode failures are reported by the lifecycle checks
     usages = list(results.values())
-    for label, disp in dispatched.items():
+    for label, open_disp in dispatched.items():
         if label not in results:
             usages.append(BudgetUsage(
-                executions=disp.reserved_executions,
-                wall_time_s=disp.reserved_wall_s,
-                output_bytes=disp.reserved_output_bytes,
+                executions=open_disp.reserved_executions,
+                wall_time_s=open_disp.reserved_wall_s,
+                output_bytes=open_disp.reserved_output_bytes,
             ))
+    # a completed model call charges its actual usage; an OPEN model dispatch
+    # (no result) reserves the worst case — a result overrides its dispatch.
+    if model_results:
+        usages.extend(model_result_usage(r) for r in model_results)
+    else:
+        usages.extend(model_dispatch_reservation(d) for d in model_dispatches)
     return combine_usage(usages)
 
 
@@ -1899,6 +2330,23 @@ def _check_command_grammar(
             errors.append(f"command {cid!r}: proposal must precede its command's effects")
         if kind == "EvaluateFork" and non_terminal and non_terminal[-1] != "fork-evaluation":
             errors.append(f"command {cid!r}: fork summary must be the last effect")
+        if kind == "RequestRefinement":
+            order = [REFINE_BINDING, REFINE_DISPATCH, REFINE_RESULT]
+            present = [t for t in order if t in non_terminal]
+            positions = [non_terminal.index(t) for t in present]
+            if positions != sorted(positions):
+                errors.append(
+                    f"command {cid!r}: model binding → dispatch → result must be ordered"
+                )
+        if (
+            kind == "ObserveCurrentState"
+            and OPERATION_DISPATCH in non_terminal
+            and OPERATION_RESULT in non_terminal
+            and non_terminal.index(OPERATION_DISPATCH) > non_terminal.index(OPERATION_RESULT)
+        ):
+            errors.append(
+                f"command {cid!r}: operation dispatch must precede the operation result"
+            )
         _check_stored_result(sub, cid, kind, terminal, events, errors)
     else:  # failed | indeterminate: a failure record and NO success effect
         counts = Counter(tokens)
@@ -1941,12 +2389,18 @@ def _check_stored_result(
     applied_ref: str | None = None
     summary_event_ref: str | None = None  # the ObservationRecorded event body ref
     summary_inner_ref: str | None = None  # the inner ForkObservation ref
+    refine_result_ref: str | None = None  # the REFINE_RESULT event body ref
+    observe_projection_ref: str | None = None  # the OPERATION_PROJECTION event body ref
     for env, body in events:
         if isinstance(body, ChangeApplied):
             applied_ref = body.change_ref
         elif isinstance(body, ObservationRecorded) and body.observation_kind == FORK_SUMMARY:
             summary_event_ref = env.body_ref
             summary_inner_ref = body.observation_ref
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == REFINE_RESULT:
+            refine_result_ref = env.body_ref
+        elif isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_PROJECTION:
+            observe_projection_ref = env.body_ref
     expected_proposal = applied_ref if kind == "ApplyChange" else None
     if stored.proposal_ref != expected_proposal:
         errors.append(
@@ -1974,19 +2428,39 @@ def _check_stored_result(
                     )
             except (ObjectMissing, ObjectCorruption, codec.SchemaError):
                 pass
+    elif kind == "RequestRefinement":
+        # a refinement's result points at its model-result event; it carries no
+        # metrics; its usage is the reconciled model-call ledger
+        if stored.observation_ref != refine_result_ref:
+            errors.append(
+                f"command {cid!r}: StoredResult.observation_ref does not match the "
+                "model result event"
+            )
+        if stored.metrics:
+            errors.append(f"command {cid!r}: StoredResult.metrics on a refinement")
+    elif kind == "ObserveCurrentState":
+        # an observation's result points at its POLICY-VISIBLE projection event;
+        # no metrics; its usage is the reconciled execution ledger
+        if stored.observation_ref != observe_projection_ref:
+            errors.append(
+                f"command {cid!r}: StoredResult.observation_ref does not match the "
+                "operation projection event"
+            )
+        if stored.metrics:
+            errors.append(f"command {cid!r}: StoredResult.metrics on an observation")
     else:
         if stored.observation_ref is not None:
             errors.append(f"command {cid!r}: StoredResult.observation_ref on a non-fork")
         if stored.metrics:
             errors.append(f"command {cid!r}: StoredResult.metrics on a non-fork")
-    # an OK terminal's usage equals the reconciled attempt ledger for a fork; a
-    # non-fork OK command spends nothing.
-    if kind == "EvaluateFork":
+    # an OK terminal's usage equals the reconciled ledger for a fork, refinement,
+    # or observation; any other OK command spends nothing.
+    if kind in ("EvaluateFork", "RequestRefinement", "ObserveCurrentState"):
         expected_usage = _reconciled_usage_from_events(sub, events)
         if stored.usage != expected_usage:
             errors.append(
                 f"command {cid!r}: StoredResult.usage does not equal the reconciled "
-                "fork attempt ledger"
+                "ledger"
             )
     elif stored.usage != BudgetUsage():
         errors.append(
@@ -2050,14 +2524,16 @@ def _fork_expected_states(
 
 
 def _check_attempt_evidence(
-    sub: Substrate, cid: str, rec: AttemptRecord, errors: list[str]
+    sub: Substrate, cid: str, rec: AttemptRecord, errors: list[str],
+    *, gen_prefix: str = "fork",
 ) -> None:
     """Bind an AttemptRecord to the EXACT evidence it references: its `overall`
     equals the referenced Evaluation's score; its `ok`/`failure` agree with the
     referenced ExecutionReport (and with each other); the report's identity is
-    this attempt's label; and its output/wall usage is consistent with the
-    report. So the score policy later uses is the one the retained evidence
-    actually supports — never an asserted number floating free of its report."""
+    this attempt's label (under `gen_prefix`: `fork`/`observe`); and its
+    output/wall usage is consistent with the report. So the score policy later
+    uses is the one the retained evidence actually supports — never an asserted
+    number floating free of its report."""
     where = f"command {cid!r}: {rec.label!r}"
     try:
         report = codec.loads(sub.objects.get_text(rec.report_ref), ExecutionReport)
@@ -2075,11 +2551,37 @@ def _check_attempt_evidence(
         errors.append(f"{where} failure != the referenced ExecutionReport.failure")
     if rec.ok != (rec.failure is None):
         errors.append(f"{where} ok disagrees with whether a failure is present")
+    # the TRUSTED origin the attempt recorded must be exactly what the referenced
+    # report's fault-origin implies — never a free-floating classification.
+    #  - a clean report (ok) MUST carry no fault_origin and be behavioral;
+    #  - a failed report MUST carry a valid fault_origin (present, not absent);
+    #  - candidate → behavioral, infrastructure → infrastructure, unknown/None → unknown.
+    if rec.origin not in OP_OPERATION_ORIGINS:
+        errors.append(f"{where} origin {rec.origin!r} is not a known operation origin")
+    elif report.ok:
+        if report.fault_origin is not None:
+            errors.append(f"{where} clean report must not carry a fault_origin")
+        if rec.origin != OP_BEHAVIORAL:
+            errors.append(f"{where} clean report must be behavioral, not {rec.origin!r}")
+    else:
+        if report.fault_origin is None:
+            errors.append(f"{where} failed report must carry a fault_origin")
+        elif report.fault_origin not in FAULT_ORIGINS:
+            errors.append(f"{where} report fault_origin {report.fault_origin!r} is invalid")
+        expected_origin = {
+            FAULT_CANDIDATE: OP_BEHAVIORAL,
+            FAULT_INFRASTRUCTURE: OP_INFRASTRUCTURE,
+        }.get(report.fault_origin or "", OP_UNKNOWN)
+        if rec.origin != expected_origin:
+            errors.append(
+                f"{where} origin {rec.origin!r} disagrees with the report's "
+                f"fault_origin {report.fault_origin!r} (expected {expected_origin!r})"
+            )
     # the evaluation mirrors the report's failure (floored iff the report failed)
     if evaluation.failure != report.failure:
         errors.append(f"{where} Evaluation.failure != ExecutionReport.failure")
     # the report's identity is this attempt's label
-    if report.generation_id != f"fork-{rec.label}":
+    if report.generation_id != f"{gen_prefix}-{rec.label}":
         errors.append(f"{where} ExecutionReport.generation_id is not this attempt's label")
     # output/wall accounting is consistent with the report: exact captured bytes,
     # and an attempt's real wall is at least the aggregated backend wall it spans
@@ -2258,6 +2760,46 @@ def _verify_observation(
                 errors.append(
                     f"envelope {env.seq}: fork candidate does not match the proposed / "
                     "issued change"
+                )
+        elif body.observation_kind == OPERATION_DISPATCH:
+            odisp = codec.loads(sub.objects.get_text(body.observation_ref), OperationDispatched)
+            if odisp.command_id != cause:
+                errors.append(f"envelope {env.seq}: operation dispatch command_id disagrees")
+        elif body.observation_kind == OPERATION_RESULT:
+            obs = codec.loads(sub.objects.get_text(body.observation_ref), AttemptRecord)
+            if obs.command_id != cause:
+                errors.append(f"envelope {env.seq}: operation result command_id disagrees")
+            if obs.label != OPERATION_LABEL:
+                errors.append(
+                    f"envelope {env.seq}: operation label {obs.label!r} != "
+                    f"{OPERATION_LABEL!r}"
+                )
+        elif body.observation_kind == OPERATION_PROJECTION:
+            proj = codec.loads(sub.objects.get_text(body.observation_ref), OperationProjection)
+            if proj.command_id != cause:
+                errors.append(f"envelope {env.seq}: operation projection command_id disagrees")
+            if proj.origin not in OP_OPERATION_ORIGINS:
+                errors.append(f"envelope {env.seq}: projection origin {proj.origin!r} invalid")
+            if proj.coverage_completed > proj.coverage_total or proj.coverage_completed < 0:
+                errors.append(f"envelope {env.seq}: projection coverage is out of range")
+        elif body.observation_kind == REFINE_BINDING:
+            binding = codec.loads(sub.objects.get_text(body.observation_ref), ModelBinding)
+            if binding.command_id != cause:
+                errors.append(f"envelope {env.seq}: model binding command_id disagrees")
+        elif body.observation_kind == REFINE_DISPATCH:
+            mdisp = codec.loads(sub.objects.get_text(body.observation_ref), ModelDispatch)
+            if mdisp.command_id != cause:
+                errors.append(f"envelope {env.seq}: model dispatch command_id disagrees")
+        elif body.observation_kind == REFINE_RESULT:
+            res = codec.loads(sub.objects.get_text(body.observation_ref), ModelResult)
+            if res.command_id != cause:
+                errors.append(f"envelope {env.seq}: model result command_id disagrees")
+            # a successful result carries a decoded proposal; a failed one a
+            # failure — never both, never neither
+            if (res.proposal_ref is None) == (res.failure is None):
+                errors.append(
+                    f"envelope {env.seq}: model result must carry exactly one of "
+                    "a proposal (ok) or a failure"
                 )
         else:
             errors.append(

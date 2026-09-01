@@ -278,12 +278,127 @@ always equals the durable external-effect ledger — with each command and
 attempt a single verifiable lifecycle across concurrency, corruption, and
 restart, verification pure and independent of kernel import order.
 
+## Phase B — `continual-refine@1` (the real continual policy)
+
+Phase B implements the Prime-Agent / Continual-Harness-style continual,
+model-led policy on the Phase A substrate. No Pareto search; no universal
+promotion gate.
+
+- **`RequestRefinement` is real and AT-MOST-ONCE** (not exactly-once — a model
+  call that may have dispatched is reconciled `indeterminate`, never silently
+  re-called). The kernel renders the
+  prompt from the per-role PINNED control prompt (`refine.md` / `review.md`,
+  from `PolicyBound.prompt_refs`) + the ACTIVE `prompt/proposal-template`
+  surface + the policy's context, resolves an adapter from an injected,
+  immutable `ModelCatalog` (no provider branches in policy code), and journals
+  the call as a durable model DISPATCH then RESULT — exactly like a fork
+  attempt. A crash between them is an OPEN dispatch reconciled as
+  `indeterminate` (explicit retry, never silently re-called); a pre-call budget
+  denial fails with no effect; adapter error / token+cost overrun / malformed
+  decode are failure-as-data with a durable model result. Model-call usage is
+  folded into the durable ledger, so model budgets survive restart.
+- **Strict typed proposals.** `strive.refine.decode_proposal` decodes a
+  `RefinementProposal` (edits, rationale, cited evidence, expected outcomes,
+  uncertainty, review hint) and rejects NaN/Infinity, unknown/missing keys, and
+  off-limits or structurally-invalid surfaces.
+- **The policy** (`strive.policies.continual_refine`) assembles ONE atomic
+  coupled prompt+code change through prompt/strategy-code `SurfaceStrategy`
+  implementations (a pinned `dependency_module`), applies structurally-valid
+  changes immediately, optionally `EvaluateFork`s (observation, not a gate),
+  and at a review checkpoint keeps / revises / reverts / defers. A deterministic
+  run+cycle-scoped state machine and an event-excluding context builder make
+  resume byte-exact.
+- **Hardening.** A fork's `issue_state_ref` must equal the folded issue state;
+  one in-flight command (terminal+checkpoint before the next issue) is enforced
+  at the kernel boundary; canonical JSON rejects NaN/Infinity; every declared
+  dependency is imported before hashing.
+
+### Phase B correction pass (truly-continual, secure, honestly-bounded)
+
+- **A truly continual loop.** A policy-neutral `ObserveCurrentState` command
+  operates the ACTIVE harness through the executor and journals a typed
+  state-scoped observation (report/evaluation/usage) — feedback, not a gate. The
+  policy alternates warm-up/operate → refine → immediate apply → post-change
+  observation window → review → next cycle (`max_cycles`); its contexts are
+  built from REAL observations (scores + the exact failing cases), prior
+  rationale/citations/expected outcomes, changes, usage, and failures.
+- **Full review.** `keep`→`ConfirmChange`, `revert`→exact rollback,
+  `defer`→gather more and re-review (never terminates), `revise`→a new atomic
+  change with lineage. Durable `RequestRefinement` constraints
+  (required change id, edit limit, enabled/run-pinned surfaces, role edit rule)
+  are enforced at decode as failure-as-data.
+- **Exact + bounded model effects.** A `ModelBinding` event pins
+  adapter/model/config digest; resume refuses to switch models after issue.
+  Model lifecycle verification parallels forks (issue-state subject;
+  control+active-template+context → exact prompt ref; binding→dispatch→result
+  ordering + adapter/model agreement; finite usage; known finish reason;
+  proposal == strict decode of the response under the issued constraints). Open
+  dispatches reserve input+output tokens, wall, and estimated cost; a finite
+  cost budget against a non-reporting/non-estimating adapter fails closed.
+- **Boundaries restored.** `RunView` hands the policy a mechanically read-only
+  `ContentReader` (never an `ObjectStore`); proposals decode against run-pinned
+  descriptors + policy-enabled surfaces, not the live catalog; production
+  `continual-refine@1` requires a secure backend (`trusted=False`) and refuses
+  fault-only unless a test-only opt-in is set.
+- **Proof.** `test_continual_refine` drives the E2E with a deterministic fake
+  through the exact production adapter path (real-model opt-in via
+  `STRIVE_MODEL_*`): the seed prompt hides the fix, the weak harness is operated
+  first (negative failures recorded), the refiner cites them, apply is immediate,
+  and the harness is operated again to prove changed behavior before a review.
+  Covers two cycles, manual/cadence, all four verdicts, restart at every command
+  boundary, model-binding drift, decode-constraint rejections, edit-limit
+  failure-as-data, cost-fail-closed, insecure-backend rejection, and the
+  optional-fork-is-observation invariant. `uv run pytest` = 265; `uv run mypy`
+  clean over 43 files; fresh-interpreter + installed-wheel smoke retained.
+
+### Phase B correction round 2 (configurable, non-leaky, honestly-bounded)
+
+- **Operation feedback is a pinned, policy-neutral CAS plan (Area 1).** An
+  injected, versioned `OperationCatalog` of `OperationDescriptor`s (`strive.operate`,
+  shipping `task-suite@1`) replaces the thin `operation_cases(Task)` driver. A
+  descriptor receives ONLY a `PolicyVisibleOperationContext` (visible cases +
+  seed + task/environment fingerprints), never the full `Task`, and
+  deterministically builds an immutable, CAS-backed `OperationPlan` (descriptor/
+  config identity, opaque manifest, execution regime, projection schema, resource
+  envelope, `all-required`|`partial-allowed` validity). The `plan_ref` is pinned
+  in the `ObserveCurrentState` intent BEFORE issue, so a descriptor/config/plan
+  drift re-derives a different `plan_ref` and is refused on resume. The kernel
+  owns execution/budget/journaling and records DISPATCH→RESULT (protected
+  `AttemptRecord`)→PROJECTION; the descriptor interprets the protected evidence
+  into a SEPARATE policy-visible `OperationProjection` — the ONLY thing policy/
+  review consumes. Matched pre/post review compares only VALID projections under
+  the SAME `plan_ref`. An open dispatch reconciles to `indeterminate`; a crash
+  between result and projection is finished from the durable result (no re-run).
+  (Areas 4 — typed `ReviewDecision`/`ReviseChange` — and 5 — typed model
+  binding/usage — are separate next rounds.)
+- **Truthful review.** The fake trigger mode was removed; auto review compares
+  pre/post operation observations (never blindly keeps); `keep` confirms with
+  the original rationale; an exhausted `defer` is left UNRESOLVED (unconfirmed);
+  `revise` applies a lineage-annotated change then OBSERVES and REVIEWS the
+  revised state before confirmation; review context is the applied change +
+  original rationale/citations/expected outcomes + optional fork evidence +
+  only post-apply observations.
+- **Model intent/recovery.** The RESOLVED model identity is pinned in the
+  durable command INTENT (payload digest) before issue, so a wrong-model resume
+  is refused (hard error) without failing the command — closing the
+  issue→dispatch window. Cost fails closed (finite budget requires a
+  conservative preflight estimate; reserve input+output tokens/wall/cost); a
+  `ModelTransportError` (possible dispatch) → indeterminate with the reservation
+  retained; unusable finish reasons are failure-as-data; the unused idempotency
+  key was removed (at-most-once).
+- **Proof.** A NON-LEAKY fixture derives the fix from observed (opaque id,
+  expected) feedback. `uv run pytest` = 266; `uv run mypy` clean over 44 files;
+  fresh-interpreter + installed-wheel smoke retained; a secure-backend E2E runs
+  when `deno-pyodide@1` is available.
+- **Deferred, noted honestly:** the legacy `MeteredJournalingAdapter` (old
+  EventLog path, unused by the vNext kernel) is not yet removed; operation
+  feedback exposes opaque ids + expected/got/errors but not raw input text.
+
 ### Next
 
-After review + merge: begin the Prime-Agent / Continual-Harness-style
-`continual-refine@1` end-to-end policy (a real model refiner behind
-`RequestRefinement`, a real prompt consumer, optional composed fork
-evaluation). See `docs/ROADMAP.md`.
+After review + merge: a real prompt CONSUMER at acting time beyond proposal
+shaping, multi-cycle cadence experiments, and richer review evidence. See
+`docs/ROADMAP.md`.
 
 The promotion-era handoff is archived at
 `docs/archive/HANDOFF-stage1-3c.md`.
