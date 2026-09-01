@@ -2217,3 +2217,39 @@ binding/usage). Full unification of the CandidateExecutor+kernel per-case
 aggregation into one shared function was not done — the kernel still aggregates
 per-case self-consistently (round-9 dominant-item fix) and the descriptor
 consumes that evidence. Noted honestly.
+
+---
+
+## PR #51 correction round 11 (Stage 3C.2B.2) — Area 1 finish: unified aggregation + validity flooring
+
+Closed the Area-1 sub-items explicitly deferred in round 10.
+
+- **Unified aggregation (one shared path).** `contracts.dominant_fault` derives
+  the (failure, origin) pair from ORDERED per-case faults (precedence
+  infrastructure > unknown > candidate). BOTH the `CandidateExecutor` per-suite
+  pass (`run_protected_suite`) and the kernel per-attempt pass (`_run_attempt`)
+  now call it — the suite pass no longer keeps the FIRST fault, so failure and
+  origin always come from the SAME dominant item across every layer.
+- **Validity + flooring behind the descriptor.** `TaskSuiteOperationDescriptor`
+  is `all-required`. `project()` now builds the policy-visible per-case outcomes
+  from the REPORT's real outcomes (not the pre-floored `Evaluation`), so
+  completed cases keep their true result:
+  - `all-required`: aggregate over ALL cases, valid only when every case ran;
+  - `partial-allowed`: aggregate over the cases that RAN (un-run excluded, never
+    floored);
+  - `indivisible`: floor ALL cases on a partial/faulted attempt (none credited).
+  An invalid/incomplete attempt still publishes no aggregate (`overall is None`).
+- **Adversarial proofs added** (`test_operation_plan.py`, now 12 tests):
+  partial-allowed scores only completed cases; indivisible floors completed
+  cases; a STRUCTURAL proof that the policy consumes only `OperationProjection`
+  (never decodes `AttemptRecord`/reads `OPERATION_RESULT`); a corrupted pinned
+  plan fails closed on resume. The dominant-fault unit test moved to the shared
+  list-based API.
+
+**Tooling.** `uv run mypy` clean (46 files); `uv run pytest` **294 passed**;
+`test_packaging` + `test_substrate_only` green. (The secure-backend E2E
+`test_continual_refine_through_secure_backend` runs when `deno` is available;
+it skips locally when the backend is absent.)
+
+**Area 1 is now complete.** Remaining separate rounds: typed `ReviewDecision` +
+`ReviseChange`/`ChangeRevised` (Area 4) and typed model binding/usage (Area 5).
