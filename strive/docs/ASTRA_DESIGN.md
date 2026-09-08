@@ -444,3 +444,209 @@ The remaining human decisions can be reduced to five.
 
 Run-local learning, explicit immutable imports, and deferred distributed hosting are recommended defaults. The existing requirement for human go/no-go before teardown remains in force.
 
+
+
+---
+
+# strive vNext — Astra design PASS 3 (over-restriction / YAGNI audit)
+
+**Author: GPT-6 Astra** (via `codex exec -m gpt-6-astra`, read-only). Scribed by the orchestrating Claude session. This pass CORRECTS earlier overreach: it separates the load-bearing hard core from premature restriction, resolves the "just log it" question, and relaxes two inherited invariants. Status: PROPOSAL — pending human decisions.
+
+**Release 1 should have an open diagnostic log and a small, closed authority protocol. Keep a narrow pure verifier; drop the requirement that it understand every executor event, proposal, diagnostic, and workload detail.**
+
+My earlier proposal overreached by making research conventions look like integrity requirements. Closed event names, strict comparability, structured memories, controller handover machinery, and universal recovery contracts do not all belong in the hard core. The essential boundary is who can authorize execution and certify what happened.
+
+This is a static audit of both design passes, the handoff, and the cited implementation. No files changed and no tests ran. The recommendations below are engineering judgments, with high confidence in the authority and recovery distinctions and moderate confidence in implementation cost.
+
+The external sources support a more permissive design than I previously proposed:
+
+- Exo explicitly permits executor-defined, namespaced events. Its trusted infrastructure stores and orders them; executors interpret them. It also retains privileged-resource brokering and sandboxing. Open logging therefore does not inherently mean unrestricted authority. Its spec leaves model calls to executors, which strive should change when those executors are editable and expenditure must be enforced. [Exo specification](https://github.com/exoharness/exo/blob/main/exoharness/docs/spec.md)
+- Self-Harness keeps its evaluator fixed while modifying the surrounding harness. Its acceptance algorithm uses both held-in and held-out scores. My inference is that this provides selection feedback even though held-out traces are hidden. It supplies evidence for flexible harness modification, not for allowing the candidate to certify its own improvement. [Self-Harness, §§3.1–3.4](https://arxiv.org/html/2606.09498v3)
+- DGM Appendix F documents an agent obtaining the maximum hallucination score by removing tool-use logging markers, despite the checking functions being hidden. This is direct evidence that a protected evaluator can still be gamed through editable instrumentation. [DGM Appendix F](https://arxiv.org/html/2505.22954v1#A6)
+
+**The “just log it” decision is resolved in favor of openness everywhere except authority.**
+
+Nothing about an event named `executor.order_completed` is dangerous by itself. It becomes dangerous when a scorer, budget ledger, permission check, or recovery routine treats it as fact.
+
+For the proposed order-fulfilment simulation, these are the concrete failure modes:
+
+| Failure mode | What breaks if executor logs become authoritative | Minimum prevention |
+|---|---|---|
+| Forged success | The executor logs “order shipped” while inventory and order state remain unchanged. | The trusted simulator/scorer determines completion from actual state and broker receipts. |
+| Ungoverned spend | An editable executor calls a model directly, omits the call, or reports zero cost. | Keep credentials outside candidate execution; authorize and reserve every paid call through the broker. |
+| Unrecoverable effects | Inventory changes, the process crashes before logging the result, and restart repeats the mutation or assumes it never happened. | Persist authorization before dispatch; use simulator operation IDs and status lookup; preserve uncertainty elsewhere. |
+| Contamination | A protected score or audit-derived memory enters adaptive context under an innocuous custom event name. | Enforce the selected feedback contract when granting access to bytes, including derived artifacts. |
+| Gaming | The executor suppresses failed attempts, changes its logging markers, or reports only successful orders. | Broker-owned interaction records and scorer-owned coverage and denominators. |
+
+These are failures of authority, access, and execution ordering. **A closed vocabulary alone prevents none of them.** A fabricated but schema-valid receipt is still fabricated.
+
+The current implementation closes considerably more than necessary. It rejects bodies outside `_BODY_UNION` and rejects unknown `observation_kind` values. Adding an innocent diagnostic therefore reaches verifier code today. [Body rejection](src/strive/substrate.py) is specifically at [substrate.py:1302](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1302), and observation rejection at [substrate.py:2858](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:2858).
+
+I recommend the following exact boundary. These are proposed protocol families, not a demand for seven separate services or elaborate class hierarchies.
+
+| Record or field group | Authoritative content | Who establishes it |
+|---|---|---|
+| Common envelope | Run identity, sequence, record class, causal identity, producer identity, access scope, payload reference. | Supervisor; an executor-supplied `producer="broker"` has no standing. |
+| Run binding | Trusted runtime/adapter/scorer versions, initial environment, budget limits, capabilities, editable scope, feedback contract, comparison contract, trust mode. | Trusted run setup, fixed for the run or changed through an explicitly supported trusted transition. |
+| Effect authorization | Effect ID, exact request reference, adapter and operation, target environment, permitted scope, reservation, recovery mode. | Broker after checking the request. |
+| Effect observation and settlement | Dispatch/return/uncertainty status, response or receipt reference, observed environment version, usage amount and whether measured, reserved, or unknown. | Broker and trusted adapters; tool return is distinct from task success. |
+| Measurement | Subject revision, workload/window identity, scorer version, receipt/state references, admitted and completed coverage, exclusions, metric identity and value. | Trusted scorer using broker/environment evidence. |
+| Revision activation | Exact previous and next bundle references, expected active revision, activation boundary. | Supervisor after validating the requested change. |
+| Continuation commit | Exact private-state bytes, executing bundle version, consumed-result cursor, environment reference. | Supervisor records what the executor produced; it does not certify the private state's reasoning. |
+
+Evidence eligibility need not require another event family. For release 1, static run/lineage scopes plus the bound feedback contract can determine access. The broker owns those labels and access decisions.
+
+Everything else may be freely logged inside an `Annotation` envelope or an `annotations` subtree:
+
+- New event names, arbitrary bounded JSON, debugging text, timing breakdowns, hypotheses, proposal rationales, memories, compaction records, component names, and claimed scores.
+- Executors may interpret these and use authorized annotations to decide their next action.
+- They cannot override authoritative fields, release reservations, certify success, authorize retries, grant artifact access, or move the active revision.
+- Unknown annotation schemas remain readable as opaque data. They do not invalidate an otherwise valid run.
+- Annotation size and storage quotas still apply. Logging must not bypass resource limits.
+
+For example, `executor.order_completed: {order_id: 42, success: true}` is permitted. It contributes nothing to fulfilment scoring. A broker receipt establishing a state transition for order 42 can contribute.
+
+A new privileged operation requires a trusted adapter with explicit authorization and recovery behavior. **It should usually reuse the generic effect records without changing the core verifier.** A new scorer can produce the existing measurement envelope under a newly pinned scorer definition. Changing the meaning of an authority primitive requires a protocol/verifier change; adding a diagnostic field does not.
+
+**Keep purity, reduce what verification promises.**
+
+The current code already separates structural verification from some workload semantics. The pure verifier checks projection coverage, identifiers, and score shape; it explicitly leaves descriptor-exact recomputation to the kernel. The kernel derives projections through the trusted operation descriptor and checks existing projections on recovery. [Structural checks](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:2020), [projection derivation and recovery](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1308).
+
+Release 1 should formalize that division:
+
+1. A small pure transition function checks authority records: references, IDs, authorized dispatch, reservations, settlement, revision transitions, and consumed-result cursors.
+2. The trusted simulator and scorer establish workload facts. The verifier checks their recorded provenance and relationships; it does not independently reconstruct arbitrary external reality.
+3. Verification performs no dispatch, imports no candidate code, and writes nothing.
+
+Incremental checking is compatible with purity. Validate the next authoritative transition against the already verified state; replay the authority stream on restart and when explicitly auditing. Do not build persistent verification-cache infrastructure yet. If retaining full replay temporarily is simpler, that is a performance choice, not an integrity requirement.
+
+Today `_emit` folds the candidate stream and then verifies the persisted stream again. That duplication is removable. [Append path](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:813).
+
+Retain preflight, but narrow its promise to **“accepted authority transitions preserve protocol consistency.”** It must not mean “nothing bad can be recorded.” If a provider reports expenditure above its reservation, preserve that receipt, record the overrun, and stop further dispatch. A trustworthy journal must represent violations and uncertainty. Suppressing an inconvenient observation to preserve a green `valid` flag would undermine integrity.
+
+The following table audits the major mechanisms in [pass 1](/Users/nikhil/personal/hatch/strive/docs/ASTRA_DESIGN.md:78), [pass 2](/Users/nikhil/personal/hatch/strive/docs/ASTRA_DESIGN.md:226), and the [inherited invariants](/Users/nikhil/personal/hatch/strive/ASTRA_HANDOFF.md:54). KEEP applies to the limited form stated, not every implementation detail previously proposed.
+
+| Mechanism | Decision | Release-1 justification |
+|---|---|---|
+| Closed record vocabulary | **LOOSEN** | Close only the authority protocol; the current blanket rejection of unknown observations creates unnecessary release coupling for diagnostics. |
+| Pure verifier and authority preflight | **KEEP** | A small side-effect-free transition checker prevents inconsistent authorization, settlement, activation, and recovery state. |
+| Full semantic verification of every artifact and observation | **DEFER** | Reimplementing every workload interpretation inside the verifier duplicates trusted adapter/scorer logic before a second real workload exists. |
+| Whole-history verification on every append | **LOOSEN** | Check transitions against verified state and retain full replay for recovery/audit, removing repeated work without weakening authority checks. |
+| Content-addressed store | **KEEP** | Existing hash-checked immutable storage identifies the exact code, requests, results, and continuation bytes needed for recovery. [Implementation](/Users/nikhil/personal/hatch/strive/src/strive/cas.py:91) |
+| Framed journal, durable publication, head checks | **KEEP** | These distinguish committed records from incomplete writes and prevent acting on an ambiguous local history. [Implementation](/Users/nikhil/personal/hatch/strive/src/strive/framing.py:228) |
+| Signed heads, external anchoring, malicious-store protection | **DEFER** | The proposed trusted-host scope does not justify an independent transparency system; the existing hash chain does not establish that protection. [Existing limitation](/Users/nikhil/personal/hatch/strive/src/strive/framing.py:24) |
+| Rebuildable discovery indexes | **KEEP** | A stale convenience index must not invalidate intact authoritative history, which the current fold already recognizes. [Implementation](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1334) |
+| Typed command variants | **KEEP** | Type the few privileged actions so malformed requests cannot accidentally change authority; leave diagnostic payloads open. |
+| Canonical command JSON plus normalized shadow fields | **LOOSEN** | Store one canonical typed request rather than maintaining duplicate representations and coherence rules. [Current duplication](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1793) |
+| Specialized model/fork/operation lifecycle grammars | **LOOSEN** | Use one effect lifecycle with adapter-specific payloads instead of requiring core changes for each execution category. |
+| Mandatory proposal rationales, citations, edit limits, and review shapes | **CONFIG** | These can improve a refinement policy, but they are not prerequisites for safe activation of authorized code. [Current command constraints](/Users/nikhil/personal/hatch/strive/src/strive/policy.py:97) |
+| Authoritative `ChangeConfirmed` and proposal bookkeeping | **LOOSEN** | “The controller likes this revision” can be an annotation; actual activation and any measured improvement remain independently recorded. [Current machinery](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1610) |
+| Exact composite revisions and atomic activation | **KEEP** | Recording one complete before/after bundle prevents mixed code, prompts, and memory after a crash. |
+| Exact configuration restoration | **KEEP** | Restoring an identified prior bundle prevents ambiguous rollback, while retaining current expenditure and world state. |
+| General inverse-edit, merge, and compensation machinery | **DEFER** | Release 1 needs explicit bundle restoration and workload operations, not a generic algebra for undoing arbitrary changes. |
+| Immutable bundles and dependency locks | **KEEP** | A fixed runtime image/lock plus exact bundle bytes prevents resume from silently executing different dependencies. |
+| Arbitrary dependency installation and complete packaging framework | **DEFER** | A supplied dependency set supports the first workload without adding package resolution and installation to the research loop. |
+| Model-weight modification | **DEFER** | It adds a separate experimental and execution problem unrelated to proving stateful harness adaptation. |
+| Pinning every research choice for an entire run | **LOOSEN** | Pin the trusted contract and each invocation's exact inputs; allowed actor/controller revisions should not require starting over. |
+| Generic operation-plan framework | **LOOSEN** | Implement one simulator adapter and the fixtures behind a small step interface, avoiding a universal workflow language. |
+| `solve(str)->int` as the kernel's execution model | **LOOSEN** | Its current hard-coding prevents the locked stateful workload; keep it only in the fixture adapter. [Current executor](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1564) |
+| Capability broker and protected credentials | **KEEP** | Otherwise editable code can bypass permission checks, spending limits, and canonical tool evidence. |
+| All model calls through the broker | **KEEP** | Acting, refinement, and generated wrappers must share the same enforced budget and receipt path. [Existing refinement path](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:752) |
+| Durable reservations and measured/reserved/unknown usage | **KEEP** | A crash or missing provider usage must not reset expenditure or silently become zero cost. [Current handling](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:824) |
+| Per-effect reconciliation contracts | **CONFIG** | Require recovery for simulator mutations; allow honest suspension for other effects instead of building recovery adapters for hypothetical providers. |
+| Universal exact resume across external boundaries | **LOOSEN** | Promise exact recorded state and safe resumption where supported, removing the impossible implication that a missing external response can always be reconstructed. |
+| Result-driven continuation and consumed-result cursors | **KEEP** | These prevent completed work from being applied twice to the resumed execution state. [Checkpoint checks](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1555) |
+| No records after a terminal command | **LOOSEN** | Keep task completion stable but permit explicit late accounting/reconciliation records rather than losing newly available facts. [Current blanket rule](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:2233) |
+| Snapshot-to-log recovery | **LOOSEN** | Support explicit simulator snapshots and continuation references; arbitrary process, VM, credential, and external-world rewind is unnecessary. |
+| Secure sandbox floor | **KEEP** | Host confinement, restricted external access, and bounded resources keep generated code away from credentials, evidence, and authority storage. [Enforcement boundary](/Users/nikhil/personal/hatch/strive/src/strive/sandboxes.py:299) |
+| Fresh interpreter per case as a security invariant | **CONFIG** | State lifetime is a workload/isolation choice, although the current secure capability tuple treats freshness as mandatory. [Current tuple](/Users/nikhil/personal/hatch/strive/src/strive/sandboxes.py:75) |
+| Eligibility before context construction | **KEEP** | Once forbidden bytes reach editable code, filtering its final prompt cannot reliably recover the declared feedback boundary. |
+| General `RunView` history and CAS access | **LOOSEN** | Replace the broad interface with scoped readable artifacts, avoiding a general information-flow engine while closing a real exposure. [Current interface](/Users/nikhil/personal/hatch/strive/src/strive/policy.py:47) |
+| Held-out A/B/C feedback contract | **CONFIG** | The run must declare permitted influence, but strict blindness is not a universal requirement for trustworthy operational records. |
+| Comparability strictness | **CONFIG** | Matching snapshots and streams supports controlled comparisons; observational evidence may still inform adaptation without being labeled causal improvement. |
+| Ban on infrastructure feedback steering the model | **LOOSEN** | Authorized timeout and tool-availability evidence can improve recovery behavior; the requirement should be honest classification, not exclusion from learning. |
+| Evidence coverage and exclusion recording | **KEEP** | Admitted, completed, failed, and unresolved work must remain visible so a candidate cannot improve its score by hiding the denominator. [Existing coverage](/Users/nikhil/personal/hatch/strive/src/strive/operate.py:166) |
+| Structured memory/skill ontology with mandatory supersession | **LOOSEN** | Versioned files and authorized inputs suffice initially; a mandatory knowledge-management schema restricts experimentation without certifying truth. |
+| Component-use attribution | **LOOSEN** | Record exact supplied code/context and broker calls; proving which memory “caused” behavior is beyond release-1 integrity. |
+| Editable refinement controller | **CONFIG** | Editability is an experimental scope choice; it must not become either a security taboo or a mandatory release milestone. |
+| Atomic controller handover | **KEEP** | When controller editing is enabled, switch versions and initial state together at a quiescent boundary to prevent mixed execution. |
+| Arbitrary controller-state migration | **DEFER** | A fixed continuation envelope and explicit initial private state remove the need for migration/rollback compatibility machinery. |
+| Independent operator recovery route | **KEEP** | A broken controller must not be required to execute its own recovery. [Existing operator path](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:920) |
+| One writer and serial execution | **KEEP** | A local lease and one outstanding effect keep release-1 ordering tractable and prevent duplicate dispatch. [Lease](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:760) |
+| Turn handles and ingress deduplication | **LOOSEN** | Stable request IDs and a scoped local API suffice without building a full agent/conversation/session product model. |
+| Subagents, descendant budgets, concurrent scheduling, distributed fencing | **DEFER** | The locked workload does not require these, and they add independent ownership, cancellation, and accounting problems. |
+| Optional comparative evaluation and snapshot forks | **CONFIG** | Policies may request them, with new execution identities and charged work; they must not become a universal activation gate. |
+| Cross-run learning imports | **LOOSEN** | Explicit bundle imports with scope/provenance suffice; defer global mutable memory and a general lineage-management system. |
+| Noninterference tests | **CONFIG** | Test the prohibited flows of the selected feedback contract; do not implement every A/B/C isolation arrangement in advance. |
+| Speculative execution and reusable effect caches | **DEFER** | They introduce invalidation, duplicate-effect, and discarded-work accounting before throughput is established as a problem. |
+| Temporal, Restate, Celld, replication, host-loss failover | **DEFER** | One surviving host and disk are enough for the initial durability claim. |
+| Optimizer integrations, population selection, universal promotion gates | **DEFER** | They are research policies, and universal promotion would contradict strive's immediate-adaptation mission. |
+| Prompt-only behavior check, integrity checks, typing, package/replay checks | **KEEP** | These establish that exposed controls affect execution and that the shipped runner preserves its narrow guarantees. |
+| Three experimental arms and mandatory demonstrated improvement | **CONFIG** | The experiment must support the chosen claim, but controller improvement should not block a release that demonstrates trustworthy actor adaptation. |
+| Research mode | **KEEP** | A fixed untrusted designation permits stubbed contracts and experimental measurement without silently extending trusted claims. |
+
+Two inherited restrictions deserve particular correction.
+
+First, **“only comparable evidence may steer adaptation” is too strong**. A new kind of failure can be useful before there is a matched baseline. The policy should be allowed to learn from it. Comparison controls constrain what the report may claim about improvement. The current policy's valid-window filtering is a reasonable default policy, not a universal execution law. [Current filtering](/Users/nikhil/personal/hatch/strive/src/strive/policies/continual_refine.py:586).
+
+Second, **“infrastructure failures can never steer the model” obstructs useful harness research**. A controller should be able to learn to reduce output after an output-limit failure, or change scheduling after repeated tool unavailability. Preserve fault origin and distinguish these observations from evidence that the actor solved an order incorrectly. Whether particular operational metadata is visible remains part of the feedback contract.
+
+The minimal viable integrity core is five guarantees:
+
+1. **Confinement and fixed authority.** Generated code runs inside an enforced sandbox. It cannot rewrite the real authorizer, verifier, scorer, access policy, or accounting machinery.
+2. **Independent facts.** The broker records actual interactions and usage; the simulator/scorer records outcomes and coverage. Candidate annotations remain claims. Access follows the declared feedback contract.
+3. **Durable execution identity.** Before dispatch, persist the exact request, effect identity, authority, and reservation. Preserve results, bundle bytes, atomic activation, and consumed-result cursors on surviving local storage.
+4. **Honest recovery.** Recover simulator mutations through durable operation IDs; reuse recorded results; retain unknown expenditure and suspend ambiguous unsupported effects. Revision rollback never rewinds spending or the world.
+5. **A small checked protocol.** Pure validation and replay establish consistent authorization, accounting, activation, and continuation, while allowing open annotations and faithfully recording bad outcomes.
+
+For the simulator, the decisive recovery case is concrete: `reserve_inventory(effect_id, order_id, quantity)` durably stores both its mutation and operation result together. If strive crashes before recording the receipt, it queries that operation ID and obtains the original result. A fresh retry cannot reserve again under the same identity. This transactional simulator contract is my proposed implementation, not a property demonstrated by the papers.
+
+For a model provider without an adequate lookup/deduplication contract, the corresponding case suspends and retains the reservation. The current implementation already takes this conservative route for dispatched operations and model calls without durable results. [Operation recovery](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1335), [model recovery](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:682).
+
+Research mode should use this same outer runner. A run-bound flag stamps results `untrusted` and permits stub adapters, experimental event semantics, and an editable measurement program inside the sandbox. Simulated receipts must say they are simulated. Self-modifying measurement is then the object being studied; it does not replace the outer accounting or authorization machinery.
+
+The candidate cannot turn the flag off, manufacture real receipts, or export an experimental score as a trusted one. A new trusted evaluation can assess an artifact produced there, with its provenance declared. Ordinary custom annotations should work in trusted mode and should never require this flag.
+
+Hardening should follow demonstrated needs:
+
+| Trigger | What becomes necessary |
+|---|---|
+| A diagnostic starts determining success, spend, permission, or eligibility | Give it a trusted producer and defined authority semantics before relying on it. |
+| A second workload introduces genuinely different effect semantics | Extend adapter contracts and, only where necessary, the authority protocol. |
+| A deployment requires uninterrupted recovery of an external mutation | Require that provider's actual reconciliation contract before claiming automatic recovery. |
+| Concurrent children or remote workers become necessary | Add budget allocation, cancellation, ownership/fencing, and stale-result handling. |
+| The chosen experiment claims blind evaluation | Enforce and test every actual feedback route, including imports, caches, provider state, and control signals. |
+| Controller replacement must preserve incompatible private state | Add explicit migration contracts and their recovery checks. |
+| Cross-run knowledge transfer becomes a research feature | Strengthen import provenance and scope propagation beyond simple explicit bundle imports. |
+| Host-loss or hostile-storage protection becomes a requirement | Add replication/backups or independently authenticated history, respectively. |
+
+There is no automatic graduation toward a universally closed event ontology. That is not the destination.
+
+Where I disagree with the human's instinct is concentrated in four places.
+
+**Broker-owned measurement is worth keeping immediately.** Logging freedom cannot include the freedom to decide which tool calls count as having happened. The DGM example makes this an observed failure mode, not speculative security work. Protecting only the scoring function is insufficient.
+
+**Durable intent and conservative accounting are also immediate requirements.** The first crash between simulator mutation and receipt persistence is enough to require them. A local simulation makes that contract cheaper to implement and examine; it does not eliminate the problem.
+
+**Artifact immutability is cheap here.** The repository already has atomic, hash-checked object publication. Replacing it with mutable “latest” files would sacrifice exact recovery identity for little benefit. Hashes establish identity, not truth.
+
+**A small preflight checker helps velocity.** It rejects a malformed privileged transition before it damages resumability. The excessive restriction was teaching that checker every research concept. It should accept an executor's new explanation format without knowing what the explanation means.
+
+Conversely, I disagree with my own pass-2 requirement that release 1 demonstrate controller self-modification through a dedicated milestone and three-arm experiment. That is an additional research objective. The first release should not wait for it.
+
+The five open decisions should now read as follows:
+
+1. **Modification scope.** Recommend acting code, prompts, and memory for the first release experiment, with a pinned controller. Controller editing remains configurable through the same sandboxed step and atomic revision interface; dedicated migration machinery and proof of improved refinement are deferred. This reverses pass 2's release requirement, not its conclusion that controller code can safely be editable.
+
+2. **Feedback boundary.** A/B/C remains explicitly undecided. I still recommend A for an untouched-audit scientific claim, but the core should enforce whichever contract is selected. Existing `selection_cases()` includes every non-audit split, and review exposes fork scores; that path cannot be described as strictly excluding held-out influence without changing its contract. [Selection](/Users/nikhil/personal/hatch/strive/src/strive/tasks.py:64), [review context](/Users/nikhil/personal/hatch/strive/src/strive/policies/continual_refine.py:764).
+
+3. **Concrete workload and providers.** Recommend the order-fulfilment simulator plus sum/max fixtures. Require simulator mutation reconciliation and permit honest suspension for the selected model provider. Do not require a general provider ecosystem.
+
+4. **Durability and threat scope.** Recommend one trusted host/operator, hostile generated code and inputs, surviving durable storage, and process-crash recovery. This supports a useful release without distributed ownership or malicious-storage guarantees.
+
+5. **Budget and release claim.** Set a real spending ceiling and compare fixed behavior with actor adaptation under matched declared budgets. Report outcomes, regressions, coverage, uncertainty, and expenditure. Controller improvement becomes a separate claim when that experiment is actually undertaken.
+
+**Yes, add an explicit sixth decision, phrased as “Which guarantees define a trusted run, and which claims does each mode permit?”** “How hard is the hard core?” otherwise invites gradual exceptions to confinement or factual accounting.
+
+My answer to that sixth decision is the five guarantees above. Feedback, editability, comparability, and recovery availability are configurable. Open annotations are normal. Experimental measurement is allowed under an untrusted designation. The real authorizer, evidence producer, and recovery record remain outside candidate control.
+
