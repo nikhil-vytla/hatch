@@ -1,0 +1,4 @@
+..............s.........                                                 [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/vnext/test_harness_gateway.py:203: host denies localhost TCP bind: [Errno 1] Operation not permitted; pipe gateway is exercised by real-process tests
+23 passed, 1 skipped in 81.09s (0:01:21)

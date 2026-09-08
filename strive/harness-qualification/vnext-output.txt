@@ -1,0 +1,16 @@
+..................................................xx.x.................. [ 22%]
+...........................ssssss..................s.................... [ 45%]
+........................................................................ [ 67%]
+..........................................x............................. [ 90%]
+................................                                         [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/vnext/test_harness.py:288: opencode: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted; native profile has not passed a single-request drive
+SKIPPED [1] tests/vnext/test_harness.py:288: codex: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted; native profile has not passed a single-request drive
+SKIPPED [1] tests/vnext/test_harness.py:288: claude-code: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted; native profile has not passed a single-request drive
+SKIPPED [3] tests/vnext/test_harness.py:291: funded live smoke: human must set a budget ceiling, provide a qualified OS jail and explicitly enable a separate funded runner; deterministic CI never uses provider credentials
+SKIPPED [1] tests/vnext/test_harness_gateway.py:203: host denies localhost TCP bind: [Errno 1] Operation not permitted; pipe gateway is exercised by real-process tests
+XFAIL tests/vnext/test_acceptance_contracts.py::test_runtime_integrity_1_confines_candidate_and_harness - Native harness isolation requires tested Seatbelt/container/VM gateway-only network and filesystem jail plus hard memory/storage limits; sandbox_apply is denied here. Candidate and Deno fixture harness permission probes pass.
+XFAIL tests/vnext/test_acceptance_contracts.py::test_runtime_integrity_2_rejects_forged_facts_and_protected_feedback - Complete stateful operation and Complete the research workflow: trusted scorer plus A/B noninterference
+XFAIL tests/vnext/test_acceptance_contracts.py::test_runtime_integrity_4_preserves_mutation_and_unresolved_obligation - Complete stateful operation and Enable adaptation: reconcile mutation, preserve uncertainty, restore only bundle
+XFAIL tests/vnext/test_runtime_sandbox.py::test_production_os_confinement_floor - Production candidate floor needs usable Seatbelt/container/VM with hard whole-process memory and aggregate storage limits; this host denies sandbox_apply
+309 passed, 7 skipped, 4 xfailed in 589.21s (0:09:49)
