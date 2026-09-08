@@ -1,0 +1,38 @@
+diff --git a/strive/src/strive/vnext/README.md b/strive/src/strive/vnext/README.md
+index 09e794e..39f31f9 100644
+--- a/strive/src/strive/vnext/README.md
++++ b/strive/src/strive/vnext/README.md
+@@ -47,3 +47,11 @@ runtime guarantee 5 with guarded fresh-interpreter replay and corruption
+ rejection. The other four runtime probes remain strict expected failures for
+ later milestones. Legacy modules remain intact; vNext has no compatibility
+ format or dual writes.
++
++Milestone 3 adds `runtime`: a serial supervisor, pinned capability broker,
++verifier-backed budget ledger, and a Deno candidate sandbox. See the
++[effects and confinement report](../../../milestone3-effects/README.md) for
++interfaces, fault tests, operator recovery and the exact confinement limits.
++Candidate steps and external effects both reserve resources through the existing
++journal before dispatch. The external adapter remains trusted in-process code;
++real harness process launch and gateway qualification belong to M4.
+diff --git a/strive/tests/vnext/test_acceptance_contracts.py b/strive/tests/vnext/test_acceptance_contracts.py
+index b96ee83..e94d0e2 100644
+--- a/strive/tests/vnext/test_acceptance_contracts.py
++++ b/strive/tests/vnext/test_acceptance_contracts.py
+@@ -337,7 +337,7 @@ def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
+ 
+ 
+ @pytest.mark.xfail(strict=True, raises=NotImplementedError,
+-                   reason="Milestone 3 Build effects, accounting, and confinement + Qualify replaceable harnesses: enforce process-tree isolation")
++                   reason="M4 Qualify replaceable harnesses: real harness process-tree isolation; candidate Deno attacks pass in M3, hard OS memory/storage floor remains")
+ def test_runtime_integrity_1_confines_candidate_and_harness(future_runtime: RuntimeAcceptanceDriver) -> None:
+     evidence = future_runtime.exercise("candidate_and_harness_attempt_credentials_network_storage_and_tool_access")
+     assert evidence.candidate_escape_denied and evidence.harness_escape_denied
+@@ -352,7 +352,7 @@ def test_runtime_integrity_2_rejects_forged_facts_and_protected_feedback(future_
+ 
+ 
+ @pytest.mark.xfail(strict=True, raises=NotImplementedError,
+-                   reason="Milestones 2/3 storage and effects + Qualify replaceable harnesses: crash at every dispatch/continuation boundary")
++                   reason="M4 Qualify replaceable harnesses: real process launch, gateway spooling and upstream recovery; M3 in-process dispatch/continuation fault tests pass")
+ def test_runtime_integrity_3_retains_request_and_consumes_result_once(future_runtime: RuntimeAcceptanceDriver) -> None:
+     evidence = future_runtime.exercise("crash_before_and_after_launch_forward_return_settlement_and_continuation")
+     assert evidence.request_retained_before_dispatch

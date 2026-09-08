@@ -337,7 +337,7 @@ def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
 
 
 @pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="Milestone 3 Build effects, accounting, and confinement + Qualify replaceable harnesses: enforce process-tree isolation")
+                   reason="M4 Qualify replaceable harnesses: real harness process-tree isolation; candidate Deno attacks pass in M3, hard OS memory/storage floor remains")
 def test_runtime_integrity_1_confines_candidate_and_harness(future_runtime: RuntimeAcceptanceDriver) -> None:
     evidence = future_runtime.exercise("candidate_and_harness_attempt_credentials_network_storage_and_tool_access")
     assert evidence.candidate_escape_denied and evidence.harness_escape_denied
@@ -352,7 +352,7 @@ def test_runtime_integrity_2_rejects_forged_facts_and_protected_feedback(future_
 
 
 @pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="Milestones 2/3 storage and effects + Qualify replaceable harnesses: crash at every dispatch/continuation boundary")
+                   reason="M4 Qualify replaceable harnesses: real process launch, gateway spooling and upstream recovery; M3 in-process dispatch/continuation fault tests pass")
 def test_runtime_integrity_3_retains_request_and_consumes_result_once(future_runtime: RuntimeAcceptanceDriver) -> None:
     evidence = future_runtime.exercise("crash_before_and_after_launch_forward_return_settlement_and_continuation")
     assert evidence.request_retained_before_dispatch

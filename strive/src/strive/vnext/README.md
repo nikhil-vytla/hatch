@@ -47,3 +47,11 @@ runtime guarantee 5 with guarded fresh-interpreter replay and corruption
 rejection. The other four runtime probes remain strict expected failures for
 later milestones. Legacy modules remain intact; vNext has no compatibility
 format or dual writes.
+
+Milestone 3 adds `runtime`: a serial supervisor, pinned capability broker,
+verifier-backed budget ledger, and a Deno candidate sandbox. See the
+[effects and confinement report](../../../milestone3-effects/README.md) for
+interfaces, fault tests, operator recovery and the exact confinement limits.
+Candidate steps and external effects both reserve resources through the existing
+journal before dispatch. The external adapter remains trusted in-process code;
+real harness process launch and gateway qualification belong to M4.
