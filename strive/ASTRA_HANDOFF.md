@@ -97,11 +97,12 @@ execution model, even the substrate) — just do not regress the properties.
 
 ## Note on running you as `gpt-6-astra`
 
-This repo's Codex CLI (0.153.4) supports `gpt-6-astra`, but it is rejected on a
-ChatGPT-account login (`400: not supported when using Codex with a ChatGPT
-account`). To run as `gpt-6-astra`, use OpenAI **API-key** auth
-(`codex login --with-api-key`, `model_provider = "openai"`), which bills at API
-rates. (This is informational for whoever launches your session.)
+Codex CLI is 0.153.4 and Codex is now authenticated with an **OpenAI API key**
+(`provider: openai`), so `gpt-6-astra` runs (verified: a probe returned READY at
+`model: gpt-6-astra`). Select it per run with `-m gpt-6-astra`; API-key usage
+bills at API rates. NOTE: this replaced the prior ChatGPT-account login globally
+— to restore ChatGPT login later, run `codex login`. (`gpt-6-astra` is rejected
+on ChatGPT-account auth, which is why the API key is in use.)
 
 — End of handoff. Start with step 1; write your design to
 `strive/docs/ASTRA_DESIGN.md` and wait for go/no-go before tearing anything out.
