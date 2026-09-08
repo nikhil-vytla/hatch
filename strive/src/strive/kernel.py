@@ -76,7 +76,7 @@ from strive.contracts import (
     FailureRecord,
     ModelRequest,
     TaskCase,
-    dominant_fault,
+    FAULT_RANK,
 )
 from strive.evaluate import evaluate
 from strive.policy import (
@@ -131,6 +131,7 @@ from strive.runtime import (
     OperationDispatched,
     PolicyStateBlob,
     RefinementProposal,
+    RequestEvidence,
     StoredResult,
     combine_usage,
     model_dispatch_reservation,
@@ -140,6 +141,7 @@ from strive.runtime import (
 from strive.sandboxes import (
     CandidateExecutor,
     SandboxLimits,
+    SandboxProvenance,
     default_catalog as default_sandbox_catalog,
 )
 from strive.substrate import (
@@ -1456,6 +1458,22 @@ def _budget_limits(services: KernelServices) -> SandboxLimits:
     )
 
 
+def _aggregate_evidence(
+    evidence: "Sequence[RequestEvidence]", services: KernelServices
+) -> tuple[FailureRecord | None, str | None, SandboxProvenance]:
+    """Derive the attempt aggregate from ONE evidence list: the failure, origin,
+    AND provenance all come from the SAME dominant faulted item (infrastructure >
+    unknown > candidate); with no fault, the provenance is the last ran request's
+    (or the executor's when nothing ran)."""
+    faulted = [e for e in evidence if e.failure is not None]
+    if faulted:
+        dom = max(faulted, key=lambda e: FAULT_RANK.get(e.fault_origin, 2))
+        return dom.failure, dom.fault_origin, dom.provenance
+    ran = [e for e in evidence if e.ran]
+    provenance = ran[-1].provenance if ran else services.executor.provenance()
+    return None, None, provenance
+
+
 def _attempt_origin(
     failure: FailureRecord | None, fault_origin: str | None
 ) -> tuple[str, str]:
@@ -1507,19 +1525,23 @@ def _run_attempt(
     cases = run_cases
     outcomes: list[CaseOutcome] = []
     denials: list[str] = []
-    provenance = None
-    # ORDERED per-case boundary faults: (failure, origin) in case order. The
-    # recorded failure AND origin are later derived from the SAME dominant item,
-    # so they are always self-consistent (never a first failure paired with a
-    # different case's origin).
-    faults: list[tuple[FailureRecord, str | None]] = []
     total_stdout = 0
     total_wall = 0.0
+    # ORDERED per-request evidence: outcome/fault/origin/provenance/limits/usage in
+    # execution order. The aggregate failure, origin, and provenance ALL derive
+    # from the SAME dominant item of this one list, and coverage derives from it —
+    # never a mix of one request's fault with another's provenance.
+    evidence: list[RequestEvidence] = []
     for case in cases:
         denial = meter.request_execution()  # cumulative executions + wall gate
         if denial is not None:
-            # a run-budget shortfall — a PROVEN infrastructure fault
-            faults.append((denial, FAULT_INFRASTRUCTURE))
+            # a run-budget shortfall — a PROVEN infrastructure fault, un-run
+            evidence.append(RequestEvidence(
+                request_id=case.case_id, ran=False, failure=denial,
+                fault_origin=FAULT_INFRASTRUCTURE,
+                provenance=services.executor.provenance(),
+                wall_time_s=0.0, output_bytes=0,
+            ))
             break
         result = services.executor.execute_suite(
             source, [case], generation_id=gen,
@@ -1528,18 +1550,16 @@ def _run_attempt(
         meter.note_output_bytes(result.report.stdout_bytes)  # ACTUAL captured bytes
         total_stdout += result.report.stdout_bytes
         total_wall += result.report.wall_time_s
-        provenance = result.provenance
         denials.extend(result.denials)
         outcomes.extend(result.report.outcomes)
-        if result.report.failure is not None:
-            faults.append((result.report.failure, result.report.fault_origin))
-    # the DOMINANT fault (infrastructure > unknown > candidate); its failure and
-    # origin come from that ONE item, so event order can never hide a later
-    # backend fault AND the pair stays self-consistent. `dominant_fault` is the
-    # SHARED aggregation rule the CandidateExecutor's per-suite pass also uses.
-    failure, fault_origin = dominant_fault(faults)
-    if provenance is None:  # denied before any case ran
-        provenance = services.executor.provenance()
+        evidence.append(RequestEvidence(
+            request_id=case.case_id, ran=True, failure=result.report.failure,
+            fault_origin=result.report.fault_origin, provenance=result.provenance,
+            wall_time_s=result.report.wall_time_s, output_bytes=result.report.stdout_bytes,
+        ))
+    # the ONE unified derivation: failure, origin, AND provenance from the SAME
+    # dominant evidence item (infrastructure > unknown > candidate).
+    failure, fault_origin, provenance = _aggregate_evidence(evidence, services)
     report = ExecutionReport(
         ok=failure is None,
         generation_id=gen,
@@ -1553,14 +1573,15 @@ def _run_attempt(
     origin, origin_detail = _attempt_origin(failure, fault_origin)
     # preserve the FULL evidence: the exact ExecutionReport (per-case
     # outputs/errors, backend failure, wall/output) and its Evaluation
-    # (per-case scores/feedback) — never collapsed to only the aggregate.
+    # (per-case scores/feedback) + the ordered per-request evidence — never
+    # collapsed to only the aggregate.
     return AttemptRecord(
         command_id=cid, label=label, state_ref=state_ref,
         overall=evaluation.overall_score, ok=failure is None,
         provenance=provenance, failure=failure, denials=tuple(denials),
         usage=_usage_delta(before, meter.usage()),
         report_ref=substrate.put(report), evaluation_ref=substrate.put(evaluation),
-        origin=origin, origin_detail=origin_detail,
+        origin=origin, origin_detail=origin_detail, evidence=tuple(evidence),
     )
 
 

@@ -60,6 +60,7 @@ from strive.contracts import (
     FAULT_CANDIDATE,
     FAULT_INFRASTRUCTURE,
     FAULT_ORIGINS,
+    FAULT_RANK,
     BudgetSpec,
     BudgetUsage,
     Evaluation,
@@ -2589,6 +2590,28 @@ def _check_attempt_evidence(
         errors.append(f"{where} usage.output_bytes != ExecutionReport.stdout_bytes")
     if rec.usage.wall_time_s + 1e-3 < report.wall_time_s:
         errors.append(f"{where} usage.wall_time_s is below the report's backend wall")
+    # UNIFIED EVIDENCE: when ordered per-request evidence is present, the record's
+    # failure, fault-origin, AND provenance must ALL derive from the SAME dominant
+    # item — never one request's fault paired with another's provenance.
+    if rec.evidence:
+        faulted = [e for e in rec.evidence if e.failure is not None]
+        if faulted:
+            dom = max(faulted, key=lambda e: FAULT_RANK.get(e.fault_origin, 2))
+            if rec.failure != dom.failure:
+                errors.append(f"{where} failure is not the dominant evidence item's failure")
+            if report.fault_origin != dom.fault_origin:
+                errors.append(f"{where} fault_origin is not the dominant evidence item's origin")
+            if rec.provenance != dom.provenance:
+                errors.append(
+                    f"{where} provenance is not the dominant fault item's provenance "
+                    "(a later case's provenance cannot back another case's fault)"
+                )
+        else:
+            if rec.failure is not None:
+                errors.append(f"{where} has a failure but no faulted evidence item")
+            ran = [e for e in rec.evidence if e.ran]
+            if ran and rec.provenance != ran[-1].provenance:
+                errors.append(f"{where} provenance is not the last ran request's provenance")
 
 
 def _check_fork_lifecycle(
