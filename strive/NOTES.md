@@ -2253,3 +2253,51 @@ it skips locally when the backend is absent.)
 
 **Area 1 is now complete.** Remaining separate rounds: typed `ReviewDecision` +
 `ReviseChange`/`ChangeRevised` (Area 4) and typed model binding/usage (Area 5).
+
+---
+
+## PR #51 correction round 12 (Stage 3C.2B.3) — Area 1 closure: binding, neutral projection, unified evidence
+
+Closed the Area-1 sub-items the round-12 goal named.
+
+- **`OperationBinding` + a REAL source digest.** The plan embeds a run-level
+  `OperationBinding` (descriptor ref, `source_digest` = sha256 of the descriptor
+  SOURCE + strict config, config, schema versions, required surfaces/caps,
+  validity+indivisible). `task-suite-impl@1` is now only a label; source/config
+  drift changes `source_digest` → the plan_ref → a refused resume, WITHOUT a
+  version bump (proven by `test_source_drift_without_version_bump_refuses_resume`).
+- **Unified ordered per-request evidence.** `AttemptRecord@4` carries
+  `RequestEvidence` (ran, failure, fault_origin, provenance, wall, output) in
+  order; `_aggregate_evidence` derives the attempt failure, origin, AND
+  provenance from the SAME dominant item — fixing the bug where a later case's
+  provenance backed another case's dominant fault. Verify enforces the
+  derivation. `dominant_fault` is shared by the CandidateExecutor and kernel.
+- **Neutral policy-visible projection.** `ProjectedOutcome` (request_id, passed,
+  score, summary, error_kind) replaces the integer `VisibleCaseOutcome`;
+  `OperationProjection@2` carries `outcomes`. The projection now describes an
+  integer suite, an agent turn, a tool call, or an env step identically (proven
+  by an `agent-turn@1` conformance descriptor). `OperationPlan@2` embeds the
+  binding. (The plan MANIFEST + shipping executor stay code-over-input; a fully
+  generic executor is future work — documented.)
+- **Plan validated before issue.** Closed validity; seed/task/regime window
+  agreement; canonical unique request ids; required surfaces pinned in the run;
+  reservations conservatively cover the manifest — under-reserved / unpinned-
+  surface plans refused before `PolicyCommandIssued`.
+- **Exact projection re-derivation + structural verify.** The kernel re-derives
+  the projection through the pinned descriptor on resume and requires equality;
+  the pure verifier checks coverage/outcome-ids/scores/aggregate against the
+  plan — a forged valid/score/coverage is refused (never journaled).
+- **Comparison window.** Policy readers consume only VALID projections from the
+  ACTIVE window (latest `plan_ref`); a regime change starts a new window and
+  never mixes plans. The source-scan test is replaced by
+  `policy_visible_operation_view` (a filtered policy-facing API) + a functional
+  test.
+
+**Tooling.** `uv run mypy` clean (46 files); `uv run pytest` **301 passed**;
+`test_packaging` (installed-wheel CLI smoke) + `test_substrate_only` green.
+The secure-backend E2E runs when `deno` is available (skips locally otherwise).
+
+**Honestly remaining (separate rounds):** a fully generic kernel executor for
+agent turns / tools / environment steps (the neutral projection already supports
+them); typed `ReviewDecision`/`ReviseChange` (Area 4); typed model
+binding/usage (Area 5).
