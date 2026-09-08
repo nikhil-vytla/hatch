@@ -281,6 +281,8 @@ class ResolvedManifest:
                 needed.add(RecoveryCapability.RECOMPUTE_DETERMINISTIC)
             if recovery.settings.strategy is RecoveryStrategy.DEDUPLICATED_RETRY:
                 needed.add(RecoveryCapability.DEDUPLICATED_RETRY)
+            if recovery.settings.strategy is RecoveryStrategy.SUSPEND_IF_AMBIGUOUS:
+                needed.add(RecoveryCapability.SUSPEND)
             if not needed <= descriptors[recovery.operation]:
                 raise ManifestError(f"recovery.{recovery.operation}: unsupported adapter recovery capability")
 
