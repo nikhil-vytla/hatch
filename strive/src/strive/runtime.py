@@ -400,48 +400,91 @@ class PolicyVisibleOperationContext:
     visible_cases: tuple[TaskCase, ...]
 
 
-@register("operation-plan", 1)
+@register("operation-binding", 1)
 @dataclass(frozen=True)
-class OperationPlan:
-    """An immutable, CAS-backed operation plan. It pins the descriptor + config
-    identity, an OPAQUE manifest (the operation-split cases), the environment
-    regime, the projection schema, the seed, the required surfaces/capabilities,
-    the resource envelope, and the attempt-validity rule. It is NOT bound to
-    harness content, so ONE plan ref measures both the pre- and post-change
-    states of the same run."""
+class OperationBinding:
+    """The RUN-LEVEL identity of the operation package + its comparison
+    semantics, pinned (via every plan) in the `ObserveCurrentState` intent.
 
-    descriptor_ref: str          # name@version
-    descriptor_impl: str         # implementation digest
+    `descriptor_ref` is a version LABEL; `source_digest` is the ACTUAL digest of
+    the descriptor's source + strict config, so source/config drift is detected
+    even WITHOUT a version-label bump. `validity`/`indivisible` are the closed
+    attempt-validity semantics; the required surfaces/capabilities are the run
+    surfaces the plan needs and the caps its execution demands."""
+
+    descriptor_ref: str          # name@version (a label)
+    source_digest: str           # ACTUAL descriptor source + config digest
     config_digest: str
     plan_schema_version: str
     projection_schema_version: str
+    required_surfaces: tuple[str, ...]
+    required_capabilities: tuple[str, ...]
+    validity: str                # closed: "all-required" | "partial-allowed"
+    indivisible: bool
+
+
+@register("operation-plan", 2)
+@dataclass(frozen=True)
+class OperationPlan:
+    """An immutable, CAS-backed operation plan. It pins the run-level
+    `OperationBinding` (descriptor/source/config identity + comparison
+    semantics), the environment regime, the seed, an opaque manifest of
+    kernel-executable requests, and the resource envelope. It is NOT bound to
+    harness content, so ONE plan ref measures both the pre- and post-change
+    states of the same run.
+
+    NOTE: `manifest` is the shipping code-over-input executor's request unit; a
+    descriptor for agent turns / tools / environment steps would populate it with
+    its own request shape. The POLICY-VISIBLE projection (`OperationProjection`)
+    is already operation-neutral (no task/integer types)."""
+
+    binding: OperationBinding
     seed: int
     task_fingerprint: str
     regime: str                  # environment snapshot (backend + capabilities)
-    manifest: tuple[TaskCase, ...]  # OPAQUE operation-split cases
-    required_surfaces: tuple[str, ...]
-    required_capabilities: tuple[str, ...]
+    manifest: tuple[TaskCase, ...]  # kernel-executable requests (opaque ids)
     reserved_executions: int
     reserved_wall_s: float
     reserved_output_bytes: int
-    validity: str                # "all-required" | "partial-allowed"
-    indivisible: bool            # floor unrelated cases on any fault when True
+
+    # convenience accessors so readers do not reach through `binding` everywhere
+    @property
+    def descriptor_ref(self) -> str:
+        return self.binding.descriptor_ref
+
+    @property
+    def validity(self) -> str:
+        return self.binding.validity
+
+    @property
+    def indivisible(self) -> bool:
+        return self.binding.indivisible
+
+    @property
+    def required_surfaces(self) -> tuple[str, ...]:
+        return self.binding.required_surfaces
+
+    @property
+    def required_capabilities(self) -> tuple[str, ...]:
+        return self.binding.required_capabilities
 
 
-@register("visible-case-outcome", 1)
+@register("projected-outcome", 1)
 @dataclass(frozen=True)
-class VisibleCaseOutcome:
-    """One case's POLICY-VISIBLE outcome: opaque id, expected, produced output,
-    pass/fail, and a SAFE error class (never raw protected text)."""
+class ProjectedOutcome:
+    """One request's POLICY-VISIBLE, OPERATION-NEUTRAL outcome: an opaque request
+    id, pass/fail, a numeric score, a human summary, and a SAFE error class. It
+    carries NO task/integer types, so a projection describes an integer task
+    suite, an agent turn, a tool call, or an environment step identically."""
 
-    case_id: str
-    expected: int
-    got: int | None
+    request_id: str
     passed: bool
+    score: float
+    summary: str
     error_kind: str | None
 
 
-@register("operation-projection", 1)
+@register("operation-projection", 2)
 @dataclass(frozen=True)
 class OperationProjection:
     """The POLICY-VISIBLE result the descriptor derives from the protected
@@ -459,7 +502,7 @@ class OperationProjection:
     coverage_completed: int
     coverage_total: int
     overall: float | None
-    cases: tuple[VisibleCaseOutcome, ...]
+    outcomes: tuple[ProjectedOutcome, ...]
 
 
 @register("model-binding", 1)
@@ -542,11 +585,12 @@ __all__ = [
     "OPERATION_LABEL",
     "OPERATION_PROJECTION",
     "OPERATION_RESULT",
+    "OperationBinding",
     "OperationDispatched",
     "OperationPlan",
     "OperationProjection",
     "PolicyVisibleOperationContext",
-    "VisibleCaseOutcome",
+    "ProjectedOutcome",
     "PolicyStateBlob",
     "REFINE_BINDING",
     "REFINE_DISPATCH",

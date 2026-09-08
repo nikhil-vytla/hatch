@@ -628,11 +628,11 @@ def _build_refine_context(
             f"observation overall={overall} valid={proj.valid} "
             f"coverage={proj.coverage_completed}/{proj.coverage_total}"
         )
-        for vc in proj.cases:
+        for vc in proj.outcomes:
             if vc.passed:
                 continue
             lines.append(
-                f"  FAIL case {vc.case_id}: expected {vc.expected}, got {vc.got} "
+                f"  FAIL request {vc.request_id}: {vc.summary} "
                 f"({vc.error_kind or 'wrong'})"
             )
 
@@ -751,7 +751,7 @@ def _build_review_context(
             )
     lines.append("=== behavior AFTER the change ===")
     for proj in _post_apply_projections(view, change_id)[-config.trajectory_window:]:
-        failing = [vc.case_id for vc in proj.cases if not vc.passed]
+        failing = [vc.request_id for vc in proj.outcomes if not vc.passed]
         overall = "n/a" if proj.overall is None else f"{proj.overall:.4f}"
         lines.append(f"observation overall={overall} failing={failing}")
     return "\n".join(lines) + "\n"

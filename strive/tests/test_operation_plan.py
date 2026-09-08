@@ -118,11 +118,12 @@ def test_projection_is_policy_visible_only(tmp_path: Path) -> None:
     task = TASK
     raw_inputs = {c.input_text for c in task.cases}
     for proj in projections:
-        for vc in proj.cases:
-            # the projection exposes opaque id + expected/got + a SAFE error class
-            assert vc.case_id.startswith("op-")
-            # it never leaks raw protected input text
+        for vc in proj.outcomes:
+            # the neutral projection exposes an opaque request id + pass/score +
+            # a human summary + a SAFE error class — never raw protected input
+            assert vc.request_id.startswith("op-")
             assert getattr(vc, "input_text", None) is None
+            assert vc.summary not in raw_inputs
             if vc.error_kind is not None:
                 assert vc.error_kind not in raw_inputs
 
@@ -276,7 +277,7 @@ def test_indivisible_floors_completed_cases_on_a_partial_attempt() -> None:
     )
     assert not proj.valid
     assert proj.overall is None
-    assert not any(vc.passed for vc in proj.cases)  # completed cases floored
+    assert not any(vc.passed for vc in proj.outcomes)  # completed cases floored
 
 
 # -- policy/review consumes only the projection ---------------------------------------------------
