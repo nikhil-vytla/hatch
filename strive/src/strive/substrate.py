@@ -2017,6 +2017,37 @@ def _check_observation_lifecycle(
                 f"command {cid!r}: an invalid operation projection must not publish "
                 "an aggregate overall"
             )
+        # STRUCTURAL forgery checks the PURE verifier can make against the plan:
+        # coverage and the outcome set must match the pinned manifest exactly, and
+        # a published aggregate/scores must be well-formed fractions. (The
+        # descriptor-EXACT recompute of origin/valid/score is a kernel-side gate,
+        # which owns the injected catalog.)
+        if plan is not None:
+            total = len(plan.manifest)
+            if projection.coverage_total != total:
+                errors.append(
+                    f"command {cid!r}: projection coverage_total {projection.coverage_total} "
+                    f"!= the plan's {total} request(s)"
+                )
+            if not (0 <= projection.coverage_completed <= total):
+                errors.append(f"command {cid!r}: projection coverage_completed out of range")
+            if len(projection.outcomes) != total:
+                errors.append(
+                    f"command {cid!r}: projection has {len(projection.outcomes)} outcome(s) "
+                    f"but the plan has {total} request(s)"
+                )
+            plan_ids = [m.case_id for m in plan.manifest]
+            if [o.request_id for o in projection.outcomes] != plan_ids:
+                errors.append(f"command {cid!r}: projection outcome ids != the plan manifest ids")
+        for o in projection.outcomes:
+            if not (0.0 <= o.score <= 1.0):
+                errors.append(f"command {cid!r}: projection outcome score out of range")
+            if o.passed != (o.score >= 1.0):
+                errors.append(f"command {cid!r}: projection outcome passed disagrees with its score")
+        if projection.valid and projection.overall is not None and not (
+            0.0 <= projection.overall <= 1.0
+        ):
+            errors.append(f"command {cid!r}: projection aggregate overall out of range")
 
 
 _KNOWN_FINISH = {"stop", "length", "error", "unknown"}

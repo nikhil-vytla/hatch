@@ -1301,16 +1301,36 @@ def _run_observation(
     cid = command.command_id
     kind = "ObserveCurrentState"
 
-    # the PROJECTION is the terminal effect: if it exists, reconstruct verbatim
+    plan, plan_ref = _pinned_operation_plan(services, view, cid)
+    descriptor = services.operation_catalog.descriptor(plan.descriptor_ref)
+    subject = view.state_ref or ""
+
+    # the PROJECTION is the terminal effect: if it exists, RE-DERIVE it through
+    # the pinned descriptor from the durable protected result and require EXACT
+    # equality — a forged/tampered valid/score/coverage cannot survive resume.
     existing_proj = _operation_projection(view, cid)
     if existing_proj is not None:
+        result = _operation_result(services, view, cid)
+        if result is not None:
+            recorded = codec.loads(
+                substrate.objects.get_text(existing_proj), OperationProjection
+            )
+            recomputed = descriptor.project(
+                plan, command_id=cid, state_ref=recorded.state_ref,
+                report=codec.loads(substrate.objects.get_text(result[1].report_ref), ExecutionReport),
+                evaluation=codec.loads(substrate.objects.get_text(result[1].evaluation_ref), Evaluation),
+                origin=result[1].origin,
+            )
+            recomputed = dataclasses.replace(recomputed, plan_ref=plan_ref)
+            if recomputed != recorded:
+                raise KernelError(
+                    f"operation {cid!r} projection does not equal its re-derivation "
+                    "from the pinned descriptor + protected result (forged/tampered)"
+                )
         return CommandResult(
             cid, kind, "ok", view.head, observation_ref=existing_proj,
             detail="operation already observed",
         )
-    plan, plan_ref = _pinned_operation_plan(services, view, cid)
-    descriptor = services.operation_catalog.descriptor(plan.descriptor_ref)
-    subject = view.state_ref or ""
 
     # crash between RESULT and PROJECTION: FINISH by deriving the projection from
     # the DURABLE result — never re-execute or re-charge
@@ -1382,12 +1402,60 @@ def _environment_fingerprint(services: KernelServices) -> str:
     return f"{services.executor.backend_name}|{'+'.join(sorted(caps.enforced))}"
 
 
+_VALIDITIES = ("all-required", "partial-allowed")
+
+
+def _validate_operation_plan(
+    plan: OperationPlan, services: KernelServices, view: VerifiedSubstrateView
+) -> None:
+    """Validate a plan BEFORE it is pinned in an `ObserveCurrentState` intent.
+    A malformed, under-reserved, contradictory, or drifted plan is refused at the
+    boundary — never issued. The kernel enforces the plan's required surfaces and
+    resource envelope here (it owns budgets/capabilities/state integrity)."""
+    b = plan.binding
+    where = f"operation plan {plan.descriptor_ref!r}"
+    if b.validity not in _VALIDITIES:
+        raise KernelError(f"{where}: invalid validity {b.validity!r}")
+    # identity/window: seed + task + environment must match this run exactly
+    if plan.seed != services.seed:
+        raise KernelError(f"{where}: plan seed {plan.seed} != run seed {services.seed}")
+    if plan.task_fingerprint != services.task.fingerprint():
+        raise KernelError(f"{where}: plan task fingerprint disagrees with the run's task")
+    if plan.regime != _environment_fingerprint(services):
+        raise KernelError(f"{where}: plan regime disagrees with the run's execution regime")
+    # canonical, unique request ids
+    ids = [r.case_id for r in plan.manifest]
+    if len(set(ids)) != len(ids):
+        raise KernelError(f"{where}: manifest request ids are not unique")
+    if any(not rid for rid in ids):
+        raise KernelError(f"{where}: manifest has an empty request id")
+    # required surfaces must be PINNED in this run
+    if view.bound is not None:
+        pinned = set(view.bound.surface_descriptor_refs)
+        missing = [s for s in b.required_surfaces if s not in pinned]
+        if missing:
+            raise KernelError(f"{where}: required surfaces {missing} are not pinned in this run")
+    # reservations must CONSERVATIVELY cover the manifest
+    cap = SandboxLimits()
+    n = len(plan.manifest)
+    if plan.reserved_executions < n:
+        raise KernelError(
+            f"{where}: reserved_executions {plan.reserved_executions} under-reserves "
+            f"{n} request(s)"
+        )
+    if plan.reserved_wall_s + 1e-9 < n * cap.wall_time_s:
+        raise KernelError(f"{where}: reserved wall under-reserves the manifest")
+    if plan.reserved_output_bytes < n * cap.output_bytes:
+        raise KernelError(f"{where}: reserved output under-reserves the manifest")
+
+
 def _operation_plan(
-    services: KernelServices,
+    services: KernelServices, view: VerifiedSubstrateView
 ) -> tuple[OperationDescriptor, OperationPlan, str]:
     """Deterministically build (descriptor, plan, plan_ref) from the run's
-    POLICY-VISIBLE operation context. Deterministic, so re-deriving on resume
-    yields the SAME plan_ref (drift → a different ref → a refused resume)."""
+    POLICY-VISIBLE operation context, VALIDATED before it can be pinned.
+    Deterministic, so re-deriving on resume yields the SAME plan_ref (drift → a
+    different ref → a refused resume)."""
     descriptor = services.operation_catalog.descriptor(services.operation_descriptor)
     context = PolicyVisibleOperationContext(
         task_fingerprint=services.task.fingerprint(),
@@ -1396,6 +1464,7 @@ def _operation_plan(
         visible_cases=services.task.visible_cases(),
     )
     plan = descriptor.create_plan(context)
+    _validate_operation_plan(plan, services, view)
     return descriptor, plan, services.substrate.put(plan)
 
 
@@ -1757,10 +1826,11 @@ def _command_payload(
         context_ref = command.context_ref
         model_binding = _resolve_model_binding(services, command.model_role)
     elif isinstance(command, ObserveCurrentState):
-        # pin the CAS-backed operation PLAN ref (and, transitively, the
-        # descriptor/config identity it embeds) in the durable intent BEFORE
-        # issue: a resume that re-derives a different plan is refused
-        _, _, plan_ref = _operation_plan(services)
+        # VALIDATE then pin the CAS-backed operation PLAN ref (and, transitively,
+        # the binding's descriptor/source/config identity) in the durable intent
+        # BEFORE issue: an invalid/under-reserved/drifted plan is refused here,
+        # and a resume that re-derives a different plan is refused by the digest
+        _, _, plan_ref = _operation_plan(services, view)
     elif isinstance(command, ScheduleTrigger):
         after_seconds = command.after_seconds
         reason = command.reason
