@@ -210,7 +210,25 @@ OP_INDETERMINATE = "indeterminate"  # crash between dispatch and result (open di
 OP_OPERATION_ORIGINS = (OP_BEHAVIORAL, OP_INFRASTRUCTURE, OP_UNKNOWN)
 
 
-@register("execution-attempt", 3)
+@register("request-evidence", 1)
+@dataclass(frozen=True)
+class RequestEvidence:
+    """ONE request's durable evidence, in execution order. The attempt's
+    aggregate failure, origin, and provenance are all derived from the SAME
+    dominant item of this list — so a dominant fault can never be paired with a
+    different request's provenance. `ran` is False for a request the kernel never
+    executed (a boundary fault or run-budget denial stopped the suite first)."""
+
+    request_id: str
+    ran: bool
+    failure: FailureRecord | None
+    fault_origin: str | None
+    provenance: SandboxProvenance
+    wall_time_s: float
+    output_bytes: int
+
+
+@register("execution-attempt", 4)
 @dataclass(frozen=True)
 class AttemptRecord:
     """The durable RESULT of one base/candidate attempt. It preserves the FULL
@@ -227,7 +245,12 @@ class AttemptRecord:
     kernel's own run-budget denials — NOT a heuristic on the failure kind.
     `origin_detail` is a short human reason. A clean run (`ok=True`) is always
     behavioral; only a backend/launcher/runtime fault or a run-budget shortfall
-    is infrastructure."""
+    is infrastructure.
+
+    `evidence` is the ORDERED per-request evidence: the attempt's `failure`,
+    `fault_origin`, and `provenance` all derive from the SAME dominant item of
+    it, and `coverage` (ran count) derives from it too — one unified evidence
+    source, never a mix of one request's fault with another's provenance."""
 
     command_id: str
     label: str  # "base" | "candidate"
@@ -242,6 +265,7 @@ class AttemptRecord:
     evaluation_ref: str   # CAS ref to the exact Evaluation
     origin: str = OP_BEHAVIORAL  # OP_BEHAVIORAL | OP_INFRASTRUCTURE
     origin_detail: str = ""
+    evidence: tuple[RequestEvidence, ...] = ()
 
 
 @register("fork-observation", 4)
@@ -529,6 +553,7 @@ __all__ = [
     "REFINE_RESULT",
     "REVIEW_VERDICTS",
     "RefinementProposal",
+    "RequestEvidence",
     "StoredResult",
     "SurfaceEdit",
     "combine_usage",
