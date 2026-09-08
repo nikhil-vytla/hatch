@@ -1,54 +1,49 @@
-Milestone 1 freezes the additive Python contracts in `strive.vnext.contracts`.
-[ASTRA_DESIGN.md](../../../docs/ASTRA_DESIGN.md), including Amendment 1, is the
-authority. Amendment 1 takes precedence wherever the earlier design conflicts.
+The vNext implementation follows [ASTRA_DESIGN.md](../../../docs/ASTRA_DESIGN.md)
+and Amendment 1. The amendment wins wherever the earlier design conflicts.
 
-The package defines the closed authoritative record groups and their owners,
-open bounded annotations, the seven commands and `Step` protocol, effect states
-and recovery tables, `strive.harness/1`, authored/resolved manifests, A/B/C
-feedback permissions, tau2 simulator acceptance scenarios, and the reference
-campaign plan. Registry backend names remain strings. The interface adds no
-harness-specific record family and no second command representation.
+Milestone 1 froze `contracts`: authority record groups and owners, annotations,
+the seven commands and `Step` interface, lifecycle/recovery tables, harness
+bindings, manifests, feedback access, simulator cases, and the reference study.
+Those types remain unchanged. Their constructors validate shape, not producer
+authenticity. TOML loaders accept text and do no resolution or execution.
 
-All code is definitions and pure construction/validation helpers. The TOML
-loaders accept text, never paths. `load_authored_manifest` retains authoring
-references; `load_resolved_configuration` requires SHA-256 references.
-`ResolvedManifest` additionally requires the retained closure, effective model
-settings, declared enabled cost phases, and adapter recovery capabilities.
-It does not fetch, resolve, hash, execute, or authenticate anything.
+Milestone 2 adds `store`, `verify`, `codec`, `wire`, and shared errors. See the
+[implementation report](../../../milestone-2-storage-verification/README.md)
+for the format, trust assumptions, semantic decisions, and acceptance-test map.
 
-The default policy validator accepts `refine_every_episodes` and
-`optional_dev_forks`. A pinned policy can supply its own pure parameter validator;
-only policy parameters are extensible. Core tables always reject unknown keys.
-The amended workload keeps the original `task_stream` and corpus field names,
-with task/episode artifacts behind their references. A validation corpus may be
-omitted under A; binding it does not grant access. Contract C is represented but
-rejected for execution configuration.
+`store.ArtifactStore` defaults to `artifacts-vnext`. It publishes immutable
+SHA-256 objects and creates runs with protected producer bindings. It rejects
+populated roots without its format marker and never reads legacy artifacts.
+A `RunWriter` holds an exclusive local lease and durable execution epoch.
+Trusted setup hands each pinned producer only its `ProducerPort`. Append takes
+the current epoch and derives producer identity from that port. Referenced
+objects and directory entries are synced before committing a journal frame.
 
-Money uses integer nanodollars, with exact decimal TOML parsing. `SETTLED` means
-known components were booked; it does not mean usage is complete. Unknown
-components retain obligations after continuation. An uncertain outcome must be
-reconciled before it can produce a consumable result. Authorization without a
-durable outcome always requires reconciliation or suspension. A recorded local
-failure or reconciled outcome can reach `RETURNED` without a dispatch observation.
-Late reconciliation is separate from reopening execution.
+`store.RunReader` opens existing journal/CAS data without creating files.
+`verify.replay(journal, objects, authority)` reconstructs an immutable
+`VerifiedState`; `verify.preflight(state, frame, objects, authority)` checks one
+new transition against a verified prefix. The verifier imports only stdlib,
+frozen contracts, and shared wire/codec definitions. It does not import mutable
+storage implementations, execute candidate code, or dispatch effects.
 
-The envelope wraps six authoritative payload classes or an `Annotation`.
-Annotation JSON may contain arbitrary claims, including familiar authority key
-names, but those bytes have no authority. Annotations have no authority fields
-of their own. The frozen per-record annotation bound is 65,536 UTF-8 JSON bytes;
-run storage quotas remain a later enforcement responsibility. Owner declarations
-and producer fields are not authentication.
+Producer MACs and supervisor seals authenticate the append path under a trusted
+local host. The protected authority file contains verification keys and pinned
+producer identities. Candidates must receive neither that file nor general
+CAS/history handles. This local authentication is not a portable signature or
+a defense against a host owner rewriting the entire run and trust root.
 
-[Acceptance tests](../../../tests/vnext/test_acceptance_contracts.py) name each
-integrity guarantee and contract deliverable. Five strict expected failures also
-contain the future runtime assertions. Their shared driver deliberately raises
-`NotImplementedError`; the named milestones must supply real fault probes and
-remove the markers. Passing the schema tests is not evidence of confinement,
-durability, scorer correctness, or feedback noninterference.
+The frozen `Annotation` constructor accepts bounded UTF-8 JSON. Storage's
+`opaque_annotation(namespace, bytes)` and decoder reuse the same type while
+checking only the namespace and 65,536-byte bound. Verification never parses
+annotation payloads, including unknown schemas and non-JSON bytes.
 
-Milestone 2 starts with an isolated artifact root, immutable CAS publication,
-framed commits and one-writer ownership, then pure preflight and full replay.
-Producer-specific append interfaces must enforce the ownership declared here.
-Its first runtime acceptance case is fresh-interpreter replay that rejects
-corrupt authority without importing candidate code. Existing modules remain
-unchanged until the human contract review preceding teardown.
+A corrupt reference, malformed record, invalid MAC, broken chain, inconsistent
+transition, or reused result cursor raises. A partial final frame raises
+`IncompleteTail` with its byte offset. Readers and writers never truncate,
+skip, or automatically repair damaged history.
+
+[Acceptance tests](../../../tests/vnext/test_acceptance_contracts.py) now close
+runtime guarantee 5 with guarded fresh-interpreter replay and corruption
+rejection. The other four runtime probes remain strict expected failures for
+later milestones. Legacy modules remain intact; vNext has no compatibility
+format or dual writes.

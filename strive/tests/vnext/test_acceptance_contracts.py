@@ -1,13 +1,14 @@
 """One primary case per §2 guarantee and per Milestone 1 contract deliverable.
 
-These test schema-level obligations. They make no claim that runtime enforcement
-exists. Runtime probes below are strict expected failures until their named
-milestones install the acceptance driver and remove the marker.
+Schema tests freeze the protocol shapes. Guarantee 5 now exercises storage and
+pure replay in a fresh interpreter. The other four runtime probes remain strict
+expected failures until their named milestones install enforcement.
 """
 
 from dataclasses import FrozenInstanceError, dataclass, fields, replace
 from decimal import Decimal
 import inspect
+from pathlib import Path
 from typing import Protocol, assert_never, get_args
 
 import pytest
@@ -301,9 +302,38 @@ class RuntimeAcceptanceDriver(Protocol):
     def exercise(self, scenario: str) -> RuntimeEvidence: ...
 
 
+class StorageRuntimeDriver:
+    """Milestone 2 closes only replay/corruption; later scenarios remain explicit."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+    def exercise(self, scenario: str) -> RuntimeEvidence:
+        if scenario != "fresh_interpreter_replay_with_corrupt_reference_and_unknown_bounded_annotation":
+            raise NotImplementedError("runtime scenario belongs to a later milestone")
+        from .fresh_probe import fresh_replay
+        from .storage_fixtures import complete_history
+
+        reader = complete_history(self.root)
+        fresh_replay(self.root, corrupt=False)
+        effect = reader.verify().effects[0]
+        assert effect.response is not None
+        reader.objects.path(effect.response).write_bytes(b"corrupted authority response")
+        fresh_replay(self.root, corrupt=True)
+        return RuntimeEvidence(
+            candidate_escape_denied=False, harness_escape_denied=False,
+            protected_input_variation_changed_adaptive_requests=False,
+            forged_measurement_rejected=False, request_retained_before_dispatch=False,
+            result_consumptions=1, mutation_count=0,
+            reservation_after_restore=Decimal(0), reservation_before_restore=Decimal(0),
+            ambiguous_retry_dispatched=False, corrupt_authority_rejected=True,
+            verifier_imported_candidate=False,
+        )
+
+
 @pytest.fixture
-def future_runtime() -> RuntimeAcceptanceDriver:
-    raise NotImplementedError("Milestone 1 has no runtime acceptance driver; implement the named fault probes")
+def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
+    return StorageRuntimeDriver(tmp_path / "runtime-vnext")
 
 
 @pytest.mark.xfail(strict=True, raises=NotImplementedError,
@@ -338,8 +368,6 @@ def test_runtime_integrity_4_preserves_mutation_and_unresolved_obligation(future
     assert not evidence.ambiguous_retry_dispatched
 
 
-@pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="Milestone 2 Build storage and pure verification: replay corrupted authority in fresh interpreter without candidate imports")
 def test_runtime_integrity_5_replay_rejects_corruption_without_candidate_imports(future_runtime: RuntimeAcceptanceDriver) -> None:
     evidence = future_runtime.exercise("fresh_interpreter_replay_with_corrupt_reference_and_unknown_bounded_annotation")
     assert evidence.corrupt_authority_rejected
