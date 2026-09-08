@@ -566,12 +566,30 @@ def _projections(view: RunView) -> list[OperationProjection]:
     return out
 
 
+def _active_window(view: RunView) -> str | None:
+    """The ACTIVE comparison window: the plan ref of the most recent projection.
+    A regime change (a different pinned plan) starts a new window; readers only
+    consume projections from THIS window, so warm-up counts, Refiner context, and
+    pre/post review can never mix evidence measured under different plans."""
+    projections = _projections(view)
+    return projections[-1].plan_ref if projections else None
+
+
+def _window_projections(view: RunView) -> list[OperationProjection]:
+    """Projections from the ACTIVE comparison window only."""
+    window = _active_window(view)
+    if window is None:
+        return []
+    return [p for p in _projections(view) if p.plan_ref == window]
+
+
 def _behavioral_op_count(view: RunView, cid_prefix: str) -> int:
-    """How many VALID behavioral operation projections were caused by commands
-    whose id starts with `cid_prefix`. Infrastructure/unknown/incomplete outcomes
-    do NOT count — a window is only satisfied by comparable behavioral evidence."""
+    """How many VALID behavioral operation projections FROM THE ACTIVE WINDOW were
+    caused by commands whose id starts with `cid_prefix`. Infrastructure/unknown/
+    incomplete outcomes and other-window projections do NOT count — a window is
+    only satisfied by comparable behavioral evidence under one plan."""
     return sum(
-        1 for p in _projections(view)
+        1 for p in _window_projections(view)
         if p.command_id.startswith(cid_prefix) and p.valid
     )
 
@@ -580,11 +598,12 @@ def _behavioral_op_count(view: RunView, cid_prefix: str) -> int:
 
 
 def _observations(view: RunView, exclude_cid: str) -> list[OperationProjection]:
-    """Behavioral operation PROJECTIONS the refiner may cite (Area 1: policy code
-    reads only the projection, never the protected evidence; Area 2:
-    infrastructure/unknown outcomes never enter refiner context)."""
+    """Behavioral operation PROJECTIONS FROM THE ACTIVE WINDOW the refiner may
+    cite (Area 1: policy code reads only the projection, never the protected
+    evidence; Area 2: infrastructure/unknown outcomes never enter refiner context;
+    only the active comparison window's plan is comparable)."""
     return [
-        p for p in _projections(view)
+        p for p in _window_projections(view)
         if p.command_id != exclude_cid and p.origin == OP_BEHAVIORAL
     ]
 
