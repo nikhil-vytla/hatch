@@ -7,10 +7,15 @@ incremental design passes it supersedes live in git history (dbab76b, 2961f3a,
 
 # strive vNext specification
 
-Status: design proposal, pending human go/no-go.  
+Status: teardown authorized (2026‑09‑08). Amendment 1 (harness pluggability &
+τ²-bench workload) must be frozen before the effect/executor boundary is built;
+see the amendment appended at the end of this document, which supersedes the
+sections it names.  
 Date: 8 September 2026.
 
-This document supersedes all earlier Astra design drafts. It specifies the intended rebuild; it does not authorize teardown or implementation.
+This document supersedes all earlier Astra design drafts. Read it together with
+Amendment 1 at the end. The one remaining human input is the funded USD ceiling
+and protected-audit allocation for the reference campaign (§9.6 / Amendment 1).
 
 ## 1. Mission and scope
 
@@ -688,3 +693,433 @@ The acceptance experience is one complete workflow: a researcher changes a polic
 - Exact resume means exact recorded state plus supported reconciliation, with suspension for unresolved external effects.
 - Bundle restoration replaces general inverse-edit machinery. Memory files replace a mandatory structured-memory ontology.
 - Release 1 uses serial local execution. Subagents, distributed durability, speculation, and general state migration are deferred.
+
+---
+
+# AMENDMENT 1 — Harness pluggability & real benchmark — GPT‑6 Astra
+
+*Authored by GPT‑6 Astra via `codex exec -m gpt-6-astra` (read-only design pass)
+after the human authorized teardown and set two directives: (1) strive must plug
+into different agent harnesses (opencode, claude code, codex, pi at minimum),
+exo-style; (2) the reference study must run a real, relevant benchmark, not a
+toy. This amendment supersedes the sections it names (§§2, 3, 4, 6, 7, 9, 10, 11)
+where they conflict. The five integrity guarantees in §2 are unchanged. Status:
+teardown authorized; this boundary amendment must be frozen before the
+effect/executor boundary is implemented. Verified environment: opencode 1.17.18,
+codex 0.153.4, claude 2.1.263 installed; pi NOT installed; `gpt-5.6-luna`
+reachable via opencode (OpenAI + Bedrock).*
+
+**Release 1 supports harness-as-model, ships opencode, codex, and Claude Code adapters, and uses the published τ²-bench telecom text tasks as its headline workload.** Pi remains interface-ready until installed and tested. Harness-as-executor is deferred.
+
+The five guarantees remain unchanged. Teardown is authorized, but the effect/executor boundary must implement the contract below before replacing the existing boundary.
+
+**Add to §3.1: harness boundary**
+
+Strive distinguishes two integration levels:
+
+| Level | Execution contract | Release 1 |
+|---|---|---|
+| **Harness-as-model** | An external harness performs one bounded generation and returns text or a proposed command. Strive owns continuation, tool execution, adaptation, accounting, and recovery. | Supported. |
+| **Harness-as-executor** | An external harness owns an agentic loop, invokes tools, and maintains internal execution state. | Rejected during manifest resolution. Reserved as a future capability. |
+
+A noninteractive command does not establish the first contract by itself. `opencode run`, `codex exec`, and `claude -p` must execute under a pinned profile that disables tools and auxiliary generations, with an enforced outer sandbox and a broker-controlled model connection.
+
+Release 1 permits **at most one upstream generation request per harness invocation**. Automatic retries, compaction calls, session-title generation, subagents, fallback models, and background model calls are disabled. The gateway rejects additional requests before forwarding them. An adapter that cannot complete under this restriction fails qualification.
+
+This preserves the executor/infrastructure distinction in the [Exo specification](https://github.com/exoharness/exo/blob/main/exoharness/docs/spec.md). Harness-specific prompt construction and response handling remain replaceable. Strive retains authority over dispatch and its consequences.
+
+| Guarantee | Enforcement across the harness boundary |
+|---|---|
+| **1. Confinement and fixed authority** | The whole harness process tree is confined. It receives scoped input bytes, pinned configuration, disposable scratch storage, and one restricted gateway capability. It receives no provider credentials, privileged tools, authoritative storage, or protected evidence. |
+| **2. Independent facts** | The gateway records requests, provider responses, and usage provenance. The workload adapter records state transitions. The scorer measures trusted state. Harness logs and generated claims cannot establish spending or success. |
+| **3. Durable execution identity** | Before launching the harness, retain its exact inputs, executable/configuration identities, effect ID, authorization, and reservation. Before forwarding its model request, durably retain the actual wire request. |
+| **4. Honest recovery** | Recover committed outputs and reconcile gateway evidence. Never infer nonexecution from process death, resume an opaque native session, or silently repeat an ambiguous generation. |
+| **5. A small checked protocol** | Every backend uses the same typed effect and continuation records. The verifier checks authority and transitions without interpreting a harness’s native transcript format. |
+
+Future executor support requires mediation of **every** model call, tool operation, descendant process, and state mutation, plus recoverable identities and bounded reservations for each. A final environment snapshot can establish an outcome, but cannot establish that intermediate actions respected permissions or budgets. Snapshot scoring alone therefore cannot qualify an opaque executor.
+
+**Add to §3.1: `HarnessAdapter` contract**
+
+A harness adapter is a pinned implementation selected through the existing model-dispatch binding. It does not replace `step()` or introduce a second acting loop.
+
+The small interface is:
+
+```text
+describe() -> HarnessDescriptor
+
+prepare(binding, generation_input, execution_context)
+    -> PreparedGeneration | Unsupported
+
+invoke(prepared_generation, supervisor_services)
+    -> HarnessReturn
+
+reconcile(prepared_generation, durable_evidence)
+    -> RecordedReturn | DefinitelyNotDispatched | Indeterminate
+```
+
+| Type | Required contents |
+|---|---|
+| `HarnessDescriptor` | Interface version, backend name, supported integration levels, compatible executable versions, supported provider protocols, confinement requirements, accounting-bound method, output decoder identity, and recovery capabilities. |
+| `GenerationInput` | Role, authorized context artifact references, requested model binding, generation settings, output schema, and resource limits. No unrestricted history or CAS handle. |
+| `ExecutionContext` | Supervisor-assigned run, invocation, effect, bundle, epoch, and evidence-scope identities. Candidate code cannot assign these. |
+| `PreparedGeneration` | Exact launch arguments, input bytes, effective configuration, dependency/executable references, sandbox profile, output-decoding contract, deadline, and defensible reservation requirements. Preparation performs no paid dispatch. |
+| `HarnessReturn` | Completion classification, captured output references, decoded text/proposal reference, process observations, and gateway receipt references. Harness-reported usage and model names retain separate provenance. |
+| `supervisor_services` | Confined process launch, bounded stream capture, deadline/cancellation control, and an effect-scoped model gateway. No arbitrary privileged shell, general network access, or unrestricted journal writer. |
+
+Backend names are registry keys, not a core enum. An operator-installed package implements `strive.harness/1`; resolution retains its code and descriptor in the trusted dependency closure. Candidates cannot install or replace adapters.
+
+The execution path remains:
+
+```text
+step(authorized_view, private_state, recorded_result)
+    -> ExecuteEffect("model.generate", binding="actor", request=...)
+    -> durable continuation containing that pending command
+
+supervisor
+    -> prepare and authorize the bound harness generation
+    -> invoke confined harness
+    -> gateway commits and forwards the permitted model request
+    -> record generation result and accounting
+
+next step(..., recorded_generation_result)
+    -> validate proposal
+    -> propose a separate brokered workload effect
+```
+
+The same path supports refinement. A refiner returns proposed bundle contents or edits as data. Existing bundle validation and `ApplyChange` perform activation.
+
+`model.generate` is the logical effect encompassing local harness execution and its single permitted upstream generation. Its reservation covers both. Process launch and provider forwarding are distinguishable dispatch stages, with their exact requests recorded before each stage. There is no second model charge attached to a surrounding harness span.
+
+A harness response never executes a tool directly. Even a syntactically valid proposed command must pass through a subsequent committed `step()` result and ordinary broker authorization.
+
+**Extend §§3.3–3.4: confinement, accounting, and recovery**
+
+Each invocation uses a fresh native session. The pinned launch profile must:
+
+- Supply only authorized context and explicitly selected bundle components.
+- Disable native tools, MCP servers, hosted tools, hooks, plugins, skills, automatic memory, discovery of user/project instructions, session sharing, and background agents.
+- Expose a minimal filesystem containing the pinned runtime, configuration, supplied context, and disposable scratch space.
+- Deny access to host homes, credentials, keychains, agent sockets, supervisor storage, environment databases, and audit artifacts.
+- Restrict the entire process tree’s network access to the effect-scoped model gateway. The gateway has fixed upstream routes and cannot act as a general proxy.
+- Enforce process, memory, storage, output-size, and active-time limits outside the harness.
+
+CLI permission settings are additional controls. They are insufficient as the outer confinement mechanism. A host without an implemented and tested confinement profile cannot launch a trusted harness run.
+
+The gateway holds the real provider credentials. The harness receives only a short-lived capability restricted to its effect, epoch, provider, requested model, request limits, and single upstream dispatch. Ambient credentials are not inherited.
+
+The gateway validates the actual model request, including harness-added instructions and schemas. It rejects unapproved models, nonempty executable tool catalogs, hosted tools, unsupported billing options, and oversized requests. It retains both the submitted context and the actual provider request, so reports do not confuse “supplied to the harness” with “sent to the model.”
+
+OpenCode documents hidden compaction, title, and summary agents, so disabling only its visible acting tools is insufficient. Its provider configuration supports a proxy base URL. These are implementation inputs, not proof that a particular profile passes confinement. [OpenCode agents](https://opencode.ai/docs/agents/), [provider configuration](https://opencode.ai/docs/providers/)
+
+For each resource, admission remains:
+
+```text
+settled usage + outstanding obligations + proposed reservation <= limit
+```
+
+For a harness generation, the provider adapter establishes:
+
+```text
+token reservation = bounded billable input + bounded billable output
+
+cost reservation =
+    maximum applicable input/cache charges
+  + maximum applicable output/reasoning charges
+  + bounded request fees
+```
+
+The bound includes harness-added context, hidden billable reasoning where applicable, and any cache-write premium. It cannot assume a cache hit. A client timeout, `max-turns` setting, or displayed dollar estimate is not a financial bound.
+
+Input counting must have a documented conservative relationship to provider billing. Where exact counting is unavailable, reserve a defensible provider maximum. If neither input nor output expenditure can be bounded under the provider contract, suspend before dispatch.
+
+Release 1 handles hidden or multiple calls as follows:
+
+| Observation | Required treatment |
+|---|---|
+| Harness attempts an auxiliary call or retry | Gateway denies it before forwarding. The adapter must not silently replace it with a different model request. |
+| Provider receipt supplies complete usage | Settle once from that receipt, preserving its provenance. |
+| Provider receipt supplies partial usage | Settle known components; retain the bound for unknown components. |
+| Output is known, but usage is missing | Record the output and unknown usage. Retain the corresponding obligation. Continuation is permitted only while the remaining budget still covers it. |
+| Harness prints a token/cost total | Retain as harness-reported diagnostics. It cannot establish complete billing coverage or release a reservation. |
+| Observed usage exceeds the bound | Record the real receipt and overrun, then stop further dispatch. |
+| Provider completion is ambiguous | Retain the obligation and suspend execution, regardless of remaining budget. |
+
+Partial settlement must not count expenditure twice. For each component, measured usage replaces its reserved component; an unknown component retains its remaining upper-bound obligation.
+
+If future harness profiles permit multiple upstream requests, each request will require its own durable authorization and accounting identity. A CLI’s final aggregate cannot replace those records. Release 1 rejects such profiles.
+
+Recovery uses the existing lifecycle:
+
+| Interruption point | Recovery |
+|---|---|
+| Authorized harness launch, no upstream authorization | Reconcile the gateway’s durable record. If it proves no upstream dispatch was authorized, revoke the old capability, terminate the old process tree, and restart local preparation under a new epoch. |
+| Upstream dispatch authorized, no durable outcome | Potentially performed. Query only through a verified provider recovery contract; otherwise suspend and retain the reservation. |
+| Provider response durably captured, harness output incomplete | Settle supported usage. Recover output only if the pinned decoder can deterministically reconstruct it from retained bytes; otherwise preserve the incomplete generation. |
+| Complete harness return durably captured | Finish settlement and continuation from recorded bytes. Do not launch the CLI again. |
+| Result already consumed | Restore the committed continuation and advance past it. |
+| Late response or receipt | Append permitted reconciliation. It cannot deliver a second result or move a consumed cursor. |
+
+The gateway durably spools complete provider responses before making their completion available to the harness. The supervisor likewise retains the decoded harness return before delivering it to `step()`.
+
+Cancellation first revokes permission for further dispatch, then terminates the confined process tree. It does not prove that an already forwarded request stopped or became free.
+
+Native `resume`, `continue`, and session IDs are never recovery authority. A transcript identifier is not a provider idempotency key. An explicitly authorized retry without a verified deduplication contract creates a new effect and reservation; the predecessor remains visible.
+
+**Extend §§4 and 6: bindings and authoritative fields**
+
+Keep model and harness selection separate. `[models.actor]` identifies the scientific model assignment; its `harness` field references a shared launcher/profile binding. This avoids duplicating executable and confinement settings across actor and refiner roles.
+
+Add or replace these manifest fragments:
+
+```toml
+[models.actor]
+provider = "openai"
+model = "gpt-5.6-luna"
+harness = "opencode"
+request_options = "sha256:<actor-request-settings>"
+max_input_tokens = 16384
+max_output_tokens = 2048
+fallback = "forbid"
+
+[models.refiner]
+provider = "openai"
+model = "gpt-5.6-luna"
+harness = "opencode"
+request_options = "sha256:<refiner-request-settings>"
+max_input_tokens = 32768
+max_output_tokens = 8192
+fallback = "forbid"
+
+[models.user]
+provider = "openai"
+model = "gpt-5.6-luna"
+request_options = "sha256:<benchmark-user-request-settings>"
+max_input_tokens = 16384
+max_output_tokens = 1024
+fallback = "forbid"
+
+[harnesses.opencode]
+interface = "strive.harness/1"
+backend = "opencode"
+adapter = "sha256:<adapter-code-and-descriptor>"
+executable = "sha256:<executable-and-runtime-closure>"
+version = "1.17.18"
+level = "model"
+launch_profile = "sha256:<arguments-config-environment-and-decoder>"
+sandbox_profile = "sha256:<enforced-process-tree-confinement>"
+model_transport = "broker_gateway"
+native_tools = "none"
+session_policy = "fresh"
+max_provider_requests = 1
+deadline_seconds = 180
+
+[pins]
+# Retain the existing pins; add this explicit shared boundary pin.
+model_gateway = "sha256:<gateway-provider-protocols-and-bound-methods>"
+
+[recovery."model.generate"]
+strategy = "suspend_if_ambiguous"
+native_session_resume = false
+automatic_redispatch = false
+unknown_usage = "retain_reservation"
+
+[recovery."benchmark.tool"]
+strategy = "reconcile"
+require_operation_lookup = true
+
+[budget]
+# Retain explicit funded numeric limits.
+price_schedule = "sha256:<dated-account-specific-price-schedule>"
+includes = [
+  "acting",
+  "refinement",
+  "user_simulation",
+  "dev_evaluation",
+  "validation",
+  "audit",
+  "retries",
+  "adapter_acceptance"
+]
+```
+
+Omitting `harness`, as in `[models.user]`, selects the existing direct trusted provider adapter. The benchmark user simulator has its own role, request settings, evidence scope, and expenditure attribution.
+
+All enabled cost-bearing phases remain chargeable regardless of the list. The campaign wrapper assigns separate development and audit allocations.
+
+Additional schema rules:
+
+- `harness` must resolve to a retained adapter and executable closure. A version string alone is insufficient.
+- Release 1 requires `level="model"`, `native_tools="none"`, `session_policy="fresh"`, and `max_provider_requests=1`.
+- The launch profile includes every effective nonsecret setting that can affect behavior. Resume rejects changed executable bytes or ambient configuration.
+- Provider endpoint, account binding, protocol, prices, and bound method resolve before dispatch.
+- Changing the harness, provider route, model assignment, or confinement profile requires a new run.
+- Seed support is recorded separately for the harness and provider. An unsupported seed does not become a reproducibility claim.
+
+Extend the existing authoritative record groups without introducing harness-specific event families:
+
+| Record group | Additional fields |
+|---|---|
+| Run binding | Harness binding/descriptor, executable closure, launch and sandbox profiles, gateway identity, integration level. |
+| Effect authorization | Harness binding reference, generation envelope, input references, dispatch stage, actual provider-request reference before upstream forwarding. |
+| Effect observation | Process outcome, raw/decoded output references, provider request ID, requested/wire/observed model identities, identity provenance, usage completeness, and gateway reconciliation references. |
+| Measurement | Benchmark upstream revision, split/grouping identity, episode and trajectory identity, reset boundary, and exact reward definition. |
+
+Model identity has three distinct values:
+
+1. **Requested:** the manifest’s provider and model, plus the harness-native identifier such as `openai/gpt-5.6-luna`.
+2. **Wire:** the provider endpoint and model actually dispatched by the gateway.
+3. **Observed:** the model identifier or revision returned by the provider, with its original field and provenance.
+
+A harness echoing `--model` does not establish observed identity. Missing observed identity remains unknown. An alias does not become an immutable model revision. Unexpected identities are retained, further dispatch suspends, and affected comparisons cannot silently retain a matched-model claim.
+
+**Release backends and acceptance**
+
+These are release requirements, not claims that the integrations are implemented or qualified today.
+
+| Backend | Release decision | Binding |
+|---|---|---|
+| **opencode 1.17.18** | Primary reference implementation; ships in release 1. | Headline actor and refiner use `openai/gpt-5.6-luna`. |
+| **codex 0.153.4** | Second reference implementation; ships in release 1. | `gpt-6-astra` is available for funded integration smoke tests, using the verified environment fact. It is not the headline experiment subject. |
+| **Claude Code 2.1.263** | Third conforming adapter; ships in release 1. | A resolved Anthropic model available through the supplied account. No exact model is invented here. |
+| **pi** | Interface-ready only. | Not installed, not tested, and not claimed as a release-1 integration. |
+
+Codex’s documented custom-provider configuration and Claude Code’s noninteractive tool controls provide implementation hooks. They do not replace the outer gateway or sandbox. In particular, Claude’s built-in tool restriction must also be accompanied by removal of MCP access. [Official Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference), [Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference)
+
+Pi later supplies the same descriptor, preparation, invocation, decoding, and reconciliation methods. Its documented tool-disabling controls are useful starting points, but it must pass the same qualification suite. [Pi coding-agent documentation](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)
+
+The acceptance test for a second harness is concrete:
+
+- Freeze the core after the opencode adapter passes.
+- Add codex through an adapter package, retained profile, and manifest binding only.
+- Run identical recorded provider fixtures through both adapters. Verify equivalent typed proposals, accounting, continuation, and recovery.
+- Exercise extra hidden requests, malformed output, missing usage, model mismatch, process crashes, stale results, forbidden file/network access, and attempted tool execution.
+- Complete a funded live smoke test for each backend using an actually available model.
+- Verify that the second integration changed no supervisor, ledger, verifier, command schema, workload adapter, or policy code.
+
+A common model is unnecessary for protocol conformance. Comparing scientific performance across harnesses requires a separate matched study with the harness difference declared.
+
+**Replace §9.4 with the following text**
+
+The reference workload is **the published τ²-bench telecom text task set**, imported from a retained September 2026 revision of `sierra-research/tau2-bench`. Telecom includes a shared environment in which the service agent and simulated user control different tools and state. This directly exercises stateful tool use, communication, and recovery. [τ²-bench paper](https://arxiv.org/abs/2506.07982)
+
+The maintained repository now also contains τ³ additions and task corrections. Strive pins the upstream commit, task bytes, policies, environment code, dependency closure, and evaluator. It identifies the imported telecom text track explicitly and never resolves “latest” on resume. [Maintained benchmark repository](https://github.com/sierra-research/tau2-bench)
+
+The benchmark environment remains trusted workload infrastructure. Candidate actors cannot modify its implementation, task definitions, user scenarios, or scorer. Strive replaces upstream scheduling and model dispatch with its own operation/effect boundary while preserving the selected tasks’ environment behavior and reward criteria.
+
+The operation adapter exposes episode initialization, agent tool calls, user tool calls, message delivery, termination, snapshots, and operation lookup. Every state-changing operation atomically records its effect ID, argument digest, resulting state, and receipt. Repeating an ID with different arguments fails. Snapshots retain both agent-side and user-side state, conversation position, and environment randomness.
+
+The trusted scorer evaluates the actual committed environment and broker-captured interaction history. It preserves each admitted task’s declared deterministic `reward_basis`, including database checks, environment assertions, and deterministic communication checks where specified. It does not replace required criteria with easier checks or use an LLM judge to certify headline success. Import qualification rejects a headline task set requiring unavailable or nondeterministic grading. [Upstream evaluation contract](https://github.com/sierra-research/tau2-bench/blob/main/docs/evaluation.md)
+
+The first campaign uses the 114-task telecom base pool, whose published split contains 74 training tasks and 40 test tasks. Sixty training tasks form development, fourteen form validation, and the forty test tasks form the protected audit. The split, grouping checks, ordering, and access grants are frozen before campaign execution. [Published telecom splits](https://github.com/sierra-research/tau2-bench/blob/main/data/tau2/domains/telecom/split_tasks.json)
+
+This is a continual-adaptation study over published benchmark episodes. Environment state persists throughout each episode and resets at the next task’s published initial state. Actor revisions and explicitly authorized learned memory persist across development episodes. The study does not claim a benchmark-native continuous world or direct comparability with an unmodified leaderboard protocol.
+
+The actor and refiner both use **gpt-5.6-luna through opencode** for the reference campaign. The primary provider route is OpenAI. The simulated user uses a separately bound, brokered Luna generation with a fixed user policy. Its outputs influence the environment through validated user operations; its claims never establish success.
+
+The verified Bedrock route and other models available through opencode are eligible for separately resolved runs. They are not automatic fallbacks. `gpt-6-astra` remains a design/driver model and optional integration-test binding. Harness choice, provider route, model settings, and observed identity are reported separately.
+
+Release 1 includes opencode, codex, and Claude Code adapters under the harness-as-model contract. Pi is deferred. Ambiguous generations suspend unless the pinned provider contract supports stronger recovery.
+
+The bespoke order simulator and sum/max fixtures remain deterministic controls for protocol testing. They are not the headline scientific workload.
+
+**Update §7: benchmark rationale and reference campaign**
+
+The workload choice follows these tradeoffs:
+
+| Candidate | Decision |
+|---|---|
+| **τ-bench / τ²-bench** | Select the telecom text track. Its shared mutable environment exercises both agent and user operations. Retail and airline remain useful later extensions, but their task-level grading requirements must be inspected individually. |
+| **SWE-bench Verified / Live** | Strong later software-engineering workloads with executable evaluation. Repository builds and test environments add substantial integration work before the first durability study. Live also requires freezing its changing task collection. [SWE-bench](https://www.swebench.com/SWE-bench/), [SWE-bench-Live](https://swe-bench-live.github.io/) |
+| **Terminal-Bench** | Strong later test of broad tool execution. It introduces a larger terminal/environment boundary; current 4.0 instructions also require GPU-capable task infrastructure, which is not established on this host. [Official run instructions](https://www.tbench.ai/run) |
+| **GAIA** | Useful for general assistant competence, but less directly targeted at recoverable mutations in a shared environment. [GAIA paper](https://arxiv.org/abs/2311.12983) |
+| **EvoHarnessBench** | Closely aligned with continual adaptation. However, its project currently describes the local environment runner as unreleased. Hosted graders would prevent strive from owning the complete local scoring boundary required here. [Project and availability](https://mas-orchestra.salesforceresearch.ai/evoharness/) |
+
+The split procedure must group tasks by underlying scenario configuration before assigning development and validation. Persona variants or duplicate scenario representations cannot straddle development and audit. Retain the grouping algorithm and resulting IDs. Qualification checks the complete imported task set before freezing the study; metadata inconsistencies stop preparation rather than silently changing its denominator.
+
+For contract A, the fourteen validation tasks remain inaccessible to adaptation and candidate selection. They are available only to separately declared B development runs. The forty audit tasks remain embargoed until campaign freeze. Public task availability does not establish freedom from model pretraining contamination; A establishes campaign information-flow isolation.
+
+Use this campaign:
+
+| Item | Fixed design |
+|---|---|
+| Arms | Fixed initial actor versus actor adaptation; identical actor harness/model bindings and resource ceilings. |
+| Paired repetitions | **8 independent trajectory pairs**, with matched task order, initial states, and user-simulator settings within each pair. |
+| Development horizon | **180 episodes per trajectory:** three passes over the 60 development tasks, using predeclared shuffled orders and fresh episode state. |
+| Adaptation | After episodes 20, 40, …, 160. At most eight refiner generations per adapting trajectory. |
+| Forks | Disabled in the reference comparison. Retention is measured across repeated development exposures. |
+| Selection | Freeze the final valid active actor from every trajectory. No selection of the best seed or checkpoint after inspecting audit results. |
+| Audit | Both arms from every pair receive all **40 audit tasks**, each with **2 fresh user-simulator repetitions**. Actor bundles remain frozen. |
+| Main workload size | **2,880 development episodes + 1,280 audit episodes = 4,160 episodes.** |
+| Pilot | Up to 24 development-only episodes and four refinement generations, charged separately and completed before scientific configuration freeze. |
+
+Each episode permits at most 100 actor generations, 100 user generations, and 400 benchmark transitions. Aggregate episode limits are **512,000 billable input tokens and 32,768 billable output tokens** across actor and user inference. Per-generation limits remain those in the manifest. These are admission ceilings, not expected consumption.
+
+Normal benchmark termination, task failure, budget exhaustion, infrastructure failure, and unresolved execution are distinct outcomes. Hitting a limit does not remove an episode from planned coverage.
+
+Paired user simulations receive matching settings and seeds where supported, but their conversations respond to each arm’s behavior. Do not force identical user transcripts across different agent actions or claim that a seed ensures identical model responses.
+
+The primary development measure is cumulative benchmark successes over the 180-episode horizon, supplemented by pass rate by exposure, retention/regression, expenditure, and coverage. Audit reports success rate and the fraction of tasks succeeding in both repetitions. Audit episodes reset conversational state and writable task memory between tasks; only the frozen imported actor artifacts persist.
+
+Use paired trajectories as the independent units for the adaptation comparison. Audit analysis must account for repeated task identities and multiple evaluations of each frozen bundle. Do not treat 1,280 audit episodes as 1,280 independent learned agents. Report intervals, unresolved-outcome bounds, and all stopped runs. Eight pairs support an initial useful study, not guaranteed power for small improvements.
+
+The scorer must read trusted snapshots and captured interactions. Replaying broker-recorded actions in a separate scorer environment may cross-check state, but candidate-authored transcripts cannot replace the live authoritative state. Termination and scorer aggregation must preserve coverage rather than inheriting upstream exclusions that conceal infrastructure failures.
+
+All user-simulator calls also cross `model.generate`. Strive must not invoke an upstream convenience runner that secretly performs inference, retries whole episodes, or drops failed simulations.
+
+**Extend §9.6: funded ceiling**
+
+Let:
+
+- `E` be the priced upper bound for one episode’s 512,000 input and 32,768 output tokens, including applicable cache premiums and request fees.
+- `F` be the priced bound for one refinement generation’s 32,768 input and 8,192 output tokens.
+
+The campaign allocation is:
+
+```text
+pilot:        24E + 4F
+development:  8 × (2 × 180E + 8F) = 2,880E + 64F
+audit:        8 × 2 × 40 × 2E     = 1,280E
+
+total:        4,184E + 68F
+```
+
+These allocation envelopes do not create duplicate ledger reservations. The supervisor reserves each admitted effect from its phase allocation.
+
+The provider adapter resolves `E` and `F` using dated, account-specific rates and supported billing bounds. Harness diagnostics cannot supply the price schedule. Reconciliation and acceptance-test expenses must also receive explicit allocations.
+
+The pilot estimates expected cost, latency, and token-limit truncation. The conservative envelope establishes admission safety. A serial local host can retain the simulator and journals while hosted models perform inference; this is a multi-day campaign, with actual duration established by the pilot.
+
+The human must supply the funded USD ceiling and protected audit allocation before paid execution. No dollar amount is inferred from model availability. If funding cannot cover the declared plan, revise and freeze the plan before the scientific campaign starts. Later exhaustion produces an incomplete study with full coverage reporting.
+
+A provider overrun remains possible under the existing provider-trust assumptions. Record it and stop dispatch. Strive must not describe admission control as an unconditional guarantee about external invoicing.
+
+**Precise remaining spec deltas**
+
+| Section | Required change |
+|---|---|
+| Opening status | Replace “pending human go/no-go” with teardown authorized, subject to freezing this boundary amendment before implementation. This pass remains design-only. |
+| **§2** | Preserve all five guarantees verbatim. Add the harness enforcement interpretation above. |
+| **§3 architecture table** | Add harness preparation/decoding to pinned adapters; explicitly assign gateway dispatch, confinement, and accounting to the supervisor/broker. |
+| **§3.1** | Insert the two integration levels, interface, and unchanged `step()` mapping. |
+| **§3.3** | Add process-launch versus upstream-dispatch stages, durable gateway spooling, native-session prohibition, and the recovery table. |
+| **§3.4** | Add whole-generation bounds, single-request admission, partial-usage obligations, and rejection of unbounded harness profiles. |
+| **§4** | Extend the existing field groups as listed. Harness logs remain annotations. |
+| **§6.1–6.2** | Add retained harness bindings, gateway pin, model identity provenance, user-model role, and recovery fields. Replace order-specific workload and policy parameters with task/episode parameters. |
+| **§6.3** | Change the example to `strive run tau2-telecom.toml --id actor-17`. Commands otherwise retain their contracts. |
+| **§7.1–7.2** | Replace order streams and fulfilment metrics with the paired episode campaign and benchmark-success metrics above. |
+| **§7.4–7.5** | Include user/device state in snapshots; enforce the 60/14/40 split, duplicate grouping, frozen selection, and separate audit sessions/caches. |
+| **§7.6** | Retain harness configuration, actual provider requests, benchmark revision, user-simulator observations, and both sides of environment state. |
+| **§8.1–8.3** | Show harness identity and launch spans; attribute model cost once. Distinguish supplied context from actual provider requests and requested identity from observed identity. |
+| **§9.4** | Replace in full with the supplied text. |
+| **§9.5** | Explicitly include the entire harness process tree in confinement assumptions. Trusted-host scope remains unchanged. |
+| **§9.6** | Add the campaign and allocation formula. Positive improvement remains unnecessary for release. |
+| **§10.1** | Replace headline order simulation with the tau adapter. Add three bounded harness adapters; defer pi and executor-owned loops. |
+| **§11** | Remove go/no-go and general provider-choice questions. Retain funded ceiling/audit allocation and resolution of account-specific prices and exact available test-model identifiers. |
+
+Insert a new milestone immediately after the effects/accounting/confinement milestone:
+
+> **Qualify replaceable harnesses.** Implement `strive.harness/1`, the model gateway, retained launch profiles, and opencode/codex/Claude Code adapters. Exit requires a second harness added without core changes, blocked hidden requests and tool access, honest missing-usage handling, durable request capture, and fault recovery across every dispatch stage.
+
+Change the stateful-operation milestone to require tau agent/user operations, transactional receipts, snapshots, scorer equivalence against upstream deterministic fixtures, complete task/split qualification, and crash-after-mutation recovery.
+
+The final study remains a release gate under a funded ceiling. This design pass establishes the contract; it does not claim that installed CLI versions have passed confinement tests or that the complete benchmark import has already been qualified.
