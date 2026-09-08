@@ -22,24 +22,30 @@ from strive.contracts import (
     FailureRecord,
     TaskCase,
 )
-from strive.kernel import _attempt_origin
+from strive.kernel import _aggregate_evidence, _attempt_origin
 from strive.contracts import dominant_fault
 from strive.runtime import (
     OP_BEHAVIORAL,
     OP_INFRASTRUCTURE,
     OP_UNKNOWN,
     AttemptRecord,
+    RequestEvidence,
     classify_operation,
     is_behavioral_operation,
 )
 from strive.sandbox import run_strategy
 from strive.sandboxes import SandboxLimits, SandboxProvenance
 
-_PROV = SandboxProvenance(
-    backend="process-fault-only@1", runtime_digest="d", component_digests={},
-    enforced_capabilities=(), mount_policy="none", network_policy="none",
-    limits=SandboxLimits(),
-)
+
+def _prov(tag: str) -> SandboxProvenance:
+    return SandboxProvenance(
+        backend=f"backend-{tag}", runtime_digest=tag, component_digests={},
+        enforced_capabilities=(), mount_policy="none", network_policy="none",
+        limits=SandboxLimits(),
+    )
+
+
+_PROV = _prov("d")
 
 
 def _rec(origin: str) -> AttemptRecord:
@@ -137,3 +143,48 @@ def test_boundary_stamps_candidate_exception_as_a_scored_behavioral_error() -> N
     )
     assert report.ok and report.fault_origin is None
     assert report.outcomes[0].error is not None
+
+
+# -- unified evidence: the dominant fault carries its OWN provenance -------------------------------
+
+
+def _ev(rid: str, *, ran: bool, kind: str | None, origin: str | None, prov: SandboxProvenance) -> RequestEvidence:
+    return RequestEvidence(
+        request_id=rid, ran=ran,
+        failure=None if kind is None else FailureRecord(kind, rid),
+        fault_origin=origin, provenance=prov, wall_time_s=0.0, output_bytes=0,
+    )
+
+
+class _FakeServices:
+    class _Exec:
+        def provenance(self) -> SandboxProvenance:
+            return _prov("executor")
+
+    executor = _Exec()
+
+
+def test_dominant_fault_provenance_is_its_own_not_a_later_case() -> None:
+    # a CANDIDATE fault (prov P1) then a later INFRASTRUCTURE fault (prov P2):
+    # the aggregate must take the DOMINANT (infra) item's failure, origin, AND
+    # provenance — never the last case's provenance for another case's fault.
+    p1, p2, p3 = _prov("cand"), _prov("infra"), _prov("clean-later")
+    evidence = [
+        _ev("op-0", ran=True, kind=FAILURE_CRASH, origin=FAULT_CANDIDATE, prov=p1),
+        _ev("op-1", ran=True, kind=FAILURE_TIMEOUT, origin=FAULT_INFRASTRUCTURE, prov=p2),
+        _ev("op-2", ran=True, kind=None, origin=None, prov=p3),
+    ]
+    failure, origin, provenance = _aggregate_evidence(evidence, _FakeServices())  # type: ignore[arg-type]
+    assert origin == FAULT_INFRASTRUCTURE
+    assert failure is not None and failure.detail == "op-1"  # the dominant item's failure
+    assert provenance == p2  # the dominant fault's OWN provenance, not p3 (last)
+
+
+def test_no_fault_uses_last_ran_provenance() -> None:
+    p1, p2 = _prov("first"), _prov("last")
+    evidence = [
+        _ev("op-0", ran=True, kind=None, origin=None, prov=p1),
+        _ev("op-1", ran=True, kind=None, origin=None, prov=p2),
+    ]
+    failure, origin, provenance = _aggregate_evidence(evidence, _FakeServices())  # type: ignore[arg-type]
+    assert failure is None and origin is None and provenance == p2

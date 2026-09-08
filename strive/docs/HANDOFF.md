@@ -358,19 +358,41 @@ promotion gate.
   shipping `task-suite@1`) replaces the thin `operation_cases(Task)` driver. A
   descriptor receives ONLY a `PolicyVisibleOperationContext` (visible cases +
   seed + task/environment fingerprints), never the full `Task`, and
-  deterministically builds an immutable, CAS-backed `OperationPlan` (descriptor/
-  config identity, opaque manifest, execution regime, projection schema, resource
-  envelope, `all-required`|`partial-allowed` validity). The `plan_ref` is pinned
-  in the `ObserveCurrentState` intent BEFORE issue, so a descriptor/config/plan
-  drift re-derives a different `plan_ref` and is refused on resume. The kernel
-  owns execution/budget/journaling and records DISPATCH→RESULT (protected
-  `AttemptRecord`)→PROJECTION; the descriptor interprets the protected evidence
-  into a SEPARATE policy-visible `OperationProjection` — the ONLY thing policy/
-  review consumes. Matched pre/post review compares only VALID projections under
-  the SAME `plan_ref`. An open dispatch reconciles to `indeterminate`; a crash
-  between result and projection is finished from the durable result (no re-run).
-  (Areas 4 — typed `ReviewDecision`/`ReviseChange` — and 5 — typed model
-  binding/usage — are separate next rounds.)
+  deterministically builds an immutable, CAS-backed `OperationPlan`. The plan
+  embeds a run-level `OperationBinding` — descriptor ref, a REAL `source_digest`
+  (sha256 of the descriptor source + strict config, so source/config drift is
+  detected even WITHOUT a version-label bump; `task-suite-impl@1` is only a
+  label), config, plan/projection schema versions, required surfaces/caps, and
+  the `all-required`|`partial-allowed`(+`indivisible`) validity — plus the
+  environment regime, seed, an opaque manifest, and the resource envelope.
+  - The plan is **validated before issue** (closed validity; seed/task/regime
+    window agree; canonical unique request ids; required surfaces pinned in the
+    run; reservations conservatively cover the manifest) and its `plan_ref` is
+    pinned in the `ObserveCurrentState` intent, so any drift re-derives a
+    different `plan_ref` and is refused on resume.
+  - The kernel owns execution/budget/journaling and records DISPATCH → RESULT →
+    PROJECTION. The protected `AttemptRecord` carries **ordered per-request
+    evidence** (`RequestEvidence`): the aggregate failure, fault-origin, AND
+    provenance all derive from the SAME dominant item (never one request's fault
+    paired with another's provenance), unified across the CandidateExecutor and
+    kernel paths.
+  - The descriptor interprets the protected evidence into a SEPARATE,
+    **operation-neutral** policy-visible `OperationProjection` of `ProjectedOutcome`s
+    (request id, passed, score, summary, error class — no task/integer types), the
+    ONLY thing policy/review consumes (via `policy_visible_operation_view`). The
+    kernel re-derives the projection through the pinned descriptor on resume and
+    requires exact equality; the pure verifier checks coverage/outcome-ids/scores
+    against the plan, so a forged valid/score/coverage is refused.
+  - Policy readers consume only VALID projections from the ACTIVE comparison
+    window (latest `plan_ref`); a regime change starts a new window and never
+    mixes plans. An open dispatch reconciles to `indeterminate`; a crash between
+    result and projection is finished from the durable result (no re-run).
+  - HONESTLY REMAINING: the plan manifest + shipping sandbox executor still run
+    code-over-input (`TaskCase`); the neutral **projection** already supports
+    operation types beyond integer suites (proven by a conformance descriptor),
+    but a fully generic executor for agent turns / tools / env steps is future
+    work. Areas 4 (`ReviewDecision`/`ReviseChange`) and 5 (typed model
+    binding/usage) are separate next rounds.
 - **Truthful review.** The fake trigger mode was removed; auto review compares
   pre/post operation observations (never blindly keeps); `keep` confirms with
   the original rationale; an exhausted `defer` is left UNRESOLVED (unconfirmed);
