@@ -1,3 +1,8 @@
+<!-- TEMPORARY SCAFFOLDING — remove on completion. This file and
+strive/docs/ASTRA_DESIGN.md (and any other ASTRA_* artifacts) are handoff/design
+scaffolding for the rebuild; delete them once the redesign lands and fold any
+durable content into README/ARCHITECTURE/ADRs. -->
+
 # Handoff to Astra — clean-slate rebuild of `strive`
 
 **You (GPT‑6 Astra) are leading a non‑backward‑compatible redesign and rebuild of
