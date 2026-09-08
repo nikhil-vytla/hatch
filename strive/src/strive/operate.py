@@ -30,18 +30,33 @@ surface without touching the kernel; there is no import-time registration.
 
 from __future__ import annotations
 
+import hashlib
+import inspect
 from typing import Protocol, Sequence
 
 from strive.contracts import Evaluation, ExecutionReport, TaskCase
 from strive.runtime import (
     OP_BEHAVIORAL,
+    OperationBinding,
     OperationPlan,
     OperationProjection,
     PolicyVisibleOperationContext,
-    VisibleCaseOutcome,
+    ProjectedOutcome,
 )
 
 OPERATION_SPLIT = "operation"
+
+
+def descriptor_source_digest(descriptor: object) -> str:
+    """The ACTUAL digest of a descriptor's implementation source + its strict
+    config identity. Edits to the descriptor's source change this even without a
+    version-label bump, so drift is detected on resume (the plan_ref changes)."""
+    try:
+        source = inspect.getsource(type(descriptor))
+    except (OSError, TypeError):  # pragma: no cover — source must be available
+        source = type(descriptor).__qualname__
+    config = getattr(descriptor, "config_digest", "")
+    return hashlib.sha256(f"{source}\x00{config}".encode("utf-8")).hexdigest()[:32]
 
 
 class OperationDescriptor(Protocol):
@@ -101,6 +116,19 @@ class TaskSuiteOperationDescriptor:
     validity = VALIDITY_ALL_REQUIRED
     indivisible = False
 
+    def binding(self) -> OperationBinding:
+        return OperationBinding(
+            descriptor_ref=self.name,
+            source_digest=descriptor_source_digest(self),
+            config_digest=self.config_digest,
+            plan_schema_version=self.plan_schema_version,
+            projection_schema_version=self.projection_schema_version,
+            required_surfaces=self.required_surfaces,
+            required_capabilities=self.required_capabilities,
+            validity=self.validity,
+            indivisible=self.indivisible,
+        )
+
     def create_plan(self, context: PolicyVisibleOperationContext) -> OperationPlan:
         from strive.sandboxes import SandboxLimits
 
@@ -115,22 +143,14 @@ class TaskSuiteOperationDescriptor:
         )
         cap = SandboxLimits()
         return OperationPlan(
-            descriptor_ref=self.name,
-            descriptor_impl=self.impl_version,
-            config_digest=self.config_digest,
-            plan_schema_version=self.plan_schema_version,
-            projection_schema_version=self.projection_schema_version,
+            binding=self.binding(),
             seed=context.seed,
             task_fingerprint=context.task_fingerprint,
             regime=context.environment_fingerprint,
             manifest=manifest,
-            required_surfaces=self.required_surfaces,
-            required_capabilities=self.required_capabilities,
             reserved_executions=len(manifest),
             reserved_wall_s=round(len(manifest) * cap.wall_time_s, 6),
             reserved_output_bytes=len(manifest) * cap.output_bytes,
-            validity=self.validity,
-            indivisible=self.indivisible,
         )
 
     def project(
@@ -158,22 +178,27 @@ class TaskSuiteOperationDescriptor:
         # keep their real outcomes.
         floored = plan.indivisible and (incomplete or not behavioral)
 
-        cases: list[VisibleCaseOutcome] = []
+        outcomes: list[ProjectedOutcome] = []
         passes = 0
         for mc in plan.manifest:
             outcome = by_id.get(mc.case_id)
             got = outcome.output if outcome is not None else None
             if outcome is None:
                 error_kind: str | None = "did-not-run"
+                summary = "did not run"
             else:
                 error_kind = _error_kind(outcome.error)
+                summary = f"expected {mc.expected}, got {got}"
             passed = (
                 outcome is not None and outcome.error is None
                 and got == mc.expected and not floored
             )
             if passed:
                 passes += 1
-            cases.append(VisibleCaseOutcome(mc.case_id, mc.expected, got, passed, error_kind))
+            outcomes.append(ProjectedOutcome(
+                request_id=mc.case_id, passed=passed,
+                score=1.0 if passed else 0.0, summary=summary, error_kind=error_kind,
+            ))
 
         if plan.validity == VALIDITY_ALL_REQUIRED:
             valid = behavioral and completed == total and total > 0 and not floored
@@ -192,7 +217,7 @@ class TaskSuiteOperationDescriptor:
             coverage_completed=completed,
             coverage_total=total,
             overall=overall,
-            cases=tuple(cases),
+            outcomes=tuple(outcomes),
         )
 
 

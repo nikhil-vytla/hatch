@@ -75,7 +75,7 @@ _COSMETIC_CODE = (
 )
 _IMPROVED_PROMPT = _SEED_PROMPT + "Signed integers may carry a leading minus.\n"
 
-_FAIL_RE = re.compile(r"FAIL case (\S+?): expected (-?\d+), got (\S+)")
+_FAIL_RE = re.compile(r"FAIL request (\S+?): expected (-?\d+), got (\S+)")
 
 
 def _required_change_id(prompt: str) -> str:
