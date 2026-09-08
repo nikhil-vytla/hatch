@@ -47,6 +47,18 @@ def test_resolved_manifest_requires_recovery_supported_by_pinned_adapter() -> No
         replace(manifest, closure=unsupported)
 
 
+def test_resolved_manifest_requires_suspend_capability_for_suspend_if_ambiguous() -> None:
+    # AUTHORED_TOML sets recovery."model.generate".strategy = "suspend_if_ambiguous";
+    # the pinned adapter descriptor must actually declare the SUSPEND capability.
+    manifest = _resolved()
+    without_suspend = replace(manifest.closure, operation_descriptors=(
+        ResolvedOperation("model.generate", frozenset()),
+        manifest.closure.operation_descriptors[1],
+    ))
+    with pytest.raises(ManifestError, match="unsupported adapter recovery capability"):
+        replace(manifest, closure=without_suspend)
+
+
 def test_resolved_manifest_keeps_harness_and_provider_seed_support_separate() -> None:
     manifest = _resolved()
     actor = manifest.closure.model_resolutions[0]
