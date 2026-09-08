@@ -254,6 +254,25 @@ class OperationCatalog:
         return descriptor
 
 
+def policy_visible_operation_view(view: object) -> list[OperationProjection]:
+    """The FILTERED policy-facing operation view: ONLY the policy-visible
+    `OperationProjection`s, decoded in order. This is the mechanical boundary a
+    policy/review consumes — the protected `AttemptRecord` behind an
+    `operation-result` observation is deliberately absent. `view` is any read
+    with `.bodies` (typed event bodies) and `.read_text(ref)` (a RunView)."""
+    from strive import codec
+    from strive.runtime import OPERATION_PROJECTION
+    from strive.substrate import ObservationRecorded
+
+    bodies = getattr(view, "bodies", ())
+    read_text = view.read_text  # type: ignore[attr-defined]
+    out: list[OperationProjection] = []
+    for body in bodies:
+        if isinstance(body, ObservationRecorded) and body.observation_kind == OPERATION_PROJECTION:
+            out.append(codec.loads(read_text(body.observation_ref), OperationProjection))
+    return out
+
+
 def default_operation_catalog() -> OperationCatalog:
     return OperationCatalog([TaskSuiteOperationDescriptor()])
 
@@ -270,4 +289,6 @@ __all__ = [
     "VALIDITY_ALL_REQUIRED",
     "VALIDITY_PARTIAL_ALLOWED",
     "default_operation_catalog",
+    "descriptor_source_digest",
+    "policy_visible_operation_view",
 ]

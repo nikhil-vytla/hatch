@@ -280,22 +280,236 @@ def test_indivisible_floors_completed_cases_on_a_partial_attempt() -> None:
     assert not any(vc.passed for vc in proj.outcomes)  # completed cases floored
 
 
-# -- policy/review consumes only the projection ---------------------------------------------------
+# -- policy/review consumes only the projection (functional API test) -----------------------------
 
 
-def test_policy_reads_only_the_projection_never_protected_evidence() -> None:
-    # STRUCTURAL proof: the continual-refine policy's operation readers consume
-    # OperationProjection exclusively — they never decode the protected
-    # AttemptRecord or read OPERATION_RESULT.
-    import strive.policies.continual_refine as cr
+def test_policy_facing_view_exposes_only_projections_not_protected_evidence(tmp_path: Path) -> None:
+    # API/conformance proof (not a source scan): the filtered policy-facing event
+    # view exposes ONLY policy-visible projections — the protected AttemptRecord
+    # behind OPERATION_RESULT is not in it.
+    from strive.operate import policy_visible_operation_view
 
-    src = Path(cr.__file__).read_text(encoding="utf-8")
-    assert "OperationProjection" in src
-    assert "OPERATION_PROJECTION" in src
-    # it never DECODES the protected AttemptRecord nor reads the OPERATION_RESULT
-    # observation (those live behind the kernel; only the projection is consumed)
-    assert ", AttemptRecord)" not in src  # no `codec.loads(..., AttemptRecord)`
-    assert "OPERATION_RESULT" not in src
+    run = new_run_id()
+    _drive(tmp_path, run)
+    view = _view(tmp_path, run)
+    facing = policy_visible_operation_view(view)
+    assert facing  # projections are present
+    assert all(isinstance(p, OperationProjection) for p in facing)
+    # every exposed item is a projection; none is a protected AttemptRecord
+    from strive.runtime import AttemptRecord
+    assert not any(isinstance(p, AttemptRecord) for p in facing)
+
+
+# -- conformance: the neutral projection carries a NON-integer operation --------------------------
+
+
+class _AgentTurnDescriptor(TaskSuiteOperationDescriptor):
+    """A conformance descriptor proving the NEUTRAL projection schema carries an
+    operation type beyond an integer task suite: it projects agent-turn-shaped
+    outcomes (string summaries, no integers) without any kernel/runtime schema
+    change."""
+
+    name = "agent-turn@1"
+    config_digest = "agent-turn-config@1"
+
+    def project(
+        self, plan: OperationPlan, *, command_id: str, state_ref: str,
+        report: ExecutionReport, evaluation: Evaluation, origin: str,
+    ) -> OperationProjection:
+        from strive.runtime import ProjectedOutcome
+
+        outcomes = tuple(
+            ProjectedOutcome(
+                request_id=mc.case_id, passed=True, score=1.0,
+                summary=f"turn {i}: tool=search, progress=advanced", error_kind=None,
+            )
+            for i, mc in enumerate(plan.manifest)
+        )
+        return OperationProjection(
+            command_id=command_id, plan_ref="", state_ref=state_ref, origin=origin,
+            valid=(origin == OP_BEHAVIORAL), coverage_completed=len(outcomes),
+            coverage_total=len(plan.manifest),
+            overall=1.0 if origin == OP_BEHAVIORAL else None, outcomes=outcomes,
+        )
+
+
+def test_neutral_projection_supports_non_integer_operations() -> None:
+    task = TASK
+    desc = _AgentTurnDescriptor()
+    plan = desc.create_plan(_context(task))
+    n = len(plan.manifest)
+    outcomes = tuple(CaseOutcome(f"op-{i}", i, None, 1.0) for i in range(n))
+    proj = desc.project(
+        plan, command_id="c", state_ref="s",
+        report=_report(ok=True, outcomes=outcomes), evaluation=_evaluation(n, n),
+        origin=OP_BEHAVIORAL,
+    )
+    assert proj.valid and proj.overall == 1.0
+    # the neutral outcomes are agent-turn-shaped strings — no integer expected/got
+    assert all("tool=search" in o.summary for o in proj.outcomes)
+    assert all(not hasattr(o, "expected") and not hasattr(o, "got") for o in proj.outcomes)
+
+
+# -- source drift WITHOUT a version-label bump refuses resume -------------------------------------
+
+
+class _SourceDriftDescriptor(TaskSuiteOperationDescriptor):
+    """Same name AND same config/version LABELS as task-suite@1, but a different
+    method SOURCE — so its real source_digest differs and drift is detected even
+    without a version bump."""
+
+    def create_plan(self, context):  # type: ignore[no-untyped-def]
+        # behavior-identical to the parent, but the source text differs
+        plan = super().create_plan(context)  # (a source-level change)
+        return plan
+
+
+def test_source_drift_without_version_bump_refuses_resume(tmp_path: Path) -> None:
+    import strive.kernel as kmod
+    from strive.contracts import BudgetSpec
+
+    # the drifted descriptor keeps the SAME name + config label as task-suite@1
+    assert _SourceDriftDescriptor().name == "task-suite@1"
+    assert _SourceDriftDescriptor().config_digest == TaskSuiteOperationDescriptor().config_digest
+    # ...yet its real source digest differs (source changed, no label bump)
+    from strive.operate import descriptor_source_digest
+    assert descriptor_source_digest(_SourceDriftDescriptor()) != descriptor_source_digest(
+        TaskSuiteOperationDescriptor()
+    )
+
+    run = new_run_id()
+    a = _services(tmp_path, run)
+    original = kmod._run_attempt
+
+    def _crash(*args: object, **kwargs: object) -> object:
+        if kwargs.get("gen_prefix") == "operation":
+            raise KeyboardInterrupt("crash during the operation")
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    kmod._run_attempt = _crash  # type: ignore[assignment]
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            _drive(tmp_path, run, services=a)
+    finally:
+        kmod._run_attempt = original
+
+    b = KernelServices.open(
+        tmp_path, TASK, run, seed=7,
+        sandbox_backend="process-fault-only@1", trusted=True,
+        allow_insecure_execution=True,
+        budget=BudgetSpec(model_calls=8, executions=512),
+        operation_catalog=OperationCatalog([_SourceDriftDescriptor()]),
+    )
+    with pytest.raises(KernelError, match="different payload digest"):
+        _drive(tmp_path, run, services=b)
+
+
+# -- plan validation before issue: under-reserved / missing-surface -------------------------------
+
+
+class _UnderReservedDescriptor(TaskSuiteOperationDescriptor):
+    name = "under-reserved@1"
+
+    def create_plan(self, context):  # type: ignore[no-untyped-def]
+        import dataclasses as _dc
+
+        plan = super().create_plan(context)
+        return _dc.replace(plan, reserved_executions=0)  # under-reserves the manifest
+
+
+class _MissingSurfaceDescriptor(TaskSuiteOperationDescriptor):
+    name = "missing-surface@1"
+
+    def binding(self):  # type: ignore[no-untyped-def]
+        from strive.runtime import OperationBinding
+        from strive.operate import descriptor_source_digest
+
+        return OperationBinding(
+            descriptor_ref=self.name, source_digest=descriptor_source_digest(self),
+            config_digest=self.config_digest,
+            plan_schema_version=self.plan_schema_version,
+            projection_schema_version=self.projection_schema_version,
+            required_surfaces=("strategy-code/nonexistent",),  # not pinned in the run
+            required_capabilities=self.required_capabilities,
+            validity=self.validity, indivisible=self.indivisible,
+        )
+
+
+def _drive_with_descriptor(tmp_path: Path, desc: object) -> None:
+    from strive.contracts import BudgetSpec
+
+    run = new_run_id()
+    services = KernelServices.open(
+        tmp_path, TASK, run, seed=7,
+        sandbox_backend="process-fault-only@1", trusted=True,
+        allow_insecure_execution=True,
+        budget=BudgetSpec(model_calls=8, executions=512),
+        operation_catalog=OperationCatalog([desc]),  # type: ignore[list-item]
+        operation_descriptor=desc.name,  # type: ignore[attr-defined]
+    )
+    _drive(tmp_path, run, services=services)
+
+
+def test_under_reserved_plan_is_refused_before_issue(tmp_path: Path) -> None:
+    with pytest.raises(KernelError, match="under-reserves"):
+        _drive_with_descriptor(tmp_path, _UnderReservedDescriptor())
+
+
+def test_plan_requiring_an_unpinned_surface_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(KernelError, match="not pinned in this run"):
+        _drive_with_descriptor(tmp_path, _MissingSurfaceDescriptor())
+
+
+# -- a forged projection (score/passed disagree) is refused ---------------------------------------
+
+
+class _ForgedScoreDescriptor(TaskSuiteOperationDescriptor):
+    name = "forged-score@1"
+
+    def project(
+        self, plan: OperationPlan, *, command_id: str, state_ref: str,
+        report: ExecutionReport, evaluation: Evaluation, origin: str,
+    ) -> OperationProjection:
+        from strive.runtime import ProjectedOutcome
+
+        # FORGERY: claim every request PASSED with a zero score (passed disagrees
+        # with score) and a perfect aggregate — the structural verifier must reject
+        outcomes = tuple(
+            ProjectedOutcome(request_id=m.case_id, passed=True, score=0.0,
+                             summary="forged pass", error_kind=None)
+            for m in plan.manifest
+        )
+        return OperationProjection(
+            command_id=command_id, plan_ref="", state_ref=state_ref, origin=origin,
+            valid=True, coverage_completed=len(outcomes), coverage_total=len(plan.manifest),
+            overall=1.0, outcomes=outcomes,
+        )
+
+
+def test_forged_projection_score_is_refused(tmp_path: Path) -> None:
+    # a projection whose per-outcome passed/score disagree is refused by the pure
+    # structural verifier: the forged append never lands in the journal (only the
+    # dispatch + protected result precede it), and the run's state stays valid.
+    from strive.substrate import ObservationRecorded
+    from strive.runtime import OPERATION_PROJECTION
+
+    run = new_run_id()
+    from strive.contracts import BudgetSpec
+    services = KernelServices.open(
+        tmp_path, TASK, run, seed=7, sandbox_backend="process-fault-only@1",
+        trusted=True, allow_insecure_execution=True,
+        budget=BudgetSpec(model_calls=8, executions=512),
+        operation_catalog=OperationCatalog([_ForgedScoreDescriptor()]),
+        operation_descriptor="forged-score@1",
+    )
+    _drive(tmp_path, run, services=services)
+    view = _view(tmp_path, run)
+    projections = [
+        b for b in view.bodies
+        if isinstance(b, ObservationRecorded) and b.observation_kind == OPERATION_PROJECTION
+    ]
+    assert projections == []  # the forged projection was refused, never journaled
+    assert Substrate.discover(tmp_path, run).verify().ok  # state stays valid
 
 
 # -- plan corruption is refused, not silently run -------------------------------------------------
