@@ -1,0 +1,65 @@
+........................................................................ [ 11%]
+........................................................................ [ 23%]
+............................................FF.......................... [ 35%]
+........................................................................ [ 46%]
+...............................................................xx.x..... [ 58%]
+........................................ssssss..................s....... [ 70%]
+........................................................................ [ 81%]
+..................................................x..................... [ 93%]
+........................................                                 [100%]
+=================================== FAILURES ===================================
+________________________ test_wheel_ships_package_data _________________________
+
+tmp_path = PosixPath('/Users/nikhil/personal/hatch/strive/harness-qualification/.scratch/full/test_wheel_ships_package_data0')
+
+    def test_wheel_ships_package_data(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (2288171) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (2288165) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/Users/nikhil/personal/hatch/strive/harness-qualification/.scr...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:23: AssertionError
+______________ test_installed_console_script_runs_in_isolated_env ______________
+
+tmp_path = PosixPath('/Users/nikhil/personal/hatch/strive/harness-qualification/.scratch/full/test_installed_console_script_0')
+
+    def test_installed_console_script_runs_in_isolated_env(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (2288189) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (2288186) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/Users/nikhil/personal/hatch/strive/harness-qualification/.scr...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:41: AssertionError
+=========================== short test summary info ============================
+SKIPPED [1] tests/vnext/test_harness.py:288: opencode: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted; native profile has not passed a single-request drive
+SKIPPED [1] tests/vnext/test_harness.py:288: codex: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted; native profile has not passed a single-request drive
+SKIPPED [1] tests/vnext/test_harness.py:288: claude-code: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted; native profile has not passed a single-request drive
+SKIPPED [3] tests/vnext/test_harness.py:291: funded live smoke: human must set a budget ceiling, provide a qualified OS jail and explicitly enable a separate funded runner; deterministic CI never uses provider credentials
+SKIPPED [1] tests/vnext/test_harness_gateway.py:203: host denies localhost TCP bind: [Errno 1] Operation not permitted; pipe gateway is exercised by real-process tests
+XFAIL tests/vnext/test_acceptance_contracts.py::test_runtime_integrity_1_confines_candidate_and_harness - Native harness isolation requires tested Seatbelt/container/VM gateway-only network and filesystem jail plus hard memory/storage limits; sandbox_apply is denied here. Candidate and Deno fixture harness permission probes pass.
+XFAIL tests/vnext/test_acceptance_contracts.py::test_runtime_integrity_2_rejects_forged_facts_and_protected_feedback - Complete stateful operation and Complete the research workflow: trusted scorer plus A/B noninterference
+XFAIL tests/vnext/test_acceptance_contracts.py::test_runtime_integrity_4_preserves_mutation_and_unresolved_obligation - Complete stateful operation and Enable adaptation: reconcile mutation, preserve uncertainty, restore only bundle
+XFAIL tests/vnext/test_runtime_sandbox.py::test_production_os_confinement_floor - Production candidate floor needs usable Seatbelt/container/VM with hard whole-process memory and aggregate storage limits; this host denies sandbox_apply
+FAILED tests/test_packaging.py::test_wheel_ships_package_data - AssertionErro...
+FAILED tests/test_packaging.py::test_installed_console_script_runs_in_isolated_env
+2 failed, 603 passed, 7 skipped, 4 xfailed in 753.27s (0:12:33)

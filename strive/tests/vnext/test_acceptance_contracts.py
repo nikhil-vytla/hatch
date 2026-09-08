@@ -333,11 +333,12 @@ class StorageRuntimeDriver:
 
 @pytest.fixture
 def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
-    return StorageRuntimeDriver(tmp_path / "runtime-vnext")
+    from .harness_acceptance import HarnessRuntimeDriver
+    return HarnessRuntimeDriver(tmp_path / "runtime-vnext")
 
 
 @pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="M4 Qualify replaceable harnesses: real harness process-tree isolation; candidate Deno attacks pass in M3, hard OS memory/storage floor remains")
+                   reason="Native harness isolation requires tested Seatbelt/container/VM gateway-only network and filesystem jail plus hard memory/storage limits; sandbox_apply is denied here. Candidate and Deno fixture harness permission probes pass.")
 def test_runtime_integrity_1_confines_candidate_and_harness(future_runtime: RuntimeAcceptanceDriver) -> None:
     evidence = future_runtime.exercise("candidate_and_harness_attempt_credentials_network_storage_and_tool_access")
     assert evidence.candidate_escape_denied and evidence.harness_escape_denied
@@ -351,8 +352,6 @@ def test_runtime_integrity_2_rejects_forged_facts_and_protected_feedback(future_
     assert not evidence.protected_input_variation_changed_adaptive_requests
 
 
-@pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="M4 Qualify replaceable harnesses: real process launch, gateway spooling and upstream recovery; M3 in-process dispatch/continuation fault tests pass")
 def test_runtime_integrity_3_retains_request_and_consumes_result_once(future_runtime: RuntimeAcceptanceDriver) -> None:
     evidence = future_runtime.exercise("crash_before_and_after_launch_forward_return_settlement_and_continuation")
     assert evidence.request_retained_before_dispatch
@@ -372,3 +371,8 @@ def test_runtime_integrity_5_replay_rejects_corruption_without_candidate_imports
     evidence = future_runtime.exercise("fresh_interpreter_replay_with_corrupt_reference_and_unknown_bounded_annotation")
     assert evidence.corrupt_authority_rejected
     assert not evidence.verifier_imported_candidate
+
+
+def test_runtime_integrity_1_candidate_and_fixture_harness_permissions(future_runtime: RuntimeAcceptanceDriver) -> None:
+    evidence = future_runtime.exercise("candidate_and_fixture_harness_enforced_permissions")
+    assert evidence.candidate_escape_denied and evidence.harness_escape_denied
