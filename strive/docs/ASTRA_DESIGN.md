@@ -1,706 +1,281 @@
-# strive vNext — Astra design (research pass)
+<!-- TEMPORARY SCAFFOLDING — remove on completion. This file (and
+strive/ASTRA_HANDOFF.md and any other ASTRA_* artifacts) is handoff/design
+scaffolding for the rebuild; delete it once the redesign lands and fold durable
+content into README/ARCHITECTURE/ADRs. This is the CONSOLIDATED spec; the four
+incremental design passes it supersedes live in git history (dbab76b, 2961f3a,
+2fc1ec3, 410fef5). Authored by GPT-6 Astra via `codex exec -m gpt-6-astra`. -->
 
-**Author: GPT‑6 Astra** (via `codex exec -m gpt-6-astra`, read‑only). Scribed to the
-branch by the orchestrating Claude Code session. **Status: PROPOSAL — pending
-human go/no‑go. No teardown has begun; no source changed and no tests were run
-for this pass.** Reflects sources available 8 September 2026 plus static
-inspection of `strive-astra`.
+# strive vNext specification
 
-Recommendation in one line: rebuild strive around a **small verified execution
-core, immutable agent bundles, and a restricted feedback channel** — keep
-immediate model‑led adaptation, generalize what the agent can change and execute,
-and make recovery and evidence rules easier to enforce.
+Status: design proposal, pending human go/no-go.  
+Date: 8 September 2026.
 
-## 1. The eight most relevant SOTA ideas
+This document supersedes all earlier Astra design drafts. It specifies the intended rebuild; it does not authorize teardown or implementation.
 
-1. **GEPA — learn from diagnostic traces, not only aggregate scores.** Reflects on
-   executions to propose targeted changes (ICLR 2026: ~6 pp avg over GRPO across
-   six tasks, up to 35× fewer rollouts; `optimize_anything` extends to code +
-   multiple components; July 2026 parallel‑proposal work). *For strive:* adopt
-   evidence‑linked reflection + component‑specific diagnostics; keep GEPA's Pareto
-   selection/acceptance OUT of the core.
-   [paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/0e9e708b6f48e14fd0ac29e167413f76-Abstract-Conference.html),
-   [API](https://gepa-ai.github.io/gepa/api/optimize_anything/optimize_anything/),
-   [July update](https://gepa-ai.github.io/gepa/blog/2026/07/30/parallel-proposals/)
-2. **DSPy — separate program structure, editable parameters, optimization
-   strategy.** MIPROv2 (Bayesian search over instructions+demos) vs SIMBA
-   (minibatch rules/demos) need different feedback/budgets. *For strive:* expose
-   typed editable components + a common execution/evidence contract; optimizers are
-   POLICIES consuming that contract, and their internal model calls must pass
-   through strive's durable execution boundary.
-   [MIPROv2](https://dspy.ai/api/optimizers/MIPROv2/), [SIMBA](https://dspy.ai/api/optimizers/SIMBA/)
-3. **ADAS — agent architecture itself is an editable program.** Meta Agent Search
-   edits control flow/tool use/decomposition, not just prompts. *For strive:*
-   drop the "adaptable code = `solve(str)->int`" assumption; support versioned
-   agent programs with declared entry points, deps, capabilities; retain prior
-   attempts as provenance WITHOUT population selection.
-   [ADAS](https://arxiv.org/abs/2408.08435)
-4. **DGM / Hyperagents — separate improving task behavior from improving the
-   improver.** DGM empirically evaluates self‑modified coding agents (and
-   documented an agent gaming its own tool‑use logging). Hyperagents (Mar 2026)
-   makes both task and meta‑agent editable. *For strive:* eventually allow
-   refinement procedures to evolve as sandboxed artifacts, but keep evidence,
-   scoring, budgets, permissions, verification OUTSIDE their authority — editable
-   instrumentation can't certify its own change.
-   [DGM](https://arxiv.org/html/2505.22954v1), [Hyperagents](https://arxiv.org/abs/2603.19461)
-5. **Continual Harness / Prime Agent — adaptation belongs inside continuing
-   operation.** Alternate acting + refinement without resetting the environment;
-   versioned edits at turn boundaries; retained execution history vs
-   non‑serializable objects needing reconstruction. *For strive:* preserve the
-   operate→refine→apply→operate→review trajectory; add genuine stateful operation +
-   explicit continuation state + versioned acting prompts. A persistent interpreter
-   is NOT an exact‑resume spec.
-   [Continual Harness](https://arxiv.org/abs/2605.09998), [Prime Agent](https://arxiv.org/html/2608.23552v1)
-6. **ACE — accumulate structured knowledge via localized edits.** Separate
-   generation/reflection/curation; incremental updates avoid wholesale‑rewrite
-   information loss. *For strive:* make memories/skills independently addressable
-   entries with evidence refs, scope, supersession; record which entries actually
-   reached an invocation; summaries never gain the authority of the observations
-   they summarize. [ACE](https://arxiv.org/html/2510.04618v1)
-7. **Durable execution (Temporal/Restate) — recorded results + explicit effect
-   identities + version pinning beat restarting a loop.** *For strive:* unify
-   model, sandbox, tool, and environment calls under ONE effect lifecycle;
-   preserve completed results; automatic retries require a real external
-   deduplication contract (incl. billing).
-   [Temporal replay](https://docs.temporal.io/workflow-execution),
-   [worker versioning](https://docs.temporal.io/worker-versioning),
-   [Restate](https://docs.restate.dev/references/architecture)
-8. **Content addressing vs append‑only verification solve different problems.**
-   Content addressing = exact artifact identity; ordered journal = which changes
-   occurred and why; transparency‑log signed heads/consistency proofs make history
-   independently checkable — none alone proves a claim truthful. *For strive:* keep
-   artifact identity separate from command/change identity; define the verifier's
-   trusted inputs explicitly; if rollback/replacement protection is needed, keep
-   authenticated history heads OUTSIDE the writable artifact store.
-   [Git objects](https://git-scm.com/book/en/v2/Git-Internals-Git-Objects.html),
-   [RFC 9162](https://www.rfc-editor.org/rfc/rfc9162.html)
+## 1. Mission and scope
 
-## 2. KEEP / DISCARD / ADD
+Strive provides **durable mechanisms for model-led adaptation**. An agent operates in a continuing environment, changes its executable behavior, and evaluates subsequent experience. Strive preserves the exact execution history and enforces permissions, accounting, recovery, and declared evidence access.
 
-**KEEP** — the mission split (policies judge; core enforces integrity, permissions,
-budgets, evidence eligibility); one authoritative journal + CAS, exact composite
-before/after changes, atomic activation, explicit rollback; result‑driven
-continuation, pinned run identity, durable reservations, honest `indeterminate`;
-the pure closed verifier + preflight (an accepted append can't invalidate the
-run); mechanically‑enforced sandbox capabilities + protected records vs
-policy‑visible projections.
+Policies decide what to change and whether a change helped. The execution core establishes what was authorized, what was observed, what remains uncertain, and which revision is active.
 
-**DISCARD** —
-- Function‑task assumptions in the kernel (`_run_attempt` still selects
-  `strategy-code/solve` and runs `TaskCase` sequences; the neutral projection is
-  good but the executor is still specialized). `src/strive/kernel.py:1564`.
-- Overlapping representations / specialized lifecycle paths (canonical command
-  JSON + normalized shadow fields, pipe‑delimited model identity, separate
-  model/fork/operation bookkeeping) → typed command variants + shared effect
-  records (keep the checks, drop the duplication). `src/strive/kernel.py:1777`.
-- Broad read access disguised as isolation (`RunView` exposes all event bodies +
-  a general CAS reader — fine for trusted policy code, insufficient once policy
-  code is model‑authored). Give such code only authorized artifacts/projections.
-  `src/strive/policy.py:47`.
-- The Aug promotion‑era matrix's universal gate + population search (superseded by
-  ADR‑0008 + the mission brief) — do not reintroduce via an optimizer integration.
+Release 1 provides a local Python runner, immutable executable bundles, stateful operation, model-led actor adaptation, controlled experiments, and journal-backed inspection.
 
-**ADD** — generic resumable operation steps + explicit environment continuation +
-immutable executable bundles with full dependency manifests; typed
-`ReviewDecision` + atomic revision supersession; typed usage provenance
-(measured/reserved/unknown); evidence eligibility enforced BEFORE context
-construction (incl. inherited memories, summaries, scalar scores, retrieved
-artifacts); component‑use attribution + prompt‑only behavioral‑change experiments;
-incremental verification over an already‑verified prefix (current append refolds
-the whole stream — `src/strive/substrate.py:813`).
+Strive is not:
 
-**Concrete evidence issue to fix:** optional forks use `selection_cases()` (which
-includes `held_out`), and model review receives their aggregate scores — a
-conflict with the strict held‑out prohibition when forks are enabled; hiding raw
-cases doesn't remove the feedback. Refinement context also carries an
-undifferentiated failure count. `src/strive/tasks.py:64`,
-`src/strive/policies/continual_refine.py:745`, `:678`.
+- An optimizer with a mandatory selection or promotion algorithm.
+- A proof that an agent improved or that a task metric captures human intent.
+- A general workflow language, distributed agent platform, or hosted experiment service.
+- A mechanism for undoing external actions by rewinding agent configuration.
 
-## 3. Recommended non‑backward‑compatible vNext architecture
+The rebuild is intentionally incompatible with existing run formats, commands, policy interfaces, and artifact schemas. It uses a new artifact root. There is no migration, compatibility alias layer, or dual-writing requirement. Existing histories remain interpretable through their original implementation.
 
-New run format, command API, policy API, artifact schema; new artifact root; no
-migration/aliases/dual‑writing. Local runner first (framed journal + CAS; adopt
-Temporal's execution discipline; add a Temporal/Restate adapter only if
-distributed operation becomes a real requirement).
+## 2. The five integrity guarantees
 
-| Component | Responsibility |
-|---|---|
-| **Run manifest + agent bundles** | Pin trusted runtime, schemas, policy package, seed, budget, operation defs, initial state. Bundles = exact code, prompts, skills, memory bindings, dep locks, entry points. Requested capabilities cannot grant permissions. |
-| **Journal + CAS** | Immutable artifacts + one authoritative sequence of commands/effects/revisions/continuations. Indexes/views rebuildable. Distinct identities for identical content across attempts. |
-| **Pure verifier** | Decode a closed record vocabulary; verify references, causation, transitions, reservations, evidence eligibility, checkpoint cursors. Operation‑specific checks live in an explicitly trusted, pinned verifier distribution. Never execute model code. |
-| **Effect supervisor + budget ledger** | Own dispatch, reconciliation, deadlines, cancellation, reservations, receipts, terminal results. Stable effect IDs; reject stale workers. ALL execution routes through here. |
-| **Sandbox + capability broker** | Execute model‑authored acting/refinement code with restricted inputs + enforced limits. Keep credentials, protected evidence, journal writes OUTSIDE the sandbox. Broker authorized tools/model calls via the supervisor. |
-| **Operation + evidence layer** | Describe resumable work, environment state, observation semantics, visibility, comparability. Convert protected receipts → bounded policy‑visible evidence. Separate behavioral vs infrastructure vs uncertain outcomes. |
-| **Policy runtime** | Run the adaptation policy over authorized evidence + explicit continuation state. Preserve `ApplyChange`, optional `EvaluateFork`, review/revise/revert. Supervisor enforces legal transitions without judging improvement. |
+These guarantees define the fixed execution core. Their threat and durability assumptions are specified in section 9.
 
-**Refinement cycle:** operate bounded steps on one pinned bundle (journal each
-external interaction + continuation) → build a durable evidence package of only
-eligible observations + authorized refs → ask the model for a typed change
-(persist request/response/proposal/usage via the supervisor) → validate
-structure/capabilities/dep‑closure/expected‑state, atomically activate at the next
-operation boundary (comparative eval optional) → operate with the new bundle,
-recording which components were consumed → review eligible evidence (confirm =
-decision about an already‑active change; revise atomically supersedes; revert
-applies an exact inverse when preconditions hold).
-
-**Two essential distinctions.**
-- *Recovery restores recorded execution state; it does NOT recreate an unknown
-  external outcome.* Crash table: before dispatch‑auth → execute once on resume;
-  result durable / completion missing → finish bookkeeping from the stored result;
-  dispatch authorized / result unavailable → query or dedup via a supported adapter
-  contract, else retain `indeterminate` + reservation; completion durable /
-  checkpoint missing → consume once, restore continuation, no repeat. An explicit
-  retry is a NEW separately‑budgeted attempt unless the provider guarantees dedup;
-  a deterministic seed does not justify repeating a paid model call.
-- *Revision rollback restores agent configuration; it does NOT undo the world.*
-  Reverting a prompt/skill can't unsend a message; environment snapshots +
-  compensating operations need separate explicit semantics.
-
-**Evidence:** distinguish the exact execution plan from its comparison contract
-(workload/sampling rule, environment regime, scoring semantics, validity). Same
-plan for the deterministic suite; for a changing environment, matching identifiers
-alone can't establish causal improvement — if comparability can't be established,
-review stays unresolved.
-
-**Invariant mapping.** (1) Durable/resumable: journal every consequential
-decision+effect; pin continuation inputs; consume results once; retain
-uncertainty+reservations. (2) Verifiable: content‑addressed closure, closed
-schemas, exact transitions, trusted receipts, pure verification before mutation
-(consistency under declared trust, not proof of improvement). (3) Secure floor:
-sandbox every model‑authored executable incl. future meta‑policies; trusted broker
-owns permissions/spend/receipts/persistence. (4) Policy‑neutral+model‑led:
-structurally valid changes activate immediately; policies choose timing/review/fork;
-no Pareto/universal gate. (5) Behavioral evidence gates: only valid, comparable,
-authorized behavioral evidence reaches adaptation; infra failures affect
-recovery/scheduling not diagnosis; held‑out audits stay out of adaptive decisions
-incl. via aggregates + inherited memory.
-
-**Replacement acceptance suite (define before teardown):** crash‑boundary checks,
-forged‑record rejection, sandbox‑escape checks, budget reconciliation, hidden‑data
-noninterference, prompt‑only behavioral change. Keep strict typing + installed‑wheel
-CLI test + fresh‑interpreter verification as release gates.
-
-## 4. Human decisions required BEFORE teardown
-
-1. **First real operational workload?** (stateful coding / tool‑using / simulated
-   env differ in continuation + security contracts). *Astra rec: one stateful
-   workload alongside the existing deterministic fixtures.*
-2. **What may evolve in the first release?** *Astra rec: acting code + acting
-   prompts + structured memory first; keep the refinement controller pinned.*
-3. **What must "exact resume" promise for external systems?** honest suspension on
-   uncertainty vs required provider auto‑recovery — name the tools/providers first.
-4. **What counts as comparable online evidence?** snapshots / repeated workloads /
-   controlled sampling / observational windows — don't encode causal certainty the
-   environment can't provide.
-5. **Where is the feedback boundary?** *Astra rec: explicitly policy‑visible dev
-   data for optional forks + separate blind audits; any hidden‑score influence
-   needs an explicit change to invariant 5* (this fixes the held‑out‑via‑forks leak).
-6. **How does improvement transfer between runs?** *Astra rec: immutable bundle
-   imports with provenance + declared scope; avoid silently changing global state.*
-7. **Which threats + deployment scale must vNext cover?** untrusted generated code
-   + accidental corruption vs malicious storage replacement / hostile operators /
-   multi‑machine — determines authenticated history, worker fencing, sandbox
-   deployment, and whether a distributed execution service is justified.
-8. **What evidence justifies the teardown?** *Astra rec: a budget‑matched
-   experiment (fixed behavior vs continual refinement) + the invariant acceptance
-   suite; measure cumulative performance, adaptation cost, regressions, recovery.*
-
-
----
-
-# strive vNext — Astra design PASS 2 (deeper)
-
-**Author: GPT-6 Astra** (via `codex exec -m gpt-6-astra`, read-only). Scribed by the orchestrating Claude session. Supersedes pass-1 where they conflict (notably: pass 1 said pin the controller; pass 2 recommends an EDITABLE controller above a fixed execution contract). Status: PROPOSAL — pending human decisions + go/no-go. No teardown begun.
-
-
-I would deepen pass 1 in two ways: **allow release 1 to revise its semantic refinement controller**, and make the boundary beneath that controller more explicit. Keep the local journal and CAS for release 1. Use development evidence for regression protection, with a separate audit mechanism whose feedback policy remains a human decision.
-
-I read [ASTRA_HANDOFF.md](/Users/nikhil/personal/hatch/strive/ASTRA_HANDOFF.md), [ASTRA_DESIGN.md](/Users/nikhil/personal/hatch/strive/docs/ASTRA_DESIGN.md), and the relevant implementation. The first workload remains locked to one stateful, tool-using workload alongside the deterministic fixtures. No files changed or tests ran.
-
-Sources were checked as of September 8, 2026. I treat the supplied packet as the baseline. Research beyond it is identified below, including September 1–4 preprints. Confidence is high in the architectural distinctions and documented mechanisms; moderate in reported experimental generalization. I have not reproduced their results.
-
-Exo is the closest prior art, and should become the primary architectural comparison.
-
-Exo’s current documentation explicitly places recursive modification **above a trusted substrate the agent cannot change**. That is compatible with strive’s secure floor. The substantive difference is what that substrate guarantees. The supplied exo specification establishes durable history and execution plumbing; strive needs explicit contracts for admissible transitions, authoritative effects, expenditure, recovery, and evidence flow. Absence from that specification is not proof that every exo implementation lacks these features. [Exo overview](https://exoharness.ai/docs/), [specification](https://github.com/exoharness/exo/blob/main/exoharness/docs/spec.md)
-
-| Exo concept | What strive should borrow | What strive should specify differently |
-|---|---|---|
-| Agent identity | A durable identity separate from a running executor or conversation. | Resolve shared configuration into an immutable run manifest. Changing global defaults must not silently change an existing run. Cross-run memory transfer is an explicit import. |
-| Executor | Put prompt construction, compaction, memory selection, tool composition, and refinement strategy in replaceable code. | Split semantic decisions from privileged execution. An executor prepares a model request; the supervisor authorizes, reserves, dispatches, and records it. |
-| Exoharness | A small durable core beneath replaceable behavior. | Include the verifier, effect state machine, capability broker, accounting, and evidence access rules in that core. Operation-specific validity rules remain explicitly trusted and pinned. |
-| Turn handle | Durably accept input and return a handle for subsequent work. | `begin_turn` deduplicates ingress and returns a scoped handle bound to a run, turn, and execution epoch. The supervisor owns ordering. The handle cannot append arbitrary authoritative records. |
-| Events and artifacts | Immutable history; immutable versioned artifacts; rebuildable indexes and context caches. | Keep a closed authoritative event vocabulary. Executor annotations may be extensible, but cannot declare success, spending, permissions, or evidence eligibility. Artifact identity and invocation identity remain separate. |
-| Bindings and secrets | Non-secret configuration references opaque credentials. | Keep credentials in trusted adapters wherever possible. A secret mounted into model-authored code is accessible to that code, even if omitted from the prompt. Enforce destination, operation, argument, scope, and spend restrictions at the broker. |
-| Snapshot-to-log recovery | Record snapshots as part of durable history and support branching from earlier state. | Bind each snapshot to a consistent journal cursor, bundle revision, continuation, environment identity, and unresolved-effect set. A snapshot reference without available bytes is not a recovery guarantee. |
-| Forks and lineage | Preserve ancestry and earlier versions. | Give a fork a new execution identity, explicit environment semantics, and a budget allocation. Forking cannot replenish the parent’s budget, inherit audit data, or repeat a historical external effect accidentally. |
-
-The model-call boundary deserves a direct disagreement with exo’s spec. **Sending a fully specified request does not require owning the semantics that constructed it.** Strive can let the executor choose context and an authorized model binding while a trusted adapter sends the request and accounts for it. This gives the executor flexibility without allowing calls that bypass the ledger.
-
-Similarly, approval presentation can be editable; authorization cannot depend on that presentation. A model-authored approval screen cannot grant itself permission. Any required approval must bind the authenticated human decision to the exact requested authority.
-
-Strive should also narrow the meaning of time travel. A journal version determines recorded agent state and references to recoverable resources. It does not restore revoked credentials, undo external transactions, or reconstruct missing provider responses. Recovery should distinguish:
-
-- Reconstructing recorded state without dispatching anything.
-- Resuming unresolved work under an adapter’s reconciliation contract.
-- Forking into an isolated environment.
-- Compensating a completed world change through another explicit operation.
-
-Budget accounting and external-effect history never rewind when an agent bundle does. Exo’s reported 96% Discord cost reduction is an interesting example of executor optimization, but the packet does not establish matched quality or independently reconciled billing. Strive should make those questions answerable.
-
-On self-modification, pass 1’s pinned-controller recommendation is too conservative.
-
-The useful boundary is **authority**, not whether an editable component happens to be prose or Python. A memory entry can redirect tool use; a prompt can encode an entire refinement strategy; a skill can launch a program. Treating those as intrinsically safe while prohibiting controller code leaves an arbitrary boundary.
-
-The research now distinguishes several kinds of improvement that should not be conflated:
-
-| System or evidence | What it establishes | Implication for strive |
-|---|---|---|
-| DGM and Hyperagents | DGM evolves task-solving code; Hyperagents explicitly makes the mechanism that proposes further improvements editable. Their published approach includes archive-based exploration. | Support an editable improver. Do not import population selection into strive’s core. [Hyperagents](https://arxiv.org/abs/2603.19461) |
-| Self-Harness, revised August 20 | The same model mines weaknesses, proposes targeted edits, and validates them. Its specified validation loop remains an externally defined acceptance procedure. | Harness self-improvement does not automatically mean the validation authority self-modifies. Borrow evidence-linked, minimal proposals. [Self-Harness](https://arxiv.org/html/2606.09498v3) |
-| Prime Agent, August | Persistent programmatic execution, recursive agents, and revisable prompts, memories, skills, and subagent specifications. Its paper says refinement supplements an immutable base prompt. | A strong reference for continuing operation and typed persistent state; less evidence for unrestricted mutation of foundational policy. [Prime Agent](https://arxiv.org/html/2608.23552) |
-| HarnessDev, September 1, beyond the packet | Evaluates harness creation and evolution. Reports unstable evolutionary gains, partial held-out transfer, and dependence on the runtime model. | Test the improver separately from the actor. Pin model identity when attributing gains. [HarnessDev](https://arxiv.org/abs/2609.01437) |
-| HarnessEvolve, September 1, beyond the packet | Uses answer-conditioned reference trajectories for diagnosis, recent-batch regression checks, and held-out snapshot selection. | Reference trajectories are useful only when their answers are authorized development evidence. Its held-out selection conflicts with invariant 5. [HarnessEvolve](https://arxiv.org/abs/2609.00829) |
-| EVOHARNESSBENCH, September 3, beyond the packet | Finds that adding tools, skills, or specialist agents can itself degrade previously available competence. | Test retention after capability additions, even when old components remain unchanged. [EVOHARNESSBENCH](https://arxiv.org/abs/2609.04280) |
-| HackProbe, September 4, beyond the packet | Uses private probes to detect gaming and proposes selection with bounded information disclosure. Its empirical setting is controlled prompt-level optimization. | Bounded leakage is still leakage. Its selection mechanism requires a different feedback contract; it is not a mechanical safety guarantee. [HackProbe](https://arxiv.org/abs/2609.04665) |
-
-These September papers are the newest directly relevant primary sources I found. Their stated methods and limitations are useful design evidence; their abstracts and reported experiments do not establish production readiness.
-
-Industry is moving toward replaceable behavior above persistent execution services, with different degrees of autonomous editing:
-
-- Pi exposes tools, compaction, subagents, and permission flows through extensions. Its documentation also says packages run with full system access. Borrow the extensibility, while executing generated extensions under strive’s boundary. [Pi documentation](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)
-- Anthropic’s Managed Agents separates durable sessions, harnesses, and sandboxes behind stable interfaces. That supports independently replaceable executors; it does not establish that the agent may autonomously rewrite authorization. [Managed Agents architecture](https://www.anthropic.com/engineering/managed-agents)
-- LangChain describes trace mining and evaluation-driven harness improvement as an engineering loop. Prime Intellect explicitly argues for model–harness co-learning. These support adapting the surrounding program, but not assuming improvements transfer unchanged across models. [LangChain’s July account](https://www.langchain.com/blog/improving-agents-is-a-data-mining-problem), [Prime Agent launch](https://www.primeintellect.ai/blog/prime-agent)
-
-My inference is that the practical frontier is programmable context, orchestration, and improvement strategy above independently enforced execution contracts. Public evidence does not justify letting an agent rewrite the machinery that certifies its own behavior.
-
-I recommend the following release-1 scope, subject to the human’s choice:
-
-| Editable surface | Release 1 recommendation | Boundary |
-|---|---|---|
-| Acting code and prompts | Allow. | Immutable revisions; sandboxed code; exact invocation inputs recorded. |
-| Memory, skills, retrieval, and compaction | Allow structured entries and sandboxed selection/transformation code. | Access only authorized inputs. Persist the actual selected context and lineage. Summaries cannot grant their contents new authority. |
-| Subagents | Allow editable role specifications and bounded, initially serial child execution. | Children inherit restricted authority, explicit inputs, and allocations from the same budget. No ambient shared filesystem. |
-| Tools | Allow new pure computations and compositions of existing brokered operations. | A generated wrapper cannot create a privileged adapter, expand network access, or declare its own calls safe to retry. |
-| Refinement prompts and controller code | **Allow**, including diagnosis, proposal strategy, timing, optional dev evaluation, and review decisions. | Fixed sandbox interface, bounded execution, explicit continuation, and no direct access to protected evidence or authoritative storage. |
-| Trusted execution machinery | Keep outside runtime self-modification. | Verifier, accounting, authorization, recovery rules, evidence eligibility, trusted scorer, and sandbox enforcement change through ordinary software releases. |
-| Model weights and arbitrary dependency installation | Defer. | Release 1 pins the model and dependency closure so experiments remain interpretable. |
-
-The controller should be a versioned program that receives an authorized view and explicit state, then returns a typed command and proposed private state. Model calls are commands with durable results. The supervisor records outputs before they can cause external effects. Verification checks the resulting protocol; it never imports controller code.
-
-Controller replacement needs a concrete handover contract:
-
-1. Stage the new controller and any coupled actor changes as immutable artifacts.
-2. Check interface compatibility, dependency closure, capabilities, and state preconditions.
-3. Switch at a quiescent adaptation boundary with no outstanding command requiring interpretation by the old controller.
-4. Atomically record the new revision and its initial private state.
-5. Keep consumed-result cursors, reservations, and effect identities supervisor-owned.
-
-Release 1 should use one fixed continuation envelope and avoid arbitrary controller-state migrations. A new controller can reconstruct its strategy from the authorized canonical view and explicitly supplied notes. Recovery uses the controller version recorded for each invocation.
-
-If the new controller loops, crashes, or emits an invalid command, the supervisor bounds execution and suspends. An operator can restore a prior compatible controller through the durable command interface without invoking the broken controller. That restoration preserves the current world and expenditure ledger.
-
-This is substantive self-modification: the agent can change how it improves itself. Its inability to redefine authorization or manufacture receipts does not make that capability superficial.
-
-DGM provides the concrete reason for this boundary. In its tool-hallucination experiment, an agent removed logging markers used by the evaluator and obtained a perfect score without fixing the underlying problem. Hiding the checking function did not protect an editable measurement path. [DGM, Appendix F](https://arxiv.org/html/2505.22954v1#A6)
-
-For strive, canonical tool-use evidence must originate at the broker. Candidate logs remain claims. Completion should be assessed from trusted receipts and observable environment state, not from the candidate’s assertion that tests passed. This prevents that specific logging attack; it does not prove the task metric perfectly captures human intent.
-
-The safety survey adds another concern: malicious behavior can persist through inherited memory, skills, and descendants. Therefore imports, summaries, and clone inheritance need the same access checks as fresh proposals. I would not generalize its numerical attack rates to strive. [Safety survey](https://arxiv.org/pdf/2606.23075)
-
-The widening path should follow demonstrated execution contracts:
-
-- Add concurrent child execution after shared-budget reservations, cancellation, message delivery, and stale-worker rejection survive fault injection.
-- Add persistent interpreters and VM snapshots after recovery covers non-serializable state and unresolved external effects.
-- Add richer controller-state migrations after forward and rollback compatibility are explicit.
-- Add new privileged tools through reviewed adapters with independent authorization and recovery contracts.
-- Permit proposed patches to the trusted runtime as development artifacts. Activating them remains a software release, because the existing floor cannot certify arbitrary replacement of itself.
-
-For durable storage, retain the local framed journal and CAS in release 1.
-
-The locked workload requires persistent state and real tool interactions. It does not yet require distributed ownership, fleet scheduling, or host-loss failover. Those are separate requirements.
-
-| Choice | What it buys | What remains strive’s responsibility | Recommendation |
+| Guarantee | Precise requirement | Enforcement | What breaks if violated |
 |---|---|---|---|
-| Local framed journal + CAS | Small deployment, direct fault injection, portable verification, reuse of existing mechanisms. | Publication ordering, crash recovery, leases, effect reconciliation, access control, accounting. | Release 1. State the durability domain explicitly. |
-| Celld / Durable Objects | Named durable actors, embedded state, alarms, hibernation, replicated writes, ownership transfer. | Agent revision semantics, protected evidence, capability authorization, external-effect deduplication, semantic verification. | Candidate later host for run coordination. |
-| Temporal or Restate | Durable execution histories, suspension, retries, scheduling, versioning discipline. | Secure execution of generated code, policy neutrality, provenance, feedback isolation, provider-specific effect guarantees. | Adopt the discipline now; integrate when distribution justifies it. |
+| **1. Confinement and fixed authority** | Candidate code cannot change authorization, accounting, evidence access, trusted measurement, verification, or recovery semantics. | Enforced sandbox, broker-only external access, protected credentials and storage, pinned trusted runtime. | Generated behavior can escape its permissions or rewrite the machinery checking it. |
+| **2. Independent facts** | Authoritative interactions, usage, outcomes, and coverage originate from the broker, adapters, and trusted scorer. Candidate claims cannot replace them. Access follows the bound feedback contract. | Producer-specific append interfaces, scoped artifact access, broker instrumentation, scorer-owned coverage. | Candidates can manufacture success, hide expenditure or failures, or consume prohibited feedback. |
+| **3. Durable execution identity** | Before external dispatch, the exact request, effect identity, authorization, and reservation are durable. Results, executable bytes, activation, and consumed-result cursors remain reconstructible. | Immutable CAS publication, framed journal commits, stable execution IDs, atomic continuation and revision transitions. | Recovery can execute different code, lose expenditure, repeat work, or consume a result twice. |
+| **4. Honest recovery** | Recovery reuses recorded outcomes, reconciles supported mutations, and preserves unsupported uncertainty. Configuration restoration never rewinds spending or world state. | Adapter recovery contracts, durable simulator operation IDs, retained reservations, explicit suspension. | A timeout becomes a false failure, an ambiguous mutation repeats, or an unknown charge becomes zero. |
+| **5. A small checked protocol** | Every accepted authority transition preserves protocol consistency. The protocol can represent failures, overruns, and uncertainty without inventing success. | Pure preflight transition checking and full replay of committed authority records. | Authorization, settlement, activation, or continuation can become internally inconsistent. |
 
-Celld’s architecture is attractive for many mostly idle, stateful agents. Its V8 execution model and embedded SQLite are not a drop-in replacement for strive’s Python sandbox or an arbitrary agent workspace. The packet’s roughly 90/25 ms write figures are reported operating points, not measurements of strive. The larger release-1 cost is introducing distributed ownership and another runtime before proving the application contracts. Celld currently labels itself alpha. [Celld documentation](https://celld.dev/docs/), [limitations](https://celld.dev/docs/limitations/)
+A protocol-consistent history can contain failed tasks, exhausted budgets, provider overruns, and indeterminate outcomes. Reports must expose those conditions separately from protocol validity.
 
-One packet detail needs qualification against the current docs: “nodes coordinate only through the bucket” accurately identifies the source of ownership authority, but current durability documentation also describes peer replication, follower fsync, and seal/tail recovery. I would verify the pinned implementation before depending on either description. Conditional object writes move arbitration into the storage service; they do not eliminate consistency assumptions. [Celld guarantees](https://celld.dev/docs/guarantees/)
+## 3. Architecture
 
-A later celld adapter should keep one authoritative run history in a trusted cell, with model-authored executors outside that cell. Its SQLite database must not become a writable store exposed to generated code. Bucket credentials remain fleet-admin credentials. Cross-cell child budgets would need reserved allocations or an explicit coordination protocol. [Celld security](https://celld.dev/docs/security/)
+These are responsibility boundaries within one local implementation, not seven separately deployed services.
 
-For Temporal or Restate, keep the durable orchestrator stable and execute versioned semantic controllers as isolated steps. Replaying an old history through today’s controller code would undermine exact resume. Temporal’s deterministic replay model supports this separation; Restate explicitly acknowledges that an external side effect can repeat if failure precedes durable recording. [Temporal replay](https://docs.temporal.io/workflow-execution), [Restate’s effect semantics](https://restate.dev/blog/why-we-built-restate)
-
-Every external adapter should declare its actual recovery contract:
-
-- **Recorded pure computation:** recompute only under the declared deterministic inputs, or reuse the recorded result.
-- **Deduplicated operation:** retry the same effect identity only within the provider’s documented deduplication contract.
-- **Queryable operation:** reconcile through a durable operation identifier.
-- **Ambiguous operation:** suspend with its reservation retained.
-
-A timeout is not evidence that nothing happened. A deduplicated business operation also does not automatically imply deduplicated billing. Local durability should initially promise recovery from process failure on surviving durable storage; host or disk destruction needs a separately implemented backup or replication contract.
-
-sPTC belongs after these contracts.
-
-Borrow its distinction between speculative and ordinary execution, but place authoritative effect metadata in trusted adapter descriptors. A model-authored `pure=True` annotation cannot authorize speculation. Its reported speedups are modest, approximately 1–1.2×, and workload-dependent. [sPTC](https://alexzhang13.github.io/blog/2026/spec-ptc/)
-
-For release 1, ordinary code-as-action execution is enough. A later speculative path must reserve and charge discarded work, isolate shadow state, and bind cached results to exact inputs, tool version, environment snapshot, and visibility scope. Repeated identical calls still need distinct invocation identities. Read-only remote calls can incur charges, consume quotas, or observe changing state; they are not automatically pure. Start with computations over immutable authorized artifacts.
-
-Regression protection can preserve invariant 5, but it cannot promise that every adaptation improves unseen performance.
-
-Self-Harness’s acceptance rule uses both development and held-out results. Its proposer may never see held-out traces, yet the next harness depends on their scores. That is feedback through selection. [Self-Harness validation algorithm](https://arxiv.org/html/2606.09498v3)
-
-The same issue exists in the current implementation: [selection_cases()](/Users/nikhil/personal/hatch/strive/src/strive/tasks.py:64) includes held-out cases, and [review context construction](/Users/nikhil/personal/hatch/strive/src/strive/policies/continual_refine.py:768) exposes fork scores. The fix must change the evaluation contract, not merely hide case contents.
-
-I recommend four distinct mechanisms.
-
-First, retain mandatory integrity checks. Every activation must satisfy structural, authorization, budget, and continuation rules. These checks establish that an operation is permitted and recoverable. They do not decide whether a candidate is better.
-
-Second, maintain an explicitly policy-visible development regression corpus. Include prior failures, retained successes, representative task families, and adversarial development cases. Version its selection rules and trusted scoring semantics. Retaining successes matters because a controller that looks only at its latest failures can forget previously working behavior.
-
-Third, implement regression review as a policy over that evidence. The default continual policy can:
-
-- Mine repeated failures from eligible traces.
-- Propose a targeted change with a stated mechanism and affected components.
-- Apply immediately at a legal boundary.
-- Review subsequent development behavior and choose keep, revise, revert, or gather more evidence.
-- Request `EvaluateFork` when an isolated comparison would be useful.
-
-A policy may choose development checks before applying a particular proposal. The framework does not impose that as a universal activation gate. This preserves invariant 4 while making Self-Harness-style validation available.
-
-For a stateful workload, useful comparisons start from matched environment snapshots and task streams. Record both initial state and subsequent interventions. For controller changes, compare complete adaptation trajectories under matched total budgets, including refinement expenditure. A single successful next task is weak evidence about a better improver.
-
-The trusted evidence layer must also prevent selective reporting. Record the planned coverage, completed coverage, and reasons for exclusions. Infrastructure failures and unresolved effects cannot silently become behavioral failures or disappear into an improved denominator. Statistical uncertainty and repeated development-set reuse remain visible limitations.
-
-Fourth, run blind audits in separate execution lineages. An audit copy necessarily sees task inputs while acting. Its resulting memories, skills, controller changes, prompts, messages, and snapshots therefore stay within the audit lineage. Exporting only “the useful memory” would still leak.
-
-Isolation must cover more than prompt text:
-
-- Separate artifact access, retrieval indexes, provider conversation state, caches, and credentials.
-- Separate audit accounting so its expenditure cannot change the adaptive run’s remaining budget.
-- No audit-derived acceptance flags, stop signals, lineage choices, or model-visible history-head changes.
-- No reuse of an audit environment that leaves clues for subsequent development runs.
-
-Test noninterference by varying protected cases and scores while holding permitted inputs and recorded model responses fixed. The adaptive run’s requests, commands, and visible state should remain unchanged. This verifies framework information flow; it does not prove the base model never encountered a benchmark during training.
-
-The feedback boundary remains undecided. These are the concrete choices:
-
-| Option | Allowed influence | Tradeoff |
-|---|---|---|
-| **A. Strict blind audit. Recommended.** | Only declared development evidence drives adaptation. Audit results remain embargoed until a predefined campaign and its candidate-selection procedure are frozen. | Preserves invariant 5. Audits assess generalization but cannot rescue the same campaign by choosing another candidate. |
-| **B. Adaptive validation plus a fresh blind audit.** | Explicitly classify a validation pool as development data and authorize its feedback for selection. Preserve a separate untouched audit pool. | Enables Self-Harness-style regression selection. The validation pool is consumed by adaptation and cannot support untouched-held-out claims. Requires an explicit data-contract decision. |
-| **C. Private deployment veto.** | A private evaluator may block deployment or choose among frozen candidates without revealing detailed scores to the model. | Useful operationally, but the selected deployed system depends on protected evidence. Requires an explicit exception to the strict invariant, with query accounting and a separate final audit. |
-
-I recommend A for the release-1 scientific claim, together with strong development regression review. If iterative private validation is wanted, B is clearer than calling selection data “held-out.” C is defensible as a different contract, but a one-bit veto is still information.
-
-Human review does not erase this distinction. If a human sees audit results and directs another refinement, that begins a new development campaign; the exposed evidence cannot remain an untouched audit for the resulting claim. HackProbe’s bounded-disclosure proposal makes this issue especially explicit. [HackProbe](https://arxiv.org/abs/2609.04665)
-
-The changes to ASTRA_DESIGN.md should be expressed as these deltas.
-
-| Delta | Change |
+| Component | Responsibility and interface |
 |---|---|
-| **KEEP** | Small verified core, immutable bundles, exact composite revisions, immediate model-led activation, optional comparative evaluation. |
-| **KEEP** | One authoritative run history, content-addressed artifacts, durable reservations, explicit uncertainty, and separation of configuration rollback from world compensation. |
-| **KEEP** | Local-first execution, pure closed verification, pinned dependencies, sandbox enforcement, and budget-matched experiments. |
-| **DISCARD** | The release-1 recommendation that the entire refinement controller remain pinned. Replace it with an editable semantic controller above a fixed execution contract. |
-| **DISCARD** | Any implication that hiding held-out traces while exposing scores or acceptance decisions satisfies invariant 5. |
-| **DISCARD** | Any implication that event-log rewind alone recovers external effects, live credentials, arbitrary interpreter state, or past expenditure. |
-| **DISCARD** | Arbitrary CAS reads and whole-history access for model-authored policies, even when those APIs are mechanically read-only. |
-| **ADD** | Exo’s identity/executor/core split; scoped turn handles; explicit binding, secret, snapshot, and lineage contracts. |
-| **ADD** | Atomic controller handover, fixed continuation envelope, version-specific execution, and an operator recovery route independent of controller health. |
-| **ADD** | Broker-owned canonical instrumentation, outcome classification, capability attenuation, and descendant budget allocation. |
-| **ADD** | Development regression corpus, isolated audit lineages, and the unresolved A/B/C feedback decision. |
-| **ADD** | September research on harness creation, retention under capability expansion, reference-trajectory diagnosis, and bounded feedback leakage. |
-| **ADD** | Adapter contracts for reconciliation and billing, plus a later sPTC contract with trusted effect metadata and accounting for discarded speculation. |
+| **Run manifests and bundles** | Resolve configuration into retained artifacts before execution. Bundles identify exact actor and controller code, prompts, memory files, entry points, and dependency closure. Requested capabilities describe needs; they do not grant authority. |
+| **Journal and CAS** | Maintain one authoritative ordered history per run and immutable content-addressed bytes. Publish referenced objects durably before committing records that reference them. Discovery indexes, reports, and context caches are rebuildable. Content identity remains distinct from command, invocation, and effect identity. |
+| **Pure verifier** | Check envelopes, references, producer authority, causation, effect transitions, reservations, settlement, revision activation, and result consumption. Treat diagnostic payloads as opaque. Perform no dispatch, execute no candidate code, and write nothing. |
+| **Effect supervisor and budget ledger** | Own execution ordering, reservations, dispatch, deadlines, cancellation, reconciliation, receipts, and accounting. Accept results only for the current execution identity and epoch. All model calls, sandbox invocations, and tool operations use this execution boundary. |
+| **Sandbox and capability broker** | Run candidate programs with bounded resources and scoped inputs. Keep credentials, authoritative storage, protected evidence, and privileged adapters outside candidate access. Check destination, operation, arguments, environment, access scope, and available budget before granting an effect. |
+| **Operation and evidence layer** | Provide a small resumable step interface, simulator snapshots, trusted scoring, coverage accounting, and authorized evidence projections. Keep workload semantics in pinned adapters and scorers rather than duplicating them in the verifier. |
+| **Policy runtime** | Execute a versioned policy over authorized evidence and explicit private state. Policies choose operation, refinement, optional comparison, activation, review, and restoration. Policy judgments remain distinct from authoritative measurements. |
 
-The harness survey is useful as a coverage check across execution, tools, context, lifecycle, observability, verification, and governance. Those categories should remain visible in the design review; they do not require seven separate services. Its public PDF is evolving, so I would pin a revision before quoting corpus counts. [Harness engineering survey](https://picrew.github.io/LLM-Harness/main.pdf)
+The separation between replaceable executor semantics and trusted execution infrastructure follows the useful distinction in the [Exo specification](https://github.com/exoharness/exo/blob/main/exoharness/docs/spec.md). Strive places model dispatch and accounting inside the trusted boundary while leaving request construction to the executor.
 
-For the locked workload, I recommend a stateful order-fulfilment simulation with brokered tools.
+### 3.1 Execution and adaptation
 
-The agent processes a continuing stream of orders using operations such as reading stock, reserving inventory, updating an order, and querying an operation’s status. State persists across turns, crashes, and agent revisions. A trusted service owns the database and scores actual state transitions. Development comparisons fork snapshots; continuing operation retains accumulated state.
+An actor or controller runs as a bounded sandbox step:
 
-This supplies real mutation, partial progress, effect reconciliation, limited observations, and adaptation over time without making an external production service part of the first recovery proof. It is a proposed concrete workload, not an additional locked human decision. The existing sum/max fixtures remain fast deterministic controls.
+```text
+step(authorized_view, private_state, recorded_result)
+    -> command, proposed_private_state, annotations
+```
 
-| Milestone | Deliverable | Exit evidence |
-|---|---|---|
-| **1. Specify the contracts and workload** | Authority map, event vocabulary, effect state machine, controller interface, feedback contract, and workload scenarios. | Each invariant has a falsifiable acceptance condition. Resolve the feedback choice before implementing adaptive evaluation. |
-| **2. Build durable execution** | Turn acceptance, framed history, CAS publication, verifier, reservations, effect dispatch, and reconciliation. | Fault injection around intent, authorization, dispatch, result recording, and continuation commit. Reject forged records and stale workers. |
-| **3. Complete the stateful workload** | Persistent service, snapshot forks, brokered reads/writes, idempotency/status lookup, and explicit agent continuation. | Crash after a world mutation but before receipt persistence; recover without repeating it. Unqueryable model-call uncertainty suspends honestly. |
-| **4. Enable acting adaptation** | Editable code, prompts, memory, skills, tool compositions, and bounded child turns. | A prompt-only change alters behavior; composite rollback restores configuration while world state and spending remain correct. |
-| **5. Enable controller self-modification** | Versioned controller execution, atomic handover, compatible continuation, independent operator recovery. | A controller replaces itself and resumes across injected crashes. Attempts to suppress receipts, relabel evidence, escape the sandbox, or expand budgets fail. |
-| **6. Evaluate and package** | Development regression policy, audit isolation, CLI, report, and installed package. | Compare frozen behavior, actor-only adaptation, and actor-plus-controller adaptation under matched total budgets. Report task outcomes, retention, actual spend, uncertainty, and recovery behavior. |
+The outer runner owns invocation identity, executing bundle, input references, result delivery, and continuation cursors. Candidate programs cannot supply authoritative values for those fields.
 
-Strict typing, relevant tests, the installed-wheel CLI smoke, and fresh-interpreter verification remain release checks throughout. The controller experiment must measure whether it produces better subsequent changes; otherwise the release demonstrates editable controllers without demonstrating improved refinement.
+The privileged command interface covers:
 
-The remaining human decisions can be reduced to five.
-
-1. **Release-1 modification scope.** My recommendation is the bounded editable controller above. The narrower alternative is pass 1’s acting-code/prompt/memory scope. This is the principal scope decision.
-2. **Feedback boundary.** Choose A, B, or C explicitly. My recommendation remains A; no choice is assumed here.
-3. **Concrete workload and effect providers.** Approve the stateful simulation or identify the actual service and model provider. Require reconciliation for workload mutations; accept honest suspension where model-call recovery or billing is unknowable.
-4. **Durability and threat scope.** My recommendation is one trusted host/operator, hostile generated code and inputs, accidental corruption, and process-crash recovery. Host-loss failover or malicious storage replacement would add replication or independently anchored history requirements.
-5. **Experimental budget and release claim.** Set the real-model spending ceiling and predeclare outcomes for the three experimental arms. Passing mechanism tests supports a durability/security claim; measured improvement requires separate evidence.
-
-Run-local learning, explicit immutable imports, and deferred distributed hosting are recommended defaults. The existing requirement for human go/no-go before teardown remains in force.
-
-
-
----
-
-# strive vNext — Astra design PASS 3 (over-restriction / YAGNI audit)
-
-**Author: GPT-6 Astra** (via `codex exec -m gpt-6-astra`, read-only). Scribed by the orchestrating Claude session. This pass CORRECTS earlier overreach: it separates the load-bearing hard core from premature restriction, resolves the "just log it" question, and relaxes two inherited invariants. Status: PROPOSAL — pending human decisions.
-
-**Release 1 should have an open diagnostic log and a small, closed authority protocol. Keep a narrow pure verifier; drop the requirement that it understand every executor event, proposal, diagnostic, and workload detail.**
-
-My earlier proposal overreached by making research conventions look like integrity requirements. Closed event names, strict comparability, structured memories, controller handover machinery, and universal recovery contracts do not all belong in the hard core. The essential boundary is who can authorize execution and certify what happened.
-
-This is a static audit of both design passes, the handoff, and the cited implementation. No files changed and no tests ran. The recommendations below are engineering judgments, with high confidence in the authority and recovery distinctions and moderate confidence in implementation cost.
-
-The external sources support a more permissive design than I previously proposed:
-
-- Exo explicitly permits executor-defined, namespaced events. Its trusted infrastructure stores and orders them; executors interpret them. It also retains privileged-resource brokering and sandboxing. Open logging therefore does not inherently mean unrestricted authority. Its spec leaves model calls to executors, which strive should change when those executors are editable and expenditure must be enforced. [Exo specification](https://github.com/exoharness/exo/blob/main/exoharness/docs/spec.md)
-- Self-Harness keeps its evaluator fixed while modifying the surrounding harness. Its acceptance algorithm uses both held-in and held-out scores. My inference is that this provides selection feedback even though held-out traces are hidden. It supplies evidence for flexible harness modification, not for allowing the candidate to certify its own improvement. [Self-Harness, §§3.1–3.4](https://arxiv.org/html/2606.09498v3)
-- DGM Appendix F documents an agent obtaining the maximum hallucination score by removing tool-use logging markers, despite the checking functions being hidden. This is direct evidence that a protected evaluator can still be gamed through editable instrumentation. [DGM Appendix F](https://arxiv.org/html/2505.22954v1#A6)
-
-**The “just log it” decision is resolved in favor of openness everywhere except authority.**
-
-Nothing about an event named `executor.order_completed` is dangerous by itself. It becomes dangerous when a scorer, budget ledger, permission check, or recovery routine treats it as fact.
-
-For the proposed order-fulfilment simulation, these are the concrete failure modes:
-
-| Failure mode | What breaks if executor logs become authoritative | Minimum prevention |
-|---|---|---|
-| Forged success | The executor logs “order shipped” while inventory and order state remain unchanged. | The trusted simulator/scorer determines completion from actual state and broker receipts. |
-| Ungoverned spend | An editable executor calls a model directly, omits the call, or reports zero cost. | Keep credentials outside candidate execution; authorize and reserve every paid call through the broker. |
-| Unrecoverable effects | Inventory changes, the process crashes before logging the result, and restart repeats the mutation or assumes it never happened. | Persist authorization before dispatch; use simulator operation IDs and status lookup; preserve uncertainty elsewhere. |
-| Contamination | A protected score or audit-derived memory enters adaptive context under an innocuous custom event name. | Enforce the selected feedback contract when granting access to bytes, including derived artifacts. |
-| Gaming | The executor suppresses failed attempts, changes its logging markers, or reports only successful orders. | Broker-owned interaction records and scorer-owned coverage and denominators. |
-
-These are failures of authority, access, and execution ordering. **A closed vocabulary alone prevents none of them.** A fabricated but schema-valid receipt is still fabricated.
-
-The current implementation closes considerably more than necessary. It rejects bodies outside `_BODY_UNION` and rejects unknown `observation_kind` values. Adding an innocent diagnostic therefore reaches verifier code today. [Body rejection](src/strive/substrate.py) is specifically at [substrate.py:1302](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1302), and observation rejection at [substrate.py:2858](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:2858).
-
-I recommend the following exact boundary. These are proposed protocol families, not a demand for seven separate services or elaborate class hierarchies.
-
-| Record or field group | Authoritative content | Who establishes it |
-|---|---|---|
-| Common envelope | Run identity, sequence, record class, causal identity, producer identity, access scope, payload reference. | Supervisor; an executor-supplied `producer="broker"` has no standing. |
-| Run binding | Trusted runtime/adapter/scorer versions, initial environment, budget limits, capabilities, editable scope, feedback contract, comparison contract, trust mode. | Trusted run setup, fixed for the run or changed through an explicitly supported trusted transition. |
-| Effect authorization | Effect ID, exact request reference, adapter and operation, target environment, permitted scope, reservation, recovery mode. | Broker after checking the request. |
-| Effect observation and settlement | Dispatch/return/uncertainty status, response or receipt reference, observed environment version, usage amount and whether measured, reserved, or unknown. | Broker and trusted adapters; tool return is distinct from task success. |
-| Measurement | Subject revision, workload/window identity, scorer version, receipt/state references, admitted and completed coverage, exclusions, metric identity and value. | Trusted scorer using broker/environment evidence. |
-| Revision activation | Exact previous and next bundle references, expected active revision, activation boundary. | Supervisor after validating the requested change. |
-| Continuation commit | Exact private-state bytes, executing bundle version, consumed-result cursor, environment reference. | Supervisor records what the executor produced; it does not certify the private state's reasoning. |
-
-Evidence eligibility need not require another event family. For release 1, static run/lineage scopes plus the bound feedback contract can determine access. The broker owns those labels and access decisions.
-
-Everything else may be freely logged inside an `Annotation` envelope or an `annotations` subtree:
-
-- New event names, arbitrary bounded JSON, debugging text, timing breakdowns, hypotheses, proposal rationales, memories, compaction records, component names, and claimed scores.
-- Executors may interpret these and use authorized annotations to decide their next action.
-- They cannot override authoritative fields, release reservations, certify success, authorize retries, grant artifact access, or move the active revision.
-- Unknown annotation schemas remain readable as opaque data. They do not invalidate an otherwise valid run.
-- Annotation size and storage quotas still apply. Logging must not bypass resource limits.
-
-For example, `executor.order_completed: {order_id: 42, success: true}` is permitted. It contributes nothing to fulfilment scoring. A broker receipt establishing a state transition for order 42 can contribute.
-
-A new privileged operation requires a trusted adapter with explicit authorization and recovery behavior. **It should usually reuse the generic effect records without changing the core verifier.** A new scorer can produce the existing measurement envelope under a newly pinned scorer definition. Changing the meaning of an authority primitive requires a protocol/verifier change; adding a diagnostic field does not.
-
-**Keep purity, reduce what verification promises.**
-
-The current code already separates structural verification from some workload semantics. The pure verifier checks projection coverage, identifiers, and score shape; it explicitly leaves descriptor-exact recomputation to the kernel. The kernel derives projections through the trusted operation descriptor and checks existing projections on recovery. [Structural checks](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:2020), [projection derivation and recovery](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1308).
-
-Release 1 should formalize that division:
-
-1. A small pure transition function checks authority records: references, IDs, authorized dispatch, reservations, settlement, revision transitions, and consumed-result cursors.
-2. The trusted simulator and scorer establish workload facts. The verifier checks their recorded provenance and relationships; it does not independently reconstruct arbitrary external reality.
-3. Verification performs no dispatch, imports no candidate code, and writes nothing.
-
-Incremental checking is compatible with purity. Validate the next authoritative transition against the already verified state; replay the authority stream on restart and when explicitly auditing. Do not build persistent verification-cache infrastructure yet. If retaining full replay temporarily is simpler, that is a performance choice, not an integrity requirement.
-
-Today `_emit` folds the candidate stream and then verifies the persisted stream again. That duplication is removable. [Append path](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:813).
-
-Retain preflight, but narrow its promise to **“accepted authority transitions preserve protocol consistency.”** It must not mean “nothing bad can be recorded.” If a provider reports expenditure above its reservation, preserve that receipt, record the overrun, and stop further dispatch. A trustworthy journal must represent violations and uncertainty. Suppressing an inconvenient observation to preserve a green `valid` flag would undermine integrity.
-
-The following table audits the major mechanisms in [pass 1](/Users/nikhil/personal/hatch/strive/docs/ASTRA_DESIGN.md:78), [pass 2](/Users/nikhil/personal/hatch/strive/docs/ASTRA_DESIGN.md:226), and the [inherited invariants](/Users/nikhil/personal/hatch/strive/ASTRA_HANDOFF.md:54). KEEP applies to the limited form stated, not every implementation detail previously proposed.
-
-| Mechanism | Decision | Release-1 justification |
-|---|---|---|
-| Closed record vocabulary | **LOOSEN** | Close only the authority protocol; the current blanket rejection of unknown observations creates unnecessary release coupling for diagnostics. |
-| Pure verifier and authority preflight | **KEEP** | A small side-effect-free transition checker prevents inconsistent authorization, settlement, activation, and recovery state. |
-| Full semantic verification of every artifact and observation | **DEFER** | Reimplementing every workload interpretation inside the verifier duplicates trusted adapter/scorer logic before a second real workload exists. |
-| Whole-history verification on every append | **LOOSEN** | Check transitions against verified state and retain full replay for recovery/audit, removing repeated work without weakening authority checks. |
-| Content-addressed store | **KEEP** | Existing hash-checked immutable storage identifies the exact code, requests, results, and continuation bytes needed for recovery. [Implementation](/Users/nikhil/personal/hatch/strive/src/strive/cas.py:91) |
-| Framed journal, durable publication, head checks | **KEEP** | These distinguish committed records from incomplete writes and prevent acting on an ambiguous local history. [Implementation](/Users/nikhil/personal/hatch/strive/src/strive/framing.py:228) |
-| Signed heads, external anchoring, malicious-store protection | **DEFER** | The proposed trusted-host scope does not justify an independent transparency system; the existing hash chain does not establish that protection. [Existing limitation](/Users/nikhil/personal/hatch/strive/src/strive/framing.py:24) |
-| Rebuildable discovery indexes | **KEEP** | A stale convenience index must not invalidate intact authoritative history, which the current fold already recognizes. [Implementation](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1334) |
-| Typed command variants | **KEEP** | Type the few privileged actions so malformed requests cannot accidentally change authority; leave diagnostic payloads open. |
-| Canonical command JSON plus normalized shadow fields | **LOOSEN** | Store one canonical typed request rather than maintaining duplicate representations and coherence rules. [Current duplication](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1793) |
-| Specialized model/fork/operation lifecycle grammars | **LOOSEN** | Use one effect lifecycle with adapter-specific payloads instead of requiring core changes for each execution category. |
-| Mandatory proposal rationales, citations, edit limits, and review shapes | **CONFIG** | These can improve a refinement policy, but they are not prerequisites for safe activation of authorized code. [Current command constraints](/Users/nikhil/personal/hatch/strive/src/strive/policy.py:97) |
-| Authoritative `ChangeConfirmed` and proposal bookkeeping | **LOOSEN** | “The controller likes this revision” can be an annotation; actual activation and any measured improvement remain independently recorded. [Current machinery](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1610) |
-| Exact composite revisions and atomic activation | **KEEP** | Recording one complete before/after bundle prevents mixed code, prompts, and memory after a crash. |
-| Exact configuration restoration | **KEEP** | Restoring an identified prior bundle prevents ambiguous rollback, while retaining current expenditure and world state. |
-| General inverse-edit, merge, and compensation machinery | **DEFER** | Release 1 needs explicit bundle restoration and workload operations, not a generic algebra for undoing arbitrary changes. |
-| Immutable bundles and dependency locks | **KEEP** | A fixed runtime image/lock plus exact bundle bytes prevents resume from silently executing different dependencies. |
-| Arbitrary dependency installation and complete packaging framework | **DEFER** | A supplied dependency set supports the first workload without adding package resolution and installation to the research loop. |
-| Model-weight modification | **DEFER** | It adds a separate experimental and execution problem unrelated to proving stateful harness adaptation. |
-| Pinning every research choice for an entire run | **LOOSEN** | Pin the trusted contract and each invocation's exact inputs; allowed actor/controller revisions should not require starting over. |
-| Generic operation-plan framework | **LOOSEN** | Implement one simulator adapter and the fixtures behind a small step interface, avoiding a universal workflow language. |
-| `solve(str)->int` as the kernel's execution model | **LOOSEN** | Its current hard-coding prevents the locked stateful workload; keep it only in the fixture adapter. [Current executor](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1564) |
-| Capability broker and protected credentials | **KEEP** | Otherwise editable code can bypass permission checks, spending limits, and canonical tool evidence. |
-| All model calls through the broker | **KEEP** | Acting, refinement, and generated wrappers must share the same enforced budget and receipt path. [Existing refinement path](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:752) |
-| Durable reservations and measured/reserved/unknown usage | **KEEP** | A crash or missing provider usage must not reset expenditure or silently become zero cost. [Current handling](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:824) |
-| Per-effect reconciliation contracts | **CONFIG** | Require recovery for simulator mutations; allow honest suspension for other effects instead of building recovery adapters for hypothetical providers. |
-| Universal exact resume across external boundaries | **LOOSEN** | Promise exact recorded state and safe resumption where supported, removing the impossible implication that a missing external response can always be reconstructed. |
-| Result-driven continuation and consumed-result cursors | **KEEP** | These prevent completed work from being applied twice to the resumed execution state. [Checkpoint checks](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:1555) |
-| No records after a terminal command | **LOOSEN** | Keep task completion stable but permit explicit late accounting/reconciliation records rather than losing newly available facts. [Current blanket rule](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:2233) |
-| Snapshot-to-log recovery | **LOOSEN** | Support explicit simulator snapshots and continuation references; arbitrary process, VM, credential, and external-world rewind is unnecessary. |
-| Secure sandbox floor | **KEEP** | Host confinement, restricted external access, and bounded resources keep generated code away from credentials, evidence, and authority storage. [Enforcement boundary](/Users/nikhil/personal/hatch/strive/src/strive/sandboxes.py:299) |
-| Fresh interpreter per case as a security invariant | **CONFIG** | State lifetime is a workload/isolation choice, although the current secure capability tuple treats freshness as mandatory. [Current tuple](/Users/nikhil/personal/hatch/strive/src/strive/sandboxes.py:75) |
-| Eligibility before context construction | **KEEP** | Once forbidden bytes reach editable code, filtering its final prompt cannot reliably recover the declared feedback boundary. |
-| General `RunView` history and CAS access | **LOOSEN** | Replace the broad interface with scoped readable artifacts, avoiding a general information-flow engine while closing a real exposure. [Current interface](/Users/nikhil/personal/hatch/strive/src/strive/policy.py:47) |
-| Held-out A/B/C feedback contract | **CONFIG** | The run must declare permitted influence, but strict blindness is not a universal requirement for trustworthy operational records. |
-| Comparability strictness | **CONFIG** | Matching snapshots and streams supports controlled comparisons; observational evidence may still inform adaptation without being labeled causal improvement. |
-| Ban on infrastructure feedback steering the model | **LOOSEN** | Authorized timeout and tool-availability evidence can improve recovery behavior; the requirement should be honest classification, not exclusion from learning. |
-| Evidence coverage and exclusion recording | **KEEP** | Admitted, completed, failed, and unresolved work must remain visible so a candidate cannot improve its score by hiding the denominator. [Existing coverage](/Users/nikhil/personal/hatch/strive/src/strive/operate.py:166) |
-| Structured memory/skill ontology with mandatory supersession | **LOOSEN** | Versioned files and authorized inputs suffice initially; a mandatory knowledge-management schema restricts experimentation without certifying truth. |
-| Component-use attribution | **LOOSEN** | Record exact supplied code/context and broker calls; proving which memory “caused” behavior is beyond release-1 integrity. |
-| Editable refinement controller | **CONFIG** | Editability is an experimental scope choice; it must not become either a security taboo or a mandatory release milestone. |
-| Atomic controller handover | **KEEP** | When controller editing is enabled, switch versions and initial state together at a quiescent boundary to prevent mixed execution. |
-| Arbitrary controller-state migration | **DEFER** | A fixed continuation envelope and explicit initial private state remove the need for migration/rollback compatibility machinery. |
-| Independent operator recovery route | **KEEP** | A broken controller must not be required to execute its own recovery. [Existing operator path](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:920) |
-| One writer and serial execution | **KEEP** | A local lease and one outstanding effect keep release-1 ordering tractable and prevent duplicate dispatch. [Lease](/Users/nikhil/personal/hatch/strive/src/strive/substrate.py:760) |
-| Turn handles and ingress deduplication | **LOOSEN** | Stable request IDs and a scoped local API suffice without building a full agent/conversation/session product model. |
-| Subagents, descendant budgets, concurrent scheduling, distributed fencing | **DEFER** | The locked workload does not require these, and they add independent ownership, cancellation, and accounting problems. |
-| Optional comparative evaluation and snapshot forks | **CONFIG** | Policies may request them, with new execution identities and charged work; they must not become a universal activation gate. |
-| Cross-run learning imports | **LOOSEN** | Explicit bundle imports with scope/provenance suffice; defer global mutable memory and a general lineage-management system. |
-| Noninterference tests | **CONFIG** | Test the prohibited flows of the selected feedback contract; do not implement every A/B/C isolation arrangement in advance. |
-| Speculative execution and reusable effect caches | **DEFER** | They introduce invalidation, duplicate-effect, and discarded-work accounting before throughput is established as a problem. |
-| Temporal, Restate, Celld, replication, host-loss failover | **DEFER** | One surviving host and disk are enough for the initial durability claim. |
-| Optimizer integrations, population selection, universal promotion gates | **DEFER** | They are research policies, and universal promotion would contradict strive's immediate-adaptation mission. |
-| Prompt-only behavior check, integrity checks, typing, package/replay checks | **KEEP** | These establish that exposed controls affect execution and that the shipped runner preserves its narrow guarantees. |
-| Three experimental arms and mandatory demonstrated improvement | **CONFIG** | The experiment must support the chosen claim, but controller improvement should not block a release that demonstrates trustworthy actor adaptation. |
-| Research mode | **KEEP** | A fixed untrusted designation permits stubbed contracts and experimental measurement without silently extending trusted claims. |
-
-Two inherited restrictions deserve particular correction.
-
-First, **“only comparable evidence may steer adaptation” is too strong**. A new kind of failure can be useful before there is a matched baseline. The policy should be allowed to learn from it. Comparison controls constrain what the report may claim about improvement. The current policy's valid-window filtering is a reasonable default policy, not a universal execution law. [Current filtering](/Users/nikhil/personal/hatch/strive/src/strive/policies/continual_refine.py:586).
-
-Second, **“infrastructure failures can never steer the model” obstructs useful harness research**. A controller should be able to learn to reduce output after an output-limit failure, or change scheduling after repeated tool unavailability. Preserve fault origin and distinguish these observations from evidence that the actor solved an order incorrectly. Whether particular operational metadata is visible remains part of the feedback contract.
-
-The minimal viable integrity core is five guarantees:
-
-1. **Confinement and fixed authority.** Generated code runs inside an enforced sandbox. It cannot rewrite the real authorizer, verifier, scorer, access policy, or accounting machinery.
-2. **Independent facts.** The broker records actual interactions and usage; the simulator/scorer records outcomes and coverage. Candidate annotations remain claims. Access follows the declared feedback contract.
-3. **Durable execution identity.** Before dispatch, persist the exact request, effect identity, authority, and reservation. Preserve results, bundle bytes, atomic activation, and consumed-result cursors on surviving local storage.
-4. **Honest recovery.** Recover simulator mutations through durable operation IDs; reuse recorded results; retain unknown expenditure and suspend ambiguous unsupported effects. Revision rollback never rewinds spending or the world.
-5. **A small checked protocol.** Pure validation and replay establish consistent authorization, accounting, activation, and continuation, while allowing open annotations and faithfully recording bad outcomes.
-
-For the simulator, the decisive recovery case is concrete: `reserve_inventory(effect_id, order_id, quantity)` durably stores both its mutation and operation result together. If strive crashes before recording the receipt, it queries that operation ID and obtains the original result. A fresh retry cannot reserve again under the same identity. This transactional simulator contract is my proposed implementation, not a property demonstrated by the papers.
-
-For a model provider without an adequate lookup/deduplication contract, the corresponding case suspends and retains the reservation. The current implementation already takes this conservative route for dispatched operations and model calls without durable results. [Operation recovery](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:1335), [model recovery](/Users/nikhil/personal/hatch/strive/src/strive/kernel.py:682).
-
-Research mode should use this same outer runner. A run-bound flag stamps results `untrusted` and permits stub adapters, experimental event semantics, and an editable measurement program inside the sandbox. Simulated receipts must say they are simulated. Self-modifying measurement is then the object being studied; it does not replace the outer accounting or authorization machinery.
-
-The candidate cannot turn the flag off, manufacture real receipts, or export an experimental score as a trusted one. A new trusted evaluation can assess an artifact produced there, with its provenance declared. Ordinary custom annotations should work in trusted mode and should never require this flag.
-
-Hardening should follow demonstrated needs:
-
-| Trigger | What becomes necessary |
+| Command | Meaning |
 |---|---|
-| A diagnostic starts determining success, spend, permission, or eligibility | Give it a trusted producer and defined authority semantics before relying on it. |
-| A second workload introduces genuinely different effect semantics | Extend adapter contracts and, only where necessary, the authority protocol. |
-| A deployment requires uninterrupted recovery of an external mutation | Require that provider's actual reconciliation contract before claiming automatic recovery. |
-| Concurrent children or remote workers become necessary | Add budget allocation, cancellation, ownership/fencing, and stale-result handling. |
-| The chosen experiment claims blind evaluation | Enforce and test every actual feedback route, including imports, caches, provider state, and control signals. |
-| Controller replacement must preserve incompatible private state | Add explicit migration contracts and their recovery checks. |
-| Cross-run knowledge transfer becomes a research feature | Strengthen import provenance and scope propagation beyond simple explicit bundle imports. |
-| Host-loss or hostile-storage protection becomes a requirement | Add replication/backups or independently authenticated history, respectively. |
+| `ExecuteEffect` | Request one operation from a pinned adapter using exact arguments and an authorized binding. |
+| `ApplyChange` | Request activation of a complete new bundle against an expected active revision. |
+| `RestoreBundle` | Request activation of an identified prior bundle against the current revision. |
+| `EvaluateFork` | Request a charged, isolated comparison at a supported snapshot boundary. |
+| `Continue`, `Suspend`, `Finish` | Return control with explicit continuation status. Finishing execution does not certify task success. |
 
-There is no automatic graduation toward a universally closed event ontology. That is not the destination.
+Store one canonical typed command. Do not maintain a second normalized representation with independent meaning.
 
-Where I disagree with the human's instinct is concentrated in four places.
+The supervisor durably accepts step output before acting on its command. A continuation commit binds the private state, consumed result, and any pending command so that recovery cannot consume a result while losing the resulting command.
 
-**Broker-owned measurement is worth keeping immediately.** Logging freedom cannot include the freedom to decide which tool calls count as having happened. The DGM example makes this an observed failure mode, not speculative security work. Protecting only the scoring function is insufficient.
+The ordinary refinement cycle is:
 
-**Durable intent and conservative accounting are also immediate requirements.** The first crash between simulator mutation and receipt persistence is enough to require them. A local simulation makes that contract cheaper to implement and examine; it does not eliminate the problem.
+1. Operate bounded steps under the active bundle.
+2. Construct an evidence view using authorized artifacts and observations.
+3. Obtain a proposed change through brokered model calls.
+4. Check structure, dependency availability, editable scope, requested capabilities, and expected revision.
+5. Activate the complete bundle atomically at a legal operation boundary.
+6. Continue operating and let the policy keep, revise, restore, or gather more evidence.
 
-**Artifact immutability is cheap here.** The repository already has atomic, hash-checked object publication. Replacing it with mutable “latest” files would sacrifice exact recovery identity for little benefit. Hashes establish identity, not truth.
+Comparative evaluation is optional. A policy may request development checks before activation, but the core imposes no improvement test.
 
-**A small preflight checker helps velocity.** It rejects a malformed privileged transition before it damages resumability. The excessive restriction was teaching that checker every research concept. It should accept an executor's new explanation format without knowing what the explanation means.
+Proposal rationales, edit-size limits, citations, review formats, and statements such as “confirmed improvement” are policy conventions or annotations. They are not authority primitives.
 
-Conversely, I disagree with my own pass-2 requirement that release 1 demonstrate controller self-modification through a dedicated milestone and three-arm experiment. That is an additional research objective. The first release should not wait for it.
+### 3.2 Revision and controller boundaries
 
-The five open decisions should now read as follows:
+Every activation records exact previous and next bundles. No invocation observes a mixture of their components.
 
-1. **Modification scope.** Recommend acting code, prompts, and memory for the first release experiment, with a pinned controller. Controller editing remains configurable through the same sandboxed step and atomic revision interface; dedicated migration machinery and proof of improved refinement are deferred. This reverses pass 2's release requirement, not its conclusion that controller code can safely be editable.
+Controller replacement uses the same mechanism, with these additional preconditions:
 
-2. **Feedback boundary.** A/B/C remains explicitly undecided. I still recommend A for an untouched-audit scientific claim, but the core should enforce whichever contract is selected. Existing `selection_cases()` includes every non-audit split, and review exposes fork scores; that path cannot be described as strictly excluding held-out influence without changing its contract. [Selection](/Users/nikhil/personal/hatch/strive/src/strive/tasks.py:64), [review context](/Users/nikhil/personal/hatch/strive/src/strive/policies/continual_refine.py:764).
+- The controller implements the fixed step and continuation interface.
+- No pending command or unconsumed result requires interpretation by the old controller.
+- The new controller and its explicit initial private state activate atomically.
+- Supervisor-owned effect identities, result cursors, and accounting survive unchanged.
 
-3. **Concrete workload and providers.** Recommend the order-fulfilment simulator plus sum/max fixtures. Require simulator mutation reconciliation and permit honest suspension for the selected model provider. Do not require a general provider ecosystem.
+There is no arbitrary controller-state migration in release 1. A replacement can reconstruct its strategy from authorized canonical history and explicitly supplied notes.
 
-4. **Durability and threat scope.** Recommend one trusted host/operator, hostile generated code and inputs, surviving durable storage, and process-crash recovery. This supports a useful release without distributed ownership or malicious-storage guarantees.
+A looping, crashing, or invalid controller causes bounded failure and suspension. An operator can restore a compatible bundle through the durable command interface without executing the broken controller.
 
-5. **Budget and release claim.** Set a real spending ceiling and compare fixed behavior with actor adaptation under matched declared budgets. Report outcomes, regressions, coverage, uncertainty, and expenditure. Controller improvement becomes a separate claim when that experiment is actually undertaken.
+Memory and skills are versioned files. A mandatory knowledge ontology is unnecessary. Imports retain provenance and access scope; summaries do not acquire greater authority than their inputs.
 
-**Yes, add an explicit sixth decision, phrased as “Which guarantees define a trusted run, and which claims does each mode permit?”** “How hard is the hard core?” otherwise invites gradual exceptions to confinement or factual accounting.
+### 3.3 Effect lifecycle and recovery
 
-My answer to that sixth decision is the five guarantees above. Feedback, editability, comparability, and recovery availability are configurable. Open annotations are normal. Experimental measurement is allowed under an untrusted designation. The real authorizer, evidence producer, and recovery record remain outside candidate control.
+Release 1 has one writer per run and serial execution, with at most one externally in-flight effect in the active execution path. A local lease and execution epoch prevent concurrent mutation and stale result acceptance.
 
+The lifecycle is:
 
----
+```text
+accepted request
+    -> durable authorization and reservation
+    -> dispatch
+    -> recorded return or uncertainty
+    -> settlement and result consumption
+```
 
-# PASS 4 (research ergonomics) — GPT‑6 Astra
+Outcome status and accounting status are separate. A known response can still have unresolved usage.
 
-*Prompted by the question: how do people actually build, use, and present these
-harnesses (blogs, arXiv, leaderboards), and how do we make strive easy to
-research on, iterate on, configure, experiment on, log, and monitor? Astra was
-run read-only via `codex exec -m gpt-6-astra`; no files were changed and no tests
-were run during this pass.*
-
-**Strive should make an experiment easy to launch, inspect, fork, compare, and reproduce from its own durable record.** The journal and content-addressed artifacts should produce both the research report and the observability view. That is strive’s advantage: execution, accounting, and evidence already share an authoritative history.
-
-I recommend trusted execution by default, actor-only adaptation for the first reference experiment, feedback contract B for everyday development, and A for the release’s scientific comparison. Use OpenTelemetry and Langfuse for inspection. Keep experiment definitions and results portable.
-
-This proposal builds on pass 3’s corrections to passes 1–2. Confidence is high in the documented mechanisms and authority boundaries, moderate in integration effort and ecosystem convergence. No files changed and no tests ran.
-
-1. People build useful harnesses around a repeatable loop: configure, run, inspect trajectories, turn failures into examples, change one component, compare again.
-
-| Practice | What to borrow |
+| Durable state at interruption | Recovery action |
 |---|---|
-| Programs and configuration evolve together. | DSPy separates programs, optimizer settings, models, and evaluation data. GEPA exposes candidate components and an evaluator returning scores plus diagnostic information. Strive should offer similarly small interfaces for replacing a policy or component. [DSPy MIPROv2](https://dspy.ai/api/optimizers/MIPROv2/), [GEPA API](https://gepa-ai.github.io/gepa/api/optimize_anything/optimize_anything/) |
-| Logs become the working research interface. | Inspect provides evaluation logs, an interactive viewer, dataframe access, and configuration export. Exo makes ordered event access and forks explicit. Researchers should be able to move directly from an aggregate regression to the responsible invocation. [Inspect logs](https://inspect.aisi.org.uk/eval-logs.html), [Exo specification](https://github.com/exoharness/exo/blob/main/exoharness/docs/spec.md) |
-| Production examples feed offline experiments. | Langfuse connects live traces, datasets, experiments, and human or automated evaluation. Anthropic describes combining regression suites, transcript review, production monitoring, and human calibration of judges. [Langfuse evaluation](https://langfuse.com/docs/evaluation/overview), [Anthropic’s evaluation practice](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) |
-| Credible comparisons account for the surrounding harness and expenditure. | HAL evaluated agents across nine benchmarks, tracked costs, inspected trajectories, and encrypted uploaded traces to reduce contamination risk. Its leaderboard presents performance alongside cost. [HAL paper](https://arxiv.org/abs/2510.11977), [harness](https://github.com/princeton-pli/hal-harness), [leaderboard](https://hal.cs.princeton.edu/) |
+| Request accepted; dispatch not authorized | Validate and authorize before executing. |
+| Dispatch authorized; no durable outcome | Treat execution as potentially performed. Reconcile through the adapter or suspend. |
+| Return recorded; settlement or continuation incomplete | Complete bookkeeping from the recorded return. Do not redispatch. |
+| Result consumed in committed continuation | Restore that continuation and proceed beyond the result. |
+| Execution finished; later receipt becomes available | Append permitted reconciliation or accounting records without reopening completed task execution. |
 
-For strive, a bloggable result should contain a concrete failure, the exact change, a before/after trajectory, and the aggregate evidence showing whether that example is representative. A paper-ready result additionally needs:
+An adapter declares which recovery mechanisms it implements:
 
-- A frozen experiment specification, resolved manifests, executable artifacts, dataset splits, scorer, and reproduction commands.
-- All declared arms and repetitions, including failed, stopped, and indeterminate runs.
-- Performance against cumulative total expenditure, with adaptation, evaluation, and retry costs included.
-- Coverage, retained competence, uncertainty intervals, and the candidate-selection procedure.
-- A trace archive with event references behind reported measurements. Protected audit content needs separate access and publication treatment.
-- The limits of the claim: simulator versus live environment, fixed versus changing model, and which evidence influenced adaptation.
+- Recompute a declared deterministic local computation from retained inputs.
+- Query an operation by durable identity.
+- Retry the same identity under a documented deduplication contract.
+- Suspend when the outcome cannot be established.
 
-A leaderboard entry should identify an **agent bundle + harness + model + evaluation contract + budget**, rather than treating the model name as the whole system.
+Business-operation deduplication does not imply billing deduplication. A timeout, cancellation request, or deterministic seed does not prove that an external action did not occur.
 
-Two baseline qualifications matter. HAL’s harness is now archived, so it is methodological precedent rather than an active integration target. OTel’s v1.41 GenAI conventions are marked Development; they are a sensible pinned export contract, not a settled universal schema. [HAL status](https://github.com/princeton-pli/hal-harness), [OTel v1.41 agent conventions](https://raw.githubusercontent.com/open-telemetry/semantic-conventions/v1.41.0/docs/gen-ai/gen-ai-agent-spans.md)
+An explicit retry outside a supported deduplication contract is a new effect with a new reservation. It does not erase the unresolved predecessor.
 
-2. Configurability should mean changing a small manifest and getting an exact, readable account of what that change affects.
+This adopts recorded-history execution discipline from [Temporal](https://docs.temporal.io/workflow-execution), without requiring a distributed execution service.
 
-Use TOML, matching strive’s existing policy configuration. Support a typed Python builder that produces the same data for programmatic experiments. Avoid a configuration language with executable expressions or elaborate inheritance.
+### 3.4 Accounting
 
-Maintain two artifacts:
+For each limited resource, admission checks:
 
-- The **authored manifest** contains understandable choices, local paths, and experimental knobs.
-- The **resolved manifest** expands defaults, captures referenced bytes, resolves dependencies, and records exact identities before execution.
+```text
+settled usage + outstanding reservations + proposed reservation <= limit
+```
 
-A manifest digest identifies a configuration. A separate run ID identifies an execution. Repeating an identical configuration must create an independent run.
+Each effect contributes once. Settlement replaces or adjusts its reservation; it does not add a second copy of the same expenditure.
 
-Proposed syntax follows. Digest placeholders are illustrative.
+Usage records distinguish:
+
+- **Measured:** usage reported through the trusted adapter, with its provenance.
+- **Reserved:** capacity withheld against possible expenditure.
+- **Unknown:** actual usage is unavailable; the associated obligation remains.
+
+Cost calculated from measured tokens and a pinned price schedule must be identified as calculated cost, not provider-reconciled billing.
+
+A finite spending ceiling requires a defensible reservation bound. Reject dispatch when the adapter cannot establish one. Reserve paid calls before dispatch, including refinement, evaluation, failed proposals, and retries.
+
+If a provider reports usage above the reservation, record the receipt and overrun, then stop further dispatch. Never reject a real observation merely to keep the ledger within its planned limit.
+
+Resource accounting survives suspension and restart. `wall_seconds` bounds cumulative active execution time across sessions; offline suspension is reported separately. Per-effect deadlines bound individual operations.
+
+## 4. The authoritative record
+
+The following field groups form the closed protocol. Adapter payloads and scorer definitions can evolve behind pinned references without adding a core event family.
+
+| Group | Authoritative fields | Owner |
+|---|---|---|
+| **Envelope** | Run ID, sequence, record ID and class, causal identity, producer identity, access scope, payload reference, integrity linkage. | Supervisor. Producer identity comes from the append interface, never a candidate-supplied string. |
+| **Run binding** | Resolved manifest, trusted runtime/verifier/adapter/scorer identities, initial environment and bundle, model bindings, limits, capabilities, editable scope, feedback contract, comparison contract, trust mode, and declared lineage. | Trusted run setup. |
+| **Effect authorization** | Command and effect IDs, exact request reference, executing bundle, adapter and operation, target environment, permitted scope, reservation, recovery contract, execution epoch. | Broker and supervisor. |
+| **Effect observation and settlement** | Dispatch, return, failure or uncertainty status; response and receipt references; observed environment version; usage quantities and provenance; reservation disposition; reconciliation references. | Broker and trusted adapters. |
+| **Measurement** | Subject run/window and revision references, workload identity, scorer version, supporting receipt/state references, planned and admitted coverage, completed coverage, exclusions, metric identity and value. | Trusted scorer. |
+| **Revision activation** | Exact previous and next bundle references, expected active revision, activation boundary, and coupled controller-state reference when applicable. | Supervisor after validation. |
+| **Continuation commit** | Exact private-state bytes, executing bundle, consumed-result cursor, pending command reference, environment reference, and execution status. | Supervisor. It certifies the recorded bytes and transition, not the quality of the private state's reasoning. |
+
+Trusted measurement records establish what the pinned scorer reported from its inputs. They do not prove that the scorer is correct or that external providers told the truth.
+
+The pure verifier checks this recorded provenance and its relationships. It does not independently reconstruct arbitrary external reality. Offline verification relies on the trusted storage and producer assumptions in section 9; a schema-valid `producer="broker"` field is not authentication.
+
+### Open annotations
+
+An `Annotation` envelope or `annotations` subtree accepts namespaced events, bounded JSON, text, hypotheses, memories, compaction descriptions, proposal explanations, component labels, timing diagnostics, and claimed scores.
+
+Unknown annotation schemas remain readable as opaque data. They do not invalidate an otherwise valid run.
+
+Annotations cannot:
+
+- Authorize execution or access.
+- Change the active revision or consumed-result cursor.
+- Settle expenditure or release a reservation.
+- Certify workload success, coverage, or evidence eligibility.
+- Authorize a retry.
+
+For example, `executor.order_completed` may claim that order 42 shipped. Only simulator state and trusted receipts can establish its scored outcome.
+
+This separation addresses the logging attack documented in [DGM Appendix F](https://arxiv.org/html/2505.22954v1#A6), where changing evaluator-visible logging produced a high score without fixing the underlying behavior.
+
+Annotation size and storage quotas apply. A diagnostic becoming relevant to success, permissions, spending, or recovery requires a trusted producer and defined authority semantics before the core relies on it.
+
+### Access and verification
+
+Release 1 uses static run and lineage scopes plus the bound feedback contract. The broker checks access before bytes reach candidate code, including before retrieval, compaction, or context construction.
+
+Candidate programs receive scoped artifact handles and filtered views. They receive neither a general CAS reader nor unrestricted history access. Derived artifacts retain the producing scope; arbitrary annotations cannot relabel them.
+
+The verifier checks each new authority transition against an already verified state. Restart and explicit audit replay the complete authority stream. Persistent verification caches are deferred.
+
+Missing required artifacts, malformed committed records, or inconsistent transitions stop mutation. An incomplete or damaged tail requires explicit recovery handling; it must not silently become a different accepted history.
+
+## 5. The original invariants
+
+| Original invariant | Final treatment |
+|---|---|
+| **Durable and exactly resumable** | Preserve exact reconstruction of committed execution state and consume recorded results once. Automatic recovery across an external boundary is conditional on its adapter contract. Unsupported ambiguity suspends rather than producing a fictitious exact outcome. |
+| **Verifiable** | Preserve pure checking, content identity, and rejection of forged or inconsistent authority transitions. Verification establishes protocol consistency under declared trust assumptions, not semantic truth for every artifact or proof of improvement. |
+| **Secure floor** | Preserve mechanically enforced confinement and fixed outer authority. Sandbox lifetime is an isolation choice; a fresh interpreter for every case is not itself the invariant. |
+| **Policy-neutral and model-led** | Preserve the policy's authority over adaptation strategy and the activation behavior in section 3. Research algorithms remain replaceable programs above the core. |
+| **Behavioral-evidence gates** | Replace universal evidence exclusion with declared access, provenance, outcome classification, and honest comparison claims. The two relaxations below are explicit parts of this specification. |
+
+The two relaxed evidence restrictions are:
+
+1. **Evidence need not be comparable before informing adaptation.** An unmatched failure can motivate a change. Comparability constrains the resulting improvement claim.
+2. **Infrastructure observations may inform adaptation.** Authorized timeout, output-limit, and tool-availability evidence can help a policy change its behavior. They cannot silently become evidence of task success or behavioral failure.
+
+The replacement classification is:
+
+| Dimension | Required distinction |
+|---|---|
+| Fault origin | Task behavior, candidate execution, infrastructure/provider failure, or unresolved outcome. |
+| Provenance | Trusted environment/scorer measurement, attributed judge assessment, or candidate claim. |
+| Exposure | Which pools and operational observations could influence adaptation or selection. |
+| Comparison | Matched evidence or descriptive observation, with mismatches disclosed. |
+| Uncertainty | Statistical uncertainty versus missing or unresolved execution outcomes. |
+
+Scoring follows the pinned workload contract. Exclusions, infrastructure failures, and unresolved effects remain visible in coverage; a candidate cannot improve its denominator by hiding them.
+
+## 6. Config-as-code
+
+### 6.1 Authored and resolved manifests
+
+The authored manifest contains readable choices, local paths, and experimental parameters. A typed Python builder may produce the same data. Configuration contains no executable expressions or inheritance language.
+
+The resolved manifest expands defaults, captures referenced bytes and local source changes, resolves package references, and records effective non-secret settings before dispatch.
+
+| Identity | Meaning |
+|---|---|
+| Configuration digest | Hash of the canonical resolved configuration. |
+| Run ID | Independent execution identity. Identical configurations can produce different runs. |
+| Bundle digest | Exact executable configuration at a revision. |
+| Invocation/effect ID | One execution occurrence, even when its input bytes match another occurrence. |
+
+The resolved closure includes runtime and platform details, dependency artifacts, controller package and initial state, actor artifacts, imported memory, tool schemas, timeout and retry settings, model request settings, price schedule, and workload/scorer definitions.
+
+`pins.initial_bundle` supplies the initial actor components. Resolution combines them with the resolved policy package into the complete active bundle.
+
+Requested model identity belongs in the resolved configuration. Observed model identity belongs in each response record. Unsupported request seeds are recorded explicitly.
+
+Credentials remain opaque external bindings. Environment variables cannot silently alter scientific settings on resume. Duplicate settings, such as conflicting token limits in a request-settings artifact and the manifest, fail resolution.
+
+### 6.2 Run schema
+
+The following is the concrete development template. Digest and provider placeholders must resolve before execution. Its example budget is not authorization to spend.
 
 ```toml
 schema = "strive.run/1"
@@ -715,7 +290,7 @@ runtime = "sha256:<runtime-and-dependency-closure>"
 verifier = "sha256:<verifier>"
 adapters = "sha256:<adapter-descriptors-and-code>"
 scorer = "sha256:<scorer-and-metric-definitions>"
-initial_bundle = "sha256:<code-prompts-memory-and-entrypoints>"
+initial_bundle = "sha256:<actor-code-prompts-memory-and-entrypoints>"
 
 [policy]
 package = "./policies/continual"
@@ -780,11 +355,22 @@ content_export = "authorized-development"
 sampling = "all"
 ```
 
-The resolved form must also capture platform/runtime details, source changes, dependency artifacts, tool schemas, timeout and retry settings, initial controller state, imported memories, and the requested versus observed model identity. Provider-specific sampling and reasoning settings belong in the pinned request settings. Record unsupported seeds explicitly.
+Schema rules:
 
-Credentials remain opaque bindings outside the artifact archive. Capture the effective non-secret configuration; never let an environment variable silently change a scientific setting on resume.
+- Unknown core keys fail with a useful error. The pinned policy validates its own parameters.
+- References resolve to retained, hash-checked artifacts. Local paths are authoring inputs, not runtime identity.
+- Monetary accounting uses exact fixed units internally.
+- `budget.includes` must cover every cost-bearing phase enabled for that run. Omitting a phase cannot exempt its expenditure.
+- Recovery settings can select only capabilities implemented by the pinned adapter.
+- The comparison plan defines horizon, pairing, metrics, exclusions, stopping, and candidate selection.
+- The audit-plan reference does not grant candidate access to its protected contents.
+- Arbitrary diagnostic keys belong in annotations, not unvalidated configuration fields.
 
-Three proposed commands should cover ordinary work:
+The trusted contract stays fixed for the run. Changing permissions, feedback exposure, model assignment, spending ceiling, or trusted implementations requires a new run. Authorized bundle revisions remain part of the existing run.
+
+### 6.3 Commands
+
+The ordinary workflow uses three commands:
 
 ```text
 strive run orders.toml --id actor-17
@@ -792,163 +378,313 @@ strive resume actor-17
 strive compare fixed-17 actor-17 --spec paired.toml
 ```
 
-Launch resolves and displays the configuration before dispatch. Resume uses the recorded manifest and preserves expenditure. Compare reads history and reports declared differences, matching failures, outcomes, and costs.
+| Command | Contract |
+|---|---|
+| `run` | Resolve, validate, retain, and display configuration before dispatch. Reject an existing run ID rather than restarting it. |
+| `resume` | Load recorded configuration, artifacts, accounting, and continuation. Reject conflicting scientific overrides. |
+| `compare` | Read histories without dispatch. Validate the comparison contract and generate Markdown, JSON, and CSV results with evidence references. |
 
-Add a thin serial `strive experiment study.toml` wrapper for arm and seed expansion. It should call the same runner, maintain a stable run list, and generate the same comparison report. It does not need a scheduler service.
+A thin serial wrapper provides study execution:
 
-Defaults should be explicit in the resolved output. Unknown configuration keys should fail with useful errors. Arbitrary diagnostic data belongs under annotations, where new keys are welcome.
+```text
+strive experiment study.toml
+```
 
-**Pin the rules governing change and record every actual revision.** Pinning must not prevent the actor from adapting within its declared scope. Changing the feedback contract, authority, experimental model assignment, or spending ceiling creates a new run or explicitly declared follow-up experiment.
+The study schema contains a base run manifest, named arm overrides, repetitions and seeds, pairing rules, per-arm and total allocations, a separate audit allocation, and an analysis plan. It records a stable mapping from each arm/repetition to its run ID before dispatch.
 
-Recovery configuration selects among capabilities the trusted adapter actually implements. Writing `strategy = "reconcile"` cannot manufacture provider deduplication or billing guarantees.
+Restarting the wrapper resumes that mapping. It does not create fresh executions for already allocated repetitions. Arm expansion calls the same runner and comparison implementation; it introduces no scheduler service.
 
-3. Experiments should be ordinary runs with declared relationships, budgets, and differences.
+## 7. Experiments
 
-Represent a study as a base manifest, explicit arm overrides, repetitions, pairing rules, and an analysis plan. Generate and retain a complete resolved manifest for every run. Show the configuration diff before spending anything.
+### 7.1 Studies and the reference comparison
 
-The first study should compare **fixed behavior versus actor adaptation**. Useful subsequent ablations include prompt-only edits, code-only edits, memory disabled, different refinement intervals, and optional development forks disabled. Controller adaptation is a separate arm when someone is studying that question.
+A study is a set of ordinary runs with declared relationships. Every run retains its complete resolved manifest.
 
-Turning off an editable surface is not always an ablation of its use. For example, freezing memory still permits reading existing memory. A “no memory” arm must change initialization and retrieval as well. Record the exact intervention.
+The first reference study compares:
 
-For stateful comparisons:
+| Arm | Intervention |
+|---|---|
+| **Fixed behavior** | Initial actor code, prompts, and memory remain fixed. Ordinary task continuation and environment state still evolve. |
+| **Actor adaptation** | The same initial actor may revise its declared code, prompts, and memory using the pinned continual controller. |
 
-- Start paired runs from the same simulator snapshot and exogenous order stream.
-- Use independent mutable environments and controller state.
-- Pair independent repetitions by workload seed. Track policy randomness separately so different call counts do not accidentally change the workload.
-- Compare complete trajectories when studying adaptation. Forking late in a successful run answers a conditional question about that state, not whether the entire adaptation method is better.
+Use feedback contract A for this study. The B template's adaptive validation pool is not granted to the reference runs.
 
-A research fork needs the parent run and cursor, active bundle, continuation, environment snapshot, import scope, and a new execution identity. Release 1 should permit execution forks only at supported snapshot boundaries without ambiguous effects. Historical inspection can reach other cursors without pretending execution can safely restart there.
+Paired repetitions start from identical simulator snapshots and exogenous order streams in independent mutable environments. Actor model assignment, scorer, capabilities, initial actor components, and available resources match. Differences in policy and editable scope are declared.
 
-Shared history must not create free training. Reports should distinguish inherited preparation cost, new branch expenditure, and total campaign cost. Forks reserve from the declared experimental allowance; they never replenish the parent’s budget.
+Workload randomness is independent of policy and model randomness. Different model-call counts must not change the exogenous order stream.
 
-**Match available resources and workload, then report actual use.** Give arms the same spending ceiling, task horizon, and relevant time limits. Include refinement, development evaluation, failed proposals, and retries. An arm that finishes cheaply need not waste its remaining budget to achieve identical expenditure. Plot outcomes over cumulative cost and over workload progress.
+Compare complete trajectories. A fork from a successful intermediate state answers a conditional question about that state.
 
-Use whole trajectories or independent environment repetitions as the statistical unit where outcomes share state. Do not calculate narrow confidence intervals by pretending every correlated order is an independent experiment.
+### 7.2 Resources, metrics, and analysis
 
-The development regression corpus should contain prior failures, retained successes, representative families, and adversarial development examples. Each addition records its source event and authorization scope. Corpus updates create new versions; an experiment pins a version or a declared update rule. Never silently change the corpus halfway through a paired comparison.
+Arms receive the same spending ceiling, task horizon, and relevant time limits. An inexpensive arm need not spend its remainder.
 
-Policies may use this corpus to propose, keep, revise, or revert changes. The runner continues to permit immediate activation after integrity checks. Regression evaluation remains a policy choice.
+Count acting, refinement, development evaluation, failed proposals, retries, and policy-requested forks against the arm's allocation. Report inherited preparation cost, new branch expenditure, and total campaign expenditure separately, without double counting shared history.
 
-Blind audit happens in a separate lineage after the campaign and candidate-selection procedure are frozen. Audit-derived memories, traces, scores, dashboard views, stop signals, and budget effects must not reach the adaptive lineage. Human inspection counts as exposure too. Once audit results guide another change, subsequent claims need a fresh audit.
+The analysis plan fixes:
 
-Reproducibility needs three precise promises:
+- Cumulative correctly fulfilled orders and fulfilment rate over the declared horizon.
+- Planned, admitted, completed, failed, excluded, and unresolved coverage.
+- Retention and regressions on the development corpus.
+- Outcomes over cumulative expenditure and workload progress.
+- Settled usage, calculated costs, outstanding reservations, and unresolved billing.
+- Stopping rules, candidate selection, and uncertainty estimation.
+
+Use paired trajectories or independent environment repetitions as statistical units. Correlated orders within one stateful trajectory are not independent repetitions.
+
+Report all declared runs, including stopped, failed, and indeterminate runs. Statistical intervals do not absorb missing outcomes; show unresolved counts and appropriate outcome bounds separately.
+
+### 7.3 Ablations and comparison strength
+
+Useful subsequent ablations include prompt-only adaptation, code-only adaptation, memory removal, refinement interval, and development forks disabled. Controller adaptation is a separate research question.
+
+Specify the actual intervention. Freezing memory does not disable reading existing memory. A “no memory” arm must change initialization and retrieval as well.
+
+| Comparison setting | Required behavior |
+|---|---|
+| `matched` | Check workload, snapshots, scorer, model settings, budgets, pairing, and other bound conditions except predeclared experimental differences. Report unexpected differences and refuse a matched-improvement claim. |
+| `descriptive` | Report observed outcomes and configuration differences without presenting them as a controlled estimate of improvement. |
+
+Expected derived digest changes must be explained by declared leaf-level interventions. An allowed policy change must not become blanket permission to ignore unrelated bundle differences.
+
+Either setting may supply authorized evidence to a policy.
+
+### 7.4 Development corpora and forks
+
+The development regression corpus contains prior failures, retained successes, representative families, and adversarial development examples. Additions identify their source events and access scope.
+
+A study pins a corpus version or an explicit update rule. Corpus changes cannot silently alter a paired comparison.
+
+Execution forks require:
+
+- Parent run and committed cursor.
+- Active bundle and explicit continuation.
+- Available simulator snapshot.
+- Authorized import scope.
+- New execution identity.
+- Reserved allocation from the declared experimental budget.
+
+Fork only at supported snapshot boundaries without ambiguous effects. Historical inspection can reach other cursors without implying that execution can restart there.
+
+Policy-requested development forks charge the requesting arm. Independent study branches receive declared campaign allocations. Neither operation replenishes the parent's budget.
+
+### 7.5 Audit lineage
+
+Predeclare the candidate-selection procedure before the campaign. Freeze the completed campaign and exact selected artifact references before running the blind audit.
+
+For the reference study, audit the selected frozen actor bundles from both arms under the same audit contract. The audit measures transfer of those bundles; it does not by itself establish that the entire adaptation procedure improves on unseen streams.
+
+Audit execution uses separate lineage, environment state, artifact access, retrieval indexes, caches, provider conversation state, and accounting. Ordinary task state may evolve inside that lineage, but audit artifacts cannot flow back into development.
+
+Isolation includes traces, memories, prompts, scores, dashboard views, acceptance flags, stop signals, budget effects, and messages. The audit runner exposes results only through the authorized reporting path after the freeze and audit procedure.
+
+An audit score cannot select a different candidate for the same untouched-audit claim. If a human uses audit findings to direct further development, the next claim requires a fresh audit.
+
+Noninterference tests vary protected inputs and scores while holding permitted inputs and recorded model responses fixed. The adaptive lineage's requests, commands, and visible state must remain unchanged. This checks framework information flow, not whether a pretrained model previously encountered benchmark material.
+
+### 7.6 Replay, resume, and reproduce
 
 | Operation | Promise |
 |---|---|
-| Replay | Reconstruct recorded state, accounting, and results from verified history without external dispatch. |
-| Resume | Continue using pinned artifacts and recorded results, reconciling unresolved effects where supported and suspending elsewhere. |
-| Reproduce | Start a new execution from the resolved specification and retained dependencies, then measure whether results agree. |
+| **Replay** | Reconstruct recorded state, results, revisions, and accounting from verified history without external dispatch or candidate execution. |
+| **Resume** | Continue the same run using pinned artifacts and recorded results, following section 3's recovery rules. |
+| **Reproduce** | Start a new execution from the resolved specification and retained dependencies, then measure agreement. |
 
-A manifest alone cannot guarantee identical fresh answers from a hosted model. Retain actual requests, responses, snapshots, random state, and relevant external observations for exact historical reconstruction. For deterministic local components, retain the executable environment and all inputs needed for repeat execution.
+Retain actual model requests and responses, simulator snapshots, random state, and relevant external observations. Replaying an old model response against changed input is invalid.
 
-Replay should fail clearly on missing artifacts. Fresh reproduction should report unavailable model versions and environmental differences. Neither should silently substitute “latest.” Replaying recorded model responses after changing their input is invalid.
+Missing artifacts cause a clear replay failure. Unavailable model versions or changed environments cause an explicit reproduction limitation. Neither operation substitutes “latest.”
 
-4. Observability should be a disposable projection of the durable journal.
+A publishable result includes the study specification, resolved manifests, executable artifacts, split and scorer identities, all run outcomes, cost and coverage tables, reproduction commands, and event references behind reported measurements. Protected audit material remains subject to separate access and publication rules.
 
-Build one read-only projector that follows committed events, resolves authorized artifacts, and emits OTLP. Recovery, scoring, and accounting must never depend on successful telemetry delivery. An exporter outage should produce a visible backlog that can be rebuilt from history.
+## 8. Observability
 
-Use this mapping. These are proposed semantic mappings, not claims that every event family already exists.
+### 8.1 Journal projection
 
-| Journal evidence | Telemetry representation |
+One read-only projector follows committed history, resolves authorized artifacts, and emits OTLP. Telemetry is never on the critical path for dispatch, recovery, scoring, or accounting.
+
+Exporter failure creates a visible backlog. Rebuilding the projection from history restores inspection without changing execution state.
+
+Keep the full authority stream locally. Export all permitted traces initially. Production tail sampling is deferred.
+
+| Journal evidence | OTel representation |
 |---|---|
-| Start and finish of a bounded adaptation cycle | `invoke_workflow` span where the cycle genuinely coordinates agent operations |
-| Actor or refiner invocation and its recorded completion | `invoke_agent` span with role and executing bundle revision |
-| Authorized model request, dispatch, response, and usage | Model span using the appropriate GenAI operation, requested/returned model identity, token usage, and observed latency |
-| Brokered tool invocation and receipt | `execute_tool` span with operation identity, request/result references, and classified outcome |
-| Revision activation, restoration, and continuation | Span events or correlated logs identifying exact before/after artifacts |
-| Trusted measurements and accounting | Measurement records, numeric metrics, and correlated event references |
-| Candidate or human annotations | Namespaced diagnostic logs with producer and subject references |
+| Bounded cycle coordinating agent operations | `invoke_workflow` span. |
+| Actor or refiner invocation | `invoke_agent` span with role and executing bundle. |
+| Model authorization, dispatch, return, and usage | Appropriate GenAI model-operation span with requested/observed model identity and available usage. |
+| Brokered tool operation | `execute_tool` span with effect identity and classified outcome. |
+| Activation, restoration, continuation | Correlated logs or span events with exact artifact references. |
+| Measurements and accounting | Numeric observations and records linked to authoritative events. |
+| Candidate or human annotations | Namespaced diagnostic logs with producer and subject references. |
 
-Use standard GenAI attributes where their meaning fits. Keep strive-specific evidence under `strive.*`. The relevant standard instruments include `gen_ai.client.operation.duration` and `gen_ai.client.token.usage`; missing usage must not become zero. [OTel model spans](https://raw.githubusercontent.com/open-telemetry/semantic-conventions/v1.41.0/docs/gen-ai/gen-ai-spans.md), [OTel metrics](https://raw.githubusercontent.com/open-telemetry/semantic-conventions/v1.41.0/docs/gen-ai/gen-ai-metrics.md)
+Pin OTel GenAI semantic conventions to `1.41.0`; their Development status makes the pin necessary. Use standard attributes where their meanings fit and `strive.*` for execution-specific fields. See the pinned [agent conventions](https://raw.githubusercontent.com/open-telemetry/semantic-conventions/v1.41.0/docs/gen-ai/gen-ai-agent-spans.md) and [model conventions](https://raw.githubusercontent.com/open-telemetry/semantic-conventions/v1.41.0/docs/gen-ai/gen-ai-spans.md).
 
-A long-running run should group many bounded traces. Do not leave one root span open for days. Use run and campaign identifiers for grouping, parent-child relationships within cycles, and links across forks and recovery episodes. Derive stable telemetry identities from execution identities, never solely from identical request content.
+Use `gen_ai.client.operation.duration` and `gen_ai.client.token.usage` where applicable. Missing usage remains missing. See the pinned [GenAI metrics](https://raw.githubusercontent.com/open-telemetry/semantic-conventions/v1.41.0/docs/gen-ai/gen-ai-metrics.md).
 
-Record broker-observed timing. Journal order establishes causality; export time does not establish execution latency. Represent suspension and later reconciliation explicitly without fabricating a completed model response.
+Group bounded traces by run and campaign. Use links across recovery episodes and forks instead of leaving a root span open indefinitely. Derive stable telemetry identities from execution identities, not request hashes.
 
-An exporter cursor and stable identifiers make retries manageable, but OTLP delivery does not supply universal exactly-once ingestion. Historical re-export must not increment live spending counters again. Financial and scientific totals always come from a fold of the authoritative ledger.
+Broker-observed timing determines latency. Export time does not. Suspension and later reconciliation remain explicit.
 
-**Ship Langfuse as the reference viewer, with compatibility profiles for LangSmith and Phoenix.** “Out of the box” should mean selecting a profile and endpoint with no changes to policy code:
+OTLP does not provide universal exactly-once ingestion. Historical re-export must not increment financial totals again. Official cost and research totals always come from the authoritative journal fold.
 
-- Langfuse needs its supported attribute mapping and propagation of grouping metadata to child spans.
-- LangSmith has its own documented mappings for run types, messages, and metadata.
-- Phoenix can ingest OTel spans, but richer presentation uses OpenInference attributes; provide translation at the export boundary.
+### 8.2 Viewer profiles
 
-These differences justify small adapters around one canonical projection. They do not justify three instrumentation implementations. [Langfuse OTel integration](https://langfuse.com/integrations/native/opentelemetry), [LangSmith OTel integration](https://docs.langchain.com/langsmith/trace-with-opentelemetry), [Phoenix translation](https://arize.com/docs/phoenix/tracing/concepts-tracing/translating-conventions)
+Ship one canonical projection with three export profiles:
 
-Assign campaign, arm, role, phase, model, revision, and evidence scope when execution is authorized. Propagate relevant dimensions to child spans. Attribute cost to the leaf effects once, then roll it up. Keep high-cardinality event IDs and artifact hashes out of general metric labels.
-
-The three-layer evaluation model is useful organization, not an industry standard or a hierarchy of truth:
-
-| Layer | Strive implementation |
+| Profile | Integration responsibility |
 |---|---|
-| Unit and deterministic checks | Protocol/recovery checks plus trusted simulator outcome and regression scoring |
-| LLM-as-judge and human review | Optional rubric-based assessments over authorized traces, with pinned judge settings, rubric, disagreement, and expenditure |
-| Live sampling | Monitor continuing operation, inspect representative and problematic trajectories, and promote authorized examples into development corpora |
+| **Langfuse, reference viewer** | Translate supported attributes and propagate grouping metadata to child spans. [Integration contract](https://langfuse.com/integrations/native/opentelemetry). |
+| **LangSmith** | Translate run types, messages, and metadata using its documented mappings. [Integration contract](https://docs.langchain.com/langsmith/trace-with-opentelemetry). |
+| **Phoenix** | Translate GenAI fields into OpenInference attributes for richer presentation. [Translation contract](https://arize.com/docs/phoenix/tracing/concepts-tracing/translating-conventions). |
 
-Judge assessments should be visibly distinct from simulator facts. A trusted record that a judge awarded 0.9 does not establish that the underlying task succeeded. Human calibration remains necessary for subjective grading. [Anthropic’s grader distinctions](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)
+Selecting a profile and endpoint requires no policy instrumentation changes. Endpoint credentials remain outside archived artifacts.
 
-`strive status RUN --follow` should answer the questions a researcher asks while waiting:
+Assign campaign, arm, role, phase, model binding, revision, and evidence scope at authorization. Attribute costs once to leaf effects and roll them up. Keep artifact hashes and event IDs out of general metric labels.
 
-- Which revision is running, what is it doing, and why is it blocked?
-- How much expenditure is settled, estimated, reserved, or unresolved? What remains dispatchable?
-- How much planned work was admitted, completed, failed, skipped, or left uncertain?
-- What is cumulative performance, which retained capabilities regressed, and how much statistical evidence exists?
-- Which exact prompt, tool definitions, retrieved content, memory, and attachments reached this invocation?
-- Is telemetry caught up with the journal?
+Audit export uses a separate destination or enforced access boundary. A shared dashboard is a feedback channel.
 
-For “what the model consumed,” preserve the actual adapter request after context selection, compaction, and truncation. Record artifact references and byte ranges for supplied components. Say **sent to the model**; neither traces nor token counts prove which material causally influenced its answer. Provider-side transformations can remain unobservable.
+### 8.3 Researcher inspection
 
-Keep statistical uncertainty separate from unresolved execution. A confidence interval cannot compensate for missing outcomes. Show the denominator and, where appropriate, bounds under alternative unresolved outcomes.
+Provide journal-backed status, history, and invocation-input inspection, including:
 
-The viewer should display separate fields for `trusted.fulfilment_rate`, `judge.*`, and `candidate.claimed_*`, each with provenance. Only trusted measurements populate official result tables. An annotation such as “all orders shipped” remains useful diagnostic text without affecting coverage.
+```text
+strive status RUN --follow
+```
 
-Viewer annotations can return to the journal as attributed diagnostic records. They must never overwrite authoritative measurements or automatically become policy feedback.
+The inspection experience shows:
 
-Export permissions follow the feedback contract. Audit telemetry needs a separate destination or access boundary, including during embargo. A shared dashboard is an information channel.
+- Active revision, current work, and reason for suspension.
+- Settled, calculated, reserved, and unknown expenditure.
+- Planned work and coverage, including failures and unresolved outcomes.
+- Performance and retention with the available statistical evidence.
+- Exact model requests, supplied components, and associated effects.
+- Telemetry cursor and backlog.
 
-Retain the full authority stream locally and export all traces initially. If volume warrants tail sampling later, retain errors, uncertainty, expensive episodes, and a random baseline. Calculate research metrics from the complete journal. Tail sampling selects diagnostic material and can be affected by late-arriving spans. [OTel tail-sampling behavior](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
+Preserve the actual adapter request after context selection, compaction, and truncation. Record component references and byte ranges where applicable. Label this material **sent to the model**. It does not establish what causally influenced the response, and provider-side transformations may be unobservable.
 
-5. The open decisions should distinguish experimental freedom from the claims a run supports.
+Display trusted workload measurements, judge assessments, and candidate claims separately. A trusted record that a judge awarded a score certifies the assessment's provenance, not simulator success.
 
-| Decision | Recommendation | Where freedom and claims diverge |
+Viewer annotations may return through an attributed annotation interface. They cannot overwrite measurements or automatically enter adaptive context.
+
+## 9. Resolved design decisions
+
+### 9.1 Modification scope
+
+Release 1 permits actor code, prompts, memory, and pure computations or compositions of already authorized tools. Dependencies come from the supplied pinned environment.
+
+The reference experiment pins the controller. Controller replacement is available through the bounded interface and atomic activation contract in section 3 when explicitly enabled in the editable scope. It does not require research mode.
+
+Demonstrated controller improvement is not a release requirement. General state migration, model-weight modification, arbitrary dependency installation, and candidate-created privileged adapters are deferred.
+
+### 9.2 Feedback contract
+
+| Contract | Final use and permitted influence |
+|---|---|
+| **A: strict blind audit** | Required for the release scientific comparison. Declared development evidence may drive adaptation and selection. Audit evidence follows section 7's embargo and lineage rules. |
+| **B: adaptive validation plus fresh blind audit** | Default development template. Both development and explicitly declared validation pools may drive adaptation and selection. Consulted validation data is consumed development evidence and cannot support an untouched-held-out claim. |
+| **C: private deployment veto** | Not implemented in release 1. Selecting or blocking a candidate using private feedback would require a distinct declared control channel, query accounting, and a separate final audit. |
+
+A and B share the same execution and evaluation machinery. Their access grants differ. Operational failures are visible by default when authorized by the manifest.
+
+### 9.3 Trusted and research modes
+
+Trusted mode is the default for ordinary policy experiments, controller edits within scope, custom annotations, and descriptive comparisons.
+
+Research mode is fixed at run creation. It permits stubbed adapters, simulated receipts, candidate-controlled measurement programs, and experimental semantics outside the trusted-result contract.
+
+Research mode retains the outer runner's confinement, authorization, and real expenditure accounting. Simulated receipts identify themselves. Experimental scores remain untrusted. Real broker receipts retain their own provenance.
+
+Artifacts produced in research mode may receive a new trusted evaluation. That does not retroactively upgrade their earlier results.
+
+### 9.4 Workload and providers
+
+The first stateful workload is an order-fulfilment simulator with persistent inventory and order state. Keep sum/max fixtures as deterministic controls behind the same small operation interface.
+
+The simulator provides stock reads, inventory reservation, order updates, operation lookup, and snapshots. A mutation transaction stores both its state change and result under the effect ID. Repeating that ID with different arguments fails; looking it up returns the original result.
+
+The trusted scorer uses actual simulator state and broker receipts. Agent-written “shipped” or “tests passed” messages have no scoring authority.
+
+Release 1 integrates one selected hosted-model provider through a trusted adapter. Actor and refiner bindings name exact available model versions and request settings. Provider/account selection remains a deployment input in section 11, not an implicit kernel default. Ambiguous model calls suspend unless the selected adapter has a verified stronger recovery contract.
+
+### 9.5 Durability and threat scope
+
+Release 1 assumes one trusted host and operator, hostile generated code and inputs, and durable local storage surviving process failure.
+
+Protect against candidate access violations, forged candidate records, accidental corruption, interrupted publication, and process crashes. Enforce sandbox resource limits and protected storage access on the supported runtime.
+
+Host or disk destruction, malicious operators, undetectable replacement of the entire store, distributed ownership, and host-loss failover are outside the claim. Hash chains alone do not establish protection against complete history replacement.
+
+### 9.6 Budget and release claim
+
+The release must demonstrate the integrity mechanisms and complete the fixed-versus-adapting study under a predeclared funded ceiling. The template's numbers are illustrative; campaign funding remains a human input.
+
+The release claim is a functioning, inspectable mechanism for trustworthy actor adaptation under the stated scope. Positive performance results are not required to ship it.
+
+An improvement claim additionally requires the matched evidence, coverage, cost accounting, uncertainty, and feedback conditions in section 7. A negative or inconclusive study must be reported as such. Controller improvement requires its own experiment.
+
+### 9.7 What defines a trusted run
+
+A run qualifies for trusted execution claims only when all five guarantees in section 2 hold under the declared assumptions. A `mode="trusted"` flag alone is insufficient.
+
+Trust does not require strict feedback A, matched comparison, controller immutability, or automatic recovery from every provider. Those are separate configuration and claim dimensions.
+
+Reports therefore carry three separate labels:
+
+| Label | Meaning |
+|---|---|
+| Execution integrity and measurement provenance | Which guarantees and producers support the recorded result. |
+| Feedback exposure | Which evidence could influence adaptation and selection. |
+| Comparison strength | Whether the evidence supports a matched comparison or descriptive observation. |
+
+A trusted B run with descriptive comparison is valid research. Its label must not imply a blind, controlled improvement result.
+
+## 10. Release-1 scope and milestones
+
+### 10.1 Build now and defer
+
+| Build now | Defer |
+|---|---|
+| TOML resolution, Python builder, retained artifact closure, strict resume, readable configuration differences. | Configuration inheritance language and a general packaging platform. |
+| Local framed journal, CAS, authority protocol, pure verifier, incremental preflight, full replay. | Persistent verifier caches, signed external history anchors, replication and host-loss recovery. |
+| Serial supervisor, durable reservations, reconciliation, honest uncertainty, operator recovery. | Remote workers, concurrent subagents, distributed scheduling and budget coordination. |
+| Enforced sandbox, capability broker, protected credentials, scoped views. | Arbitrary dependency installation and generated privileged adapters. |
+| Stateful order simulator, sum/max fixtures, explicit continuation, supported snapshot forks. | General workflow language, persistent interpreter recovery, arbitrary VM/process snapshots. |
+| Actor adaptation and general atomic bundle/state activation, including bounded controller replacement. | Controller-state migration and a required controller-improvement study. |
+| Open annotations, versioned memory files, explicit scoped imports. | Mandatory memory ontology and global mutable cross-run memory. |
+| A/B feedback contracts, development corpus, isolated final audit. | Private veto contract C. |
+| Serial study wrapper, two-arm reference study, paired analysis, Markdown/JSON/CSV reports. | Automatic hyperparameter search, optimizer-specific integrations and population-search tooling. |
+| Journal-backed CLI inspection, OTLP projection, Langfuse setup and LangSmith/Phoenix profiles. | Custom web UI, hosted leaderboard, prompt-management service, labeling product and production tail sampling. |
+| Ordinary brokered execution. | Speculation and reusable external-effect caches. |
+
+### 10.2 Milestone sequence
+
+| Milestone | Deliverable | Exit evidence |
 |---|---|---|
-| Modification scope | Allow acting code, prompts, memory, and compositions of already authorized tools. Pin the controller in the reference experiment. Support controller replacement through the same bounded interface and atomic activation mechanism when enabled. | Wider scope supports more interesting experiments but makes attribution harder. Use narrower arms to identify the source of gains. Controller changes do not require research mode if authority remains fixed. |
-| Feedback A | Use for the release’s scientific comparison. Development evidence is available; audit evidence remains embargoed until campaign and selection freeze. | Strongest support for an untouched-audit claim. Audit results cannot select a better candidate for that same claim. |
-| Feedback B | Make this the everyday research template. Explicitly permit validation feedback and selection, while preserving a separate fresh blind audit. | Easier iteration and optimizer integration. Repeatedly consulted validation data is consumed development evidence, regardless of its filename. |
-| Feedback C | Defer private deployment veto machinery. | A private veto can support operational selection, but even one bit affects the chosen system. It requires query accounting, declared influence, and a separate final audit. |
-| Trusted versus research | Default to trusted runs. Reserve research mode for stubbed contracts, candidate-controlled measurement, or experimental semantics outside the trusted claim. | Ordinary policy experiments and custom logging should retain trusted accounting. Experimental measurement cannot certify itself. |
+| **1. Freeze contracts and acceptance cases** | Authority schema, step interface, effect lifecycle, manifest schema, simulator scenarios, feedback access matrix, and reference study plan. | Each integrity guarantee has a falsifiable test. Human go/no-go precedes teardown. |
+| **2. Build storage and pure verification** | New artifact root, CAS publication, framed history, one-writer ownership, reference validation, replay and preflight. | Reject malformed authority transitions and corrupted references. Accept unknown bounded annotations. Verification works in a fresh interpreter without candidate imports. |
+| **3. Build effects, accounting, and confinement** | Broker, sandbox, reservations, recorded returns, settlement, continuation and operator recovery. | Fault injection at authorization, dispatch, return, settlement, and continuation boundaries. Reject stale results, unauthorized calls, credential access and budget expansion. |
+| **4. Complete stateful operation** | Transactional simulator mutations, operation lookup, snapshots, trusted scoring and coverage. | Crash after mutation but before strive records the receipt; recover the original result without repeating the mutation. Unsupported model uncertainty retains its obligation and suspends. |
+| **5. Enable adaptation** | Code/prompt/memory revisions, atomic activation/restoration, optional forks and bounded controller handover. | Prompt-only edits alter behavior. Composite activation survives crashes. Restoration preserves current world state and accounting. Controller failure can be repaired independently. |
+| **6. Complete the research workflow** | Manifest and study commands, A/B access, audit isolation, comparisons, CLI inspection and telemetry profiles. | Protected-data noninterference, complete denominator reporting, restart-safe study expansion, and exporter outage/re-export checks. |
+| **7. Evaluate and package** | Funded reference study, portable report and artifacts, installed package and documentation. | All declared runs reported; every official measurement and cost traces to authoritative records. State only claims supported by results. |
 
-A and B can share most implementation. Their manifests declare which pools may influence adaptation and selection. Neither needs a separate evaluation engine. C adds a distinct private control channel and should earn its implementation cost.
+Maintain strict typing, relevant tests, installed-wheel CLI smoke tests, and fresh-interpreter verification throughout the rebuild. Tests for authority and recovery must exercise failure boundaries, not merely mirror implementation structure.
 
-Comparability should have `matched` and `descriptive` settings. Matched comparison validates everything except predeclared experimental differences. Descriptive comparison shows mismatches and observed trends without presenting them as controlled improvement. Both may supply authorized evidence to adaptation.
+The acceptance experience is one complete workflow: a researcher changes a policy or parameter, inspects the resolved differences, launches paired runs, interrupts and resumes execution without resetting expenditure, follows cost and coverage, opens the exact request behind a regression, and generates a comparison with traceable numbers. The same workflow remains usable while telemetry delivery is unavailable.
 
-Keep three labels separate in reports:
+## 11. Remaining human questions
 
-- Execution integrity and measurement provenance.
-- Feedback exposure.
-- Comparison strength.
+1. **Go/no-go:** Approve this specification, including its explicit evidence-rule relaxations, before any teardown?
+2. **Provider binding:** Which funded provider account and exact actor/refiner model versions should the first adapter and campaign use?
+3. **Campaign size:** What total spending ceiling, separate audit allocation, task horizon, and number of paired repetitions are authorized for the first real-model study?
 
-A trusted execution under B with descriptive comparison can be valuable research. It simply supports a different claim from a matched, blind-audit experiment.
+## Appendix: Changes from earlier drafts
 
-Research mode remains fixed for the run and cannot disable confinement, real expenditure accounting, or outer authorization. Its headline experimental result stays marked untrusted. Real broker receipts retain their provenance. An artifact developed there can undergo a new trusted evaluation; the earlier result is not retroactively upgraded.
-
-This recommendation changes the *default development workflow* from pass 3’s emphasis on A. It preserves A for the first published claim and preserves pass 3’s small authority boundary.
-
-6. Release 1 should make one complete research workflow pleasant before adding platform features.
-
-| Build in release 1 | Concrete scope |
-|---|---|
-| Manifest resolution | TOML schema, explicit defaults, captured local changes, artifact closure, readable configuration diffs, and strict resume checks |
-| Experiment runner | Serial expansion of named arms and seeds, stable run identities, supported simulator forks, and declared budgets |
-| Evaluation workflow | Versioned development corpus, A/B visibility contracts, isolated final audit, and fixed-versus-adapting reference study |
-| Comparison and export | Markdown/JSON/CSV results, coverage and cost accounting, paired trajectory summaries, uncertainty, manifest references, and trace references |
-| Live inspection | CLI status/history/input inspection driven directly by the journal |
-| Portable telemetry | One journal projector, OTLP export, Langfuse reference setup, small LangSmith/Phoenix mappings, and export backlog visibility |
-| Diagnostic freedom | Bounded arbitrary annotations, provenance, authorized content export, and clear separation of claims from trusted measurements |
-
-Defer a custom web UI, hosted leaderboard, prompt-management service, dataset-labeling product, distributed experiment scheduler, automatic hyperparameter search, and optimizer-specific integrations. Also defer production tail-sampling infrastructure, private veto workflows, general controller-state migration, and distributed durability.
-
-Support controller editability through the general bundle contract where that mechanism is ready; do not require demonstrated controller improvement to release the research tooling. Unsupported combinations should fail explicitly rather than silently weakening their declared guarantees.
-
-The release acceptance experience should be concrete: a researcher changes a policy or parameter, launches paired runs, resumes an interrupted run without resetting its budget, follows cost and coverage live, opens the exact model input behind a regression, and generates a comparison whose numbers can be traced back to journal events.
-
+- Closed schemas now cover authority records only. Diagnostics and policy annotations are open.
+- The verifier checks protocol consistency and provenance; workload facts belong to pinned adapters and scorers.
+- Faithful records may include overruns, uncertainty, and late settlement after execution finishes.
+- Actor-only adaptation is the reference experiment. Controller editing remains supported within fixed authority, without a dedicated improvement gate.
+- B is the development default; A governs the release scientific comparison. C is deferred.
+- Unmatched evidence and infrastructure observations may inform adaptation. Classification and comparison rules constrain claims.
+- Exact resume means exact recorded state plus supported reconciliation, with suspension for unresolved external effects.
+- Bundle restoration replaces general inverse-edit machinery. Memory files replace a mandatory structured-memory ontology.
+- Release 1 uses serial local execution. Subagents, distributed durability, speculation, and general state migration are deferred.
