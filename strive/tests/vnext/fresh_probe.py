@@ -16,8 +16,15 @@ _PROGRAM = textwrap.dedent('''
     import importlib.abc
     from pathlib import Path
 
+    sys.path = [p for p in sys.path if "site-packages" not in p]
     sys.path.insert(0, sys.argv[1])
-    forbidden = ("dspy", "litellm", "openai", "anthropic", "numpy", "torch", "candidate")
+    if len(sys.argv) > 5 and sys.argv[5]:
+        sys.path.append(sys.argv[5])
+        import importlib.metadata
+        assert importlib.metadata.version("strive-benchmark-tau2") == "0.1.0"
+
+    forbidden = ("dspy", "litellm", "openai", "anthropic", "numpy", "torch", "candidate", "tau2", "strive_benchmark_tau2", "strive_benchmark_counter",
+                 "pandas", "pydantic", "httpx", "requests", "fastapi", "tenacity", "deepdiff", "dotenv", "tiktoken", "tokenizers", "strive.vnext.benchmarks")
     allowed_strive = {"strive", "strive.vnext"} | {
         "strive.vnext." + name for name in (
             "codec", "errors", "wire", "verify", "verify.engine", "store", "store.cas", "store.journal",
@@ -66,11 +73,15 @@ _PROGRAM = textwrap.dedent('''
         outcome = "CORRUPTION_REJECTED"
     else:
         assert not expected_corruption, "corrupt authority was accepted"
-        assert len(state.records) == 6
-        assert len(state.consumed_results) == 1
-        assert state.private_state == b"private-state\\x00"
-        assert isinstance(state.records[-1].payload, Annotation)
-        assert state.records[-1].payload.payload.startswith(b"\\xffnot JSON")
+        if len(sys.argv) > 4 and sys.argv[4] == "benchmark":
+            assert state.measurements and state.measurements[-1].metric_value == 1
+            assert len(state.consumed_results) == len(state.effects)
+        else:
+            assert len(state.records) == 6
+            assert len(state.consumed_results) == 1
+            assert state.private_state == b"private-state\\x00"
+            assert isinstance(state.records[-1].payload, Annotation)
+            assert state.records[-1].payload.payload.startswith(b"\\xffnot JSON")
         outcome = "REPLAY_ACCEPTED"
     assert not any(name == prefix or name.startswith(prefix + ".") for name in sys.modules for prefix in forbidden)
     assert not any(name.startswith("strive.") and name not in allowed_strive for name in sys.modules)
@@ -78,10 +89,11 @@ _PROGRAM = textwrap.dedent('''
 ''')
 
 
-def fresh_replay(root: Path, *, corrupt: bool) -> None:
+def fresh_replay(root: Path, *, corrupt: bool, benchmark: bool = False, installed: Path | None = None) -> None:
     source = Path(__file__).resolve().parents[2] / "src"
     result = subprocess.run(
-        [sys.executable, "-I", "-B", "-c", _PROGRAM, str(source), str(root), "corrupt" if corrupt else "valid"],
+        [sys.executable, "-I", "-B", "-c", _PROGRAM, str(source), str(root), "corrupt" if corrupt else "valid",
+         "benchmark" if benchmark else "storage", str(installed) if installed else ""],
         capture_output=True, text=True, timeout=30,
     )
     assert result.returncode == 0, f"fresh verifier failed: stdout={result.stdout!r}, stderr={result.stderr!r}"

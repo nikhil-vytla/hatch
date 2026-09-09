@@ -284,6 +284,21 @@ def _activate(state: VerifiedState, payload: RevisionActivation, frame: Frame, o
     _require(state.execution_status is not ExecutionStatus.FINISHED, "cannot activate after finish")
     _require(payload.previous_bundle == state.active_bundle and payload.expected_active_revision == state.active_revision,
              "revision/bundle continuity mismatch")
+    # The supervisor's operator entry point retains the RestoreBundle itself.
+    # This single record changes only bundle identity, even with pending effects.
+    if state.execution_status is ExecutionStatus.SUSPENDED:
+        boundary = decode(objects.read(payload.activation_boundary))
+        if isinstance(boundary, RestoreBundle):
+            _require(boundary.prior_bundle == payload.next_bundle
+                     and boundary.expected_active_revision == state.active_revision
+                     and boundary.controller_state is None
+                     and payload.coupled_controller_state_reference is None,
+                     "suspended restoration cannot migrate state or change request")
+            _require(payload.next_bundle in {bundle for _, bundle in state.revisions},
+                     "restoration requires a previously active bundle")
+            revision = RevisionId(frame.envelope.record_id)
+            return replace(state, active_bundle=payload.next_bundle, active_revision=revision,
+                           revisions=state.revisions + ((revision, payload.next_bundle),))
     _require(all(effect.state in {EffectState.SETTLED, EffectState.CONSUMED} for effect in state.effects),
              "activation requires a legal operation boundary")
     if state.pending_command is not None:

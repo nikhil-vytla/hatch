@@ -1803,3 +1803,35 @@ All committed tests use deterministic scripts, retained responses, or the inject
 **Do not overstate overall release readiness.** The current acceptance suite still marks native-harness confinement as unresolved. M5 can close benchmark scoring and recovery evidence without claiming that every native harness already satisfies all five guarantees. The funded ceiling and protected audit allocation remain prerequisites for the later paid campaign.
 
 Automatic approval review rejected opening the raw task file in the browser because permission was declined. That retrieval was not bypassed; complete task-inventory certification remains outstanding.
+
+### M5 implementation status, 9 September 2026
+
+Amendment 2 is implemented under `src/strive/vnext/benchmarks/`, with the tau2
+implementation in the separately resolved `adapters/tau2/` project. The typed
+`strive.benchmark/1` interface remains outside the authority codec. The operation
+and evidence ownership described in §3 now uses `BenchmarkEffectAdapter`,
+`EpisodeDriver`, transactional operation receipts, and the trusted scorer port.
+`Measurement` retains its frozen fields and carries authenticated receipt and
+state references, the task reward definition, grouping identity and coverage.
+
+The §3.3 runtime changes use pinned scoped admission and the existing
+`RevisionActivation`. Suspended operator restoration retains the canonical
+`RestoreBundle`, changes only active bundle/revision, and preserves suspension,
+private state, pending commands, effect authorizations, results and accounting.
+Candidate activation still cannot cross an unresolved operation boundary.
+
+The §6 closure includes source/dependency/data identities and an explicit
+retained data tree. The §7 telecom reference campaign remains 60 development,
+14 validation and 40 audit tasks; generic adapters do not inherit that split.
+The importer scans the full supplied inventory, groups scenarios transitively,
+and fails preparation on ineligible grading, crossing groups or an impossible
+whole-group partition. No audit or validation feedback is granted to adaptation.
+
+M5's §9.4/§10 evidence is fixture-level in this environment. The pinned tau2
+resolution hit the macOS uv system-configuration panic; shell task retrieval
+failed DNS and the web reader rejected the task file's size. Full upstream
+inventory certification and live deterministic evaluator equivalence remain
+explicitly skipped. No task exclusions or replacement denominator are approved.
+A second integer-target benchmark exercises the frozen common infrastructure
+without changes to its files. The implementation report and exact limits are in
+[`m5-investigation/README.md`](../m5-investigation/README.md).

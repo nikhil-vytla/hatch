@@ -104,8 +104,7 @@ class Supervisor:
                                                          for e in self.state.effects)):
                 raise VerificationError("candidate step requires an available continuation")
             scope = self.writer.reader.authority.scope
-            permitted = set().union(*(c.inputs for c in self.broker.capabilities))
-            if any(item.access_scope != scope or item.reference not in permitted for item in artifacts):
+            if any(item.access_scope != scope or not self.broker.permits_input(self.state, item) for item in artifacts):
                 raise VerificationError("candidate input not permitted")
             assert self.state.active_bundle is not None and self.state.active_revision is not None
             assert self.state.environment is not None
@@ -211,7 +210,7 @@ class Supervisor:
         finally:
             self._lock.release()
 
-    def _accept(self, output: StepOutput, expected_head: ArtifactRef | None) -> None:
+    def _accept(self, output: StepOutput, expected_head: ArtifactRef | None, *, operator: bool = False) -> None:
         # Canonical decoding checks runtime types, not just dataclass annotations.
         if not isinstance(decode(encode(output)), StepOutput):
             raise VerificationError("invalid step output")
@@ -222,6 +221,8 @@ class Supervisor:
         if any(e.state not in {EffectState.SETTLED, EffectState.CONSUMED} for e in self.state.effects):
             raise VerificationError("step cannot interpret an unresolved effect")
         command = output.command
+        if isinstance(command, RestoreBundle) and not operator:
+            raise VerificationError("bundle restoration requires the operator entry point")
         if isinstance(command, ExecuteEffect) and (command.binding == "@supervisor" or command.operation == "runtime.step"):
             raise VerificationError("candidate cannot request supervisor operations")
         if isinstance(command, EvaluateFork):
@@ -266,6 +267,10 @@ class Supervisor:
             self._lock.release()
 
     def _drive(self) -> None:
+        if self.state.dispatch_stopped:
+            raise VerificationError("dispatch stopped")
+        if self.state.execution_status is not ExecutionStatus.CONTINUE:
+            return
         if self.state.pending_command is None:
             return
         command = decode(self.writer.objects.read(self.state.pending_command))
@@ -470,8 +475,21 @@ class Supervisor:
         self._enter()
         try:
             assert self.state.active_revision is not None
-            self._accept(StepOutput(RestoreBundle(bundle, self.state.active_revision, controller_state),
-                                    self.state.private_state), self.state.head)
-            self._drive()
+            command = RestoreBundle(bundle, self.state.active_revision, controller_state)
+            if self.state.execution_status is ExecutionStatus.SUSPENDED:
+                if controller_state is not None:
+                    raise VerificationError("suspended restoration cannot migrate state")
+                if bundle not in {prior for _, prior in self.state.revisions}:
+                    raise VerificationError("restoration requires a previously active bundle")
+                if self._compatible_bundle is None or not self._compatible_bundle(bundle):
+                    raise VerificationError("bundle has not passed trusted compatibility validation")
+                assert self.state.active_bundle is not None
+                boundary = self.writer.objects.publish(encode(command))
+                self._append(RevisionActivation(self.state.active_bundle, bundle, self.state.active_revision,
+                                                boundary, None), ProducerKind.SUPERVISOR, self._cause())
+                self.fault(Boundary.ACTIVATED)
+            else:
+                self._accept(StepOutput(command, self.state.private_state), self.state.head, operator=True)
+                self._drive()
         finally:
             self._lock.release()

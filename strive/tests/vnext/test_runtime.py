@@ -233,7 +233,7 @@ def test_operator_restore_uses_durable_command_preserves_accounting(runtime: Run
     runtime.supervisor.drive()
     runtime.supervisor.accept(StepOutput(Suspend("broken controller"), b"broken"), expected_head=runtime.supervisor.state.head)
     before = runtime.supervisor.state
-    arm(runtime, Boundary.ACCEPTED)
+    arm(runtime, Boundary.ACTIVATED)
     with pytest.raises(Crash):
         runtime.supervisor.restore(runtime.bundle)
     runtime.restart().recover()
@@ -242,6 +242,8 @@ def test_operator_restore_uses_durable_command_preserves_accounting(runtime: Run
     assert after.obligations == before.obligations and after.measured == before.measured
     assert after.environment == before.environment and after.consumed_results == before.consumed_results
     assert runtime.provider.calls == 1
+
+    assert after.execution_status is ExecutionStatus.SUSPENDED
 
 
 def test_in_process_upstream_gate_retains_actual_request_and_denies_second(runtime: RuntimeFixture) -> None:
