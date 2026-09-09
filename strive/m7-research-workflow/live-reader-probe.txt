@@ -1,0 +1,1 @@
+Confirmed: a legitimate concurrent append rejects an ordinary file-backed fold.

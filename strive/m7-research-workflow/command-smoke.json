@@ -1,0 +1,81 @@
+[
+  {
+    "command": "run",
+    "arguments": [
+      "run",
+      "/Users/nikhil/personal/hatch/strive/m7-research-workflow/examples/counter.toml",
+      "--id",
+      "adapting-17"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": "resume",
+    "arguments": [
+      "resume",
+      "adapting-17"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": "fixed",
+    "arguments": [
+      "run",
+      "/Users/nikhil/personal/hatch/strive/m7-research-workflow/examples/fixed.toml",
+      "--id",
+      "fixed-17"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": "compare",
+    "arguments": [
+      "compare",
+      "fixed-17",
+      "adapting-17",
+      "--spec",
+      "/Users/nikhil/personal/hatch/strive/m7-research-workflow/examples/paired.toml"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": "descriptive",
+    "arguments": [
+      "compare",
+      "fixed-17",
+      "adapting-17",
+      "--spec",
+      "/Users/nikhil/personal/hatch/strive/m7-research-workflow/examples/descriptive.toml",
+      "--out",
+      "/Users/nikhil/personal/hatch/strive/m7-research-workflow/.smoke-final/descriptive"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": "status",
+    "arguments": [
+      "status",
+      "adapting-17",
+      "--follow"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": "experiment",
+    "arguments": [
+      "experiment",
+      "/Users/nikhil/personal/hatch/strive/m7-research-workflow/examples/study.toml"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": "project",
+    "arguments": [
+      "project",
+      "adapting-17",
+      "--profile",
+      "langfuse"
+    ],
+    "exit_code": 0
+  }
+]

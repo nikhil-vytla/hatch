@@ -1,0 +1,45 @@
+"id" = "reference"
+"base" = "counter.toml"
+"repetitions" = 2
+"seeds" = [17, 18]
+"pairing" = "workload_seed"
+["arms"]
+["arms"."fixed"]
+"run.editable" = []
+["arms"."adapting"]
+"run.editable" = ["actor.code", "actor.prompts", "actor.memory"]
+["allocations"]
+["allocations"."fixed"]
+"usd_nanodollars" = 0
+"tokens" = 10000
+"model_calls" = 10
+"wall_seconds" = 120
+["allocations"."adapting"]
+"usd_nanodollars" = 0
+"tokens" = 10000
+"model_calls" = 10
+"wall_seconds" = 120
+["allocations"."total"]
+"usd_nanodollars" = 0
+"tokens" = 40000
+"model_calls" = 40
+"wall_seconds" = 480
+["audit"]
+"target" = 7
+"destination" = "audit:reference"
+"selection" = "final_valid_active_actor_from_every_trajectory"
+["audit"."allocation"]
+"usd_nanodollars" = 0
+"tokens" = 40000
+"model_calls" = 40
+"wall_seconds" = 480
+["analysis"]
+"strictness" = "matched"
+"allowed_differences" = ["run.editable"]
+"horizon" = 2
+"pairing" = "workload_seed"
+"metric" = "cumulative_successes"
+"exclusions" = []
+"stopping" = "budget-or-horizon"
+"selection" = "final_valid_active_actor_from_every_trajectory"
+"uncertainty" = "paired-normal-95"

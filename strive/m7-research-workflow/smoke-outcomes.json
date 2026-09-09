@@ -1,0 +1,313 @@
+{
+  "development": {
+    "runs": [
+      {
+        "run": "reference-fixed-0",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 2,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "0",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "0",
+          "outcome_bounds": [
+            "0",
+            "0"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      },
+      {
+        "run": "reference-adapting-0",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 1,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "1",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "0.5",
+          "outcome_bounds": [
+            "1",
+            "1"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      },
+      {
+        "run": "reference-fixed-1",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 2,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "0",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "0",
+          "outcome_bounds": [
+            "0",
+            "0"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      },
+      {
+        "run": "reference-adapting-1",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 1,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "1",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "0.5",
+          "outcome_bounds": [
+            "1",
+            "1"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      }
+    ],
+    "uncertainty": {
+      "complete_pairs": 2,
+      "incomplete_pairs": 0,
+      "interval": [
+        1.0,
+        1.0
+      ],
+      "mean_complete_pair_delta": 1.0,
+      "method": "predeclared normal approximation, 95%; complete pairs only; small-sample limitations apply",
+      "missing_outcomes": "not absorbed by intervals; per-run bounds and coverage are reported separately",
+      "planned_pairs": 2,
+      "unit": "paired trajectory"
+    },
+    "accounting": {
+      "expenditure": {
+        "calculated_nanodollars": 0,
+        "inherited_preparation_nanodollars": 0,
+        "reserved": {},
+        "runs": 4,
+        "settled_usage": {
+          "input_tokens": 2,
+          "model_calls": 2,
+          "output_tokens": 2,
+          "wall_milliseconds": 2860
+        },
+        "source": "sum of independent verified journal folds, deduplicated by execution identity",
+        "unknown": []
+      }
+    }
+  },
+  "audit": {
+    "runs": [
+      {
+        "run": "reference-fixed-0-audit",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 2,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "0",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "0",
+          "outcome_bounds": [
+            "0",
+            "0"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      },
+      {
+        "run": "reference-fixed-1-audit",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 2,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "0",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "0",
+          "outcome_bounds": [
+            "0",
+            "0"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      },
+      {
+        "run": "reference-adapting-0-audit",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 0,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "2",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "1",
+          "outcome_bounds": [
+            "2",
+            "2"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      },
+      {
+        "run": "reference-adapting-1-audit",
+        "status": "finished",
+        "coverage": {
+          "admitted": 2,
+          "completed": 2,
+          "excluded": 0,
+          "failed": 0,
+          "planned": 2,
+          "task_failures": 0,
+          "unresolved": 0
+        },
+        "performance": {
+          "cumulative_successes": "2",
+          "fulfilment_denominator": 2,
+          "observed_fulfilment": "1",
+          "outcome_bounds": [
+            "2",
+            "2"
+          ],
+          "uncertainty": {
+            "interval": null,
+            "n": 1,
+            "reason": "one trajectory; missing outcomes remain explicit",
+            "unit": "independent trajectory"
+          },
+          "unobserved_outcomes": 0
+        }
+      }
+    ],
+    "uncertainty": null,
+    "accounting": {
+      "audit_expenditure": {
+        "calculated_nanodollars": 0,
+        "inherited_preparation_nanodollars": 0,
+        "reserved": {},
+        "runs": 4,
+        "settled_usage": {
+          "wall_milliseconds": 2949
+        },
+        "source": "sum of independent verified journal folds, deduplicated by execution identity",
+        "unknown": []
+      },
+      "campaign_expenditure": {
+        "calculated_nanodollars": 0,
+        "inherited_preparation_nanodollars": 0,
+        "reserved": {},
+        "runs": 8,
+        "settled_usage": {
+          "input_tokens": 2,
+          "model_calls": 2,
+          "output_tokens": 2,
+          "wall_milliseconds": 5809
+        },
+        "source": "sum of independent verified journal folds, deduplicated by execution identity",
+        "unknown": []
+      },
+      "development_expenditure": {
+        "calculated_nanodollars": 0,
+        "inherited_preparation_nanodollars": 0,
+        "reserved": {},
+        "runs": 4,
+        "settled_usage": {
+          "input_tokens": 2,
+          "model_calls": 2,
+          "output_tokens": 2,
+          "wall_milliseconds": 2860
+        },
+        "source": "sum of independent verified journal folds, deduplicated by execution identity",
+        "unknown": []
+      }
+    }
+  }
+}

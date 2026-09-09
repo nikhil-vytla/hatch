@@ -1,0 +1,126 @@
+{
+  "matching": 30,
+  "total": 30,
+  "files": {
+    "src/strive/vnext/benchmarks/__init__.py": {
+      "expected": "8f2f24a56ce7f514ebaa1fd47fdbe3fddc798d8363267e7fcf8b8e078d9465fa",
+      "actual": "8f2f24a56ce7f514ebaa1fd47fdbe3fddc798d8363267e7fcf8b8e078d9465fa"
+    },
+    "src/strive/vnext/benchmarks/api.py": {
+      "expected": "96944b927067de7a95d07be0e1695f74dbd8e23b83bc598289822306f58b2d1d",
+      "actual": "96944b927067de7a95d07be0e1695f74dbd8e23b83bc598289822306f58b2d1d"
+    },
+    "src/strive/vnext/benchmarks/bridge.py": {
+      "expected": "86765a2dd0f7d3de95016c852dd5ece4b2bc3c6491b3d3ec20f787b9b3ea2f14",
+      "actual": "86765a2dd0f7d3de95016c852dd5ece4b2bc3c6491b3d3ec20f787b9b3ea2f14"
+    },
+    "src/strive/vnext/benchmarks/closure.py": {
+      "expected": "f861b8c5f9773de6764b677fad393235f81585e79c70a343d474d9c9626a55a3",
+      "actual": "f861b8c5f9773de6764b677fad393235f81585e79c70a343d474d9c9626a55a3"
+    },
+    "src/strive/vnext/benchmarks/episodes.py": {
+      "expected": "2d71f7b7ba48dca4d2d34f7f6e6f20ba19de932ea5c61bb9f5e7553d4797973f",
+      "actual": "2d71f7b7ba48dca4d2d34f7f6e6f20ba19de932ea5c61bb9f5e7553d4797973f"
+    },
+    "src/strive/vnext/benchmarks/json_data.py": {
+      "expected": "9ac13ceff01d0d4931dee777fe5a8ecea08e98977506c7ddb179b4fac5a754e2",
+      "actual": "9ac13ceff01d0d4931dee777fe5a8ecea08e98977506c7ddb179b4fac5a754e2"
+    },
+    "src/strive/vnext/benchmarks/payloads.py": {
+      "expected": "8ee1f4e8f66596c2731da25fd05a90527a495dee1e8e3de54c22e076ef5314f9",
+      "actual": "8ee1f4e8f66596c2731da25fd05a90527a495dee1e8e3de54c22e076ef5314f9"
+    },
+    "src/strive/vnext/benchmarks/store.py": {
+      "expected": "b824dda8d8c66324dca8e67da766b1e800ebff8d33a0505ce8361589d7e8b7cb",
+      "actual": "b824dda8d8c66324dca8e67da766b1e800ebff8d33a0505ce8361589d7e8b7cb"
+    },
+    "src/strive/vnext/codec.py": {
+      "expected": "165eac31493320441f37ff92b1a2913ec395003714fdaf3ce2a204c20b8eb87d",
+      "actual": "165eac31493320441f37ff92b1a2913ec395003714fdaf3ce2a204c20b8eb87d"
+    },
+    "src/strive/vnext/contracts/__init__.py": {
+      "expected": "2d2411c7ec9d69c648fa8ff065a8c43b5dd921387f01713d24cfdbd8304a214c",
+      "actual": "2d2411c7ec9d69c648fa8ff065a8c43b5dd921387f01713d24cfdbd8304a214c"
+    },
+    "src/strive/vnext/contracts/annotations.py": {
+      "expected": "1c7b4f18a40a53e7dbc83015752aa0ac855a8616f3ae2f5853723f7cd9e2a357",
+      "actual": "1c7b4f18a40a53e7dbc83015752aa0ac855a8616f3ae2f5853723f7cd9e2a357"
+    },
+    "src/strive/vnext/contracts/bindings.py": {
+      "expected": "c5c37c5ced8626da31dc2334e2e9f16dffd48a6e7095e64b28bd465a79ea324c",
+      "actual": "c5c37c5ced8626da31dc2334e2e9f16dffd48a6e7095e64b28bd465a79ea324c"
+    },
+    "src/strive/vnext/contracts/commands.py": {
+      "expected": "62bc9c1624e048379c79f98daa2288cf8cef4e2c91749468abbfdf1799bc9370",
+      "actual": "62bc9c1624e048379c79f98daa2288cf8cef4e2c91749468abbfdf1799bc9370"
+    },
+    "src/strive/vnext/contracts/feedback.py": {
+      "expected": "d762ece51a47330570100ce1040507eefa73d14da2dc491bbfd74fbe69f67420",
+      "actual": "d762ece51a47330570100ce1040507eefa73d14da2dc491bbfd74fbe69f67420"
+    },
+    "src/strive/vnext/contracts/harness.py": {
+      "expected": "a6c870131a8fb7cfd20cb639ab8aa16e33fbdf8a601071ce44a573c28c9cdc1a",
+      "actual": "a6c870131a8fb7cfd20cb639ab8aa16e33fbdf8a601071ce44a573c28c9cdc1a"
+    },
+    "src/strive/vnext/contracts/lifecycle.py": {
+      "expected": "90440799698b2f200301773c9905bd3cf1d39f8004d81cf8c9c35cdd958e81cc",
+      "actual": "90440799698b2f200301773c9905bd3cf1d39f8004d81cf8c9c35cdd958e81cc"
+    },
+    "src/strive/vnext/contracts/manifest.py": {
+      "expected": "36ae490a85795a4c58a29535b4bd44799c4a105263a4bacf1535c306f9a1fc44",
+      "actual": "36ae490a85795a4c58a29535b4bd44799c4a105263a4bacf1535c306f9a1fc44"
+    },
+    "src/strive/vnext/contracts/primitives.py": {
+      "expected": "01c7d778ccafc9ec23b83acc8f12407550c5dec88113a2f2c9060e79b085a448",
+      "actual": "01c7d778ccafc9ec23b83acc8f12407550c5dec88113a2f2c9060e79b085a448"
+    },
+    "src/strive/vnext/contracts/records.py": {
+      "expected": "82ed54ec24a01ee8e1bb9258f8577b73fcce836174c36e09c4de890c7cb1b5b8",
+      "actual": "82ed54ec24a01ee8e1bb9258f8577b73fcce836174c36e09c4de890c7cb1b5b8"
+    },
+    "src/strive/vnext/contracts/study.py": {
+      "expected": "f87ad7adc972a1a1ec58878bc31f87921e642f26a4b56583af629663422b9b19",
+      "actual": "f87ad7adc972a1a1ec58878bc31f87921e642f26a4b56583af629663422b9b19"
+    },
+    "src/strive/vnext/runtime/__init__.py": {
+      "expected": "cb467acdf7efb2a1c5cfc59079a69820b38c232f10c31fbbea9c2240a8db7bc5",
+      "actual": "cb467acdf7efb2a1c5cfc59079a69820b38c232f10c31fbbea9c2240a8db7bc5"
+    },
+    "src/strive/vnext/runtime/_limits.py": {
+      "expected": "ef5098fe8418492a9d8c1bb2cbbd3bccf87473cec772b562b31080e0b89e9b6e",
+      "actual": "ef5098fe8418492a9d8c1bb2cbbd3bccf87473cec772b562b31080e0b89e9b6e"
+    },
+    "src/strive/vnext/runtime/_memory.py": {
+      "expected": "b81c97d54ed401f908abebde83ac9d51d506d1206dca7a2498003ab781d34483",
+      "actual": "b81c97d54ed401f908abebde83ac9d51d506d1206dca7a2498003ab781d34483"
+    },
+    "src/strive/vnext/runtime/admission.py": {
+      "expected": "77884ffc14716175fbba7b0abbf011e2b449d69e6803209904c238d0cfe08c24",
+      "actual": "77884ffc14716175fbba7b0abbf011e2b449d69e6803209904c238d0cfe08c24"
+    },
+    "src/strive/vnext/runtime/broker.py": {
+      "expected": "8deb9130795fcd803d6ea40d05054440a429141369f9fe98dde213b65125735d",
+      "actual": "8deb9130795fcd803d6ea40d05054440a429141369f9fe98dde213b65125735d"
+    },
+    "src/strive/vnext/runtime/ledger.py": {
+      "expected": "9e924c650d0554b9c51dd8ff53ac08cc8ecc1ff46f91aa598fee492a725e6433",
+      "actual": "9e924c650d0554b9c51dd8ff53ac08cc8ecc1ff46f91aa598fee492a725e6433"
+    },
+    "src/strive/vnext/runtime/sandbox.py": {
+      "expected": "c8c21f30868431aafa34dc70eef8923b89a0c01a4709573cf092cdef8d076c1b",
+      "actual": "c8c21f30868431aafa34dc70eef8923b89a0c01a4709573cf092cdef8d076c1b"
+    },
+    "src/strive/vnext/runtime/supervisor.py": {
+      "expected": "f87edecb136d6113625fcbbf4e9e7936b7cfa7ac1f877e4070d198ffe52c73ea",
+      "actual": "f87edecb136d6113625fcbbf4e9e7936b7cfa7ac1f877e4070d198ffe52c73ea"
+    },
+    "src/strive/vnext/verify/__init__.py": {
+      "expected": "42f9b30d534d015ccce3f52f8b6f7b4c7300e04499ef0d775b89994fa15129f2",
+      "actual": "42f9b30d534d015ccce3f52f8b6f7b4c7300e04499ef0d775b89994fa15129f2"
+    },
+    "src/strive/vnext/verify/engine.py": {
+      "expected": "7df710d1b042f8beb9c41fe89f33aea937b9f9d76de928074791d2f6c2e536f2",
+      "actual": "7df710d1b042f8beb9c41fe89f33aea937b9f9d76de928074791d2f6c2e536f2"
+    }
+  }
+}
