@@ -1,0 +1,26 @@
+# M6 implementation notes
+
+- Created a new work folder before investigation, then moved it to the repository root. All writes stay inside /Users/nikhil/personal/hatch/strive. No commits, PRs or git history changes.
+- Read ASTRA_DESIGN.md sections 3.1, 3.2, 9.1 and the adaptation milestone. The user's milestone numbering and explicit fork deferral govern this pass.
+- Existing M5 APIs expose the needed seams: Supervisor compatible_bundle and CandidateSandbox, scoped admission, EpisodeDriver, and model EffectAdapter. No core change is needed for immediate adaptation.
+- EvaluateFork remains unsupported. ExecuteEffect is the only chargeable authorization in the frozen verifier. Add exactly one deferred enactment test; do not build a substitute fork effect.
+- Git fsmonitor failed. Subsequent git reads disable fsmonitor. Papercuts logging declined because the parent repository has not opted in; no opt-in file created.
+- Bundle files will be immutable CAS versions with retained parent/source references and scope. Evidence checks precede reads. The policy will consume model proposals as data and activate only through canonical ApplyChange.
+- Implemented policy-only bundle data/validation/registry, a composite Deno loader, evidence selector, gateway refiner adapter and continual episode scheduling. Initial strict mypy passes with 143 source files including new tests.
+- The M4 text harness decoder only accepts ExecuteEffect proposals. Added a policy-owned refiner adapter using the unchanged ModelGateway rather than altering that decoder or any core. Its Upstream is injectable; tests use an in-memory scripted provider with zero prices and no network.
+- Evidence observations now require the benchmark's declared episode pool. A validation episode cannot be relabeled development merely because its output is operational. Exact evidence origins are retained with each generation for restart-safe provenance.
+- First focused suite is running. Test fixtures exercise the real Deno confinement, durable gateway, broker admission, counter adapter, supervisor and fresh replay.
+- First focused result: 26 passed, 1 failed, 1 xfailed. The failure was the test indexing a zero-dollar ledger entry; zero quantities are omitted. Fixed the assertion to treat absence as zero.
+- Added tests for model return/settlement/activation crash recovery, optional development checks, validation provenance through summaries/imports, validation operation classification, durable actor-action reuse, and rejection of a stripped controller initial state.
+- Controller approval now retains the entire ApplyChange command and checks the coupled state again at dispatch. Suspended restoration still follows the unchanged M5 operator path, including pending work.
+- Cached the immutable RunBinding feedback access matrix in the bundle loader after noticing per-file full replays during validation. This is a policy read cache, not verifier state or activation authority.
+- Expanded focused result: 37 passed, 1 xfailed. Strict mypy passed across 143 files.
+- Before completing the full suite, restarted its invocation with TMPDIR and --basetemp explicitly inside this work folder to keep generated test artifacts within strive. The interrupted invocation is not counted as final verification.
+- All 30 frozen SHA-256 values currently match. The diff for all frozen files plus harness/gateway.py is empty.
+- Composition review found the refiner route was checked against its gateway contract but not explicitly against RunBinding.model_bindings. Added that check and corrected the fixture's retained refiner binding. Rejected mismatches now dispatch nothing.
+- Added binary memory projection and defensive handling of opaque annotation payloads, with focused regression tests. Interrupted the partial full-suite run so final verification can cover all changes together.
+- Final focused suite after the composition fixes: 40 passed, 1 xfailed in 39.22 seconds. Strict mypy remains clean across 143 files. Full vNext rerun is in progress with all final source changes.
+- Final context review added active/prior bundle IDs to the authorized refiner projection. The restore test now selects its target exclusively from that context. Restarted full verification after this correction; partial invocations are not final test evidence.
+- Completed final full vNext invocation on the final source: 411 passed, 10 skipped, 4 xfailed in 642.03 seconds. Existing three xfails remain; the fourth is the single explicit EvaluateFork deferral. No failures or live model calls.
+- Post-suite strict mypy passed across 143 files. Recomputed all 30 freeze hashes: all match. The diff across frozen files and harness/gateway.py is empty. Branch remains strive-astra; no existing source/test changes, commit, PR or history mutation.
+- Finalized README test mapping and summary. Removed generated test stores, copied executables, scratch data and caches from this work folder. Retained only notes, reports, a new-files patch and small verification logs.
