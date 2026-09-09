@@ -1123,3 +1123,683 @@ Insert a new milestone immediately after the effects/accounting/confinement mile
 Change the stateful-operation milestone to require tau agent/user operations, transactional receipts, snapshots, scorer equivalence against upstream deterministic fixtures, complete task/split qualification, and crash-after-mutation recovery.
 
 The final study remains a release gate under a funded ceiling. This design pass establishes the contract; it does not claim that installed CLI versions have passed confinement tests or that the complete benchmark import has already been qualified.
+
+---
+
+# AMENDMENT 2 — General BenchmarkAdapter interface & τ²-bench telecom (M5) — GPT‑6 Astra
+
+*Authored by GPT‑6 Astra via `codex exec -m gpt-6-astra` (read-only research+design
+pass) after the human directed that Milestone 5 be built around a GENERAL
+benchmark-adapter interface (mirroring HAL's benchmark contract and Inspect's
+Dataset/Task/Solver/Scorer) with τ²-bench telecom as the first concrete
+implementation — sourced as a pinned git dependency, not vendored/submoduled.
+Human approved (2026‑09‑09): the plan; two generic runtime changes (dynamic
+scoped admission; suspended operator-only bundle restoration); a bounded direct
+user-model adapter for the τ² user simulator's structured tool calls; and
+task-qualification as a hard stop-gate. Supersedes §9.4/§10 M5 and refines §§3,4,
+6,7 where named. τ²-bench pinned at commit a2c024725189473d2d7cea3a5cfdbcc67478e41f
+(distribution `tau2` 1.0.1, MIT, Sierra Research).*
+
+# Milestone 5: general benchmark adapters and trusted episode measurement
+
+**Design for approval · 9 September 2026 · No implementation or file changes**
+
+Milestone 5 should introduce `strive.benchmark/1`, a general interface for task discovery, episode operations, recovery, and trusted scoring. The first implementation is the published τ²-bench telecom text workload, supplied as a pinned dependency. Benchmark semantics belong behind this interface; the supervisor, broker, ledger, and verifier must not learn telecom concepts.
+
+Two existing runtime restrictions need explicit treatment during M5: admission currently requires prelisted argument hashes, and bundle restoration currently rejects unresolved effects. Both are general runtime issues. Resolve them before freezing the core for the second-benchmark acceptance test.
+
+## 1. τ²-bench: verified current interface
+
+### Revision and research boundary
+
+Use this exact upstream commit for the proposed dependency:
+
+```text
+repository: https://github.com/sierra-research/tau2-bench
+commit:     a2c024725189473d2d7cea3a5cfdbcc67478e41f
+track:      telecom, text, half-duplex, solo_mode=False
+```
+
+The commit exists upstream. Its package metadata declares distribution `tau2`, version `1.0.1`. This is an inspected revision selected for M5, not a floating promise to use September’s latest `main`. The maintained repository now advertises τ³ additions, including voice and knowledge evaluation. Therefore, identifying the workload merely as “tau2-bench” is insufficient. [Selected commit](https://github.com/sierra-research/tau2-bench/commit/a2c024725189473d2d7cea3a5cfdbcc67478e41f), [pinned package metadata](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/pyproject.toml), [current repository](https://github.com/sierra-research/tau2-bench).
+
+**Verification limit:** this pass inspected upstream interfaces, evaluators, the telecom task generator, and published split definitions, but could not retrieve and enumerate the complete task JSON. Consequently, it does not certify the exact reward-basis histogram, absence of malformed tasks, or duplicate-scenario relationships across all task records. Those are mandatory import-qualification gates below. No exclusion count or task-data digest is invented.
+
+### How a third party supplies its own agent
+
+The current text-agent interface is `HalfDuplexAgent[StateType]`. Its constructor receives environment tools and domain policy. Implementations provide:
+
+```python
+get_init_state(message_history: list[Message] | None = None) -> StateType
+
+generate_next_message(
+    message: ValidAgentInputMessage,
+    state: StateType,
+) -> tuple[AssistantMessage, StateType]
+```
+
+The documented input union includes user messages, individual tool results, and multiple tool results. A factory receives `tools`, `domain_policy`, and configuration arguments; registering that factory gives it a name selectable through `tau2 run --agent NAME --domain telecom`. LLM configuration is optional through `LLMConfigMixin`; supplying one’s own agent does not mean replacing only the model name. [Agent developer guide](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/agent/README.md), [pinned agent classes](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/agent/base_agent.py).
+
+Strive should preserve this interaction model through a compatibility wrapper, but continue running candidate behavior through its existing bounded `step()` interface. It must not execute a candidate-supplied Python agent inside the trusted benchmark process. Nor should it expose the complete upstream `Task` object merely because an upstream factory can receive one.
+
+### Environment and dual control
+
+Upstream domains supply database models, toolkits, policies, environment constructors, task loaders, and split loaders. Telecom specifically combines:
+
+- `TelecomDB` and `TelecomTools` for service-side state and operations.
+- `TelecomUserDB` and `TelecomUserTools` for device state and surroundings.
+- `TelecomEnvironment.sync_tools()` for interactions between them.
+
+Examples of synchronization include line activation, roaming permission, data allowance, and payment state. These are coupled views of one episode, not independent agent and user simulations. [Domain structure](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/domains/README.md), [telecom environment](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/domains/telecom/environment.py).
+
+The tool execution path matters. `make_tool_call()` explicitly does not synchronize; `get_response()` invokes the tool, synchronizes, and produces a `ToolMessage`, including errors. Strive must wrap the established execution path and preserve its sequencing. Calling toolkit methods directly would omit benchmark behavior. [Environment implementation](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/environment/environment.py).
+
+The paper models this as a shared dual-control environment and describes the simulator’s observations and actions as constrained by tools and state. Its original telecom evaluation uses state assertions. [Paper, environment and task evaluation](https://arxiv.org/html/2506.07982v1#S3).
+
+### User simulator
+
+`UserSimulator` is an LLM-backed half-duplex participant with explicit `UserState`. It constructs its prompt from global simulation guidelines, scenario instructions, and persona configuration. Its generation path appends the incoming message, flips conversational roles, passes user tools to generation, and converts the response into a `UserMessage`. Stop detection recognizes the configured stop, transfer, and out-of-scope markers in non-tool messages. [Pinned user simulator](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/user/user_simulator.py).
+
+For strive, user inference is an independently charged `model.generate` effect. User tool execution follows as separate benchmark effects. Simulator prose cannot establish environmental facts or reward.
+
+A deterministic scorer does **not** make the experiment deterministic. User-model responses can vary; their exact requests, responses, settings, and supported seeds must be retained.
+
+### Exact reward behavior
+
+For an ordinarily terminated simulation, the combined evaluator multiplies the components selected by the task’s `evaluation_criteria.reward_basis`. `EvaluationType.ALL` respects that basis and invokes NL grading if the basis requires it. `ALL_WITH_NL_ASSERTIONS` can invoke NL grading even when it does not affect the final reward. Neither option should be selected blindly. [Pinned combined evaluator](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/evaluator/evaluator.py).
+
+| Component | Implemented semantics | Headline eligibility |
+|---|---|---|
+| `DB` | Construct a gold environment from task initialization and reference actions; compare **both agent and user database hashes** with the predicted environment. A different action sequence can pass. | Deterministic, subject to qualified environment behavior. |
+| `ENV_ASSERTION` | Invoke the task’s assertion functions against the predicted environment; each result must match its declared Boolean expectation. All selected assertions must pass. | Deterministic, subject to qualification of the invoked functions. |
+| `COMMUNICATE` | Every required string must occur in an assistant text message. The implementation lowercases both sides and removes commas from message content. | Deterministic. |
+| `ACTION` | Every expected action must match some recorded tool call. This is a membership check, not exact ordered-trajectory equality. | Deterministic. |
+| `NL_ASSERTION` | An LLM evaluates natural-language assertions about the trajectory. | Ineligible for headline scoring. |
+
+Sources: [environment evaluator](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/evaluator/evaluator_env.py), [communication evaluator](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/evaluator/evaluator_communicate.py), [action evaluator](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/evaluator/evaluator_action.py), [NL evaluator](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/evaluator/evaluator_nl_assertions.py).
+
+Preserve `Action.compare_with_tool_call()` exactly, including its quirks. It compares the tool name and selected arguments; `compare_args=[]` accepts any arguments for that name. When `compare_args` is absent, the implementation selects the predicted call’s argument keys. It does not itself compare requestor identity. Strive must enforce requestor authorization separately without silently changing the benchmark’s action metric. [Pinned action comparison](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/data_model/tasks.py).
+
+The combined evaluator returns zero for termination reasons other than `AGENT_STOP` or `USER_STOP`. It also returns one when evaluation criteria are absent. Strive should preserve known premature-termination scoring, but reject missing criteria during headline-task qualification rather than admitting vacuous success. Infrastructure uncertainty remains separately reported. [Combined evaluator](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/evaluator/evaluator.py).
+
+**There is a material upstream documentation discrepancy.** The evaluation guide says telecom uses `DB + COMMUNICATE` and never `ACTION`. The pinned telecom generator instead initializes `reward_basis` to `["ENV_ASSERTION"]` and adds `ACTION` for expected-failure tasks requiring transfer. It never adds `NL_ASSERTION` in that generation path. Trust the task bytes and executable evaluator over the guide’s domain-wide summary. [Evaluation guide](https://github.com/sierra-research/tau2-bench/blob/main/docs/evaluation.md), [pinned telecom generator](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/domains/telecom/tasks/manager.py).
+
+The defensible conclusion is that the published telecom generation path uses deterministic grading and provides no evidence of required LLM grading. A complete zero-NL certification still requires scanning the actual imported records. M5 must reject any task requiring `NL_ASSERTION`, unknown grading components, or nondeterministic assertion functions. It must never remove a required component to make a task eligible.
+
+### Packaging, data, and license
+
+The distribution and import package are `tau2`; the console entry point is `tau2 = tau2.cli:main`. The inspected package requires Python `>=3.12,<3.14` and uses Hatchling. Its core dependencies include LiteLLM `>=1.80.15,<1.82.7`, pandas, NumPy, FastAPI, Uvicorn, HTTPX, Requests, Tenacity, DeepDiff, and configuration/logging libraries. Voice, knowledge, gym, and development dependencies are optional extras. [Pinned `pyproject.toml`](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/pyproject.toml).
+
+LiteLLM brings additional model-client dependencies. For example, version `1.80.15`, within tau’s declared range, requires `openai>=2.8.0`, Pydantic, tokenizers, and tiktoken. An exact transitive environment must therefore be locked rather than inferred from tau’s Git revision. [Published LiteLLM dependency metadata](https://pypi.org/pypi/litellm/1.80.15/json).
+
+Current upstream installation instructions use a Git checkout followed by `uv sync`. Non-editable installation requires an explicit `TAU2_DATA_DIR`; package installation alone must not be assumed to provide discoverable task data. The CLI includes `tau2 run`, `tau2 check-data`, and domain inspection. [Installation guide](https://github.com/sierra-research/tau2-bench/blob/main/docs/getting-started.md).
+
+Task and split definitions are located at:
+
+```text
+data/tau2/domains/telecom/tasks.json
+data/tau2/domains/telecom/split_tasks.json
+```
+
+The split file declares `base`, `train`, `test`, and additional pools. The published `base` has 114 IDs, with 74 training IDs and 40 test IDs. Those split definitions do not, by themselves, prove that every ID resolves to a valid task record. [Telecom split file](https://github.com/sierra-research/tau2-bench/blob/main/data/tau2/domains/telecom/split_tasks.json).
+
+The repository license is MIT, copyright Sierra Research. Retain its copyright and permission notice with redistributed upstream material. [LICENSE](https://github.com/sierra-research/tau2-bench/blob/main/LICENSE).
+
+## 2. The SOTA mirror
+
+| Reference | Structure worth borrowing | Strive’s additional requirement |
+|---|---|---|
+| HAL | A benchmark owns task data, `evaluate_output()`, and metric extraction. The agent exposes `run(input, **kwargs)` returning submissions keyed by task ID. | Split interaction into durable effects; authenticate facts and scoring producers; retain uncertainty and expenditure. |
+| Inspect | A `Task` combines a dataset, solver, and scorer. Solver execution and scoring are separate interfaces. | Candidate solvers cannot acquire scorer authority, protected targets, or arbitrary external access. |
+| Both | Benchmark-specific logic stays behind an explicit interface. Agent implementations remain replaceable. | Recovery contracts, committed environment state, scoped evidence, and independently owned measurements are mandatory. |
+
+Sources: [HAL benchmark contract](https://github.com/princeton-pli/hal-harness/tree/main/hal/benchmarks), [HAL agent contract](https://github.com/princeton-pli/hal-harness/blob/main/agents/README.md), [Inspect tasks](https://inspect.aisi.org.uk/tasks.html), [Inspect solvers](https://inspect.aisi.org.uk/solvers.html).
+
+HAL is a useful architectural precedent, but its repository was archived in July 2026 and is no longer accepting leaderboard updates through that harness. Borrow its separation of responsibilities rather than adding it as a runtime dependency. [HAL status](https://github.com/princeton-pli/hal-harness).
+
+Strive should also avoid treating every score emitted during solver execution as authoritative. Inspect explicitly permits solver-provided scores and intermediate scoring; strive’s headline measurements must originate exclusively from its pinned trusted scorer. [Inspect solver scoring](https://inspect.aisi.org.uk/solvers.html).
+
+## 3. General `BenchmarkAdapter` interface
+
+### Ownership and placement
+
+Introduce these implementation areas:
+
+```text
+strive.vnext.benchmarks.api          dependency-light adapter interfaces
+strive.vnext.benchmarks.bridge       existing EffectAdapter integration
+strive.vnext.benchmarks.episodes     trusted episode scheduling and projections
+strive_benchmark_tau2                separately installed implementation
+```
+
+These are proposed paths, not files created by this pass.
+
+The adapter interface is not part of the frozen authority wire schema. Adapter payloads use versioned canonical bytes behind existing `ArtifactRef` fields. Do not add benchmark classes to `codec._MODULES`, dynamically import classes named by stored data, or add telecom event families.
+
+### Typed contract
+
+The following declarations specify the interface. Supporting records contain only explicit types and immutable values; upstream objects and `Any` do not cross it.
+
+```python
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Literal, Protocol
+
+from strive.vnext.contracts.lifecycle import RecoveryContract
+from strive.vnext.contracts.primitives import (
+    ArtifactRef,
+    EffectId,
+    EnvironmentId,
+    EpisodeId,
+    ResultCursor,
+)
+from strive.vnext.contracts.records import EffectAuthorization
+
+
+@dataclass(frozen=True)
+class TaskSpec:
+    task_id: str
+    scenario_group: str
+    definition: ArtifactRef
+    reward_definition: ArtifactRef
+
+
+@dataclass(frozen=True)
+class SplitSpec:
+    name: str
+    task_ids: tuple[str, ...]
+    grouping_definition: ArtifactRef
+
+
+@dataclass(frozen=True)
+class OperationSpec:
+    name: str
+    argument_schema: ArtifactRef
+    result_schema: ArtifactRef
+    recovery: RecoveryContract
+
+
+@dataclass(frozen=True)
+class BenchmarkDescriptor:
+    protocol: Literal["strive.benchmark/1"]
+    workload: ArtifactRef
+    implementation: ArtifactRef
+    upstream_revision: str
+    closure: ArtifactRef
+    scorer: ArtifactRef
+    operations: tuple[OperationSpec, ...]
+    has_user_simulator: bool
+    supports_forks: bool
+
+
+@dataclass(frozen=True)
+class EpisodeSnapshot:
+    episode: EpisodeId
+    environment: EnvironmentId
+    version: int
+    state: ArtifactRef
+
+
+@dataclass(frozen=True)
+class OperationContext:
+    authorization: EffectAuthorization
+    episode: EpisodeId
+    arguments: ArtifactRef
+    expected_snapshot: EpisodeSnapshot | None
+
+
+@dataclass(frozen=True)
+class ToolInvocation:
+    call_id: str
+    name: str
+    arguments: ArtifactRef
+
+
+@dataclass(frozen=True)
+class CapturedGeneration:
+    result_cursor: ResultCursor
+    request: ArtifactRef
+    response: ArtifactRef
+
+
+@dataclass(frozen=True)
+class UserTurnPlan:
+    snapshot: EpisodeSnapshot
+    generation_input: ArtifactRef
+    response_schema: ArtifactRef
+
+
+@dataclass(frozen=True)
+class OperationReceipt:
+    effect_id: EffectId
+    original_epoch: int
+    exact_request: ArtifactRef
+    arguments: ArtifactRef
+    before: EpisodeSnapshot | None
+    after: EpisodeSnapshot
+    output: ArtifactRef
+    evidence: ArtifactRef
+
+
+@dataclass(frozen=True)
+class FoundOperation:
+    receipt: OperationReceipt
+
+
+@dataclass(frozen=True)
+class ProvenAbsent:
+    proof: ArtifactRef
+
+
+@dataclass(frozen=True)
+class UnknownOperation:
+    reason: ArtifactRef
+
+
+type LookupResult = FoundOperation | ProvenAbsent | UnknownOperation
+
+
+@dataclass(frozen=True)
+class ScoringInput:
+    task: TaskSpec
+    final_snapshot: EpisodeSnapshot
+    captured_interaction: ArtifactRef
+    operation_receipts: tuple[ArtifactRef, ...]
+    termination: ArtifactRef
+
+
+@dataclass(frozen=True)
+class Metric:
+    identity: ArtifactRef
+    value: Decimal
+
+
+@dataclass(frozen=True)
+class RewardResult:
+    status: Literal["scored", "unresolved", "invalid"]
+    metrics: tuple[Metric, ...]
+    exact_reward_definition: ArtifactRef
+    evidence: tuple[ArtifactRef, ...]
+
+
+class TrustedScorer(Protocol):
+    @property
+    def identity(self) -> ArtifactRef: ...
+
+    def score(self, inputs: ScoringInput) -> RewardResult: ...
+
+
+class BenchmarkAdapter(Protocol):
+    @property
+    def identity(self) -> ArtifactRef: ...
+
+    @property
+    def scorer(self) -> TrustedScorer: ...
+
+    def describe(self) -> BenchmarkDescriptor: ...
+
+    def enumerate_tasks(self) -> tuple[TaskSpec, ...]: ...
+
+    def declare_splits(self) -> tuple[SplitSpec, ...]: ...
+
+    def initialize(
+        self,
+        context: OperationContext,
+        task: TaskSpec,
+        initialization: ArtifactRef,
+    ) -> OperationReceipt: ...
+
+    def agent_tool(
+        self,
+        context: OperationContext,
+        call: ToolInvocation,
+    ) -> OperationReceipt: ...
+
+    def plan_user_turn(
+        self,
+        snapshot: EpisodeSnapshot,
+        delivered_message: ArtifactRef,
+    ) -> UserTurnPlan | None: ...
+
+    def user_turn(
+        self,
+        context: OperationContext,
+        plan: UserTurnPlan,
+        generation: CapturedGeneration,
+    ) -> OperationReceipt: ...
+
+    def user_tool(
+        self,
+        context: OperationContext,
+        call: ToolInvocation,
+    ) -> OperationReceipt: ...
+
+    def deliver_message(
+        self,
+        context: OperationContext,
+        message: ArtifactRef,
+    ) -> OperationReceipt: ...
+
+    def terminate(
+        self,
+        context: OperationContext,
+        termination: ArtifactRef,
+    ) -> OperationReceipt: ...
+
+    def snapshot(
+        self,
+        context: OperationContext,
+    ) -> OperationReceipt: ...
+
+    def lookup_operation(
+        self,
+        episode: EpisodeId,
+        effect_id: EffectId,
+        exact_request: ArtifactRef,
+    ) -> LookupResult: ...
+
+    def open_committed_snapshot(
+        self,
+        snapshot: EpisodeSnapshot,
+    ) -> None: ...
+```
+
+`OperationContext` is constructed by the trusted bridge from the actual authorization and retained request. The bridge checks that typed method arguments encode to the authorized argument bytes. A candidate cannot supply an authoritative context.
+
+`open_committed_snapshot()` reconstructs a worker from verified committed state. It cannot move an existing environment backward. Fork initialization requires a new environment identity and an explicitly authorized snapshot origin.
+
+Benchmarks without users advertise `has_user_simulator=False`; `plan_user_turn()` returns `None`, and user operations fail admission. Unsupported fork or recovery behavior must be declared rather than simulated.
+
+### Mapping onto existing effects
+
+`BenchmarkEffectAdapter` implements the existing `runtime.broker.EffectAdapter`:
+
+| Existing method or field | Benchmark integration |
+|---|---|
+| `prepare()` | Validate operation, arguments, scope, expected state, limits, and recovery contract; establish a bounded reservation. |
+| `invoke()` | Dispatch one authorized adapter operation and translate its durable receipt. |
+| `reconcile()` | Call `lookup_operation()`, validate evidence, and reattest the original result under the current epoch. |
+| `Receipt.output` | Candidate-visible result projection only. |
+| `Receipt.evidence` | Trusted operation receipt, including request identity and state transition. |
+| `Receipt.environment` | Resulting committed snapshot reference. |
+| `validate_upstream()` | Reject network forwarding for local benchmark operations. User inference belongs to its model adapter. |
+
+Source for the existing seam: [broker.py](/Users/nikhil/personal/hatch/strive/src/strive/vnext/runtime/broker.py).
+
+There must be no hidden model call inside a benchmark mutation:
+
+```text
+deliver agent message
+  → prepare user generation from committed state
+  → model.generate, role=user
+  → commit captured user response
+  → execute requested user tools through the broker
+  → deliver resulting observations
+```
+
+Each arrow that performs an operation has its own effect identity and durable result. The episode driver persists the pending batch and cursor, so restarting halfway through several tool calls does not repeat completed calls or solicit another model response.
+
+The upstream user simulator requests structured tool calls. M4’s current text-only `ProviderContract` rejects nonempty tool arrays. M5 therefore needs a separate bounded **direct user-model adapter** that returns tool proposals as data through `model.generate`. It must reuse the authorization, gateway capture, reservation, and reconciliation discipline. It must not enable native tool execution inside the actor/refiner harnesses or silently replace the upstream user protocol with a new prose parser. [Current provider restrictions](/Users/nikhil/personal/hatch/strive/src/strive/vnext/harness/provider.py).
+
+### Trusted state, transactions, and recovery
+
+Every operation receipt binds:
+
+- Run, episode, environment, adapter identity, effect ID, and original execution epoch.
+- Exact request reference and argument digest.
+- Expected previous snapshot and resulting snapshot.
+- Returned observation, including benchmark tool errors.
+- Interaction position and any simulator continuation changes.
+
+Use an adapter-owned transactional store. For telecom, a suitable implementation is a local SQLite database with durable transactions, containing both operation records and environment-head references. Publish referenced CAS objects durably first; then atomically commit the operation receipt and new head. A crash before the transaction leaves harmless unreferenced objects. A crash after it permits lookup of the original result even if strive never recorded the return.
+
+Repeated identity with identical request bytes returns the original receipt. Repeated identity with different bytes fails without mutation. Request identity includes the episode and expected state, not just the tool’s argument dictionary.
+
+Lookup distinguishes three cases:
+
+1. **Found:** validate the complete identity, request digest, state chain, durable objects, and fencing evidence before accepting it.
+2. **Proven absent:** retry the same operation only if the declared deduplication contract supports it.
+3. **Unknown:** preserve uncertainty and reservations; suspend.
+
+A missing row in an unavailable or incomplete store is not proof of nonexecution. Business-operation deduplication says nothing about model-provider billing.
+
+“Verified lookup” means the trusted bridge verifies lookup evidence before issuing its receipt. The pure verifier checks the resulting authority records and references. It never imports telecom to reproduce the mutation.
+
+### Snapshot contents
+
+A telecom snapshot must retain both databases, simulator state, and scheduling state:
+
+- Agent-side service database and user-side device/surroundings database.
+- Agent-visible and user-visible message histories.
+- User simulator system messages, persona configuration, and explicit state.
+- Current speaker, pending message, tool-call batch, and delivery cursor.
+- Episode counters, termination state, and environment random state.
+- Task, policy, schemas, configuration, and dependency identities.
+
+Candidate private state remains in the existing `ContinuationCommit`. A resumable checkpoint binds that continuation to the environment snapshot; copying the environment alone is insufficient.
+
+Provider conversation state must be reconstructible from retained messages. No opaque upstream session is a substitute for a snapshot.
+
+### Trusted scoring and Measurement
+
+The scoring host, not candidate code, selects `ScoringInput` from verified history. It gives the scorer read-only state and captured interaction, then appends through the existing `TRUSTED_SCORER` producer port.
+
+For telecom:
+
+1. Load the actual final committed environment.
+2. Apply the task’s deterministic criteria to that environment and broker-captured interaction.
+3. Independently run upstream deterministic evaluation over the captured trajectory as an equivalence check.
+4. Require replayed state to agree with committed state. Divergence is an infrastructure/scorer inconsistency, not permission to substitute a favorable score.
+
+Assertions run on an isolated copy so evaluation cannot alter the live environment. Gold initialization or reference-action failures stop qualification; they must not disappear into upstream warning logs.
+
+Populate the existing `Measurement` fields as follows:
+
+| Fields | Source |
+|---|---|
+| `subject_run`, `subject_window`, `revision_references` | Verified episode execution and revision history. |
+| `workload_identity`, `benchmark_upstream_revision` | Resolved benchmark descriptor and exact upstream commit. |
+| `scorer_version`, `exact_reward_definition` | Pinned scorer implementation, task criteria, and selected evaluation mode. |
+| `supporting_receipt_references`, `supporting_state_references` | Authenticated operation receipts, final state, and captured interaction. |
+| Coverage fields | Trusted episode schedule and completion records. |
+| `split_grouping_identity`, episode/trajectory identities, `reset_boundary` | Frozen study assignment and initialization receipt. |
+| `metric_identity`, `metric_value` | Scorer result, using exact `Decimal` values. |
+
+No new Measurement field is required. [Existing Measurement definition](/Users/nikhil/personal/hatch/strive/src/strive/vnext/contracts/records.py).
+
+An unresolved episode has no fabricated success value. Report completed known scores, unresolved coverage, and separately identified lower/upper success bounds. Budget exhaustion remains in planned coverage. Candidate `Finish`, annotations, and statements such as `"success": true` do not certify reward.
+
+### Trust boundary and later benchmarks
+
+| Trusted, pinned workload infrastructure | Replaceable candidate behavior |
+|---|---|
+| Task/split definitions, policies, environment code, user-simulator policy, schemas, operation store, projection rules, scorer, and adapter dependencies. | Actor/controller code, permitted prompts, learned memory, model requests, proposed actions, and explicit private state. |
+
+The candidate receives permitted observations and callable operation schemas. It receives no scorer port, reward definitions, general CAS reader, task-store access, or user-operation authority.
+
+Later integrations fit the same contract:
+
+- **SWE-bench:** tasks identify repositories and base revisions; environment state contains the worktree and execution environment; operations expose bounded file/terminal actions; final submissions identify patches. A trusted isolated grading process runs the pinned evaluation tests. [SWE-bench evaluation contract](https://www.swebench.com/SWE-bench/guides/evaluation/).
+- **Terminal-Bench:** tasks identify instructions, environment configuration, and evaluation assets. Terminal operations and filesystem state use adapter-specific snapshot/recovery support. Harbor’s task format provides test scripts and reward outputs, but strive must obtain those outputs from its trusted grading environment, not a candidate-writable reward file. Admit only deterministically gradable tasks. [Harbor task and verifier format](https://www.harborframework.com/docs/tasks).
+
+The interface does not promise automatic recovery of arbitrary shell side effects. An adapter may support snapshots only at quiescent boundaries and suspend after an unreconcilable command.
+
+**Second-benchmark acceptance:** after the M5 general infrastructure is frozen, add a small genuine second benchmark fixture integration through a new adapter package, scorer, manifests, and tests only. Run discovery, initialization, operations, scoring, interrupted execution, and offline verification. The diff must contain no changes to supervisor, broker, ledger, verifier, frozen contracts, or the common episode driver. Merely selecting another telecom task is insufficient. A later full SWE-bench or Terminal-Bench integration must pass the same gate before its zero-core-change claim is accepted.
+
+## 4. Sourcing and isolation plan
+
+### Dependency pin
+
+Use a separately resolved adapter-runtime project with an optional telecom extra:
+
+```toml
+[project.optional-dependencies]
+telecom = [
+  "tau2 @ git+https://github.com/sierra-research/tau2-bench@a2c024725189473d2d7cea3a5cfdbcc67478e41f"
+]
+```
+
+The direct reference preserves the commit requirement for both uv and pip-compatible tooling. Lock and retain the complete adapter environment. Install no voice, knowledge, gym, or experiment extras for the reference text workload. uv also supports Git sources pinned through `rev`; neither approach should resolve a branch on resume. [uv dependency documentation](https://docs.astral.sh/uv/concepts/projects/dependencies/#git).
+
+Keep this environment separate from strive’s verifier/runtime environment. A project-level optional extra alone does not provide isolation if everything is installed into one interpreter.
+
+### Resolved-manifest closure
+
+Before any episode dispatch, retain and hash:
+
+1. Upstream source identity, source artifact, built wheel, and license notices.
+2. Exact dependency artifacts, lockfile, Python runtime, platform, and build configuration.
+3. Original task/split bytes and a canonical index of selected task records.
+4. Base agent/user databases and every policy or guideline file actually loaded.
+5. Tool schemas, environment/assertion implementation closure, and scorer implementation.
+6. User-model binding, persona settings, stop rules, request codec, limits, and seed support.
+7. Qualification report, grouping algorithm, final split IDs, episode order, and metric definitions.
+
+Keep original task bytes for provenance and canonical parsed forms for stable comparison. Hashes without retained bytes are insufficient for offline reproduction.
+
+Materialize data under an adapter-owned read-only directory and set `TAU2_DATA_DIR` explicitly. Resume uses this retained directory and closure; ambient `.env` files, source-tree fallbacks, newer package versions, or fresh task downloads cannot change the run.
+
+### Verifier purity
+
+Preserve and extend the existing guard:
+
+```text
+tests/vnext/fresh_probe.py::_PROGRAM.ImportGuard
+tests/vnext/test_verifier_only.py::
+    test_fresh_interpreter_verifier_is_read_only_and_candidate_free
+```
+
+The existing subprocess runs with `-I -B`, rejects heavy/candidate imports, checks loaded modules, and installs audit guards against writes and dispatch. [Fresh probe](/Users/nikhil/personal/hatch/strive/tests/vnext/fresh_probe.py), [purity test](/Users/nikhil/personal/hatch/strive/tests/vnext/test_verifier_only.py).
+
+M5 must:
+
+- Explicitly forbid `tau2`, the adapter distribution, benchmark runtime modules, and their heavy dependencies.
+- Keep the `allowed_strive` list narrow; do not add benchmark modules.
+- Add static import-boundary checks for `verify/*`, contracts, codec, and package initializers.
+- Replay a completed benchmark history in a fresh interpreter without the adapter environment installed.
+- Repeat with adapters installed but import-blocked, proving purity is architectural rather than accidental.
+- Verify corrupted state/receipt references and opaque benchmark payloads without importing their decoders.
+
+Benchmark discovery occurs only in the execution composition root. Verifier startup must not enumerate adapter entry points.
+
+### License and vendoring
+
+No vendored source file or Git submodule is necessary. Use the pinned dependency and retained, hashed data artifacts. Keep upstream code outside strive’s maintained source tree.
+
+MIT permits copying and redistribution subject to preserving its notice. Retaining task data or wheels for reproducibility still constitutes retaining upstream material; include the upstream license alongside distributed artifact bundles and retain dependency notices. A hash alone does not satisfy either reproducibility or notice requirements. [Upstream MIT license](https://github.com/sierra-research/tau2-bench/blob/main/LICENSE).
+
+## 5. Spec deltas and M5 build plan
+
+### Required spec edits
+
+| Section | Change |
+|---|---|
+| §3 operation/evidence row | Name `BenchmarkAdapter`, the trusted episode driver, transactional receipts, projections, and scorer ownership. |
+| §3.3 | Define adapter lookup evidence, paired state/receipt commits, and the suspended operator-restoration exception below. |
+| §4 | Document the existing Measurement mapping; retain the frozen record schema. |
+| §6.1–6.2 | Add benchmark implementation/data/dependency closure, explicit data root, schemas, and qualification artifacts. |
+| §7 | Retain the reference study; make its implementation consume generic tasks, episodes, splits, and metrics. Preserve A/B isolation and audit freeze. |
+| §9.4 and Amendment 1 | Generalize to “BenchmarkAdapter interface; τ²-bench telecom text is implementation #1.” Correct the reward discussion to task-specific `reward_basis`. |
+| §10 | M5 becomes “General benchmark adapters and trusted stateful operation.” Adaptation, research workflow, and funded evaluation follow it. |
+
+Keep the frozen `ReferenceStudyPlan` as the telecom reference campaign, not as the universal benchmark schema.
+
+### General runtime corrections required first
+
+**Dynamic request admission.** `CapabilityBroker.prepare()` currently requires exact argument/input references from fixed sets, and `Supervisor.step()` similarly checks prelisted inputs. This cannot support arbitrary new model-produced tool arguments and observations. [Broker admission](/Users/nikhil/personal/hatch/strive/src/strive/vnext/runtime/broker.py), [supervisor input checks](/Users/nikhil/personal/hatch/strive/src/strive/vnext/runtime/supervisor.py).
+
+Add a pinned generic admission policy that validates schema, destination, operation, bounds, current environment, and artifact provenance/access scope. Keep exact-hash grants available for fixtures. Never implement a wildcard CAS grant or treat a candidate-supplied scope label as proof of access. Retain the policy identity and exact accepted request through existing capability and authorization references.
+
+**Restoration during unresolved execution.** The current supervisor rejects commands with unresolved effects, and `_activate()` requires all effects to be settled or consumed. Therefore the existing guarantee-4 probe cannot presently restore a bundle while a model outcome remains ambiguous. Missing usage after a known return is a different case. [Supervisor acceptance/restoration](/Users/nikhil/personal/hatch/strive/src/strive/vnext/runtime/supervisor.py), [activation rules](/Users/nikhil/personal/hatch/strive/src/strive/vnext/verify/engine.py).
+
+Approve a narrow operator-only rule:
+
+- The run remains suspended.
+- Restore only a previously active compatible bundle.
+- Do not migrate controller state, consume a pending result, replace a pending command, or dispatch work.
+- Preserve all effect authorizations, their original executing bundles, environment state, and accounting.
+- Retain the canonical `RestoreBundle` request through `RevisionActivation.activation_boundary`.
+- Commit restoration atomically using the existing activation record.
+- Reject ordinary candidate activation while effects remain unresolved.
+
+This changes a general transition rule, not the record schema. It belongs in this approval, before the post-M5 core freeze.
+
+### Build steps and exit evidence
+
+| Step | Deliverable | Exit test |
+|---|---|---|
+| 1. Freeze the adapter seam | Typed interface, payload schemas, bridge, generic admission, and restoration rule. | Strict typing; unchanged authority schemas; malformed requests and forged artifact scopes rejected. |
+| 2. Resolve upstream | Exact dependency, isolated environment, retained data and closure. | Offline resolution succeeds from retained artifacts; altered task, policy, scorer, or dependency bytes fail identity checks. |
+| 3. Qualify inventory | Full task scan, reward histogram, assertion allowlist, split and grouping report. | Every selected ID resolves exactly once; no required NL/unknown component; all required fixtures and assertions execute without inference. |
+| 4. Implement operation storage | Atomic environment-head and receipt transaction; fenced lookup. | Same ID/same request deduplicates; changed arguments fail; wrong episode, stale epoch, corrupt receipt, and missing state objects cannot reconcile. |
+| 5. Implement telecom episodes | Initialization, both toolkits, delivery, user generation, termination, snapshots. | Recorded interactions match upstream ordering and observations; both databases and both participant states survive restart. |
+| 6. Implement trusted scoring | Committed-state scorer and upstream equivalence checks. | Correct and failing deterministic fixtures agree with upstream; candidate success claims cannot alter scores or coverage. |
+| 7. Close recovery probes | Real crash injection and operator restoration. | Crash-after-mutation reconciles once; unsupported model ambiguity remains reserved and suspended after restoration. |
+| 8. Prove generality and purity | Second benchmark fixture integration and guarded offline replay. | No post-freeze core edits; verifier never imports adapters, models, or candidate code. |
+
+Upstream supplies telecom domain tests and task verification logic. Select their deterministic cases explicitly; do not run a broad upstream test command that may initiate model calls. [Telecom tests](https://github.com/sierra-research/tau2-bench/tree/main/tests/test_domains/test_telecom), [task verification logic](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/domains/telecom/tasks/manager.py).
+
+### Split qualification: 60/14/40
+
+The importer must validate the entire declared source inventory, then select the 114-task base pool.
+
+1. Confirm unique task IDs and `base = train ∪ test`, with disjoint 74/40 membership.
+2. Derive scenario groups from normalized scenario configuration. Strip persona decorations for one grouping signal; also compare normalized initialization and goal definitions to catch duplicate representations.
+3. Form connected groups whenever either equivalence rule identifies the same underlying scenario.
+4. Require no group to cross training and audit.
+5. Partition the 74 training tasks into exactly 60 development and 14 validation tasks using whole groups and a retained deterministic ordering.
+6. Retain the grouping implementation, seed/order, group membership, and final IDs.
+
+If whole-group partitioning cannot produce 60/14, or a group crosses the published train/test boundary, preparation fails. Do not split the group, quietly remove tasks, or replace audit IDs. A revised campaign then needs explicit approval.
+
+Contract A grants no validation feedback to adaptation. The 40 audit tasks remain embargoed until campaign freeze. Trusted qualification may inspect protected definitions, but its task-level output must not enter adaptive prompts, caches, or candidate selection.
+
+### Scorer-equivalence cases
+
+Use recorded fixtures and synthetic boundary cases covering:
+
+- Successful and failed environment assertions.
+- Failure caused only by incorrect user/device state.
+- Equivalent final state reached through different actions.
+- Required transfer/action checks, including `compare_args=[]`.
+- Communication normalization and missing required communication.
+- Premature termination and budget exhaustion.
+- Tool errors with any resulting state preserved.
+- Divergence between committed state and replayed state.
+- Required NL grading rejected before episode admission.
+- Forged success logs, forged tool-result transcripts, and candidate-written reward files.
+
+Where telecom lacks a selected reward component, test that component with a clearly labeled synthetic contract fixture. Do not modify telecom’s metric to increase test coverage.
+
+### Closing guarantees 4 and 2
+
+The existing guarantee-4 test is:
+
+```text
+test_runtime_integrity_4_preserves_mutation_and_unresolved_obligation
+scenario:
+crash_after_mutation_then_restore_bundle_with_ambiguous_model_effect
+```
+
+Its M5 implementation must perform a real durable mutation, crash before strive records its receipt, reconcile it exactly once, then create an unreconcilable model dispatch. Restore the prior bundle through the approved operator path. Assert unchanged environment, unchanged positive reservation, unchanged pending effect identity, no retry, and continued suspension. Exercise both agent and user mutations. [Current acceptance probes](/Users/nikhil/personal/hatch/strive/tests/vnext/test_acceptance_contracts.py).
+
+For guarantee 2, add a passing standalone runtime test for the forge-facts half. A candidate should claim success while leaving the task unsolved and attempt to submit counterfeit measurement evidence. The producer boundary rejects unauthorized Measurement records, and the real trusted scorer returns the state-supported outcome.
+
+The existing combined guarantee-2 probe also requires protected-feedback noninterference. Keep that remaining research-workflow obligation visible; passing forged-facts tests does not close the whole guarantee.
+
+All committed tests use deterministic scripts, retained responses, or the injectable provider. Disable external network access during tests. No live model calls, paid smoke tests, or whole-episode upstream retries are part of M5’s committed test suite.
+
+## 6. Risks and decisions for the human
+
+**Approve the two generic runtime changes.** Dynamic scoped admission and suspended operator-only restoration are necessary to meet the requested interface and recovery probe honestly. They preserve the authority record schema but require explicit implementation and semantic changes before the second-benchmark core freeze.
+
+**Approve the bounded direct user-model adapter.** The existing text-only provider profile does not implement upstream user tool proposals. Add that capability as a separately pinned model adapter; preserve the actor/refiner harness restrictions. Do not silently substitute a different user-simulation protocol.
+
+**Keep task qualification as a hard gate.** The source generator supports deterministic telecom scoring, but this pass did not certify every task record. If the complete scan discovers required NL grading or incompatible grouping, stop preparation and present the exact affected IDs and proposed campaign revision. Do not weaken reward criteria or silently change the denominator.
+
+**Keep dependency resolution separate.** Tau’s Python range and LiteLLM constraints may conflict with strive’s existing environment. A separately locked adapter runtime is the default resolution; changing upstream dependencies requires a new closure and equivalence run.
+
+**Preserve the limit of the metric.** Deterministic success measures the selected task criteria. It does not certify every policy instruction, user-simulator realism, or absence of pretraining contamination.
+
+**Do not overstate overall release readiness.** The current acceptance suite still marks native-harness confinement as unresolved. M5 can close benchmark scoring and recovery evidence without claiming that every native harness already satisfies all five guarantees. The funded ceiling and protected audit allocation remain prerequisites for the later paid campaign.
+
+Automatic approval review rejected opening the raw task file in the browser because permission was declined. That retrieval was not bypassed; complete task-inventory certification remains outstanding.
