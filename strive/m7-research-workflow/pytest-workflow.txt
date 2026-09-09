@@ -1,0 +1,12 @@
+......F....                                                              [100%]
+=================================== FAILURES ===================================
+______________________ test_cli_commands_use_real_runner _______________________
+tests/vnext/test_workflow.py:155: in test_cli_commands_use_real_runner
+    assert main(prefix + ["resume", "cli"]) == 0
+E   AssertionError: assert 1 == 0
+E    +  where 1 = main((['--root', '/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytest-of-nikhil/pytest-40/test_cli_commands_use_real_run0/state'] + ['resume', 'cli']))
+----------------------------- Captured stderr call -----------------------------
+error: pinned runtime differs; reproduce/resume requires retained implementation
+=========================== short test summary info ============================
+FAILED tests/vnext/test_workflow.py::test_cli_commands_use_real_runner - Asse...
+1 failed, 10 passed in 104.90s (0:01:44)

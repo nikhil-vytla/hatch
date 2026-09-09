@@ -1,0 +1,12 @@
+...F...                                                                  [100%]
+=================================== FAILURES ===================================
+_____________ test_stopped_pending_work_is_reported_indeterminate ______________
+tests/vnext/test_workflow.py:270: in test_stopped_pending_work_is_reported_indeterminate
+    assert report["status"] == "indeterminate"
+E   AssertionError: assert 'suspended' == 'indeterminate'
+E     
+E     - indeterminate
+E     + suspended
+=========================== short test summary info ============================
+FAILED tests/vnext/test_workflow.py::test_stopped_pending_work_is_reported_indeterminate
+1 failed, 6 passed, 17 deselected in 24.02s

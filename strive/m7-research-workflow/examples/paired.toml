@@ -1,0 +1,9 @@
+"strictness" = "matched"
+"allowed_differences" = ["run.editable"]
+"horizon" = 2
+"pairing" = "workload_seed"
+"metric" = "cumulative_successes"
+"exclusions" = []
+"stopping" = "budget-or-horizon"
+"selection" = "final_valid_active_actor_from_every_trajectory"
+"uncertainty" = "paired-normal-95"
