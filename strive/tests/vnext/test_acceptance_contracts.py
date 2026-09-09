@@ -333,8 +333,8 @@ class StorageRuntimeDriver:
 
 @pytest.fixture
 def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
-    from .harness_acceptance import HarnessRuntimeDriver
-    return HarnessRuntimeDriver(tmp_path / "runtime-vnext")
+    from .benchmark_acceptance import BenchmarkRuntimeDriver
+    return BenchmarkRuntimeDriver(tmp_path / "runtime-vnext")
 
 
 @pytest.mark.xfail(strict=True, raises=NotImplementedError,
@@ -345,7 +345,7 @@ def test_runtime_integrity_1_confines_candidate_and_harness(future_runtime: Runt
 
 
 @pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="Complete stateful operation and Complete the research workflow: trusted scorer plus A/B noninterference")
+                   reason="Research workflow still owes protected-feedback A/B noninterference; standalone M5 forged-facts probe passes")
 def test_runtime_integrity_2_rejects_forged_facts_and_protected_feedback(future_runtime: RuntimeAcceptanceDriver) -> None:
     evidence = future_runtime.exercise("forge_success_and_vary_protected_evidence_with_fixed_permitted_inputs")
     assert evidence.forged_measurement_rejected
@@ -358,8 +358,6 @@ def test_runtime_integrity_3_retains_request_and_consumes_result_once(future_run
     assert evidence.result_consumptions == 1
 
 
-@pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="Complete stateful operation and Enable adaptation: reconcile mutation, preserve uncertainty, restore only bundle")
 def test_runtime_integrity_4_preserves_mutation_and_unresolved_obligation(future_runtime: RuntimeAcceptanceDriver) -> None:
     evidence = future_runtime.exercise("crash_after_mutation_then_restore_bundle_with_ambiguous_model_effect")
     assert evidence.mutation_count == 1

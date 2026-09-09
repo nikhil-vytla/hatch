@@ -9,12 +9,13 @@ from typing import Protocol
 from ..codec import decode, encode
 from ..contracts.commands import ExecuteEffect
 from ..contracts.lifecycle import DispatchStage, RecoveryContract
-from ..contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, Reservation, ResourceQuantity
+from ..contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, Reservation, ResourceQuantity, ScopedArtifact
 from ..contracts.records import EffectAuthorization, OutcomeStatus, UsageProvenance
 from ..errors import VerificationError
 from ..store.cas import CAS
 from ..verify.engine import VerifiedState
 from .ledger import BudgetLedger
+from .admission import ScopedAdmission
 
 
 @dataclass(frozen=True)
@@ -126,11 +127,18 @@ class EffectAdapter(Protocol):
 
 class CapabilityBroker:
     def __init__(self, objects: CAS, capabilities: tuple[Capability, ...],
-                 adapters: Mapping[str, EffectAdapter]) -> None:
+                 adapters: Mapping[str, EffectAdapter], admission: ScopedAdmission | None = None) -> None:
         self.objects = objects
         self.capabilities = capabilities
         self.adapters = MappingProxyType(dict(adapters))
-        self.policy_reference = objects.publish(encode(tuple(c.retained() for c in capabilities)))
+        self.admission = admission
+        exact = tuple(c.retained() for c in capabilities)
+        self.policy_reference = objects.publish(encode(exact if admission is None else
+                                                       ("capabilities/2", exact, admission.identity)))
+
+    def permits_input(self, state: VerifiedState, item: ScopedArtifact) -> bool:
+        return any(c.scope == item.access_scope and item.reference in c.inputs for c in self.capabilities) or (
+            self.admission is not None and self.admission.permits_input(state, item))
 
     def prepare(self, state: VerifiedState, command: ExecuteEffect) -> tuple[EffectAdapter, EffectRequest, PreparedEffect]:
         if state.binding is None or state.binding.capabilities != self.policy_reference:
@@ -140,11 +148,20 @@ class CapabilityBroker:
                   and c.destination == request.destination and c.scope == request.scope
                   and request.arguments in c.arguments and set(request.inputs) <= c.inputs]
         adapter = self.adapters.get(command.binding)
-        if len(grants) != 1 or adapter is None or adapter.identity != grants[0].adapter:
-            raise VerificationError("destination, scope, operation, arguments or adapter not permitted")
+        dynamic = None
+        if not (len(grants) == 1 and adapter is not None and adapter.identity == grants[0].adapter):
+            if self.admission is None or adapter is None or grants:
+                raise VerificationError("destination, scope, operation, arguments or adapter not permitted")
+            dynamic = self.admission.admit(state, command.binding, command.operation, request.destination,
+                                           request.scope, request.arguments, request.inputs, adapter.identity)
+        assert adapter is not None
         for ref in (request.arguments, *request.inputs):
             self.objects.read(ref)
         plan = adapter.prepare(command, request)
+        if dynamic is not None:
+            bounds = {q.resource: q.quantity for q in dynamic.bounds}
+            if any(q.resource not in bounds or q.quantity > bounds[q.resource] for q in plan.reservation.components):
+                raise VerificationError("adapter reservation exceeds scoped policy bounds")
         BudgetLedger.admit(state, plan.reservation)
         if command.operation == "model.generate" and plan.generation is None:
             raise VerificationError("model generation requires retained generation inputs")

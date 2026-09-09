@@ -135,9 +135,13 @@ def test_broken_candidate_suspends_and_operator_can_restore(sandbox: DenoSandbox
         with pytest.raises(SandboxFailure):
             fixture.supervisor.step(sandbox)
         assert fixture.supervisor.state.execution_status is ExecutionStatus.SUSPENDED
+        before = fixture.supervisor.state
         fixture.supervisor.restore(fixture.bundle)
         assert fixture.supervisor.state.active_bundle == fixture.bundle
-        assert fixture.reader.verify().execution_status is ExecutionStatus.CONTINUE
+        assert fixture.reader.verify().execution_status is ExecutionStatus.SUSPENDED
+        assert fixture.supervisor.state.effects == before.effects
+        assert fixture.supervisor.state.environment == before.environment
+        assert fixture.supervisor.state.private_state == before.private_state
     finally:
         fixture.close()
 

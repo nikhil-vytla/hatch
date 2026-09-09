@@ -1,0 +1,366 @@
+diff --git a/strive/docs/ASTRA_DESIGN.md b/strive/docs/ASTRA_DESIGN.md
+index 23ccf65..e7afd01 100644
+--- a/strive/docs/ASTRA_DESIGN.md
++++ b/strive/docs/ASTRA_DESIGN.md
+@@ -1803,3 +1803,35 @@ All committed tests use deterministic scripts, retained responses, or the inject
+ **Do not overstate overall release readiness.** The current acceptance suite still marks native-harness confinement as unresolved. M5 can close benchmark scoring and recovery evidence without claiming that every native harness already satisfies all five guarantees. The funded ceiling and protected audit allocation remain prerequisites for the later paid campaign.
+ 
+ Automatic approval review rejected opening the raw task file in the browser because permission was declined. That retrieval was not bypassed; complete task-inventory certification remains outstanding.
++
++### M5 implementation status, 9 September 2026
++
++Amendment 2 is implemented under `src/strive/vnext/benchmarks/`, with the tau2
++implementation in the separately resolved `adapters/tau2/` project. The typed
++`strive.benchmark/1` interface remains outside the authority codec. The operation
++and evidence ownership described in §3 now uses `BenchmarkEffectAdapter`,
++`EpisodeDriver`, transactional operation receipts, and the trusted scorer port.
++`Measurement` retains its frozen fields and carries authenticated receipt and
++state references, the task reward definition, grouping identity and coverage.
++
++The §3.3 runtime changes use pinned scoped admission and the existing
++`RevisionActivation`. Suspended operator restoration retains the canonical
++`RestoreBundle`, changes only active bundle/revision, and preserves suspension,
++private state, pending commands, effect authorizations, results and accounting.
++Candidate activation still cannot cross an unresolved operation boundary.
++
++The §6 closure includes source/dependency/data identities and an explicit
++retained data tree. The §7 telecom reference campaign remains 60 development,
++14 validation and 40 audit tasks; generic adapters do not inherit that split.
++The importer scans the full supplied inventory, groups scenarios transitively,
++and fails preparation on ineligible grading, crossing groups or an impossible
++whole-group partition. No audit or validation feedback is granted to adaptation.
++
++M5's §9.4/§10 evidence is fixture-level in this environment. The pinned tau2
++resolution hit the macOS uv system-configuration panic; shell task retrieval
++failed DNS and the web reader rejected the task file's size. Full upstream
++inventory certification and live deterministic evaluator equivalence remain
++explicitly skipped. No task exclusions or replacement denominator are approved.
++A second integer-target benchmark exercises the frozen common infrastructure
++without changes to its files. The implementation report and exact limits are in
++[`m5-investigation/README.md`](../m5-investigation/README.md).
+diff --git a/strive/pyproject.toml b/strive/pyproject.toml
+index abcf556..c2b6541 100644
+--- a/strive/pyproject.toml
++++ b/strive/pyproject.toml
+@@ -29,10 +29,15 @@ testpaths = ["tests"]
+ 
+ [tool.mypy]
+ strict = true
+-files = ["src", "tests"]
++files = ["src", "tests", "adapters/tau2/src", "adapters/counter/src"]
++mypy_path = ["adapters/tau2/src", "adapters/counter/src"]
+ 
+ # DSPy ships no py.typed marker; the deno-pyodide backend uses it behind a
+ # narrow typed wrapper (strive.sandbox_backends).
+ [[tool.mypy.overrides]]
+ module = ["dspy.*"]
+ ignore_missing_imports = true
++
++[[tool.mypy.overrides]]
++module = ["tau2.*"]
++ignore_missing_imports = true
+diff --git a/strive/src/strive/vnext/runtime/broker.py b/strive/src/strive/vnext/runtime/broker.py
+index 34d6099..a05f950 100644
+--- a/strive/src/strive/vnext/runtime/broker.py
++++ b/strive/src/strive/vnext/runtime/broker.py
+@@ -9,12 +9,13 @@ from typing import Protocol
+ from ..codec import decode, encode
+ from ..contracts.commands import ExecuteEffect
+ from ..contracts.lifecycle import DispatchStage, RecoveryContract
+-from ..contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, Reservation, ResourceQuantity
++from ..contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, Reservation, ResourceQuantity, ScopedArtifact
+ from ..contracts.records import EffectAuthorization, OutcomeStatus, UsageProvenance
+ from ..errors import VerificationError
+ from ..store.cas import CAS
+ from ..verify.engine import VerifiedState
+ from .ledger import BudgetLedger
++from .admission import ScopedAdmission
+ 
+ 
+ @dataclass(frozen=True)
+@@ -126,11 +127,18 @@ class EffectAdapter(Protocol):
+ 
+ class CapabilityBroker:
+     def __init__(self, objects: CAS, capabilities: tuple[Capability, ...],
+-                 adapters: Mapping[str, EffectAdapter]) -> None:
++                 adapters: Mapping[str, EffectAdapter], admission: ScopedAdmission | None = None) -> None:
+         self.objects = objects
+         self.capabilities = capabilities
+         self.adapters = MappingProxyType(dict(adapters))
+-        self.policy_reference = objects.publish(encode(tuple(c.retained() for c in capabilities)))
++        self.admission = admission
++        exact = tuple(c.retained() for c in capabilities)
++        self.policy_reference = objects.publish(encode(exact if admission is None else
++                                                       ("capabilities/2", exact, admission.identity)))
++
++    def permits_input(self, state: VerifiedState, item: ScopedArtifact) -> bool:
++        return any(c.scope == item.access_scope and item.reference in c.inputs for c in self.capabilities) or (
++            self.admission is not None and self.admission.permits_input(state, item))
+ 
+     def prepare(self, state: VerifiedState, command: ExecuteEffect) -> tuple[EffectAdapter, EffectRequest, PreparedEffect]:
+         if state.binding is None or state.binding.capabilities != self.policy_reference:
+@@ -140,11 +148,20 @@ class CapabilityBroker:
+                   and c.destination == request.destination and c.scope == request.scope
+                   and request.arguments in c.arguments and set(request.inputs) <= c.inputs]
+         adapter = self.adapters.get(command.binding)
+-        if len(grants) != 1 or adapter is None or adapter.identity != grants[0].adapter:
+-            raise VerificationError("destination, scope, operation, arguments or adapter not permitted")
++        dynamic = None
++        if not (len(grants) == 1 and adapter is not None and adapter.identity == grants[0].adapter):
++            if self.admission is None or adapter is None or grants:
++                raise VerificationError("destination, scope, operation, arguments or adapter not permitted")
++            dynamic = self.admission.admit(state, command.binding, command.operation, request.destination,
++                                           request.scope, request.arguments, request.inputs, adapter.identity)
++        assert adapter is not None
+         for ref in (request.arguments, *request.inputs):
+             self.objects.read(ref)
+         plan = adapter.prepare(command, request)
++        if dynamic is not None:
++            bounds = {q.resource: q.quantity for q in dynamic.bounds}
++            if any(q.resource not in bounds or q.quantity > bounds[q.resource] for q in plan.reservation.components):
++                raise VerificationError("adapter reservation exceeds scoped policy bounds")
+         BudgetLedger.admit(state, plan.reservation)
+         if command.operation == "model.generate" and plan.generation is None:
+             raise VerificationError("model generation requires retained generation inputs")
+diff --git a/strive/src/strive/vnext/runtime/supervisor.py b/strive/src/strive/vnext/runtime/supervisor.py
+index 758efc2..e47143d 100644
+--- a/strive/src/strive/vnext/runtime/supervisor.py
++++ b/strive/src/strive/vnext/runtime/supervisor.py
+@@ -104,8 +104,7 @@ class Supervisor:
+                                                          for e in self.state.effects)):
+                 raise VerificationError("candidate step requires an available continuation")
+             scope = self.writer.reader.authority.scope
+-            permitted = set().union(*(c.inputs for c in self.broker.capabilities))
+-            if any(item.access_scope != scope or item.reference not in permitted for item in artifacts):
++            if any(item.access_scope != scope or not self.broker.permits_input(self.state, item) for item in artifacts):
+                 raise VerificationError("candidate input not permitted")
+             assert self.state.active_bundle is not None and self.state.active_revision is not None
+             assert self.state.environment is not None
+@@ -211,7 +210,7 @@ class Supervisor:
+         finally:
+             self._lock.release()
+ 
+-    def _accept(self, output: StepOutput, expected_head: ArtifactRef | None) -> None:
++    def _accept(self, output: StepOutput, expected_head: ArtifactRef | None, *, operator: bool = False) -> None:
+         # Canonical decoding checks runtime types, not just dataclass annotations.
+         if not isinstance(decode(encode(output)), StepOutput):
+             raise VerificationError("invalid step output")
+@@ -222,6 +221,8 @@ class Supervisor:
+         if any(e.state not in {EffectState.SETTLED, EffectState.CONSUMED} for e in self.state.effects):
+             raise VerificationError("step cannot interpret an unresolved effect")
+         command = output.command
++        if isinstance(command, RestoreBundle) and not operator:
++            raise VerificationError("bundle restoration requires the operator entry point")
+         if isinstance(command, ExecuteEffect) and (command.binding == "@supervisor" or command.operation == "runtime.step"):
+             raise VerificationError("candidate cannot request supervisor operations")
+         if isinstance(command, EvaluateFork):
+@@ -266,6 +267,10 @@ class Supervisor:
+             self._lock.release()
+ 
+     def _drive(self) -> None:
++        if self.state.dispatch_stopped:
++            raise VerificationError("dispatch stopped")
++        if self.state.execution_status is not ExecutionStatus.CONTINUE:
++            return
+         if self.state.pending_command is None:
+             return
+         command = decode(self.writer.objects.read(self.state.pending_command))
+@@ -470,8 +475,21 @@ class Supervisor:
+         self._enter()
+         try:
+             assert self.state.active_revision is not None
+-            self._accept(StepOutput(RestoreBundle(bundle, self.state.active_revision, controller_state),
+-                                    self.state.private_state), self.state.head)
+-            self._drive()
++            command = RestoreBundle(bundle, self.state.active_revision, controller_state)
++            if self.state.execution_status is ExecutionStatus.SUSPENDED:
++                if controller_state is not None:
++                    raise VerificationError("suspended restoration cannot migrate state")
++                if bundle not in {prior for _, prior in self.state.revisions}:
++                    raise VerificationError("restoration requires a previously active bundle")
++                if self._compatible_bundle is None or not self._compatible_bundle(bundle):
++                    raise VerificationError("bundle has not passed trusted compatibility validation")
++                assert self.state.active_bundle is not None
++                boundary = self.writer.objects.publish(encode(command))
++                self._append(RevisionActivation(self.state.active_bundle, bundle, self.state.active_revision,
++                                                boundary, None), ProducerKind.SUPERVISOR, self._cause())
++                self.fault(Boundary.ACTIVATED)
++            else:
++                self._accept(StepOutput(command, self.state.private_state), self.state.head, operator=True)
++                self._drive()
+         finally:
+             self._lock.release()
+diff --git a/strive/src/strive/vnext/verify/engine.py b/strive/src/strive/vnext/verify/engine.py
+index a9f07d7..f700d38 100644
+--- a/strive/src/strive/vnext/verify/engine.py
++++ b/strive/src/strive/vnext/verify/engine.py
+@@ -284,6 +284,21 @@ def _activate(state: VerifiedState, payload: RevisionActivation, frame: Frame, o
+     _require(state.execution_status is not ExecutionStatus.FINISHED, "cannot activate after finish")
+     _require(payload.previous_bundle == state.active_bundle and payload.expected_active_revision == state.active_revision,
+              "revision/bundle continuity mismatch")
++    # The supervisor's operator entry point retains the RestoreBundle itself.
++    # This single record changes only bundle identity, even with pending effects.
++    if state.execution_status is ExecutionStatus.SUSPENDED:
++        boundary = decode(objects.read(payload.activation_boundary))
++        if isinstance(boundary, RestoreBundle):
++            _require(boundary.prior_bundle == payload.next_bundle
++                     and boundary.expected_active_revision == state.active_revision
++                     and boundary.controller_state is None
++                     and payload.coupled_controller_state_reference is None,
++                     "suspended restoration cannot migrate state or change request")
++            _require(payload.next_bundle in {bundle for _, bundle in state.revisions},
++                     "restoration requires a previously active bundle")
++            revision = RevisionId(frame.envelope.record_id)
++            return replace(state, active_bundle=payload.next_bundle, active_revision=revision,
++                           revisions=state.revisions + ((revision, payload.next_bundle),))
+     _require(all(effect.state in {EffectState.SETTLED, EffectState.CONSUMED} for effect in state.effects),
+              "activation requires a legal operation boundary")
+     if state.pending_command is not None:
+diff --git a/strive/tests/vnext/fresh_probe.py b/strive/tests/vnext/fresh_probe.py
+index 35dbb45..5c9b6f6 100644
+--- a/strive/tests/vnext/fresh_probe.py
++++ b/strive/tests/vnext/fresh_probe.py
+@@ -16,8 +16,15 @@ _PROGRAM = textwrap.dedent('''
+     import importlib.abc
+     from pathlib import Path
+ 
++    sys.path = [p for p in sys.path if "site-packages" not in p]
+     sys.path.insert(0, sys.argv[1])
+-    forbidden = ("dspy", "litellm", "openai", "anthropic", "numpy", "torch", "candidate")
++    if len(sys.argv) > 5 and sys.argv[5]:
++        sys.path.append(sys.argv[5])
++        import importlib.metadata
++        assert importlib.metadata.version("strive-benchmark-tau2") == "0.1.0"
++
++    forbidden = ("dspy", "litellm", "openai", "anthropic", "numpy", "torch", "candidate", "tau2", "strive_benchmark_tau2", "strive_benchmark_counter",
++                 "pandas", "pydantic", "httpx", "requests", "fastapi", "tenacity", "deepdiff", "dotenv", "tiktoken", "tokenizers", "strive.vnext.benchmarks")
+     allowed_strive = {"strive", "strive.vnext"} | {
+         "strive.vnext." + name for name in (
+             "codec", "errors", "wire", "verify", "verify.engine", "store", "store.cas", "store.journal",
+@@ -66,11 +73,15 @@ _PROGRAM = textwrap.dedent('''
+         outcome = "CORRUPTION_REJECTED"
+     else:
+         assert not expected_corruption, "corrupt authority was accepted"
+-        assert len(state.records) == 6
+-        assert len(state.consumed_results) == 1
+-        assert state.private_state == b"private-state\\x00"
+-        assert isinstance(state.records[-1].payload, Annotation)
+-        assert state.records[-1].payload.payload.startswith(b"\\xffnot JSON")
++        if len(sys.argv) > 4 and sys.argv[4] == "benchmark":
++            assert state.measurements and state.measurements[-1].metric_value == 1
++            assert len(state.consumed_results) == len(state.effects)
++        else:
++            assert len(state.records) == 6
++            assert len(state.consumed_results) == 1
++            assert state.private_state == b"private-state\\x00"
++            assert isinstance(state.records[-1].payload, Annotation)
++            assert state.records[-1].payload.payload.startswith(b"\\xffnot JSON")
+         outcome = "REPLAY_ACCEPTED"
+     assert not any(name == prefix or name.startswith(prefix + ".") for name in sys.modules for prefix in forbidden)
+     assert not any(name.startswith("strive.") and name not in allowed_strive for name in sys.modules)
+@@ -78,10 +89,11 @@ _PROGRAM = textwrap.dedent('''
+ ''')
+ 
+ 
+-def fresh_replay(root: Path, *, corrupt: bool) -> None:
++def fresh_replay(root: Path, *, corrupt: bool, benchmark: bool = False, installed: Path | None = None) -> None:
+     source = Path(__file__).resolve().parents[2] / "src"
+     result = subprocess.run(
+-        [sys.executable, "-I", "-B", "-c", _PROGRAM, str(source), str(root), "corrupt" if corrupt else "valid"],
++        [sys.executable, "-I", "-B", "-c", _PROGRAM, str(source), str(root), "corrupt" if corrupt else "valid",
++         "benchmark" if benchmark else "storage", str(installed) if installed else ""],
+         capture_output=True, text=True, timeout=30,
+     )
+     assert result.returncode == 0, f"fresh verifier failed: stdout={result.stdout!r}, stderr={result.stderr!r}"
+diff --git a/strive/tests/vnext/test_acceptance_contracts.py b/strive/tests/vnext/test_acceptance_contracts.py
+index 6aa31a1..82b0592 100644
+--- a/strive/tests/vnext/test_acceptance_contracts.py
++++ b/strive/tests/vnext/test_acceptance_contracts.py
+@@ -333,8 +333,8 @@ class StorageRuntimeDriver:
+ 
+ @pytest.fixture
+ def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
+-    from .harness_acceptance import HarnessRuntimeDriver
+-    return HarnessRuntimeDriver(tmp_path / "runtime-vnext")
++    from .benchmark_acceptance import BenchmarkRuntimeDriver
++    return BenchmarkRuntimeDriver(tmp_path / "runtime-vnext")
+ 
+ 
+ @pytest.mark.xfail(strict=True, raises=NotImplementedError,
+@@ -345,7 +345,7 @@ def test_runtime_integrity_1_confines_candidate_and_harness(future_runtime: Runt
+ 
+ 
+ @pytest.mark.xfail(strict=True, raises=NotImplementedError,
+-                   reason="Complete stateful operation and Complete the research workflow: trusted scorer plus A/B noninterference")
++                   reason="Research workflow still owes protected-feedback A/B noninterference; standalone M5 forged-facts probe passes")
+ def test_runtime_integrity_2_rejects_forged_facts_and_protected_feedback(future_runtime: RuntimeAcceptanceDriver) -> None:
+     evidence = future_runtime.exercise("forge_success_and_vary_protected_evidence_with_fixed_permitted_inputs")
+     assert evidence.forged_measurement_rejected
+@@ -358,8 +358,6 @@ def test_runtime_integrity_3_retains_request_and_consumes_result_once(future_run
+     assert evidence.result_consumptions == 1
+ 
+ 
+-@pytest.mark.xfail(strict=True, raises=NotImplementedError,
+-                   reason="Complete stateful operation and Enable adaptation: reconcile mutation, preserve uncertainty, restore only bundle")
+ def test_runtime_integrity_4_preserves_mutation_and_unresolved_obligation(future_runtime: RuntimeAcceptanceDriver) -> None:
+     evidence = future_runtime.exercise("crash_after_mutation_then_restore_bundle_with_ambiguous_model_effect")
+     assert evidence.mutation_count == 1
+diff --git a/strive/tests/vnext/test_harness.py b/strive/tests/vnext/test_harness.py
+index c9662d2..d3f7243 100644
+--- a/strive/tests/vnext/test_harness.py
++++ b/strive/tests/vnext/test_harness.py
+@@ -261,6 +261,13 @@ def test_nondeterministic_decoder_preserves_incomplete(tmp_path: Path) -> None:
+ def test_core_unchanged_and_adapters_selected_by_manifest(tmp_path: Path) -> None:
+     root = Path(__file__).resolve().parents[2]
+     baseline = json.loads((root / "harness-qualification/core-baseline.json").read_text())
++    # Amendment 2 explicitly approves scoped admission and suspended operator
++    # restoration. Preserve M4's baseline for every other core file.
++    m5 = json.loads((root / "m5-investigation/second-benchmark-core-freeze.json").read_text())
++    approved = {"src/strive/vnext/runtime/broker.py", "src/strive/vnext/runtime/supervisor.py",
++                "src/strive/vnext/verify/engine.py"}
++    assert {name for name in baseline if baseline[name] != m5[name]} == approved
++    baseline.update({name: m5[name] for name in approved})
+     for name, digest in baseline.items():
+         assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest, name
+     for path in (root / "src/strive/vnext/harness/adapters").glob("*.py"):
+diff --git a/strive/tests/vnext/test_runtime.py b/strive/tests/vnext/test_runtime.py
+index bff5781..e603751 100644
+--- a/strive/tests/vnext/test_runtime.py
++++ b/strive/tests/vnext/test_runtime.py
+@@ -233,7 +233,7 @@ def test_operator_restore_uses_durable_command_preserves_accounting(runtime: Run
+     runtime.supervisor.drive()
+     runtime.supervisor.accept(StepOutput(Suspend("broken controller"), b"broken"), expected_head=runtime.supervisor.state.head)
+     before = runtime.supervisor.state
+-    arm(runtime, Boundary.ACCEPTED)
++    arm(runtime, Boundary.ACTIVATED)
+     with pytest.raises(Crash):
+         runtime.supervisor.restore(runtime.bundle)
+     runtime.restart().recover()
+@@ -243,6 +243,8 @@ def test_operator_restore_uses_durable_command_preserves_accounting(runtime: Run
+     assert after.environment == before.environment and after.consumed_results == before.consumed_results
+     assert runtime.provider.calls == 1
+ 
++    assert after.execution_status is ExecutionStatus.SUSPENDED
++
+ 
+ def test_in_process_upstream_gate_retains_actual_request_and_denies_second(runtime: RuntimeFixture) -> None:
+     runtime.provider.harness = True
+diff --git a/strive/tests/vnext/test_runtime_sandbox.py b/strive/tests/vnext/test_runtime_sandbox.py
+index 951b245..530735c 100644
+--- a/strive/tests/vnext/test_runtime_sandbox.py
++++ b/strive/tests/vnext/test_runtime_sandbox.py
+@@ -135,9 +135,13 @@ def test_broken_candidate_suspends_and_operator_can_restore(sandbox: DenoSandbox
+         with pytest.raises(SandboxFailure):
+             fixture.supervisor.step(sandbox)
+         assert fixture.supervisor.state.execution_status is ExecutionStatus.SUSPENDED
++        before = fixture.supervisor.state
+         fixture.supervisor.restore(fixture.bundle)
+         assert fixture.supervisor.state.active_bundle == fixture.bundle
+-        assert fixture.reader.verify().execution_status is ExecutionStatus.CONTINUE
++        assert fixture.reader.verify().execution_status is ExecutionStatus.SUSPENDED
++        assert fixture.supervisor.state.effects == before.effects
++        assert fixture.supervisor.state.environment == before.environment
++        assert fixture.supervisor.state.private_state == before.private_state
+     finally:
+         fixture.close()
+ 
