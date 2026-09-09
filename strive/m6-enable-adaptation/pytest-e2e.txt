@@ -1,0 +1,25 @@
+F
+=================================== FAILURES ===================================
+______ test_continual_refine_counter_replay_and_fresh_interpreter_purity _______
+
+adaptation = <vnext.adaptation_fixtures.AdaptationFixture object at 0x1090b3a10>
+
+    def test_continual_refine_counter_replay_and_fresh_interpreter_purity(adaptation: AdaptationFixture) -> None:
+        adaptation.upstream.decide = lambda context: Proposal(RevisionId(str(context["revision"])), "revise",
+            (Edit("prompts/delta.txt", b"7"),), rationale="confirmed improvement is just a claim", compare=True)
+        adaptation.policy.run(adaptation.adapter, adaptation.assignments(), adaptation.routes, CounterProgram(adaptation))
+        state = adaptation.reader.verify()
+        assert [m.metric_value for m in state.measurements] == [0, 1]
+        assert adaptation.upstream.calls == 1
+        assert len(state.revisions) == 2 and not state.pending_command
+        assert all(e.state is EffectState.CONSUMED for e in state.effects)
+        assert amounts(state.measured)[Resource.MODEL_CALLS] == 1
+>       assert amounts(state.measured)[Resource.USD_NANODOLLARS] == 0
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: <Resource.USD_NANODOLLARS: 'usd_nanodollars'>
+
+tests/vnext/test_adaptation.py:217: KeyError
+=========================== short test summary info ============================
+FAILED tests/vnext/test_adaptation.py::test_continual_refine_counter_replay_and_fresh_interpreter_purity
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed in 8.13s
