@@ -262,10 +262,11 @@ def test_core_unchanged_and_adapters_selected_by_manifest(tmp_path: Path) -> Non
     root = Path(__file__).resolve().parents[2]
     baseline = json.loads((root / "harness-qualification/core-baseline.json").read_text())
     # Amendment 2 explicitly approves scoped admission and suspended operator
-    # restoration. Preserve M4's baseline for every other core file.
+    # restoration. The human-approved release 1 telemetry trim changes only
+    # manifest.py. Preserve M4's baseline for every other core file.
     m5 = json.loads((root / "m5-investigation/second-benchmark-core-freeze.json").read_text())
     approved = {"src/strive/vnext/runtime/broker.py", "src/strive/vnext/runtime/supervisor.py",
-                "src/strive/vnext/verify/engine.py"}
+                "src/strive/vnext/verify/engine.py", "src/strive/vnext/contracts/manifest.py"}
     assert {name for name in baseline if baseline[name] != m5[name]} == approved
     baseline.update({name: m5[name] for name in approved})
     for name, digest in baseline.items():

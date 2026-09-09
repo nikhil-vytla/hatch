@@ -1,0 +1,202 @@
+diff --git a/strive/docs/ASTRA_DESIGN.md b/strive/docs/ASTRA_DESIGN.md
+index e7afd01..f19c654 100644
+--- a/strive/docs/ASTRA_DESIGN.md
++++ b/strive/docs/ASTRA_DESIGN.md
+@@ -533,15 +533,11 @@ OTLP does not provide universal exactly-once ingestion. Historical re-export mus
+ 
+ ### 8.2 Viewer profiles
+ 
+-Ship one canonical projection with three export profiles:
++Release 1 ships one reference profile, [Langfuse](https://langfuse.com/integrations/native/opentelemetry), over vendor-neutral OTLP with GenAI semantic conventions pinned to `1.41.0`. It adds supported Langfuse attributes and child-span grouping metadata while preserving standard and `strive.*` attributes.
+ 
+-| Profile | Integration responsibility |
+-|---|---|
+-| **Langfuse, reference viewer** | Translate supported attributes and propagate grouping metadata to child spans. [Integration contract](https://langfuse.com/integrations/native/opentelemetry). |
+-| **LangSmith** | Translate run types, messages, and metadata using its documented mappings. [Integration contract](https://docs.langchain.com/langsmith/trace-with-opentelemetry). |
+-| **Phoenix** | Translate GenAI fields into OpenInference attributes for richer presentation. [Translation contract](https://arize.com/docs/phoenix/tracing/concepts-tracing/translating-conventions). |
++LangSmith and Phoenix profiles are deferred and rejected by manifest validation. OTLP output already works with any OTel backend that accepts the emitted OTLP/HTTP JSON; per-vendor attribute mappings will be added on demand.
+ 
+-Selecting a profile and endpoint requires no policy instrumentation changes. Endpoint credentials remain outside archived artifacts.
++Selecting an endpoint requires no policy instrumentation changes. Endpoint credentials remain outside archived artifacts.
+ 
+ Assign campaign, arm, role, phase, model binding, revision, and evidence scope at authorization. Attribute costs once to leaf effects and roll them up. Keep artifact hashes and event IDs out of general metric labels.
+ 
+@@ -657,7 +653,7 @@ A trusted B run with descriptive comparison is valid research. Its label must no
+ | Open annotations, versioned memory files, explicit scoped imports. | Mandatory memory ontology and global mutable cross-run memory. |
+ | A/B feedback contracts, development corpus, isolated final audit. | Private veto contract C. |
+ | Serial study wrapper, two-arm reference study, paired analysis, Markdown/JSON/CSV reports. | Automatic hyperparameter search, optimizer-specific integrations and population-search tooling. |
+-| Journal-backed CLI inspection, OTLP projection, Langfuse setup and LangSmith/Phoenix profiles. | Custom web UI, hosted leaderboard, prompt-management service, labeling product and production tail sampling. |
++| Journal-backed CLI inspection, vendor-neutral OTLP projection and the Langfuse reference profile. | LangSmith/Phoenix profiles until needed; custom web UI, hosted leaderboard, prompt-management service, labeling product and production tail sampling. |
+ | Ordinary brokered execution. | Speculation and reusable external-effect caches. |
+ 
+ ### 10.2 Milestone sequence
+@@ -669,7 +665,7 @@ A trusted B run with descriptive comparison is valid research. Its label must no
+ | **3. Build effects, accounting, and confinement** | Broker, sandbox, reservations, recorded returns, settlement, continuation and operator recovery. | Fault injection at authorization, dispatch, return, settlement, and continuation boundaries. Reject stale results, unauthorized calls, credential access and budget expansion. |
+ | **4. Complete stateful operation** | Transactional simulator mutations, operation lookup, snapshots, trusted scoring and coverage. | Crash after mutation but before strive records the receipt; recover the original result without repeating the mutation. Unsupported model uncertainty retains its obligation and suspends. |
+ | **5. Enable adaptation** | Code/prompt/memory revisions, atomic activation/restoration, optional forks and bounded controller handover. | Prompt-only edits alter behavior. Composite activation survives crashes. Restoration preserves current world state and accounting. Controller failure can be repaired independently. |
+-| **6. Complete the research workflow** | Manifest and study commands, A/B access, audit isolation, comparisons, CLI inspection and telemetry profiles. | Protected-data noninterference, complete denominator reporting, restart-safe study expansion, and exporter outage/re-export checks. |
++| **6. Complete the research workflow** | Manifest and study commands, A/B access, audit isolation, comparisons, CLI inspection and the Langfuse telemetry profile. | Protected-data noninterference, complete denominator reporting, restart-safe study expansion, and exporter outage/re-export checks. |
+ | **7. Evaluate and package** | Funded reference study, portable report and artifacts, installed package and documentation. | All declared runs reported; every official measurement and cost traces to authoritative records. State only claims supported by results. |
+ 
+ Maintain strict typing, relevant tests, installed-wheel CLI smoke tests, and fresh-interpreter verification throughout the rebuild. Tests for authority and recovery must exercise failure boundaries, not merely mirror implementation structure.
+@@ -1109,7 +1105,7 @@ A provider overrun remains possible under the existing provider-trust assumption
+ | **§7.1–7.2** | Replace order streams and fulfilment metrics with the paired episode campaign and benchmark-success metrics above. |
+ | **§7.4–7.5** | Include user/device state in snapshots; enforce the 60/14/40 split, duplicate grouping, frozen selection, and separate audit sessions/caches. |
+ | **§7.6** | Retain harness configuration, actual provider requests, benchmark revision, user-simulator observations, and both sides of environment state. |
+-| **§8.1–8.3** | Show harness identity and launch spans; attribute model cost once. Distinguish supplied context from actual provider requests and requested identity from observed identity. |
++| **§8.1–8.3** | Show harness identity and launch spans; attribute model cost once. Distinguish supplied context from actual provider requests and requested identity from observed identity. Release 1 ships only the Langfuse profile over vendor-neutral OTLP GenAI 1.41.0; LangSmith/Phoenix mappings are deferred until needed. |
+ | **§9.4** | Replace in full with the supplied text. |
+ | **§9.5** | Explicitly include the entire harness process tree in confinement assumptions. Trusted-host scope remains unchanged. |
+ | **§9.6** | Add the campaign and allocation formula. Positive improvement remains unnecessary for release. |
+diff --git a/strive/m5-investigation/second-benchmark-core-freeze.json b/strive/m5-investigation/second-benchmark-core-freeze.json
+index a667584..6025985 100644
+--- a/strive/m5-investigation/second-benchmark-core-freeze.json
++++ b/strive/m5-investigation/second-benchmark-core-freeze.json
+@@ -15,7 +15,7 @@
+   "src/strive/vnext/contracts/feedback.py": "d762ece51a47330570100ce1040507eefa73d14da2dc491bbfd74fbe69f67420",
+   "src/strive/vnext/contracts/harness.py": "a6c870131a8fb7cfd20cb639ab8aa16e33fbdf8a601071ce44a573c28c9cdc1a",
+   "src/strive/vnext/contracts/lifecycle.py": "90440799698b2f200301773c9905bd3cf1d39f8004d81cf8c9c35cdd958e81cc",
+-  "src/strive/vnext/contracts/manifest.py": "36ae490a85795a4c58a29535b4bd44799c4a105263a4bacf1535c306f9a1fc44",
++  "src/strive/vnext/contracts/manifest.py": "7cfe64182077324efb3f9818f7933f403689e7b23810de51b1788490a8bc55f4",
+   "src/strive/vnext/contracts/primitives.py": "01c7d778ccafc9ec23b83acc8f12407550c5dec88113a2f2c9060e79b085a448",
+   "src/strive/vnext/contracts/records.py": "82ed54ec24a01ee8e1bb9258f8577b73fcce836174c36e09c4de890c7cb1b5b8",
+   "src/strive/vnext/contracts/study.py": "f87ad7adc972a1a1ec58878bc31f87921e642f26a4b56583af629663422b9b19",
+diff --git a/strive/src/strive/vnext/contracts/manifest.py b/strive/src/strive/vnext/contracts/manifest.py
+index dbb6b59..e710677 100644
+--- a/strive/src/strive/vnext/contracts/manifest.py
++++ b/strive/src/strive/vnext/contracts/manifest.py
+@@ -156,8 +156,6 @@ class OperationRecovery:
+ 
+ class TelemetryProfile(StrEnum):
+     LANGFUSE = "langfuse"
+-    LANGSMITH = "langsmith"
+-    PHOENIX = "phoenix"
+ 
+ 
+ @dataclass(frozen=True, slots=True)
+@@ -438,6 +436,10 @@ def _load[Ref](source: str, ref: Callable[[str], Ref], policy_validator: PolicyV
+         telemetry.literal("semconv", "1.41.0")
+         telemetry.literal("content_export", "authorized-development")
+         telemetry.literal("sampling", "all")
++        profile = telemetry.string("profile")
++        if profile != TelemetryProfile.LANGFUSE:
++            raise ManifestError(f"telemetry.profile: unsupported profile {profile!r}; release 1 supports only 'langfuse'; "
++                                "LangSmith/Phoenix profiles are deferred")
+         return RunManifest(
+             schema="strive.run/1",
+             run=RunTable(TrustMode(run.string("mode")), run.strings("editable"), ref(run.string("capabilities"))),
+@@ -458,7 +460,7 @@ def _load[Ref](source: str, ref: Callable[[str], Ref], policy_validator: PolicyV
+             budget=BudgetTable(usd, budget.integer("tokens"), budget.integer("model_calls"), budget.integer("wall_seconds"),
+                                ref(budget.string("price_schedule")), frozenset(CostPhase(item) for item in budget.strings("includes"))),
+             recovery=recovery,
+-            telemetry=TelemetryTable("1.41.0", TelemetryProfile(telemetry.string("profile")), "authorized-development", "all"),
++            telemetry=TelemetryTable("1.41.0", TelemetryProfile(profile), "authorized-development", "all"),
+         )
+     except ManifestError:
+         raise
+diff --git a/strive/src/strive/vnext/telemetry/profiles.py b/strive/src/strive/vnext/telemetry/profiles.py
+index 6a948f5..b9c7170 100644
+--- a/strive/src/strive/vnext/telemetry/profiles.py
++++ b/strive/src/strive/vnext/telemetry/profiles.py
+@@ -20,23 +20,4 @@ def profile_attributes(profile: TelemetryProfile, attributes: dict[str, object])
+                                ("strive.response.text", "langfuse.observation.output")):
+             if source in attributes:
+                 result[target] = attributes[source]
+-    elif profile is TelemetryProfile.LANGSMITH:
+-        result["langsmith.span.kind"] = "llm" if kind == "generation" else "chain" if kind in {"agent", "chain", "event"} else kind
+-        result["langsmith.trace.session_name"] = attributes.get("strive.campaign", attributes["strive.run.id"])
+-        for k, v in attributes.items():
+-            if k.startswith("strive."):
+-                result["langsmith.metadata." + k[7:]] = v
+-        for source, target in (("strive.request.text", "gen_ai.prompt"), ("strive.response.text", "gen_ai.completion")):
+-            if source in attributes:
+-                result[target] = attributes[source]
+-    else:
+-        result["openinference.span.kind"] = "LLM" if kind == "generation" else "AGENT" if kind == "agent" else "TOOL" if kind == "tool" else "CHAIN"
+-        for source, target in (("gen_ai.request.model", "llm.model_name"),
+-                               ("gen_ai.provider.name", "llm.provider"),
+-                               ("gen_ai.usage.input_tokens", "llm.token_count.prompt"),
+-                               ("gen_ai.usage.output_tokens", "llm.token_count.completion"),
+-                               ("strive.request.text", "input.value"), ("strive.response.text", "output.value")):
+-            if source in attributes:
+-                result[target] = attributes[source]
+-        result["session.id"] = attributes["strive.run.id"]
+     return result
+diff --git a/strive/tests/vnext/test_harness.py b/strive/tests/vnext/test_harness.py
+index d3f7243..6cae505 100644
+--- a/strive/tests/vnext/test_harness.py
++++ b/strive/tests/vnext/test_harness.py
+@@ -262,10 +262,11 @@ def test_core_unchanged_and_adapters_selected_by_manifest(tmp_path: Path) -> Non
+     root = Path(__file__).resolve().parents[2]
+     baseline = json.loads((root / "harness-qualification/core-baseline.json").read_text())
+     # Amendment 2 explicitly approves scoped admission and suspended operator
+-    # restoration. Preserve M4's baseline for every other core file.
++    # restoration. The human-approved release 1 telemetry trim changes only
++    # manifest.py. Preserve M4's baseline for every other core file.
+     m5 = json.loads((root / "m5-investigation/second-benchmark-core-freeze.json").read_text())
+     approved = {"src/strive/vnext/runtime/broker.py", "src/strive/vnext/runtime/supervisor.py",
+-                "src/strive/vnext/verify/engine.py"}
++                "src/strive/vnext/verify/engine.py", "src/strive/vnext/contracts/manifest.py"}
+     assert {name for name in baseline if baseline[name] != m5[name]} == approved
+     baseline.update({name: m5[name] for name in approved})
+     for name, digest in baseline.items():
+diff --git a/strive/tests/vnext/test_telemetry.py b/strive/tests/vnext/test_telemetry.py
+index 571db75..c734e58 100644
+--- a/strive/tests/vnext/test_telemetry.py
++++ b/strive/tests/vnext/test_telemetry.py
+@@ -6,10 +6,12 @@ import pytest
+ from strive.vnext.cli.data import mapping, read_json, sequence
+ from strive.vnext.cli.fixture import example
+ from strive.vnext.cli.runner import reader, resume, run, run_directory
+-from strive.vnext.contracts.manifest import TelemetryProfile
++from strive.vnext.contracts.manifest import ManifestError, TelemetryProfile, load_authored_manifest, load_resolved_configuration
+ from strive.vnext.report.history import expenditure
+ from strive.vnext.telemetry.projector import HTTPExporter, MemoryExporter, Projector, cursor_status, project, project_metrics
+ 
++from .fixtures import AUTHORED_TOML, RESOLVED_TOML
++
+ 
+ def test_projector_outage_rebuild_and_no_double_count(tmp_path: Path) -> None:
+     path = example(tmp_path)
+@@ -55,20 +57,36 @@ def test_projector_outage_rebuild_and_no_double_count(tmp_path: Path) -> None:
+         "gen_ai.client.operation.duration", "gen_ai.client.token.usage"}
+ 
+ 
+-@pytest.mark.parametrize("profile,key", [(TelemetryProfile.LANGFUSE, "langfuse.observation.type"),
+-    (TelemetryProfile.LANGSMITH, "langsmith.span.kind"), (TelemetryProfile.PHOENIX, "openinference.span.kind")])
+-def test_profile_switch_requires_no_policy_change(tmp_path: Path, profile: TelemetryProfile, key: str) -> None:
++def test_langfuse_profile_preserves_otlp_and_journal(tmp_path: Path) -> None:
+     path = example(tmp_path)
+     root = tmp_path / "state"
+     run(root, path, "run-1", display=lambda _: None)
+     read = reader(root, "run-1")
+     journal = read.journal.path.read_bytes()
+     exporter = MemoryExporter()
+-    Projector(read, tmp_path / "cursor", exporter, profile=profile).flush()
+-    assert all(key in {mapping(a)["key"] for a in sequence(span["attributes"])} for span in exporter.spans.values())
++    Projector(read, tmp_path / "cursor", exporter, profile=TelemetryProfile.LANGFUSE).flush()
++    assert exporter.spans
++    exported = {str(span["spanId"]): span for span in exporter.spans.values()}
++    for span in project(read):
++        attributes = {str(mapping(a)["key"]): mapping(a)["value"]
++                      for a in sequence(exported[span.identity]["attributes"])}
++        assert "langfuse.observation.type" in attributes
++        for key, value in span.fields.items():
++            if value is not None:
++                assert key in attributes
++        assert attributes["strive.run.id"] == {"stringValue": "run-1"}
+     assert read.journal.path.read_bytes() == journal
+ 
+ 
++@pytest.mark.parametrize("profile", ["langsmith", "phoenix"])
++def test_manifest_rejects_deferred_telemetry_profiles(profile: str) -> None:
++    message = rf"telemetry\.profile: unsupported profile '{profile}'; .*only 'langfuse'; .*deferred"
++    with pytest.raises(ManifestError, match=message):
++        load_authored_manifest(AUTHORED_TOML.replace('profile = "langfuse"', f'profile = "{profile}"'))
++    with pytest.raises(ManifestError, match=message):
++        load_resolved_configuration(RESOLVED_TOML.replace('profile = "langfuse"', f'profile = "{profile}"'))
++
++
+ def test_execution_does_not_import_projection_or_reporting() -> None:
+     root = Path(__file__).resolve().parents[2] / "src/strive/vnext"
+     for directory in ("runtime", "policy", "benchmarks", "verify", "store", "harness"):

@@ -1,0 +1,4 @@
+.uv-cache/
+pytest-tmp/
+focused-tmp/
+final-tmp/

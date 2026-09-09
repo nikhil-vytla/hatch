@@ -15,7 +15,7 @@
   "src/strive/vnext/contracts/feedback.py": "d762ece51a47330570100ce1040507eefa73d14da2dc491bbfd74fbe69f67420",
   "src/strive/vnext/contracts/harness.py": "a6c870131a8fb7cfd20cb639ab8aa16e33fbdf8a601071ce44a573c28c9cdc1a",
   "src/strive/vnext/contracts/lifecycle.py": "90440799698b2f200301773c9905bd3cf1d39f8004d81cf8c9c35cdd958e81cc",
-  "src/strive/vnext/contracts/manifest.py": "36ae490a85795a4c58a29535b4bd44799c4a105263a4bacf1535c306f9a1fc44",
+  "src/strive/vnext/contracts/manifest.py": "7cfe64182077324efb3f9818f7933f403689e7b23810de51b1788490a8bc55f4",
   "src/strive/vnext/contracts/primitives.py": "01c7d778ccafc9ec23b83acc8f12407550c5dec88113a2f2c9060e79b085a448",
   "src/strive/vnext/contracts/records.py": "82ed54ec24a01ee8e1bb9258f8577b73fcce836174c36e09c4de890c7cb1b5b8",
   "src/strive/vnext/contracts/study.py": "f87ad7adc972a1a1ec58878bc31f87921e642f26a4b56583af629663422b9b19",

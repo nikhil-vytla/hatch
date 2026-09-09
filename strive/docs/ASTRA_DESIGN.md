@@ -533,15 +533,11 @@ OTLP does not provide universal exactly-once ingestion. Historical re-export mus
 
 ### 8.2 Viewer profiles
 
-Ship one canonical projection with three export profiles:
+Release 1 ships one reference profile, [Langfuse](https://langfuse.com/integrations/native/opentelemetry), over vendor-neutral OTLP with GenAI semantic conventions pinned to `1.41.0`. It adds supported Langfuse attributes and child-span grouping metadata while preserving standard and `strive.*` attributes.
 
-| Profile | Integration responsibility |
-|---|---|
-| **Langfuse, reference viewer** | Translate supported attributes and propagate grouping metadata to child spans. [Integration contract](https://langfuse.com/integrations/native/opentelemetry). |
-| **LangSmith** | Translate run types, messages, and metadata using its documented mappings. [Integration contract](https://docs.langchain.com/langsmith/trace-with-opentelemetry). |
-| **Phoenix** | Translate GenAI fields into OpenInference attributes for richer presentation. [Translation contract](https://arize.com/docs/phoenix/tracing/concepts-tracing/translating-conventions). |
+LangSmith and Phoenix profiles are deferred and rejected by manifest validation. OTLP output already works with any OTel backend that accepts the emitted OTLP/HTTP JSON; per-vendor attribute mappings will be added on demand.
 
-Selecting a profile and endpoint requires no policy instrumentation changes. Endpoint credentials remain outside archived artifacts.
+Selecting an endpoint requires no policy instrumentation changes. Endpoint credentials remain outside archived artifacts.
 
 Assign campaign, arm, role, phase, model binding, revision, and evidence scope at authorization. Attribute costs once to leaf effects and roll them up. Keep artifact hashes and event IDs out of general metric labels.
 
@@ -657,7 +653,7 @@ A trusted B run with descriptive comparison is valid research. Its label must no
 | Open annotations, versioned memory files, explicit scoped imports. | Mandatory memory ontology and global mutable cross-run memory. |
 | A/B feedback contracts, development corpus, isolated final audit. | Private veto contract C. |
 | Serial study wrapper, two-arm reference study, paired analysis, Markdown/JSON/CSV reports. | Automatic hyperparameter search, optimizer-specific integrations and population-search tooling. |
-| Journal-backed CLI inspection, OTLP projection, Langfuse setup and LangSmith/Phoenix profiles. | Custom web UI, hosted leaderboard, prompt-management service, labeling product and production tail sampling. |
+| Journal-backed CLI inspection, vendor-neutral OTLP projection and the Langfuse reference profile. | LangSmith/Phoenix profiles until needed; custom web UI, hosted leaderboard, prompt-management service, labeling product and production tail sampling. |
 | Ordinary brokered execution. | Speculation and reusable external-effect caches. |
 
 ### 10.2 Milestone sequence
@@ -669,7 +665,7 @@ A trusted B run with descriptive comparison is valid research. Its label must no
 | **3. Build effects, accounting, and confinement** | Broker, sandbox, reservations, recorded returns, settlement, continuation and operator recovery. | Fault injection at authorization, dispatch, return, settlement, and continuation boundaries. Reject stale results, unauthorized calls, credential access and budget expansion. |
 | **4. Complete stateful operation** | Transactional simulator mutations, operation lookup, snapshots, trusted scoring and coverage. | Crash after mutation but before strive records the receipt; recover the original result without repeating the mutation. Unsupported model uncertainty retains its obligation and suspends. |
 | **5. Enable adaptation** | Code/prompt/memory revisions, atomic activation/restoration, optional forks and bounded controller handover. | Prompt-only edits alter behavior. Composite activation survives crashes. Restoration preserves current world state and accounting. Controller failure can be repaired independently. |
-| **6. Complete the research workflow** | Manifest and study commands, A/B access, audit isolation, comparisons, CLI inspection and telemetry profiles. | Protected-data noninterference, complete denominator reporting, restart-safe study expansion, and exporter outage/re-export checks. |
+| **6. Complete the research workflow** | Manifest and study commands, A/B access, audit isolation, comparisons, CLI inspection and the Langfuse telemetry profile. | Protected-data noninterference, complete denominator reporting, restart-safe study expansion, and exporter outage/re-export checks. |
 | **7. Evaluate and package** | Funded reference study, portable report and artifacts, installed package and documentation. | All declared runs reported; every official measurement and cost traces to authoritative records. State only claims supported by results. |
 
 Maintain strict typing, relevant tests, installed-wheel CLI smoke tests, and fresh-interpreter verification throughout the rebuild. Tests for authority and recovery must exercise failure boundaries, not merely mirror implementation structure.
@@ -1109,7 +1105,7 @@ A provider overrun remains possible under the existing provider-trust assumption
 | **§7.1–7.2** | Replace order streams and fulfilment metrics with the paired episode campaign and benchmark-success metrics above. |
 | **§7.4–7.5** | Include user/device state in snapshots; enforce the 60/14/40 split, duplicate grouping, frozen selection, and separate audit sessions/caches. |
 | **§7.6** | Retain harness configuration, actual provider requests, benchmark revision, user-simulator observations, and both sides of environment state. |
-| **§8.1–8.3** | Show harness identity and launch spans; attribute model cost once. Distinguish supplied context from actual provider requests and requested identity from observed identity. |
+| **§8.1–8.3** | Show harness identity and launch spans; attribute model cost once. Distinguish supplied context from actual provider requests and requested identity from observed identity. Release 1 ships only the Langfuse profile over vendor-neutral OTLP GenAI 1.41.0; LangSmith/Phoenix mappings are deferred until needed. |
 | **§9.4** | Replace in full with the supplied text. |
 | **§9.5** | Explicitly include the entire harness process tree in confinement assumptions. Trusted-host scope remains unchanged. |
 | **§9.6** | Add the campaign and allocation formula. Positive improvement remains unnecessary for release. |
