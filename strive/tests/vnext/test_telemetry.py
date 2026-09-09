@@ -6,9 +6,11 @@ import pytest
 from strive.vnext.cli.data import mapping, read_json, sequence
 from strive.vnext.cli.fixture import example
 from strive.vnext.cli.runner import reader, resume, run, run_directory
-from strive.vnext.contracts.manifest import TelemetryProfile
+from strive.vnext.contracts.manifest import ManifestError, TelemetryProfile, load_authored_manifest, load_resolved_configuration
 from strive.vnext.report.history import expenditure
 from strive.vnext.telemetry.projector import HTTPExporter, MemoryExporter, Projector, cursor_status, project, project_metrics
+
+from .fixtures import AUTHORED_TOML, RESOLVED_TOML
 
 
 def test_projector_outage_rebuild_and_no_double_count(tmp_path: Path) -> None:
@@ -55,18 +57,34 @@ def test_projector_outage_rebuild_and_no_double_count(tmp_path: Path) -> None:
         "gen_ai.client.operation.duration", "gen_ai.client.token.usage"}
 
 
-@pytest.mark.parametrize("profile,key", [(TelemetryProfile.LANGFUSE, "langfuse.observation.type"),
-    (TelemetryProfile.LANGSMITH, "langsmith.span.kind"), (TelemetryProfile.PHOENIX, "openinference.span.kind")])
-def test_profile_switch_requires_no_policy_change(tmp_path: Path, profile: TelemetryProfile, key: str) -> None:
+def test_langfuse_profile_preserves_otlp_and_journal(tmp_path: Path) -> None:
     path = example(tmp_path)
     root = tmp_path / "state"
     run(root, path, "run-1", display=lambda _: None)
     read = reader(root, "run-1")
     journal = read.journal.path.read_bytes()
     exporter = MemoryExporter()
-    Projector(read, tmp_path / "cursor", exporter, profile=profile).flush()
-    assert all(key in {mapping(a)["key"] for a in sequence(span["attributes"])} for span in exporter.spans.values())
+    Projector(read, tmp_path / "cursor", exporter, profile=TelemetryProfile.LANGFUSE).flush()
+    assert exporter.spans
+    exported = {str(span["spanId"]): span for span in exporter.spans.values()}
+    for span in project(read):
+        attributes = {str(mapping(a)["key"]): mapping(a)["value"]
+                      for a in sequence(exported[span.identity]["attributes"])}
+        assert "langfuse.observation.type" in attributes
+        for key, value in span.fields.items():
+            if value is not None:
+                assert key in attributes
+        assert attributes["strive.run.id"] == {"stringValue": "run-1"}
     assert read.journal.path.read_bytes() == journal
+
+
+@pytest.mark.parametrize("profile", ["langsmith", "phoenix"])
+def test_manifest_rejects_deferred_telemetry_profiles(profile: str) -> None:
+    message = rf"telemetry\.profile: unsupported profile '{profile}'; .*only 'langfuse'; .*deferred"
+    with pytest.raises(ManifestError, match=message):
+        load_authored_manifest(AUTHORED_TOML.replace('profile = "langfuse"', f'profile = "{profile}"'))
+    with pytest.raises(ManifestError, match=message):
+        load_resolved_configuration(RESOLVED_TOML.replace('profile = "langfuse"', f'profile = "{profile}"'))
 
 
 def test_execution_does_not_import_projection_or_reporting() -> None:

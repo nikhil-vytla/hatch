@@ -156,8 +156,6 @@ class OperationRecovery:
 
 class TelemetryProfile(StrEnum):
     LANGFUSE = "langfuse"
-    LANGSMITH = "langsmith"
-    PHOENIX = "phoenix"
 
 
 @dataclass(frozen=True, slots=True)
@@ -438,6 +436,10 @@ def _load[Ref](source: str, ref: Callable[[str], Ref], policy_validator: PolicyV
         telemetry.literal("semconv", "1.41.0")
         telemetry.literal("content_export", "authorized-development")
         telemetry.literal("sampling", "all")
+        profile = telemetry.string("profile")
+        if profile != TelemetryProfile.LANGFUSE:
+            raise ManifestError(f"telemetry.profile: unsupported profile {profile!r}; release 1 supports only 'langfuse'; "
+                                "LangSmith/Phoenix profiles are deferred")
         return RunManifest(
             schema="strive.run/1",
             run=RunTable(TrustMode(run.string("mode")), run.strings("editable"), ref(run.string("capabilities"))),
@@ -458,7 +460,7 @@ def _load[Ref](source: str, ref: Callable[[str], Ref], policy_validator: PolicyV
             budget=BudgetTable(usd, budget.integer("tokens"), budget.integer("model_calls"), budget.integer("wall_seconds"),
                                ref(budget.string("price_schedule")), frozenset(CostPhase(item) for item in budget.strings("includes"))),
             recovery=recovery,
-            telemetry=TelemetryTable("1.41.0", TelemetryProfile(telemetry.string("profile")), "authorized-development", "all"),
+            telemetry=TelemetryTable("1.41.0", TelemetryProfile(profile), "authorized-development", "all"),
         )
     except ManifestError:
         raise

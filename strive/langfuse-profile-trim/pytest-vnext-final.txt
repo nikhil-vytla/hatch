@@ -1,0 +1,6 @@
+Running all 454 vNext cases exactly once across 4 shards
+Shard 1: 111 cases, exit 0
+Shard 2: 116 cases, exit 0
+Shard 0: 112 cases, exit 0
+Shard 3: 115 cases, exit 0
+441 passed, 10 skipped, 3 xfailed, 0 failed

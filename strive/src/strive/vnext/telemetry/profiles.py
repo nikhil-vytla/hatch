@@ -20,23 +20,4 @@ def profile_attributes(profile: TelemetryProfile, attributes: dict[str, object])
                                ("strive.response.text", "langfuse.observation.output")):
             if source in attributes:
                 result[target] = attributes[source]
-    elif profile is TelemetryProfile.LANGSMITH:
-        result["langsmith.span.kind"] = "llm" if kind == "generation" else "chain" if kind in {"agent", "chain", "event"} else kind
-        result["langsmith.trace.session_name"] = attributes.get("strive.campaign", attributes["strive.run.id"])
-        for k, v in attributes.items():
-            if k.startswith("strive."):
-                result["langsmith.metadata." + k[7:]] = v
-        for source, target in (("strive.request.text", "gen_ai.prompt"), ("strive.response.text", "gen_ai.completion")):
-            if source in attributes:
-                result[target] = attributes[source]
-    else:
-        result["openinference.span.kind"] = "LLM" if kind == "generation" else "AGENT" if kind == "agent" else "TOOL" if kind == "tool" else "CHAIN"
-        for source, target in (("gen_ai.request.model", "llm.model_name"),
-                               ("gen_ai.provider.name", "llm.provider"),
-                               ("gen_ai.usage.input_tokens", "llm.token_count.prompt"),
-                               ("gen_ai.usage.output_tokens", "llm.token_count.completion"),
-                               ("strive.request.text", "input.value"), ("strive.response.text", "output.value")):
-            if source in attributes:
-                result[target] = attributes[source]
-        result["session.id"] = attributes["strive.run.id"]
     return result
