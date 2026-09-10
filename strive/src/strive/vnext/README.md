@@ -1,57 +1,49 @@
-The vNext implementation follows [ASTRA_DESIGN.md](../../../docs/ASTRA_DESIGN.md)
-and Amendment 1. The amendment wins wherever the earlier design conflicts.
+# vNext implementation
 
-Milestone 1 froze `contracts`: authority record groups and owners, annotations,
-the seven commands and `Step` interface, lifecycle/recovery tables, harness
-bindings, manifests, feedback access, simulator cases, and the reference study.
-Those types remain unchanged. Their constructors validate shape, not producer
-authenticity. TOML loaders accept text and do no resolution or execution.
+[Architecture](../../../docs/ARCHITECTURE.md) defines the current design and its
+five integrity guarantees. [ADRs](../../../docs/adrs/README.md) record the durable
+decisions. This package has its own run format and artifact roots; it neither
+reads nor migrates legacy histories.
 
-Milestone 2 adds `store`, `verify`, `codec`, `wire`, and shared errors. See the
-[implementation report](../../../milestone-2-storage-verification/README.md)
-for the format, trust assumptions, semantic decisions, and acceptance-test map.
+| Package | Responsibility |
+| --- | --- |
+| `contracts` | Closed authority records, typed commands, manifests, feedback contracts and bindings. Constructors validate shape, not producer authenticity. |
+| `store`, `codec`, `wire` | Immutable SHA-256 objects, framed journals, authenticated producer ports and retained execution epochs. |
+| `verify` | Pure preflight and replay into `VerifiedState`, without dispatch, candidate execution or benchmark imports. |
+| `runtime` | Serial supervisor, capability admission, budget ledger, Deno permissions and the Linux OS jail. |
+| `harness` | Bounded generation adapters, provider gateway, exact request/response retention and recovery. |
+| `benchmarks` | General `BenchmarkAdapter`, episode operations, transactional receipts and trusted scoring. Counter and tau2 implementations live under `adapters/`. |
+| `policy` | `ContinualRefine`, complete bundle validation, scoped evidence, brokered refinement and atomic activation/restoration. |
+| `cli`, `study` | Manifest resolution, retained run identities, serial studies, frozen actor handoff and isolated audit. |
+| `report`, `telemetry` | Journal-derived inspection, comparisons and optional OTLP projection with a Langfuse profile. |
 
-`store.ArtifactStore` defaults to `artifacts-vnext`. It publishes immutable
-SHA-256 objects and creates runs with protected producer bindings. It rejects
-populated roots without its format marker and never reads legacy artifacts.
-A `RunWriter` holds an exclusive local lease and durable execution epoch.
-Trusted setup hands each pinned producer only its `ProducerPort`. Append takes
-the current epoch and derives producer identity from that port. Referenced
-objects and directory entries are synced before committing a journal frame.
+`ArtifactStore` defaults to `artifacts-vnext`; the workflow CLI defaults to
+`artifacts-vnext-workflow`. A `RunWriter` holds a local lease. Trusted setup hands
+each producer its own `ProducerPort`; append derives identity from that port and
+checks the current epoch. Referenced objects are synced before their journal
+frame commits. Protected verification keys assume a trusted local host and
+operator, not a portable public signature.
 
-`store.RunReader` opens existing journal/CAS data without creating files.
-`verify.replay(journal, objects, authority)` reconstructs an immutable
-`VerifiedState`; `verify.preflight(state, frame, objects, authority)` checks one
-new transition against a verified prefix. The verifier imports only stdlib,
-frozen contracts, and shared wire/codec definitions. It does not import mutable
-storage implementations, execute candidate code, or dispatch effects.
+`RunReader` opens existing data without creating it. `verify.replay()` checks the
+whole history, and `verify.preflight()` checks a transition against a verified
+prefix. Missing objects, invalid authentication, malformed committed frames and
+inconsistent transitions stop mutation. An incomplete final frame raises
+`IncompleteTail`; execution readers never silently truncate or repair history.
+Annotations remain bounded opaque bytes and cannot authorize effects, settle
+usage, change revisions or certify reward.
 
-Producer MACs and supervisor seals authenticate the append path under a trusted
-local host. The protected authority file contains verification keys and pinned
-producer identities. Candidates must receive neither that file nor general
-CAS/history handles. This local authentication is not a portable signature or
-a defense against a host owner rewriting the entire run and trust root.
+Candidate steps run through `runtime.confined_sandbox.DenoSandbox`. A qualified
+Linux jail adds namespaces, seccomp, hard cgroup limits and bounded scratch.
+Unsupported hosts retain the permission sandbox with an explicit deferred OS
+floor. Native CLI qualification is a separate gate from jail availability.
 
-The frozen `Annotation` constructor accepts bounded UTF-8 JSON. Storage's
-`opaque_annotation(namespace, bytes)` and decoder reuse the same type while
-checking only the namespace and 65,536-byte bound. Verification never parses
-annotation payloads, including unknown schemas and non-JSON bytes.
+`uv run python -m strive.vnext.cli --help` lists the manifest workflow commands.
+The current composition runs the counter adapter and a recorded provider; it
+rejects native harness campaign manifests. The tau2 adapter is separately
+installed and qualified. `EvaluateFork` enactment, private-veto feedback C and
+funded reference campaigns remain deferred or gated.
 
-A corrupt reference, malformed record, invalid MAC, broken chain, inconsistent
-transition, or reused result cursor raises. A partial final frame raises
-`IncompleteTail` with its byte offset. Readers and writers never truncate,
-skip, or automatically repair damaged history.
-
-[Acceptance tests](../../../tests/vnext/test_acceptance_contracts.py) now close
-runtime guarantee 5 with guarded fresh-interpreter replay and corruption
-rejection. The other four runtime probes remain strict expected failures for
-later milestones. Legacy modules remain intact; vNext has no compatibility
-format or dual writes.
-
-Milestone 3 adds `runtime`: a serial supervisor, pinned capability broker,
-verifier-backed budget ledger, and a Deno candidate sandbox. See the
-[effects and confinement report](../../../milestone3-effects/README.md) for
-interfaces, fault tests, operator recovery and the exact confinement limits.
-Candidate steps and external effects both reserve resources through the existing
-journal before dispatch. The external adapter remains trusted in-process code;
-real harness process launch and gateway qualification belong to M4.
+[Tests](../../../tests/vnext/) cover the runtime boundaries, recovery, scoped
+feedback, report provenance and replay purity. Permanent core hash fixtures live
+in [baselines](../../../tests/vnext/baselines/README.md). See the
+[handoff](../../../docs/HANDOFF.md) for host and Linux verification commands.

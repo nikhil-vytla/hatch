@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_second_benchmark_zero_core_diff_discovery_operations_scoring_recovery(tmp_path: Path) -> None:
-    freeze = json.loads((ROOT / "m5-investigation/second-benchmark-core-freeze.json").read_text())
+    freeze = json.loads((ROOT / "tests/vnext/baselines/second-benchmark-core-freeze.json").read_text())
     assert all(hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == digest for name, digest in freeze.items())
     store = ArtifactStore(tmp_path / "artifacts")
     objects = store.objects

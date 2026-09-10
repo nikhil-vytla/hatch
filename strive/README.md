@@ -1,124 +1,78 @@
 # strive
 
-**Durable mechanisms for model-led adaptation.** Strive is a policy-neutral,
-revision-native substrate: one run-scoped, semantically-verified event/CAS
-store and a result-driven, resumable policy kernel that let a policy
-**apply, observe, checkpoint, and revert EXACT composite changes** to
-allowlisted surfaces. Comparative evaluation is an OPTIONAL mechanism a
-policy requests — not a universal activation gate. (This is the vNext reset;
-the promotion-era design, Stages 1–3C, is archived under `docs/archive/`.)
+Strive provides durable mechanisms for model-led adaptation. An agent can revise
+its code, prompts and memory while a fixed execution core enforces permissions,
+accounts for effects, records exact revisions and recovers without hiding
+uncertainty. Policies decide whether a change helped; comparative evaluation is
+optional.
 
-## Quickstart
+The current implementation lives in `src/strive/vnext`. Read
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) for the five integrity guarantees and
+[the ADRs](docs/adrs/README.md) for the decisions behind them.
+[HANDOFF.md](docs/HANDOFF.md) has verification commands and qualification gates;
+[ROADMAP.md](docs/ROADMAP.md) tracks remaining work.
 
-```bash
-uv sync
-uv run strive run                 # bind + drive a manual-change@1 run
-uv run strive runs                # list runs under ./artifacts
-uv run strive status              # the verified view of the latest run
-uv run strive view                # the current composite HarnessState
-uv run strive history             # the ordered event stream (id, kind, cause)
-uv run strive inspect --event 8   # decode one event body as JSON
-uv run strive revert manual-change-1   # revert an applied change, exactly
-uv run strive repair              # quarantine + truncate an unverified tail
-uv run strive sandbox             # sandbox backends + enforced capabilities
+The implementation includes immutable bundles, an authenticated journal and CAS,
+pure verification, a serial supervisor and budget ledger, bounded candidate
+execution, a Linux OS jail, and model harness adapters behind a single-request
+gateway. `BenchmarkAdapter` separates task semantics and trusted scoring from
+the core. Counter supplies deterministic workflow tests; tau2 telecom is the
+first external benchmark, installed in a separate environment.
+
+`ContinualRefine` operates, gathers authorized evidence, requests a proposal and
+keeps, revises or restores a complete bundle. Feedback A/B and isolated final
+audit control which evidence may influence adaptation. Journal-derived reports
+and optional OTLP export with a Langfuse profile expose results and accounting.
+
+## Run the recorded counter example
+
+Use Python 3.12 or newer, uv and Deno. From this directory:
+
+```sh
+uv sync --frozen
+export PYTHONPATH="$PWD/adapters/counter/src${PYTHONPATH:+:$PYTHONPATH}"
+uv run python - <<'PY'
+from pathlib import Path
+from strive.vnext.cli.fixture import example
+print(example(Path(".cache/counter-example")))
+PY
+uv run python -m strive.vnext.cli --root .cache/counter-runs \
+  run .cache/counter-example/counter.toml --id adapting-17
+uv run python -m strive.vnext.cli --root .cache/counter-runs status adapting-17
+uv run python -m strive.vnext.cli --root .cache/counter-runs resume adapting-17
 ```
 
-`uv run pytest` and `uv run mypy` are green (`--strict`).
+The example uses recorded responses and makes no paid calls. Run IDs are unique;
+resume reuses the original bindings and retained state. The manifest CLI also
+provides `experiment`, `compare` and `project`; `--help` lists their arguments.
+The installed `strive` command routes these manifest-shaped commands to vNext.
+Legacy flag-based commands and run formats remain separate.
 
-## The idea
+## Current limits
 
-The harness does not decide *whether a change is good* — a policy does. What
-the harness guarantees is that model-led change is **durable, verifiable, and
-exactly resumable**:
+The CLI currently composes the counter adapter and recorded provider. It rejects
+native harness campaign manifests. Native CLI single-request drives, Linux jail
+qualification on the executing host, installed tau2 grading/recovery checks and
+funded campaigns are separate gates. Host Deno permission tests do not establish
+the Linux confinement floor.
 
-- **Revision-native state.** Harness state is a composite of surface
-  bindings drawn from an injected, immutable `SurfaceCatalog`
-  (`strategy-code/solve`, `prompt/proposal-template`), each pinned to exact
-  content in a content-addressed store and screened by a trusted structural
-  validator before it is ever seeded or applied. A change is coupled, exact
-  before→after per surface, and invertible.
-- **Exact run identity.** A run id is an opaque, validated token (no path
-  separators, no `..`); the task is discovered from a DERIVED binding index
-  (rebuildable, crash-safe), never string-parsed. Each run pins its task
-  fingerprint (incl. scorer semantics), full policy-module digest, config,
-  prompts, seed + seed state, budget spec, capability profile, and a versioned
-  per-surface descriptor snapshot in the authoritative leading `PolicyBound`
-  event; resume loads the bound values and rejects any caller that disagrees.
-- **A verified event log.** One artifact root holds many runs; each run is an
-  append-only, crash-framed, hash-chained stream of `EventEnvelope`s (stable
-  id, run/task scope, command causation, timestamp). Nothing mutates over an
-  unverified log: `verify()` is pure (it never writes CAS) and closed (only the
-  known body union), decodes/hash-verifies every referenced object as its
-  EXPECTED type, replays every apply/revert exactly, requires each effect to
-  cite an issued compatible command (matched to its proposal AND its command
-  payload, not a kind string) and each revert to be the exact inverse of one
-  unreverted apply, and on any error refuses every mutation and exposes no
-  active state. Appends are ATOMIC: a candidate event is preflighted through
-  the same pure fold and refused unless the resulting run is valid, so an
-  accepted append can never turn a valid run invalid.
-- **A resumable kernel.** One command at a time — one intent, one effect
-  (performed or reconciled), one terminal result — then `reduce` and
-  checkpoint. State never advances before the outcome; a crash at any
-  boundary resumes exactly, with no duplicated effect, model call,
-  observation, or spend. Budgets survive restart: the spec is pinned and
-  cumulative spend is re-seeded from durable usage, so a resume cannot reset
-  or expand the budget.
-- **A policy boundary.** `AdaptationPolicy` emits a small closed command
-  vocabulary (`ApplyChange`, `EvaluateFork`, `RevertChange`, …); `EvaluateFork`
-  is how a policy *requests* comparative evaluation. Policies are packages:
-  typed code + frozen TOML config + versioned Markdown instructions, pinned
-  per run by implementation, config, prompts, and seed.
-- **A floor that is not configurable.** Catalogued surfaces with pinned
-  versioned validators, exact before/after, logical expected-state conflict
-  checks, a per-run execution lease, canonical traversal-safe CAS with verified
-  reads and concurrent-writer-safe publication, append-only tamper-evident
-  events, budgets that survive restart, the secure `CandidateExecutor` sandbox
-  boundary with declared
-  capabilities, checkpoints/rollback, crash recovery, and explicit (never
-  silent) repair. Operator mutations (e.g. `strive revert`) go through the
-  same durable command path as a policy.
-- **One unambiguous intent, internally-consistent evidence.** A command's
-  normalized anchors are reconciled against its canonical JSON (one shared
-  encoder both sides use), so no effect binds to a field the issued command did
-  not name. Every terminal outcome is validated identically and reconstructs
-  exactly; a crashed command's failure usage is reconciled from its durable
-  attempt ledger, never zero. Each retained AttemptRecord is bound to the exact
-  ExecutionReport + Evaluation it references, so the score policy consumes is
-  the one the evidence supports. A backend fault (timeout/crash/refusal) is an
-  infrastructure failure (`ok=False`); a candidate exception stays a completed
-  per-case evaluation — the two are never conflated.
+Adaptive telecom uses whole scenario groups with 49 development, 29 validation
+and 36 audit tasks. Its separate fixed-stock runner uses the original 40 test
+IDs and an upstream fixed actor. These modes have different populations and
+implementations; their scores are reported separately. See the
+[tau2 adapter guide](adapters/tau2/README.md).
 
-## Layout
+`EvaluateFork` enactment and private-veto feedback C remain deferred. A valid
+execution history can contain failures, unknown outcomes and budget overruns.
+No fixture result establishes live-model improvement.
 
-See `docs/ARCHITECTURE.md` for the module map, `docs/PROJECT_CHARTER.md` for
-the thesis and floor, `docs/ROADMAP.md` for what's next
-(`continual-refine@1`), and `docs/adrs/0008-vnext-substrate.md` for the
-design decision.
+## Verify
 
-## The policies
+```sh
+uv run mypy --strict
+uv run pytest tests/vnext -q
+```
 
-`manual-change@1` (deterministic) builds one coupled prompt+code change,
-`EvaluateFork`s it (the optional comparative mechanism), and — reacting to
-the fork through its reducer — applies then reverts it exactly. It is the
-substrate proof; its fork scores the code surface.
-
-`continual-refine@1` is the real continual, model-led policy. It alternates
-OPERATION and REFINEMENT over a continuing trajectory: it operates the active
-harness (`ObserveCurrentState`, journaling real behavior as feedback), then
-`RequestRefinement`s — the kernel binds a model, renders the prompt from the
-per-role pinned control prompt + the ACTIVE proposal template + a context of
-real observations/prior rationale/changes/usage/failures, calls the model
-through an injected immutable `ModelCatalog`, and STRICTLY decodes a typed
-`RefinementProposal` under durable constraints (malformed output is
-failure-as-data). Its surface strategies assemble ONE atomic coupled prompt+code
-change, applied immediately under the kernel floor; `EvaluateFork` is an
-OPTIONAL observation, never a gate. It operates again to see the changed
-behavior, then reviews — keep (`ConfirmChange`), revert (exact rollback), defer
-(observe more), or revise (a new atomic change with lineage) — across cycles.
-Model calls are durably bound and budgeted (a resume can't switch models after
-issue; open dispatches reserve tokens/wall/cost; a finite cost budget against a
-non-reporting adapter fails closed); model-authored code stays inside the
-SECURE executor (`trusted=False`, secure capabilities — production never
-defaults to fault-only); and the policy gets only a mechanically read-only
-content view. CI drives it with a deterministic fake model through the exact
-production adapter path; real-model runs are opt-in (`STRIVE_MODEL_*`).
+The [handoff](docs/HANDOFF.md) documents the local-cache/no-sync workaround for
+restricted macOS environments and the required Linux container checks. Core hash
+fixtures live in [tests/vnext/baselines](tests/vnext/baselines/README.md).

@@ -271,7 +271,7 @@ def test_memory_import_cannot_launder_provenance_or_scope(adaptation: Adaptation
 
 def test_core_freeze_all_30_hashes_match() -> None:
     root = Path(__file__).resolve().parents[2]
-    freeze = json.loads((root / "m5-investigation/second-benchmark-core-freeze.json").read_text())
+    freeze = json.loads((root / "tests/vnext/baselines/second-benchmark-core-freeze.json").read_text())
     assert len(freeze) == 30
     assert all(hashlib.sha256((root / name).read_bytes()).hexdigest() == digest for name, digest in freeze.items())
 
