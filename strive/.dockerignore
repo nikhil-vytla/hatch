@@ -13,7 +13,6 @@ adapters/tau2/retained-data
 adapters/tau2/upstream-source
 artifacts
 .container-results
-milestone8-container-verification/downloads
 **/.uv-cache
 **/.pytest-tmp
 **/.tmp

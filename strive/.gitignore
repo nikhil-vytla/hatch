@@ -15,6 +15,5 @@ artifacts/demo*/ledger/*.lock
 adapters/tau2/retained-data/
 adapters/tau2/upstream-source/
 adapters/tau2/uv.lock
-milestone8-container-verification/downloads/
 
 .cache/

@@ -1,4 +1,5 @@
-# Definition only. Builds for both linux/arm64 and linux/amd64.
+# Linux verification image for linux/arm64 and linux/amd64.
+# Architecture and qualification limits: docs/ARCHITECTURE.md; commands: docs/HANDOFF.md.
 FROM ghcr.io/astral-sh/uv:0.9.18 AS uv
 FROM denoland/deno:bin-2.9.5 AS deno
 FROM python:3.12.12-slim-trixie

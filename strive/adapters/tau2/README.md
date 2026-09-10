@@ -7,10 +7,11 @@ interpreter. `native_worker.py` runs only through a separate interpreter; all
 cross-process values are JSON bytes. Actor/controller code stays in its existing
 bounded sandbox.
 
-Resolution has not succeeded in this workspace. `uv lock` panics in macOS
-system-configuration before resolving packages. No lockfile, installed tau2
-closure, full inventory certificate or live-equivalence result is claimed.
-`tests/vnext/test_tau2_live.py` records those limits as explicit skips.
+The current architecture is described in [ARCHITECTURE.md](../../docs/ARCHITECTURE.md)
+and [the ADRs](../../docs/adrs/README.md). Qualify the installed adapter and retain
+its closure before dispatch. Missing tau2 produces explicit host test skips; an
+installed runtime with a wrong pin, incomplete data or failed grading must fail.
+Host tests alone do not establish installed-runtime qualification.
 
 Preparation must complete these steps before live dispatch:
 
@@ -29,7 +30,7 @@ Preparation must complete these steps before live dispatch:
    initialization/reference checks without inference and retains grouping,
    seed/order, all memberships, and actual sizes against the 60/14/40 target.
    Selected-task grading or adaptive group-disjointness failure emits exact IDs
-   and stops. See Amendment 3 modes below.
+   and stops. See the evaluation modes below.
 5. Retain the full closure through `benchmarks.closure`, construct
    `IsolatedTau2(python, data_root, objects, closure, data_index)`, derive
    `implementation_identity()`, and create the operation store with that identity
@@ -59,7 +60,7 @@ is enforced by operation admission and execution, separately from its metric.
 Missing, NL or unknown required grading stops qualification. Infrastructure
 inconsistency produces an invalid/unresolved result with no success metric.
 
-Milestone 8 supplies `scripts/install-tau2.sh` and the root `Containerfile` to
+The project supplies `scripts/install-tau2.sh` and the root `Containerfile` to
 perform the preparation in Linux. The installer preserves the interpreter's
 virtualenv path, installs the pinned telecom extra separately, retains the
 original data and MIT notice, and copies the generated lock to
@@ -71,12 +72,10 @@ are rejected rather than automatically admitted.
 tau2 skips; a wrong pin, incomplete data or failed qualification fails. Its
 `live_checks` subprocess exercises real upstream evaluators, authored actor/user
 responses, and process death after committed agent/user mutations without any
-model calls. See `milestone8-container-verification/README.md` for the complete
-build/verification command and current validation limits. The earlier macOS
-installation note describes M5's result; it is not a reason to skip an installed
-runtime in M8.
+model calls. See [HANDOFF.md](../../docs/HANDOFF.md#linux-verification) for the
+build and verification commands, retained outputs and qualification limits.
 
-## Amendment 3 modes
+## Evaluation modes
 
 Qualification now accepts `--mode adaptive` or `--mode fixed-stock`. Adaptive is
 the default. It selects all base IDs and assigns whole base templates across our
@@ -99,8 +98,8 @@ campaign. Unselected tasks receive a structural grading scan, reported separatel
 only selected tasks receive executable initialization/reference checks.
 
 Version 2 certificates explicitly bind the mode and extended report. The RPC
-server requires a new Amendment 3 certificate rather than reinterpreting an old
-certificate under different split semantics. Adaptive adapters declare
+server requires a version 2 certificate rather than reinterpreting an old certificate
+under different split semantics. Adaptive adapters declare
 `development`, `validation`, and `audit`; fixed-stock adapters declare `test`.
 
 The standalone fixed-stock runner executes an initial tau2 `llm_agent` with

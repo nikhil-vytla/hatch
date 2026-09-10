@@ -1,1 +1,0 @@
-Wheel contains all harness modules; installed adapter imports and legacy CLI smoke pass.

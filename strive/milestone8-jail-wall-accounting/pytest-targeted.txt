@@ -1,4 +1,0 @@
-..............ss......................s............sssssss.s             [100%]
-=========================== short test summary info ============================
-SKIPPED [11] tests/vnext/test_linux_jail.py:23: OS jail deferred: Linux cgroups v2, user/mount/pid/net namespaces and seccomp unavailable on darwin
-49 passed, 11 skipped in 15.40s

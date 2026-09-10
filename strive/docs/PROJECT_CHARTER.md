@@ -1,62 +1,57 @@
-# strive — Project Charter (vNext)
+# strive project charter
 
-**Thesis.** Strive provides **durable mechanisms for model-led adaptation**
-(the Exo lineage), not a universal empirical-promotion pipeline. A policy
-apply, observe, checkpoint, and revert EXACT composite changes to
-allowlisted surfaces; **comparative evaluation is an OPTIONAL mechanism a
-policy requests**, never a gate the harness imposes. The value Strive adds
-is a substrate and a kernel that make model-led change *durable, verifiable,
-and exactly resumable* — not a fixed acceptance ceremony.
+Strive provides durable mechanisms for model-led adaptation. Agents may change
+executable code, prompts and memory during continuing operation. A fixed outer
+runtime preserves what ran, controls access, accounts for effects and recovers
+honestly. The value is inspectable, reproducible execution under declared
+assumptions; a positive improvement result is not guaranteed.
 
-## What is non-configurable: the floor
+[ARCHITECTURE.md](ARCHITECTURE.md) defines the current implementation and
+[the ADRs](adrs/README.md) record its decisions. The project assumes one trusted
+host and operator, hostile generated code and inputs, and local durable storage
+that survives process failure.
 
-Regardless of policy, the substrate and kernel enforce:
+## Fixed guarantees
 
-- **Catalogued surfaces** — a change touches only `(kind, name)` pairs in the
-  injected immutable `SurfaceCatalog`, and each surface's content passes that
-  surface's trusted structural validator before it is seeded or applied.
-- **Exact before/after state** — every surface delta pins exact content by
-  CAS ref, so a change applies and inverts deterministically; a stale before
-  is a conflict.
-- **Semantic verification** — nothing mutates over an unverified log: the
-  whole event stream is parsed into a `VerifiedSubstrateView` (framing
-  integrity, one leading `PolicyBound`, CAS closure, canonical allowlisted
-  bindings, an exact apply/revert replay, command lifecycle + digest
-  consistency, checkpoint agreement, change-id uniqueness). A structural or
-  semantic error refuses every authority append.
-- **Run-scoped, append-only, tamper-evident events** — one artifact root
-  holds many runs; every event has a stable id, run/task scope, command
-  causation, and timestamp.
-- **Resumable kernel** — one intent, one effect, one terminal result per
-  command; state advances only after the outcome; restart reconstructs the
-  exact same result with no duplicated effect, model call, observation, or
-  spend.
-- **Budgets, sandbox, secrets, permissions** — trusted budgets charge
-  executions/model-calls; candidate code runs only under the secure
-  `CandidateExecutor` with declared, capability-checked sandbox provenance;
-  irreversible effects are controlled.
-- **Checkpoints, rollback, crash recovery, explicit repair** — recovery
-  (quarantine + truncate to the last verified frame) is explicit, never
-  silent; a semantically-invalid-but-intact log is refused, not
-  auto-quarantined.
+1. Confine candidate execution and keep authorization, accounting, measurement
+   and recovery outside its control.
+2. Derive authoritative facts from trusted producers and scorers, with evidence
+   access constrained by the bound feedback contract and actual grants.
+3. Retain exact execution identities, requests, bundles, reservations and
+   continuation cursors before their effects depend on them.
+4. Reuse recorded outcomes and supported recovery contracts. Preserve unknown
+   outcomes and charges rather than silently retrying or clearing obligations.
+5. Check every authority transition through a small pure protocol that can
+   represent failure, overruns and uncertainty.
 
-## What is a policy's business (not the harness's)
+## Policy and scientific scope
 
-Whether and when to evaluate comparatively; whether to keep, revise, or
-revert a change; timing and lifecycle; how many surfaces to couple; what
-"better" means. These live in policy packages (typed code + frozen TOML
-config + versioned Markdown instructions), pinned per run by
-implementation, exact config, prompt refs, and seed. The model/provider is
-reproducibility metadata, not harness identity.
+Policies choose what to change, when to compare, and whether to keep, revise or
+restore a bundle. There is no universal empirical-promotion requirement.
+Restoration changes configuration; it never undoes external actions or spending.
 
-## Status and next phase
+The research workflow pins manifests and study plans, separates development from
+blind audit, and reports coverage, costs and uncertainty. Feedback A is the
+reference comparison contract; B permits declared validation feedback and
+requires a fresh final audit. C, a private deployment veto, is deferred. Reports
+separate execution integrity, feedback exposure and comparison strength.
 
-Phase A shipped the substrate, the result-driven kernel, the CLI, and
-`manual-change@1` (a deterministic proof: propose → optional fork → apply →
-revert, exactly, resumably). The next policy is **`continual-refine@1`** — a
-Prime-Agent / Continual-Harness-style end-to-end refinement loop over this
-substrate (NOT Pareto search). See `docs/ROADMAP.md` and
-`docs/adrs/0008-vnext-substrate.md`.
+The first external workload is separately installed tau2 telecom through the
+general benchmark interface. Its adaptive 49/29/36 whole-group split and its
+40-task fixed-stock evaluation are distinct experiments. The executable CLI
+currently demonstrates the workflow with the recorded counter fixture. Native
+harness profiles, installed telecom qualification and a funded campaign remain
+explicit gates, as described in [ROADMAP.md](ROADMAP.md).
 
-The promotion-era charter, architecture, roadmap, and handoff (Stages 1–3C)
-are archived under `docs/archive/` as historical context.
+## Boundaries
+
+The current system is a local Python runner with serial effects, immutable
+bundles, a journal/CAS, trusted adapters, bounded candidate execution and Linux
+confinement where qualified. It is not a distributed scheduler or hosted
+experiment service. Model-weight changes, generated privileged adapters,
+arbitrary controller-state migration, global mutable cross-run memory and
+host-loss failover are outside scope.
+
+New vNext runs use their own format and roots. Existing legacy histories retain
+their original interpretation; there is no migration or compatibility layer.
+Earlier project documents remain in [the archive](archive/README.md).

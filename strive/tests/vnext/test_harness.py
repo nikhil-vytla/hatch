@@ -260,15 +260,16 @@ def test_nondeterministic_decoder_preserves_incomplete(tmp_path: Path) -> None:
 
 def test_core_unchanged_and_adapters_selected_by_manifest(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[2]
-    baseline = json.loads((root / "harness-qualification/core-baseline.json").read_text())
-    # Amendment 2 explicitly approves scoped admission and suspended operator
-    # restoration. The human-approved release 1 telemetry trim changes only
-    # manifest.py. Preserve M4's baseline for every other core file.
-    m5 = json.loads((root / "m5-investigation/second-benchmark-core-freeze.json").read_text())
+    baseline = json.loads((root / "tests/vnext/baselines/core-baseline.json").read_text())
+    # Approved changes: scoped admission, suspended operator restoration,
+    # the telemetry profile trim, and the contracts architecture docstring link.
+    # Preserve the historical baseline for every other core file.
+    current = json.loads((root / "tests/vnext/baselines/second-benchmark-core-freeze.json").read_text())
     approved = {"src/strive/vnext/runtime/broker.py", "src/strive/vnext/runtime/supervisor.py",
-                "src/strive/vnext/verify/engine.py", "src/strive/vnext/contracts/manifest.py"}
-    assert {name for name in baseline if baseline[name] != m5[name]} == approved
-    baseline.update({name: m5[name] for name in approved})
+                "src/strive/vnext/verify/engine.py", "src/strive/vnext/contracts/manifest.py",
+                "src/strive/vnext/contracts/__init__.py"}
+    assert {name for name in baseline if baseline[name] != current[name]} == approved
+    baseline.update({name: current[name] for name in approved})
     for name, digest in baseline.items():
         assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest, name
     for path in (root / "src/strive/vnext/harness/adapters").glob("*.py"):

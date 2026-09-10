@@ -1,6 +1,0 @@
-........................................................................ [ 64%]
-.....x...........................s......                                 [100%]
-=========================== short test summary info ============================
-SKIPPED [1] tests/vnext/test_harness.py:299: funded live smoke: human must set a budget ceiling, provide a qualified OS jail and explicitly enable a separate funded runner; deterministic CI never uses provider credentials
-XFAIL tests/vnext/test_acceptance_contracts.py::test_runtime_integrity_1_confines_candidate_and_harness - Native harness isolation requires tested Seatbelt/container/VM gateway-only network and filesystem jail plus hard memory/storage limits; sandbox_apply is denied here. Candidate and Deno fixture harness permission probes pass.
-110 passed, 1 skipped, 1 xfailed in 253.84s (0:04:13)

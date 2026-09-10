@@ -1,426 +1,102 @@
-# HANDOFF — strive (vNext)
+# strive handoff
 
-## Current: vNext Phase A (hardened), on branch `strive-vnext-phaseA`
+The current system is `src/strive/vnext`. Start with
+[ARCHITECTURE.md](ARCHITECTURE.md), [the ADR index](adrs/README.md) and
+[ROADMAP.md](ROADMAP.md). The architecture defines the five guarantees and the
+implemented mechanisms; the roadmap distinguishes qualification from deferred
+capabilities. Legacy modules and earlier ADR implementation descriptions are not
+the vNext API.
 
-Strive is a policy-neutral, revision-native mechanism substrate plus a
-result-driven, resumable policy kernel. Comparative evaluation is an optional
-mechanism a policy requests, never a universal activation gate.
+## Host workflow
 
-### Intent-to-effect binding pass (what changed since the last review)
+From the project directory, use Python 3.12 or newer, uv and Deno:
 
-- **Durable command intent is explicit and typed.** `CommandPayload` is now a
-  NEUTRAL, normalized record — not an opaque JSON blob — carrying every
-  consequential field (target change id, change ref, `expected_state_ref`, the
-  fork's `issue_state_ref`, prompt role/context, trigger delay, stop reason).
-  Verify binds each effect to exactly what the command named: Confirm/Revert
-  target the change the command names, and an Apply/Revert effect must satisfy
-  the ISSUED `expected_state_ref`, not merely the folded state at effect time.
-- **Fork evidence is derived from the issued states.** The base state is
-  anchored to the state ref recorded at issue; the candidate state is recomputed
-  by applying the issued candidate change to that base; every attempt
-  dispatch/result and the summary subject must equal those exact refs; and
-  `improved` is recomputed (`candidate.overall > base.overall`), never trusted
-  as asserted.
-- **Every terminal reconstructs exactly.** ok/failed/indeterminate ALL require a
-  typed `StoredResult` (no `result_ref=None` fallback); verify matches its
-  id/kind/outcome, proposal/observation refs, metrics, usage, and the exact
-  pre-terminal SEMANTIC head (`"<seq>:<state_ref>"`). A failure recorded before
-  a crash is RECONCILED into a terminal with the same outcome — the operation is
-  never re-run — and a legal partial prefix admits at most one failure/effect.
-- **Live budget == durable ledger.** After every terminal/reconciliation the
-  meter is rebuilt from the durable attempt ledger before the policy may emit
-  the next command; an indeterminate dispatch reserves executions AND wall AND
-  output immediately, in-process and after restart.
-- **Full execution evidence is preserved.** Each `AttemptRecord` references the
-  exact `ExecutionReport` (per-case outputs/errors, backend failure,
-  wall/output) and `Evaluation` (per-case scores) — a completed evaluation with
-  candidate errors is distinguished from a sandbox/infra failure, neither
-  collapsed to only an aggregate score. `CandidateExecutor` preserves the actual
-  backend wall/output (fixed earlier).
+```sh
+uv sync --frozen
+uv run mypy --strict
+uv run pytest tests/vnext -q
+uv run python -m strive.vnext.cli --help
+```
 
-### Command/attempt state-machine pass (earlier in this PR)
+The [root README](../README.md) creates and runs the recorded counter example.
+Its provider makes no paid calls. Counter is separately packaged; install
+`adapters/counter` or expose `adapters/counter/src` on `PYTHONPATH` for the CLI.
+Tests arrange the lightweight adapter imports themselves.
 
-- **Each command is a CLOSED state machine.** `verify()` now checks the exact
-  per-kind + per-outcome effect grammar: ApplyChange(ok) = a matching proposal
-  + one apply; RevertChange(ok) = one exact revert; EvaluateFork(ok) = proposal
-  + base dispatch→result + candidate dispatch→result + a matching summary;
-  ConfirmChange(ok) = one confirmation; Schedule/Stop = no state effect. A
-  failed/indeterminate command requires exactly one failure record and NO
-  success effect. Effects before intent, effects after terminal, missing/extra
-  effects, a successful terminal without a `StoredResult`, and a duplicate
-  checkpoint are all rejected; a checkpoint must follow one terminal, consume
-  its command exactly once, and reference the exact reduced state.
-- **Typed command/result semantics.** `CommandPayload.json`, `ConfigBlob.json`,
-  and `PolicyStateBlob.json` must be canonical JSON; a `StoredResult`'s id,
-  kind, outcome, proposal ref, observation ref, and metrics must match the
-  command's actual effects; the full `expected_state_ref` stays in the durable
-  command identity; and the initial and reconstructed results (incl. the fork
-  observation ref) are byte-for-byte equivalent.
-- **Verified fork-attempt lifecycle.** Per `(command_id, label)`: exactly one
-  dispatch then at most one result, no result without a dispatch, no duplicate
-  labels, base before candidate; dispatch/result `state_ref` must equal the
-  observation's `subject_state_ref`; a summary must equal the two durable result
-  records and the issued candidate change; actual attempt provenance must
-  satisfy the run's pinned capability profile; and every `BudgetUsage` field
-  (incl. reservations) must be finite and nonnegative.
-- **Honest budget dimensions.** An open dispatch reserves executions AND wall
-  AND output (not executions alone). `CandidateExecutor` no longer zeroes
-  backend wall time or derives stdout bytes from error strings — it preserves
-  the ACTUAL captured wall/output/failure, and cumulative output across cases
-  is enforced from real captured bytes.
-- **Pinned evaluation + policy package.** The task fingerprint now includes the
-  case-selection rule and the aggregate evaluator (not only `score_case`); a
-  `PolicyDescriptor` may declare `dependency_modules` folded into the pinned
-  policy digest (an explicit policy-package manifest).
+In this restricted macOS workspace, automatic uv sync can hit a cache permission
+error or a `system-configuration` panic before pytest starts. With the existing
+synced environment, the tested workaround is:
 
-### Semantic-atomicity pass (earlier in this PR)
+```sh
+UV_CACHE_DIR="$PWD/.cache/uv" UV_NO_SYNC=1 uv run mypy --strict
+UV_CACHE_DIR="$PWD/.cache/uv" UV_NO_SYNC=1 uv run pytest tests/vnext -q
+```
 
-- **No append can turn a valid run invalid.** Every authority append runs a
-  PURE candidate-event preflight (`_fold_view` over the resulting stream) and
-  is refused unless the POST-event view is fully valid; a refused append leaves
-  the journal byte-for-byte unchanged (only an orphan CAS body may remain).
-- **Runtime records are a neutral, closed contracts module** (`strive.runtime`)
-  imported directly by the substrate — verification no longer depends on kernel
-  import order (proved by a fresh-interpreter test). Verify decodes each ref as
-  its EXPECTED type and matches command id/kind/outcome/encoding; requires ONE
-  proposal per change id; and matches an applied/forked change to BOTH its
-  proposal and its issued command payload's `change_ref`, not a kind string.
-  `OperationFailed.command_id == caused_by`; confirm/revise must target an
-  existing change and revised refs must decode.
-- **Mutation is confined to the run's PINNED surface set.** A run may only
-  touch surfaces pinned in its `PolicyBound`, resolved + validated through the
-  pinned descriptors even for content already in shared CAS. Growing the live
-  catalog keeps old runs READABLE, but mutating a newly-added surface needs an
-  explicit rebind/new run.
-- **Command preconditions are durable.** `expected_state_ref` is part of the
-  command's durable identity (a changed precondition is a changed command and
-  fails closed); the manual policy derives it from the STABLE seed-state ref,
-  not whichever state exists after a crash.
-- **Attempts + budgets are truthful at every crash point.** A fork journals
-  each base/candidate DISPATCH then RESULT separately; an open dispatch (result
-  never written) is reconciled as `indeterminate`, never implicitly re-run.
-  Failed/partial attempts still record actual provenance/failure/denials/usage.
-  The meter is REBUILT fresh from the durable per-attempt ledger on every entry
-  (no repeated absorption into a reused `KernelServices`); wall is cumulative
-  active time; output is enforced cumulatively across cases (each case's cap is
-  the remaining allowance).
+This reuses installed dependencies; it does not verify a fresh dependency sync.
+Host skips can include Linux confinement, absent tau2, unqualified native CLIs,
+funded smokes and restricted localhost sockets. The explicit expected failure is
+`EvaluateFork` enactment. Do not report skipped gates as qualified execution.
 
-### Correctness pass 2 (earlier in this PR)
+## Linux verification
 
-- **Verification is closed AND deep.** Every envelope's run AND task scope is
-  checked; a duplicate intent is rejected even with the same digest; every
-  effect/annotation/terminal/checkpoint must cite an ISSUED, compatible command
-  in valid order; every referenced ref (command payload, result, policy-state,
-  observation, proposal, config, budget, prompt, surface, state) is
-  decoded/hash-verified, not merely `has()`-checked; proposal/change ids agree
-  with their refs; a revert must follow one unreverted apply and equal its
-  EXACT inverse; a checkpoint's cursor must name a command whose terminal it
-  reduced. Verification stays pure and exposes no state on error.
-- **Run discovery is crash-safe.** `PolicyBound` is authoritative; the
-  `<run>.binding.json` index is a DERIVED cache. `ensure_binding`/`discover`
-  rebuild it after a crash between the event and the index write, cross-check
-  its `run_id`, and quarantine a divergent index rather than invalidating a
-  valid event stream. `bind_policy` preflights every bound ref + seed invariant.
-- **Command exactness + concurrency.** An exclusive per-run advisory LEASE
-  stops two processes executing one run concurrently; a same-id/same-digest
-  issue is an idempotent read (no second intent); the initial and reconstructed
-  `CommandResult` (including `head`) are identical (the command's canonical head
-  is a stable pre-terminal point); `expected_state_ref` is a LOGICAL
-  harness-state precondition (robust to intervening non-state events) that is
-  part of the command's durable identity (a changed precondition is a changed
-  command and fails closed).
-- **Honest budgets/effects.** Per-command usage (including failed/partial) is
-  persisted in the terminal result and re-seeded from EVERY completed command
-  on restart — no reset, no double-absorption; sandbox limits are capped by
-  remaining wall/output budget; a fork records its base and candidate attempts
-  SEPARATELY with actual provenance, failure, denials, usage, and state ref; a
-  dispatch with no recoverable durable result is recorded `indeterminate` and
-  requires an explicit retry (never a silent re-dispatch).
-- **CAS + extensibility hardened.** `put_text` verifies a preexisting object
-  (corruption is loud); invalid UTF-8 is `ObjectCorruption`; a change's
-  referenced surface artifacts are validated even when already shared, and
-  unrelated staged blobs are rejected. Surfaces are pinned PER RUN as versioned
-  `SurfaceDescriptorSnapshot` refs (validator name + IMPLEMENTATION digest):
-  adding a catalog surface never invalidates an old run, and a validator
-  implementation change is detected as drift. Task identity now includes the
-  signature, primitive catalog, and SCORER semantics; policy identity is the
-  full policy MODULE, not just the class source.
-- **Operator/package papercuts.** The CLI catches sandbox/config errors
-  cleanly; state/config decode strictly and reject unknown TOML fields; the
-  wheel is BUILT, INSTALLED into an isolated venv, and the real `strive` script
-  is invoked end to end (build/install failures fail the test, never skip).
+The Containerfile builds the runtime, seccomp filter and minimal jail rootfs.
+It pins Python, uv and Deno versions; Debian packages resolve through the base
+image's repositories, so the build is not a fully byte-reproducible package
+snapshot. Image tags are not registry digest pins.
 
-### Correctness pass 1 (earlier in this PR)
+```sh
+docker build --file Containerfile --tag strive-vnext .
+mkdir -p .container-results
+docker run --rm --privileged --cgroupns=private \
+  --mount "type=bind,src=$PWD/.container-results,dst=/workspace/strive/.container-results" \
+  strive-vnext
+```
 
-- **Exact run identity.** Run ids are opaque validated tokens (no separators,
-  no `..`); the task is discovered from a persisted `RunBinding` index, never
-  parsed from the id. `PolicyBound` now pins the task fingerprint, policy
-  implementation digest, config, prompts, seed + seed state, budget spec,
-  required capability profile, and surface-catalog digest; resume rejects any
-  caller that disagrees.
-- **Pure, closed, complete `verify()`.** Verification never writes CAS (the
-  replay recomputes expected refs with `hash_text`), accepts only the closed
-  substrate body union, checks command causation/one-terminal/one-digest,
-  observation + proposal refs, revert-after-unreverted-apply, binding-index
-  agreement, and the surface-catalog digest — and on any error exposes NO
-  active state.
-- **Strict identity + codecs.** The kernel re-derives a command's payload
-  digest and compares it before both the already-issued and already-completed
-  paths; canonical encoding is strict typed JSON (no `default=str`); config /
-  policy-state blobs pin an encoder version; TOML config loading rejects
-  non-string values; the public `VerifiedSubstrateView` mappings are
-  read-only proxies.
-- **Honest effects + budgets.** Durable state effects reconcile exactly; a
-  completed fork's base/candidate refs and metered usage are recorded durably
-  and REUSED on resume (never re-executed or re-charged); the budget spec is
-  pinned in CAS and cumulative spend is re-seeded from durable usage, so a
-  restart cannot reset or expand the budget; wall + cumulative output are
-  enforced alongside execution count.
-- **Hardened CAS + injected surface catalog.** CAS refs are validated as
-  canonical sha256 (traversal-safe), reads are hash-verified, publication is
-  concurrent-writer safe (unique temp + fsync + atomic replace). Surfaces come
-  from an injected immutable `SurfaceCatalog` with trusted structural
-  validators (code parses to exactly one `solve(input_text)`; prompt is
-  non-empty) run before seed/apply.
-- **Mutation stays on the command path.** `strive revert` issues a durable
-  operator `RevertChange` command through the kernel (`operator_revert`),
-  never a direct `Substrate.revert`.
+Inside an already prepared container, run `bash scripts/verify-in-container.sh`.
+The outer container needs namespace support and writable delegated memory/pids
+controllers. Its payload processes lose privileges inside the jail. Use the
+private container cgroup namespace; do not expose the host's cgroup root or
+Docker socket. Missing delegation is a failure, not a skip.
 
-### Modules
+The entrypoint installs the pinned tau2 adapter in its own environment, prepares
+retained data, checks the real jail, runs strict mypy and the full vNext suite,
+and rejects skipped or missing required jail/tau2 gates. Outputs include logs,
+JUnit results, dependency information, the generated tau2 lock and certificates
+under `.container-results/`. The live tau2 checks use authored generations and
+make no model calls. They exercise adaptive and fixed-stock certification,
+upstream scoring, structured tool messages and mutation recovery.
 
-- **`strive.substrate`** — one artifact root, many runs
-  (`<root>/runs/<run_id>.events`), CAS shared at `<root>/objects`. Composite
-  `HarnessState`; coupled `CompositeChange` (exact before/after, invertible);
-  `EventEnvelope` (stable `<run_id>#<seq>` id, run/task scope, `caused_by`,
-  timestamp, CAS body ref). `verify()` → `VerifiedSubstrateView` is pure and
-  closed: framing, one leading `PolicyBound`, per-envelope run/task scope,
-  decode/hash-verify of every referenced ref, catalogued/validated bindings, an
-  EXACT apply/revert replay (recomputed without writing CAS), causation
-  (every effect/terminal/checkpoint cites an issued compatible command in
-  order), one intent + one terminal + one digest per command id, revert =
-  exact inverse of one unreverted apply, and checkpoint state+cursor agreement.
-  Authority appends verify first and are head-checked; a per-run advisory lease
-  serializes runners. `repair` quarantines only a torn/forged tail. The
-  `<run>.binding.json` index is DERIVED (rebuilt/quarantined by
-  `ensure_binding`/`discover`), never part of stream validity.
-- **`strive.surfaces`** — the injected immutable `SurfaceCatalog`
-  (`SurfaceDescriptor` per legal surface) and trusted structural validators
-  (`validate_solve_code`, `validate_prompt`). A run pins one
-  `SurfaceDescriptorSnapshot` (validator name + implementation digest) PER
-  surface, so catalog growth never invalidates old runs and validator drift is
-  detected.
-- **`strive.runtime`** — the NEUTRAL, closed runtime contracts shared by the
-  substrate and kernel: `CommandPayload`, `StoredResult`, `ConfigBlob`,
-  `PolicyStateBlob`, `AttemptDispatched`, `AttemptRecord`, `ForkObservation`.
-  A leaf module (imports only `codec`/`contracts`/`sandboxes`) so verification
-  never depends on kernel import order.
-- **`strive.policy`** — `AdaptationPolicy[Config, State]` (`next_command` +
-  `reduce`, `decode_state`) and `SurfaceStrategy`; the closed command
-  vocabulary; immutable `RunView`; injected immutable `PolicyCatalog` with a
-  `conformance_violations` suite.
-- **`strive.kernel`** — the result-driven loop: one intent / one effect
-  (perform or reconcile) / one terminal result per command, then reduce and
-  checkpoint (state + consumed-result cursor). Never advances before the
-  outcome; restart reconstructs the exact result. Enforces the floor —
-  authoritative bound identity, trusted budgets, sandbox capabilities +
-  exact `SandboxProvenance`, CAS closure before apply, and fork base/candidate
-  refs captured before execution.
-- **`strive.policies.manual_change`** — `manual-change@1`: `policy.py` +
-  `manual_change.toml` + `prompts/manual_change_refine@1.md`. Emits
-  `ChangeProposed`, uses run-scoped ids, and reacts to fork success/failure
-  through the reducer (applies+reverts on improvement; stops otherwise).
-- **`strive.cli`** — `strive run/runs/status/view/history/inspect/revert/
-  repair/sandbox`.
+Linux verification is separate from a funded benchmark run. See the
+[tau2 guide](../adapters/tau2/README.md) for installation, certificates and the
+fixed-stock runner. `--prepare-only` retains a fixed-stock plan without model
+calls; execution requires its own authorized funding.
 
-### Honest scope
+## Remaining gates
 
-`manual-change@1`'s fork scores the **code** surface over the task's cases;
-the **prompt** surface is coupled into the same change and applied+reverted
-round-trip, but no scorer consumes it yet. A real prompt consumer and a real
-model refiner arrive with `continual-refine@1`.
+The manifest CLI currently composes the counter benchmark and recorded provider.
+It rejects native harness campaign manifests. A functioning jail does not
+qualify a vendor CLI's single-request behavior. Each native profile and the
+adaptive telecom composition need their own evidence before a funded reference
+campaign. That campaign also needs a retained workload closure, passing selected
+task grading, provider reservation bounds, a funded ceiling and a protected
+audit allocation.
 
-### Verification
+Adaptive telecom uses 49/29/36 whole groups over 114 tasks. The separate
+fixed-stock runner uses 40 published test IDs and a fresh upstream actor. Their
+results have different populations and actor implementations. Feedback C and
+`EvaluateFork` enactment remain unsupported.
 
-- `uv run pytest` — 241 tests. The Phase-A floor plus the adversarial matrix
-  (`test_cas`, `test_surfaces`, `test_adversarial`, `test_budget`,
-  `test_state_machine`): CAS/surface/identity/budget/state-machine attacks PLUS
-  the intent-to-effect bindings — Confirm/Revert target mismatch, apply
-  expected-state mismatch, unrelated fork states, forged `improved`,
-  summary-subject mismatch, failed/null result, forged stored head, crash after
-  failure-before-terminal (reconcile, no re-run), same-process indeterminate
-  wall/output reservation, and preserved backend/candidate-error evidence. The
-  internal-consistency pass adds: command-payload coherence (missing/forbidden
-  anchor, target=None bypass, JSON/normalized disagreement, wrong encoding,
-  extra JSON key, change_ref↔subtree disagreement); failed-terminal StoredResult
-  forgery (metrics, detail, nonzero usage), effect-after-failure, reconciled
-  partial-fork usage (accepted vs zeroed); AttemptRecord↔report/evaluation
-  disagreement; and REAL boundary faults (`test_sandbox_backend`: a crashed /
-  timed-out child is ok=False+failure, a candidate exception stays a completed
-  per-case evaluation). `test_substrate_only` verifies a kernel-driven run in a
-  FRESH interpreter that never imports the kernel; `test_packaging` BUILDS +
-  INSTALLS the wheel in an isolated venv and runs the real `strive` script
-  (never skipped).
-- `uv run mypy` — clean, `--strict`, over 39 files (src + tests).
-- `uv run strive` — installed console script; verified in tests and smoke.
+## Core freeze maintenance
 
-### The Phase-A claim
+Permanent fixtures live in [tests/vnext/baselines](../tests/vnext/baselines/README.md).
+The historical 21-file baseline stays unchanged. The current 30-file manifest
+includes the intentionally updated contracts initializer docstring hash.
 
-Every durable command field is bound to its exact effect; command intent has
-ONE unambiguous representation (normalized anchors reconciled against the
-canonical JSON through a single shared `strict_encode`); fork evidence is
-derived from the issued base and candidate states and every AttemptRecord is
-bound to its exact ExecutionReport + Evaluation; every terminal outcome is
-validated identically and reconstructs exactly, with failure usage reconciled
-from the durable attempt ledger (never zero); candidate failures stay distinct
-from infrastructure failures (a boundary fault propagates as ok=False, a
-candidate exception stays a completed per-case evaluation); and the live budget
-always equals the durable external-effect ledger — with each command and
-attempt a single verifiable lifecycle across concurrency, corruption, and
-restart, verification pure and independent of kernel import order.
-
-## Phase B — `continual-refine@1` (the real continual policy)
-
-Phase B implements the Prime-Agent / Continual-Harness-style continual,
-model-led policy on the Phase A substrate. No Pareto search; no universal
-promotion gate.
-
-- **`RequestRefinement` is real and AT-MOST-ONCE** (not exactly-once — a model
-  call that may have dispatched is reconciled `indeterminate`, never silently
-  re-called). The kernel renders the
-  prompt from the per-role PINNED control prompt (`refine.md` / `review.md`,
-  from `PolicyBound.prompt_refs`) + the ACTIVE `prompt/proposal-template`
-  surface + the policy's context, resolves an adapter from an injected,
-  immutable `ModelCatalog` (no provider branches in policy code), and journals
-  the call as a durable model DISPATCH then RESULT — exactly like a fork
-  attempt. A crash between them is an OPEN dispatch reconciled as
-  `indeterminate` (explicit retry, never silently re-called); a pre-call budget
-  denial fails with no effect; adapter error / token+cost overrun / malformed
-  decode are failure-as-data with a durable model result. Model-call usage is
-  folded into the durable ledger, so model budgets survive restart.
-- **Strict typed proposals.** `strive.refine.decode_proposal` decodes a
-  `RefinementProposal` (edits, rationale, cited evidence, expected outcomes,
-  uncertainty, review hint) and rejects NaN/Infinity, unknown/missing keys, and
-  off-limits or structurally-invalid surfaces.
-- **The policy** (`strive.policies.continual_refine`) assembles ONE atomic
-  coupled prompt+code change through prompt/strategy-code `SurfaceStrategy`
-  implementations (a pinned `dependency_module`), applies structurally-valid
-  changes immediately, optionally `EvaluateFork`s (observation, not a gate),
-  and at a review checkpoint keeps / revises / reverts / defers. A deterministic
-  run+cycle-scoped state machine and an event-excluding context builder make
-  resume byte-exact.
-- **Hardening.** A fork's `issue_state_ref` must equal the folded issue state;
-  one in-flight command (terminal+checkpoint before the next issue) is enforced
-  at the kernel boundary; canonical JSON rejects NaN/Infinity; every declared
-  dependency is imported before hashing.
-
-### Phase B correction pass (truly-continual, secure, honestly-bounded)
-
-- **A truly continual loop.** A policy-neutral `ObserveCurrentState` command
-  operates the ACTIVE harness through the executor and journals a typed
-  state-scoped observation (report/evaluation/usage) — feedback, not a gate. The
-  policy alternates warm-up/operate → refine → immediate apply → post-change
-  observation window → review → next cycle (`max_cycles`); its contexts are
-  built from REAL observations (scores + the exact failing cases), prior
-  rationale/citations/expected outcomes, changes, usage, and failures.
-- **Full review.** `keep`→`ConfirmChange`, `revert`→exact rollback,
-  `defer`→gather more and re-review (never terminates), `revise`→a new atomic
-  change with lineage. Durable `RequestRefinement` constraints
-  (required change id, edit limit, enabled/run-pinned surfaces, role edit rule)
-  are enforced at decode as failure-as-data.
-- **Exact + bounded model effects.** A `ModelBinding` event pins
-  adapter/model/config digest; resume refuses to switch models after issue.
-  Model lifecycle verification parallels forks (issue-state subject;
-  control+active-template+context → exact prompt ref; binding→dispatch→result
-  ordering + adapter/model agreement; finite usage; known finish reason;
-  proposal == strict decode of the response under the issued constraints). Open
-  dispatches reserve input+output tokens, wall, and estimated cost; a finite
-  cost budget against a non-reporting/non-estimating adapter fails closed.
-- **Boundaries restored.** `RunView` hands the policy a mechanically read-only
-  `ContentReader` (never an `ObjectStore`); proposals decode against run-pinned
-  descriptors + policy-enabled surfaces, not the live catalog; production
-  `continual-refine@1` requires a secure backend (`trusted=False`) and refuses
-  fault-only unless a test-only opt-in is set.
-- **Proof.** `test_continual_refine` drives the E2E with a deterministic fake
-  through the exact production adapter path (real-model opt-in via
-  `STRIVE_MODEL_*`): the seed prompt hides the fix, the weak harness is operated
-  first (negative failures recorded), the refiner cites them, apply is immediate,
-  and the harness is operated again to prove changed behavior before a review.
-  Covers two cycles, manual/cadence, all four verdicts, restart at every command
-  boundary, model-binding drift, decode-constraint rejections, edit-limit
-  failure-as-data, cost-fail-closed, insecure-backend rejection, and the
-  optional-fork-is-observation invariant. `uv run pytest` = 265; `uv run mypy`
-  clean over 43 files; fresh-interpreter + installed-wheel smoke retained.
-
-### Phase B correction round 2 (configurable, non-leaky, honestly-bounded)
-
-- **Operation feedback is a pinned, policy-neutral CAS plan (Area 1).** An
-  injected, versioned `OperationCatalog` of `OperationDescriptor`s (`strive.operate`,
-  shipping `task-suite@1`) replaces the thin `operation_cases(Task)` driver. A
-  descriptor receives ONLY a `PolicyVisibleOperationContext` (visible cases +
-  seed + task/environment fingerprints), never the full `Task`, and
-  deterministically builds an immutable, CAS-backed `OperationPlan`. The plan
-  embeds a run-level `OperationBinding` — descriptor ref, a REAL `source_digest`
-  (sha256 of the descriptor source + strict config, so source/config drift is
-  detected even WITHOUT a version-label bump; `task-suite-impl@1` is only a
-  label), config, plan/projection schema versions, required surfaces/caps, and
-  the `all-required`|`partial-allowed`(+`indivisible`) validity — plus the
-  environment regime, seed, an opaque manifest, and the resource envelope.
-  - The plan is **validated before issue** (closed validity; seed/task/regime
-    window agree; canonical unique request ids; required surfaces pinned in the
-    run; reservations conservatively cover the manifest) and its `plan_ref` is
-    pinned in the `ObserveCurrentState` intent, so any drift re-derives a
-    different `plan_ref` and is refused on resume.
-  - The kernel owns execution/budget/journaling and records DISPATCH → RESULT →
-    PROJECTION. The protected `AttemptRecord` carries **ordered per-request
-    evidence** (`RequestEvidence`): the aggregate failure, fault-origin, AND
-    provenance all derive from the SAME dominant item (never one request's fault
-    paired with another's provenance), unified across the CandidateExecutor and
-    kernel paths.
-  - The descriptor interprets the protected evidence into a SEPARATE,
-    **operation-neutral** policy-visible `OperationProjection` of `ProjectedOutcome`s
-    (request id, passed, score, summary, error class — no task/integer types), the
-    ONLY thing policy/review consumes (via `policy_visible_operation_view`). The
-    kernel re-derives the projection through the pinned descriptor on resume and
-    requires exact equality; the pure verifier checks coverage/outcome-ids/scores
-    against the plan, so a forged valid/score/coverage is refused.
-  - Policy readers consume only VALID projections from the ACTIVE comparison
-    window (latest `plan_ref`); a regime change starts a new window and never
-    mixes plans. An open dispatch reconciles to `indeterminate`; a crash between
-    result and projection is finished from the durable result (no re-run).
-  - HONESTLY REMAINING: the plan manifest + shipping sandbox executor still run
-    code-over-input (`TaskCase`); the neutral **projection** already supports
-    operation types beyond integer suites (proven by a conformance descriptor),
-    but a fully generic executor for agent turns / tools / env steps is future
-    work. Areas 4 (`ReviewDecision`/`ReviseChange`) and 5 (typed model
-    binding/usage) are separate next rounds.
-- **Truthful review.** The fake trigger mode was removed; auto review compares
-  pre/post operation observations (never blindly keeps); `keep` confirms with
-  the original rationale; an exhausted `defer` is left UNRESOLVED (unconfirmed);
-  `revise` applies a lineage-annotated change then OBSERVES and REVIEWS the
-  revised state before confirmation; review context is the applied change +
-  original rationale/citations/expected outcomes + optional fork evidence +
-  only post-apply observations.
-- **Model intent/recovery.** The RESOLVED model identity is pinned in the
-  durable command INTENT (payload digest) before issue, so a wrong-model resume
-  is refused (hard error) without failing the command — closing the
-  issue→dispatch window. Cost fails closed (finite budget requires a
-  conservative preflight estimate; reserve input+output tokens/wall/cost); a
-  `ModelTransportError` (possible dispatch) → indeterminate with the reservation
-  retained; unusable finish reasons are failure-as-data; the unused idempotency
-  key was removed (at-most-once).
-- **Proof.** A NON-LEAKY fixture derives the fix from observed (opaque id,
-  expected) feedback. `uv run pytest` = 266; `uv run mypy` clean over 44 files;
-  fresh-interpreter + installed-wheel smoke retained; a secure-backend E2E runs
-  when `deno-pyodide@1` is available.
-- **Deferred, noted honestly:** the legacy `MeteredJournalingAdapter` (old
-  EventLog path, unused by the vNext kernel) is not yet removed; operation
-  feedback exposes opaque ids + expected/got/errors but not raw input text.
-
-### Next
-
-After review + merge: a real prompt CONSUMER at acting time beyond proposal
-shaping, multi-cycle cadence experiments, and richer review evidence. See
-`docs/ROADMAP.md`.
-
-The promotion-era handoff is archived at
-`docs/archive/HANDOFF-stage1-3c.md`.
+Three tests read these fixtures: the adaptation all-30-hashes test, the harness
+baseline/adapter-selection test, and the second-benchmark operation/recovery
+test. The harness test checks an exact five-file historical changed set:
+`runtime/broker.py`, `runtime/supervisor.py`, `verify/engine.py`,
+`contracts/manifest.py` and `contracts/__init__.py`, all under `src/strive/vnext`.
+The initializer's sole change is its design-document pointer. The other four
+entries reflect earlier approved admission, restoration and telemetry changes.
+Never blanket-regenerate baseline hashes to hide unrelated drift.

@@ -1,7 +1,0 @@
-...........................................................x............ [ 62%]
-.....................................s....s.                             [100%]
-=========================== short test summary info ============================
-SKIPPED [1] tests/vnext/test_harness.py:299: funded live smoke: human must set a budget ceiling, provide a qualified OS jail and explicitly enable a separate funded runner; deterministic CI never uses provider credentials
-SKIPPED [1] tests/vnext/test_tau2_live.py:17: tau2 not installed: isolated uv lock panicked in macOS system-configuration (Attempted to create a NULL object); shell DNS for raw.githubusercontent.com unavailable
-XFAIL tests/vnext/test_runtime_sandbox.py::test_production_os_confinement_floor - Production candidate floor needs usable Seatbelt/container/VM with hard whole-process memory and aggregate storage limits; this host denies sandbox_apply
-113 passed, 2 skipped, 1 xfailed in 252.30s (0:04:12)
