@@ -22,6 +22,7 @@ from ..contracts.harness import CapturedStreams, PreparedGeneration, ProcessHand
 from ..contracts.primitives import ArtifactRef
 from ..errors import VerificationError
 from ..runtime._memory import resident_bytes
+from ..runtime.linux_jail import LinuxJail
 from .gateway import ModelGateway
 from .profiles import LaunchProfile, NATIVE_RESIDUAL, fixture_profile
 from .provider import json_object
@@ -34,6 +35,7 @@ class ProcessServices:
         self.gateway, self.profile, self.scratch_root, self._forward = gateway, profile, scratch_root, forward
         self.mode = mode
         self._process: subprocess.Popen[bytes] | None = None
+        self.jail: LinuxJail | None = None
         self._prepared: PreparedGeneration | None = None
         self._token: str | None = None
         self._failure: BaseException | None = None
@@ -97,8 +99,20 @@ class ProcessServices:
         self.gateway.fault("launch-retained")
         self._started = time.monotonic()
         self._deadline = self._started + prepared_generation.deadline_seconds
-        self._process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=environment, cwd=scratch, close_fds=True, start_new_session=True)
+        self.jail = LinuxJail.available()
+        if self.jail is not None:
+            # Retain the unique cgroup identity before any payload can run.
+            self.gateway.event(prepared_generation.execution_context, "os-jail",
+                self.gateway.objects.publish(encode(("linux-cgroup/1", str(self.jail.group),
+                    Path("/proc/sys/kernel/random/boot_id").read_text().strip(), self.jail.identity))))
+        try:
+            self._process = (self.jail.launch(command) if self.jail is not None else
+                subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    env=environment, cwd=scratch, close_fds=True, start_new_session=True))
+        except BaseException:
+            if self.jail is not None:
+                self.jail.close()
+            raise
         assert self._process.stdin is not None
         self._process.stdin.write(payload + b"\n")
         self._process.stdin.flush()
@@ -136,7 +150,7 @@ class ProcessServices:
             selector.register(child.stdout, selectors.EVENT_READ, out)
             selector.register(child.stderr, selectors.EVENT_READ, err)
             while selector.get_map():
-                if time.monotonic() >= self._deadline or resident_bytes(child.pid) > 256 * 1024 * 1024:
+                if time.monotonic() >= self._deadline or (self.jail is None and resident_bytes(child.pid) > 256 * 1024 * 1024):
                     timed_out = True
                     break
                 for key, _ in selector.select(0.02):
@@ -198,9 +212,9 @@ class ProcessServices:
         child = self._check(process)
         assert self._prepared is not None
         self.gateway.revoke(self._prepared.execution_context)
-        # Only Deno fixtures can enter this launcher and they cannot create
-        # descendants. Reaping an already-exited child also avoids targeting a
-        # recycled PID. Native trees require the separately qualified OS jail.
+        if self.jail is not None:
+            self.jail.kill()
+        # Reap only our child; the cgroup kill also covers reparented descendants.
         if child.poll() is None:
             try:
                 os.killpg(child.pid, signal.SIGKILL)
@@ -226,5 +240,10 @@ class ProcessServices:
                 self._process.stdout.close()
             if self._process.stderr is not None:
                 self._process.stderr.close()
+        if self.jail is not None:
+            self.jail.close()
+            if self._prepared is not None:
+                self.gateway.event(self._prepared.execution_context, "os-jail-exit",
+                    self.gateway.objects.publish(encode(("linux-cgroup-events/1", tuple(sorted(self.jail.events.items()))))))
         if self._temporary is not None:
             self._temporary.cleanup()

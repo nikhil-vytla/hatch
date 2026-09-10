@@ -337,9 +337,9 @@ def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
     return WorkflowRuntimeDriver(tmp_path / "runtime-vnext")
 
 
-@pytest.mark.xfail(strict=True, raises=NotImplementedError,
-                   reason="Native harness isolation requires tested Seatbelt/container/VM gateway-only network and filesystem jail plus hard memory/storage limits; sandbox_apply is denied here. Candidate and Deno fixture harness permission probes pass.")
 def test_runtime_integrity_1_confines_candidate_and_harness(future_runtime: RuntimeAcceptanceDriver) -> None:
+    from .test_linux_jail import require_jail
+    require_jail()
     evidence = future_runtime.exercise("candidate_and_harness_attempt_credentials_network_storage_and_tool_access")
     assert evidence.candidate_escape_denied and evidence.harness_escape_denied
 

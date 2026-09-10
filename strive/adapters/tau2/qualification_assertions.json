@@ -1,0 +1,19 @@
+{
+  "assistant": [
+    "assert_data_refueling_amount",
+    "assert_line_status",
+    "assert_overdue_bill_exists",
+    "assert_no_overdue_bill"
+  ],
+  "user": [
+    "assert_airplane_mode_status",
+    "assert_service_status",
+    "assert_mobile_data_status",
+    "assert_mobile_roaming_status",
+    "assert_mobile_data_saver_mode_status",
+    "assert_internet_speed",
+    "assert_internet_not_excellent",
+    "assert_can_send_mms",
+    "assert_mobile_data_usage_exceeded"
+  ]
+}

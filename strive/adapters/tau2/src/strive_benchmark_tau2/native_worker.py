@@ -26,9 +26,50 @@ def tuples(value: Any) -> Any:
     return tuple(tuples(v) for v in value) if isinstance(value, list) else value
 
 
+def message_record(message: Any) -> dict[str, Any]:
+    """Retain model fields, excluding only timestamps on message envelopes."""
+    return dict(message.model_dump(mode="json", exclude={
+        "timestamp": True, "tool_messages": {"__all__": {"timestamp"}},
+    }))
+
+
+def tool_results_message(results: list[dict[str, Any]]) -> dict[str, Any]:
+    # At PIN, the batch requires role="tool" and tool_messages; each result
+    # requires id and role="tool". Validate before retaining the pending input.
+    from tau2.data_model.message import MultiToolMessage
+    return message_record(MultiToolMessage(role="tool", tool_messages=results))
+
+
+def generation_request(kwargs: dict[str, Any]) -> dict[str, Any]:
+    # UserState.flip_roles creates new messages with wall-clock timestamps on
+    # every call. Those timestamps are not sent by to_litellm_messages. Exclude
+    # only that message metadata; retain content, tool arguments and settings.
+    return {"model": kwargs["model"],
+            "messages": [message_record(m) for m in kwargs["messages"]],
+            "tools": [t.openai_schema for t in kwargs["tools"]] if kwargs["tools"] else [],
+            "settings": {k: v for k, v in kwargs.items() if k not in {"model", "messages", "tools", "call_name"}}}
+
+
+def reference_trajectory(task: Any, environment: Any) -> list[Any]:
+    """Record the reference actions as live calls, including telecom sync."""
+    from tau2.data_model.message import AssistantMessage, ToolCall, UserMessage
+    initial = task.initial_state
+    trajectory = list(initial.message_history or []) if initial else []
+    for action in task.evaluation_criteria.actions or []:
+        call = ToolCall(id=action.action_id, name=action.name, requestor=action.requestor, arguments=action.arguments)
+        message_type = UserMessage if action.requestor == "user" else AssistantMessage
+        trajectory.append(message_type(role=action.requestor, tool_calls=[call]))
+        response = environment.get_response(call)
+        if response.error:
+            raise ValueError(f"reference action {action.action_id} ({action.name}) failed: {response.content}")
+        trajectory.append(response)
+    return trajectory
+
+
 def run(request: dict[str, Any]) -> dict[str, Any]:
     # These imports must never run in strive's runtime/verifier interpreter.
     # Upstream configuration must come from the retained request/data tree.
+    os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
     import dotenv
     dotenv.load_dotenv = lambda *args, **kwargs: False
     from pydantic import TypeAdapter
@@ -115,7 +156,7 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
             state["delivery_cursor"] += 1
             if state["delivery_cursor"] == len(state["pending_batch"]):
                 results = state["trajectory"][-len(state["pending_batch"]):]
-                state["pending_message"] = {"tool_messages": results}
+                state["pending_message"] = tool_results_message(results)
                 state["pending_batch"] = []
                 state["delivery_cursor"] = 0
     elif operation == "deliver_message":
@@ -137,9 +178,7 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
         class Capture(BaseException):
             pass
         def generation(**kwargs: Any) -> Any:
-            captured.update({"model": kwargs["model"], "messages": [m.model_dump(mode="json") for m in kwargs["messages"]],
-                             "tools": [t.openai_schema for t in kwargs["tools"]] if kwargs["tools"] else [],
-                             "settings": {k: v for k, v in kwargs.items() if k not in {"model", "messages", "tools", "call_name"}}})
+            captured.update(generation_request(kwargs))
             if operation == "plan_user_turn":
                 raise Capture()
             if captured != payload["plan"]:
@@ -167,15 +206,24 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
         if criteria is None or not criteria.reward_basis or any(str(b.value) not in {"DB", "ENV_ASSERTION", "ACTION", "COMMUNICATE"} for b in criteria.reward_basis):
             raise ValueError("task requires missing/unknown/nondeterministic grading")
         initial = task.initial_state
-        gold = get_environment(solo_mode=False)
-        gold.set_state(initial.initialization_data if initial else None, initial.initialization_actions if initial else None,
-                       list(initial.message_history or []) if initial else [], strict=True)
-        # Fail here instead of allowing upstream's warning-and-continue path.
-        for action in criteria.actions or []:
-            gold.make_tool_call(action.name, requestor=action.requestor, **action.arguments)
         if operation == "qualify":
-            for assertion in criteria.env_assertions or []:
-                gold.run_env_assertion(assertion, raise_assertion_error=True)
+            gold = get_environment(solo_mode=False)
+            gold.set_state(initial.initialization_data if initial else None, initial.initialization_actions if initial else None,
+                           list(initial.message_history or []) if initial else [], strict=True)
+            # Keep the preparation gate strict about errors in upstream's DB
+            # target construction, which uses unsynchronized make_tool_call.
+            for action in criteria.actions or []:
+                gold.make_tool_call(action.name, requestor=action.requestor, **action.arguments)
+            # Assertions grade the replayed environment, not the DB target.
+            # get_response synchronizes after each reference action just as a
+            # real trajectory does; calculate_reward then strictly replays it.
+            reference = reference_trajectory(task, deepcopy(env))
+            checked = EnvironmentEvaluator.calculate_reward(get_environment, task, reference, solo_mode=False, strict_replay=True)
+            failures = [str(check.env_assertion) for check in checked.env_assertions or [] if not check.met]
+            if failures:
+                raise ValueError("reference trajectory fails assertions: " + "; ".join(failures))
+            if checked.reward != 1:
+                raise ValueError("reference trajectory fails selected environment reward: " + str(checked.reward_breakdown))
             output = {"qualified": True}
         else:
             if task.model_dump(mode="json") != Task.model_validate(payload["task"]).model_dump(mode="json"):
@@ -188,23 +236,28 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
                              trajectory, strict=True)
             if (replay.get_db_hash(), replay.get_user_db_hash()) != (env.get_db_hash(), env.get_user_db_hash()):
                 output = {"status": "invalid", "reason": "committed/replayed state divergence"}
+            elif state["termination"] not in {"agent_stop", "user_stop"}:
+                # evaluate_simulation returns zero before running evaluators
+                # on premature termination. Keep receipt/state checks above.
+                output = {"status": "scored", "value": 0, "upstream": 0, "components": {}}
             else:
-                predicted = deepcopy(env)
-                direct = {"DB": int((predicted.get_db_hash(), predicted.get_user_db_hash()) == (gold.get_db_hash(), gold.get_user_db_hash())),
-                          "ENV_ASSERTION": int(all(predicted.run_env_assertion(a, raise_assertion_error=False) for a in criteria.env_assertions or []))}
+                # Use the pinned deterministic evaluators, including the env
+                # evaluator's None-vs-empty behavior, DB target construction,
+                # and execution of every assertion on the replayed trajectory.
+                # Combine component rewards exactly as evaluate_simulation(ALL).
+                environment_reward = EnvironmentEvaluator.calculate_reward(get_environment, task, trajectory, solo_mode=False, strict_replay=True)
                 tool_types = get_tool_types(env.tools) | get_tool_types(env.user_tools)
-                direct["ACTION"] = int(ActionEvaluator.calculate_reward(task=task, full_trajectory=trajectory, tool_types=tool_types).reward)
-                direct["COMMUNICATE"] = int(CommunicateEvaluator.calculate_reward(task=task, full_trajectory=trajectory).reward)
-                upstream_env = EnvironmentEvaluator.calculate_reward(get_environment, task, trajectory, solo_mode=False, strict_replay=True)
+                action_reward = ActionEvaluator.calculate_reward(task=task, full_trajectory=trajectory, tool_types=tool_types)
+                communicate_reward = CommunicateEvaluator.calculate_reward(task=task, full_trajectory=trajectory)
+                selected = {basis.value for basis in criteria.reward_basis}
                 reward = 1
-                equivalent = 1
-                for basis in criteria.reward_basis:
-                    reward *= direct[basis.value]
-                    equivalent *= int(upstream_env.reward_breakdown[basis]) if basis.value in {"DB", "ENV_ASSERTION"} else direct[basis.value]
-                if state["termination"] not in {"agent_stop", "user_stop"}:
-                    reward = equivalent = 0
-                output = {"status": "scored" if reward == equivalent else "invalid", "value": reward,
-                          "upstream": equivalent, "components": direct}
+                components = {}
+                for bases, result in (({"DB", "ENV_ASSERTION"}, environment_reward),
+                                      ({"ACTION"}, action_reward), ({"COMMUNICATE"}, communicate_reward)):
+                    if selected & bases:
+                        reward *= int(result.reward)
+                        components.update({basis.value: value for basis, value in (result.reward_breakdown or {}).items()})
+                output = {"status": "scored", "value": reward, "upstream": reward, "components": components}
     elif operation == "terminate":
         if not isinstance(payload, str) or payload not in {"agent_stop", "user_stop", "max_steps", "too_many_errors", "budget_exhausted"}:
             raise ValueError("unknown termination reason")

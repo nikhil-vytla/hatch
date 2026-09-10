@@ -1,0 +1,165 @@
+################ TAU2 LIVE FAILURE 1: full_inventory_certification ################
+(status=blocked; affected_ids = essentially the whole [mms_issue] family; assertions assert_can_send_mms / assert_mobile_data_status fail on the env being checked)
+______________________ test_full_inventory_certification _______________________
+
+tau2_python = PosixPath('/workspace/strive/adapters/tau2/.venv/bin/python')
+tmp_path = PosixPath('/workspace/strive/.container-results/pytest-tmp/test_full_inventory_certificat0')
+
+    def test_full_inventory_certification(tau2_python: Path, tmp_path: Path) -> None:
+        output = Path(os.environ.get("STRIVE_RESULTS", str(tmp_path))) / "tau2-certificate"
+        result = subprocess.run([str(tau2_python), "-I", "-B", "-m", "strive_benchmark_tau2.certify", str(DATA), str(output)],
+            capture_output=True, text=True, timeout=1800, cwd=DATA, env=environment())
+>       assert result.returncode == 0, result.stdout + "\n" + result.stderr  # Includes every offending task ID.
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: {
+E           "status": "blocked",
+E           "affected_ids": [
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|data_usage_exceeded[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|user_abroad_roaming_disabled_off[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|user_abroad_roaming_disabled_on[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|user_abroad_roaming_enabled_off[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_usage_exceeded[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|user_abroad_roaming_disabled_off[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|user_abroad_roaming_disabled_on[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|data_usage_exceeded[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|user_abroad_roaming_disabled_off[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|user_abroad_roaming_disabled_on[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|user_abroad_roaming_enabled_off[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_usage_exceeded[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|user_abroad_roaming_disabled_off[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|user_abroad_roaming_disabled_on[PERSONA:Easy]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|user_abroad_roaming_enabled_off[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off[PERSONA:None]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off|data_saver_mode_on[PERSONA:Hard]",
+E             "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off|data_saver_mode_on|data_usage_exceeded[PERSONA:Easy]",
+
+################ TAU2 LIVE FAILURE 2: deterministic_scorer_against_upstream ################
+_____________ test_live_tau2_deterministic_scorer_against_upstream _____________
+
+tau2_python = PosixPath('/workspace/strive/adapters/tau2/.venv/bin/python')
+tmp_path = PosixPath('/workspace/strive/.container-results/pytest-tmp/test_live_tau2_deterministic_s0')
+
+    def test_live_tau2_deterministic_scorer_against_upstream(tau2_python: Path, tmp_path: Path) -> None:
+>       live_check(tau2_python, "equivalence", tmp_path)
+
+tests/vnext/test_tau2_live.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+python = PosixPath('/workspace/strive/adapters/tau2/.venv/bin/python')
+mode = 'equivalence'
+output = PosixPath('/workspace/strive/.container-results/pytest-tmp/test_live_tau2_deterministic_s0')
+
+    def live_check(python: Path, mode: str, output: Path) -> None:
+        result = subprocess.run([str(python), "-I", "-B", "-m", "strive_benchmark_tau2.live_checks", mode,
+            str(output), str(RECORDINGS)], capture_output=True, text=True, timeout=300, cwd=DATA, env=environment())
+>       assert result.returncode == 0, result.stdout + "\n" + result.stderr
+E       AssertionError: 
+E         2026-09-10 01:27:38.467 | WARNING  | tau2.utils.utils:<module>:15 - No .env file found
+E         2026-09-10 01:27:38.468 | INFO     | tau2.utils.utils:<module>:23 - Using data directory from environment: /workspace/strive/adapters/tau2/retained-data
+E         2026-09-10 01:27:40.273 | INFO     | tau2.utils.llm_utils:<module>:102 - LiteLLM: Cache is disabled
+E         2026-09-10 01:27:40.388 | DEBUG    | tau2.registry:<module>:281 - Registering default components...
+E         2026-09-10 01:27:40.394 | DEBUG    | tau2.registry:<module>:292 - Voice dependencies not installed, skipping voice user registration
+E         2026-09-10 01:27:40.394 | DEBUG    | tau2.registry:<module>:350 - Default components registered successfully. Registry info: {
+E           "domains": [
+E             "mock",
+E             "airline",
+E             "retail",
+E             "telecom",
+E             "telecom-workflow",
+E             "banking_knowledge"
+E           ],
+E           "agents": [
+E             "llm_agent",
+E             "llm_agent_gt",
+E             "llm_agent_solo",
+E             "discrete_time_audio_native_agent"
+E           ],
+E           "users": [
+E             "user_simulator",
+E             "dummy_user"
+E           ],
+E           "task_sets": [
+E             "mock",
+E             "airline",
+E             "retail",
+E             "telecom_full",
+E             "telecom_small",
+E             "telecom",
+E             "telecom-workflow",
+E             "banking_knowledge"
+E           ]
+E         }
+E         2026-09-10 01:27:40.534 | DEBUG    | tau2.user.user_simulator:_generate_next_message:222 - User responds to message: AssistantMessage
+E         content: Please toggle your mobile data once and tell me when it is done.
+E         is_final_chunk: True
+E         2026-09-10 01:27:40.542 | DEBUG    | tau2.user.user_simulator:_generate_next_message:222 - User responds to message: AssistantMessage
+E         content: Please toggle your mobile data once and tell me when it is done.
+
+################ TAU2 LIVE FAILURE 3: operation_store_snapshot_and_crash_recovery ################
+__________ test_live_tau2_operation_store_snapshot_and_crash_recovery __________
+
+tau2_python = PosixPath('/workspace/strive/adapters/tau2/.venv/bin/python')
+tmp_path = PosixPath('/workspace/strive/.container-results/pytest-tmp/test_live_tau2_operation_store0')
+
+    def test_live_tau2_operation_store_snapshot_and_crash_recovery(tau2_python: Path, tmp_path: Path) -> None:
+>       live_check(tau2_python, "integration", tmp_path)
+
+tests/vnext/test_tau2_live.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+python = PosixPath('/workspace/strive/adapters/tau2/.venv/bin/python')
+mode = 'integration'
+output = PosixPath('/workspace/strive/.container-results/pytest-tmp/test_live_tau2_operation_store0')
+
+    def live_check(python: Path, mode: str, output: Path) -> None:
+        result = subprocess.run([str(python), "-I", "-B", "-m", "strive_benchmark_tau2.live_checks", mode,
+            str(output), str(RECORDINGS)], capture_output=True, text=True, timeout=300, cwd=DATA, env=environment())
+>       assert result.returncode == 0, result.stdout + "\n" + result.stderr
+E       AssertionError: 
+E         Traceback (most recent call last):
+E           File "<frozen runpy>", line 198, in _run_module_as_main
+E           File "<frozen runpy>", line 88, in _run_code
+E           File "/workspace/strive/adapters/tau2/src/strive_benchmark_tau2/live_checks.py", line 265, in <module>
+E             main()
+E           File "/workspace/strive/adapters/tau2/src/strive_benchmark_tau2/live_checks.py", line 257, in main
+E             integration(Path(sys.argv[2]))
+E           File "/workspace/strive/adapters/tau2/src/strive_benchmark_tau2/live_checks.py", line 142, in integration
+E             pin = objects.publish(Path(__file__).read_bytes())
+E                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/workspace/strive/src/strive/vnext/store/cas.py", line 73, in publish
+E             atomic_file(self.path(reference), data)
+E           File "/workspace/strive/src/strive/vnext/store/cas.py", line 33, in atomic_file
+E             descriptor, temporary = tempfile.mkstemp(prefix=".publish-", dir=path.parent)
+E                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/usr/local/lib/python3.12/tempfile.py", line 357, in mkstemp
+E             return _mkstemp_inner(dir, prefix, suffix, flags, output_type)
+E                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/usr/local/lib/python3.12/tempfile.py", line 256, in _mkstemp_inner
+E             fd = _os.open(file, flags, 0o600)
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E         FileNotFoundError: [Errno 2] No such file or directory: '/workspace/strive/.container-results/pytest-tmp/test_live_tau2_operation_store0/objects/.publish-bli4apnm'
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/workspace/strive/adapters/tau2/.venv/bin/python', '-I', '-B', '-m', 'strive_benchmark_tau2.live_checks', 'integration', '/workspace/strive/.container-results/pytest-tmp/test_live_tau2_operation_store0', '/workspace/strive/tests/vnext/fixtures/tau2_recorded_generations.json'], returncode=1, stdout='', stderr='Traceback (most recent call last):\n  File "<frozen runpy>", line 198, in _run_module_as_main\n  File "<frozen runpy>", line 88, in _run_code\n  File "/workspace/strive/adapters/tau2/src/strive_benchmark_tau2/live_checks.py", line 265, in <module>\n    main()\n  File "/workspace/strive/adapters/tau2/src/strive_benchmark_tau2/live_checks.py", line 257, in main\n    integration(Path(sys.argv[2]))\n  File "/workspace/strive/adapters/tau2/src/strive_benchmark_tau2/live_checks.py", line 142, in integration\n    pin = objects.publish(Path(__file__).read_bytes())\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/workspace/strive/src/strive/vnext/store/cas.py", line 73, in publish\n    atomic_file(self.path(reference), data)\n  File "/workspace/strive/src/strive/vnext/store/cas.py", line 33, in atomic_file\n    descriptor, temporary = tempfile.mkstemp(prefix=".publish-", dir=path.parent)\n                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/usr/local/lib/python3.12/tempfile.py", line 357, in mkstemp\n    return _mkstemp_inner(dir, prefix, suffix, flags, output_type)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/usr/local/lib/python3.12/tempfile.py", line 256, in _mkstemp_inner\n    fd = _os.open(file, flags, 0o600)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/workspace/strive/.container-results/pytest-tmp/test_live_tau2_operation_store0/objects/.publish-bli4apnm\'\n').returncode
+
+tests/vnext/test_tau2_live.py:51: AssertionError
+------ generated xml file: /workspace/strive/.container-results/vnext.xml ------
+=========================== short test summary info ============================

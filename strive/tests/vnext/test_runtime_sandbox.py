@@ -9,7 +9,8 @@ from strive.vnext.codec import content_ref
 from strive.vnext.contracts.commands import AuthorizedView, Finish
 from strive.vnext.contracts.primitives import EnvironmentId, ExecutionStatus, RevisionId, ScopedArtifact
 from strive.vnext.errors import VerificationError
-from strive.vnext.runtime import DenoSandbox, SandboxFailure, SandboxLimits
+from strive.vnext.runtime import SandboxFailure, SandboxLimits
+from strive.vnext.runtime.confined_sandbox import DenoSandbox
 
 from .runtime_fixtures import RuntimeFixture
 
@@ -157,15 +158,19 @@ def test_sandbox_reports_pinned_enforcement(sandbox: DenoSandbox) -> None:
     assert {"no-host-files", "no-network", "no-env", "no-subprocess", "cpu-rlimit", "output-cap"} <= set(profile.enforced)
 
 
-@pytest.mark.xfail(strict=True, reason="Production candidate floor needs usable Seatbelt/container/VM with hard whole-process memory and aggregate storage limits; this host denies sandbox_apply")
 def test_production_os_confinement_floor(sandbox: DenoSandbox) -> None:
+    from .test_linux_jail import require_jail
+    require_jail()
     assert sandbox.profile().production_floor
+    assert isinstance(sandbox.run(("function step(){" + RETURN_FINISH + "}").encode(), view(), b"", None, {}).command, Finish)
+    assert "memory.events.oom_kill" in sandbox.jail_events
 
 
 def test_rss_watchdog_includes_arraybuffers_outside_v8_heap(sandbox: DenoSandbox) -> None:
     sandbox.limits = SandboxLimits(resident_megabytes=64)
     source = b'function step(){const a=[];while(true){a.push(new Uint8Array(32*1024*1024).fill(1));}}'
-    with pytest.raises(SandboxFailure, match="resident memory limit"):
+    message = "cgroup memory limit" if sandbox.profile().production_floor else "resident memory limit"
+    with pytest.raises(SandboxFailure, match=message):
         sandbox.run(source, view(), b"", None, {})
 
 

@@ -9,3 +9,12 @@ artifacts/*
 
 # advisory writer locks are runtime artifacts, never content
 artifacts/demo*/ledger/*.lock
+
+# Container and upstream qualification outputs; definitions remain tracked.
+.container-results/
+adapters/tau2/retained-data/
+adapters/tau2/upstream-source/
+adapters/tau2/uv.lock
+milestone8-container-verification/downloads/
+
+.cache/

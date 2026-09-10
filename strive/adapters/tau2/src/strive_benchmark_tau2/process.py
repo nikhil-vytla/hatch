@@ -14,7 +14,7 @@ from .data import verify_data
 class IsolatedTau2:
     def __init__(self, python: Path, data_root: Path, objects: CAS, closure: ArtifactRef, data_index: ArtifactRef) -> None:
         verify_closure(objects, closure)
-        self.python, self.data_root, self.objects, self.closure = python.resolve(), data_root.resolve(), objects, closure
+        self.python, self.data_root, self.objects, self.closure = python.absolute(), data_root.resolve(), objects, closure
         self.data_index = data_index
         verify_data(objects, data_index, self.data_root)
         self.script = Path(__file__).with_name("native_worker.py")

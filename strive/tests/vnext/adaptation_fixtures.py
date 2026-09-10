@@ -21,7 +21,8 @@ from strive.vnext.policy import BundleManager, BundleSandbox, ContinualRefine, E
 from strive.vnext.policy.data import dumps
 from strive.vnext.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
 from strive.vnext.runtime.broker import CapabilityBroker
-from strive.vnext.runtime.sandbox import DenoSandbox, SandboxLimits
+from strive.vnext.runtime.sandbox import SandboxLimits
+from strive.vnext.runtime.confined_sandbox import DenoSandbox
 from strive.vnext.runtime.supervisor import Supervisor
 from strive.vnext.store import ArtifactStore
 from strive_benchmark_counter import CounterAdapter

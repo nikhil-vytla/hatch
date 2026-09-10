@@ -1,0 +1,17 @@
+{
+  "total": 797,
+  "passed": 772,
+  "skipped": 22,
+  "xfailed": 1,
+  "failed": 2,
+  "failure_names": [
+    "tests.test_packaging.test_wheel_ships_package_data",
+    "tests.test_packaging.test_installed_console_script_runs_in_isolated_env"
+  ],
+  "duration_seconds": 1136.43,
+  "mypy": "179 files clean with UV_NO_SYNC=1 uv run mypy --strict",
+  "focused": "79 passed, 5 live tau2 skips",
+  "live_tau2_or_container_run_on_host": false,
+  "fully_green": false,
+  "failure_reason": "Pre-existing uv macOS system-configuration panic in unchanged packaging tests"
+}

@@ -1,0 +1,1362 @@
+diff --git a/adapters/tau2/README.md b/adapters/tau2/README.md
+index 02b58a7..9ebc400 100644
+--- a/adapters/tau2/README.md
++++ b/adapters/tau2/README.md
+@@ -27,8 +27,9 @@ Preparation must complete these steps before live dispatch:
+    deterministic assertion-function names. Run `python -m
+    strive_benchmark_tau2.certify DATA_ROOT OUTPUT_ROOT`. It executes strict
+    initialization/reference checks without inference and retains grouping,
+-   seed/order, all memberships and the 60/14/40 result. Failure emits exact IDs
+-   and a revised-campaign proposal, then stops.
++   seed/order, all memberships, and actual sizes against the 60/14/40 target.
++   Selected-task grading or adaptive group-disjointness failure emits exact IDs
++   and stops. See Amendment 3 modes below.
+ 5. Retain the full closure through `benchmarks.closure`, construct
+    `IsolatedTau2(python, data_root, objects, closure, data_index)`, derive
+    `implementation_identity()`, and create the operation store with that identity
+@@ -74,3 +75,72 @@ model calls. See `milestone8-container-verification/README.md` for the complete
+ build/verification command and current validation limits. The earlier macOS
+ installation note describes M5's result; it is not a reason to skip an installed
+ runtime in M8.
++
++## Amendment 3 modes
++
++Qualification now accepts `--mode adaptive` or `--mode fixed-stock`. Adaptive is
++the default. It selects all base IDs and assigns whole base templates across our
++own development/validation/audit split. The generator's `[mms_issue]`,
++`[mobile_data_issue]`, and `[service_issue]` roots ignore appended failure-condition
++combinations and persona tags. Shared goals or substrings never connect roots.
++The closest allocation with three nonempty partitions is **49/29/36**, against
++the 60/14/40 target. No selected ID is dropped. This split is Strive-derived and
++has no leaderboard comparability claim.
++
++The certificate retains source bytes, algorithm source, seed/order, group-to-ID
++mapping, target/actual sizes, exact-target feasibility, and hard-gate outcomes.
++Every selected headline task must pass strict deterministic grading and reference
++execution. NL assertions, missing/unknown components and unreviewed assertions
++still block. Our adaptive partition must cover the pool exactly once without
++crossing groups. Full-inventory overlap across the stock train/test boundary is
++informational under both the new roots and the historical connected-group rule.
++The latter preserves the captured 2,285-ID diagnostic without blocking a valid
++campaign. Unselected tasks receive a structural grading scan, reported separately;
++only selected tasks receive executable initialization/reference checks.
++
++Version 2 certificates explicitly bind the mode and extended report. The RPC
++server requires a new Amendment 3 certificate rather than reinterpreting an old
++certificate under different split semantics. Adaptive adapters declare
++`development`, `validation`, and `audit`; fixed-stock adapters declare `test`.
++
++The standalone fixed-stock runner executes an initial tau2 `llm_agent` with
++unchanged model/options and a fresh actor per simulation. It has no refinement or
++cross-episode memory path. This is an upstream LLM-agent baseline, not an opencode
++actor port. Use an initial actor artifact prepared before examining results:
++
++```json
++{
++  "schema": "strive.initial-tau2-actor/1",
++  "agent": "llm_agent",
++  "model": "gpt-4.1-2025-04-14",
++  "model_settings": {"temperature": 0.0}
++}
++```
++
++In the pinned Linux adapter environment:
++
++```sh
++adapters/tau2/.venv/bin/python -I -B -m strive_benchmark_tau2.fixed_stock \
++  adapters/tau2/retained-data .container-results/fixed-stock \
++  --initial-actor initial-actor.json --trials 4 --seed 300
++```
++
++This command makes model calls. Add `--prepare-only` to certify and retain the
++plan without dispatch. The runner always pins the user simulator to
++`gpt-4.1-2025-04-14` at temperature `0.0`, as in the pinned upstream defaults. It
++retains the initial configuration, resolved upstream settings, task IDs, trials,
++raw results and a separate `fixed-stock-result.json`. Missing rewards, missing
++trials, duplicated task/trial identities and substituted tasks cannot produce a
++completed result. A changed plan or existing result requires a fresh output
++folder.
++
++Fixed-stock results are comparable only to evaluations on the same stock `test`
++population with matching settings. [Upstream split guidance](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/README.md)
++identifies `base` as the original leaderboard denominator. Never label a 40-task
++test score as a 114-task base leaderboard score, or combine it with adaptive
++results. The whole-group rationale follows [GroupKFold](https://scikit-learn.org/stable/modules/cross_validation.html#group-k-fold).
++
++The Linux verification script runs both certification modes and validates the
++fixed runner's real upstream configuration without model calls. All five live
++tau2 tests skip on macOS. The existing scorer-equivalence, mutation recovery,
++jail and MultiToolMessage checks remain in place.
+diff --git a/adapters/tau2/src/strive_benchmark_tau2/adapter.py b/adapters/tau2/src/strive_benchmark_tau2/adapter.py
+index 0ff2ca8..8394650 100644
+--- a/adapters/tau2/src/strive_benchmark_tau2/adapter.py
++++ b/adapters/tau2/src/strive_benchmark_tau2/adapter.py
+@@ -16,6 +16,7 @@ from strive.vnext.errors import VerificationError
+ from strive.vnext.store.cas import CAS
+ from . import UPSTREAM_REVISION
+ from .qualification import Qualification
++from .splits import scenario_group
+ 
+ 
+ class TelecomBackend(Protocol):
+@@ -82,7 +83,8 @@ class Tau2Adapter:
+         index = {string(obj(task)["id"]): obj(task) for task in items(inventory)}
+         for task in tasks:
+             original = index[task.task_id]
+-            if (objects.read(task.definition) != canonical(original)
++            if (task.scenario_group != scenario_group(original)
++                    or objects.read(task.definition) != canonical(original)
+                     or objects.read(task.reward_definition) != canonical(original["evaluation_criteria"])):
+                 raise VerificationError("task/reward definition differs from qualified source inventory")
+         self._operations = tuple(OperationSpec(name, objects.publish(encode(("telecom-arguments/1", name))),
+@@ -102,6 +104,8 @@ class Tau2Adapter:
+         return self.tasks
+ 
+     def declare_splits(self) -> tuple[SplitSpec, ...]:
++        if self.qualification.mode == "fixed-stock":
++            return (SplitSpec("test", self.qualification.audit, self.qualification.report),)
+         return tuple(SplitSpec(name, ids, self.qualification.report) for name, ids in (
+             ("development", self.qualification.development), ("validation", self.qualification.validation),
+             ("audit", self.qualification.audit)))
+diff --git a/adapters/tau2/src/strive_benchmark_tau2/certify.py b/adapters/tau2/src/strive_benchmark_tau2/certify.py
+index e04b922..f36781a 100644
+--- a/adapters/tau2/src/strive_benchmark_tau2/certify.py
++++ b/adapters/tau2/src/strive_benchmark_tau2/certify.py
+@@ -4,6 +4,7 @@ Usage: python -m strive_benchmark_tau2.certify DATA_ROOT OUTPUT_ROOT
+ DATA_ROOT/qualification_assertions.json is the reviewed function allowlist.
+ Nothing is excluded or reassigned when qualification fails.
+ """
++import argparse
+ import importlib.metadata
+ import json
+ import os
+@@ -16,11 +17,11 @@ from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, stri
+ from strive.vnext.store import ArtifactStore
+ from . import UPSTREAM_REVISION
+ from .native_worker import deny_network, run
+-from .qualification import QualificationFailure, qualify
++from .qualification import MODES, Qualification, QualificationFailure, qualify
+ 
+ 
+-def main() -> None:
+-    root, output = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
++def certify(root: Path, output: Path, *, mode: str = "adaptive") -> Qualification:
++    root, output = root.resolve(), output.resolve()
+     output.mkdir(parents=True, exist_ok=True)
+     metadata = importlib.metadata.distribution("tau2")
+     source = json.loads(metadata.read_text("direct_url.json") or "{}")
+@@ -42,18 +43,27 @@ def main() -> None:
+             print(f"Qualified initialization/gold/assertions for {checked} task records", file=sys.stderr, flush=True)
+     try:
+         result = qualify(store.objects, (root / "tau2/domains/telecom/tasks.json").read_bytes(),
+-            (root / "tau2/domains/telecom/split_tasks.json").read_bytes(), assertion_allowlist=assertions, execute_checks=check)
++            (root / "tau2/domains/telecom/split_tasks.json").read_bytes(), assertion_allowlist=assertions, execute_checks=check, mode=mode)
+     except QualificationFailure as error:
+-        failure_report = {"status": "blocked", "affected_ids": error.affected_ids, "failures": error.failures,
++        failure_report = {**error.details, "status": "blocked", "affected_ids": error.affected_ids, "failures": error.failures,
+                   "proposed_campaign": error.proposed_campaign}
+         (output / "qualification.json").write_bytes(canonical(failure_report))
+         print(json.dumps(failure_report, indent=2))
+         raise SystemExit(1)
+-    report = {"status": "qualified", "report": result.report.digest, "groups": result.groups,
+-              "development": result.development, "validation": result.validation, "audit": result.audit,
+-              "checked_records": checked}
++    report = {**obj(parse(store.objects.read(result.details))), "report": result.report.digest}
++    assert report["checked_records"] == checked
+     (output / "qualification.json").write_bytes(canonical(report))
+-    print(json.dumps(report, indent=2))
++    print(json.dumps({k: report[k] for k in ("status", "mode", "actual_sizes", "checked_records", "gates")}, indent=2))
++    return result
++
++
++def main() -> None:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("data_root", type=Path)
++    parser.add_argument("output_root", type=Path)
++    parser.add_argument("--mode", choices=MODES, default="adaptive")
++    args = parser.parse_args()
++    certify(args.data_root, args.output_root, mode=args.mode)
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/adapters/tau2/src/strive_benchmark_tau2/fixed_stock.py b/adapters/tau2/src/strive_benchmark_tau2/fixed_stock.py
+new file mode 100644
+index 0000000..fcbffc2
+--- /dev/null
++++ b/adapters/tau2/src/strive_benchmark_tau2/fixed_stock.py
+@@ -0,0 +1,144 @@
++"""Initial, non-adapting tau2 LLM actor on stock test, reported separately.
++
++The initial actor is an explicit model/options artifact, never a selected final
++adaptive checkpoint. Upstream constructs a fresh LLM agent for each simulation.
++No refiner, learned memory, prompt update, or cross-episode actor state is used.
++"""
++import argparse
++from collections import Counter
++from collections.abc import Callable
++from copy import deepcopy
++import math
++from pathlib import Path
++
++from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
++from strive.vnext.errors import VerificationError
++from strive.vnext.store import ArtifactStore
++from . import UPSTREAM_REVISION
++from .qualification import Qualification
++
++USER_MODEL = "gpt-4.1-2025-04-14"
++USER_TEMPERATURE = 0.0
++Batch = Callable[[dict[str, object], list[dict[str, object]], Path], dict[str, object]]
++
++
++def configuration(initial_actor: bytes, *, trials: int, seed: int) -> dict[str, object]:
++    actor = obj(parse(initial_actor))
++    if (set(actor) != {"schema", "agent", "model", "model_settings"}
++            or actor["schema"] != "strive.initial-tau2-actor/1" or actor["agent"] != "llm_agent"):
++        raise VerificationError("fixed stock mode requires the initial tau2 llm_agent model/options artifact")
++    model = string(actor["model"])
++    settings = obj(actor["model_settings"])
++    temperature = settings.get("temperature")
++    if (not model.strip() or isinstance(temperature, bool) or not isinstance(temperature, (int, float))
++            or not math.isfinite(temperature) or not 0 <= temperature <= 2 or trials < 1):
++        raise VerificationError("initial actor model, explicit temperature, and positive trial count required")
++    return {"domain": "telecom", "task_split_name": "test", "agent": "llm_agent", "user": "user_simulator",
++            "llm_agent": model, "llm_args_agent": settings, "llm_user": USER_MODEL,
++            "llm_args_user": {"temperature": USER_TEMPERATURE}, "num_trials": trials, "seed": seed,
++            "max_steps": 200, "max_errors": 10, "max_concurrency": 1, "auto_resume": False,
++            "auto_review": False, "hallucination_retries": 0}
++
++
++def upstream_batch(config: dict[str, object], tasks: list[dict[str, object]], output: Path) -> dict[str, object]:
++    # Heavy imports stay in the isolated tau2 interpreter. This is the separate
++    # fixed benchmark runner, not the adapting Strive runtime or its verifier.
++    from tau2.data_model.simulation import TextRunConfig
++    from tau2.data_model.tasks import Task
++    from tau2.evaluator.evaluator import EvaluationType
++    from tau2.runner import run_tasks
++    resolved = TextRunConfig(**config)
++    resolved.validate()
++    (output / "resolved-tau2-config.json").write_text(resolved.model_dump_json(indent=2))
++    results = run_tasks(resolved, [Task.model_validate(task) for task in tasks],
++                        save_path=output / "upstream-results.json", evaluation_type=EvaluationType.ALL)
++    return obj(results.model_dump(mode="json"))
++
++
++def run_fixed_stock(store: ArtifactStore, qualification: Qualification, initial_actor: bytes,
++                    output: Path, *, trials: int = 4, seed: int = 300,
++                    execute: Batch = upstream_batch, prepare_only: bool = False) -> dict[str, object]:
++    if qualification.mode != "fixed-stock" or qualification.development or qualification.validation:
++        raise VerificationError("fixed stock execution requires its own fixed-stock certificate")
++    splits = obj(parse(store.objects.read(qualification.source_splits)))
++    if tuple(string(v) for v in items(splits["test"])) != qualification.audit:
++        raise VerificationError("fixed stock task IDs/order differ from published test")
++    source = parse(store.objects.read(qualification.inventory))
++    if isinstance(source, dict):
++        source = source.get("tasks")
++    index = {string(obj(t)["id"]): obj(t) for t in items(source)}
++    tasks = [index[t] for t in qualification.audit]
++    config = configuration(initial_actor, trials=trials, seed=seed)
++    initial = store.objects.publish(initial_actor)
++    plan: dict[str, object] = {"schema": "strive.fixed-stock/1", "mode": "fixed-stock",
++        "upstream_revision": UPSTREAM_REVISION, "qualification": qualification.report.digest,
++        "initial_actor": initial.digest, "actor_selection": "initial", "adaptation_enabled": False,
++        "cross_episode_actor_state": False, "group_disjointness_gate": False, "split": "test",
++        "task_ids": qualification.audit, "config": config, "expected_simulations": len(tasks) * trials,
++        "comparison_scope": "tau2 stock test with matching settings; not the original base-split leaderboard",
++        "result_role": "separate fixed-agent benchmark; never adaptive campaign feedback"}
++    output.mkdir(parents=True, exist_ok=True)
++    # Publish before dispatch; the same folder cannot silently acquire a new plan.
++    plan_path = output / "fixed-stock-plan.json"
++    if plan_path.exists() and plan_path.read_bytes() != canonical(plan):
++        raise VerificationError("fixed stock plan changed; use a fresh output directory")
++    plan_path.write_bytes(canonical(plan))
++    report_path = output / "fixed-stock-result.json"
++    if report_path.exists():
++        raise VerificationError("fixed stock results already exist; use a fresh output directory")
++    if prepare_only:
++        return {**plan, "status": "prepared", "performance_measured": False}
++    report: dict[str, object] = {**plan, "status": "incomplete", "performance_measured": False}
++    try:
++        result = execute(deepcopy(config), deepcopy(tasks), output)
++        report["raw_results"] = store.objects.publish(canonical(result)).digest
++        simulations = [obj(s) for s in items(result.get("simulations"))]
++        observed = Counter(string(s.get("task_id")) for s in simulations)
++        if observed != Counter({t: trials for t in qualification.audit}):
++            raise VerificationError("fixed stock result omits, repeats, or substitutes selected trials")
++        pairs: set[tuple[str, int]] = set()
++        rewards: list[float] = []
++        for simulation in simulations:
++            trial = simulation.get("trial")
++            if isinstance(trial, bool) or not isinstance(trial, int) or not 0 <= trial < trials:
++                raise VerificationError("missing or invalid fixed stock trial identity")
++            pair = string(simulation["task_id"]), trial
++            if pair in pairs:
++                raise VerificationError("duplicate fixed stock task/trial result")
++            pairs.add(pair)
++            reward = obj(simulation.get("reward_info")).get("reward")
++            if not isinstance(reward, (float, int)) or reward not in (0, 1):
++                raise VerificationError("missing or invalid deterministic stock reward")
++            rewards.append(float(reward))
++        report.update(status="completed", performance_measured=True, simulations=len(simulations),
++                      mean_success=sum(rewards) / len(rewards), successes=sum(rewards))
++    except Exception as error:
++        report["error"] = str(error)
++        report_path.write_bytes(canonical(report))
++        raise
++    report_path.write_bytes(canonical(report))
++    return report
++
++
++def main() -> None:
++    from .certify import certify
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("data_root", type=Path)
++    parser.add_argument("output_root", type=Path)
++    parser.add_argument("--initial-actor", type=Path, required=True)
++    parser.add_argument("--trials", type=int, default=4)
++    parser.add_argument("--seed", type=int, default=300)
++    parser.add_argument("--prepare-only", action="store_true")
++    args = parser.parse_args()
++    # Parse the actor before costly qualification; qualification performs no inference.
++    initial_actor = args.initial_actor.read_bytes()
++    configuration(initial_actor, trials=args.trials, seed=args.seed)
++    qualification = certify(args.data_root, args.output_root / "certificate", mode="fixed-stock")
++    store = ArtifactStore(args.output_root / "certificate/artifacts")
++    report = run_fixed_stock(store, qualification, initial_actor, args.output_root,
++                             trials=args.trials, seed=args.seed, prepare_only=args.prepare_only)
++    print(canonical(report).decode())
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/adapters/tau2/src/strive_benchmark_tau2/live_checks.py b/adapters/tau2/src/strive_benchmark_tau2/live_checks.py
+index 5dccf67..159f7a7 100644
+--- a/adapters/tau2/src/strive_benchmark_tau2/live_checks.py
++++ b/adapters/tau2/src/strive_benchmark_tau2/live_checks.py
+@@ -259,6 +259,22 @@ def crash(configuration: Path) -> None:
+     raise AssertionError("crash did not fire")
+ 
+ 
++def fixed_configuration() -> None:
++    from tau2.config import DEFAULT_LLM_USER, DEFAULT_LLM_ARGS_USER
++    from tau2.data_model.simulation import TextRunConfig
++    from .fixed_stock import USER_MODEL, USER_TEMPERATURE, configuration
++    actor = canonical({"schema": "strive.initial-tau2-actor/1", "agent": "llm_agent", "model": DEFAULT_LLM_USER,
++                       "model_settings": {"temperature": 0.0}})
++    config = TextRunConfig(**configuration(actor, trials=4, seed=300))
++    config.validate()
++    assert config.task_split_name == "test" and config.agent == "llm_agent"
++    assert config.llm_user == USER_MODEL == DEFAULT_LLM_USER
++    assert config.llm_args_user == DEFAULT_LLM_ARGS_USER == {"temperature": USER_TEMPERATURE}
++    assert not config.auto_review and not config.auto_resume and config.hallucination_retries == 0
++    print(json.dumps({"fixed_stock_configuration": "validated", "user_model": USER_MODEL,
++                      "temperature": USER_TEMPERATURE, "live_model_calls": 0}))
++
++
+ def main() -> None:
+     check_install()
+     mode = sys.argv[1]
+@@ -272,6 +288,8 @@ def main() -> None:
+             equivalence()
+         elif mode == "integration":
+             integration(Path(sys.argv[2]))
++        elif mode == "fixed-configuration":
++            fixed_configuration()
+         elif mode == "crash":
+             crash(Path(sys.argv[2]))
+         else:
+diff --git a/adapters/tau2/src/strive_benchmark_tau2/qualification.py b/adapters/tau2/src/strive_benchmark_tau2/qualification.py
+index 60389aa..c4a9d7d 100644
+--- a/adapters/tau2/src/strive_benchmark_tau2/qualification.py
++++ b/adapters/tau2/src/strive_benchmark_tau2/qualification.py
+@@ -1,28 +1,29 @@
+-"""Full-inventory hard gate. Failure never changes membership or reward criteria."""
++"""Strict selected-task grading; Amendment 3 adaptive and fixed-stock modes."""
+ from collections import Counter
+ from collections.abc import Callable
+ from dataclasses import dataclass
+-import hashlib
+ from pathlib import Path
+ 
+ from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
+-from strive.vnext.codec import encode
++from strive.vnext.codec import decode, encode
+ from strive.vnext.contracts.primitives import ArtifactRef
+ from strive.vnext.errors import VerificationError
+ from strive.vnext.store.cas import CAS
++from .splits import (ALGORITHM, DEFAULT_SEED, OBJECTIVE, TARGET, crossing_report,
++                     group_tasks, normalized, validate_partition, whole_group_split)
+ 
+ DETERMINISTIC = frozenset({"DB", "ENV_ASSERTION", "COMMUNICATE", "ACTION"})
+-DEFAULT_SEED = "strive-amendment-2-60-14-40-v1"
++MODES = ("adaptive", "fixed-stock")
+ 
+ 
+ class QualificationFailure(VerificationError):
+-    def __init__(self, failures: dict[str, tuple[str, ...]]) -> None:
+-        self.failures = failures
++    def __init__(self, failures: dict[str, tuple[str, ...]], details: dict[str, object]) -> None:
++        self.failures, self.details = failures, details
+         self.affected_ids = tuple(sorted({task for ids in failures.values() for task in ids}))
+         self.proposed_campaign = (
+-            "Keep the 114-task reference campaign blocked. Review the listed tasks and connected groups; "
+-            "approve a separately named campaign with deterministic criteria and whole-group splits. "
+-            "Retain the original 60/14/40 denominator and audit IDs until that approval."
++            "Resolve selected-task grading or source integrity failures before dispatch. "
++            "Do not drop tasks or weaken grading. Amendment 3 permits the closest whole-group "
++            "allocation to 60/14/40; stock train/test group overlap is informational."
+         )
+         super().__init__(str(failures) + ". " + self.proposed_campaign)
+ 
+@@ -37,17 +38,8 @@ class Qualification:
+     development: tuple[str, ...]
+     validation: tuple[str, ...]
+     audit: tuple[str, ...]
+-
+-
+-def normalized(value: object, *, persona: bool = False) -> object:
+-    if isinstance(value, dict):
+-        ignored = {"persona", "persona_config"} if persona else {"action_id", "message", "info"}
+-        return {str(k): normalized(v, persona=persona) for k, v in sorted(value.items()) if k not in ignored and v is not None}
+-    if isinstance(value, list):
+-        return [normalized(v, persona=persona) for v in value]
+-    if isinstance(value, str):
+-        return " ".join(value.split())
+-    return value
++    mode: str
++    details: ArtifactRef
+ 
+ 
+ def normalized_goal(value: object) -> object:
+@@ -63,9 +55,36 @@ def normalized_goal(value: object) -> object:
+     return result
+ 
+ 
++def legacy_connected_groups(tasks: list[dict[str, object]]) -> tuple[tuple[str, ...], ...]:
++    """Historical diagnostic only. Never used to assign adaptive memberships."""
++    ids = [string(t["id"]) for t in tasks]
++    parent = {task_id: task_id for task_id in ids}
++    def root(task_id: str) -> str:
++        while parent[task_id] != task_id:
++            task_id = parent[task_id]
++        return task_id
++    seen: dict[tuple[str, bytes], str] = {}
++    for task_id, task in sorted(zip(ids, tasks, strict=True), key=lambda pair: pair[0]):
++        for signal, value in (("scenario", normalized(task.get("user_scenario"), persona=True)),
++                              ("init-goal", [normalized(task.get("initial_state")), normalized_goal(task["evaluation_criteria"])
++                               if isinstance(task.get("evaluation_criteria"), dict) else None])):
++            signal_key = signal, canonical(value)
++            if signal_key in seen:
++                parent[root(task_id)] = root(seen[signal_key])
++            else:
++                seen[signal_key] = task_id
++    grouped: dict[str, list[str]] = {}
++    for task_id in sorted(set(ids)):
++        grouped.setdefault(root(task_id), []).append(task_id)
++    return tuple(sorted(tuple(v) for v in grouped.values()))
++
++
+ def qualify(objects: CAS, task_bytes: bytes, split_bytes: bytes, *,
+             assertion_allowlist: frozenset[tuple[str, str]],
+-            execute_checks: Callable[[dict[str, object]], None], seed: str = DEFAULT_SEED) -> Qualification:
++            execute_checks: Callable[[dict[str, object]], None], seed: str = DEFAULT_SEED,
++            mode: str = "adaptive") -> Qualification:
++    if mode not in MODES:
++        raise VerificationError("unknown qualification mode: " + mode)
+     source = parse(task_bytes)
+     if isinstance(source, dict):
+         source = source.get("tasks")
+@@ -84,69 +103,114 @@ def qualify(objects: CAS, task_bytes: bytes, split_bytes: bytes, *,
+     for name, values in splits.items():
+         if len(values) != len(set(values)):
+             failures["duplicate split IDs: " + name] = tuple(sorted(v for v, n in Counter(values).items() if n > 1))
+-    base, train, audit = (set(splits.get(k, ())) for k in ("base", "train", "test"))
+-    if len(train) != 74 or len(audit) != 40 or train & audit or base != train | audit:
+-        failures["base/train/test must be disjoint 74/40 union"] = tuple(sorted(base | train | audit))
++    base, train, test = (set(splits.get(k, ())) for k in ("base", "train", "test"))
++    if not base or not train or not test or train & test or base != train | test:
++        failures["base/train/test must be a disjoint union"] = tuple(sorted(base | train | test))
++    selected = base if mode == "adaptive" else test
+     histogram: Counter[str] = Counter()
+-    for task_id, task in zip(ids, tasks, strict=True):
++    inventory_findings: dict[str, tuple[str, ...]] = {}
++    checked = 0
++    for task_id in sorted(index):
++        task = index[task_id]
+         try:
+             criteria = obj(task.get("evaluation_criteria"))
+             basis = tuple(string(v) for v in items(criteria.get("reward_basis")))
+-            if not basis or set(basis) - DETERMINISTIC:
+-                raise VerificationError("required NL/unknown/missing reward basis")
+             histogram.update(basis)
+-            # Inspect every assertion, even diagnostic assertions upstream may run.
++            if not basis or set(basis) - DETERMINISTIC or criteria.get("nl_assertions"):
++                raise VerificationError("required NL/unknown/missing reward basis or NL assertions")
++            # Inspect every assertion, including diagnostic assertions.
+             for assertion in items(criteria.get("env_assertions") or []):
+                 a = obj(assertion)
+                 if (string(a.get("env_type")), string(a.get("func_name"))) not in assertion_allowlist:
+                     raise VerificationError("unqualified/nondeterministic assertion")
+-            execute_checks(task)  # Strict initialization, gold actions and assertion execution.
++            if task_id in selected:
++                execute_checks(task)  # Strict initialization, gold actions, all assertions.
++                checked += 1
+         except Exception as error:
+             key = "task qualification: " + str(error)
+-            failures[key] = (*failures.get(key, ()), task_id)
+-    # Either equivalence signal connects scenarios. Transitive closure matters.
+-    parent = {task_id: task_id for task_id in ids}
+-    def root(task_id: str) -> str:
+-        while parent[task_id] != task_id:
+-            task_id = parent[task_id]
+-        return task_id
+-    seen: dict[tuple[str, bytes], str] = {}
+-    for task_id, task in zip(ids, tasks, strict=True):
+-        for signal, value in (("scenario", normalized(task.get("user_scenario"), persona=True)),
+-                              ("init-goal", [normalized(task.get("initial_state")), normalized_goal(task["evaluation_criteria"])
+-                               if isinstance(task.get("evaluation_criteria"), dict) else None])):
+-            signal_key = signal, canonical(value)
+-            if signal_key in seen:
+-                parent[root(task_id)] = root(seen[signal_key])
+-            else:
+-                seen[signal_key] = task_id
+-    grouped: dict[str, list[str]] = {}
+-    for task_id in sorted(set(ids)):
+-        grouped.setdefault(root(task_id), []).append(task_id)
+-    groups = tuple(sorted((tuple(v) for v in grouped.values()), key=lambda group: (
+-        hashlib.sha256(canonical([seed, group])).hexdigest(), group)))
+-    crossing = tuple(task for group in groups if set(group) & train and set(group) & audit for task in group)
+-    if crossing:
+-        failures["connected scenario group crosses train/audit"] = crossing
+-    training_groups = tuple(tuple(t for t in group if t in train) for group in groups if set(group) & train)
+-    possibilities: dict[int, tuple[int, ...]] = {0: ()}
+-    for position, group in enumerate(training_groups):
+-        for count, chosen in list(possibilities.items()):
+-            total = count + len(group)
+-            if total <= 14 and total not in possibilities:
+-                possibilities[total] = (*chosen, position)
+-    if 14 not in possibilities:
+-        failures["whole-group 60/14 partition impossible"] = tuple(sorted(train))
++            destination = failures if task_id in selected else inventory_findings
++            destination[key] = (*destination.get(key, ()), task_id)
++    grouped: dict[str, tuple[str, ...]] = {}
++    try:
++        grouped = group_tasks(tasks, seed)
++    except VerificationError as error:
++        failures[str(error)] = tuple(sorted(selected))
++    groups = tuple(grouped.values())
++    development: tuple[str, ...] = ()
++    validation: tuple[str, ...] = ()
++    audit: tuple[str, ...] = ()
++    if not missing and groups and selected:
++        if mode == "adaptive":
++            try:
++                development, validation, audit = whole_group_split(groups, selected)
++                validate_partition(groups, selected, (development, validation, audit))
++            except VerificationError as error:
++                failures[str(error)] = tuple(sorted(selected))
++        else:
++            audit = splits["test"]  # Exact upstream order, no group gate or reallocation.
++    actual = (len(development), len(validation), len(audit))
++    # Legacy closure survives solely as an informational diagnostic, including
++    # the original 2,285-ID finding. It cannot affect selected membership.
++    try:
++        legacy_diagnostic = crossing_report(legacy_connected_groups(tasks), train, test)
++    except (TypeError, ValueError, VerificationError) as error:
++        legacy_diagnostic = {"severity": "informational", "fatal": False, "error": str(error)}
++    details: dict[str, object] = {
++        "schema": "strive.telecom-qualification/2", "mode": mode,
++        "split_origin": "strive-derived-base" if mode == "adaptive" else "tau2-stock-test",
++        "leaderboard_comparability": "none" if mode == "adaptive" else "stock-test only; match model/settings/trials; upstream original leaderboard uses base",
++        "grouping_algorithm": ALGORITHM, "seed": seed, "group_order": tuple(grouped),
++        "group_to_ids": grouped, "groups": groups, "selected_ids": tuple(sorted(selected)),
++        "development": development, "validation": validation, "audit": audit,
++        "target_sizes": dict(zip(("development", "validation", "audit"), TARGET, strict=True)) if mode == "adaptive" else None,
++        "actual_sizes": dict(zip(("development", "validation", "audit"), actual, strict=True)),
++        "exact_target_achievable": actual == TARGET if mode == "adaptive" else None,
++        "allocation_objective": OBJECTIVE if mode == "adaptive" else None,
++        "checked_records": checked, "inventory_records": len(tasks), "reward_basis_histogram": dict(sorted(histogram.items())),
++        "stock_split_cross_group": crossing_report(groups, train, test),
++        "stock_split_legacy_cross_group": legacy_diagnostic,
++        "unselected_grading_findings": {"severity": "informational", "failures": inventory_findings},
++        "gates": {"deterministic_grading": "passed" if checked == len(selected) and selected else "blocked",
++                  "adaptive_whole_group_disjoint": "not-applicable" if mode == "fixed-stock" else "passed" if not any(
++                      sum(bool(set(group) & set(part)) for part in (development, validation, audit)) > 1 for group in groups
++                  ) and set(development + validation + audit) == selected and selected else "blocked"},
++        "assertion_allowlist": sorted(assertion_allowlist),
++    }
+     if failures:
+-        # Protected preparation output only; never a candidate-facing projection.
+-        failure_report = {"status": "blocked", "failures": failures, "seed": seed, "groups": groups, "assertion_allowlist": sorted(assertion_allowlist)}
+-        objects.publish(canonical(failure_report))
+-        raise QualificationFailure(failures)
+-    validation = tuple(t for p in possibilities[14] for t in training_groups[p])
+-    development = tuple(t for group in training_groups for t in group if t not in validation)
+-    audit_order = tuple(t for group in groups for t in group if t in audit)
+-    implementation = objects.publish(Path(__file__).read_bytes())
++        details.update(status="blocked", failures=failures)
++        objects.publish(canonical(details))
++        raise QualificationFailure(failures, details)
++    details["status"] = "qualified"
++    # Retain both source files which define the new grouping and qualification.
++    implementation = objects.publish(encode(tuple((p.name, objects.publish(p.read_bytes())) for p in (
++        Path(__file__), Path(__file__).with_name("splits.py")))))
+     inventory, source_splits = objects.publish(task_bytes), objects.publish(split_bytes)
+-    report = objects.publish(encode(("qualified-telecom/1", implementation, inventory, source_splits,
+-        seed, groups, development, validation, audit_order, tuple(sorted(histogram.items())), len(tasks), tuple(sorted(assertion_allowlist)))))
+-    return Qualification(inventory, source_splits, implementation, report, groups, development, validation, audit_order)
++    detail_ref = objects.publish(canonical(details))
++    report = objects.publish(encode(("qualified-telecom/2", implementation, inventory, source_splits,
++        seed, groups, development, validation, audit, tuple(sorted(histogram.items())), len(tasks),
++        tuple(sorted(assertion_allowlist)), mode, detail_ref)))
++    return Qualification(inventory, source_splits, implementation, report, groups, development, validation, audit, mode, detail_ref)
++
++
++def load_qualification(objects: CAS, report: ArtifactRef) -> Qualification:
++    value = decode(objects.read(report))
++    if not isinstance(value, tuple) or len(value) != 14 or value[0] != "qualified-telecom/2":
++        raise VerificationError("remote adapter requires Amendment 3 qualification")
++    implementation, inventory, splits = value[1:4]
++    if not all(isinstance(ref, ArtifactRef) for ref in (implementation, inventory, splits, value[13])):
++        raise VerificationError("invalid qualification references")
++    assert isinstance(implementation, ArtifactRef) and isinstance(inventory, ArtifactRef) and isinstance(splits, ArtifactRef)
++    groups, development, validation, audit = value[5:9]
++    if (not isinstance(groups, tuple) or not all(isinstance(group, tuple) and all(isinstance(t, str) for t in group) for group in groups)
++            or not all(isinstance(ids, tuple) and all(isinstance(t, str) for t in ids) for ids in (development, validation, audit))):
++        raise VerificationError("invalid qualified memberships")
++    assert isinstance(development, tuple) and isinstance(validation, tuple) and isinstance(audit, tuple)
++    mode, details = value[12:14]
++    if not isinstance(mode, str) or mode not in MODES or not isinstance(details, ArtifactRef):
++        raise VerificationError("invalid qualification mode/details")
++    metadata = obj(parse(objects.read(details)))
++    if metadata.get("mode") != mode or metadata.get("status") != "qualified":
++        raise VerificationError("qualification details disagree with certificate")
++    if mode == "adaptive":
++        validate_partition(groups, set(development + validation + audit), (development, validation, audit))
++    return Qualification(inventory, splits, implementation, report, groups, development, validation, audit, mode, details)
+diff --git a/adapters/tau2/src/strive_benchmark_tau2/server.py b/adapters/tau2/src/strive_benchmark_tau2/server.py
+index 379e400..3dc7e7d 100644
+--- a/adapters/tau2/src/strive_benchmark_tau2/server.py
++++ b/adapters/tau2/src/strive_benchmark_tau2/server.py
+@@ -7,13 +7,13 @@ from strive.vnext.benchmarks.api import (CapturedGeneration, EpisodeSnapshot, Op
+ from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
+ from strive.vnext.benchmarks.payloads import dumps, loads
+ from strive.vnext.benchmarks.store import OperationStore
+-from strive.vnext.codec import decode
+ from strive.vnext.contracts.primitives import ArtifactRef, EffectId, EpisodeId, RunId
+ from strive.vnext.errors import VerificationError
+ from strive.vnext.store.cas import CAS
+ from .adapter import Tau2Adapter, implementation_identity
+ from .process import IsolatedTau2
+-from .qualification import Qualification
++from .qualification import load_qualification
++from .splits import scenario_group
+ 
+ 
+ def assemble(configuration: tuple[object, ...], *, create: bool) -> Tau2Adapter:
+@@ -25,19 +25,9 @@ def assemble(configuration: tuple[object, ...], *, create: bool) -> Tau2Adapter:
+             objects = CAS(Path(cas_path))
+         case _:
+             raise VerificationError("invalid remote adapter configuration")
+-    value = decode(objects.read(report))
+-    if not isinstance(value, tuple) or len(value) != 12 or value[0] != "qualified-telecom/1":
+-        raise VerificationError("remote adapter requires full inventory qualification")
+-    implementation, inventory, splits = value[1:4]
+-    if not all(isinstance(ref, ArtifactRef) for ref in (implementation, inventory, splits)):
+-        raise VerificationError("invalid qualification references")
+-    assert isinstance(implementation, ArtifactRef) and isinstance(inventory, ArtifactRef) and isinstance(splits, ArtifactRef)
+-    groups, development, validation, audit = value[5:9]
+-    if (not isinstance(groups, tuple) or not all(isinstance(group, tuple) and all(isinstance(t, str) for t in group) for group in groups)
+-            or not all(isinstance(ids, tuple) and all(isinstance(t, str) for t in ids) for ids in (development, validation, audit))):
+-        raise VerificationError("invalid qualified memberships")
+-    assert isinstance(development, tuple) and isinstance(validation, tuple) and isinstance(audit, tuple)
+-    qualification = Qualification(inventory, splits, implementation, report, groups, development, validation, audit)
++    qualification = load_qualification(objects, report)
++    inventory = qualification.inventory
++    development, validation, audit = qualification.development, qualification.validation, qualification.audit
+     backend = IsolatedTau2(Path(sys.executable), Path(os.environ["TAU2_DATA_DIR"]), objects, closure, data_index)
+     identity = implementation_identity(objects, backend, qualification, closure)
+     operations = OperationStore(Path(database_path), objects, RunId(run), identity, epoch, create=create)
+@@ -45,7 +35,7 @@ def assemble(configuration: tuple[object, ...], *, create: bool) -> Tau2Adapter:
+     if isinstance(source, dict):
+         source = source.get("tasks")
+     selected = set(development + validation + audit)
+-    tasks = tuple(TaskSpec(string(obj(task)["id"]), next(group[0] for group in groups if obj(task)["id"] in group),
++    tasks = tuple(TaskSpec(string(obj(task)["id"]), scenario_group(obj(task)),
+         objects.publish(canonical(task)), objects.publish(canonical(obj(task)["evaluation_criteria"])))
+         for task in items(source) if obj(task)["id"] in selected)
+     return Tau2Adapter(objects, backend, tasks, qualification, closure, operations)
+diff --git a/adapters/tau2/src/strive_benchmark_tau2/splits.py b/adapters/tau2/src/strive_benchmark_tau2/splits.py
+new file mode 100644
+index 0000000..4f96550
+--- /dev/null
++++ b/adapters/tau2/src/strive_benchmark_tau2/splits.py
+@@ -0,0 +1,101 @@
++"""Amendment 3: direct base-template groups and deterministic whole-group allocation."""
++import hashlib
++import re
++
++from strive.vnext.benchmarks.json_data import canonical, obj, string
++from strive.vnext.errors import VerificationError
++
++ALGORITHM = "tau2-base-template/1"
++DEFAULT_SEED = "strive-amendment-3-60-14-40-v1"
++TARGET = (60, 14, 40)
++OBJECTIVE = "nonempty dev/val/audit when at least three groups; min(sum absolute size errors, max error, audit error, validation error, development error, dev size, val size); first seeded DP path breaks assignment ties"
++
++
++def normalized(value: object, *, persona: bool = False) -> object:
++    if isinstance(value, dict):
++        ignored = {"persona", "persona_config"} if persona else {"action_id", "message", "info"}
++        return {str(k): normalized(v, persona=persona) for k, v in sorted(value.items()) if k not in ignored and v is not None}
++    if isinstance(value, list):
++        return [normalized(v, persona=persona) for v in value]
++    if isinstance(value, str):
++        return " ".join(value.split())
++    return value
++
++
++def scenario_group(task: dict[str, object]) -> str:
++    """TaskManager's [name] template precedes composed conditions and PERSONA.
++
++    The condition list is alphabetically composed, not an ancestry path. Neither
++    its first token nor shared goals establish a distinct base scenario seed.
++    Non-generator contract fixtures use exact persona-free scenario equality.
++    """
++    task_id = string(task.get("id"))
++    if task_id.startswith("["):
++        match = re.fullmatch(r"\[([a-z][a-z0-9_]*)\](?:[a-z0-9_]+(?:\|[a-z0-9_]+)*)?(?:\[PERSONA:[^\[\]]+\])?", task_id)
++        if match is None:
++            raise VerificationError("unrecognized generated scenario ID: " + task_id)
++        return "[" + match[1] + "]"
++    scenario = obj(task.get("user_scenario"))
++    if not scenario.get("instructions"):
++        raise VerificationError("missing base scenario: " + task_id)
++    return "scenario:" + hashlib.sha256(canonical(normalized(scenario, persona=True))).hexdigest()
++
++
++def group_tasks(tasks: list[dict[str, object]], seed: str = DEFAULT_SEED) -> dict[str, tuple[str, ...]]:
++    groups: dict[str, list[str]] = {}
++    for task in tasks:
++        groups.setdefault(scenario_group(task), []).append(string(task["id"]))
++    # Group ordering depends only on seed + root, never inventory traversal or
++    # out-of-pool variants. IDs within each group have lexical order.
++    return {key: tuple(sorted(groups[key])) for key in sorted(groups, key=lambda key: (
++        hashlib.sha256(canonical([seed, key])).hexdigest(), key))}
++
++
++def size_error(sizes: tuple[int, int, int], target: tuple[int, int, int] = TARGET) -> tuple[int, ...]:
++    dev, val, audit = (abs(a - b) for a, b in zip(sizes, target, strict=True))
++    return sum((dev, val, audit)), max(dev, val, audit), audit, val, dev
++
++
++def whole_group_split(groups: tuple[tuple[str, ...], ...], selected: set[str], *,
++                      target: tuple[int, int, int] = TARGET) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
++    """Exhaustive reachable-size DP, with no task dropping or group subdivision.
++
++    A group means its entire intersection with the preselected pool. Tasks outside
++    that pool never enter any arm. Keep the first assignment to each size pair;
++    sorted DP traversal and dev/val/audit transition order make ties reproducible.
++    """
++    pool = tuple(tuple(t for t in group if t in selected) for group in groups)
++    pool = tuple(group for group in pool if group)
++    flattened = [t for group in pool for t in group]
++    if len(flattened) != len(set(flattened)) or set(flattened) != selected or not selected:
++        raise VerificationError("group mapping must cover each selected task exactly once")
++    states: dict[tuple[int, int], tuple[int, ...]] = {(0, 0): ()}
++    for group in pool:
++        updated: dict[tuple[int, int], tuple[int, ...]] = {}
++        for (dev, val), path in sorted(states.items()):
++            for arm, counts in enumerate(((dev + len(group), val), (dev, val + len(group)), (dev, val))):
++                updated.setdefault(counts, (*path, arm))
++        states = updated
++    eligible = [p for p in states if len(pool) < 3 or min(p[0], p[1], len(selected) - sum(p)) > 0]
++    counts = min(eligible, key=lambda p: (size_error((p[0], p[1], len(selected) - sum(p)), target), p))
++    assignments = states[counts]
++    result = tuple(tuple(t for group, arm in zip(pool, assignments, strict=True) if arm == wanted for t in group)
++                   for wanted in range(3))
++    return result[0], result[1], result[2]
++
++
++def validate_partition(groups: tuple[tuple[str, ...], ...], selected: set[str],
++                       parts: tuple[tuple[str, ...], ...]) -> None:
++    flat = [t for part in parts for t in part]
++    if len(flat) != len(set(flat)) or set(flat) != selected:
++        raise VerificationError("adaptive split omits or repeats selected tasks")
++    if any(sum(bool(set(group) & set(part)) for part in parts) > 1 for group in groups):
++        raise VerificationError("adaptive base scenario group crosses partitions")
++
++
++def crossing_report(groups: tuple[tuple[str, ...], ...], train: set[str], test: set[str]) -> dict[str, object]:
++    crossing = tuple(group for group in groups if set(group) & train and set(group) & test)
++    ids = tuple(sorted(t for group in crossing for t in group))
++    return {"severity": "informational", "fatal": False, "group_count": len(crossing),
++            "inventory_id_count": len(ids), "stock_train_id_count": len(set(ids) & train),
++            "stock_test_id_count": len(set(ids) & test), "ids": ids}
+diff --git a/docs/ASTRA_DESIGN.md b/docs/ASTRA_DESIGN.md
+index f19c654..bb3d0d2 100644
+--- a/docs/ASTRA_DESIGN.md
++++ b/docs/ASTRA_DESIGN.md
+@@ -401,6 +401,8 @@ Restarting the wrapper resumes that mapping. It does not create fresh executions
+ 
+ ## 7. Experiments
+ 
++Amendment 3 governs telecom split assignment. The adaptive study and its matched fixed control use a Strive-derived whole-base-scenario split. A separate initial fixed-agent run uses tau2's stock `test` split; its results never enter adaptation or the adaptive comparison. Retain actual split sizes and keep these two result populations separate.
++
+ ### 7.1 Studies and the reference comparison
+ 
+ A study is a set of ordinary runs with declared relationships. Every run retains its complete resolved manifest.
+@@ -456,6 +458,8 @@ Either setting may supply authorized evidence to a policy.
+ 
+ ### 7.4 Development corpora and forks
+ 
++For telecom, assign whole base scenario roots across development, validation, and audit before running either arm. Target 60/14/40, retain every selected base task, and report the closest feasible nonempty partition. The pinned pool yields 49/29/36 under Amendment 3. The full-inventory stock train/test overlap scan is informational.
++
+ The development regression corpus contains prior failures, retained successes, representative families, and adversarial development examples. Additions identify their source events and access scope.
+ 
+ A study pins a corpus version or an explicit update rule. Corpus changes cannot silently alter a paired comparison.
+@@ -598,13 +602,13 @@ Artifacts produced in research mode may receive a new trusted evaluation. That d
+ 
+ ### 9.4 Workload and providers
+ 
+-The first stateful workload is an order-fulfilment simulator with persistent inventory and order state. Keep sum/max fixtures as deterministic controls behind the same small operation interface.
++The first stateful workload is pinned tau2 telecom text through the separately installed `BenchmarkAdapter` implementation described in Amendments 1 and 2. Agent tools and user device operations mutate a coupled environment; trusted deterministic evaluators determine success. Candidate claims never establish reward.
+ 
+-The simulator provides stock reads, inventory reservation, order updates, operation lookup, and snapshots. A mutation transaction stores both its state change and result under the effect ID. Repeating that ID with different arguments fails; looking it up returns the original result.
++Amendment 3 defines two evaluation modes. The adaptive study uses our own whole-base-scenario split over the selected base pool, with exact actual IDs retained. The separate fixed-stock mode runs the initial non-adapting actor on all published `test` IDs, without a group-disjointness gate. Every selected headline task in either mode must pass deterministic grading qualification. Stock train/test scenario overlap is informational, including the historical 2,285-ID finding.
+ 
+-The trusted scorer uses actual simulator state and broker receipts. Agent-written “shipped” or “tests passed” messages have no scoring authority.
++The adaptive split has no leaderboard comparability claim. Fixed-stock results support comparisons using the same stock test IDs, actor implementation, user model, temperature, trial count, and upstream revision. Upstream documents `base` as the original leaderboard denominator, so stock test results must not be presented as a full-base leaderboard score. See Amendment 3 for pinned user settings and execution details.
+ 
+-Release 1 integrates one selected hosted-model provider through a trusted adapter. Actor and refiner bindings name exact available model versions and request settings. Provider/account selection remains a deployment input in section 11, not an implicit kernel default. Ambiguous model calls suspend unless the selected adapter has a verified stronger recovery contract.
++Actor and refiner bindings retain exact model versions and request settings. Adaptive inference remains brokered through the existing confined runtime. The fixed-stock benchmark runner has no refiner or cross-episode learned state and reports separately from Strive's adaptive accounting and integrity claims.
+ 
+ ### 9.5 Durability and threat scope
+ 
+@@ -1006,7 +1010,7 @@ The operation adapter exposes episode initialization, agent tool calls, user too
+ 
+ The trusted scorer evaluates the actual committed environment and broker-captured interaction history. It preserves each admitted task’s declared deterministic `reward_basis`, including database checks, environment assertions, and deterministic communication checks where specified. It does not replace required criteria with easier checks or use an LLM judge to certify headline success. Import qualification rejects a headline task set requiring unavailable or nondeterministic grading. [Upstream evaluation contract](https://github.com/sierra-research/tau2-bench/blob/main/docs/evaluation.md)
+ 
+-The first campaign uses the 114-task telecom base pool, whose published split contains 74 training tasks and 40 test tasks. Sixty training tasks form development, fourteen form validation, and the forty test tasks form the protected audit. The split, grouping checks, ordering, and access grants are frozen before campaign execution. [Published telecom splits](https://github.com/sierra-research/tau2-bench/blob/main/data/tau2/domains/telecom/split_tasks.json)
++The first campaign uses the 114-task telecom base pool, whose published split contains 74 training tasks and 40 test tasks. Amendment 3 supersedes the original stock-based allocation: select all 114 base tasks, derive our own whole-scenario development/validation/audit split, target 60/14/40, and retain the actual 49/29/36 allocation. The split, grouping checks, ordering, and access grants are frozen before campaign execution. [Published telecom splits](https://github.com/sierra-research/tau2-bench/blob/main/data/tau2/domains/telecom/split_tasks.json)
+ 
+ This is a continual-adaptation study over published benchmark episodes. Environment state persists throughout each episode and resets at the next task’s published initial state. Actor revisions and explicitly authorized learned memory persist across development episodes. The study does not claim a benchmark-native continuous world or direct comparability with an unmodified leaderboard protocol.
+ 
+@@ -1030,7 +1034,7 @@ The workload choice follows these tradeoffs:
+ | **GAIA** | Useful for general assistant competence, but less directly targeted at recoverable mutations in a shared environment. [GAIA paper](https://arxiv.org/abs/2311.12983) |
+ | **EvoHarnessBench** | Closely aligned with continual adaptation. However, its project currently describes the local environment runner as unreleased. Hosted graders would prevent strive from owning the complete local scoring boundary required here. [Project and availability](https://mas-orchestra.salesforceresearch.ai/evoharness/) |
+ 
+-The split procedure must group tasks by underlying scenario configuration before assigning development and validation. Persona variants or duplicate scenario representations cannot straddle development and audit. Retain the grouping algorithm and resulting IDs. Qualification checks the complete imported task set before freezing the study; metadata inconsistencies stop preparation rather than silently changing its denominator.
++The Amendment 3 split procedure groups tasks by their underlying base template before assigning all three partitions. Persona and composed failure-condition variants stay with that root. Retain the grouping algorithm, seed/order, group-to-ID map, and final IDs. Validate inventory integrity and strictly qualify every selected headline task. Whole-group disjointness applies to our adaptive split; full-inventory overlap across stock train/test is informational.
+ 
+ For contract A, the fourteen validation tasks remain inaccessible to adaptation and candidate selection. They are available only to separately declared B development runs. The forty audit tasks remain embargoed until campaign freeze. Public task availability does not establish freedom from model pretraining contamination; A establishes campaign information-flow isolation.
+ 
+@@ -1060,7 +1064,7 @@ Use paired trajectories as the independent units for the adaptation comparison.
+ 
+ The scorer must read trusted snapshots and captured interactions. Replaying broker-recorded actions in a separate scorer environment may cross-check state, but candidate-authored transcripts cannot replace the live authoritative state. Termination and scorer aggregation must preserve coverage rather than inheriting upstream exclusions that conceal infrastructure failures.
+ 
+-All user-simulator calls also cross `model.generate`. Strive must not invoke an upstream convenience runner that secretly performs inference, retries whole episodes, or drops failed simulations.
++In adaptive Strive studies and their paired fixed controls, all user-simulator calls also cross `model.generate`. Their runtime must not invoke an upstream convenience runner that secretly performs inference, retries whole episodes, or drops failed simulations. Amendment 3's separate fixed-stock baseline explicitly uses upstream execution, retains its configuration and full results, and makes no Strive runtime-integrity or matched cross-mode claim.
+ 
+ **Extend §9.6: funded ceiling**
+ 
+@@ -1103,7 +1107,7 @@ A provider overrun remains possible under the existing provider-trust assumption
+ | **§6.1–6.2** | Add retained harness bindings, gateway pin, model identity provenance, user-model role, and recovery fields. Replace order-specific workload and policy parameters with task/episode parameters. |
+ | **§6.3** | Change the example to `strive run tau2-telecom.toml --id actor-17`. Commands otherwise retain their contracts. |
+ | **§7.1–7.2** | Replace order streams and fulfilment metrics with the paired episode campaign and benchmark-success metrics above. |
+-| **§7.4–7.5** | Include user/device state in snapshots; enforce the 60/14/40 split, duplicate grouping, frozen selection, and separate audit sessions/caches. |
++| **§7.4–7.5** | Include user/device state in snapshots; enforce Amendment 3 whole-base-scenario assignment, report actual sizes against the 60/14/40 target, freeze selection, and keep separate audit sessions/caches. |
+ | **§7.6** | Retain harness configuration, actual provider requests, benchmark revision, user-simulator observations, and both sides of environment state. |
+ | **§8.1–8.3** | Show harness identity and launch spans; attribute model cost once. Distinguish supplied context from actual provider requests and requested identity from observed identity. Release 1 ships only the Langfuse profile over vendor-neutral OTLP GenAI 1.41.0; LangSmith/Phoenix mappings are deferred until needed. |
+ | **§9.4** | Replace in full with the supplied text. |
+@@ -1734,20 +1738,18 @@ This changes a general transition rule, not the record schema. It belongs in thi
+ 
+ Upstream supplies telecom domain tests and task verification logic. Select their deterministic cases explicitly; do not run a broad upstream test command that may initiate model calls. [Telecom tests](https://github.com/sierra-research/tau2-bench/tree/main/tests/test_domains/test_telecom), [task verification logic](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/domains/telecom/tasks/manager.py).
+ 
+-### Split qualification: 60/14/40
++### Split qualification under Amendment 3
+ 
+-The importer must validate the entire declared source inventory, then select the 114-task base pool.
++Import the original inventory and stock split definitions. Confirm unique/resolvable IDs and the disjoint `base = train ∪ test` source relationship. Source metadata counts are retained, not a claim of scenario disjointness.
+ 
+-1. Confirm unique task IDs and `base = train ∪ test`, with disjoint 74/40 membership.
+-2. Derive scenario groups from normalized scenario configuration. Strip persona decorations for one grouping signal; also compare normalized initialization and goal definitions to catch duplicate representations.
+-3. Form connected groups whenever either equivalence rule identifies the same underlying scenario.
+-4. Require no group to cross training and audit.
+-5. Partition the 74 training tasks into exactly 60 development and 14 validation tasks using whole groups and a retained deterministic ordering.
+-6. Retain the grouping implementation, seed/order, group membership, and final IDs.
++1. Derive one root per task directly from the generator's base scenario template. Strip persona and composed failure conditions; never connect groups through shared instructions, goals, initial state, or substrings.
++2. In adaptive mode, select the entire base pool and assign every whole group to one of development, validation, or audit. Keep all three partitions nonempty when at least three groups exist, and deterministically minimize size deviations from 60/14/40. Retain actual counts and whether the target was achievable.
++3. In fixed-stock mode, select all stock `test` IDs in published order and run only the initial actor. Apply no group-disjointness gate.
++4. Hard-block any selected task requiring NL assertions, missing/unknown grading, an unreviewed assertion, or failed strict initialization/reference/assertion execution. Retain every failure ID; never filter the denominator to pass.
++5. Hard-check our adaptive partition for complete coverage and whole-group disjointness, including `(dev ∪ val) ∩ audit` at the group level.
++6. Retain both direct-root and legacy connected-group stock train/test overlap scans as informational diagnostics. They cannot block a qualified adaptive partition or fixed-stock result.
+ 
+-If whole-group partitioning cannot produce 60/14, or a group crosses the published train/test boundary, preparation fails. Do not split the group, quietly remove tasks, or replace audit IDs. A revised campaign then needs explicit approval.
+-
+-Contract A grants no validation feedback to adaptation. The 40 audit tasks remain embargoed until campaign freeze. Trusted qualification may inspect protected definitions, but its task-level output must not enter adaptive prompts, caches, or candidate selection.
++The pinned adaptive split is 49 development, 29 validation, and 36 audit tasks. Exact 60/14/40 is impossible with these roots. Contract A grants no validation feedback to adaptation. Audit definitions, grouping diagnostics, and task-level qualification output stay in protected preparation storage until the relevant release boundary.
+ 
+ ### Scorer-equivalence cases
+ 
+@@ -1817,17 +1819,45 @@ private state, pending commands, effect authorizations, results and accounting.
+ Candidate activation still cannot cross an unresolved operation boundary.
+ 
+ The §6 closure includes source/dependency/data identities and an explicit
+-retained data tree. The §7 telecom reference campaign remains 60 development,
+-14 validation and 40 audit tasks; generic adapters do not inherit that split.
+-The importer scans the full supplied inventory, groups scenarios transitively,
+-and fails preparation on ineligible grading, crossing groups or an impossible
+-whole-group partition. No audit or validation feedback is granted to adaptation.
++retained data tree. Amendment 3 supersedes M5's original transitive grouping and
++stock-split hard gate. The §7 telecom target remains 60/14/40, with actual
++49/29/36 whole-base-scenario membership; generic adapters do not inherit it.
++Selected-task grading and our adaptive group disjointness remain blocking.
++Stock-split overlap is informational. No audit or validation feedback is granted
++to adaptation.
+ 
+ M5's §9.4/§10 evidence is fixture-level in this environment. The pinned tau2
+ resolution hit the macOS uv system-configuration panic; shell task retrieval
+ failed DNS and the web reader rejected the task file's size. Full upstream
+ inventory certification and live deterministic evaluator equivalence remain
+-explicitly skipped. No task exclusions or replacement denominator are approved.
++explicitly skipped in that historical M5 pass. Amendment 3 now approves derived
++whole-group reassignment with actual size reporting and no task exclusions.
+ A second integer-target benchmark exercises the frozen common infrastructure
+ without changes to its files. The implementation report and exact limits are in
+ [`m5-investigation/README.md`](../m5-investigation/README.md).
++
++
++## Amendment 3: split recalibration and separate fixed-stock evaluation
++
++Human-approved for Milestone 8. This amendment supersedes the stock-split and transitive-group requirements in §7, §9.4, and Amendments 1–2. It preserves the deterministic-grading gate, frozen contracts, verifier, ledger, broker, admission, supervisor, gateway, and Linux jail.
++
++An adaptive harness can learn scenario-specific behavior from development feedback. Its audit must hold out entire underlying scenarios to measure transfer. A fixed agent that never trains or changes across episodes has no within-campaign train-to-test adaptation leakage, so overlapping scenario families in unused stock training data do not invalidate its fixed test evaluation. This is the rationale behind keeping dependent samples in the same fold in [GroupKFold](https://scikit-learn.org/stable/modules/cross_validation.html#group-k-fold). It does not establish absence of pretraining contamination.
++
++| Mode | Task assignment | Actor and result interpretation |
++| --- | --- | --- |
++| `adaptive` | Strive-derived whole-base-scenario split of all 114 selected base tasks; target 60/14/40, actual 49/29/36. Both the adapting arm and its matched fixed control use this assignment. | Start from the same initial actor. Keep validation/audit feedback embargoed under contract A. No leaderboard comparability claim. |
++| `fixed-stock` | All 40 published `test` IDs, in stock order, without a group-disjointness gate. | Run the initial, non-adapting actor with fresh episode state. Report independently; do not substitute a selected final adaptive actor or feed results into adaptation. |
++
++Tau2 defines task splits as named ID lists. Its default `base` pool preserves the original evaluation denominator, while train/test support training experiments. The approved stock-test mode therefore permits comparisons only to evaluations on that same test population and protocol; it does not claim equivalence to an original 114-task leaderboard score. See [upstream split documentation](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/README.md) and [pinned telecom split IDs](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/data/tau2/domains/telecom/split_tasks.json).
++
++The grouping algorithm `tau2-base-template/1` uses the `[name]` stem of the generator's base template. `TaskManager` appends a composed failure-condition list and `[PERSONA:...]` to that stem. All such variations normalize to the same root; selecting the first alphabetically sorted failure condition would invent a finer ancestry not represented in the generator. Shared goals, initialization, words, and near-similarity never join roots. For non-generator contract fixtures only, exact canonical persona-free scenario equality supplies a group key. See the [pinned generator](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/domains/telecom/tasks/manager.py).
++
++Retain the algorithm source, seed `strive-amendment-3-60-14-40-v1`, SHA-256 order of seed plus root, sorted IDs within each group, full group-to-ID map, and selected assignments. Dynamic programming enumerates reachable development/validation size pairs. Among nonempty three-way partitions when at least three groups exist, minimize total absolute size error, maximum error, audit error, validation error, development error, then development/validation sizes. Sorted state traversal and development/validation/audit transition order choose the first path to each size pair. Fewer than three groups allow empty partitions, explicitly reported without dropping tasks; such an allocation cannot support a nonempty held-out evaluation claim.
++
++The selected pool contains 49 MMS, 36 mobile-data, and 29 service tasks, so the closest nonempty allocation is development=MMS, validation=service, audit=mobile-data. This is coarse transfer across only three roots, not evidence of generalization across many independent scenarios. Exact 60/14/40 is unachievable. Freeze actual denominators and episode orders before dispatch. Earlier 180-episode and 4,160-episode totals are target-size estimates: three development passes now mean 147 episodes per trajectory and eight paired repetitions plus two audit trials mean 2,352 development plus 1,152 audit episodes. Recompute refinement opportunities and budgets from the retained plan, never relabel nominal counts as completed work.
++
++Certification passes when every selected task is deterministically gradable and the adaptive partition covers the selected pool exactly once without crossing groups. NL assertions, missing/unknown reward bases, unreviewed assertions, and failed strict reference/assertion checks still block. Full-inventory stock overlap is informational under both the new roots and the retained legacy closure diagnostic. The captured legacy scan counted 2,285 IDs: 1,984 MMS, 254 mobile-data, and 47 service. Report these counts with their algorithm and source; retain the exact new scan in the Linux certificate.
++
++The standalone fixed-stock runner accepts a retained initial `llm_agent` model/options artifact, constructs a fresh upstream actor for each simulation, and exposes no refiner, learned-memory import, or prompt-update path. This implementation is an upstream LLM-agent baseline, not a claim that an opencode actor has been ported unchanged. It pins the user to `gpt-4.1-2025-04-14`, temperature `0.0`, matching [upstream defaults](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/config.py). Retain actor options, user settings, trial count, seeds, resolved upstream configuration, original results, and explicit coverage. The reference adaptive user binding remains separately pinned and must be reported with its own result. Model or actor-implementation differences preclude a matched cross-mode comparison.
++
++The Linux suite runs selected-task certification in both modes, asserts the 49/29/36 whole-group adaptive allocation and informational stock counts, checks real fixed-mode configuration, and retains deterministic scorer and crash-recovery checks. These tests make no model calls and skip on macOS. The initial fixed actor's model-performance run is a separate funded operation; preparation is not a benchmark score.
+diff --git a/scripts/report-container-results.py b/scripts/report-container-results.py
+index a265137..efecb27 100644
+--- a/scripts/report-container-results.py
++++ b/scripts/report-container-results.py
+@@ -25,6 +25,7 @@ expected = {
+     "test_cgroup_kill_covers_descendants_in_new_sessions",
+     "test_live_tau2_action_comparator_equivalence",
+     "test_full_inventory_certification",
++    "test_live_tau2_fixed_stock_mode",
+     "test_live_tau2_deterministic_scorer_against_upstream",
+     "test_live_tau2_operation_store_snapshot_and_crash_recovery",
+ }
+diff --git a/tests/vnext/benchmark_fixtures.py b/tests/vnext/benchmark_fixtures.py
+index fe2e32f..2914fd5 100644
+--- a/tests/vnext/benchmark_fixtures.py
++++ b/tests/vnext/benchmark_fixtures.py
+@@ -21,6 +21,7 @@ from strive.vnext.runtime.supervisor import Supervisor
+ from strive.vnext.store import ArtifactStore
+ from strive_benchmark_tau2.adapter import Tau2Adapter, implementation_identity
+ from strive_benchmark_tau2.qualification import qualify
++from strive_benchmark_tau2.splits import scenario_group
+ 
+ from .fixtures import AUTHORED_TOML
+ from .runtime_fixtures import FakeProvider
+@@ -125,7 +126,7 @@ class BenchmarkFixture:
+         self.backend = SyntheticTelecom(self.pin)
+         tasks, splits = inventory()
+         qualification = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=frozenset({("user", "connected")}), execute_checks=lambda task: None)
+-        specs = tuple(TaskSpec(string(t["id"]), string(t["id"]), objects.publish(canonical(t)),
++        specs = tuple(TaskSpec(string(t["id"]), scenario_group(t), objects.publish(canonical(t)),
+                                objects.publish(canonical(t["evaluation_criteria"]))) for t in tasks)
+         self.adapter_pin = implementation_identity(objects, self.backend, qualification, self.pin)
+         self.operations = OperationStore(root / "operations", objects, self.scope.run_id, self.adapter_pin, 1, create=True)
+diff --git a/tests/vnext/test_benchmark_qualification.py b/tests/vnext/test_benchmark_qualification.py
+index 624ad2f..7beaa0b 100644
+--- a/tests/vnext/test_benchmark_qualification.py
++++ b/tests/vnext/test_benchmark_qualification.py
+@@ -1,46 +1,56 @@
+ from copy import deepcopy
++from itertools import product
+ from pathlib import Path
+ 
+ import pytest
+ 
+ from strive.vnext.benchmarks.closure import REQUIRED, retain_closure, verify_closure
+-from strive.vnext.benchmarks.json_data import canonical, obj
++from strive.vnext.benchmarks.json_data import canonical, items, obj, parse
+ from strive.vnext.errors import VerificationError
+ from strive.vnext.store import ArtifactStore
+-from strive_benchmark_tau2.qualification import QualificationFailure, qualify
++from strive_benchmark_tau2.qualification import QualificationFailure, qualify, load_qualification
++from strive_benchmark_tau2.splits import group_tasks, scenario_group, size_error, validate_partition, whole_group_split
+ 
+ from .benchmark_fixtures import inventory
+ 
++ALLOWLIST = frozenset({("user", "connected")})
++
+ 
+ def test_full_fixture_inventory_and_deterministic_whole_group_partition(tmp_path: Path) -> None:
+     objects = ArtifactStore(tmp_path).objects
+     tasks, splits = inventory()
+-    # Non-base pools are scanned too.
+     extra = deepcopy(tasks[0]); extra["id"] = "extra"
+     tasks.append(extra); splits["additional"] = ["extra"]
+     tasks[1]["user_scenario"] = tasks[0]["user_scenario"]
+     called: list[str] = []
+     def check(task: dict[str, object]) -> None:
+         called.append(str(task["id"]))
+-    result = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=frozenset({("user", "connected")}), execute_checks=check)
+-    assert len(called) == 115
+-    assert len(result.development) == 60 and len(result.validation) == 14 and len(result.audit) == 40
++    result = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST, execute_checks=check)
++    assert set(called) == set(splits["base"]) and len(called) == 114
++    assert tuple(map(len, (result.development, result.validation, result.audit))) == (60, 14, 40)
+     assert any(set(group) == {"0", "1", "extra"} for group in result.groups)
+-    again = qualify(objects, canonical(list(reversed(tasks))), canonical(splits), assertion_allowlist=frozenset({("user", "connected")}), execute_checks=check)
++    again = qualify(objects, canonical(list(reversed(tasks))), canonical(splits), assertion_allowlist=ALLOWLIST, execute_checks=check)
+     assert (result.groups, result.development, result.validation, result.audit) == (again.groups, again.development, again.validation, again.audit)
+-    for group in result.groups:
+-        assert not (set(group) & set(result.development) and set(group) & set(result.validation))
++    validate_partition(result.groups, set(splits["base"]), (result.development, result.validation, result.audit))
++    assert load_qualification(objects, result.report) == result
++    details = obj(parse(objects.read(result.details)))
++    assert details["exact_target_achievable"] is True
++    assert details["split_origin"] == "strive-derived-base"
++    assert details["leaderboard_comparability"] == "none"
+ 
+ 
+-@pytest.mark.parametrize("case,affected", [("nl", "0"), ("unknown", "0"), ("assertion", "0"), ("missing_criteria", "0"),
+-    ("duplicate", "0"), ("missing", "missing"), ("crossing", "74"), ("partition", "0"), ("gold", "0"), ("extra_nl", "extra")])
++@pytest.mark.parametrize("case,affected", [("nl", "0"), ("diagnostic_nl", "0"), ("unknown", "0"), ("assertion", "0"),
++    ("missing_criteria", "0"), ("duplicate", "0"), ("missing", "missing"), ("gold", "0")])
+ def test_qualification_hard_stops_with_exact_ids(tmp_path: Path, case: str, affected: str) -> None:
+     objects = ArtifactStore(tmp_path).objects
+     tasks, splits = inventory()
+     checks = lambda task: None
+     criteria = obj(tasks[0]["evaluation_criteria"])
+-    if case in {"nl", "unknown"}:
+-        criteria["reward_basis"] = ["NL_ASSERTION" if case == "nl" else "UNKNOWN"]
++    if case in {"nl", "unknown", "diagnostic_nl"}:
++        if case == "diagnostic_nl":
++            criteria["nl_assertions"] = ["ask an LLM"]
++        else:
++            criteria["reward_basis"] = ["NL_ASSERTION" if case == "nl" else "UNKNOWN"]
+         tasks[0]["evaluation_criteria"] = criteria
+     elif case == "assertion":
+         criteria["env_assertions"] = [{"env_type": "user", "func_name": "random_assertion"}]
+@@ -51,37 +61,98 @@ def test_qualification_hard_stops_with_exact_ids(tmp_path: Path, case: str, affe
+         tasks.append(deepcopy(tasks[0]))
+     elif case == "missing":
+         splits["additional"] = ["missing"]
+-    elif case == "crossing":
+-        tasks[74]["initial_state"] = tasks[0]["initial_state"]
+-        tasks[74]["evaluation_criteria"] = tasks[0]["evaluation_criteria"]
+-    elif case == "partition":
+-        for task in tasks[:74]:
+-            task["user_scenario"] = {"instructions": "same scenario", "persona": task["id"]}
+     elif case == "gold":
+         def failing(task: dict[str, object]) -> None:
+             if task["id"] == "0":
+                 raise VerificationError("gold action failed")
+         checks = failing
+-    elif case == "extra_nl":
+-        extra = deepcopy(tasks[0]); extra["id"] = "extra"
+-        extra["evaluation_criteria"] = {"reward_basis": ["NL_ASSERTION"]}
+-        tasks.append(extra)
+-        splits["additional"] = ["extra"]
+     with pytest.raises(QualificationFailure) as raised:
+-        qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=frozenset({("user", "connected")}), execute_checks=checks)
++        qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST, execute_checks=checks)
+     assert affected in raised.value.affected_ids
+     assert "60/14/40" in raised.value.proposed_campaign
+     assert splits["base"] == [str(i) for i in range(114)]
+ 
+ 
+-def test_connected_transitive_groups(tmp_path: Path) -> None:
++def test_stock_overlap_and_unselected_grading_are_informational(tmp_path: Path) -> None:
++    objects = ArtifactStore(tmp_path).objects
++    tasks, splits = inventory()
++    tasks[74]["user_scenario"] = tasks[0]["user_scenario"]
++    extra = deepcopy(tasks[0]); extra["id"] = "extra"
++    extra["evaluation_criteria"] = {"reward_basis": ["NL_ASSERTION"]}
++    tasks.append(extra); splits["additional"] = ["extra"]
++    result = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST, execute_checks=lambda task: None)
++    details = obj(parse(objects.read(result.details)))
++    for key in ("stock_split_cross_group", "stock_split_legacy_cross_group"):
++        overlap = obj(details[key])
++        assert overlap["severity"] == "informational" and overlap["fatal"] is False
++        assert overlap["inventory_id_count"] == 3
++        assert set(items(overlap["ids"])) == {"0", "74", "extra"}
++    assert obj(details["unselected_grading_findings"])["failures"]
++    assert details["status"] == "qualified"
++    validate_partition(result.groups, set(splits["base"]), (result.development, result.validation, result.audit))
++
++
++def test_groups_do_not_merge_through_goals_or_similarity(tmp_path: Path) -> None:
+     objects = ArtifactStore(tmp_path).objects
+     tasks, splits = inventory()
+     tasks[1]["user_scenario"] = tasks[0]["user_scenario"]
+     tasks[2]["initial_state"] = tasks[1]["initial_state"]
+     tasks[2]["evaluation_criteria"] = tasks[1]["evaluation_criteria"]
+-    result = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=frozenset({("user", "connected")}), execute_checks=lambda task: None)
+-    assert ("0", "1", "2") in result.groups
++    result = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST, execute_checks=lambda task: None)
++    assert ("0", "1") in result.groups
++    assert ("2",) in result.groups
++
++
++def test_generated_base_templates_normalize_all_composition_and_persona_variants() -> None:
++    variants = ["[mms_issue]bad_wifi_calling[PERSONA:None]",
++                "[mms_issue]airplane_mode_on|bad_wifi_calling[PERSONA:Easy]",
++                "[mms_issue]bad_wifi_calling|airplane_mode_on[PERSONA:Hard]",
++                "[mms_issue]overdue_bill_suspension[PERSONA:Hard]"]
++    assert {scenario_group({"id": value}) for value in variants} == {"[mms_issue]"}
++    assert scenario_group({"id": "[service_issue]airplane_mode_on[PERSONA:Easy]"}) == "[service_issue]"
++    with pytest.raises(VerificationError, match="unrecognized"):
++        scenario_group({"id": "[mms_issue]bad[PERSONA:Easy]unexpected"})
++
++
++def test_closest_nonempty_partition_keeps_all_three_real_root_groups(tmp_path: Path) -> None:
++    objects = ArtifactStore(tmp_path).objects
++    tasks, splits = inventory()
++    names = ["mms_issue"] * 49 + ["mobile_data_issue"] * 36 + ["service_issue"] * 29
++    for task, name in zip(tasks, names, strict=True):
++        task["id"] = f"[{name}]condition_{task['id']}[PERSONA:None]"
++    splits = {key: [str(tasks[int(i)]["id"]) for i in ids] for key, ids in splits.items()}
++    result = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST, execute_checks=lambda task: None)
++    assert tuple(map(len, (result.development, result.validation, result.audit))) == (49, 29, 36)
++    validate_partition(result.groups, set(splits["base"]), (result.development, result.validation, result.audit))
++    details = obj(parse(objects.read(result.details)))
++    assert details["exact_target_achievable"] is False
++    assert obj(details["gates"])["adaptive_whole_group_disjoint"] == "passed"
++    assert len(obj(details["group_to_ids"])) == 3
++
++
++def test_partition_optimizes_globally_and_rejects_overlapping_group_membership() -> None:
++    sizes = (4, 3, 2, 2)
++    groups = tuple(tuple(f"{i}-{j}" for j in range(size)) for i, size in enumerate(sizes))
++    selected = {t for group in groups for t in group}
++    target = (5, 2, 4)
++    dev, val, audit = whole_group_split(groups, selected, target=target)
++    attainable = [tuple(sum(s for s, arm in zip(sizes, assignments, strict=True) if arm == part) for part in range(3))
++                  for assignments in product(range(3), repeat=len(groups)) if len(set(assignments)) == 3]
++    assert size_error((len(dev), len(val), len(audit)), target) == min(size_error((s[0], s[1], s[2]), target) for s in attainable)
++    with pytest.raises(VerificationError, match="exactly once"):
++        whole_group_split((*groups, groups[0]), selected)
++    with pytest.raises(VerificationError, match="crosses"):
++        validate_partition((("a", "b"),), {"a", "b"}, (("a",), (), ("b",)))
++
++
++def test_insufficient_groups_reports_empty_partition_without_dropping_tasks(tmp_path: Path) -> None:
++    tasks, splits = inventory()
++    for task in tasks:
++        task["user_scenario"] = {"instructions": "one root", "persona": task["id"]}
++    result = qualify(ArtifactStore(tmp_path).objects, canonical(tasks), canonical(splits),
++                     assertion_allowlist=ALLOWLIST, execute_checks=lambda task: None)
++    assert tuple(map(len, (result.development, result.validation, result.audit))) == (114, 0, 0)
++    assert set(result.development) == set(splits["base"])
+ 
+ 
+ @pytest.mark.parametrize("category_to_corrupt", ["tasks", "policies", "scorer", "dependencies"])
+diff --git a/tests/vnext/test_tau2_fixed_stock.py b/tests/vnext/test_tau2_fixed_stock.py
+new file mode 100644
+index 0000000..34d991f
+--- /dev/null
++++ b/tests/vnext/test_tau2_fixed_stock.py
+@@ -0,0 +1,110 @@
++"""Host execution checks for the fixed stock runner; no upstream imports/models."""
++from copy import deepcopy
++from pathlib import Path
++
++import pytest
++
++from strive.vnext.benchmarks.json_data import canonical, obj, parse
++from strive.vnext.errors import VerificationError
++from strive.vnext.store import ArtifactStore
++from strive_benchmark_tau2.fixed_stock import USER_MODEL, USER_TEMPERATURE, configuration, run_fixed_stock
++from strive_benchmark_tau2.qualification import QualificationFailure, qualify
++from .benchmark_fixtures import inventory
++
++INITIAL = canonical({"schema": "strive.initial-tau2-actor/1", "agent": "llm_agent", "model": "initial-test-model",
++                     "model_settings": {"temperature": 0}})
++ALLOWLIST = frozenset({("user", "connected")})
++
++
++def test_stock_mode_runs_initial_actor_on_all_stock_test_tasks(tmp_path: Path) -> None:
++    tasks, splits = inventory()
++    tasks[74]["user_scenario"] = tasks[0]["user_scenario"]
++    # A training-only NL task cannot block this independently fixed test run.
++    tasks[0]["evaluation_criteria"] = {"reward_basis": ["NL_ASSERTION"]}
++    store = ArtifactStore(tmp_path / "cas")
++    checked: list[str] = []
++    qualification = qualify(store.objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST,
++                            execute_checks=lambda task: checked.append(str(task["id"])), mode="fixed-stock")
++    assert qualification.audit == tuple(splits["test"])
++    assert set(checked) == set(splits["test"]) and len(checked) == 40
++    def execute(config: dict[str, object], selected: list[dict[str, object]], output: Path) -> dict[str, object]:
++        assert [task["id"] for task in selected] == splits["test"]
++        assert config["llm_agent"] == "initial-test-model"
++        assert config["llm_user"] == USER_MODEL
++        assert config["llm_args_user"] == {"temperature": USER_TEMPERATURE}
++        assert config["auto_resume"] is False and config["auto_review"] is False
++        # Attempted executor mutations cannot alter the retained plan or source.
++        config["llm_agent"] = "changed"
++        selected[0]["user_scenario"] = "mutated"
++        return {"simulations": [{"task_id": t, "trial": trial, "reward_info": {"reward": int(trial == 0)}}
++                                for t in splits["test"] for trial in range(2)]}
++    result = run_fixed_stock(store, qualification, INITIAL, tmp_path / "fixed", trials=2, execute=execute)
++    assert result["simulations"] == 80 and result["mean_success"] == 0.5
++    assert result["actor_selection"] == "initial" and result["adaptation_enabled"] is False
++    assert result["group_disjointness_gate"] is False
++    assert obj(result["config"])["llm_agent"] == "initial-test-model"
++    assert store.objects.read(qualification.inventory) == canonical(tasks)
++    assert obj(parse((tmp_path / "fixed/fixed-stock-result.json").read_bytes()))["status"] == "completed"
++    with pytest.raises(VerificationError, match="already exist"):
++        run_fixed_stock(store, qualification, INITIAL, tmp_path / "fixed", trials=2, execute=execute)
++
++
++@pytest.mark.parametrize("grading", ["nl", "unknown", "assertion", "gold"])
++def test_stock_mode_keeps_selected_grading_blocking(tmp_path: Path, grading: str) -> None:
++    tasks, splits = inventory()
++    criteria = deepcopy(obj(tasks[74]["evaluation_criteria"]))
++    if grading in {"nl", "unknown"}:
++        criteria["reward_basis"] = ["NL_ASSERTION" if grading == "nl" else "unknown"]
++    if grading == "assertion":
++        criteria["env_assertions"] = [{"env_type": "user", "func_name": "random"}]
++    tasks[74]["evaluation_criteria"] = criteria
++    def check(task: dict[str, object]) -> None:
++        if grading == "gold":
++            raise VerificationError("gold replay failed")
++    with pytest.raises(QualificationFailure) as raised:
++        qualify(ArtifactStore(tmp_path).objects, canonical(tasks), canonical(splits),
++                assertion_allowlist=ALLOWLIST, execute_checks=check, mode="fixed-stock")
++    assert "74" in raised.value.affected_ids
++
++
++def test_fixed_runner_rejects_adaptive_certificate_and_incomplete_trials(tmp_path: Path) -> None:
++    tasks, splits = inventory()
++    store = ArtifactStore(tmp_path / "cas")
++    adaptive = qualify(store.objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST, execute_checks=lambda task: None)
++    with pytest.raises(VerificationError, match="own fixed-stock certificate"):
++        run_fixed_stock(store, adaptive, INITIAL, tmp_path / "wrong")
++    fixed = qualify(store.objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST,
++                    execute_checks=lambda task: None, mode="fixed-stock")
++    with pytest.raises(VerificationError, match="omits"):
++        run_fixed_stock(store, fixed, INITIAL, tmp_path / "incomplete", execute=lambda *args: {"simulations": []})
++    result = obj(parse((tmp_path / "incomplete/fixed-stock-result.json").read_bytes()))
++    assert result["status"] == "incomplete" and result["performance_measured"] is False
++
++
++def test_prepare_does_not_dispatch_and_actor_settings_are_explicit(tmp_path: Path) -> None:
++    tasks, splits = inventory()
++    store = ArtifactStore(tmp_path / "cas")
++    fixed = qualify(store.objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST,
++                    execute_checks=lambda task: None, mode="fixed-stock")
++    def never(*args: object) -> dict[str, object]:
++        raise AssertionError("preparation cannot dispatch")
++    report = run_fixed_stock(store, fixed, INITIAL, tmp_path / "prepared", execute=never, prepare_only=True)
++    assert report["status"] == "prepared" and report["expected_simulations"] == 160
++    bad = obj(parse(INITIAL)); bad["model_settings"] = {}
++    with pytest.raises(VerificationError, match="temperature"):
++        configuration(canonical(bad), trials=1, seed=300)
++    bad["agent"] = "learned-agent"
++    with pytest.raises(VerificationError, match="initial"):
++        configuration(canonical(bad), trials=1, seed=300)
++
++
++def test_fixed_runner_rejects_duplicate_trial_identities(tmp_path: Path) -> None:
++    tasks, splits = inventory()
++    store = ArtifactStore(tmp_path / "cas")
++    fixed = qualify(store.objects, canonical(tasks), canonical(splits), assertion_allowlist=ALLOWLIST,
++                    execute_checks=lambda task: None, mode="fixed-stock")
++    def duplicate(*args: object) -> dict[str, object]:
++        return {"simulations": [{"task_id": task, "trial": 0, "reward_info": {"reward": 1}}
++                                for task in splits["test"] for _ in range(2)]}
++    with pytest.raises(VerificationError, match="duplicate"):
++        run_fixed_stock(store, fixed, INITIAL, tmp_path / "fixed", trials=2, execute=duplicate)
+diff --git a/tests/vnext/test_tau2_live.py b/tests/vnext/test_tau2_live.py
+index 5d8a8de..f0fa457 100644
+--- a/tests/vnext/test_tau2_live.py
++++ b/tests/vnext/test_tau2_live.py
+@@ -18,6 +18,8 @@ RECORDINGS = ROOT / "tests/vnext/fixtures/tau2_recorded_generations.json"
+ 
+ @pytest.fixture(scope="module")
+ def tau2_python() -> Path:
++    if sys.platform != "linux":
++        pytest.skip("live tau2 checks run only in the Linux verification container")
+     configured = os.environ.get("STRIVE_TAU2_PYTHON")
+     isolated = ROOT / "adapters/tau2/.venv/bin/python"
+     python = Path(configured) if configured else isolated if isolated.exists() else Path(sys.executable)
+@@ -65,17 +67,33 @@ def test_full_inventory_certification(tau2_python: Path, tmp_path: Path) -> None
+     source = json.loads((DATA / "tau2/domains/telecom/tasks.json").read_text())
+     tasks = source["tasks"] if isinstance(source, dict) else source
+     assert certificate["status"] == "qualified"
+-    assert certificate["checked_records"] == len(tasks)
++    assert certificate["checked_records"] == 114
++    assert certificate["inventory_records"] == len(tasks)
++    assert certificate["gates"]["deterministic_grading"] == "passed"
++    assert certificate["gates"]["adaptive_whole_group_disjoint"] == "passed"
+     assert len({task["id"] for task in tasks}) == len(tasks)
+     splits = json.loads((DATA / "tau2/domains/telecom/split_tasks.json").read_text())
+     dev, validation, audit = (set(certificate[name]) for name in ("development", "validation", "audit"))
+-    assert (len(dev), len(validation), len(audit)) == (60, 14, 40)
++    assert (len(dev), len(validation), len(audit)) == (49, 29, 36)
++    assert certificate["exact_target_achievable"] is False
++    assert certificate["target_sizes"] == {"development": 60, "validation": 14, "audit": 40}
+     assert not dev & validation and not (dev | validation) & audit
+-    assert dev | validation == set(splits["train"])
+-    assert audit == set(splits["test"])
+     assert dev | validation | audit == set(splits["base"])
+     assert all(sum(bool(set(group) & part) for part in (dev, validation, audit)) <= 1 for group in certificate["groups"])
+-    print(json.dumps({"scanned_records": len(tasks), "development": 60, "validation": 14, "audit": 40}))
++    assert certificate["mode"] == "adaptive" and certificate["leaderboard_comparability"] == "none"
++    assert set(certificate["group_to_ids"]) == {"[mms_issue]", "[mobile_data_issue]", "[service_issue]"}
++    for name in ("stock_split_cross_group", "stock_split_legacy_cross_group"):
++        info = certificate[name]
++        assert info["severity"] == "informational" and info["fatal"] is False
++        assert info["inventory_id_count"] == len(info["ids"]) == 2285
++        assert info["stock_train_id_count"] == 74 and info["stock_test_id_count"] == 40
++    selected = [task for task in tasks if task["id"] in dev | validation | audit]
++    for task in selected:
++        criteria = task["evaluation_criteria"]
++        assert criteria["reward_basis"] and set(criteria["reward_basis"]) <= {"DB", "ENV_ASSERTION", "ACTION", "COMMUNICATE"}
++        assert not criteria.get("nl_assertions")
++    print(json.dumps({"scanned_records": len(tasks), "actual_sizes": certificate["actual_sizes"],
++                      "stock_overlap_informational": certificate["stock_split_legacy_cross_group"]["inventory_id_count"]}))
+ 
+ 
+ def test_live_tau2_deterministic_scorer_against_upstream(tau2_python: Path, tmp_path: Path) -> None:
+@@ -84,3 +102,19 @@ def test_live_tau2_deterministic_scorer_against_upstream(tau2_python: Path, tmp_
+ 
+ def test_live_tau2_operation_store_snapshot_and_crash_recovery(tau2_python: Path, tmp_path: Path) -> None:
+     live_check(tau2_python, "integration", tmp_path)
++
++
++def test_live_tau2_fixed_stock_mode(tau2_python: Path, tmp_path: Path) -> None:
++    output = Path(os.environ.get("STRIVE_RESULTS", str(tmp_path))) / "tau2-fixed-stock-certificate"
++    result = subprocess.run([str(tau2_python), "-I", "-B", "-m", "strive_benchmark_tau2.certify", str(DATA), str(output),
++        "--mode", "fixed-stock"], capture_output=True, text=True, timeout=1800, cwd=DATA, env=environment())
++    assert result.returncode == 0, result.stdout + "\n" + result.stderr
++    certificate = json.loads((output / "qualification.json").read_text())
++    splits = json.loads((DATA / "tau2/domains/telecom/split_tasks.json").read_text())
++    assert certificate["mode"] == "fixed-stock" and certificate["status"] == "qualified"
++    assert certificate["development"] == certificate["validation"] == []
++    assert certificate["audit"] == splits["test"]
++    assert certificate["checked_records"] == 40
++    assert certificate["gates"] == {"deterministic_grading": "passed", "adaptive_whole_group_disjoint": "not-applicable"}
++    assert certificate["stock_split_legacy_cross_group"]["inventory_id_count"] == 2285
++    live_check(tau2_python, "fixed-configuration", tmp_path)

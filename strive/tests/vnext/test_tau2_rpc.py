@@ -53,3 +53,19 @@ server.main()
         assert fixture.driver.score().metrics[0].value == 1
     finally:
         fixture.close()
+
+
+def test_client_preserves_virtualenv_interpreter_symlink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from strive.vnext.benchmarks.api import BenchmarkDescriptor
+    from strive.vnext.codec import content_ref
+    pin = content_ref(b"interpreter path regression fixture")
+    descriptor = BenchmarkDescriptor("strive.benchmark/1", pin, pin, "fixture", pin, pin, (), True, False)
+    def describe(self: Tau2Client, *args: object) -> BenchmarkDescriptor:
+        return descriptor
+    monkeypatch.setattr(Tau2Client, "call", describe)
+    python = tmp_path / "venv/bin/python"
+    python.parent.mkdir(parents=True)
+    python.symlink_to(sys.executable)
+    client = Tau2Client(python, tmp_path, (), pin)
+    assert client.python == python.absolute()
+    assert client.python != python.resolve()

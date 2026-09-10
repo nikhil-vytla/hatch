@@ -1,0 +1,542 @@
+diff --git a/strive/.gitignore b/strive/.gitignore
+index 5f02cfe..d12d058 100644
+--- a/strive/.gitignore
++++ b/strive/.gitignore
+@@ -9,3 +9,12 @@ artifacts/*
+ 
+ # advisory writer locks are runtime artifacts, never content
+ artifacts/demo*/ledger/*.lock
++
++# Container and upstream qualification outputs; definitions remain tracked.
++.container-results/
++adapters/tau2/retained-data/
++adapters/tau2/upstream-source/
++adapters/tau2/uv.lock
++milestone8-container-verification/downloads/
++
++.cache/
+diff --git a/strive/adapters/tau2/README.md b/strive/adapters/tau2/README.md
+index 8c7868e..02b58a7 100644
+--- a/strive/adapters/tau2/README.md
++++ b/strive/adapters/tau2/README.md
+@@ -57,3 +57,20 @@ state on a copy, and compares the deterministic upstream evaluator outcome.
+ is enforced by operation admission and execution, separately from its metric.
+ Missing, NL or unknown required grading stops qualification. Infrastructure
+ inconsistency produces an invalid/unresolved result with no success metric.
++
++Milestone 8 supplies `scripts/install-tau2.sh` and the root `Containerfile` to
++perform the preparation in Linux. The installer preserves the interpreter's
++virtualenv path, installs the pinned telecom extra separately, retains the
++original data and MIT notice, and copies the generated lock to
++`.container-results/tau2-uv.lock`. `qualification_assertions.json` lists the
++reviewed deterministic assertions from the pinned telecom tools; new functions
++are rejected rather than automatically admitted.
++
++`tests/vnext/test_tau2_live.py` now detects the installed distribution. Missing
++tau2 skips; a wrong pin, incomplete data or failed qualification fails. Its
++`live_checks` subprocess exercises real upstream evaluators, authored actor/user
++responses, and process death after committed agent/user mutations without any
++model calls. See `milestone8-container-verification/README.md` for the complete
++build/verification command and current validation limits. The earlier macOS
++installation note describes M5's result; it is not a reason to skip an installed
++runtime in M8.
+diff --git a/strive/adapters/tau2/src/strive_benchmark_tau2/certify.py b/strive/adapters/tau2/src/strive_benchmark_tau2/certify.py
+index 391b53c..e04b922 100644
+--- a/strive/adapters/tau2/src/strive_benchmark_tau2/certify.py
++++ b/strive/adapters/tau2/src/strive_benchmark_tau2/certify.py
+@@ -21,9 +21,10 @@ from .qualification import QualificationFailure, qualify
+ 
+ def main() -> None:
+     root, output = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
++    output.mkdir(parents=True, exist_ok=True)
+     metadata = importlib.metadata.distribution("tau2")
+     source = json.loads(metadata.read_text("direct_url.json") or "{}")
+-    if source.get("vcs_info", {}).get("commit_id") != UPSTREAM_REVISION:
++    if metadata.version != "1.0.1" or source.get("vcs_info", {}).get("commit_id") != UPSTREAM_REVISION:
+         raise RuntimeError("certification requires the pinned tau2 distribution")
+     os.environ["TAU2_DATA_DIR"] = str(root)
+     allowlist_path = root / "qualification_assertions.json"
+@@ -31,9 +32,14 @@ def main() -> None:
+     assertions = frozenset((requestor, string(name)) for requestor, names in allowlist.items() for name in items(names))
+     store = ArtifactStore(output / "artifacts")
+     store.objects.publish(allowlist_path.read_bytes())
++    checked = 0
+     def check(task: dict[str, object]) -> None:
++        nonlocal checked
+         with patch.object(socket.socket, "connect", deny_network), patch.object(socket, "create_connection", deny_network):
+             run({"operation": "qualify", "state": None, "payload": {"task": task, "initialization": {}}})
++        checked += 1
++        if checked % 100 == 0:
++            print(f"Qualified initialization/gold/assertions for {checked} task records", file=sys.stderr, flush=True)
+     try:
+         result = qualify(store.objects, (root / "tau2/domains/telecom/tasks.json").read_bytes(),
+             (root / "tau2/domains/telecom/split_tasks.json").read_bytes(), assertion_allowlist=assertions, execute_checks=check)
+@@ -44,7 +50,8 @@ def main() -> None:
+         print(json.dumps(failure_report, indent=2))
+         raise SystemExit(1)
+     report = {"status": "qualified", "report": result.report.digest, "groups": result.groups,
+-              "development": result.development, "validation": result.validation, "audit": result.audit}
++              "development": result.development, "validation": result.validation, "audit": result.audit,
++              "checked_records": checked}
+     (output / "qualification.json").write_bytes(canonical(report))
+     print(json.dumps(report, indent=2))
+ 
+diff --git a/strive/adapters/tau2/src/strive_benchmark_tau2/client.py b/strive/adapters/tau2/src/strive_benchmark_tau2/client.py
+index 108910a..17efe88 100644
+--- a/strive/adapters/tau2/src/strive_benchmark_tau2/client.py
++++ b/strive/adapters/tau2/src/strive_benchmark_tau2/client.py
+@@ -29,7 +29,7 @@ class RemoteScorer:
+ class Tau2Client:
+     def __init__(self, python: Path, data_root: Path, configuration: tuple[object, ...],
+                  identity: ArtifactRef, *, bootstrap: bool = False) -> None:
+-        self.python, self.data_root, self.configuration = python.resolve(), data_root.resolve(), configuration
++        self.python, self.data_root, self.configuration = python.absolute(), data_root.resolve(), configuration
+         self.identity = identity
+         descriptor = self.call("bootstrap" if bootstrap else "describe", (), BenchmarkDescriptor)
+         if descriptor.implementation != identity:
+diff --git a/strive/adapters/tau2/src/strive_benchmark_tau2/native_worker.py b/strive/adapters/tau2/src/strive_benchmark_tau2/native_worker.py
+index 587d870..547153a 100644
+--- a/strive/adapters/tau2/src/strive_benchmark_tau2/native_worker.py
++++ b/strive/adapters/tau2/src/strive_benchmark_tau2/native_worker.py
+@@ -29,6 +29,7 @@ def tuples(value: Any) -> Any:
+ def run(request: dict[str, Any]) -> dict[str, Any]:
+     # These imports must never run in strive's runtime/verifier interpreter.
+     # Upstream configuration must come from the retained request/data tree.
++    os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
+     import dotenv
+     dotenv.load_dotenv = lambda *args, **kwargs: False
+     from pydantic import TypeAdapter
+diff --git a/strive/adapters/tau2/src/strive_benchmark_tau2/process.py b/strive/adapters/tau2/src/strive_benchmark_tau2/process.py
+index ee5e083..182d2f0 100644
+--- a/strive/adapters/tau2/src/strive_benchmark_tau2/process.py
++++ b/strive/adapters/tau2/src/strive_benchmark_tau2/process.py
+@@ -14,7 +14,7 @@ from .data import verify_data
+ class IsolatedTau2:
+     def __init__(self, python: Path, data_root: Path, objects: CAS, closure: ArtifactRef, data_index: ArtifactRef) -> None:
+         verify_closure(objects, closure)
+-        self.python, self.data_root, self.objects, self.closure = python.resolve(), data_root.resolve(), objects, closure
++        self.python, self.data_root, self.objects, self.closure = python.absolute(), data_root.resolve(), objects, closure
+         self.data_index = data_index
+         verify_data(objects, data_index, self.data_root)
+         self.script = Path(__file__).with_name("native_worker.py")
+diff --git a/strive/src/strive/vnext/cli/runner.py b/strive/src/strive/vnext/cli/runner.py
+index 920d18d..3dc1fbc 100644
+--- a/strive/src/strive/vnext/cli/runner.py
++++ b/strive/src/strive/vnext/cli/runner.py
+@@ -25,7 +25,8 @@ from ..harness.provider import ProviderContract, Upstream
+ from ..policy import BundleManager, BundleSandbox, ContinualRefine, EvidenceSelector, GatewayRefiner, GenerationValidator, RefinerRoute
+ from ..runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
+ from ..runtime.broker import CapabilityBroker
+-from ..runtime.sandbox import DenoSandbox, SandboxLimits
++from ..runtime.sandbox import SandboxLimits
++from ..runtime.confined_sandbox import DenoSandbox
+ from ..runtime.supervisor import Supervisor
+ from ..store import ArtifactStore, RunReader
+ from ..store.cas import atomic_file, durable_directory, fsync_directory
+diff --git a/strive/src/strive/vnext/harness/process.py b/strive/src/strive/vnext/harness/process.py
+index e39f69b..4e9426c 100644
+--- a/strive/src/strive/vnext/harness/process.py
++++ b/strive/src/strive/vnext/harness/process.py
+@@ -22,6 +22,7 @@ from ..contracts.harness import CapturedStreams, PreparedGeneration, ProcessHand
+ from ..contracts.primitives import ArtifactRef
+ from ..errors import VerificationError
+ from ..runtime._memory import resident_bytes
++from ..runtime.linux_jail import LinuxJail
+ from .gateway import ModelGateway
+ from .profiles import LaunchProfile, NATIVE_RESIDUAL, fixture_profile
+ from .provider import json_object
+@@ -34,6 +35,7 @@ class ProcessServices:
+         self.gateway, self.profile, self.scratch_root, self._forward = gateway, profile, scratch_root, forward
+         self.mode = mode
+         self._process: subprocess.Popen[bytes] | None = None
++        self.jail: LinuxJail | None = None
+         self._prepared: PreparedGeneration | None = None
+         self._token: str | None = None
+         self._failure: BaseException | None = None
+@@ -97,8 +99,20 @@ class ProcessServices:
+         self.gateway.fault("launch-retained")
+         self._started = time.monotonic()
+         self._deadline = self._started + prepared_generation.deadline_seconds
+-        self._process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+-            env=environment, cwd=scratch, close_fds=True, start_new_session=True)
++        self.jail = LinuxJail.available()
++        if self.jail is not None:
++            # Retain the unique cgroup identity before any payload can run.
++            self.gateway.event(prepared_generation.execution_context, "os-jail",
++                self.gateway.objects.publish(encode(("linux-cgroup/1", str(self.jail.group),
++                    Path("/proc/sys/kernel/random/boot_id").read_text().strip(), self.jail.identity))))
++        try:
++            self._process = (self.jail.launch(command) if self.jail is not None else
++                subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
++                    env=environment, cwd=scratch, close_fds=True, start_new_session=True))
++        except BaseException:
++            if self.jail is not None:
++                self.jail.close()
++            raise
+         assert self._process.stdin is not None
+         self._process.stdin.write(payload + b"\n")
+         self._process.stdin.flush()
+@@ -136,7 +150,7 @@ class ProcessServices:
+             selector.register(child.stdout, selectors.EVENT_READ, out)
+             selector.register(child.stderr, selectors.EVENT_READ, err)
+             while selector.get_map():
+-                if time.monotonic() >= self._deadline or resident_bytes(child.pid) > 256 * 1024 * 1024:
++                if time.monotonic() >= self._deadline or (self.jail is None and resident_bytes(child.pid) > 256 * 1024 * 1024):
+                     timed_out = True
+                     break
+                 for key, _ in selector.select(0.02):
+@@ -198,9 +212,9 @@ class ProcessServices:
+         child = self._check(process)
+         assert self._prepared is not None
+         self.gateway.revoke(self._prepared.execution_context)
+-        # Only Deno fixtures can enter this launcher and they cannot create
+-        # descendants. Reaping an already-exited child also avoids targeting a
+-        # recycled PID. Native trees require the separately qualified OS jail.
++        if self.jail is not None:
++            self.jail.kill()
++        # Reap only our child; the cgroup kill also covers reparented descendants.
+         if child.poll() is None:
+             try:
+                 os.killpg(child.pid, signal.SIGKILL)
+@@ -226,5 +240,10 @@ class ProcessServices:
+                 self._process.stdout.close()
+             if self._process.stderr is not None:
+                 self._process.stderr.close()
++        if self.jail is not None:
++            self.jail.close()
++            if self._prepared is not None:
++                self.gateway.event(self._prepared.execution_context, "os-jail-exit",
++                    self.gateway.objects.publish(encode(("linux-cgroup-events/1", tuple(sorted(self.jail.events.items()))))))
+         if self._temporary is not None:
+             self._temporary.cleanup()
+diff --git a/strive/src/strive/vnext/harness/process_identity.py b/strive/src/strive/vnext/harness/process_identity.py
+index bfb81ca..27d5fdc 100644
+--- a/strive/src/strive/vnext/harness/process_identity.py
++++ b/strive/src/strive/vnext/harness/process_identity.py
+@@ -14,6 +14,7 @@ import sys
+ from ..codec import decode
+ from ..contracts.harness import ExecutionContext
+ from ..errors import VerificationError
++from ..runtime.linux_jail import terminate_recorded_group
+ from .gateway import ModelGateway
+ 
+ 
+@@ -47,6 +48,15 @@ def birth(pid: int) -> str | None:
+ def terminate_recorded(gateway: ModelGateway, context: ExecutionContext) -> None:
+     # Revoke first, even if identity inspection subsequently fails.
+     gateway.revoke(context)
++    jails = gateway.events(context, "os-jail")
++    for reference in jails:
++        value = decode(gateway.objects.read(reference))
++        if (not isinstance(value, tuple) or len(value) != 4 or value[0] != "linux-cgroup/1"
++                or not isinstance(value[1], str) or not isinstance(value[2], str) or not isinstance(value[3], bytes)):
++            raise VerificationError("invalid retained cgroup identity")
++        terminate_recorded_group(value[1], value[2])
++    if jails:
++        return
+     for reference in gateway.events(context, "pid"):
+         value = decode(gateway.objects.read(reference))
+         if (not isinstance(value, tuple) or len(value) != 3 or value[0] != "process-identity/1"
+diff --git a/strive/src/strive/vnext/harness/profiles.py b/strive/src/strive/vnext/harness/profiles.py
+index d97d35b..b6ebb1a 100644
+--- a/strive/src/strive/vnext/harness/profiles.py
++++ b/strive/src/strive/vnext/harness/profiles.py
+@@ -7,12 +7,13 @@ from pathlib import Path
+ from ..codec import encode
+ from ..contracts.primitives import ArtifactRef
+ from ..store.cas import CAS
++from ..runtime.linux_jail import ENFORCED, capability
+ 
+ DISABLED = ("tools", "mcp", "hooks", "plugins", "skills", "memory", "subagents",
+             "session-sharing", "instructions-discovery", "retry", "compaction", "title")
+ NATIVE_RESIDUAL = ("Native CLI qualification requires a tested OS process-tree jail with per-process "
+                    "gateway-only network, filesystem and keychain denial, hard memory and aggregate "
+-                   "storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted")
++                   "storage limits; a working jail does not qualify untested CLI versions or protocols")
+ 
+ 
+ @dataclass(frozen=True)
+@@ -77,6 +78,7 @@ def fixture_profile(backend: str, executable: Path, script: Path) -> LaunchProfi
+     arguments = ("run", "--quiet", "--no-prompt", "--no-config", "--no-lock", "--no-npm", "--cached-only",
+                  "--no-code-cache", "--deny-read", "--deny-write", "--deny-env", "--deny-run", "--deny-ffi",
+                  "--deny-sys", "--deny-import", "--deny-net", "--v8-flags=--max-old-space-size=64", str(script.resolve()))
++    detected = capability()
+     return LaunchProfile(backend, "fixture/1", executable.resolve(), arguments, b'{"native_features":"disabled"}',
+         encode(("deno-permissions/1", "no-network: inherited gateway pipe only", "no-read-write-env-run-ffi-import",
+-                "hard OS memory/storage deferred")), script.resolve())
++                (ENFORCED, detected.identity) if detected.available else ("OS jail deferred", detected.reason))), script.resolve())
+diff --git a/strive/tests/vnext/adaptation_fixtures.py b/strive/tests/vnext/adaptation_fixtures.py
+index 570b760..b9e0a09 100644
+--- a/strive/tests/vnext/adaptation_fixtures.py
++++ b/strive/tests/vnext/adaptation_fixtures.py
+@@ -21,7 +21,8 @@ from strive.vnext.policy import BundleManager, BundleSandbox, ContinualRefine, E
+ from strive.vnext.policy.data import dumps
+ from strive.vnext.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
+ from strive.vnext.runtime.broker import CapabilityBroker
+-from strive.vnext.runtime.sandbox import DenoSandbox, SandboxLimits
++from strive.vnext.runtime.sandbox import SandboxLimits
++from strive.vnext.runtime.confined_sandbox import DenoSandbox
+ from strive.vnext.runtime.supervisor import Supervisor
+ from strive.vnext.store import ArtifactStore
+ from strive_benchmark_counter import CounterAdapter
+diff --git a/strive/tests/vnext/harness_acceptance.py b/strive/tests/vnext/harness_acceptance.py
+index cf0b83c..e48f521 100644
+--- a/strive/tests/vnext/harness_acceptance.py
++++ b/strive/tests/vnext/harness_acceptance.py
+@@ -5,8 +5,8 @@ from decimal import Decimal
+ from strive.vnext.contracts.commands import Finish
+ from strive.vnext.contracts.lifecycle import EffectState
+ from strive.vnext.contracts.primitives import ExecutionStatus
+-from strive.vnext.harness.profiles import NATIVE_RESIDUAL
+-from strive.vnext.runtime import Boundary, DenoSandbox
++from strive.vnext.runtime import Boundary
++from strive.vnext.runtime.confined_sandbox import DenoSandbox
+ 
+ from .harness_support import HarnessFixture, ProcessCrash
+ from .test_acceptance_contracts import RuntimeEvidence, StorageRuntimeDriver
+@@ -20,7 +20,11 @@ class HarnessRuntimeDriver(StorageRuntimeDriver):
+ 
+     def exercise(self, scenario: str) -> RuntimeEvidence:
+         if scenario == "candidate_and_harness_attempt_credentials_network_storage_and_tool_access":
+-            raise NotImplementedError(NATIVE_RESIDUAL)
++            from .test_linux_jail import assert_native_denials, require_jail
++            require_jail()
++            assert_native_denials(self.root / "candidate-native")
++            assert_native_denials(self.root / "harness-native")
++            return self.exercise("candidate_and_fixture_harness_enforced_permissions")
+         if scenario == "candidate_and_fixture_harness_enforced_permissions":
+             sandbox = DenoSandbox(self.root / "candidate")
+             source = '''async function step() {
+@@ -37,6 +41,11 @@ class HarnessRuntimeDriver(StorageRuntimeDriver):
+                 fixture.run()
+                 assert fixture.supervisor.state.effects[0].response is not None
+                 assert len(fixture.upstream.requests) == 1
++                if sandbox.profile().production_floor:
++                    context = fixture.bridge._context(fixture.supervisor.state.effects[0].authorization)
++                    assert fixture.gateway.events(context, "os-jail")
++                    assert fixture.gateway.events(context, "os-jail-exit")
++                    assert "memory.events.oom_kill" in sandbox.jail_events
+             finally:
+                 fixture.close()
+             return replace(self.evidence(), candidate_escape_denied=True, harness_escape_denied=True)
+diff --git a/strive/tests/vnext/test_acceptance_contracts.py b/strive/tests/vnext/test_acceptance_contracts.py
+index 94c237e..d7dc592 100644
+--- a/strive/tests/vnext/test_acceptance_contracts.py
++++ b/strive/tests/vnext/test_acceptance_contracts.py
+@@ -337,9 +337,9 @@ def future_runtime(tmp_path: Path) -> RuntimeAcceptanceDriver:
+     return WorkflowRuntimeDriver(tmp_path / "runtime-vnext")
+ 
+ 
+-@pytest.mark.xfail(strict=True, raises=NotImplementedError,
+-                   reason="Native harness isolation requires tested Seatbelt/container/VM gateway-only network and filesystem jail plus hard memory/storage limits; sandbox_apply is denied here. Candidate and Deno fixture harness permission probes pass.")
+ def test_runtime_integrity_1_confines_candidate_and_harness(future_runtime: RuntimeAcceptanceDriver) -> None:
++    from .test_linux_jail import require_jail
++    require_jail()
+     evidence = future_runtime.exercise("candidate_and_harness_attempt_credentials_network_storage_and_tool_access")
+     assert evidence.candidate_escape_denied and evidence.harness_escape_denied
+ 
+diff --git a/strive/tests/vnext/test_runtime_sandbox.py b/strive/tests/vnext/test_runtime_sandbox.py
+index 530735c..0dd3e0a 100644
+--- a/strive/tests/vnext/test_runtime_sandbox.py
++++ b/strive/tests/vnext/test_runtime_sandbox.py
+@@ -9,7 +9,8 @@ from strive.vnext.codec import content_ref
+ from strive.vnext.contracts.commands import AuthorizedView, Finish
+ from strive.vnext.contracts.primitives import EnvironmentId, ExecutionStatus, RevisionId, ScopedArtifact
+ from strive.vnext.errors import VerificationError
+-from strive.vnext.runtime import DenoSandbox, SandboxFailure, SandboxLimits
++from strive.vnext.runtime import SandboxFailure, SandboxLimits
++from strive.vnext.runtime.confined_sandbox import DenoSandbox
+ 
+ from .runtime_fixtures import RuntimeFixture
+ 
+@@ -157,15 +158,19 @@ def test_sandbox_reports_pinned_enforcement(sandbox: DenoSandbox) -> None:
+     assert {"no-host-files", "no-network", "no-env", "no-subprocess", "cpu-rlimit", "output-cap"} <= set(profile.enforced)
+ 
+ 
+-@pytest.mark.xfail(strict=True, reason="Production candidate floor needs usable Seatbelt/container/VM with hard whole-process memory and aggregate storage limits; this host denies sandbox_apply")
+ def test_production_os_confinement_floor(sandbox: DenoSandbox) -> None:
++    from .test_linux_jail import require_jail
++    require_jail()
+     assert sandbox.profile().production_floor
++    assert isinstance(sandbox.run(("function step(){" + RETURN_FINISH + "}").encode(), view(), b"", None, {}).command, Finish)
++    assert "memory.events.oom_kill" in sandbox.jail_events
+ 
+ 
+ def test_rss_watchdog_includes_arraybuffers_outside_v8_heap(sandbox: DenoSandbox) -> None:
+     sandbox.limits = SandboxLimits(resident_megabytes=64)
+     source = b'function step(){const a=[];while(true){a.push(new Uint8Array(32*1024*1024).fill(1));}}'
+-    with pytest.raises(SandboxFailure, match="resident memory limit"):
++    message = "cgroup memory limit" if sandbox.profile().production_floor else "resident memory limit"
++    with pytest.raises(SandboxFailure, match=message):
+         sandbox.run(source, view(), b"", None, {})
+ 
+ 
+diff --git a/strive/tests/vnext/test_tau2_live.py b/strive/tests/vnext/test_tau2_live.py
+index aabbdae..5d8a8de 100644
+--- a/strive/tests/vnext/test_tau2_live.py
++++ b/strive/tests/vnext/test_tau2_live.py
+@@ -1,68 +1,86 @@
+-"""Live-upstream checks are explicit skips unless the separate runtime is ready.
++"""Run live upstream tests whenever the isolated tau2 installation is present.
+ 
+-These tests never install packages, download data or make model calls.
++Missing packages skip on the host. An installed but broken pin/data/protocol
++fails visibly. Tests never install packages, download data or call models.
+ """
++import json
++import os
+ from pathlib import Path
+ import subprocess
++import sys
+ 
+ import pytest
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+-PYTHON = ROOT / "adapters/tau2/.venv/bin/python"
+-DATA = ROOT / "adapters/tau2/retained-data"
+-REASON = "tau2 not installed: isolated uv lock panicked in macOS system-configuration (Attempted to create a NULL object); shell DNS for raw.githubusercontent.com unavailable"
+-DATA_REASON = "full telecom inventory unavailable: shell DNS failed for raw.githubusercontent.com; web reader rejected tasks.json as larger than 4MB; full-inventory certification outstanding"
+-
+-
+-@pytest.mark.skipif(not PYTHON.exists(), reason=REASON)
+-def test_live_tau2_action_comparator_equivalence() -> None:
+-    program = '''
+-from tau2.data_model.tasks import Action
+-from tau2.data_model.message import ToolCall
+-cases = [(None, {}, True), ([], {"x": 9}, True), (None, {"x": 1}, True), (None, {"x": 2}, False)]
+-for compare, arguments, expected in cases:
+-    action = Action(action_id="reference", name="transfer", arguments={"x": 1, "y": 2}, compare_args=compare)
+-    call = ToolCall(id="call", name="transfer", arguments=arguments, requestor="user")
+-    assert action.compare_with_tool_call(call) is expected
+-'''
+-    result = subprocess.run([str(PYTHON), "-I", "-B", "-c", program], capture_output=True, text=True, timeout=30)
+-    assert result.returncode == 0, result.stderr
++DATA = Path(os.environ.get("TAU2_DATA_DIR", str(ROOT / "adapters/tau2/retained-data")))
++RECORDINGS = ROOT / "tests/vnext/fixtures/tau2_recorded_generations.json"
+ 
+ 
+-@pytest.mark.skipif(not (DATA / "tau2/domains/telecom/tasks.json").exists(), reason=DATA_REASON)
+-def test_full_inventory_certification(tmp_path: Path) -> None:
+-    # A real certificate must include executed initialization/gold/assertion
+-    # checks, so data presence alone cannot turn this into a passing test.
+-    if not PYTHON.exists():
+-        pytest.skip(REASON)
+-    result = subprocess.run([str(PYTHON), "-I", "-B", "-m", "strive_benchmark_tau2.certify", str(DATA), str(tmp_path / "certificate")],
+-                            capture_output=True, text=True, timeout=60)
++@pytest.fixture(scope="module")
++def tau2_python() -> Path:
++    configured = os.environ.get("STRIVE_TAU2_PYTHON")
++    isolated = ROOT / "adapters/tau2/.venv/bin/python"
++    python = Path(configured) if configured else isolated if isolated.exists() else Path(sys.executable)
++    result = subprocess.run([str(python), "-I", "-B", "-c", '''
++import importlib.metadata, sys
++try:
++    importlib.metadata.distribution("tau2")
++except importlib.metadata.PackageNotFoundError:
++    sys.exit(73)
++from strive_benchmark_tau2.prepare import check_install
++check_install()
++'''], capture_output=True, text=True, timeout=30)
++    if result.returncode == 73:
++        reason = "tau2 is absent from the isolated interpreter; run scripts/install-tau2.sh in Linux"
++        if os.environ.get("STRIVE_REQUIRE_TAU2") == "1":
++            pytest.fail(reason)
++        pytest.skip(reason)
+     assert result.returncode == 0, result.stderr
++    assert (DATA / "tau2/domains/telecom/tasks.json").is_file(), "tau2 installed but retained task data missing; run scripts/install-tau2.sh"
++    return python
++
++
++def environment() -> dict[str, str]:
++    return {"TAU2_DATA_DIR": str(DATA), "PYTHONHASHSEED": "0", "PYTHONDONTWRITEBYTECODE": "1",
++            "LITELLM_LOCAL_MODEL_COST_MAP": "True", "PATH": "/usr/local/bin:/usr/bin:/bin"}
++
++
++def live_check(python: Path, mode: str, output: Path) -> None:
++    result = subprocess.run([str(python), "-I", "-B", "-m", "strive_benchmark_tau2.live_checks", mode,
++        str(output), str(RECORDINGS)], capture_output=True, text=True, timeout=300, cwd=DATA, env=environment())
++    assert result.returncode == 0, result.stdout + "\n" + result.stderr
++    print(result.stdout)
++
+ 
++def test_live_tau2_action_comparator_equivalence(tau2_python: Path, tmp_path: Path) -> None:
++    live_check(tau2_python, "comparator", tmp_path)
+ 
+-@pytest.mark.skipif(not PYTHON.exists(), reason=REASON)
+-@pytest.mark.skipif(not (DATA / "tau2/domains/telecom/tasks.json").exists(), reason=DATA_REASON)
+-def test_live_tau2_initial_snapshot_and_deterministic_scorer() -> None:
+-    import json
+-    import os
+-    task_source = json.loads((DATA / "tau2/domains/telecom/tasks.json").read_text())
+-    tasks = task_source["tasks"] if isinstance(task_source, dict) else task_source
++
++def test_full_inventory_certification(tau2_python: Path, tmp_path: Path) -> None:
++    output = Path(os.environ.get("STRIVE_RESULTS", str(tmp_path))) / "tau2-certificate"
++    result = subprocess.run([str(tau2_python), "-I", "-B", "-m", "strive_benchmark_tau2.certify", str(DATA), str(output)],
++        capture_output=True, text=True, timeout=1800, cwd=DATA, env=environment())
++    assert result.returncode == 0, result.stdout + "\n" + result.stderr  # Includes every offending task ID.
++    certificate = json.loads((output / "qualification.json").read_text())
++    source = json.loads((DATA / "tau2/domains/telecom/tasks.json").read_text())
++    tasks = source["tasks"] if isinstance(source, dict) else source
++    assert certificate["status"] == "qualified"
++    assert certificate["checked_records"] == len(tasks)
++    assert len({task["id"] for task in tasks}) == len(tasks)
+     splits = json.loads((DATA / "tau2/domains/telecom/split_tasks.json").read_text())
+-    task = next(task for task in tasks if task["id"] == splits["base"][0])
+-    script = ROOT / "adapters/tau2/src/strive_benchmark_tau2/native_worker.py"
+-    def call(operation: str, state: object, payload: object) -> dict[str, object]:
+-        result = subprocess.run([str(PYTHON), "-I", "-B", str(script)], input=json.dumps({"operation": operation, "state": state, "payload": payload}),
+-            capture_output=True, text=True, timeout=60, cwd=DATA, env={"TAU2_DATA_DIR": str(DATA)})
+-        assert result.returncode == 0, result.stderr
+-        value: dict[str, object] = json.loads(result.stdout)
+-        return value
+-    initial = call("initialize", None, {"task": task, "initialization": {}, "identities": {}})
+-    snapshot = call("snapshot", initial["state"], {})
+-    for key in ("agent_db", "user_db", "user_state", "agent_history", "user_history", "random_state"):
+-        assert isinstance(initial["state"], dict) and isinstance(snapshot["state"], dict)
+-        assert initial["state"][key] == snapshot["state"][key]
+-    terminated = call("terminate", snapshot["state"], "agent_stop")
+-    scored = call("score", terminated["state"], {"task": task, "termination": "agent_stop"})
+-    assert isinstance(scored["output"], dict)
+-    assert scored["output"]["status"] == "scored"
+-    assert scored["output"]["value"] == scored["output"]["upstream"]
++    dev, validation, audit = (set(certificate[name]) for name in ("development", "validation", "audit"))
++    assert (len(dev), len(validation), len(audit)) == (60, 14, 40)
++    assert not dev & validation and not (dev | validation) & audit
++    assert dev | validation == set(splits["train"])
++    assert audit == set(splits["test"])
++    assert dev | validation | audit == set(splits["base"])
++    assert all(sum(bool(set(group) & part) for part in (dev, validation, audit)) <= 1 for group in certificate["groups"])
++    print(json.dumps({"scanned_records": len(tasks), "development": 60, "validation": 14, "audit": 40}))
++
++
++def test_live_tau2_deterministic_scorer_against_upstream(tau2_python: Path, tmp_path: Path) -> None:
++    live_check(tau2_python, "equivalence", tmp_path)
++
++
++def test_live_tau2_operation_store_snapshot_and_crash_recovery(tau2_python: Path, tmp_path: Path) -> None:
++    live_check(tau2_python, "integration", tmp_path)
+diff --git a/strive/tests/vnext/test_tau2_rpc.py b/strive/tests/vnext/test_tau2_rpc.py
+index d9a6a7d..ff1177a 100644
+--- a/strive/tests/vnext/test_tau2_rpc.py
++++ b/strive/tests/vnext/test_tau2_rpc.py
+@@ -53,3 +53,19 @@ server.main()
+         assert fixture.driver.score().metrics[0].value == 1
+     finally:
+         fixture.close()
++
++
++def test_client_preserves_virtualenv_interpreter_symlink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
++    from strive.vnext.benchmarks.api import BenchmarkDescriptor
++    from strive.vnext.codec import content_ref
++    pin = content_ref(b"interpreter path regression fixture")
++    descriptor = BenchmarkDescriptor("strive.benchmark/1", pin, pin, "fixture", pin, pin, (), True, False)
++    def describe(self: Tau2Client, *args: object) -> BenchmarkDescriptor:
++        return descriptor
++    monkeypatch.setattr(Tau2Client, "call", describe)
++    python = tmp_path / "venv/bin/python"
++    python.parent.mkdir(parents=True)
++    python.symlink_to(sys.executable)
++    client = Tau2Client(python, tmp_path, (), pin)
++    assert client.python == python.absolute()
++    assert client.python != python.resolve()

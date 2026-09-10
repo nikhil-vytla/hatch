@@ -5,8 +5,8 @@ from decimal import Decimal
 from strive.vnext.contracts.commands import Finish
 from strive.vnext.contracts.lifecycle import EffectState
 from strive.vnext.contracts.primitives import ExecutionStatus
-from strive.vnext.harness.profiles import NATIVE_RESIDUAL
-from strive.vnext.runtime import Boundary, DenoSandbox
+from strive.vnext.runtime import Boundary
+from strive.vnext.runtime.confined_sandbox import DenoSandbox
 
 from .harness_support import HarnessFixture, ProcessCrash
 from .test_acceptance_contracts import RuntimeEvidence, StorageRuntimeDriver
@@ -20,7 +20,11 @@ class HarnessRuntimeDriver(StorageRuntimeDriver):
 
     def exercise(self, scenario: str) -> RuntimeEvidence:
         if scenario == "candidate_and_harness_attempt_credentials_network_storage_and_tool_access":
-            raise NotImplementedError(NATIVE_RESIDUAL)
+            from .test_linux_jail import assert_native_denials, require_jail
+            require_jail()
+            assert_native_denials(self.root / "candidate-native")
+            assert_native_denials(self.root / "harness-native")
+            return self.exercise("candidate_and_fixture_harness_enforced_permissions")
         if scenario == "candidate_and_fixture_harness_enforced_permissions":
             sandbox = DenoSandbox(self.root / "candidate")
             source = '''async function step() {
@@ -37,6 +41,11 @@ class HarnessRuntimeDriver(StorageRuntimeDriver):
                 fixture.run()
                 assert fixture.supervisor.state.effects[0].response is not None
                 assert len(fixture.upstream.requests) == 1
+                if sandbox.profile().production_floor:
+                    context = fixture.bridge._context(fixture.supervisor.state.effects[0].authorization)
+                    assert fixture.gateway.events(context, "os-jail")
+                    assert fixture.gateway.events(context, "os-jail-exit")
+                    assert "memory.events.oom_kill" in sandbox.jail_events
             finally:
                 fixture.close()
             return replace(self.evidence(), candidate_escape_denied=True, harness_escape_denied=True)

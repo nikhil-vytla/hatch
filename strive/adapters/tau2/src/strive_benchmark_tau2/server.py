@@ -7,13 +7,13 @@ from strive.vnext.benchmarks.api import (CapturedGeneration, EpisodeSnapshot, Op
 from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
 from strive.vnext.benchmarks.payloads import dumps, loads
 from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.codec import decode
 from strive.vnext.contracts.primitives import ArtifactRef, EffectId, EpisodeId, RunId
 from strive.vnext.errors import VerificationError
 from strive.vnext.store.cas import CAS
 from .adapter import Tau2Adapter, implementation_identity
 from .process import IsolatedTau2
-from .qualification import Qualification
+from .qualification import load_qualification
+from .splits import scenario_group
 
 
 def assemble(configuration: tuple[object, ...], *, create: bool) -> Tau2Adapter:
@@ -25,19 +25,9 @@ def assemble(configuration: tuple[object, ...], *, create: bool) -> Tau2Adapter:
             objects = CAS(Path(cas_path))
         case _:
             raise VerificationError("invalid remote adapter configuration")
-    value = decode(objects.read(report))
-    if not isinstance(value, tuple) or len(value) != 12 or value[0] != "qualified-telecom/1":
-        raise VerificationError("remote adapter requires full inventory qualification")
-    implementation, inventory, splits = value[1:4]
-    if not all(isinstance(ref, ArtifactRef) for ref in (implementation, inventory, splits)):
-        raise VerificationError("invalid qualification references")
-    assert isinstance(implementation, ArtifactRef) and isinstance(inventory, ArtifactRef) and isinstance(splits, ArtifactRef)
-    groups, development, validation, audit = value[5:9]
-    if (not isinstance(groups, tuple) or not all(isinstance(group, tuple) and all(isinstance(t, str) for t in group) for group in groups)
-            or not all(isinstance(ids, tuple) and all(isinstance(t, str) for t in ids) for ids in (development, validation, audit))):
-        raise VerificationError("invalid qualified memberships")
-    assert isinstance(development, tuple) and isinstance(validation, tuple) and isinstance(audit, tuple)
-    qualification = Qualification(inventory, splits, implementation, report, groups, development, validation, audit)
+    qualification = load_qualification(objects, report)
+    inventory = qualification.inventory
+    development, validation, audit = qualification.development, qualification.validation, qualification.audit
     backend = IsolatedTau2(Path(sys.executable), Path(os.environ["TAU2_DATA_DIR"]), objects, closure, data_index)
     identity = implementation_identity(objects, backend, qualification, closure)
     operations = OperationStore(Path(database_path), objects, RunId(run), identity, epoch, create=create)
@@ -45,7 +35,7 @@ def assemble(configuration: tuple[object, ...], *, create: bool) -> Tau2Adapter:
     if isinstance(source, dict):
         source = source.get("tasks")
     selected = set(development + validation + audit)
-    tasks = tuple(TaskSpec(string(obj(task)["id"]), next(group[0] for group in groups if obj(task)["id"] in group),
+    tasks = tuple(TaskSpec(string(obj(task)["id"]), scenario_group(obj(task)),
         objects.publish(canonical(task)), objects.publish(canonical(obj(task)["evaluation_criteria"])))
         for task in items(source) if obj(task)["id"] in selected)
     return Tau2Adapter(objects, backend, tasks, qualification, closure, operations)

@@ -7,12 +7,13 @@ from pathlib import Path
 from ..codec import encode
 from ..contracts.primitives import ArtifactRef
 from ..store.cas import CAS
+from ..runtime.linux_jail import ENFORCED, capability
 
 DISABLED = ("tools", "mcp", "hooks", "plugins", "skills", "memory", "subagents",
             "session-sharing", "instructions-discovery", "retry", "compaction", "title")
 NATIVE_RESIDUAL = ("Native CLI qualification requires a tested OS process-tree jail with per-process "
                    "gateway-only network, filesystem and keychain denial, hard memory and aggregate "
-                   "storage limits; this host rejects Seatbelt sandbox_apply: Operation not permitted")
+                   "storage limits; a working jail does not qualify untested CLI versions or protocols")
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ def fixture_profile(backend: str, executable: Path, script: Path) -> LaunchProfi
     arguments = ("run", "--quiet", "--no-prompt", "--no-config", "--no-lock", "--no-npm", "--cached-only",
                  "--no-code-cache", "--deny-read", "--deny-write", "--deny-env", "--deny-run", "--deny-ffi",
                  "--deny-sys", "--deny-import", "--deny-net", "--v8-flags=--max-old-space-size=64", str(script.resolve()))
+    detected = capability()
     return LaunchProfile(backend, "fixture/1", executable.resolve(), arguments, b'{"native_features":"disabled"}',
         encode(("deno-permissions/1", "no-network: inherited gateway pipe only", "no-read-write-env-run-ffi-import",
-                "hard OS memory/storage deferred")), script.resolve())
+                (ENFORCED, detected.identity) if detected.available else ("OS jail deferred", detected.reason))), script.resolve())

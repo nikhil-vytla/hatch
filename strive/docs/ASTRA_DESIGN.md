@@ -401,6 +401,8 @@ Restarting the wrapper resumes that mapping. It does not create fresh executions
 
 ## 7. Experiments
 
+Amendment 3 governs telecom split assignment. The adaptive study and its matched fixed control use a Strive-derived whole-base-scenario split. A separate initial fixed-agent run uses tau2's stock `test` split; its results never enter adaptation or the adaptive comparison. Retain actual split sizes and keep these two result populations separate.
+
 ### 7.1 Studies and the reference comparison
 
 A study is a set of ordinary runs with declared relationships. Every run retains its complete resolved manifest.
@@ -455,6 +457,8 @@ Expected derived digest changes must be explained by declared leaf-level interve
 Either setting may supply authorized evidence to a policy.
 
 ### 7.4 Development corpora and forks
+
+For telecom, assign whole base scenario roots across development, validation, and audit before running either arm. Target 60/14/40, retain every selected base task, and report the closest feasible nonempty partition. The pinned pool yields 49/29/36 under Amendment 3. The full-inventory stock train/test overlap scan is informational.
 
 The development regression corpus contains prior failures, retained successes, representative families, and adversarial development examples. Additions identify their source events and access scope.
 
@@ -598,13 +602,13 @@ Artifacts produced in research mode may receive a new trusted evaluation. That d
 
 ### 9.4 Workload and providers
 
-The first stateful workload is an order-fulfilment simulator with persistent inventory and order state. Keep sum/max fixtures as deterministic controls behind the same small operation interface.
+The first stateful workload is pinned tau2 telecom text through the separately installed `BenchmarkAdapter` implementation described in Amendments 1 and 2. Agent tools and user device operations mutate a coupled environment; trusted deterministic evaluators determine success. Candidate claims never establish reward.
 
-The simulator provides stock reads, inventory reservation, order updates, operation lookup, and snapshots. A mutation transaction stores both its state change and result under the effect ID. Repeating that ID with different arguments fails; looking it up returns the original result.
+Amendment 3 defines two evaluation modes. The adaptive study uses our own whole-base-scenario split over the selected base pool, with exact actual IDs retained. The separate fixed-stock mode runs the initial non-adapting actor on all published `test` IDs, without a group-disjointness gate. Every selected headline task in either mode must pass deterministic grading qualification. Stock train/test scenario overlap is informational, including the historical 2,285-ID finding.
 
-The trusted scorer uses actual simulator state and broker receipts. Agent-written “shipped” or “tests passed” messages have no scoring authority.
+The adaptive split has no leaderboard comparability claim. Fixed-stock results support comparisons using the same stock test IDs, actor implementation, user model, temperature, trial count, and upstream revision. Upstream documents `base` as the original leaderboard denominator, so stock test results must not be presented as a full-base leaderboard score. See Amendment 3 for pinned user settings and execution details.
 
-Release 1 integrates one selected hosted-model provider through a trusted adapter. Actor and refiner bindings name exact available model versions and request settings. Provider/account selection remains a deployment input in section 11, not an implicit kernel default. Ambiguous model calls suspend unless the selected adapter has a verified stronger recovery contract.
+Actor and refiner bindings retain exact model versions and request settings. Adaptive inference remains brokered through the existing confined runtime. The fixed-stock benchmark runner has no refiner or cross-episode learned state and reports separately from Strive's adaptive accounting and integrity claims.
 
 ### 9.5 Durability and threat scope
 
@@ -1006,7 +1010,7 @@ The operation adapter exposes episode initialization, agent tool calls, user too
 
 The trusted scorer evaluates the actual committed environment and broker-captured interaction history. It preserves each admitted task’s declared deterministic `reward_basis`, including database checks, environment assertions, and deterministic communication checks where specified. It does not replace required criteria with easier checks or use an LLM judge to certify headline success. Import qualification rejects a headline task set requiring unavailable or nondeterministic grading. [Upstream evaluation contract](https://github.com/sierra-research/tau2-bench/blob/main/docs/evaluation.md)
 
-The first campaign uses the 114-task telecom base pool, whose published split contains 74 training tasks and 40 test tasks. Sixty training tasks form development, fourteen form validation, and the forty test tasks form the protected audit. The split, grouping checks, ordering, and access grants are frozen before campaign execution. [Published telecom splits](https://github.com/sierra-research/tau2-bench/blob/main/data/tau2/domains/telecom/split_tasks.json)
+The first campaign uses the 114-task telecom base pool, whose published split contains 74 training tasks and 40 test tasks. Amendment 3 supersedes the original stock-based allocation: select all 114 base tasks, derive our own whole-scenario development/validation/audit split, target 60/14/40, and retain the actual 49/29/36 allocation. The split, grouping checks, ordering, and access grants are frozen before campaign execution. [Published telecom splits](https://github.com/sierra-research/tau2-bench/blob/main/data/tau2/domains/telecom/split_tasks.json)
 
 This is a continual-adaptation study over published benchmark episodes. Environment state persists throughout each episode and resets at the next task’s published initial state. Actor revisions and explicitly authorized learned memory persist across development episodes. The study does not claim a benchmark-native continuous world or direct comparability with an unmodified leaderboard protocol.
 
@@ -1030,7 +1034,7 @@ The workload choice follows these tradeoffs:
 | **GAIA** | Useful for general assistant competence, but less directly targeted at recoverable mutations in a shared environment. [GAIA paper](https://arxiv.org/abs/2311.12983) |
 | **EvoHarnessBench** | Closely aligned with continual adaptation. However, its project currently describes the local environment runner as unreleased. Hosted graders would prevent strive from owning the complete local scoring boundary required here. [Project and availability](https://mas-orchestra.salesforceresearch.ai/evoharness/) |
 
-The split procedure must group tasks by underlying scenario configuration before assigning development and validation. Persona variants or duplicate scenario representations cannot straddle development and audit. Retain the grouping algorithm and resulting IDs. Qualification checks the complete imported task set before freezing the study; metadata inconsistencies stop preparation rather than silently changing its denominator.
+The Amendment 3 split procedure groups tasks by their underlying base template before assigning all three partitions. Persona and composed failure-condition variants stay with that root. Retain the grouping algorithm, seed/order, group-to-ID map, and final IDs. Validate inventory integrity and strictly qualify every selected headline task. Whole-group disjointness applies to our adaptive split; full-inventory overlap across stock train/test is informational.
 
 For contract A, the fourteen validation tasks remain inaccessible to adaptation and candidate selection. They are available only to separately declared B development runs. The forty audit tasks remain embargoed until campaign freeze. Public task availability does not establish freedom from model pretraining contamination; A establishes campaign information-flow isolation.
 
@@ -1060,7 +1064,7 @@ Use paired trajectories as the independent units for the adaptation comparison. 
 
 The scorer must read trusted snapshots and captured interactions. Replaying broker-recorded actions in a separate scorer environment may cross-check state, but candidate-authored transcripts cannot replace the live authoritative state. Termination and scorer aggregation must preserve coverage rather than inheriting upstream exclusions that conceal infrastructure failures.
 
-All user-simulator calls also cross `model.generate`. Strive must not invoke an upstream convenience runner that secretly performs inference, retries whole episodes, or drops failed simulations.
+In adaptive Strive studies and their paired fixed controls, all user-simulator calls also cross `model.generate`. Their runtime must not invoke an upstream convenience runner that secretly performs inference, retries whole episodes, or drops failed simulations. Amendment 3's separate fixed-stock baseline explicitly uses upstream execution, retains its configuration and full results, and makes no Strive runtime-integrity or matched cross-mode claim.
 
 **Extend §9.6: funded ceiling**
 
@@ -1103,7 +1107,7 @@ A provider overrun remains possible under the existing provider-trust assumption
 | **§6.1–6.2** | Add retained harness bindings, gateway pin, model identity provenance, user-model role, and recovery fields. Replace order-specific workload and policy parameters with task/episode parameters. |
 | **§6.3** | Change the example to `strive run tau2-telecom.toml --id actor-17`. Commands otherwise retain their contracts. |
 | **§7.1–7.2** | Replace order streams and fulfilment metrics with the paired episode campaign and benchmark-success metrics above. |
-| **§7.4–7.5** | Include user/device state in snapshots; enforce the 60/14/40 split, duplicate grouping, frozen selection, and separate audit sessions/caches. |
+| **§7.4–7.5** | Include user/device state in snapshots; enforce Amendment 3 whole-base-scenario assignment, report actual sizes against the 60/14/40 target, freeze selection, and keep separate audit sessions/caches. |
 | **§7.6** | Retain harness configuration, actual provider requests, benchmark revision, user-simulator observations, and both sides of environment state. |
 | **§8.1–8.3** | Show harness identity and launch spans; attribute model cost once. Distinguish supplied context from actual provider requests and requested identity from observed identity. Release 1 ships only the Langfuse profile over vendor-neutral OTLP GenAI 1.41.0; LangSmith/Phoenix mappings are deferred until needed. |
 | **§9.4** | Replace in full with the supplied text. |
@@ -1734,20 +1738,18 @@ This changes a general transition rule, not the record schema. It belongs in thi
 
 Upstream supplies telecom domain tests and task verification logic. Select their deterministic cases explicitly; do not run a broad upstream test command that may initiate model calls. [Telecom tests](https://github.com/sierra-research/tau2-bench/tree/main/tests/test_domains/test_telecom), [task verification logic](https://raw.githubusercontent.com/sierra-research/tau2-bench/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/domains/telecom/tasks/manager.py).
 
-### Split qualification: 60/14/40
+### Split qualification under Amendment 3
 
-The importer must validate the entire declared source inventory, then select the 114-task base pool.
+Import the original inventory and stock split definitions. Confirm unique/resolvable IDs and the disjoint `base = train ∪ test` source relationship. Source metadata counts are retained, not a claim of scenario disjointness.
 
-1. Confirm unique task IDs and `base = train ∪ test`, with disjoint 74/40 membership.
-2. Derive scenario groups from normalized scenario configuration. Strip persona decorations for one grouping signal; also compare normalized initialization and goal definitions to catch duplicate representations.
-3. Form connected groups whenever either equivalence rule identifies the same underlying scenario.
-4. Require no group to cross training and audit.
-5. Partition the 74 training tasks into exactly 60 development and 14 validation tasks using whole groups and a retained deterministic ordering.
-6. Retain the grouping implementation, seed/order, group membership, and final IDs.
+1. Derive one root per task directly from the generator's base scenario template. Strip persona and composed failure conditions; never connect groups through shared instructions, goals, initial state, or substrings.
+2. In adaptive mode, select the entire base pool and assign every whole group to one of development, validation, or audit. Keep all three partitions nonempty when at least three groups exist, and deterministically minimize size deviations from 60/14/40. Retain actual counts and whether the target was achievable.
+3. In fixed-stock mode, select all stock `test` IDs in published order and run only the initial actor. Apply no group-disjointness gate.
+4. Hard-block any selected task requiring NL assertions, missing/unknown grading, an unreviewed assertion, or failed strict initialization/reference/assertion execution. Retain every failure ID; never filter the denominator to pass.
+5. Hard-check our adaptive partition for complete coverage and whole-group disjointness, including `(dev ∪ val) ∩ audit` at the group level.
+6. Retain both direct-root and legacy connected-group stock train/test overlap scans as informational diagnostics. They cannot block a qualified adaptive partition or fixed-stock result.
 
-If whole-group partitioning cannot produce 60/14, or a group crosses the published train/test boundary, preparation fails. Do not split the group, quietly remove tasks, or replace audit IDs. A revised campaign then needs explicit approval.
-
-Contract A grants no validation feedback to adaptation. The 40 audit tasks remain embargoed until campaign freeze. Trusted qualification may inspect protected definitions, but its task-level output must not enter adaptive prompts, caches, or candidate selection.
+The pinned adaptive split is 49 development, 29 validation, and 36 audit tasks. Exact 60/14/40 is impossible with these roots. Contract A grants no validation feedback to adaptation. Audit definitions, grouping diagnostics, and task-level qualification output stay in protected preparation storage until the relevant release boundary.
 
 ### Scorer-equivalence cases
 
@@ -1817,17 +1819,45 @@ private state, pending commands, effect authorizations, results and accounting.
 Candidate activation still cannot cross an unresolved operation boundary.
 
 The §6 closure includes source/dependency/data identities and an explicit
-retained data tree. The §7 telecom reference campaign remains 60 development,
-14 validation and 40 audit tasks; generic adapters do not inherit that split.
-The importer scans the full supplied inventory, groups scenarios transitively,
-and fails preparation on ineligible grading, crossing groups or an impossible
-whole-group partition. No audit or validation feedback is granted to adaptation.
+retained data tree. Amendment 3 supersedes M5's original transitive grouping and
+stock-split hard gate. The §7 telecom target remains 60/14/40, with actual
+49/29/36 whole-base-scenario membership; generic adapters do not inherit it.
+Selected-task grading and our adaptive group disjointness remain blocking.
+Stock-split overlap is informational. No audit or validation feedback is granted
+to adaptation.
 
 M5's §9.4/§10 evidence is fixture-level in this environment. The pinned tau2
 resolution hit the macOS uv system-configuration panic; shell task retrieval
 failed DNS and the web reader rejected the task file's size. Full upstream
 inventory certification and live deterministic evaluator equivalence remain
-explicitly skipped. No task exclusions or replacement denominator are approved.
+explicitly skipped in that historical M5 pass. Amendment 3 now approves derived
+whole-group reassignment with actual size reporting and no task exclusions.
 A second integer-target benchmark exercises the frozen common infrastructure
 without changes to its files. The implementation report and exact limits are in
 [`m5-investigation/README.md`](../m5-investigation/README.md).
+
+
+## Amendment 3: split recalibration and separate fixed-stock evaluation
+
+Human-approved for Milestone 8. This amendment supersedes the stock-split and transitive-group requirements in §7, §9.4, and Amendments 1–2. It preserves the deterministic-grading gate, frozen contracts, verifier, ledger, broker, admission, supervisor, gateway, and Linux jail.
+
+An adaptive harness can learn scenario-specific behavior from development feedback. Its audit must hold out entire underlying scenarios to measure transfer. A fixed agent that never trains or changes across episodes has no within-campaign train-to-test adaptation leakage, so overlapping scenario families in unused stock training data do not invalidate its fixed test evaluation. This is the rationale behind keeping dependent samples in the same fold in [GroupKFold](https://scikit-learn.org/stable/modules/cross_validation.html#group-k-fold). It does not establish absence of pretraining contamination.
+
+| Mode | Task assignment | Actor and result interpretation |
+| --- | --- | --- |
+| `adaptive` | Strive-derived whole-base-scenario split of all 114 selected base tasks; target 60/14/40, actual 49/29/36. Both the adapting arm and its matched fixed control use this assignment. | Start from the same initial actor. Keep validation/audit feedback embargoed under contract A. No leaderboard comparability claim. |
+| `fixed-stock` | All 40 published `test` IDs, in stock order, without a group-disjointness gate. | Run the initial, non-adapting actor with fresh episode state. Report independently; do not substitute a selected final adaptive actor or feed results into adaptation. |
+
+Tau2 defines task splits as named ID lists. Its default `base` pool preserves the original evaluation denominator, while train/test support training experiments. The approved stock-test mode therefore permits comparisons only to evaluations on that same test population and protocol; it does not claim equivalence to an original 114-task leaderboard score. See [upstream split documentation](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/README.md) and [pinned telecom split IDs](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/data/tau2/domains/telecom/split_tasks.json).
+
+The grouping algorithm `tau2-base-template/1` uses the `[name]` stem of the generator's base template. `TaskManager` appends a composed failure-condition list and `[PERSONA:...]` to that stem. All such variations normalize to the same root; selecting the first alphabetically sorted failure condition would invent a finer ancestry not represented in the generator. Shared goals, initialization, words, and near-similarity never join roots. For non-generator contract fixtures only, exact canonical persona-free scenario equality supplies a group key. See the [pinned generator](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/domains/telecom/tasks/manager.py).
+
+Retain the algorithm source, seed `strive-amendment-3-60-14-40-v1`, SHA-256 order of seed plus root, sorted IDs within each group, full group-to-ID map, and selected assignments. Dynamic programming enumerates reachable development/validation size pairs. Among nonempty three-way partitions when at least three groups exist, minimize total absolute size error, maximum error, audit error, validation error, development error, then development/validation sizes. Sorted state traversal and development/validation/audit transition order choose the first path to each size pair. Fewer than three groups allow empty partitions, explicitly reported without dropping tasks; such an allocation cannot support a nonempty held-out evaluation claim.
+
+The selected pool contains 49 MMS, 36 mobile-data, and 29 service tasks, so the closest nonempty allocation is development=MMS, validation=service, audit=mobile-data. This is coarse transfer across only three roots, not evidence of generalization across many independent scenarios. Exact 60/14/40 is unachievable. Freeze actual denominators and episode orders before dispatch. Earlier 180-episode and 4,160-episode totals are target-size estimates: three development passes now mean 147 episodes per trajectory and eight paired repetitions plus two audit trials mean 2,352 development plus 1,152 audit episodes. Recompute refinement opportunities and budgets from the retained plan, never relabel nominal counts as completed work.
+
+Certification passes when every selected task is deterministically gradable and the adaptive partition covers the selected pool exactly once without crossing groups. NL assertions, missing/unknown reward bases, unreviewed assertions, and failed strict reference/assertion checks still block. Full-inventory stock overlap is informational under both the new roots and the retained legacy closure diagnostic. The captured legacy scan counted 2,285 IDs: 1,984 MMS, 254 mobile-data, and 47 service. Report these counts with their algorithm and source; retain the exact new scan in the Linux certificate.
+
+The standalone fixed-stock runner accepts a retained initial `llm_agent` model/options artifact, constructs a fresh upstream actor for each simulation, and exposes no refiner, learned-memory import, or prompt-update path. This implementation is an upstream LLM-agent baseline, not a claim that an opencode actor has been ported unchanged. It pins the user to `gpt-4.1-2025-04-14`, temperature `0.0`, matching [upstream defaults](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/src/tau2/config.py). Retain actor options, user settings, trial count, seeds, resolved upstream configuration, original results, and explicit coverage. The reference adaptive user binding remains separately pinned and must be reported with its own result. Model or actor-implementation differences preclude a matched cross-mode comparison.
+
+The Linux suite runs selected-task certification in both modes, asserts the 49/29/36 whole-group adaptive allocation and informational stock counts, checks real fixed-mode configuration, and retains deterministic scorer and crash-recovery checks. These tests make no model calls and skip on macOS. The initial fixed actor's model-performance run is a separate funded operation; preparation is not a benchmark score.

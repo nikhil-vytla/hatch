@@ -1,0 +1,17 @@
+{
+  "changed_existing_files": [
+    "adapters/tau2/src/strive_benchmark_tau2/live_checks.py",
+    "adapters/tau2/src/strive_benchmark_tau2/native_worker.py"
+  ],
+  "new_code_files": [
+    "tests/vnext/test_tau2_worker_regressions.py"
+  ],
+  "frozen_core_files_checked": 30,
+  "frozen_core_hashes_matching": 30,
+  "unrelated_changes_since_start": [],
+  "changed_file_sha256": {
+    "adapters/tau2/src/strive_benchmark_tau2/live_checks.py": "92eba6642fe4bd1cfc683ad840ecb414365b30702d0dca0dda6f28ea28ff2e5c",
+    "adapters/tau2/src/strive_benchmark_tau2/native_worker.py": "ed6aea2c86865ea76737ff81e001c6aa549293f085835b87f5427ea956538ca0",
+    "tests/vnext/test_tau2_worker_regressions.py": "d02a645a3325bcd03889077b6dd85862cdfec202eb80915d00cf0a91aea3756c"
+  }
+}

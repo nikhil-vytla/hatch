@@ -29,7 +29,7 @@ class RemoteScorer:
 class Tau2Client:
     def __init__(self, python: Path, data_root: Path, configuration: tuple[object, ...],
                  identity: ArtifactRef, *, bootstrap: bool = False) -> None:
-        self.python, self.data_root, self.configuration = python.resolve(), data_root.resolve(), configuration
+        self.python, self.data_root, self.configuration = python.absolute(), data_root.resolve(), configuration
         self.identity = identity
         descriptor = self.call("bootstrap" if bootstrap else "describe", (), BenchmarkDescriptor)
         if descriptor.implementation != identity:

@@ -16,6 +16,7 @@ from strive.vnext.errors import VerificationError
 from strive.vnext.store.cas import CAS
 from . import UPSTREAM_REVISION
 from .qualification import Qualification
+from .splits import scenario_group
 
 
 class TelecomBackend(Protocol):
@@ -82,7 +83,8 @@ class Tau2Adapter:
         index = {string(obj(task)["id"]): obj(task) for task in items(inventory)}
         for task in tasks:
             original = index[task.task_id]
-            if (objects.read(task.definition) != canonical(original)
+            if (task.scenario_group != scenario_group(original)
+                    or objects.read(task.definition) != canonical(original)
                     or objects.read(task.reward_definition) != canonical(original["evaluation_criteria"])):
                 raise VerificationError("task/reward definition differs from qualified source inventory")
         self._operations = tuple(OperationSpec(name, objects.publish(encode(("telecom-arguments/1", name))),
@@ -102,6 +104,8 @@ class Tau2Adapter:
         return self.tasks
 
     def declare_splits(self) -> tuple[SplitSpec, ...]:
+        if self.qualification.mode == "fixed-stock":
+            return (SplitSpec("test", self.qualification.audit, self.qualification.report),)
         return tuple(SplitSpec(name, ids, self.qualification.report) for name, ids in (
             ("development", self.qualification.development), ("validation", self.qualification.validation),
             ("audit", self.qualification.audit)))

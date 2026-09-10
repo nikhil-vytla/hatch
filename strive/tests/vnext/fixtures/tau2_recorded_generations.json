@@ -1,0 +1,31 @@
+{
+  "description": "Authored offline provider responses. These test fixtures are not observations from a paid model run.",
+  "actor": {
+    "role": "assistant",
+    "content": "Please toggle your mobile data once and tell me when it is done."
+  },
+  "user_tool": {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+      {
+        "id": "recorded-toggle",
+        "name": "toggle_data",
+        "arguments": {},
+        "requestor": "assistant"
+      }
+    ]
+  },
+  "user_done": {
+    "role": "assistant",
+    "content": "I toggled mobile data. The recorded confirmation code is STRIVE-4821."
+  },
+  "actor_tool": {
+    "id": "recorded-refuel",
+    "name": "refuel_data",
+    "requestor": "assistant",
+    "arguments": {
+      "gb_amount": 1.0
+    }
+  }
+}

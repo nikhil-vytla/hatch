@@ -11,5 +11,10 @@ telecom = ["tau2 @ git+https://github.com/sierra-research/tau2-bench@a2c02472518
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# The pinned tau2 commit is a direct git reference; hatchling requires this
+# opt-in to build the package metadata that declares it in the telecom extra.
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/strive_benchmark_tau2"]

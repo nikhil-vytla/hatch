@@ -21,6 +21,7 @@ from strive.vnext.runtime.supervisor import Supervisor
 from strive.vnext.store import ArtifactStore
 from strive_benchmark_tau2.adapter import Tau2Adapter, implementation_identity
 from strive_benchmark_tau2.qualification import qualify
+from strive_benchmark_tau2.splits import scenario_group
 
 from .fixtures import AUTHORED_TOML
 from .runtime_fixtures import FakeProvider
@@ -125,7 +126,7 @@ class BenchmarkFixture:
         self.backend = SyntheticTelecom(self.pin)
         tasks, splits = inventory()
         qualification = qualify(objects, canonical(tasks), canonical(splits), assertion_allowlist=frozenset({("user", "connected")}), execute_checks=lambda task: None)
-        specs = tuple(TaskSpec(string(t["id"]), string(t["id"]), objects.publish(canonical(t)),
+        specs = tuple(TaskSpec(string(t["id"]), scenario_group(t), objects.publish(canonical(t)),
                                objects.publish(canonical(t["evaluation_criteria"]))) for t in tasks)
         self.adapter_pin = implementation_identity(objects, self.backend, qualification, self.pin)
         self.operations = OperationStore(root / "operations", objects, self.scope.run_id, self.adapter_pin, 1, create=True)
