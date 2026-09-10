@@ -1,0 +1,48 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________________________ test_wheel_ships_package_data _________________________
+
+tmp_path = PosixPath('/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytest-of-nikhil/pytest-178/test_wheel_ships_package_data0')
+
+    def test_wheel_ships_package_data(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (9799997) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (9799996) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytes...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:23: AssertionError
+______________ test_installed_console_script_runs_in_isolated_env ______________
+
+tmp_path = PosixPath('/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytest-of-nikhil/pytest-178/test_installed_console_script_0')
+
+    def test_installed_console_script_runs_in_isolated_env(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (9800015) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (9800013) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytes...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:41: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_packaging.py::test_wheel_ships_package_data - AssertionErro...
+FAILED tests/test_packaging.py::test_installed_console_script_runs_in_isolated_env
+2 failed in 0.11s

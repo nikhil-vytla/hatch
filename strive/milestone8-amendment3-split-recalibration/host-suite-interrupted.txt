@@ -1,0 +1,99 @@
+........................................................................ [  9%]
+........................................................................ [ 18%]
+............................................FF.......................... [ 27%]
+..........
+=================================== FAILURES ===================================
+________________________ test_wheel_ships_package_data _________________________
+
+tmp_path = PosixPath('/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytest-of-nikhil/pytest-120/test_wheel_ships_package_data0')
+
+    def test_wheel_ships_package_data(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (9352891) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (9352889) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytes...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:23: AssertionError
+______________ test_installed_console_script_runs_in_isolated_env ______________
+
+tmp_path = PosixPath('/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytest-of-nikhil/pytest-120/test_installed_console_script_0')
+
+    def test_installed_console_script_runs_in_isolated_env(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (9352909) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (9352905) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytes...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:41: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_packaging.py::test_wheel_ships_package_data - AssertionErro...
+FAILED tests/test_packaging.py::test_installed_console_script_runs_in_isolated_env
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/Users/nikhil/.local/share/uv/python/cpython-3.13.11-macos-aarch64-none/lib/python3.13/threading.py:1095: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+2 failed, 224 passed in 173.10s (0:02:53)
+Traceback (most recent call last):
+  File "/Users/nikhil/personal/hatch/strive/.venv/bin/pytest", line 10, in <module>
+    sys.exit(_console_main())
+             ~~~~~~~~~~~~~^^
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 253, in _console_main
+    code = _main(prog=_get_prog_name(sys.argv))
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 229, in _main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/_pytest/main.py", line 377, in pytest_cmdline_main
+    return wrap_session(config, _main)
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/_pytest/main.py", line 372, in wrap_session
+    config._ensure_unconfigure()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 1217, in _ensure_unconfigure
+    self._cleanup_stack.close()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/nikhil/.local/share/uv/python/cpython-3.13.11-macos-aarch64-none/lib/python3.13/contextlib.py", line 627, in close
+    self.__exit__(None, None, None)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Users/nikhil/.local/share/uv/python/cpython-3.13.11-macos-aarch64-none/lib/python3.13/contextlib.py", line 619, in __exit__
+    raise exc
+  File "/Users/nikhil/.local/share/uv/python/cpython-3.13.11-macos-aarch64-none/lib/python3.13/contextlib.py", line 604, in __exit__
+    if cb(*exc_details):
+       ~~^^^^^^^^^^^^^^
+  File "/Users/nikhil/.local/share/uv/python/cpython-3.13.11-macos-aarch64-none/lib/python3.13/contextlib.py", line 482, in _exit_wrapper
+    callback(*args, **kwds)
+    ~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/_pytest/unraisableexception.py", line 99, in cleanup
+    gc_collect_harder(gc_collect_iterations)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nikhil/personal/hatch/strive/.venv/lib/python3.13/site-packages/_pytest/unraisableexception.py", line 33, in gc_collect_harder
+    gc.collect()
+    ~~~~~~~~~~^^
+KeyboardInterrupt

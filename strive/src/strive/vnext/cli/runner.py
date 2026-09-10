@@ -25,7 +25,8 @@ from ..harness.provider import ProviderContract, Upstream
 from ..policy import BundleManager, BundleSandbox, ContinualRefine, EvidenceSelector, GatewayRefiner, GenerationValidator, RefinerRoute
 from ..runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
 from ..runtime.broker import CapabilityBroker
-from ..runtime.sandbox import DenoSandbox, SandboxLimits
+from ..runtime.sandbox import SandboxLimits
+from ..runtime.confined_sandbox import DenoSandbox
 from ..runtime.supervisor import Supervisor
 from ..store import ArtifactStore, RunReader
 from ..store.cas import atomic_file, durable_directory, fsync_directory

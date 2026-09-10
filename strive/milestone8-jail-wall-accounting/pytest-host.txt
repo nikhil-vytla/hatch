@@ -1,0 +1,71 @@
+........................................................................ [  8%]
+........................................................................ [ 17%]
+............................................FF.......................... [ 26%]
+........................................................................ [ 35%]
+...............................................................s........ [ 44%]
+........................x............................................... [ 53%]
+....................................ss.................................. [ 62%]
+.........ssssss..................s.........sssssss.s.................... [ 70%]
+........................................................................ [ 79%]
+.....................................s.................................. [ 88%]
+...................................sssss................................ [ 97%]
+....................                                                     [100%]
+=================================== FAILURES ===================================
+________________________ test_wheel_ships_package_data _________________________
+
+tmp_path = PosixPath('/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytest-of-nikhil/pytest-176/test_wheel_ships_package_data0')
+
+    def test_wheel_ships_package_data(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (9792567) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (9792566) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytes...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:23: AssertionError
+______________ test_installed_console_script_runs_in_isolated_env ______________
+
+tmp_path = PosixPath('/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytest-of-nikhil/pytest-176/test_installed_console_script_0')
+
+    def test_installed_console_script_runs_in_isolated_env(tmp_path: Path) -> None:
+        project = Path(__file__).resolve().parent.parent
+        out = tmp_path / "dist"
+        built = _run("uv", "build", "--wheel", "-o", str(out))
+>       assert built.returncode == 0, f"wheel build FAILED: {built.stderr[-500:]}"
+E       AssertionError: wheel build FAILED: 
+E         thread 'main2' (9792583) panicked at /Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs:154:1:
+E         Attempted to create a NULL object.
+E         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+E         
+E         thread 'main' (9792582) panicked at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:
+E         Tokio executor failed, was there a panic?: Any { .. }
+E         
+E       assert 101 == 0
+E        +  where 101 = CompletedProcess(args=['uv', 'build', '--wheel', '-o', '/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/pytes...ed at /Users/runner/work/uv/uv/crates/uv/src/lib.rs:2540:10:\nTokio executor failed, was there a panic?: Any { .. }\n").returncode
+
+tests/test_packaging.py:41: AssertionError
+=========================== short test summary info ============================
+SKIPPED [12] tests/vnext/test_linux_jail.py:23: OS jail deferred: Linux cgroups v2, user/mount/pid/net namespaces and seccomp unavailable on darwin
+SKIPPED [1] tests/vnext/test_harness.py:296: opencode: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; a working jail does not qualify untested CLI versions or protocols; native profile has not passed a single-request drive
+SKIPPED [1] tests/vnext/test_harness.py:296: codex: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; a working jail does not qualify untested CLI versions or protocols; native profile has not passed a single-request drive
+SKIPPED [1] tests/vnext/test_harness.py:296: claude-code: Native CLI qualification requires a tested OS process-tree jail with per-process gateway-only network, filesystem and keychain denial, hard memory and aggregate storage limits; a working jail does not qualify untested CLI versions or protocols; native profile has not passed a single-request drive
+SKIPPED [3] tests/vnext/test_harness.py:299: funded live smoke: human must set a budget ceiling, provide a qualified OS jail and explicitly enable a separate funded runner; deterministic CI never uses provider credentials
+SKIPPED [1] tests/vnext/test_harness_gateway.py:203: host denies localhost TCP bind: [Errno 1] Operation not permitted; pipe gateway is exercised by real-process tests
+SKIPPED [1] tests/vnext/test_tau2_live.py:57: live tau2 checks run only in the Linux verification container
+SKIPPED [1] tests/vnext/test_tau2_live.py:61: live tau2 checks run only in the Linux verification container
+SKIPPED [1] tests/vnext/test_tau2_live.py:99: live tau2 checks run only in the Linux verification container
+SKIPPED [1] tests/vnext/test_tau2_live.py:103: live tau2 checks run only in the Linux verification container
+SKIPPED [1] tests/vnext/test_tau2_live.py:107: live tau2 checks run only in the Linux verification container
+XFAIL tests/vnext/test_adaptation.py::test_evaluate_fork_enactment_deferred - EvaluateFork enactment is deferred: a future approved verifier+supervisor change must authorize and charge fork effects; ExecuteEffect is currently the only chargeable authorization.
+FAILED tests/test_packaging.py::test_wheel_ships_package_data - AssertionErro...
+FAILED tests/test_packaging.py::test_installed_console_script_runs_in_isolated_env
+2 failed, 785 passed, 24 skipped, 1 xfailed in 1132.81s (0:18:52)

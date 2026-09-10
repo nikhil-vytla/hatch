@@ -14,6 +14,7 @@ import sys
 from ..codec import decode
 from ..contracts.harness import ExecutionContext
 from ..errors import VerificationError
+from ..runtime.linux_jail import terminate_recorded_group
 from .gateway import ModelGateway
 
 
@@ -47,6 +48,15 @@ def birth(pid: int) -> str | None:
 def terminate_recorded(gateway: ModelGateway, context: ExecutionContext) -> None:
     # Revoke first, even if identity inspection subsequently fails.
     gateway.revoke(context)
+    jails = gateway.events(context, "os-jail")
+    for reference in jails:
+        value = decode(gateway.objects.read(reference))
+        if (not isinstance(value, tuple) or len(value) != 4 or value[0] != "linux-cgroup/1"
+                or not isinstance(value[1], str) or not isinstance(value[2], str) or not isinstance(value[3], bytes)):
+            raise VerificationError("invalid retained cgroup identity")
+        terminate_recorded_group(value[1], value[2])
+    if jails:
+        return
     for reference in gateway.events(context, "pid"):
         value = decode(gateway.objects.read(reference))
         if (not isinstance(value, tuple) or len(value) != 3 or value[0] != "process-identity/1"

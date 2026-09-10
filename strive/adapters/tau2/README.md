@@ -27,8 +27,9 @@ Preparation must complete these steps before live dispatch:
    deterministic assertion-function names. Run `python -m
    strive_benchmark_tau2.certify DATA_ROOT OUTPUT_ROOT`. It executes strict
    initialization/reference checks without inference and retains grouping,
-   seed/order, all memberships and the 60/14/40 result. Failure emits exact IDs
-   and a revised-campaign proposal, then stops.
+   seed/order, all memberships, and actual sizes against the 60/14/40 target.
+   Selected-task grading or adaptive group-disjointness failure emits exact IDs
+   and stops. See Amendment 3 modes below.
 5. Retain the full closure through `benchmarks.closure`, construct
    `IsolatedTau2(python, data_root, objects, closure, data_index)`, derive
    `implementation_identity()`, and create the operation store with that identity
@@ -57,3 +58,89 @@ state on a copy, and compares the deterministic upstream evaluator outcome.
 is enforced by operation admission and execution, separately from its metric.
 Missing, NL or unknown required grading stops qualification. Infrastructure
 inconsistency produces an invalid/unresolved result with no success metric.
+
+Milestone 8 supplies `scripts/install-tau2.sh` and the root `Containerfile` to
+perform the preparation in Linux. The installer preserves the interpreter's
+virtualenv path, installs the pinned telecom extra separately, retains the
+original data and MIT notice, and copies the generated lock to
+`.container-results/tau2-uv.lock`. `qualification_assertions.json` lists the
+reviewed deterministic assertions from the pinned telecom tools; new functions
+are rejected rather than automatically admitted.
+
+`tests/vnext/test_tau2_live.py` now detects the installed distribution. Missing
+tau2 skips; a wrong pin, incomplete data or failed qualification fails. Its
+`live_checks` subprocess exercises real upstream evaluators, authored actor/user
+responses, and process death after committed agent/user mutations without any
+model calls. See `milestone8-container-verification/README.md` for the complete
+build/verification command and current validation limits. The earlier macOS
+installation note describes M5's result; it is not a reason to skip an installed
+runtime in M8.
+
+## Amendment 3 modes
+
+Qualification now accepts `--mode adaptive` or `--mode fixed-stock`. Adaptive is
+the default. It selects all base IDs and assigns whole base templates across our
+own development/validation/audit split. The generator's `[mms_issue]`,
+`[mobile_data_issue]`, and `[service_issue]` roots ignore appended failure-condition
+combinations and persona tags. Shared goals or substrings never connect roots.
+The closest allocation with three nonempty partitions is **49/29/36**, against
+the 60/14/40 target. No selected ID is dropped. This split is Strive-derived and
+has no leaderboard comparability claim.
+
+The certificate retains source bytes, algorithm source, seed/order, group-to-ID
+mapping, target/actual sizes, exact-target feasibility, and hard-gate outcomes.
+Every selected headline task must pass strict deterministic grading and reference
+execution. NL assertions, missing/unknown components and unreviewed assertions
+still block. Our adaptive partition must cover the pool exactly once without
+crossing groups. Full-inventory overlap across the stock train/test boundary is
+informational under both the new roots and the historical connected-group rule.
+The latter preserves the captured 2,285-ID diagnostic without blocking a valid
+campaign. Unselected tasks receive a structural grading scan, reported separately;
+only selected tasks receive executable initialization/reference checks.
+
+Version 2 certificates explicitly bind the mode and extended report. The RPC
+server requires a new Amendment 3 certificate rather than reinterpreting an old
+certificate under different split semantics. Adaptive adapters declare
+`development`, `validation`, and `audit`; fixed-stock adapters declare `test`.
+
+The standalone fixed-stock runner executes an initial tau2 `llm_agent` with
+unchanged model/options and a fresh actor per simulation. It has no refinement or
+cross-episode memory path. This is an upstream LLM-agent baseline, not an opencode
+actor port. Use an initial actor artifact prepared before examining results:
+
+```json
+{
+  "schema": "strive.initial-tau2-actor/1",
+  "agent": "llm_agent",
+  "model": "gpt-4.1-2025-04-14",
+  "model_settings": {"temperature": 0.0}
+}
+```
+
+In the pinned Linux adapter environment:
+
+```sh
+adapters/tau2/.venv/bin/python -I -B -m strive_benchmark_tau2.fixed_stock \
+  adapters/tau2/retained-data .container-results/fixed-stock \
+  --initial-actor initial-actor.json --trials 4 --seed 300
+```
+
+This command makes model calls. Add `--prepare-only` to certify and retain the
+plan without dispatch. The runner always pins the user simulator to
+`gpt-4.1-2025-04-14` at temperature `0.0`, as in the pinned upstream defaults. It
+retains the initial configuration, resolved upstream settings, task IDs, trials,
+raw results and a separate `fixed-stock-result.json`. Missing rewards, missing
+trials, duplicated task/trial identities and substituted tasks cannot produce a
+completed result. A changed plan or existing result requires a fresh output
+folder.
+
+Fixed-stock results are comparable only to evaluations on the same stock `test`
+population with matching settings. [Upstream split guidance](https://github.com/sierra-research/tau2-bench/blob/a2c024725189473d2d7cea3a5cfdbcc67478e41f/README.md)
+identifies `base` as the original leaderboard denominator. Never label a 40-task
+test score as a 114-task base leaderboard score, or combine it with adaptive
+results. The whole-group rationale follows [GroupKFold](https://scikit-learn.org/stable/modules/cross_validation.html#group-k-fold).
+
+The Linux verification script runs both certification modes and validates the
+fixed runner's real upstream configuration without model calls. All five live
+tau2 tests skip on macOS. The existing scorer-equivalence, mutation recovery,
+jail and MultiToolMessage checks remain in place.
