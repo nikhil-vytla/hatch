@@ -234,7 +234,7 @@ def request_from_user_plan(plan_bytes: bytes, contract: UserProviderContract) ->
         schemas.append({"type": "function", **tool["function"]})
     if schemas != json.loads(contract.tool_schemas):
         raise VerificationError("upstream user tools differ from pinned provider schema")
-    raw = json.dumps({"model": contract.model, "input": messages, "tools": schemas,
+    raw = json.dumps({**contract.request_controls(), "model": contract.model, "input": messages, "tools": schemas,
         "max_output_tokens": contract.output_ceiling, "parallel_tool_calls": False}, sort_keys=True, separators=(",", ":")).encode()
     contract.validate(raw)
     return raw

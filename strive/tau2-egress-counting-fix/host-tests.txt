@@ -1,0 +1,4 @@
+$ uv run pytest tests -q
+............. [ 99%]
+..                                                                       [100%]
+839 passed, 26 skipped, 1 xfailed in 1261.11s (0:21:01)

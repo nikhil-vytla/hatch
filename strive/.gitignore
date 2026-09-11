@@ -17,3 +17,6 @@ adapters/tau2/upstream-source/
 adapters/tau2/uv.lock
 
 .cache/
+
+# live campaign runtime outputs (response hashes, transport dbs) — never commit
+live-results/

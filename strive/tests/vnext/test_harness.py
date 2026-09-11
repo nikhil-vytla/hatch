@@ -85,8 +85,9 @@ def test_gateway_denies_hidden_calls_tools_options(tmp_path: Path, mode: str) ->
         fixture.close()
 
 
-def test_fixture_process_denies_files_network_tools_credentials(tmp_path: Path) -> None:
-    fixture = HarnessFixture(tmp_path, mode="escape")
+@pytest.mark.parametrize("backend", ["opencode", "codex", "claude-code"])
+def test_fixture_process_denies_files_network_tools_credentials(tmp_path: Path, backend: str) -> None:
+    fixture = HarnessFixture(tmp_path, backend, mode="escape")
     try:
         fixture.run()
         context = fixture.bridge._context(fixture.supervisor.state.effects[0].authorization)

@@ -40,6 +40,9 @@ def copy_binary(source: Path, destination: Path) -> None:
 
 copy_binary(Path(sys.executable).resolve(), root / "usr/local/bin/python3.12")
 copy_binary(Path("/usr/local/bin/deno"), root / "usr/local/bin/deno")
+opencode = shutil.which("opencode")
+if opencode:
+    copy_binary(Path(opencode), root / "usr/local/bin/opencode")
 for extension in (root / "usr/local/lib/python3.12/lib-dynload").glob("*.so"):
     original = Path("/") / extension.relative_to(root)
     copy_binary(original, extension)

@@ -200,13 +200,21 @@ class ProcessServices:
             body = self.gateway.dispatch(context, token, raw.encode(), self._forward)
             result = {"status": 200, "body": body.decode()}
         except BaseException as error:
-            self._failure = error
+            if self._failure is None:
+                self._failure = error
             if not isinstance(error, Exception):
                 raise
             self.gateway.deny(context)
             result = {"status": 403, "body": "{}"}
-        child.stdin.write(json.dumps(result).encode() + b"\n")
-        child.stdin.flush()
+        try:
+            child.stdin.write(json.dumps(result).encode() + b"\n")
+            child.stdin.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            # A deadline can kill the child while its parent awaits OpenAI.
+            # Preserve the upstream cause instead of replacing it with EPIPE.
+            if self._failure is not None:
+                raise self._failure
+            raise
 
     def cancel(self, process: ProcessHandle) -> None:
         child = self._check(process)

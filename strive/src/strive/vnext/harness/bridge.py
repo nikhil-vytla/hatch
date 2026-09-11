@@ -17,7 +17,6 @@ from ..contracts.records import EffectAuthorization, OutcomeStatus, UsageProvena
 from ..errors import VerificationError
 from ..runtime.broker import DispatchContext, EffectRequest, PreparedEffect, Receipt
 from .adapters.base import TextHarnessAdapter
-from .decoding import proposal
 from .gateway import ModelGateway
 from .process import ProcessServices
 from .provider import json_object
@@ -88,7 +87,7 @@ class HarnessEffectAdapter:
                 return Receipt(context.authorization.effect_id, context.authorization.execution_epoch, output, b"")
             return context.forward(raw, perform).output
 
-        services = ProcessServices(self.gateway, self.adapter.profile, self.scratch_root, forward, mode=self.mode)
+        services = self.services(forward)
         try:
             result = self.adapter.invoke(prepared, services)
             response = self.gateway.recover_response(prepared.execution_context)
@@ -100,14 +99,16 @@ class HarnessEffectAdapter:
         finally:
             services.close()
 
+    def services(self, forward: Callable[[bytes, Callable[[bytes], bytes]], bytes]) -> ProcessServices:
+        return ProcessServices(self.gateway, self.adapter.profile, self.scratch_root, forward, mode=self.mode)
+
     def _receipt(self, prepared: PreparedGeneration, result: HarnessReturn, epoch: int) -> Receipt:
         context = prepared.execution_context
         state = self.gateway.read(context)
         if state is None or state.response is None:
             raise VerificationError("no retained response")
         raw = self.gateway.objects.read(state.response)
-        native_model = (self.gateway.contract.provider + "/" + self.gateway.contract.model
-                        if self.adapter.profile.backend == "opencode" else self.gateway.contract.model)
+        native_model = self.adapter.native_identifier()
         identity = self.gateway.identity_evidence(context, native_model)
         self.gateway.event(context, "identity", self.gateway.objects.publish(identity))
         observed = json_object(raw).get("model")
@@ -120,7 +121,7 @@ class HarnessEffectAdapter:
         if stop_reason is not None:
             output, outcome = encode(("qualification-failed", stop_reason, result)), OutcomeStatus.FAILED
         elif result.completion_classification is CompletionClassification.COMPLETE:
-            expected = proposal(self.gateway.contract.text(raw))
+            expected = self.adapter.decode_text(self.gateway.contract.text(raw))
             if result.decoded_text_or_proposal_reference is None or self.gateway.objects.read(result.decoded_text_or_proposal_reference) != expected:
                 raise VerificationError("harness output differs from provider output")
             output, outcome = expected, OutcomeStatus.RETURNED

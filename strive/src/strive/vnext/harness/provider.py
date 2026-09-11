@@ -67,6 +67,9 @@ class ProviderContract:
     def retained(self) -> bytes:
         return encode(tuple(getattr(self, key) for key in self.__dataclass_fields__))
 
+    def request_controls(self) -> dict[str, object]:
+        return {}
+
     def reservation(self, bound_method: ArtifactRef) -> Reservation:
         return Reservation((ResourceQuantity(Resource.INPUT_TOKENS, self.input_ceiling),
                             ResourceQuantity(Resource.OUTPUT_TOKENS, self.output_ceiling),
