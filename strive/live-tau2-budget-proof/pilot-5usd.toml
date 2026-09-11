@@ -1,0 +1,88 @@
+schema = "strive.run/1"
+[run]
+mode = "trusted"
+editable = []
+capabilities = "builtin:capabilities"
+[pins]
+runtime = "builtin:runtime"
+verifier = "builtin:verifier"
+adapters = "builtin:tau2"
+scorer = "builtin:scorer"
+initial_bundle = "builtin:actor"
+model_gateway = "builtin:gateway"
+[policy]
+package = "builtin:policy"
+entrypoint = "campaign:step"
+refine_every_episodes = 1000000
+optional_dev_forks = false
+[workload]
+implementation = "builtin:workload"
+initial_snapshot = "builtin:initial"
+task_stream = "builtin:stream"
+dev_corpus = "builtin:corpus"
+[feedback]
+contract = "A"
+operational_failures_visible = true
+audit_plan = "builtin:audit-plan"
+audit_release = "after-campaign-freeze"
+[comparison]
+strictness = "matched"
+plan = "builtin:comparison-plan"
+allowed_differences = []
+[models.actor]
+provider = "openai"
+model = "gpt-5.6-luna"
+harness = "opencode"
+request_options = "builtin:options"
+max_input_tokens = 32768
+max_output_tokens = 1024
+fallback = "forbid"
+[models.refiner]
+provider = "openai"
+model = "gpt-5.6-luna"
+harness = "opencode"
+request_options = "builtin:options"
+max_input_tokens = 32768
+max_output_tokens = 1024
+fallback = "forbid"
+[models.user]
+provider = "openai"
+model = "gpt-5.6-luna"
+request_options = "builtin:options"
+max_input_tokens = 32768
+max_output_tokens = 1024
+fallback = "forbid"
+[harnesses.opencode]
+interface = "strive.harness/1"
+backend = "opencode"
+adapter = "builtin:opencode-adapter"
+executable = "builtin:opencode-executable"
+version = "1.18.30"
+level = "model"
+launch_profile = "builtin:opencode-launch"
+sandbox_profile = "builtin:opencode-sandbox"
+model_transport = "broker_gateway"
+native_tools = "none"
+session_policy = "fresh"
+max_provider_requests = 1
+deadline_seconds = 150
+[seeds]
+workload = 17
+policy = 17
+[budget]
+usd = 5.00
+tokens = 5000000
+model_calls = 1000
+wall_seconds = 14400
+price_schedule = "prices/openai-2026-09-10.json"
+includes = ["acting", "refinement", "user_simulation", "retries", "adapter_acceptance"]
+[recovery."model.generate"]
+strategy = "suspend_if_ambiguous"
+native_session_resume = false
+automatic_redispatch = false
+unknown_usage = "retain_reservation"
+[telemetry]
+semconv = "1.41.0"
+profile = "langfuse"
+content_export = "authorized-development"
+sampling = "all"

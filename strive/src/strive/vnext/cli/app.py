@@ -52,6 +52,13 @@ def parser() -> argparse.ArgumentParser:
     compare_parser.add_argument("--out", type=Path)
     experiment_parser = sub.add_parser("experiment")
     experiment_parser.add_argument("study", type=Path)
+    for name in ("campaign", "budget-stop-live"):
+        campaign_parser = sub.add_parser(name)
+        campaign_parser.add_argument("manifest", type=Path)
+        campaign_parser.add_argument("--id", required=True)
+        campaign_parser.add_argument("--resume", action="store_true")
+        campaign_parser.add_argument("--episodes", type=int)
+        campaign_parser.add_argument("--prepare-only", action="store_true")
     status_parser = sub.add_parser("status")
     status_parser.add_argument("run")
     status_parser.add_argument("--follow", action="store_true")
@@ -83,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "experiment":
             from ..study.experiment import experiment
             print(json_bytes(experiment(args.root, args.study)).decode())
+        elif args.command in {"campaign", "budget-stop-live"}:
+            from .campaign import live
+            print(json_bytes(live(args.root, args.manifest, args.id, resume=args.resume,
+                episodes=args.episodes, prepare_only=args.prepare_only, budget_proof=args.command == "budget-stop-live")).decode())
         elif args.command == "status":
             for value in status(args.root, args.run, follow=args.follow, invocation=args.invocation):
                 print(json_bytes(value).decode(), flush=True)
@@ -109,5 +120,5 @@ def accepts(argv: list[str]) -> bool:
     if index >= len(argv):
         return False
     word = argv[index]
-    return word in {"resume", "compare", "experiment", "project"} or (
+    return word in {"resume", "compare", "experiment", "project", "campaign", "budget-stop-live"} or (
         word in {"run", "status"} and index + 1 < len(argv) and not argv[index + 1].startswith("-"))

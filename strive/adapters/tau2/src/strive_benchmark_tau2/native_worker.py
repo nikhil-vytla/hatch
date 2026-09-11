@@ -134,6 +134,15 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
     output: Any = {}
     if operation == "initialize":
         output = {"policy": env.get_policy(), "tools": [tool.openai_schema for tool in env.get_tools()]}
+    elif operation == "actor_view":
+        # Public agent policy/tools/history only. Never expose user instructions,
+        # gold actions, reward criteria, databases or user simulator state.
+        output = {"policy": env.get_policy(), "tools": [tool.openai_schema for tool in env.get_tools()],
+                  "messages": [message for message in state["trajectory"]
+                               if not (message.get("role") == "tool" and message.get("requestor") != "assistant")
+                               and not (message.get("role") == "user" and message.get("tool_calls"))]}
+    elif operation == "user_schemas":
+        output = [tool.openai_schema for tool in env.get_user_tools(include=task.user_tools)]
     elif operation in {"agent_tool", "user_tool"}:
         requestor = "user" if operation == "user_tool" else "assistant"
         if payload.get("requestor") != requestor:
@@ -271,7 +280,7 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
         output = {"steps": state["steps"]}
     else:
         raise ValueError("unknown telecom operation")
-    if operation not in {"plan_user_turn", "score", "qualify"}:
+    if operation not in {"plan_user_turn", "score", "qualify", "actor_view", "user_schemas"}:
         state["steps"] += 1
     state["agent_db"] = env.tools.db.model_dump(mode="json")
     state["user_db"] = env.user_tools.db.model_dump(mode="json")

@@ -18,6 +18,7 @@ from ..contracts.harness import ExecutionContext, PreparedGeneration
 from ..contracts.primitives import ArtifactRef, RequestedModelIdentity, WireModelIdentity, ObservedModelIdentity
 from ..errors import VerificationError
 from ..store.cas import CAS, durable_directory, fsync_directory
+from .deadline import upstream_deadline
 from .provider import ProviderContract, Upstream, json_object
 
 
@@ -143,7 +144,14 @@ class ModelGateway:
                     raise VerificationError("cancelled or expired before upstream send")
                 self._db.execute("UPDATE spool SET state='forward' WHERE effect=?", (self.key(context),))
             self.fault("upstream-before-send")
-            response = self.upstream.generate(request, self.key(context))
+            # Include harness startup and counting in the existing generation
+            # deadline. The trusted parent owns both this call and the network.
+            deadline = time.monotonic() + max(0, row[1] - time.time())
+            deadline_token = upstream_deadline.set(deadline)
+            try:
+                response = self.upstream.generate(request, self.key(context))
+            finally:
+                upstream_deadline.reset(deadline_token)
             self.fault("upstream-return-before-spool")
             self.capture(context, response)
             self.fault("response-spooled")

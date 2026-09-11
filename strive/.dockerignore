@@ -13,6 +13,7 @@ adapters/tau2/retained-data
 adapters/tau2/upstream-source
 artifacts
 .container-results
+live-results
 **/.uv-cache
 **/.pytest-tmp
 **/.tmp

@@ -11,7 +11,7 @@ from ..contracts.manifest import (
     FeedbackTable, ComparisonTable, NamedModel, NamedHarness, BudgetTable,
     load_authored_manifest,
 )
-from ..contracts.bindings import ModelBinding
+from ..contracts.bindings import ModelBinding, HarnessBinding
 from ..contracts.primitives import ArtifactRef
 from ..errors import VerificationError
 from ..store.cas import CAS, CASReader
@@ -59,10 +59,10 @@ class Resolver:
             return retain_tree(self.objects, path)
         return self.objects.publish(path.read_bytes())
 
-    def configuration(self, authored: AuthoredManifest) -> RunManifest[ArtifactRef]:
+    def configuration(self, authored: AuthoredManifest, *, allow_harness: bool = False) -> RunManifest[ArtifactRef]:
         r = self.reference
         a = authored
-        if a.harnesses:
+        if a.harnesses and not allow_harness:
             raise VerificationError("fixture runner supports direct recorded provider only; native harness campaign remains gated")
         return RunManifest(a.schema, RunTable(a.run.mode, a.run.editable, r(a.run.capabilities)),
             PinsTable(*(r(getattr(a.pins, name)) for name in a.pins.__dataclass_fields__)),
@@ -73,7 +73,9 @@ class Resolver:
             ComparisonTable(a.comparison.strictness, r(a.comparison.plan), a.comparison.allowed_differences),
             tuple(NamedModel(m.name, ModelBinding(m.binding.provider, m.binding.model, r(m.binding.request_options),
                 m.binding.max_input_tokens, m.binding.max_output_tokens, m.binding.fallback, m.binding.harness)) for m in a.models),
-            tuple[NamedHarness[ArtifactRef], ...](), a.seeds,
+            tuple(NamedHarness(h.name, HarnessBinding(h.binding.interface, h.binding.backend, r(h.binding.adapter), r(h.binding.executable),
+                h.binding.version, h.binding.level, r(h.binding.launch_profile), r(h.binding.sandbox_profile),
+                h.binding.model_transport, h.binding.native_tools, h.binding.session_policy, h.binding.max_provider_requests, h.binding.deadline_seconds)) for h in a.harnesses), a.seeds,
             BudgetTable(a.budget.usd, a.budget.tokens, a.budget.model_calls, a.budget.wall_seconds,
                         r(a.budget.price_schedule), a.budget.includes), a.recovery, a.telemetry)
 

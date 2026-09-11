@@ -19,10 +19,19 @@ from ..provider import ProviderContract
 
 
 class TextHarnessAdapter:
+    output_schema = b"typed-proposal/1"
+
+    def decode_text(self, text: str) -> bytes:
+        return proposal(text)
+
+    def native_identifier(self) -> str:
+        return (self.provider.provider + "/" + self.provider.model
+                if self.profile.backend == "opencode" else self.provider.model)
+
     def __init__(self, objects: CAS, profile: LaunchProfile, provider: ProviderContract) -> None:
         self.objects, self.profile, self.provider = objects, profile, provider
         self.bound = objects.publish(provider.retained())
-        self.decoder = objects.publish(encode(("typed-proposal/1", profile.backend,
+        self.decoder = objects.publish(encode((self.output_schema.decode(), profile.backend,
             objects.publish(Path(__file__).parent.parent.joinpath("decoding.py").read_bytes()), provider.deterministic_decoder)))
         self._profile_reference = self.profile.retained(objects)
         sources = tuple(objects.publish(path.read_bytes()) for path in sorted(Path(__file__).parent.parent.rglob("*.py")))
@@ -48,7 +57,7 @@ class TextHarnessAdapter:
             return Unsupported("context scope mismatch")
         if generation_input.generation_settings != binding.request_options:
             return Unsupported("generation settings differ from binding")
-        if self.objects.read(binding.request_options) != b"{}" or self.objects.read(generation_input.output_schema) != b"typed-proposal/1":
+        if self.objects.read(binding.request_options) != b"{}" or self.objects.read(generation_input.output_schema) != self.output_schema:
             return Unsupported("unqualified generation settings or output decoder")
         if self.profile.deadline_seconds * 1000 > self.provider.wall_milliseconds:
             return Unsupported("local harness deadline exceeds whole-generation reservation")
@@ -80,7 +89,7 @@ class TextHarnessAdapter:
         completion = CompletionClassification.INCOMPLETE
         try:
             if streams.observations.exit_code == 0 and not streams.observations.output_truncated:
-                decoded = self.objects.publish(proposal(native_text(self.profile.backend, raw)))
+                decoded = self.objects.publish(self.decode_text(native_text(self.profile.backend, raw)))
                 completion = CompletionClassification.COMPLETE
         except (ValueError, RuntimeError):
             pass
@@ -101,7 +110,7 @@ class TextHarnessAdapter:
         if durable_evidence.captured_provider_responses and self.provider.deterministic_decoder:
             raw = self.objects.read(durable_evidence.captured_provider_responses[0])
             try:
-                decoded = self.objects.publish(proposal(self.provider.text(raw)))
+                decoded = self.objects.publish(self.decode_text(self.provider.text(raw)))
             except (ValueError, RuntimeError):
                 return Indeterminate(durable_evidence.captured_provider_responses, "provider output cannot reconstruct pinned decoder")
             result = HarnessReturn(CompletionClassification.COMPLETE, (), decoded,
