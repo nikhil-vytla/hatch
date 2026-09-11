@@ -1,13 +1,11 @@
 # ADR-0008 — vNext: a policy-neutral, revision-native mechanism substrate
 
-Status: accepted and implemented in vNext Phase A. **Supersedes the
-empirical-promotion premise** of ADR-0004 (validation bundles / selection
-decisions as a universal activation gate) and the "selection decides every
-activation" framing of ADR-0005, and retires the loop-era `AcceptancePolicy`
-gate. ADR-0001/0002/0003/0006 are refactored (their FLOOR notions survive;
-the generation ledger, revision mirror, dual-write/parity, reader canary,
-and migrations are deleted). ADR-0007 (the secure sandbox boundary) is kept
-unchanged.
+Status: historical implementation, superseded by the current
+[vNext architecture](../ARCHITECTURE.md). The policy-neutral principle remains:
+comparative evaluation is optional, not a universal promotion gate. The APIs,
+module names and completion claims below describe the earlier implementation,
+not `strive.vnext`. Current mechanisms and qualification limits are recorded in
+ADRs 0009–0013 and the architecture document.
 
 ## Context
 

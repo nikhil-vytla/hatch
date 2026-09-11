@@ -1,0 +1,32 @@
+
+2026-09-10: Started on strive-astra with a clean tracked tree. No paid calls permitted on this host; no commits/PRs requested. The 30-file freeze includes manifest/broker/supervisor/ledger/benchmark interfaces, but not CLI or harness implementations.
+
+Inspected counter-only CLI composition, M3 reserve-before-dispatch/settlement, direct user adapter, tau2 RPC, and Linux jail. Native ProcessServices explicitly rejects non-fixture launches. A native OpenCode pipe provider is needed; network access in its jail must remain denied. Existing generic provider receipts ignore caching and reasoning output items, so a dedicated pinned OpenAI contract is needed.
+
+Official OpenAI pricing fetched on 2026-09-10: Luna Standard short input/cached/write/output per million = $0.20/$0.02/$0.25/$1.20; long = $0.40/$0.04/$0.50/$1.80. Source https://developers.openai.com/api/docs/pricing. Counting-token docs state the input token endpoint returns exact model input, including formatting and schemas: https://developers.openai.com/api/docs/guides/token-counting. Use it after reservation but before paid generation to enforce a small input ceiling. No tokenizer guesses.
+
+Host frictions: Git fsmonitor IPC failed; subsequent commands use core.fsmonitor=false. Shell network cannot resolve GitHub; official web/docs tools work. OpenCode --version reports 1.18.30. No model invocation was made.
+
+Native OpenCode 1.18.30 ran locally with a synthetic pipe receipt and no API credentials. The first test exposed an AI SDK v2/v3 finish-reason mismatch that requested another generation; the one-call adapter refused it. Switching to the actual v3 stream contract produced one native request, a stop finish reason, and exit 0. The production launcher requires the existing Linux jail and retains the same no-network inherited-pipe transport. No seccomp or namespace relaxation was made.
+
+Implemented initial live campaign composition, exact provider input counting gate, dated schedule, manifest parsing/resolution, actor/user gateways, and resumable stage checkpoints. Initial strict mypy passed; campaign integration tests are now exercising setup/ledger rather than a disconnected fake ledger.
+
+No-spend campaign tests now demonstrate two full-priced scripted receipts settling to exactly $0.0155648, then a refused next reservation; no actor/user dispatch occurs after stop or after reopening the same run. Mid-episode pause/resume completes and scores with three distinct model effect IDs. A replacement USD cap on resume is rejected. The test fixture initially left its stdin reader alive, causing a real wall-bound overrun; explicitly exiting fixed the fixture, without changing the ledger.
+
+The native smoke test is part of the container wrapper before any live command. The host cannot certify Linux native execution, so that test and the live proof remain orchestrator gates. The portable pilot is resolved against actual container executable/data hashes before dispatch; reporting a host-generated hash as a Linux pin would be incorrect.
+
+The official Luna model page confirms that the current snapshot is exactly gpt-5.6-luna, low reasoning is supported, output limits include reasoning, and prompts above 272K input tokens use doubled input and 1.5x output rates: https://developers.openai.com/api/docs/models/gpt-5.6-luna. This verifies the schedule's long-context threshold rather than inferring it from older models.
+
+Final review: HTTP credentials are validated before header construction so malformed values cannot appear in http.client exceptions. Container startup runs a no-spend native jail smoke test before the live command. The host packaging tests hit a uv 0.9.18 macOS system-configuration panic before wheel building; offline/native-TLS/build-isolation variations reproduce it. Tests are not weakened.
+
+Added a lower-usage campaign test: seven receipts at $0.00032 each settle to $0.00224 under a $0.01 cap, then the unchanged ledger refuses the next $0.0077824 reservation. This checks release of unused reservations in the actual campaign composition. The live CLI was invoked on this Mac only to verify its early container refusal; it exited before preparing a run or reading the key. Provider price evidence must equal the resolved manifest price reference.
+
+The lower-usage test exposed a real proof-path bug: repeated dev episodes put duplicate task IDs in measurement planned coverage, which the frozen verifier correctly rejected. Fixed the campaign assignment to use unique task coverage while preserving each repeated episode identity. This required no core or verifier changes.
+
+The same multi-episode test then caught reuse of one environment ID across episodes. The frozen operation store enforces a unique environment per episode, so the campaign now derives that ID from the episode ID. This fixes both repeated proof tasks and ordinary multi-episode pilots without modifying the store. Unknown or mismatched provider models also retain the USD obligation rather than being priced as Luna.
+
+Final targeted result: 11 passed, 1 Linux native-jail test skipped on macOS. Strict mypy passes for 188 source files. The audit-workflow test passes on a focused rerun. Container qualification now includes the existing installed-tau2 determinism checks and requires that installation. Other pytest sessions share the global temporary root and removed the completed proof outputs before collection; regenerating only the two proof artifacts under a dedicated /tmp base so the reports can be retained for review.
+
+Retained scripted-budget-proofs.json from the dedicated test run. Both proofs passed: exact cap $0.0155648 with two calls, and $0.00224 in measured receipts with seven calls under a $0.01 cap. Both show zero dispatches after stop, zero unknown USD, and zero overrun. Final wheel built directly with Hatchling and contains the runner, native provider module and existing policy data.
+
+Full host suite completed: 794 passed, 26 skipped, 1 xfailed, 3 failed in 1223.89 seconds. The audit failure is explicitly a pinned-runtime mismatch caused by editing runtime source during that test; its isolated rerun passed. The two packaging failures are uv panics before wheel building, reproduced with offline and build-isolation variations. Direct Hatchling builds the final wheel and includes all required package data. No test assertions were weakened. Linux qualification and the paid proof remain unrun by this agent, as required. Final worktree is uncommitted and all 30 frozen hashes still match.

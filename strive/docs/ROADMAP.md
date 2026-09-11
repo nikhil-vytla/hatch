@@ -1,56 +1,66 @@
-# strive — Roadmap (vNext)
+# strive roadmap
 
-The promotion-era roadmap (Stages 1–3C) is archived under
-`docs/archive/ROADMAP-stage1-3c.md`. vNext is organized around policies over
-one durable substrate.
+The [architecture](ARCHITECTURE.md) describes the implemented `strive.vnext`
+boundaries. Work remaining is qualification and explicit capability extensions,
+not the earlier kernel rollout described in the historical ADRs.
 
-## Phase A — the substrate and the resumable kernel (done)
+## Implemented mechanisms
 
-- Run-scoped, semantically-verified event/CAS substrate
-  (`strive.substrate`): composite `HarnessState`, coupled `CompositeChange`
-  with exact before/after, `EventEnvelope` with stable ids + causation,
-  `VerifiedSubstrateView` (framing + CAS closure + exact apply/revert replay
-  + command lifecycle + digest/change-id uniqueness), explicit `repair`.
-- Result-driven, resumable kernel (`strive.kernel`): `next_command` +
-  `reduce`; one intent / one effect / one terminal per command; exact resume
-  and reconciliation for Apply, Revert, EvaluateFork, Confirm, Schedule,
-  Stop (RequestRefinement reserved); the floor (bound identity, budgets,
-  sandbox capabilities + provenance, CAS closure, fork base/candidate refs).
-- The `strive` CLI: run / status / view / history / inspect / revert /
-  repair / sandbox, over one artifact root with many runs.
-- `manual-change@1`: a deterministic proof policy — propose → OPTIONAL fork
-  → (react through the reducer) apply → revert, exactly and resumably.
+- Typed authority records, immutable CAS, authenticated framed journals, pure
+  preflight/replay, local writer leases and durable execution epochs.
+- Serial supervisor, scoped admission, budget reservations and settlement,
+  supported reconciliation, uncertainty retention and single result consumption.
+- Complete executable bundles, bounded actor/controller steps, continual
+  refinement, atomic activation and restoration with evidence provenance.
+- Deno permissions and the Linux jail, with runtime capability checks, hard
+  cgroup limits, bounded scratch and whole-tree cleanup.
+- Bounded harness generation adapters and a trusted single-request gateway.
+- General BenchmarkAdapter, counter and isolated tau2 telecom implementations,
+  transactional simulator operations and trusted scoring.
+- Feedback A/B, serial studies, actor freeze, isolated audit, journal-derived
+  comparison/inspection and optional OTLP export with Langfuse.
 
-## Phase B — `continual-refine@1` (IMPLEMENTED; under review in PR #51)
+## Qualification and reference campaign
 
-A Prime-Agent / Continual-Harness-style **end-to-end refinement policy** over
-this substrate, UNCHANGED — NOT Pareto search:
+1. Run the prepared Linux verification stack. Required jail and installed tau2
+   checks must execute and pass, including both certificate modes, deterministic
+   scorer equivalence and mutation recovery. Retain the report and dependency
+   closure. A green host run with capability skips cannot close this gate.
+2. Qualify each native harness executable/configuration against the gateway's
+   single-request contract inside the jail. Version detection, adapter fixtures
+   and jail availability are insufficient on their own.
+3. Compose and qualify the adaptive telecom campaign path. The manifest CLI
+   currently supports the recorded counter workflow and rejects native harness
+   manifests. The standalone fixed-stock runner is a separate upstream-actor
+   baseline, not that campaign composition.
+4. Bind explicit funded limits and a protected audit allocation before live
+   dispatch. Retain provider bounds, model settings, prices, selected task IDs,
+   ordering, workload closure and the analysis plan.
+5. Run and report fixed versus adapting actors under feedback A using the same
+   initial actor and adaptive assignment. Report negative, incomplete or
+   inconclusive results with coverage and expenditure intact.
 
-- iterative diagnose → refine → (optionally) fork-evaluate → apply/keep or
-  revert, driven entirely by the policy's `next_command`/`reduce`;
-- a real model refiner behind `RequestRefinement` (typed proposal decoding,
-  journaled once, resumed without repeating the model call);
-- a real prompt CONSUMER so the prompt surface is not merely round-trip;
-- honest, optional comparative evaluation the policy composes — never a
-  universal gate.
-- a policy-neutral, PINNED operation mechanism (Area 1): an injected
-  `OperationCatalog` of versioned `OperationDescriptor`s produces a CAS-backed
-  `OperationPlan` (pinned in the `ObserveCurrentState` intent) and a separate
-  policy-visible projection; hidden data is absent from the descriptor API, and
-  only comparable, valid projections under the same plan drive review.
+The adaptive assignment has 49 development, 29 validation and 36 audit tasks.
+Three development passes mean 147 episodes per trajectory. Its three scenario
+roots permit only a coarse transfer claim. Fixed-stock uses all 40 stock test
+IDs and reports separately; neither mode silently inherits another population's
+leaderboard meaning. See [ADR-0013](adrs/0013-adaptive-whole-group-split.md).
 
-### Remaining Phase-B rounds (separate)
+## Deferred capabilities
 
-- **Area 4** — a typed `ReviewDecision` + a crash-safe `ReviseChange`/
-  `ChangeRevised` supersession lifecycle; prompt-only causal proof.
-- **Area 5** — typed model binding/usage records (basis `actual|reservation|
-  unknown`; payload==binding==dispatch==result) replacing the pipe string.
+`EvaluateFork` is a declared command with unsupported enactment and an explicit
+expected-failure test. It needs approved verifier/supervisor authorization and
+accounting changes plus an adapter with actual fork support. Immediate bundle
+activation does not depend on it.
 
-## Later
+Feedback C needs a distinct private-control channel, query accounting and fresh
+audit. It cannot be added as an annotation or an implicit access grant.
 
-- Additional strategies and coupled multi-surface refinement.
-- A budget-matched policy comparison (e.g. hill-climb vs population search)
-  expressed as ordinary policies over the substrate, journaled as
-  command/reducer state machines — never baked into the kernel.
-- Broadening the surface allowlist as new evolvable surfaces earn a
-  descriptor + validator.
+Other deferred work includes arbitrary controller-state migration, model-weight
+updates, generated privileged adapters, remote/concurrent workers, distributed
+budget coordination, persistent verification caches, external history anchors,
+host-loss recovery and additional viewer profiles. A custom web UI and hosted
+experiment service are outside the present scope.
+
+[HANDOFF.md](HANDOFF.md) contains operational verification commands. Earlier
+roadmaps remain in [the archive](archive/README.md).

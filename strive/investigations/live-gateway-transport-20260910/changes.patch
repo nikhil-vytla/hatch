@@ -1,0 +1,682 @@
+diff --git a/src/strive/vnext/harness/openai_live.py b/src/strive/vnext/harness/openai_live.py
+index a28a8f1..1dd05b8 100644
+--- a/src/strive/vnext/harness/openai_live.py
++++ b/src/strive/vnext/harness/openai_live.py
+@@ -5,16 +5,26 @@ including message framing and function schemas, before paid generation. Neither
+ endpoint retries. Ambiguous calls retain the M3 obligation.
+ """
+ from dataclasses import dataclass
++import base64
+ import http.client
+ import json
+ import os
+ from pathlib import Path
+ import sqlite3
++import socket
++import ssl
+ import sys
++import threading
++import time
++from collections.abc import Callable
++from typing import cast
++from urllib.parse import unquote, urlsplit
++import urllib.request
+ 
+ from ..contracts.primitives import Resource, ResourceQuantity
+ from ..errors import VerificationError
+ from ..store.cas import CAS, fsync_directory
++from .deadline import upstream_deadline
+ from .provider import ProviderContract, json_object
+ from .user_model import UserProviderContract
+ 
+@@ -23,6 +33,20 @@ ENDPOINT = "https://api.openai.com/v1/responses"
+ CONTROLS: dict[str, object] = {"service_tier": "default", "store": False,
+     "prompt_cache_options": {"mode": "explicit"}, "reasoning": {"effort": "low"}}
+ 
++# typeshed exposes this helper only on Linux, but our no-spend tests also run on
++# macOS. Use the environment-only helper, never macOS system proxy discovery.
++proxy_bypass_environment = cast(Callable[[str, dict[str, str]], bool],
++                               getattr(urllib.request, "proxy_bypass_environment"))
++
++
++def network_namespace() -> str | None:
++    # Network namespaces are per-thread on Linux. Do not confuse the process
++    # leader's namespace with a calling thread that has entered a jail.
++    try:
++        return os.readlink("/proc/thread-self/ns/net")
++    except OSError:
++        return None
++
+ 
+ def require_live_container() -> None:
+     # Live calls only inside the sanctioned Linux container. Accept both the
+@@ -141,30 +165,145 @@ class OpenAITransport:
+             # http.client can include an invalid header's value in its error.
+             raise VerificationError("OPENAI_API_KEY contains invalid header characters")
+         self._credential = credential
++        self._owner_pid = os.getpid()
++        self._owner_netns = network_namespace()
++        self._operation_key = ""
++        self._deadline = 0.0
++        self._proxy_secrets: set[str] = set()
++        self._route = "direct"
++        self._connect_timeout = 0.0
++        self._read_timeout = 0.0
+         self.contract, self.objects = contract, objects
+         directory.mkdir(parents=True, exist_ok=True)
+         self.db = sqlite3.connect(directory / "transport.sqlite")
+         self.db.execute("PRAGMA synchronous=FULL")
+         self.db.execute("CREATE TABLE IF NOT EXISTS calls (operation TEXT PRIMARY KEY, request TEXT, count TEXT, response TEXT)")
++        self.db.execute("CREATE TABLE IF NOT EXISTS diagnostics (id INTEGER PRIMARY KEY, operation TEXT, detail TEXT)")
+         self.db.commit()
+         fsync_directory(directory)
+ 
++    def _failure(self, error: Exception, path: str, raw: bytes, phase: str,
++                 started: float, status: int | None) -> VerificationError:
++        # Exception messages may echo a header or request. Never retain either.
++        secrets = {self._credential, raw.decode(errors="replace"), repr(raw), *self._proxy_secrets}
++        def collect(value: object) -> None:
++            if isinstance(value, str) and value:
++                secrets.update((value, json.dumps(value)[1:-1], repr(value)[1:-1]))
++            elif isinstance(value, list):
++                for item in value:
++                    collect(item)
++            elif isinstance(value, dict):
++                for item in value.values():
++                    collect(item)
++        collect(json_object(raw))
++        message = str(error)
++        for secret in sorted(secrets, key=len, reverse=True):
++            message = message.replace(secret, "[redacted]")
++        kind = ("dns" if isinstance(error, socket.gaierror) else "tls" if isinstance(error, ssl.SSLError)
++                else phase + "_timeout" if isinstance(error, TimeoutError)
++                else "http" if status is not None and status != 200 else "transport")
++        detail = {"schema": "strive.openai-transport-error/1", "operation": self._operation_key,
++            "endpoint": path, "phase": phase, "exception_type": type(error).__name__, "message": message[:1024],
++            "kind": kind, "route": self._route, "connect_timeout_seconds": self._connect_timeout,
++            "read_timeout_seconds": self._read_timeout, "deadline_exceeded": time.monotonic() >= self._deadline,
++            "errno": error.errno if isinstance(error, OSError) else None, "http_status": status,
++            "elapsed_seconds": round(time.monotonic() - started, 3), "pid": os.getpid(),
++            "owner_pid": self._owner_pid, "netns": network_namespace(), "owner_netns": self._owner_netns,
++            "action": "no retry; retain reservation"}
++        encoded = canonical(detail).decode()
++        # Print even if persisting the diagnostic itself fails. FULL sync commit
++        # completes before the exception reaches campaign recovery.
++        print("OpenAI transport failure: " + encoded, file=sys.stderr, flush=True)
++        with self.db:
++            self.db.execute("INSERT INTO diagnostics(operation, detail) VALUES (?,?)", (self._operation_key, encoded))
++        return VerificationError("OpenAI transport outcome unknown; no retry; retain reservation: " + encoded)
++
++    def _remaining(self) -> float:
++        remaining = self._deadline - time.monotonic()
++        if remaining <= 0:
++            raise TimeoutError("generation deadline exhausted")
++        return remaining
++
++    def _connection(self) -> http.client.HTTPSConnection:
++        # Match urllib's Linux environment proxy routing, but never follow a
++        # redirect or fall back to direct egress. CONNECT carries no API key;
++        # the key and prompt are sent only after TLS to api.openai.com.
++        proxies = urllib.request.getproxies_environment()
++        proxy = proxies.get("https") if not proxy_bypass_environment("api.openai.com", proxies) else None
++        self._route = "proxy" if proxy else "direct"
++        self._connect_timeout = min(10.0, self._remaining())
++        if not proxy:
++            return http.client.HTTPSConnection("api.openai.com", timeout=self._connect_timeout)
++        self._proxy_secrets.add(proxy)
++        route = urlsplit(proxy if "://" in proxy else "http://" + proxy)
++        if route.scheme != "http" or not route.hostname or route.query or route.fragment or route.path not in {"", "/"}:
++            raise VerificationError("HTTPS_PROXY must specify an HTTP CONNECT proxy")
++        headers: dict[str, str] = {}
++        if route.username is not None:
++            username, password = unquote(route.username), unquote(route.password or "")
++            authorization = "Basic " + base64.b64encode((username + ":" + password).encode()).decode()
++            self._proxy_secrets.update(value for value in (username, password, authorization) if value)
++            headers["Proxy-Authorization"] = authorization
++        connection = http.client.HTTPSConnection(route.hostname, route.port or 80, timeout=self._connect_timeout)
++        connection.set_tunnel("api.openai.com", 443, headers=headers)
++        return connection
++
+     def _post(self, path: str, raw: bytes) -> bytes:
+-        connection = http.client.HTTPSConnection("api.openai.com", timeout=min(60, self.contract.wall_milliseconds / 2000))
++        started, phase, status = time.monotonic(), "boundary", None
++        self._connect_timeout = self._read_timeout = 0.0
++        connection: http.client.HTTPSConnection | None = None
++        timer: threading.Timer | None = None
+         try:
++            if os.getpid() != self._owner_pid or network_namespace() != self._owner_netns:
++                raise VerificationError("upstream transport left its trusted owner process/network namespace")
++            phase = "connect"
++            connection = self._connection()
++            connection.connect()
++            # Socket timeouts limit an idle read. Also shut down the socket at
++            # the absolute deadline so a slow trickle cannot extend the call.
++            sock = connection.sock
++            assert sock is not None
++            self._read_timeout = self._remaining()
++            sock.settimeout(self._read_timeout)
++            def expire() -> None:
++                try:
++                    sock.shutdown(socket.SHUT_RDWR)
++                except OSError:
++                    pass
++            timer = threading.Timer(self._read_timeout, expire)
++            timer.daemon = True
++            timer.start()
++            phase = "write"
+             connection.request("POST", path, raw, {"Content-Type": "application/json", "Authorization": "Bearer " + self._credential})
++            phase = "read_headers"
++            sock.settimeout(self._remaining())
+             response = connection.getresponse()
++            status = response.status
++            if status != 200:
++                raise VerificationError("OpenAI HTTP status " + str(status))
++            phase = "read_body"
++            sock.settimeout(self._remaining())
+             body = response.read(self.contract.max_response_bytes + 1)
+-            if response.status != 200 or len(body) > self.contract.max_response_bytes:
+-                raise VerificationError("OpenAI HTTP failure or oversized response; no retry; retain reservation")
++            self._remaining()
++            if len(body) > self.contract.max_response_bytes:
++                raise VerificationError("OpenAI response exceeds byte limit")
+             return body
+-        except OSError:
+-            raise VerificationError("OpenAI transport outcome unknown; no retry; retain reservation") from None
++        except (OSError, http.client.HTTPException, VerificationError, ValueError) as error:
++            raise self._failure(error, path, raw, phase, started, status) from None
+         finally:
+-            connection.close()
++            if timer is not None:
++                timer.cancel()
++                timer.join()
++            if connection is not None:
++                connection.close()
+ 
+     def generate(self, request: bytes, operation_key: str) -> bytes:
+         self.contract.validate(request)
++        self._operation_key = operation_key
++        # Leave one second for the harness to consume the reply and exit, while
++        # keeping the existing wall reservation and outer deadline unchanged.
++        now = time.monotonic()
++        self._deadline = min(upstream_deadline.get() or float("inf"), now + self.contract.wall_milliseconds / 1000) - 1
+         if self.db.execute("SELECT 1 FROM calls WHERE operation=?", (operation_key,)).fetchone():
+             raise VerificationError("duplicate live dispatch forbidden")
+         value = json_object(request)
+diff --git a/src/strive/vnext/harness/gateway.py b/src/strive/vnext/harness/gateway.py
+index c4a23d3..e22a422 100644
+--- a/src/strive/vnext/harness/gateway.py
++++ b/src/strive/vnext/harness/gateway.py
+@@ -18,6 +18,7 @@ from ..contracts.harness import ExecutionContext, PreparedGeneration
+ from ..contracts.primitives import ArtifactRef, RequestedModelIdentity, WireModelIdentity, ObservedModelIdentity
+ from ..errors import VerificationError
+ from ..store.cas import CAS, durable_directory, fsync_directory
++from .deadline import upstream_deadline
+ from .provider import ProviderContract, Upstream, json_object
+ 
+ 
+@@ -143,7 +144,14 @@ class ModelGateway:
+                     raise VerificationError("cancelled or expired before upstream send")
+                 self._db.execute("UPDATE spool SET state='forward' WHERE effect=?", (self.key(context),))
+             self.fault("upstream-before-send")
+-            response = self.upstream.generate(request, self.key(context))
++            # Include harness startup and counting in the existing generation
++            # deadline. The trusted parent owns both this call and the network.
++            deadline = time.monotonic() + max(0, row[1] - time.time())
++            deadline_token = upstream_deadline.set(deadline)
++            try:
++                response = self.upstream.generate(request, self.key(context))
++            finally:
++                upstream_deadline.reset(deadline_token)
+             self.fault("upstream-return-before-spool")
+             self.capture(context, response)
+             self.fault("response-spooled")
+diff --git a/src/strive/vnext/harness/process.py b/src/strive/vnext/harness/process.py
+index 4e9426c..23c82d6 100644
+--- a/src/strive/vnext/harness/process.py
++++ b/src/strive/vnext/harness/process.py
+@@ -200,13 +200,21 @@ class ProcessServices:
+             body = self.gateway.dispatch(context, token, raw.encode(), self._forward)
+             result = {"status": 200, "body": body.decode()}
+         except BaseException as error:
+-            self._failure = error
++            if self._failure is None:
++                self._failure = error
+             if not isinstance(error, Exception):
+                 raise
+             self.gateway.deny(context)
+             result = {"status": 403, "body": "{}"}
+-        child.stdin.write(json.dumps(result).encode() + b"\n")
+-        child.stdin.flush()
++        try:
++            child.stdin.write(json.dumps(result).encode() + b"\n")
++            child.stdin.flush()
++        except (BrokenPipeError, ConnectionResetError):
++            # A deadline can kill the child while its parent awaits OpenAI.
++            # Preserve the upstream cause instead of replacing it with EPIPE.
++            if self._failure is not None:
++                raise self._failure
++            raise
+ 
+     def cancel(self, process: ProcessHandle) -> None:
+         child = self._check(process)
+diff --git a/src/strive/vnext/harness/deadline.py b/src/strive/vnext/harness/deadline.py
+new file mode 100644
+index 0000000..d2d938f
+--- /dev/null
++++ b/src/strive/vnext/harness/deadline.py
+@@ -0,0 +1,5 @@
++"""Trusted dispatch deadline, shared by counting and generation HTTP calls."""
++from contextvars import ContextVar
++
++# The gateway sets this in its own dispatch thread, never from candidate data.
++upstream_deadline: ContextVar[float | None] = ContextVar("upstream_deadline", default=None)
+diff --git a/tests/vnext/test_openai_live_transport.py b/tests/vnext/test_openai_live_transport.py
+new file mode 100644
+index 0000000..c217167
+--- /dev/null
++++ b/tests/vnext/test_openai_live_transport.py
+@@ -0,0 +1,349 @@
++"""Actual live transport code with scripted sockets only; no network or spend."""
++from dataclasses import dataclass, field
++import errno
++import http.client
++import json
++import os
++from pathlib import Path
++import socket
++import sqlite3
++import ssl
++import threading
++from typing import Iterator
++
++import pytest
++
++from strive.vnext.codec import decode
++from strive.vnext.contracts.primitives import ExecutionStatus, Resource
++from strive.vnext.errors import VerificationError
++from strive.vnext.harness import openai_live
++from strive.vnext.harness.deadline import upstream_deadline
++from strive.vnext.harness.openai_live import CONTROLS, OpenAITransport, canonical, load_contract
++from strive.vnext.runtime.ledger import amounts
++from strive.vnext.store.cas import CAS
++from .test_live_campaign import PRICE, Setup
++
++KEY = "test-secret-openai-key"
++PROMPT = 'private prompt with "quotes" and\na newline'
++COUNT = canonical({"object": "response.input_tokens", "input_tokens": 10})
++REPLY = canonical({"id": "resp-scripted", "model": "gpt-5.6-luna", "status": "completed", "service_tier": "default",
++    "usage": {"input_tokens": 10, "output_tokens": 10, "input_tokens_details": {"cached_tokens": 0}},
++    "output": [{"type": "message", "content": [{"type": "output_text", "text": '{"message":"hello"}'}]}]})
++
++
++@dataclass
++class Step:
++    body: bytes = COUNT
++    phase: str = "read_headers"
++    error: Exception | None = None
++    status: int = 200
++    delay: float = 0
++    reads: int = 0
++
++
++@dataclass
++class ScriptedSocket:
++    timeout: float = 0
++
++    def settimeout(self, value: float) -> None:
++        self.timeout = value
++
++    def shutdown(self, how: int) -> None:
++        pass
++
++
++@dataclass
++class Wire:
++    steps: list[Step] = field(default_factory=lambda: [Step(), Step(REPLY)])
++    connections: list["ScriptedConnection"] = field(default_factory=list)
++    now: float = 100
++    pids: list[int] = field(default_factory=list)
++    threads: list[int] = field(default_factory=list)
++
++
++class ScriptedConnection:
++    def __init__(self, wire: Wire, host: str, port: int | None, timeout: float) -> None:
++        self.wire, self.host, self.port, self.timeout = wire, host, port, timeout
++        self.step = wire.steps[len(wire.connections)]
++        self.sock = ScriptedSocket(timeout)
++        self.tunnel: tuple[str, int, dict[str, str]] | None = None
++        self.path: str | None = None
++        self.headers: dict[str, str] = {}
++        self.closed = False
++        wire.connections.append(self)
++
++    def set_tunnel(self, host: str, port: int, headers: dict[str, str]) -> None:
++        self.tunnel = host, port, headers
++
++    def check(self, phase: str) -> None:
++        if phase == self.step.phase and self.step.error is not None:
++            raise self.step.error
++
++    def connect(self) -> None:
++        self.wire.pids.append(os.getpid())
++        self.wire.threads.append(threading.get_ident())
++        self.check("connect")
++
++    def request(self, method: str, path: str, body: bytes, headers: dict[str, str]) -> None:
++        assert method == "POST"
++        self.path, self.headers = path, headers
++        self.check("write")
++
++    def getresponse(self) -> "ScriptedConnection":
++        self.check("read_headers")
++        if self.step.delay >= self.sock.timeout:
++            self.wire.now += self.sock.timeout
++            raise TimeoutError("timed out waiting for response headers")
++        self.wire.now += self.step.delay
++        return self
++
++    @property
++    def status(self) -> int:
++        return self.step.status
++
++    def read(self, maximum: int) -> bytes:
++        self.step.reads += 1
++        self.check("read_body")
++        return self.step.body[:maximum]
++
++    def close(self) -> None:
++        self.closed = True
++
++
++def install_wire(monkeypatch: pytest.MonkeyPatch, wire: Wire, *, clock: bool = True) -> None:
++    monkeypatch.setattr(openai_live, "require_live_container", lambda: None)
++    monkeypatch.setenv("OPENAI_API_KEY", KEY)
++    for name in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"):
++        monkeypatch.delenv(name, raising=False)
++    def connection(host: str, port: int | None = None, *, timeout: float) -> ScriptedConnection:
++        return ScriptedConnection(wire, host, port, timeout)
++    monkeypatch.setattr("strive.vnext.harness.openai_live.http.client.HTTPSConnection", connection)
++    if clock:
++        monkeypatch.setattr("strive.vnext.harness.openai_live.time.monotonic", lambda: wire.now)
++
++
++@pytest.fixture
++def rig(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[OpenAITransport, Wire, bytes]]:
++    wire = Wire()
++    install_wire(monkeypatch, wire)
++    objects = CAS(tmp_path / "cas")
++    objects.directory.mkdir()
++    contract = load_contract(objects, PRICE, input_tokens=32768, output_tokens=1024, wall_seconds=150)
++    transport = OpenAITransport(contract, objects, tmp_path / "transport")
++    request = canonical({**CONTROLS, "model": contract.model, "input": PROMPT, "max_output_tokens": 1024})
++    try:
++        yield transport, wire, request
++    finally:
++        transport.close()
++
++
++def diagnostic(transport: OpenAITransport) -> dict[str, object]:
++    row = transport.db.execute("SELECT detail FROM diagnostics ORDER BY id DESC LIMIT 1").fetchone()
++    assert row is not None
++    value: object = json.loads(row[0])
++    assert isinstance(value, dict)
++    return value
++
++
++@pytest.mark.parametrize("phase,error,kind", [
++    ("connect", socket.gaierror(socket.EAI_NONAME, "Name or service not known"), "dns"),
++    ("connect", OSError(errno.ENETUNREACH, "Network is unreachable"), "transport"),
++    ("connect", TimeoutError("connect timed out"), "connect_timeout"),
++    ("connect", ssl.SSLError("certificate verify failed"), "tls"),
++    ("write", BrokenPipeError(errno.EPIPE, "Broken pipe"), "transport"),
++    ("read_headers", TimeoutError("read timed out"), "read_headers_timeout"),
++    ("read_headers", http.client.RemoteDisconnected("peer closed without response"), "transport"),
++    ("read_body", http.client.IncompleteRead(b"secret response bytes", 100), "transport"),
++])
++@pytest.mark.parametrize("counting", [True, False])
++def test_real_cause_is_durable_and_visible_without_retry(rig: tuple[OpenAITransport, Wire, bytes],
++        capsys: pytest.CaptureFixture[str], tmp_path: Path, phase: str, error: Exception, kind: str, counting: bool) -> None:
++    transport, wire, request = rig
++    wire.steps[0 if counting else 1] = Step(phase=phase, error=error)
++    with pytest.raises(VerificationError, match="no retry; retain reservation") as caught:
++        transport.generate(request, "operation-1")
++    detail = diagnostic(transport)
++    assert detail["exception_type"] == type(error).__name__
++    assert detail["message"] == str(error)
++    assert detail["kind"] == kind and detail["phase"] == phase
++    assert detail["endpoint"] == ("/v1/responses/input_tokens" if counting else "/v1/responses")
++    assert detail["errno"] == (error.errno if isinstance(error, OSError) else None)
++    assert detail["pid"] == detail["owner_pid"] == os.getpid()
++    assert detail["netns"] == detail["owner_netns"]
++    assert len(wire.connections) == (1 if counting else 2)
++    assert all(c.closed for c in wire.connections)
++    assert type(error).__name__ in capsys.readouterr().err
++    assert type(error).__name__ in str(caught.value)
++    # Reopen independently to verify this is durable, not an in-memory log.
++    with sqlite3.connect(tmp_path / "transport/transport.sqlite") as db:
++        assert db.execute("SELECT operation FROM diagnostics").fetchall() == [("operation-1",)]
++    if not counting:
++        with pytest.raises(VerificationError, match="duplicate"):
++            transport.generate(request, "operation-1")
++        assert len(wire.connections) == 2
++        assert transport.db.execute("SELECT response FROM calls").fetchall() == [(None,)]
++
++
++@pytest.mark.parametrize("status", [302, 401, 429, 500])
++def test_http_status_without_error_body_or_redirect(rig: tuple[OpenAITransport, Wire, bytes], status: int) -> None:
++    transport, wire, request = rig
++    wire.steps[1] = Step(body=(KEY + PROMPT).encode(), status=status)
++    with pytest.raises(VerificationError):
++        transport.generate(request, "http-error")
++    detail = diagnostic(transport)
++    assert detail["http_status"] == status and detail["message"] == f"OpenAI HTTP status {status}"
++    assert wire.steps[1].reads == 0 and len(wire.connections) == 2
++
++
++def test_exception_redaction(rig: tuple[OpenAITransport, Wire, bytes], capsys: pytest.CaptureFixture[str]) -> None:
++    transport, wire, request = rig
++    wire.steps[1].error = OSError(errno.ECONNRESET, f"reset {KEY} {PROMPT} {request!r}")
++    with pytest.raises(VerificationError) as caught:
++        transport.generate(request, "redacted")
++    recorded = canonical(diagnostic(transport)).decode() + str(caught.value) + capsys.readouterr().err
++    assert KEY not in recorded and "private prompt" not in recorded and "a newline" not in recorded
++    assert "ConnectionResetError" in recorded and "[redacted]" in recorded
++
++
++def test_reasoning_wait_over_sixty_seconds_uses_remaining_deadline(rig: tuple[OpenAITransport, Wire, bytes]) -> None:
++    transport, wire, request = rig
++    wire.steps[0].delay = 5
++    wire.steps[1].delay = 90
++    assert transport.generate(request, "slow-generation") == REPLY
++    assert wire.now == 195
++    assert [c.timeout for c in wire.connections] == [10, 10]
++    assert wire.connections[1].sock.timeout == 54
++    assert transport.db.execute("SELECT count(*) FROM diagnostics").fetchone()[0] == 0
++
++
++def test_count_and_generation_share_harness_deadline(rig: tuple[OpenAITransport, Wire, bytes]) -> None:
++    transport, wire, request = rig
++    wire.steps[0].delay, wire.steps[1].delay = 5, 90
++    token = upstream_deadline.set(wire.now + 70)
++    try:
++        with pytest.raises(VerificationError, match="TimeoutError"):
++            transport.generate(request, "remaining-harness-budget")
++    finally:
++        upstream_deadline.reset(token)
++    assert wire.now == 169
++    detail = diagnostic(transport)
++    assert detail["read_timeout_seconds"] == 64 and detail["deadline_exceeded"] is True
++    assert transport.db.execute("SELECT response FROM calls").fetchall() == [(None,)]
++
++
++@pytest.mark.parametrize("bypass", [False, True])
++def test_proxy_is_used_only_in_trusted_parent_and_no_proxy_is_honored(rig: tuple[OpenAITransport, Wire, bytes],
++        monkeypatch: pytest.MonkeyPatch, bypass: bool) -> None:
++    transport, wire, request = rig
++    monkeypatch.setenv("https_proxy", "http://proxy-user:proxy-password@egress.example:3128")
++    if bypass:
++        monkeypatch.setenv("no_proxy", ".openai.com")
++    assert transport.generate(request, "proxy-route") == REPLY
++    for connection in wire.connections:
++        assert connection.host == ("api.openai.com" if bypass else "egress.example")
++        if not bypass:
++            assert connection.tunnel is not None and connection.tunnel[:2] == ("api.openai.com", 443)
++            assert "Proxy-Authorization" in connection.tunnel[2]
++            assert KEY not in str(connection.tunnel)
++        assert connection.headers["Authorization"] == "Bearer " + KEY
++        assert "Proxy-Authorization" not in connection.headers
++    assert wire.pids == [os.getpid(), os.getpid()]
++
++
++@pytest.mark.parametrize("change", ["pid", "netns"])
++def test_transport_refuses_a_move_into_child_or_other_netns(rig: tuple[OpenAITransport, Wire, bytes],
++        monkeypatch: pytest.MonkeyPatch, change: str) -> None:
++    transport, wire, request = rig
++    if change == "pid":
++        monkeypatch.setattr("strive.vnext.harness.openai_live.os.getpid", lambda: transport._owner_pid + 1)
++    else:
++        monkeypatch.setattr(openai_live, "network_namespace", lambda: "net:[confined]")
++    with pytest.raises(VerificationError, match="trusted owner"):
++        transport.generate(request, "wrong-boundary")
++    assert not wire.connections
++    assert diagnostic(transport)["phase"] == "boundary"
++
++
++def test_campaign_pipe_attempts_upstream_in_parent_and_suspends_with_real_cause(tmp_path: Path,
++        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
++    wire = Wire(steps=[Step(), Step(error=TimeoutError("scripted read timeout after request send"))])
++    install_wire(monkeypatch, wire, clock=False)
++    setup = Setup(tmp_path)
++    try:
++        campaign = setup.open()
++        gateway = campaign.gateways["actor"]
++        transport = OpenAITransport(campaign.contracts["actor"], campaign.objects, campaign.directory / "transport/actor")
++        campaign.resources.callback(transport.close)
++        gateway.upstream = transport
++        with pytest.raises(VerificationError, match="scripted read timeout"):
++            campaign.drive()
++        state = campaign.reader.verify()
++        assert state.execution_status is ExecutionStatus.SUSPENDED
++        assert amounts(state.obligations)[Resource.USD_NANODOLLARS] == 7_782_400
++        assert amounts(state.measured).get(Resource.USD_NANODOLLARS, 0) == 0
++        context = campaign.actor._context(state.effects[-1].authorization)
++        pid_ref, = gateway.events(context, "pid")
++        identity = decode(campaign.objects.read(pid_ref))
++        assert isinstance(identity, tuple) and identity[0] == "process-identity/1"
++        assert identity[1] != os.getpid()
++        assert wire.pids == [os.getpid(), os.getpid()]
++        assert wire.threads == [threading.get_ident(), threading.get_ident()]
++        assert diagnostic(transport)["message"] == "scripted read timeout after request send"
++        assert "TimeoutError" in capsys.readouterr().err
++        campaign.drive()
++        assert len(wire.connections) == 2
++        setup.close()
++        campaign = setup.open(resume=True)
++        campaign.drive()
++        assert campaign.reader.verify().execution_status is ExecutionStatus.SUSPENDED
++        assert len(wire.connections) == 2 and not setup.calls
++        assert amounts(campaign.reader.verify().obligations)[Resource.USD_NANODOLLARS] == 7_782_400
++    finally:
++        setup.close()
++
++
++def test_proxy_failure_is_redacted_and_never_falls_back(rig: tuple[OpenAITransport, Wire, bytes],
++        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
++    transport, wire, request = rig
++    monkeypatch.setenv("HTTPS_PROXY", "http://proxy-user:proxy-password@egress.example:3128")
++    wire.steps[0].phase = "connect"
++    wire.steps[0].error = OSError("proxy refused proxy-user proxy-password")
++    with pytest.raises(VerificationError):
++        transport.generate(request, "proxy-failure")
++    detail = diagnostic(transport)
++    assert detail["route"] == "proxy" and detail["phase"] == "connect"
++    assert len(wire.connections) == 1
++    assert "proxy-password" not in capsys.readouterr().err + str(detail)
++    assert "proxy-user" not in str(detail)
++
++
++def test_upstream_error_survives_child_broken_pipe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
++    from collections.abc import Callable
++    import io
++    import subprocess
++    from typing import cast
++    from strive.vnext.contracts.harness import ExecutionContext
++    from strive.vnext.harness.process import ProcessServices
++    from .harness_support import HarnessFixture
++    from .test_harness_gateway import prepare
++
++    cause = VerificationError("original upstream read timeout")
++    class ClosedInput(io.BytesIO):
++        def write(self, data: object) -> int:
++            raise BrokenPipeError(errno.EPIPE, "child exited")
++    class Child:
++        stdin = ClosedInput()
++    def fail(context: ExecutionContext, token: str, raw: bytes,
++             forward: Callable[[bytes, Callable[[bytes], bytes]], bytes]) -> bytes:
++        raise cause
++    fixture = HarnessFixture(tmp_path)
++    try:
++        services = ProcessServices(fixture.gateway, fixture.adapter.profile, tmp_path, lambda raw, send: send(raw))
++        services._prepared = prepare(fixture)
++        monkeypatch.setattr(fixture.gateway, "dispatch", fail)
++        with pytest.raises(VerificationError) as caught:
++            services._pipe_request(canonical({"gateway_request": "{}", "token": "test", "path": "/generation"}),
++                                   cast(subprocess.Popen[bytes], Child()))
++        assert caught.value is cause
++    finally:
++        fixture.close()
+diff --git a/tests/vnext/test_live_campaign.py b/tests/vnext/test_live_campaign.py
+index c36ad35..3c1a395 100644
+--- a/tests/vnext/test_live_campaign.py
++++ b/tests/vnext/test_live_campaign.py
+@@ -2,7 +2,9 @@
+ from dataclasses import replace
+ from decimal import Decimal
+ from pathlib import Path
++import os
+ import shutil
++import threading
+ 
+ import pytest
+ 
+@@ -13,7 +15,7 @@ from strive.vnext.cli.budget_proof import prove, dispatches
+ from strive.vnext.cli.campaign import Campaign
+ from strive.vnext.contracts.primitives import ArtifactRef, RunId, Resource
+ from strive.vnext.errors import VerificationError
+-from strive.vnext.harness.openai_live import OpenAIContract, OpenAITransport, CONTROLS, load_contract
++from strive.vnext.harness.openai_live import OpenAIContract, OpenAITransport, CONTROLS, load_contract, network_namespace
+ from strive.vnext.harness.profiles import fixture_profile
+ from strive.vnext.harness.provider import Upstream
+ from strive.vnext.runtime.ledger import amounts
+@@ -47,6 +49,10 @@ class ScriptedProvider:
+         self.contract, self.owner = contract, owner
+ 
+     def generate(self, request: bytes, operation_key: str) -> bytes:
++        # Also exercised by the real native-jail qualification in the container.
++        assert os.getpid() == self.owner.parent_pid
++        assert threading.get_ident() == self.owner.parent_thread
++        assert network_namespace() == self.owner.parent_netns
+         self.contract.validate(request)
+         # The callback runs only after M3 committed authorization and forward.
+         state = self.owner.campaign.reader.verify()
+@@ -66,6 +72,8 @@ class ScriptedProvider:
+ 
+ class Setup:
+     def __init__(self, root: Path, *, cap: str = "0.0155648") -> None:
++        self.parent_pid, self.parent_thread = os.getpid(), threading.get_ident()
++        self.parent_netns = network_namespace()
+         self.root, self.calls = root, list[str]()
+         self.overrun = False
+         self.input_tokens, self.output_tokens = 32768, 1024
+diff --git a/live-tau2-budget-proof/run-container.sh b/live-tau2-budget-proof/run-container.sh
+index 4fd4b51..b44d209 100644
+--- a/live-tau2-budget-proof/run-container.sh
++++ b/live-tau2-budget-proof/run-container.sh
+@@ -8,6 +8,7 @@ export PYTHONPATH="$PWD/adapters/tau2/src"
+ python scripts/prepare-cgroup.py
+ if [[ "$1" == qualify ]]; then
+   uv run --no-sync pytest tests/vnext/test_linux_jail.py tests/vnext/test_live_campaign.py \
++    tests/vnext/test_openai_live_transport.py \
+     tests/vnext/test_tau2_live.py tests/vnext/test_tau2_worker_regressions.py -q
+ else
+   # This real native CLI smoke uses a scripted provider and spends nothing.
