@@ -40,6 +40,25 @@ def test_token_ceiling_enforced_across_calls() -> None:
     assert denial is not None and "token budget exhausted" in denial.detail
 
 
+def test_output_cap_reserves_input_first_so_viable_budgets_succeed() -> None:
+    # estimate input FIRST, then cap output to remaining-input: a viable finite
+    # budget yields a reservation (input + capped output) that does NOT exceed.
+    meter = BudgetMeter(BudgetSpec(model_calls=10, tokens=100))
+    assert meter.remaining_tokens() == 100
+    est_input = 30
+    max_out = meter.cap_output_tokens(512, reserved_input=est_input)
+    assert max_out == 70  # 100 - 30, not the full 100
+    assert meter.would_exceed_tokens(est_input + max_out) is None  # exactly fits
+
+    # capping output to the FULL remaining (ignoring input) would wrongly exceed
+    naive = meter.cap_output_tokens(512)  # 100
+    assert meter.would_exceed_tokens(est_input + naive) is not None
+
+
+def test_remaining_tokens_is_none_when_unlimited() -> None:
+    assert BudgetMeter(BudgetSpec(tokens=UNLIMITED)).remaining_tokens() is None
+
+
 def test_cost_ceiling_enforced_across_calls() -> None:
     meter = BudgetMeter(BudgetSpec(model_calls=10, cost=1.0))
     assert meter.request_model_call() is None

@@ -40,6 +40,8 @@ from strive.contracts import (
     FAILURE_OUTPUT_LIMIT,
     FAILURE_SCHEMA_MISMATCH,
     FAILURE_TIMEOUT,
+    FAULT_CANDIDATE,
+    FAULT_UNKNOWN,
     CaseOutcome,
     ExecutionReport,
     FailureRecord,
@@ -88,6 +90,7 @@ def run_strategy(
         outcomes: tuple[CaseOutcome, ...] = (),
         failure: FailureRecord | None = None,
         stdout_bytes: int = 0,
+        fault_origin: str | None = None,
     ) -> ExecutionReport:
         return ExecutionReport(
             ok=ok,
@@ -96,6 +99,7 @@ def run_strategy(
             failure=failure,
             wall_time_s=round(time.monotonic() - started, 6),
             stdout_bytes=stdout_bytes,
+            fault_origin=fault_origin,
         )
 
     payload = json.dumps(
@@ -147,6 +151,7 @@ def run_strategy(
                         detail=f"stdout exceeded {output_bytes_cap} bytes",
                     ),
                     stdout_bytes=len(stdout),
+                    fault_origin=FAULT_CANDIDATE,  # the candidate flooded stdout
                 )
             proc.wait()
             stderr = _read_bounded(proc.stderr, 65536)
@@ -163,6 +168,9 @@ def run_strategy(
                 kind=FAILURE_TIMEOUT, detail=f"killed after {timeout_s}s"
             ),
             stdout_bytes=len(stdout),
+            # a wall timeout is NOT proven candidate (a hung child looks the same
+            # as a slow launcher) — the cause is UNKNOWN
+            fault_origin=FAULT_UNKNOWN,
         )
     if proc.returncode == _EXIT_SCHEMA_MISMATCH:
         return report(
@@ -172,6 +180,7 @@ def run_strategy(
                 detail=stderr.decode("utf-8", "replace").strip() or "runner rejected payload",
             ),
             stdout_bytes=len(stdout),
+            fault_origin=FAULT_UNKNOWN,  # a runner-protocol break; cause not proven
         )
     if proc.returncode != 0:
         tail = stderr.decode("utf-8", "replace").strip().splitlines()[-5:]
@@ -182,6 +191,9 @@ def run_strategy(
                 detail=f"child exited {proc.returncode}: " + " | ".join(tail),
             ),
             stdout_bytes=len(stdout),
+            # a nonzero exit could be the candidate crashing OR the launcher/
+            # runner failing to start — NOT distinguishable here, so UNKNOWN
+            fault_origin=FAULT_UNKNOWN,
         )
 
     try:
@@ -208,6 +220,7 @@ def run_strategy(
                 kind=FAILURE_MALFORMED_OUTPUT, detail=f"runner output unparseable: {exc}"
             ),
             stdout_bytes=len(stdout),
+            fault_origin=FAULT_UNKNOWN,  # protocol break; candidate-flood vs runner-bug unproven
         )
 
     return report(ok=True, outcomes=outcomes, stdout_bytes=len(stdout))

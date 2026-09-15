@@ -157,11 +157,23 @@ class BudgetMeter:
             "recursion_depth": basic(self.spec.max_recursion_depth),
         }
 
-    def cap_output_tokens(self, requested: int) -> int:
-        """Cap requested completion tokens to the remaining token allowance."""
+    def remaining_tokens(self) -> int | None:
+        """The token allowance still unspent, or None when tokens are unlimited."""
+        if not _limited(self.spec.tokens):
+            return None
+        return self.spec.tokens - self._tokens
+
+    def cap_output_tokens(self, requested: int, reserved_input: int = 0) -> int:
+        """Cap requested completion tokens to what remains AFTER the call's
+        reserved input tokens. Estimating input FIRST and capping output to
+        ``remaining - reserved_input`` means a viable finite budget (enough room
+        for the input plus at least one output token) always yields a usable,
+        non-exceeding reservation — instead of capping output to the full
+        remaining and then adding input on top (which wrongly denies viable
+        budgets)."""
         if not _limited(self.spec.tokens):
             return requested
-        remaining = self.spec.tokens - self._tokens
+        remaining = self.spec.tokens - self._tokens - reserved_input
         return max(1, min(requested, remaining))
 
     def tokens_overrun(self) -> FailureRecord | None:
@@ -183,6 +195,36 @@ class BudgetMeter:
                 "cost",
                 f"{self.spec.cost} allowed, {self._cost} spent — the "
                 "overrunning call's completion is rejected",
+            )
+        return None
+
+    def would_exceed_tokens(self, reserved_tokens: int) -> FailureRecord | None:
+        """CONSERVATIVE preflight: would committing ``reserved_tokens`` (a
+        call's estimated input + capped output) push cumulative tokens past the
+        hard limit? Denies BEFORE dispatch so nothing is spent — distinct from
+        the post-call ``tokens_overrun`` check."""
+        if not _limited(self.spec.tokens):
+            return None
+        projected = self._tokens + reserved_tokens
+        if projected > self.spec.tokens:
+            return self._exhausted(
+                "token",
+                f"{self.spec.tokens} allowed, {self._tokens} consumed + "
+                f"{reserved_tokens} reserved would reach {projected} — call denied",
+            )
+        return None
+
+    def would_exceed_cost(self, reserved_cost: float) -> FailureRecord | None:
+        """CONSERVATIVE preflight: would committing ``reserved_cost`` push
+        cumulative cost past the hard limit? Denies BEFORE dispatch."""
+        if not _limited(self.spec.cost):
+            return None
+        projected = self._cost + reserved_cost
+        if projected > self.spec.cost:
+            return self._exhausted(
+                "cost",
+                f"{self.spec.cost} allowed, {self._cost} spent + "
+                f"{reserved_cost} reserved would reach {projected} — call denied",
             )
         return None
 
