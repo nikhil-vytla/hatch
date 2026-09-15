@@ -1,0 +1,37 @@
+# continual-refine@1 — default policy configuration.
+#
+# The policy is model-led: it does NOT carry target content (the model
+# proposes it). This config sets the triggers and bounds the loop.
+
+[continual_refine]
+summary = "continual model-led refinement of the strategy + proposal template"
+
+# which model-adapter ROLE the kernel resolves from the injected catalog
+model_role = "refine"
+
+# operate (observe) the active harness this many times before refining, so the
+# refiner reacts to REAL observed behavior
+warmup_observations = 1
+
+# post-change observations gathered before a review checkpoint
+review_window = 1
+
+# how many recent trajectory items to feed the refiner as context
+trajectory_window = 8
+
+# the maximum number of surface edits ONE atomic coupled proposal may carry
+edit_limit = 2
+
+# the surfaces whose deltas the strategies may assemble into a change
+enabled_strategies = ["strategy-code", "prompt"]
+
+# request an OPTIONAL comparative EvaluateFork before applying (an observation,
+# never a gate — the change is applied immediately regardless)
+use_fork = false
+
+# "auto" = keep unless a fork showed no improvement; "model" = consult the
+# review prompt for a keep/revise/revert/defer verdict
+review_mode = "auto"
+
+# how many refine cycles the run performs (cadence trigger)
+max_cycles = 1

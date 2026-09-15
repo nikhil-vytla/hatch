@@ -33,6 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol, Sequence, TypeVar
 
+from strive.cas import ContentReader
 from strive.substrate import CompositeChange, HarnessState, VerifiedSubstrateView
 
 Config = TypeVar("Config", contravariant=True)
@@ -46,7 +47,12 @@ State = TypeVar("State")
 class RunView:
     """The immutable read a policy is handed each step: the run/task scope,
     the current composite state, the pinned seed state (stable across
-    resume), the journal head, and the ordered event bodies (read-only)."""
+    resume), the journal head, and the ordered event bodies (read-only).
+
+    `reader` is a MECHANICALLY read-only content view: a policy may resolve a
+    ref it sees in `bodies` (e.g. a decoded `RefinementProposal` behind a
+    `ModelResult`, or an edit's content) to build its next change. It has no
+    method that mutates the store — the kernel remains the only writer."""
 
     run_id: str
     task_id: str
@@ -57,9 +63,19 @@ class RunView:
     head: str
     seed: int
     bodies: tuple[object, ...]
+    reader: ContentReader | None = None
+
+    def read_text(self, ref: str) -> str:
+        """Resolve a CAS ref to its content (read-only). Raises if no reader is
+        attached (a policy built without one cannot resolve refs)."""
+        if self.reader is None:
+            raise RuntimeError("RunView has no content reader attached")
+        return self.reader.get_text(ref)
 
     @staticmethod
-    def of(seed: int, view: VerifiedSubstrateView) -> "RunView":
+    def of(
+        seed: int, view: VerifiedSubstrateView, reader: ContentReader | None = None
+    ) -> "RunView":
         return RunView(
             run_id=view.run_id,
             task_id=view.task_id,
@@ -70,6 +86,7 @@ class RunView:
             head=view.head,
             seed=seed,
             bodies=view.bodies,
+            reader=reader,
         )
 
 
@@ -79,12 +96,33 @@ class RunView:
 @dataclass(frozen=True)
 class RequestRefinement:
     """Ask the kernel to run the model under a pinned prompt role and decode a
-    strict typed proposal. The kernel performs and journals the model call
-    once, so a restart never repeats it."""
+    strict typed proposal. The kernel renders the prompt from the ACTIVE
+    proposal-template surface plus the policy's context (`context_ref`, staged
+    via `content_blobs`), performs and journals the model call once, so a
+    restart never repeats it. `context_ref` MUST be a key of `content_blobs`
+    (the policy supplies the exact context bytes it addresses).
+
+    The DURABLE proposal constraints travel in the command so a violation is
+    failure-as-data (a `failed` refinement), never a policy exception: the
+    proposal must use exactly `required_change_id`, touch at most `edit_limit`
+    surfaces, and only surfaces in `enabled_surfaces` (each `"kind/name"`, a
+    subset of the run-pinned surfaces). `edit_rule` encodes the role's
+    edit requirement — `"refine"` (edits required) or `"review"` (edits iff the
+    verdict is `revise`; keep/revert/defer forbid them).
+
+    `model_role` names the model-catalog role the kernel resolves for this call:
+    it travels IN the command (part of its durable intent), so the kernel never
+    depends on a separately-aligned `KernelServices.model_role`."""
 
     command_id: str
     prompt_role: str
+    model_role: str
     context_ref: str
+    required_change_id: str
+    edit_limit: int
+    enabled_surfaces: tuple[str, ...]
+    edit_rule: str  # "refine" | "review"
+    content_blobs: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -113,6 +151,18 @@ class EvaluateFork:
     command_id: str
     candidate: CompositeChange
     content_blobs: dict[str, str] = field(default_factory=dict)
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class ObserveCurrentState:
+    """Execute the ACTIVE harness once through the secure executor and journal a
+    typed, state-scoped observation (report + evaluation + usage). This is
+    FEEDBACK a policy gathers from continuing operation — never an acceptance
+    gate. Deterministic and re-runnable, so a crash mid-observation just
+    re-observes on resume (its cost stays bounded by the executions budget)."""
+
+    command_id: str
     detail: str = ""
 
 
@@ -147,6 +197,7 @@ KernelCommand = (
     RequestRefinement
     | ApplyChange
     | EvaluateFork
+    | ObserveCurrentState
     | ScheduleTrigger
     | ConfirmChange
     | RevertChange
@@ -214,7 +265,12 @@ class PolicyDescriptor:
     (`dependency_modules`), i.e. any strategy/helper module the policy relies on
     OUTSIDE its own module. The kernel folds these module sources into the
     pinned policy digest, so a change to a declared dependency is detected on
-    resume even though it lives elsewhere."""
+    resume even though it lives elsewhere.
+
+    `requires_secure_execution` marks a policy whose model-authored code MUST
+    run under a mechanically-secure executor: the kernel refuses to drive it on
+    an insecure (fault-only) backend unless the caller EXPLICITLY opts in
+    (a test-only escape hatch), so production never silently downgrades."""
 
     name: str
     factory: Callable[[], "AdaptationPolicy[Any, Any]"]
@@ -222,6 +278,7 @@ class PolicyDescriptor:
     default_config_path: str
     prompt_files: dict[str, str] = field(default_factory=dict)
     dependency_modules: tuple[str, ...] = ()
+    requires_secure_execution: bool = False
 
 
 class PolicyCatalog:
@@ -271,9 +328,10 @@ def conformance_violations(descriptor: PolicyDescriptor) -> list[str]:
 
 
 def default_catalog() -> PolicyCatalog:
+    from strive.policies.continual_refine import DESCRIPTOR as CONTINUAL_REFINE
     from strive.policies.manual_change import DESCRIPTOR as MANUAL_CHANGE
 
-    return PolicyCatalog([MANUAL_CHANGE])
+    return PolicyCatalog([MANUAL_CHANGE, CONTINUAL_REFINE])
 
 
 __all__ = [
@@ -283,6 +341,7 @@ __all__ = [
     "ConfirmChange",
     "EvaluateFork",
     "KernelCommand",
+    "ObserveCurrentState",
     "PolicyCatalog",
     "PolicyDescriptor",
     "RequestRefinement",

@@ -277,6 +277,32 @@ def test_semantic_corruption_is_refused_not_quarantined(tmp_path: Path) -> None:
         sub.confirm_change(change_id="x", rationale="r", caused_by="c")
 
 
+def test_confirm_of_reverted_change_is_refused(tmp_path: Path) -> None:
+    # a confirm may only ratify a CURRENTLY-active change: confirming a change
+    # that was already reverted is a forged verdict and must be refused.
+    sub = _open(tmp_path)
+    _bind(sub)
+    change, blobs = _change(sub, code=_code(1), prompt="new template")
+    _apply(sub, "cmd-apply", change, blobs)
+    _revert(sub, "cmd-revert", change.change_id)
+    _issue(sub, "cmd-confirm", "ConfirmChange", target=change.change_id)
+    with pytest.raises(SubstrateError, match="already reverted"):
+        sub.confirm_change(change_id=change.change_id, rationale="r", caused_by="cmd-confirm")
+
+
+def test_confirm_of_unapplied_change_is_refused(tmp_path: Path) -> None:
+    # a change that was proposed but never applied is not in effect: confirming
+    # it is refused (only a live, applied change may be confirmed).
+    sub = _open(tmp_path)
+    _bind(sub)
+    change, _blobs = _change(sub, code=_code(1), prompt="new template")
+    _issue(sub, "cmd-apply", "ApplyChange", change)
+    sub.record_proposal(change=change, strategy_ref="t", caused_by="cmd-apply")
+    _issue(sub, "cmd-confirm", "ConfirmChange", target=change.change_id)
+    with pytest.raises(SubstrateError, match="not applied"):
+        sub.confirm_change(change_id=change.change_id, rationale="r", caused_by="cmd-confirm")
+
+
 def test_pure_apply_change_is_invertible() -> None:
     state = canonical_state({("strategy-code", "solve"): "aa" * 32})
     change = CompositeChange("c", (SurfaceDelta("strategy-code", "solve", "aa" * 32, "bb" * 32),), "x")

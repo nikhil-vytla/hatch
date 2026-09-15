@@ -21,7 +21,7 @@ one durable substrate.
 - `manual-change@1`: a deterministic proof policy — propose → OPTIONAL fork
   → (react through the reducer) apply → revert, exactly and resumably.
 
-## Phase B — `continual-refine@1` (next)
+## Phase B — `continual-refine@1` (IMPLEMENTED; under review in PR #51)
 
 A Prime-Agent / Continual-Harness-style **end-to-end refinement policy** over
 this substrate, UNCHANGED — NOT Pareto search:
@@ -33,6 +33,18 @@ this substrate, UNCHANGED — NOT Pareto search:
 - a real prompt CONSUMER so the prompt surface is not merely round-trip;
 - honest, optional comparative evaluation the policy composes — never a
   universal gate.
+- a policy-neutral, PINNED operation mechanism (Area 1): an injected
+  `OperationCatalog` of versioned `OperationDescriptor`s produces a CAS-backed
+  `OperationPlan` (pinned in the `ObserveCurrentState` intent) and a separate
+  policy-visible projection; hidden data is absent from the descriptor API, and
+  only comparable, valid projections under the same plan drive review.
+
+### Remaining Phase-B rounds (separate)
+
+- **Area 4** — a typed `ReviewDecision` + a crash-safe `ReviseChange`/
+  `ChangeRevised` supersession lifecycle; prompt-only causal proof.
+- **Area 5** — typed model binding/usage records (basis `actual|reservation|
+  unknown`; payload==binding==dispatch==result) replacing the pipe string.
 
 ## Later
 

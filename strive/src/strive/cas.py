@@ -16,8 +16,20 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from typing import Protocol
 
 _REF_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class ContentReader(Protocol):
+    """A MECHANICALLY read-only view of content-addressed storage. What a policy
+    receives so it can resolve refs it sees (a decoded proposal, an edit's
+    content) WITHOUT any handle that could mutate the store — the kernel stays
+    the only writer. It exposes exactly `get_text` and `has`, nothing else."""
+
+    def get_text(self, ref: str) -> str: ...
+
+    def has(self, ref: str, *, verify: bool = False) -> bool: ...
 
 
 class ObjectCorruption(Exception):
@@ -143,3 +155,26 @@ class ObjectStore:
             return _digest(path.read_bytes()) == ref
         except OSError:
             return False
+
+    def reader(self) -> "ReadOnlyContent":
+        """A read-only view of this store — the only content access a policy
+        gets. It cannot `put_text` (there is no such method on it), so a policy
+        physically cannot write to the store."""
+        return ReadOnlyContent(self)
+
+
+class ReadOnlyContent:
+    """A mechanically read-only wrapper over an `ObjectStore`: it forwards only
+    `get_text`/`has` and holds no method that mutates the store. Handing this to
+    a policy makes "policies never write" a mechanical fact, not a convention."""
+
+    __slots__ = ("_store",)
+
+    def __init__(self, store: ObjectStore) -> None:
+        self._store = store
+
+    def get_text(self, ref: str) -> str:
+        return self._store.get_text(ref)
+
+    def has(self, ref: str, *, verify: bool = False) -> bool:
+        return self._store.has(ref, verify=verify)
