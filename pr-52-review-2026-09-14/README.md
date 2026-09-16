@@ -1,6 +1,8 @@
 # Open PR review — commit volume, PR #52 organization, merge order
 
-Read-only review of the 7 non-draft open PRs on `nikhil-vytla/hatch` as of 2026-09-14. No PRs, branches, or repo files were modified — see `NOTES.md` for the raw data and commands used.
+Review of the 7 non-draft open PRs on `nikhil-vytla/hatch` as of 2026-09-14, followed by acting on the recommendation for the strive stack. See `NOTES.md` for the raw data and commands used.
+
+**Update (2026-09-16):** #51 merged into `main` on 2026-09-15; #52 was retargeted from `strive-vnext-phaseB` to `main` and merged into `main` on 2026-09-16 (`fd543a0`). The strive stack is fully landed. Only #31–#35 (Parallax) and the unrelated draft #23 remain open — the recommendation below for those is unchanged.
 
 ## Why PR #52 has 22 commits
 
