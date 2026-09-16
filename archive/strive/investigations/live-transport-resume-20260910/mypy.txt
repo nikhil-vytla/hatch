@@ -1,0 +1,6 @@
+Command: uv run mypy --strict
+Success: no issues found in 190 source files
+
+Additional check including the standalone proof script:
+.venv/bin/mypy --strict src tests adapters/tau2/src adapters/counter/src investigations/live-transport-resume-20260910/scripted_transport_proof.py
+Success: no issues found in 191 source files

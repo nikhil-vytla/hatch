@@ -1,0 +1,488 @@
+diff --git a/src/strive/vnext/harness/openai_live.py b/src/strive/vnext/harness/openai_live.py
+index 060d6df..b635e82 100644
+--- a/src/strive/vnext/harness/openai_live.py
++++ b/src/strive/vnext/harness/openai_live.py
+@@ -174,6 +174,68 @@ class HTTPAttempt:
+                 pass
+ 
+ 
++class OpenAIEgress:
++    """One worker captured and readied in trusted setup, before any jail entry."""
++
++    def __init__(self) -> None:
++        self.pid = os.getpid()
++        self.netns = network_namespace()
++        if sys.platform == "linux" and self.netns is None:
++            raise VerificationError("cannot capture OpenAI egress network namespace; no dispatch")
++        self.ready: Future[None] = Future()
++        self.stalled = False
++        self._closed = False
++        self._jobs: Queue[tuple[Callable[[HTTPAttempt], bytes], HTTPAttempt] | None] = Queue()
++        self.thread = threading.Thread(target=self._serve, name="openai-egress", daemon=True)
++        self.thread.start()
++        try:
++            # No HTTP probe or spend. Acknowledgement proves the worker has
++            # inherited the captured namespace before setup can enter a jail.
++            self.ready.result(timeout=CONNECT_TIMEOUT_SECONDS)
++        except Exception:
++            self.close()
++            raise VerificationError("OpenAI egress worker failed readiness; no dispatch") from None
++
++    def check(self) -> None:
++        if (os.getpid() != self.pid or threading.current_thread() is not self.thread
++                or network_namespace() != self.netns):
++            raise VerificationError("upstream transport left its trusted owner process/network namespace/worker")
++
++    def submit(self, exchange: Callable[[HTTPAttempt], bytes], attempt: HTTPAttempt) -> None:
++        if (os.getpid() != self.pid or self._closed or self.stalled or not self.thread.is_alive()):
++            raise VerificationError("OpenAI egress worker unavailable; no retry; retain reservation")
++        self.ready.result(timeout=0)
++        self._jobs.put((exchange, attempt))
++
++    def _serve(self) -> None:
++        try:
++            self.check()
++        except Exception as error:
++            self.ready.set_exception(error)
++            return
++        self.ready.set_result(None)
++        while (job := self._jobs.get()) is not None:
++            exchange, attempt = job
++            try:
++                if attempt.cancelled.is_set():
++                    raise TimeoutError("request cancelled before egress dispatch")
++                body = exchange(attempt)
++            except Exception as error:
++                if not attempt.connected.done():
++                    attempt.connected.set_exception(error)
++                attempt.result.set_exception(error)
++            else:
++                attempt.result.set_result(body)
++
++    def close(self) -> None:
++        if not self._closed:
++            self._closed = True
++            self._jobs.put(None)
++            # DNS cannot be interrupted portably. Cancelled late connections
++            # never send, and the daemon never writes diagnostics or receipts.
++            self.thread.join(timeout=1)
++
++
+ class OpenAITransport:
+     """Durable dispatch audit; never store headers, credentials, or error bodies."""
+     contract: OpenAIContract
+@@ -181,7 +243,8 @@ class OpenAITransport:
+     db: sqlite3.Connection
+     _credential: str
+ 
+-    def __init__(self, contract: OpenAIContract, objects: CAS, directory: Path) -> None:
++    def __init__(self, contract: OpenAIContract, objects: CAS, directory: Path,
++                 *, egress: OpenAIEgress | None = None) -> None:
+         require_live_container()
+         credential = os.environ.get("OPENAI_API_KEY")
+         if not credential:
+@@ -190,12 +253,15 @@ class OpenAITransport:
+             # http.client can include an invalid header's value in its error.
+             raise VerificationError("OPENAI_API_KEY contains invalid header characters")
+         self._credential = credential
+-        self._owner_pid = os.getpid()
+-        self._owner_netns = network_namespace()
++        self._egress = egress if egress is not None else OpenAIEgress()
++        self._owns_egress = egress is None
++        self._worker = self._egress.thread
++        self._owner_pid = self._egress.pid
++        self._owner_netns = self._egress.netns
+         self._operation_key = ""
+         self._deadline = 0.0
+         self._proxy_secrets: set[str] = set()
+-        self._route = "direct"
++        self._proxy_route = "none"
+         self._connect_timeout = 0.0
+         self._read_timeout = 0.0
+         self._lock = threading.Lock()
+@@ -212,23 +278,6 @@ class OpenAITransport:
+         self.db.execute("CREATE TABLE IF NOT EXISTS attempts (operation TEXT PRIMARY KEY)")
+         self.db.commit()
+         fsync_directory(directory)
+-        # Start eagerly in Campaign's trusted setup context, before any child
+-        # jail or gateway-serving thread can enter a different netns. Never use
+-        # a lazy executor: its first submit could inherit the jailed namespace.
+-        self._jobs: Queue[HTTPAttempt | None] = Queue()
+-        self._worker = threading.Thread(target=self._serve, name="openai-egress", daemon=True)
+-        self._worker.start()
+-
+-    def _serve(self) -> None:
+-        while (attempt := self._jobs.get()) is not None:
+-            try:
+-                body = self._exchange(attempt)
+-            except Exception as error:
+-                if not attempt.connected.done():
+-                    attempt.connected.set_exception(error)
+-                attempt.result.set_exception(error)
+-            else:
+-                attempt.result.set_result(body)
+ 
+     def _failure(self, error: Exception, path: str, raw: bytes, phase: str,
+                  started: float, status: int | None) -> VerificationError:
+@@ -257,12 +306,13 @@ class OpenAITransport:
+                 else "http" if status is not None and status != 200 else "transport")
+         detail = {"schema": "strive.openai-transport-error/1", "operation": self._operation_key,
+             "endpoint": path, "phase": phase, "exception_type": type(error).__name__, "message": message[:1024],
+-            "kind": kind, "route": self._route, "connect_timeout_seconds": self._connect_timeout,
++            "kind": kind, "route": "egress_worker", "proxy_route": self._proxy_route,
++            "connect_timeout_seconds": self._connect_timeout,
+             "read_timeout_seconds": self._read_timeout, "deadline_exceeded": time.monotonic() >= self._deadline,
+             "errno": error.errno if isinstance(error, OSError) else None, "http_status": status,
+             "elapsed_seconds": round(time.monotonic() - started, 3), "pid": os.getpid(),
+             "owner_pid": self._owner_pid, "netns": self._attempt.netns if self._attempt else network_namespace(),
+-            "owner_netns": self._owner_netns, "caller_netns": self._caller_netns,
++            "owner_netns": self._owner_netns, "egress_netns": self._egress.netns, "caller_netns": self._caller_netns,
+             "upstream_thread": self._attempt.thread if self._attempt else None,
+             "action": "no retry; retain reservation"}
+         encoded = canonical(detail).decode()
+@@ -283,9 +333,10 @@ class OpenAITransport:
+         # Match urllib's Linux environment proxy routing, but never follow a
+         # redirect or fall back to direct egress. CONNECT carries no API key;
+         # the key and prompt are sent only after TLS to api.openai.com.
++        self._egress.check()
+         proxies = urllib.request.getproxies_environment()
+         proxy = proxies.get("https") if not proxy_bypass_environment("api.openai.com", proxies) else None
+-        self._route = "proxy" if proxy else "direct"
++        self._proxy_route = "http_connect" if proxy else "none"
+         if not proxy:
+             return http.client.HTTPSConnection("api.openai.com", timeout=self._connect_timeout)
+         self._proxy_secrets.add(proxy)
+@@ -307,11 +358,12 @@ class OpenAITransport:
+         attempt = HTTPAttempt(path, raw)
+         self._attempt = attempt
+         self._connect_timeout = self._read_timeout = 0.0
++        self._proxy_route = "none"
+         try:
+             if os.getpid() != self._owner_pid:
+                 raise VerificationError("upstream transport left its trusted owner process")
+             self._connect_timeout = min(CONNECT_TIMEOUT_SECONDS, self._remaining())
+-            self._jobs.put(attempt)
++            self._egress.submit(self._exchange, attempt)
+             self._wait(attempt.connected, self._connect_timeout, "connect")
+             if not attempt.result.done():
+                 self._wait(attempt.result, min(READ_TIMEOUT_SECONDS, self._remaining()), "read")
+@@ -337,6 +389,7 @@ class OpenAITransport:
+                 future.result()
+                 return
+             self._stalled = True
++            self._egress.stalled = True
+             raise TimeoutError(phase + " timeout waiting for egress worker" +
+                                (" (includes DNS, TCP and TLS)" if phase == "connect" else "")) from None
+ 
+@@ -345,8 +398,7 @@ class OpenAITransport:
+         try:
+             attempt.netns = network_namespace()
+             attempt.thread = threading.get_native_id()
+-            if os.getpid() != self._owner_pid or attempt.netns != self._owner_netns:
+-                raise VerificationError("upstream transport left its trusted owner process/network namespace")
++            self._egress.check()
+             attempt.phase = "connect"
+             connection = self._connection()
+             connection.connect()
+@@ -428,8 +480,6 @@ class OpenAITransport:
+         with self._lock:
+             if not self._closed:
+                 self._closed = True
+-                self._jobs.put(None)
+-                # DNS cannot be interrupted portably. A cancelled late connect
+-                # is closed without sending; shutdown never waits for DNS.
+-                self._worker.join(timeout=1)
++                if self._owns_egress:
++                    self._egress.close()
+                 self.db.close()
+diff --git a/src/strive/vnext/cli/campaign.py b/src/strive/vnext/cli/campaign.py
+index 4dac41c..df7c13e 100644
+--- a/src/strive/vnext/cli/campaign.py
++++ b/src/strive/vnext/cli/campaign.py
+@@ -5,6 +5,7 @@ telecom action as data; every mutation and generation is a separate M3 effect.
+ """
+ from collections.abc import Callable
+ from contextlib import ExitStack
++from functools import partial
+ import fcntl
+ import json
+ from pathlib import Path
+@@ -29,7 +30,7 @@ from ..errors import VerificationError
+ from ..harness.bridge import HarnessEffectAdapter
+ from ..harness.gateway import ModelGateway
+ from ..harness.native_opencode import NativeOpenCodeBridge, TelecomOpenCodeAdapter, profile
+-from ..harness.openai_live import CONTROLS, MODEL, OpenAIContract, OpenAITransport, canonical, load_contract
++from ..harness.openai_live import CONTROLS, MODEL, OpenAIContract, OpenAIEgress, OpenAITransport, canonical, load_contract
+ from ..harness.profiles import LaunchProfile
+ from ..harness.provider import Upstream, json_object
+ from ..harness.user_model import DirectUserModelAdapter, request_from_user_plan
+@@ -69,6 +70,10 @@ class Campaign:
+         self.directory, self.run_id, self.view = directory, run_id, view
+         self.resources = ExitStack()
+         try:
++            if providers is OpenAITransport:
++                egress = OpenAIEgress()
++                self.resources.callback(egress.close)
++                providers = partial(OpenAITransport, egress=egress)
+             directory.mkdir(parents=True, exist_ok=True)
+             lease = self.resources.enter_context((directory / "campaign.lease").open("a+b"))
+             fcntl.flock(lease.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+@@ -418,8 +423,20 @@ PROMPT = ('You are the telecom support agent. Follow the supplied policy and con
+ def live(root: Path, manifest: Path, run_id: str, *, resume: bool = False, episodes: int | None = None,
+          prepare_only: bool = False, budget_proof: bool = False) -> dict[str, object]:
+     from ..harness.openai_live import require_live_container
+-    from ..runtime.linux_jail import require_capability
+     require_live_container()
++    with ExitStack() as resources:
++        # Capture once before even the qualification jail, and share this
++        # readied worker with every actor/user transport, including late ones.
++        egress = None if prepare_only else OpenAIEgress()
++        if egress is not None:
++            resources.callback(egress.close)
++        return _live(root, manifest, run_id, resume=resume, episodes=episodes,
++                     prepare_only=prepare_only, budget_proof=budget_proof, egress=egress)
++
++
++def _live(root: Path, manifest: Path, run_id: str, *, resume: bool, episodes: int | None,
++          prepare_only: bool, budget_proof: bool, egress: OpenAIEgress | None) -> dict[str, object]:
++    from ..runtime.linux_jail import require_capability
+     require_capability()
+     from strive_benchmark_tau2.client import Tau2Client
+     from strive_benchmark_tau2.process import IsolatedTau2
+@@ -453,7 +470,7 @@ def live(root: Path, manifest: Path, run_id: str, *, resume: bool = False, episo
+         tasks = tasks * 200  # Repeat qualified dev episodes until USD admission refuses.
+     schemas = {name: canonical(value) for name, value in mapping(spec["user_schemas"]).items()}
+     def provider(contract: OpenAIContract, cas: CAS, path: Path) -> Upstream:
+-        return PreparationProvider() if prepare_only else OpenAITransport(contract, cas, path)
++        return PreparationProvider() if prepare_only else OpenAITransport(contract, cas, path, egress=egress)
+     with Campaign(directory, run_id, manifest, adapter_factory, backend.call, tasks, schemas, profile(executable),
+                   providers=provider, resume=resume) as campaign:
+         result = campaign.report() if prepare_only else campaign.drive(episodes=episodes)
+diff --git a/tests/vnext/test_openai_live_transport.py b/tests/vnext/test_openai_live_transport.py
+index 08ecb52..277ceb2 100644
+--- a/tests/vnext/test_openai_live_transport.py
++++ b/tests/vnext/test_openai_live_transport.py
+@@ -1,4 +1,5 @@
+ """Actual live transport code with scripted sockets only; no network or spend."""
++from concurrent.futures import Future
+ from dataclasses import dataclass, field
+ import errno
+ import http.client
+@@ -19,7 +20,7 @@ from strive.vnext.contracts.primitives import ExecutionStatus, Resource
+ from strive.vnext.errors import VerificationError
+ from strive.vnext.harness import openai_live
+ from strive.vnext.harness.deadline import upstream_deadline
+-from strive.vnext.harness.openai_live import CONTROLS, OpenAITransport, canonical, load_contract
++from strive.vnext.harness.openai_live import CONTROLS, OpenAIEgress, OpenAITransport, canonical, load_contract
+ from strive.vnext.runtime.ledger import amounts
+ from strive.vnext.store.cas import CAS
+ from .test_live_campaign import PRICE, Setup
+@@ -148,6 +149,129 @@ def diagnostic(transport: OpenAITransport) -> dict[str, object]:
+     return value
+ 
+ 
++@pytest.fixture
++def namespace(monkeypatch: pytest.MonkeyPatch) -> threading.local:
++    namespace = threading.local()
++    namespace.name = "net:[egress]"
++    monkeypatch.setattr(openai_live, "network_namespace", lambda: getattr(namespace, "name", "net:[egress]"))
++    start = threading.Thread.start
++    def inherit_namespace(thread: threading.Thread) -> None:
++        inherited, run = namespace.name, thread.run
++        def run_in_namespace() -> None:
++            namespace.name = inherited
++            run()
++        thread.run = run_in_namespace  # type: ignore[method-assign]
++        start(thread)
++    monkeypatch.setattr(threading.Thread, "start", inherit_namespace)
++    return namespace
++
++
++def test_counting_and_generation_share_ready_egress_for_late_transport(tmp_path: Path,
++        monkeypatch: pytest.MonkeyPatch, namespace: threading.local) -> None:
++    wire = Wire(steps=[Step(), Step(REPLY), Step(), Step(REPLY)])
++    install_wire(monkeypatch, wire)
++    objects = CAS(tmp_path / "cas")
++    objects.directory.mkdir()
++    contract = load_contract(objects, PRICE, input_tokens=32768, output_tokens=1024, wall_seconds=150)
++    egress = OpenAIEgress()
++    try:
++        assert egress.ready.done() and egress.ready.result() is None
++        assert not wire.connections  # Readiness performs no upstream probe.
++        namespace.name = "net:[gateway-only]"
++        # Both transports are created AFTER jail entry. Neither may capture
++        # this caller's namespace or start a replacement egress worker.
++        for role in ("actor", "user"):
++            transport = OpenAITransport(contract, objects, tmp_path / role, egress=egress)
++            try:
++                assert transport._worker is egress.thread
++                request = canonical({**CONTROLS, "model": contract.model, "input": PROMPT, "max_output_tokens": 1024})
++                assert transport.generate(request, role) == REPLY
++                assert namespace.name == "net:[gateway-only]"
++            finally:
++                transport.close()
++            assert egress.thread.is_alive()  # One transport cannot close it.
++        assert [connection.path for connection in wire.connections] == [
++            "/v1/responses/input_tokens", "/v1/responses",
++            "/v1/responses/input_tokens", "/v1/responses"]
++        assert wire.threads == [egress.thread.ident] * 4
++        assert wire.threads[0] != threading.get_ident()
++        assert wire.namespaces == [egress.netns] * 4 == ["net:[egress]"] * 4
++        assert [connection.timeout for connection in wire.connections] == [10] * 4
++    finally:
++        namespace.name = "net:[egress]"
++        egress.close()
++
++
++def test_egress_constructor_waits_for_namespace_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
++    entered, release = threading.Event(), threading.Event()
++    def namespace() -> str:
++        if threading.current_thread().name == "openai-egress":
++            entered.set()
++            assert release.wait(5), "test must release worker startup"
++        return "net:[egress]"
++    monkeypatch.setattr(openai_live, "network_namespace", namespace)
++    result: Future[OpenAIEgress] = Future()
++    def construct() -> None:
++        try:
++            result.set_result(OpenAIEgress())
++        except BaseException as error:
++            result.set_exception(error)
++    caller = threading.Thread(target=construct, daemon=True)
++    caller.start()
++    try:
++        assert entered.wait(5)
++        assert not result.done()  # start() alone must not count as readiness.
++    finally:
++        release.set()
++        caller.join(timeout=5)
++    egress = result.result(timeout=5)
++    try:
++        assert egress.ready.done() and egress.ready.result() is None
++    finally:
++        egress.close()
++
++
++def test_egress_rejects_wrong_namespace_at_startup(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setattr(openai_live, "network_namespace", lambda:
++                        "net:[wrong]" if threading.current_thread().name == "openai-egress" else "net:[egress]")
++    with pytest.raises(VerificationError, match="failed readiness; no dispatch"):
++        OpenAIEgress()
++
++
++def test_upstream_connection_cannot_bypass_worker(rig: tuple[OpenAITransport, Wire, bytes]) -> None:
++    transport, wire, _ = rig
++    # Even a caller still in the original namespace cannot open upstream HTTP.
++    with pytest.raises(VerificationError, match="trusted owner"):
++        transport._connection()
++    assert not wire.connections
++
++
++def test_worker_namespace_is_checked_again_for_generation(tmp_path: Path,
++        monkeypatch: pytest.MonkeyPatch, namespace: threading.local) -> None:
++    wire = Wire()
++    install_wire(monkeypatch, wire)
++    objects = CAS(tmp_path / "cas")
++    objects.directory.mkdir()
++    contract = load_contract(objects, PRICE, input_tokens=32768, output_tokens=1024, wall_seconds=150)
++    transport = OpenAITransport(contract, objects, tmp_path / "transport")
++    original = ScriptedConnection.close
++    def change_namespace(connection: ScriptedConnection) -> None:
++        original(connection)
++        namespace.name = "net:[unexpected-worker-jail]"
++    monkeypatch.setattr(ScriptedConnection, "close", change_namespace)
++    try:
++        request = canonical({**CONTROLS, "model": contract.model, "input": PROMPT, "max_output_tokens": 1024})
++        with pytest.raises(VerificationError, match="trusted owner"):
++            transport.generate(request, "worker-moved")
++        assert [connection.path for connection in wire.connections] == ["/v1/responses/input_tokens"]
++        assert diagnostic(transport)["endpoint"] == "/v1/responses"
++        assert diagnostic(transport)["phase"] == "boundary"
++        assert diagnostic(transport)["netns"] == "net:[unexpected-worker-jail]"
++        assert diagnostic(transport)["egress_netns"] == "net:[egress]"
++    finally:
++        transport.close()
++
++
+ @pytest.mark.parametrize("phase,error,kind", [
+     ("connect", socket.gaierror(socket.EAI_NONAME, "Name or service not known"), "dns"),
+     ("connect", OSError(errno.ENETUNREACH, "Network is unreachable"), "transport"),
+@@ -170,6 +294,7 @@ def test_real_cause_is_durable_and_visible_without_retry(rig: tuple[OpenAITransp
+     assert detail["message"] == str(error)
+     assert detail["kind"] == kind and detail["phase"] == phase
+     assert detail["endpoint"] == ("/v1/responses/input_tokens" if counting else "/v1/responses")
++    assert detail["route"] == "egress_worker" and detail["proxy_route"] == "none"
+     assert detail["errno"] == (error.errno if isinstance(error, OSError) else None)
+     assert detail["pid"] == detail["owner_pid"] == os.getpid()
+     assert detail["netns"] == detail["owner_netns"]
+@@ -280,22 +405,13 @@ def test_transport_refuses_a_move_into_child_or_other_netns(rig: tuple[OpenAITra
+     assert diagnostic(transport)["phase"] == "boundary"
+ 
+ 
++@pytest.mark.parametrize("counting", [True, False])
+ def test_campaign_pipe_attempts_upstream_in_parent_and_suspends_with_real_cause(tmp_path: Path,
+-        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+-    wire = Wire(steps=[Step(), Step(error=TimeoutError("scripted read timeout after request send"))])
++        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], namespace: threading.local,
++        counting: bool) -> None:
++    wire = Wire()
++    wire.steps[0 if counting else 1] = Step(error=TimeoutError("scripted read timeout after request send"))
+     install_wire(monkeypatch, wire, clock=False)
+-    namespace = threading.local()
+-    namespace.name = "net:[egress]"
+-    monkeypatch.setattr(openai_live, "network_namespace", lambda: getattr(namespace, "name", "net:[egress]"))
+-    start = threading.Thread.start
+-    def inherit_namespace(thread: threading.Thread) -> None:
+-        inherited, run = namespace.name, thread.run
+-        def run_in_namespace() -> None:
+-            namespace.name = inherited
+-            run()
+-        thread.run = run_in_namespace  # type: ignore[method-assign]
+-        start(thread)
+-    monkeypatch.setattr(threading.Thread, "start", inherit_namespace)
+     setup = Setup(tmp_path)
+     try:
+         campaign = setup.open()
+@@ -322,22 +438,27 @@ def test_campaign_pipe_attempts_upstream_in_parent_and_suspends_with_real_cause(
+         identity = decode(campaign.objects.read(pid_ref))
+         assert isinstance(identity, tuple) and identity[0] == "process-identity/1"
+         assert identity[1] != os.getpid()
+-        assert wire.pids == [os.getpid(), os.getpid()]
+-        assert wire.threads == [transport._worker.ident, transport._worker.ident]
++        calls = 1 if counting else 2
++        assert [connection.path for connection in wire.connections] == [
++            "/v1/responses/input_tokens", "/v1/responses"][:calls]
++        assert wire.pids == [os.getpid()] * calls
++        assert wire.threads == [transport._worker.ident] * calls
+         assert wire.threads[0] != threading.get_ident()
+-        assert wire.namespaces == ["net:[egress]", "net:[egress]"]
++        assert wire.namespaces == ["net:[egress]"] * calls
+         assert namespace.name == "net:[gateway-only]"  # Caller was not unjailed.
+         assert diagnostic(transport)["caller_netns"] == "net:[gateway-only]"
+         assert diagnostic(transport)["netns"] == "net:[egress]"
++        assert diagnostic(transport)["egress_netns"] == "net:[egress]"
++        assert diagnostic(transport)["route"] == "egress_worker"
+         assert diagnostic(transport)["message"] == "scripted read timeout after request send"
+         assert "TimeoutError" in capsys.readouterr().err
+         campaign.drive()
+-        assert len(wire.connections) == 2
++        assert len(wire.connections) == calls
+         setup.close()
+         campaign = setup.open(resume=True)
+         campaign.drive()
+         assert campaign.reader.verify().execution_status is ExecutionStatus.SUSPENDED
+-        assert len(wire.connections) == 2 and not setup.calls
++        assert len(wire.connections) == calls and not setup.calls
+         assert amounts(campaign.reader.verify().obligations)[Resource.USD_NANODOLLARS] == 7_782_400
+     finally:
+         namespace.name = "net:[egress]"
+@@ -446,7 +567,8 @@ def test_proxy_failure_is_redacted_and_never_falls_back(rig: tuple[OpenAITranspo
+     with pytest.raises(VerificationError):
+         transport.generate(request, "proxy-failure")
+     detail = diagnostic(transport)
+-    assert detail["route"] == "proxy" and detail["phase"] == "connect"
++    assert detail["route"] == "egress_worker" and detail["proxy_route"] == "http_connect"
++    assert detail["phase"] == "connect"
+     assert len(wire.connections) == 1
+     assert "proxy-password" not in capsys.readouterr().err + str(detail)
+     assert "proxy-user" not in str(detail)
