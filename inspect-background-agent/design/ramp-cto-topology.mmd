@@ -1,0 +1,124 @@
+flowchart TB
+    subgraph Frontend["Frontend (React App)"]
+        UI["Session UI"]
+        RQ["React Query Cache"]
+        WS_Client["WebSocket Subscriptions"]
+        Iframe_VSCode["VSCode iFrame"]
+        Iframe_VNC["VNC iFrame"]
+        Iframe_TTYD["Terminal iFrame"]
+    end
+
+    subgraph CloudflareWorker["Cloudflare Worker (agent-api)"]
+        direction TB
+        API["REST API Routes"]
+        subgraph DurableObjects["Durable Objects"]
+            SessionAgent["SessionAgent DO<br/>per-session SQLite"]
+            EventBus["EventBus DO<br/>realtime fan-out"]
+        end
+        D1[("D1: metadata, auth, memories")]
+        R2[("R2: screenshots, uploads")]
+    end
+
+    subgraph ModalBackend["Modal Backend (Python)"]
+        direction TB
+        SessionMgr["Session Manager"]
+        SandboxMgr["Sandbox Manager"]
+        subgraph ImageConfigs["Image Definitions"]
+            BaseImage["base: tools, code-server, ttyd"]
+            WebAppImage["webapp"]
+            CoreImage["core: Postgres, Redis, Temporal"]
+            OtherImages["android, ios, elixir, …"]
+        end
+        ModalDict[("Dict: locks, image store")]
+        ModalQueue[/"Queue: prompt ingress"/]
+    end
+
+    subgraph ModalSandbox["Modal Sandbox"]
+        direction TB
+        subgraph Runner["Runner (Bun/TS)"]
+            RunnerCLI["Runner CLI"]
+            PromptHandler["Prompt Handler"]
+            AgentClientWS["AgentClient WS to DO"]
+            ProxyFactory["Proxy Factory JWT"]
+        end
+        subgraph OpenCode["OpenCode Server"]
+            OC_Server["opencode serve"]
+            OC_SDK["@opencode-ai/sdk"]
+            OC_Events["Event Stream"]
+        end
+        subgraph VSCodeStack["VS Code Server"]
+            CodeServer["code-server"]
+            VSProxy["Auth Proxy"]
+        end
+        subgraph VNCStack["VNC Stack"]
+            Xvfb["Xvfb"]
+            Fluxbox["Fluxbox"]
+            X11VNC["x11vnc"]
+            Websockify["websockify"]
+            VNCProxy["Auth Proxy"]
+            Chrome["Chromium"]
+            DevServer["Dev Server"]
+        end
+        subgraph TTYDStack["Web Terminal"]
+            TTYD["ttyd"]
+            TTYDProxy["Auth Proxy"]
+        end
+        RepoCode[("Repository Code")]
+        RunnerVol[("Runner Volume")]
+    end
+
+    subgraph ExternalServices["External Services"]
+        GitHub["GitHub"]
+        Slack["Slack"]
+        Linear["Linear"]
+        Anthropic["Anthropic"]
+        OpenAI["OpenAI"]
+        Google["Google"]
+    end
+
+    UI -->|"HTTP"| API
+    WS_Client <--> EventBus
+    WS_Client <--> SessionAgent
+    RQ <--> WS_Client
+    Iframe_VSCode <-->|"Modal Tunnel + JWT"| VSProxy
+    Iframe_VNC <-->|"Modal Tunnel + JWT"| VNCProxy
+    Iframe_TTYD <-->|"Modal Tunnel + JWT"| TTYDProxy
+    API --> SessionAgent
+    API --> D1
+    API --> R2
+    SessionAgent --> EventBus
+    SessionAgent --> D1
+    EventBus --> D1
+    API -->|"spawn sandbox"| SessionMgr
+    SessionMgr --> SandboxMgr
+    SandboxMgr --> ImageConfigs
+    SandboxMgr -->|"snapshot boot"| ModalSandbox
+    SandboxMgr <--> ModalDict
+    SessionMgr <--> ModalQueue
+    PromptHandler <-->|"WebSocket"| SessionAgent
+    AgentClientWS -->|"opencode events"| SessionAgent
+    PromptHandler -->|"webhooks"| API
+    RunnerCLI --> PromptHandler
+    PromptHandler <-->|"HTTP"| OC_Server
+    OC_Server --> OC_SDK
+    OC_Events --> PromptHandler
+    ProxyFactory --> VSProxy
+    ProxyFactory --> VNCProxy
+    ProxyFactory --> TTYDProxy
+    VSProxy --> CodeServer
+    VNCProxy --> Websockify
+    TTYDProxy --> TTYD
+    Xvfb --> X11VNC
+    Fluxbox --> Xvfb
+    X11VNC --> Websockify
+    Chrome --> Xvfb
+    DevServer --> Chrome
+    OC_SDK <--> Anthropic
+    OC_SDK <--> OpenAI
+    OC_SDK <--> Google
+    API <--> GitHub
+    EventBus --> Slack
+    API <--> Linear
+    OC_Server --> RepoCode
+    CodeServer --> RepoCode
+    RunnerCLI --> RunnerVol

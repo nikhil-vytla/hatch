@@ -1,0 +1,38 @@
+{
+  "name": "@hatch/inspect",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "serve": "tsx scripts/serve.ts",
+    "serve:cloud": "tsx scripts/serve-cloud.ts",
+    "compute:shim": "tsx scripts/compute-shim.ts",
+    "e2e": "tsx scripts/e2e-full.ts",
+    "e2e:cloud": "tsx scripts/e2e-cloud.ts",
+    "eval:smoke": "tsx scripts/eval-smoke.ts"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.13.10",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.17",
+    "@hono/node-ws": "^1.3.1",
+    "@opencode-ai/sdk": "^1.18.11",
+    "better-sqlite3": "^11.10.0",
+    "hono": "^4.12.34",
+    "opencode-ai": "^1.18.11",
+    "ws": "^8.21.1"
+  }
+}
