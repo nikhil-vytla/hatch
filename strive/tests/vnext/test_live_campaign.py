@@ -26,7 +26,7 @@ from strive_benchmark_tau2.splits import scenario_group
 from .benchmark_fixtures import SyntheticTelecom, inventory
 
 ROOT = Path(__file__).resolve().parents[2]
-PRICE = ROOT / "live-tau2-budget-proof/prices/openai-2026-09-10.json"
+PRICE = ROOT / "tests/vnext/fixtures/budget-proof/prices/openai-2026-09-10.json"
 
 
 class CampaignBackend(SyntheticTelecom):
@@ -82,7 +82,7 @@ class Setup:
         assert deno
         self.launch = fixture_profile("opencode", Path(deno), Path(__file__).with_name("harness_fixtures") / "campaign.js")
         self.manifest = root / "pilot.toml"
-        source = (ROOT / "live-tau2-budget-proof/pilot-5usd.toml").read_text()
+        source = (ROOT / "tests/vnext/fixtures/budget-proof/pilot-5usd.toml").read_text()
         self.manifest.write_text(source.replace('usd = 5.00', 'usd = ' + cap).replace('version = "1.18.30"', 'version = "fixture/1"')
             .replace('deadline_seconds = 150', 'deadline_seconds = 10').replace('prices/openai-2026-09-10.json', str(PRICE)))
         self.backend = CampaignBackend(ArtifactRef("sha256:" + "a" * 64))

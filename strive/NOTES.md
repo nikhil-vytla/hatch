@@ -74,13 +74,16 @@ its findings were incorporated here and in the permanent documentation.
 
 ## Post-merge cleanup (2026-09-16)
 
-With PRs #50–#52 fully merged, `investigations/` and `tau2-egress-counting-fix/`
-moved to `archive/strive/` at the repo root — their findings were already
-folded into this file and the permanent docs, so only the raw records moved,
-not the module tree. `live-tau2-budget-proof/` stayed put: `pilot-5usd.toml`
-and `prices/openai-2026-09-10.json` under it are live fixtures read by
-`tests/vnext/test_live_campaign.py`, not just historical record. The legacy
-pre-vNext implementation
+With PRs #50–#52 fully merged, `investigations/`, `tau2-egress-counting-fix/`
+and the investigation narrative from `live-tau2-budget-proof/` (README, NOTES,
+changes.patch, proof/log files) moved to `archive/strive/` at the repo root —
+their findings were already folded into this file and the permanent docs, so
+only the raw records moved, not the module tree. `live-tau2-budget-proof/`'s
+three actual test fixtures (`pilot-5usd.toml`, `budget-stop-5c.toml`,
+`prices/openai-2026-09-10.json` — read by `test_live_campaign.py` and
+`tests/live/test_budget_stop_live.py`, not just historical record) moved
+instead to `tests/vnext/fixtures/budget-proof/`. The legacy pre-vNext
+implementation
 (`kernel.py`, `substrate.py`, `runtime.py`, `sandbox*.py`, `policy.py`/`policies/`,
 `refine.py`, `budget.py`, `operate.py`, `cas.py`, `framing.py`, `codec.py`,
 `events.py`, `evaluate.py`, `strategy_runner.py`, `surfaces.py`, `tasks.py`,
