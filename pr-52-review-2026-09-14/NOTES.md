@@ -34,3 +34,10 @@ Repo: `nikhil-vytla/hatch` (personal). Open PRs (`gh pr list --state open`):
 ## Learned
 - git's own MERGEABLE/CLEAN check is only against current `main` tip; it says nothing about whether independently-authored sibling branches semantically conflict with each other once one of them lands. That's why the parallax PRs looked "clean" individually but are not safe to merge as an unordered batch.
 - Investigation was read-only: no PRs, branches, or files outside this folder were modified.
+
+## Follow-up: acting on the recommendation (2026-09-15/16)
+
+- User merged PR #51 (`strive-vnext-phaseB` → `main`) via a real merge commit (`ca5ec92`), not squash/rebase.
+- Asked to "update #52": retargeted its base from `strive-vnext-phaseB` to `main` via `gh pr edit 52 --base main`. Verified safety first — `strive-vnext-phaseB` was now an ancestor of `main`, and `strive-astra` was still exactly 22 commits ahead of both, so the retarget was metadata-only (no rebase/force-push, diff unchanged: 26,676 additions / 237 files).
+- Hit a permissions error: the active `gh` account (`nikhil-at-canva`) has no write access to `nikhil-vytla/hatch`. A second logged-in account, `nikhil-vytla` (the repo owner), was available. Asked the user, then ran `gh auth switch --user nikhil-vytla`, did the retarget, and switched back to `nikhil-at-canva` afterward per the user's choice.
+- PR #52 merged 2026-09-16 (`fd543a0`) directly into `main`. The strive stack (#51 → #52) is now fully landed; only the five stale Parallax PRs (#31–#35) and the unrelated draft (#23) remain open, per the original recommendation.
