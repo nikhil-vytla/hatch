@@ -3,15 +3,15 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal, Protocol
 
-from strive.vnext.contracts.lifecycle import RecoveryContract
-from strive.vnext.contracts.primitives import (
+from ..contracts.lifecycle import RecoveryContract
+from ..contracts.primitives import (
     ArtifactRef,
     EffectId,
     EnvironmentId,
     EpisodeId,
     ResultCursor,
 )
-from strive.vnext.contracts.records import EffectAuthorization
+from ..contracts.records import EffectAuthorization
 
 
 @dataclass(frozen=True)

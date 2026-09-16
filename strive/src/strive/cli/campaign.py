@@ -446,7 +446,7 @@ def _live(root: Path, manifest: Path, run_id: str, *, resume: bool, episodes: in
     if budget_proof and (load_authored_manifest(manifest.read_text()).budget.usd.nanodollars != 50_000_000
                          or episodes is not None or prepare_only):
         raise VerificationError("budget-stop-live requires exactly USD 0.05 and no episode/preparation override")
-    repository = Path(__file__).resolve().parents[4]
+    repository = Path(__file__).resolve().parents[3]
     python = Path(os.environ.get("STRIVE_TAU2_PYTHON", str(repository / "adapters/tau2/.venv/bin/python")))
     data = Path(os.environ.get("TAU2_DATA_DIR", str(repository / "adapters/tau2/retained-data")))
     executable = Path(os.environ.get("STRIVE_OPENCODE", "/usr/local/bin/opencode"))

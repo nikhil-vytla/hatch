@@ -5,12 +5,12 @@ from typing import Iterator
 
 import pytest
 
-from strive.vnext.codec import content_ref
-from strive.vnext.contracts.commands import AuthorizedView, Finish
-from strive.vnext.contracts.primitives import EnvironmentId, ExecutionStatus, RevisionId, ScopedArtifact
-from strive.vnext.errors import VerificationError
-from strive.vnext.runtime import SandboxFailure, SandboxLimits
-from strive.vnext.runtime.confined_sandbox import DenoSandbox
+from strive.codec import content_ref
+from strive.contracts.commands import AuthorizedView, Finish
+from strive.contracts.primitives import EnvironmentId, ExecutionStatus, RevisionId, ScopedArtifact
+from strive.errors import VerificationError
+from strive.runtime import SandboxFailure, SandboxLimits
+from strive.runtime.confined_sandbox import DenoSandbox
 
 from .runtime_fixtures import RuntimeFixture
 
@@ -175,8 +175,8 @@ def test_rss_watchdog_includes_arraybuffers_outside_v8_heap(sandbox: DenoSandbox
 
 
 def test_candidate_time_is_reserved_and_survives_restart(sandbox: DenoSandbox, fixture: RuntimeFixture) -> None:
-    from strive.vnext.contracts.primitives import Resource
-    from strive.vnext.runtime.ledger import amounts
+    from strive.contracts.primitives import Resource
+    from strive.runtime.ledger import amounts
     fixture.supervisor.step(sandbox)
     state = fixture.reader.verify()
     assert state.effects[0].authorization.operation == "runtime.step"
@@ -189,8 +189,8 @@ def test_candidate_time_is_reserved_and_survives_restart(sandbox: DenoSandbox, f
 
 @pytest.mark.parametrize("boundary", ["accepted", "authorized", "dispatch", "external_return", "return_recorded", "settled", "continuation"])
 def test_candidate_step_crash_boundaries(sandbox: DenoSandbox, fixture: RuntimeFixture, boundary: str) -> None:
-    from strive.vnext.contracts.lifecycle import EffectState
-    from strive.vnext.runtime import Boundary, Supervisor
+    from strive.contracts.lifecycle import EffectState
+    from strive.runtime import Boundary, Supervisor
     from .test_runtime import Crash, arm
     arm(fixture, Boundary(boundary))
     with pytest.raises(Crash):
@@ -211,9 +211,9 @@ def test_candidate_step_crash_boundaries(sandbox: DenoSandbox, fixture: RuntimeF
 
 
 def test_model_result_is_retained_in_next_sandbox_command(sandbox: DenoSandbox, tmp_path: Path) -> None:
-    from strive.vnext.contracts.commands import StepOutput
-    from strive.vnext.contracts.primitives import Resource
-    from strive.vnext.runtime.ledger import amounts
+    from strive.contracts.commands import StepOutput
+    from strive.contracts.primitives import Resource
+    from strive.runtime.ledger import amounts
     fixture = RuntimeFixture(tmp_path / "store", ('''function step(view,state,result,handles) {
         if (!result || atob(handles[result.fields.output.fields.reference.fields.digest]) !== "real outcome")
             throw Error("lost result");
@@ -233,7 +233,7 @@ def test_model_result_is_retained_in_next_sandbox_command(sandbox: DenoSandbox, 
 
 
 def test_resume_rejects_changed_sandbox_limits(sandbox: DenoSandbox, fixture: RuntimeFixture) -> None:
-    from strive.vnext.runtime import Boundary, Supervisor
+    from strive.runtime import Boundary, Supervisor
     from .test_runtime import Crash, arm
     arm(fixture, Boundary.ACCEPTED)
     with pytest.raises(Crash):

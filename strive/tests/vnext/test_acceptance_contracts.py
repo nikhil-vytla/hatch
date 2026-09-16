@@ -13,30 +13,30 @@ from typing import Protocol, assert_never, get_args
 
 import pytest
 
-from strive.vnext.contracts.annotations import Annotation, MAX_ANNOTATION_BYTES
-from strive.vnext.contracts.commands import (
+from strive.contracts.annotations import Annotation, MAX_ANNOTATION_BYTES
+from strive.contracts.commands import (
     ApplyChange, Command, Continue, EvaluateFork, ExecuteEffect, Finish,
     RestoreBundle, Step, StepOutput, Suspend,
 )
-from strive.vnext.contracts.feedback import EvidencePool, FEEDBACK_ACCESS_MATRIX, FeedbackContract
-from strive.vnext.contracts.harness import HarnessAdapter
-from strive.vnext.contracts.lifecycle import (
+from strive.contracts.feedback import EvidencePool, FEEDBACK_ACCESS_MATRIX, FeedbackContract
+from strive.contracts.harness import HarnessAdapter
+from strive.contracts.lifecycle import (
     DispatchStage, EffectState, FINISHED_EXECUTION_RECOVERY_ACTION, HARNESS_RECOVERY_ACTIONS, HarnessInterruption,
     LEGAL_TRANSITIONS, RECOVERY_ACTIONS, RecoveryAction, validate_transition,
 )
-from strive.vnext.contracts.manifest import (
+from strive.contracts.manifest import (
     ManifestError, load_authored_manifest, load_resolved_configuration,
 )
-from strive.vnext.contracts.primitives import (
+from strive.contracts.primitives import (
     EffectId, ObservedModelIdentity, RequestedModelIdentity, Resource,
     ResourceQuantity, WireModelIdentity,
 )
-from strive.vnext.contracts.records import (
+from strive.contracts.records import (
     AuthorityRecord, ContinuationCommit, EffectAuthorization, EffectObservationSettlement,
     Envelope, Measurement, RECORD_OWNERS, RecordClass, RecordOwner, RevisionActivation,
     RunBinding, UsageKind, UsageObservation, UsageProvenance,
 )
-from strive.vnext.contracts.study import (
+from strive.contracts.study import (
     BenchmarkOperation, EpisodeOutcome, REFERENCE_STUDY_PLAN, SIMULATOR_SCENARIOS,
 )
 

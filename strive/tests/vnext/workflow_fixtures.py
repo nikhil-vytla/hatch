@@ -2,8 +2,8 @@
 from pathlib import Path
 import tomllib
 
-from strive.vnext.cli.data import mapping, toml
-from strive.vnext.cli.fixture import example
+from strive.cli.data import mapping, toml
+from strive.cli.fixture import example
 
 
 def spec(strictness: str = "matched") -> dict[str, object]:

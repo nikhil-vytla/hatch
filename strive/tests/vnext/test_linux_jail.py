@@ -12,7 +12,7 @@ import subprocess
 
 import pytest
 
-from strive.vnext.runtime.linux_jail import LinuxJail, capability, settings
+from strive.runtime.linux_jail import LinuxJail, capability, settings
 
 
 def require_jail() -> None:
@@ -189,7 +189,7 @@ else:
 
 
 def test_unavailable_capability_never_claims_enforcement(monkeypatch: pytest.MonkeyPatch) -> None:
-    from strive.vnext.runtime.linux_jail import _detect
+    from strive.runtime.linux_jail import _detect
     missing = _detect("linux", "/nonexistent/strive-jail", "/nonexistent/strive-cgroup")
     assert not missing.available and missing.reason
     assert not _detect("darwin", "", "").available
@@ -202,7 +202,7 @@ def test_unavailable_capability_never_claims_enforcement(monkeypatch: pytest.Mon
 
 def test_cgroup_kill_covers_descendants_in_new_sessions(tmp_path: Path) -> None:
     require_jail()
-    from strive.vnext.runtime.linux_jail import terminate_recorded_group
+    from strive.runtime.linux_jail import terminate_recorded_group
     script = tmp_path / "descendants.py"
     script.write_text("""
 import os, time

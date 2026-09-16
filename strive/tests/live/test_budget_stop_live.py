@@ -14,7 +14,7 @@ import pytest
 def test_budget_stop_live(tmp_path: Path) -> None:
     assert Path("/.dockerenv").is_file() or Path("/run/.containerenv").is_file(), "paid proof must run in the orchestrator container"
     root = Path(__file__).resolve().parents[2]
-    result = subprocess.run([sys.executable, "-m", "strive.vnext.cli", "--root", str(tmp_path), "budget-stop-live",
+    result = subprocess.run([sys.executable, "-m", "strive.cli", "--root", str(tmp_path), "budget-stop-live",
         str(root / "tests/vnext/fixtures/budget-proof/budget-stop-5c.toml"), "--id", "live-proof"],
         capture_output=True, text=True, timeout=7200)
     assert result.returncode == 0, result.stdout + result.stderr

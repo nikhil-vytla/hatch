@@ -4,18 +4,18 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.cli import app
-from strive.vnext.cli.data import mapping
-from strive.vnext.cli.fixture import example
-from strive.vnext.cli.runner import reader, run, run_directory
-from strive.vnext.contracts.annotations import Annotation
-from strive.vnext.contracts.records import CausalIdentity, ProducerKind
-from strive.vnext.errors import IncompleteTail, JournalCorruption
-from strive.vnext.report.snapshot import snapshot
-from strive.vnext.store import ArtifactStore
-from strive.vnext.store.journal import FileJournal
-from strive.vnext.telemetry.projector import MemoryExporter, Projector
-from strive.vnext.wire import Frame
+from strive.cli import app
+from strive.cli.data import mapping
+from strive.cli.fixture import example
+from strive.cli.runner import reader, run, run_directory
+from strive.contracts.annotations import Annotation
+from strive.contracts.records import CausalIdentity, ProducerKind
+from strive.errors import IncompleteTail, JournalCorruption
+from strive.report.snapshot import snapshot
+from strive.store import ArtifactStore
+from strive.store.journal import FileJournal
+from strive.telemetry.projector import MemoryExporter, Projector
+from strive.wire import Frame
 
 
 def test_live_follow_and_projector_use_verified_complete_prefix(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

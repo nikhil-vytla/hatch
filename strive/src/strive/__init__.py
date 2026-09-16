@@ -5,9 +5,8 @@ execution core enforces permissions, accounts for effects, records exact
 revisions and recovers without hiding uncertainty. Comparative evaluation is
 optional, not a universal promotion gate.
 
-The current implementation lives in `strive.vnext`; see `strive.vnext.cli`
-for the manifest-shaped CLI and `docs/ARCHITECTURE.md` for the five integrity
-guarantees.
+See `strive.cli` for the manifest-shaped CLI and `docs/ARCHITECTURE.md` for
+the five integrity guarantees.
 """
 
 __version__ = "0.2.0"

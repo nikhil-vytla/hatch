@@ -13,8 +13,8 @@ import socket
 import sys
 from unittest.mock import patch
 
-from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.json_data import canonical, items, obj, parse, string
+from strive.store import ArtifactStore
 from . import UPSTREAM_REVISION
 from .native_worker import deny_network, run
 from .qualification import MODES, Qualification, QualificationFailure, qualify

@@ -14,7 +14,7 @@ uv sync --frozen --python /usr/local/bin/python3.12
 bash scripts/install-tau2.sh
 python scripts/prepare-cgroup.py
 uv run --no-sync python - <<'PY'
-from strive.vnext.runtime.linux_jail import require_capability
+from strive.runtime.linux_jail import require_capability
 print("OS confinement:", require_capability().reason)
 PY
 set +e

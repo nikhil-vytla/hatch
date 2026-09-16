@@ -7,22 +7,22 @@ import shutil
 import threading
 from typing import Literal
 
-from strive.vnext.codec import encode
-from strive.vnext.contracts.bindings import HarnessBinding, ModelBinding
-from strive.vnext.contracts.commands import Continue, ExecuteEffect, StepOutput
-from strive.vnext.contracts.harness import GenerationInput
-from strive.vnext.contracts.manifest import NamedHarness, load_resolved_configuration
-from strive.vnext.contracts.primitives import (AccessScope, ArtifactRef, IntegrationLevel, LineageId, ModelRole, RunId, ScopedArtifact)
-from strive.vnext.contracts.records import BoundHarness, CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
-from strive.vnext.harness.adapters import REGISTRY, resolve
-from strive.vnext.harness.bridge import HarnessEffectAdapter
-from strive.vnext.harness.gateway import ModelGateway
-from strive.vnext.harness.execution import HarnessExecution
-from strive.vnext.harness.profiles import fixture_profile
-from strive.vnext.harness.provider import HTTPProvider, ProviderContract
-from strive.vnext.runtime import Capability, CapabilityBroker, EffectRequest, Supervisor
-from strive.vnext.store import ArtifactStore
-from strive.vnext.store.cas import atomic_file
+from strive.codec import encode
+from strive.contracts.bindings import HarnessBinding, ModelBinding
+from strive.contracts.commands import Continue, ExecuteEffect, StepOutput
+from strive.contracts.harness import GenerationInput
+from strive.contracts.manifest import NamedHarness, load_resolved_configuration
+from strive.contracts.primitives import (AccessScope, ArtifactRef, IntegrationLevel, LineageId, ModelRole, RunId, ScopedArtifact)
+from strive.contracts.records import BoundHarness, CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
+from strive.harness.adapters import REGISTRY, resolve
+from strive.harness.bridge import HarnessEffectAdapter
+from strive.harness.gateway import ModelGateway
+from strive.harness.execution import HarnessExecution
+from strive.harness.profiles import fixture_profile
+from strive.harness.provider import HTTPProvider, ProviderContract
+from strive.runtime import Capability, CapabilityBroker, EffectRequest, Supervisor
+from strive.store import ArtifactStore
+from strive.store.cas import atomic_file
 
 from .fixtures import AUTHORED_TOML
 

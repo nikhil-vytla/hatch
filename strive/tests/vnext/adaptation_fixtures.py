@@ -4,27 +4,27 @@ from dataclasses import replace
 import json
 from pathlib import Path
 
-from strive.vnext.benchmarks.api import EpisodeSnapshot
-from strive.vnext.benchmarks.bridge import BenchmarkEffectAdapter, OperationRequest, OperationValidator
-from strive.vnext.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
-from strive.vnext.benchmarks.json_data import canonical
-from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.codec import encode
-from strive.vnext.contracts.bindings import ModelBinding
-from strive.vnext.contracts.feedback import FeedbackContract
-from strive.vnext.contracts.manifest import load_resolved_configuration
-from strive.vnext.contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, EpisodeId, LineageId, RevisionId, RunId
-from strive.vnext.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
-from strive.vnext.harness.gateway import ModelGateway
-from strive.vnext.harness.provider import ProviderContract, json_object
-from strive.vnext.policy import BundleManager, BundleSandbox, ContinualRefine, Edit, EvidenceSelector, GatewayRefiner, GenerationValidator, Proposal, RefinerRoute
-from strive.vnext.policy.data import dumps
-from strive.vnext.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
-from strive.vnext.runtime.broker import CapabilityBroker
-from strive.vnext.runtime.sandbox import SandboxLimits
-from strive.vnext.runtime.confined_sandbox import DenoSandbox
-from strive.vnext.runtime.supervisor import Supervisor
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.api import EpisodeSnapshot
+from strive.benchmarks.bridge import BenchmarkEffectAdapter, OperationRequest, OperationValidator
+from strive.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
+from strive.benchmarks.json_data import canonical
+from strive.benchmarks.store import OperationStore
+from strive.codec import encode
+from strive.contracts.bindings import ModelBinding
+from strive.contracts.feedback import FeedbackContract
+from strive.contracts.manifest import load_resolved_configuration
+from strive.contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, EpisodeId, LineageId, RevisionId, RunId
+from strive.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
+from strive.harness.gateway import ModelGateway
+from strive.harness.provider import ProviderContract, json_object
+from strive.policy import BundleManager, BundleSandbox, ContinualRefine, Edit, EvidenceSelector, GatewayRefiner, GenerationValidator, Proposal, RefinerRoute
+from strive.policy.data import dumps
+from strive.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
+from strive.runtime.broker import CapabilityBroker
+from strive.runtime.sandbox import SandboxLimits
+from strive.runtime.confined_sandbox import DenoSandbox
+from strive.runtime.supervisor import Supervisor
+from strive.store import ArtifactStore
 from strive_benchmark_counter import CounterAdapter
 
 from .fixtures import AUTHORED_TOML
@@ -69,7 +69,7 @@ class CounterProgram:
         return self.fixture.objects.publish(b"{}")
 
     def operation(self, snapshot: EpisodeSnapshot, current: ArtifactRef, action: bytes) -> OperationRequest:
-        from strive.vnext.benchmarks.api import ToolInvocation
+        from strive.benchmarks.api import ToolInvocation
         objects = self.fixture.objects
         if snapshot.version == 0:
             delta = json_object(action)["delta"]
