@@ -1,7 +1,7 @@
 # Checkpoint evolution: algorithmic model
 
-This document formalizes checkpoint evolution — the synthesis strategy behind
-SlopCodeBench (SCBench) — in the vocabulary of Parallax's
+This document formalizes checkpoint evolution, the synthesis strategy behind
+SlopCodeBench (SCBench), in the vocabulary of Parallax's
 [`docs/MODEL.md`](../../docs/MODEL.md). It characterizes what the
 paper and repository actually do before abstracting, and cites the specific
 sections and files each claim comes from.
@@ -35,9 +35,9 @@ influences stage $i+1$ is the artifact itself.
 
 **Design principles (paper §2.1; repo `docs/contributing-problems/README.md`).**
 
-1. No prescribed internal interfaces — specs constrain the external contract
+1. No prescribed internal interfaces: specs constrain the external contract
    only (entry command, CLI flags, API endpoints, output schemas).
-2. No visible test suite — agents see specification prose and embedded
+2. No visible test suite: agents see specification prose and embedded
    examples, never tests or test feedback.
 3. Black-box, language-agnostic evaluation via subprocess/API, with
    normalization guidance (ordering, tie-breaking, path format) wherever an
@@ -53,14 +53,14 @@ strict (all tests including regression), ISO (all non-regression), CORE (core
 only). If the agent crashes mid-problem, remaining checkpoints score zero
 correctness; quality metrics for missing checkpoints are excluded, not
 imputed. Pytest exit codes 2–5 are flagged `infrastructure_failure` and are
-distinguished from test failures — the upstream analog of Parallax's
+distinguished from test failures, the upstream analog of Parallax's
 Verification vs RunFailure split.
 
 **Checkpoint semantics (repo `docs/contributing-problems/README.md`).**
 Sanctioned checkpoint moves: expand constraints, narrow constraints, modify
 input source, change modality (CLI → REST). Prohibited: changing the core
 problem, adding unrelated problems, removing previously working features
-(`review-checklist.md`: "Each checkpoint adds to prior ones — no removal of
+(`review-checklist.md`: "Each checkpoint adds to prior ones. No removal of
 previously working features"). The first checkpoint defines the core problem
 and "you can't change it later."
 
@@ -134,7 +134,7 @@ Each stage is a TaskSpec in MODEL.md's form:
   endpoints); internal structure is unconstrained. This constraint is what
   transfers the architectural burden to the agent.
 - $x_{\mathrm{pub},i} = S_i$: specification prose plus embedded examples
-  and normalization guidance. Nothing else — no tests, no verdicts, no prior
+  and normalization guidance. Nothing else. No tests, no verdicts, no prior
   conversation.
 - $x_{\mathrm{seal},i} = (T_i, \Omega_{i-1}, N_i)$: the new sealed tests,
   the inherited obligations, and the normalization/comparison rules the
@@ -164,8 +164,8 @@ $\mu_{0,i} = \delta_{W_{i-1}}$ (with $W_0$ empty), horizon and budget
 $H_i, B_i$ declared per stage (upstream: two-hour wall clock, no turn or
 cost cap), and interaction schedule $\kappa_i$ degenerate within the
 episode: one specification delivery at $t=0$, no further user events. The
-interesting schedule is the *cross-episode* one — which requirements arrive at
-which stage — and that is exactly what the synthesis strategy controls.
+interesting schedule is the *cross-episode* one, which requirements arrive at
+which stage, and that is exactly what the synthesis strategy controls.
 
 ### 2.4 Evolution operators
 
@@ -197,8 +197,8 @@ sequence.** A sequence exerts design pressure when an architecture chosen
 myopically at stage $i$ makes the diff required at stage $j>i$ large. The
 paper's running example (§2, code_search): hardcoding Python at $C_1$ causes
 cascading rewrites at $C_2$ and $C_5$. We can make this measurable: given
-two reference implementations — one architecturally naive-but-correct at
-$C_1$, one anticipatory — the pressure of a sequence is the ratio of
+two reference implementations, one architecturally naive-but-correct at
+$C_1$ and one anticipatory. The pressure of a sequence is the ratio of
 downstream edit cost (diff churn, or probe-agent cost) between them. A
 sequence with ratio ≈ 1 tests iteration stamina, not design. This
 operationalization is used as an admission predicate in
@@ -222,7 +222,7 @@ t \in \Omega_{i} \;\Rightarrow\; t \in \Omega_{j},
 This is CE's substitute for EI's terminal restoration: EI guarantees the
 *endpoint* equals the source; CE guarantees the *past is never invalidated*.
 A checkpoint whose spec silently contradicts a prior sealed test destroys
-attribution the same way an EI arm that swaps the verifier would — later
+attribution the same way an EI arm that swaps the verifier would: later
 strict failures would measure spec incoherence, not agent degradation.
 (Upstream permits an explicit, justified opt-out via
 `include_prior_tests: false`; under this model that is a *declared* verifier
@@ -236,7 +236,7 @@ the workspace. (Upstream satisfies this; a Parallax implementation must
 preserve it under any added instrumentation.)
 
 **Invariant (workspace fidelity).** $\mu_{0,i+1}$ is exactly the agent's
-terminal $W_i$ — no repair, no normalization beyond declared environment
+terminal $W_i$. No repair, no normalization beyond declared environment
 reset, no reference-solution substitution. Violating this severs the causal
 chain the strategy exists to study.
 
@@ -259,13 +259,13 @@ VERIFY(i):   execute Ω_i via entrypoint; measure quality Q(y_i)
   └─ verifier infrastructure fault ───▶ RUNFAILURE(i)
 RUNFAILURE(i): record run failure
   └─ policy: family continues only if W_i exists; otherwise remaining
-     stages are censored (recorded, bounded worst-case in analysis —
+     stages are censored (recorded, bounded worst-case in analysis,
      not silently dropped)
 ```
 
 Guards worth naming because upstream leaves them implicit:
 
-- **Continue-on-failure**: a *failing verdict* never halts the family — the
+- **Continue-on-failure**: a *failing verdict* never halts the family. The
   flawed workspace carries forward by design. Only a *missing workspace*
   censors.
 - **RunFailure vs Verification**: budget exhaustion with a produced workspace
@@ -291,7 +291,7 @@ family and stage):
     \text{same family, admitted, controlled}\,\big].
 ```
 
-**Slope contrasts**, new to CE — the trajectory itself is the outcome:
+**Slope contrasts** are new to CE, where the trajectory itself is the outcome:
 
 ```math
 \beta_a = \mathbb E\big[\,Q_{i+1}(a) - Q_i(a)\,\big],
@@ -315,7 +315,7 @@ named intervention differs):
 | `repair-scheduled` | own $W_{i-1}$ | $S_i$, with declared refactor-only stages inserted ($T_{\mathrm{new}} = \varnothing$) | reversibility of degradation |
 
 `carry-reference` is the arm the paper explicitly declines to run (it is what
-"other benchmarks" do, §1/§2.2) — which is precisely why it is the right
+"other benchmarks" do, §1/§2.2), which is precisely why it is the right
 matched control for the self-accumulation estimand: upstream *asserts* the
 causal chain matters; the matched pair tests it. The `monolithic` and
 `foresight` arms are the CE analogs of EI's static arm: same terminal
@@ -356,8 +356,8 @@ gives three measurement capabilities EI structurally lacks:
    output is invisible in any restore-at-the-end design.
 2. **Silent-quality divergence.** Correctness and quality are measured on the
    same artifact at every stage, so quality can be tracked *conditional on
-   sustained correctness* — decay that pass rates never expose.
+   sustained correctness*, decay that pass rates never expose.
 3. **Deferred-cost realization.** A bad decision at stage $i$ is priced by
    verdicts and costs at stages $j>i$. This is the only design in the
    Parallax portfolio where "maintainability" has a native, sealed,
-   behavioral price — the future stages themselves.
+   behavioral price, the future stages themselves.

@@ -11,7 +11,7 @@ and
 each do in their own idiom? Second, how should those specifications translate
 onto HUD, the `verifiers` library, and other RL environment platforms,
 repeatably? The deliverable is the smallest tool that makes the translation
-deterministic and rerunnable — not a framework.
+deterministic and rerunnable, not a framework.
 
 **Verdict up front.** The second-consumer bar is met for a sealing-aware
 spec schema and a cross-platform conformance check, and it is not met for a
@@ -58,8 +58,8 @@ and any `verifiers` target.
 ### The observed failure that motivates the lever
 
 The HUD build is where the model's invariants stop being structural.
-`render_environment` serializes the **full sealed verifier** — test patch,
-FAIL_TO_PASS, PASS_TO_PASS, test command — into `instance.json`, and the
+`render_environment` serializes the **full sealed verifier** (test patch,
+FAIL_TO_PASS, PASS_TO_PASS, test command) into `instance.json`, and the
 generated Dockerfile does `COPY env.py instance.json /app/` into the same
 image whose `/testbed` workspace the agent occupies. With HUD's ssh
 capability the agent can read the whole container filesystem, so
@@ -72,7 +72,7 @@ The same file hand-rolls grading: `_grade()` returns
 official SWE-bench harness resolves FAIL_TO_PASS and PASS_TO_PASS per test
 from parsed logs; returncode-only grading conflates a harness crash, a
 PASS_TO_PASS regression, and a genuine failure into one bit. Inside the
-environment there is no `Verification`/`RunFailure` separation at all — the
+environment there is no `Verification`/`RunFailure` separation at all. The
 discriminated `Outcome` union exists in `runner.py` but the compiled
 artifact never heard of it.
 
@@ -118,7 +118,7 @@ costs them:
 - **Sealing.** `label` sits in the same sample object as the turns; nothing
   structural separates evaluator-only material from agent-visible material.
 - **Reproducibility of the published set.** Only ID lists are published,
-  not Stage-3 outputs — the reason
+  not Stage-3 outputs. The reason
   [`DESIGN-SELECTION.md`](../../docs/decisions/DESIGN-SELECTION.md) records
   an unresolved asset question, and `evolving-intent.md` disclaims
   reproduction claims.
@@ -144,17 +144,17 @@ marker-based test categorization (CORE / FUNCTIONALITY / ERROR /
 REGRESSION, with prior-checkpoint tests auto-reclassified to REGRESSION),
 and `CorrectnessResults.infrastructure_failure` derived from pytest exit
 codes 2–5. That flag is a native RunFailure/Verification separation baked
-into the result artifact — the property our compiled HUD grader lost.
+into the result artifact. That is the property our compiled HUD grader lost.
 
 What they do **not** specify, and the cost: nothing is sealed (the whole
-problem set, tests included, is public in the repo — a contamination
+problem set, tests included, is public in the repo, which is a contamination
 budget they simply accept); the spec-text↔test linkage is a naming
 convention; and `include_prior_tests: false` silently changes verifier
 semantics (already flagged as a declared-intervention issue in
 [`checkpoint-evolution.md`](../../docs/methods/checkpoint-evolution.md)).
 
 **Takeaway.** Each upstream freezes exactly the layer its claims depend on
-— evolving-intent freezes intent structure but not text or sealing;
+evolving-intent freezes intent structure but not text or sealing;
 slop-code-bench freezes verifier structure and failure classification but
 not secrecy. Parallax's claims depend on sealing, matched arms, and failure
 separation, so those are the layers its spec must freeze structurally.
@@ -163,9 +163,9 @@ separation, so those are the layers its spec must freeze structurally.
 
 ### HUD v6 (in-tree pin `hud==0.6.12`)
 
-A [task](https://docs.hud.ai/v6/reference/tasks) is a Pydantic row —
+A [task](https://docs.hud.ai/v6/reference/tasks) is a Pydantic row with
 `env` (name, a join key), `id` (template id), `args`, `slug`,
-`agent_config`, `runtime_config` (image, resources) — minted by calling an
+`agent_config`, and `runtime_config` (image, resources), minted by calling an
 async-generator template registered with `@env.template` that yields a
 prompt, receives the agent's answer, and yields a reward. The
 [environment](https://docs.hud.ai/v6/reference/environment) is a wire
@@ -177,7 +177,7 @@ Parallax mapping: matched arms fit naturally as template args (the current
 `episode(arm)` template already does this). Sealed authority has **no
 structural home**: sealed material lives wherever the env author puts it in
 the container, and the ssh capability makes the whole container filesystem
-agent-reachable — the observed leak is an instance of a platform-level gap,
+agent-reachable. The observed leak is an instance of a platform-level gap,
 not just a local bug. RunFailure separation likewise must be encoded by
 convention inside `info`. Both must therefore be enforced by *our*
 compiler, not assumed from the platform.
@@ -198,7 +198,7 @@ drives the model; runtime = subprocess or docker/prime/modal sandbox),
 composed by `vf.Env` and distributed via the Environments Hub. New work
 should target v1.
 
-Parallax mapping: a `Script` family compiles cleanly — the scripted user is
+Parallax mapping: a `Script` family compiles cleanly. The scripted user is
 an `env_response` that replays the next `Turn` (or a v1 taskset update
 hook); `answer`/`info` columns are structurally outside the prompt, which
 is a mild sealing boundary (though Hub-published datasets are public, so
@@ -216,7 +216,7 @@ treatment.
 input/target/metadata/files with optional per-sample
 [sandbox](https://inspect.aisi.org.uk/sandboxing.html) (Docker, K8s,
 Proxmox, ...). The key property for Parallax: **the scorer runs host-side,
-outside the sandbox** — `target` and scorer internals never enter the
+outside the sandbox**, so `target` and scorer internals never enter the
 agent's container unless the author explicitly copies them. That is the
 strongest structural sealing story of any surveyed platform, and it is the
 architecture the fixed HUD compiler should imitate (sealed material enters
@@ -240,7 +240,7 @@ Track it; do not compile to it yet.
 execution environment per repository, then synthesize task instances inside
 it (50k instances, 295 GB of images vs multi-TB per-instance designs). Its
 task formulation is deliberately identical to the SWE-bench instance
-schema — which is the de-facto SWE interchange format, and which
+schema, which is the de-facto SWE interchange format and which
 `SweBenchProblem` already mirrors. No new spec layer to adopt here; the
 lesson is that environment identity (image digest) belongs in the spec, as
 Parallax already does.
@@ -261,8 +261,8 @@ Three projects triangulate the answer.
 - **[Harbor](https://www.tbench.ai/news/announcement-2-0)**
   (Terminal-Bench 2.x, [arXiv 2601.11868](https://arxiv.org/abs/2601.11868))
   runs 20+ benchmarks through per-benchmark **adapters** into one harness
-  with RL rollout interfaces. That is many-specs→one-platform — the inverse
-  direction of Parallax's need, and evidence that the ecosystem norm is
+  with RL rollout interfaces. That is many-specs to one-platform, the inverse
+  of Parallax's need, and evidence that the ecosystem norm is
   hand-ported adapters, not shared specs.
 - **[CUBE](https://arxiv.org/abs/2603.15798)** (AI Alliance,
   [alpha](https://github.com/The-AI-Alliance/cube-standard)) is the first
@@ -272,7 +272,7 @@ Three projects triangulate the answer.
   If it matures it becomes one more compile *target*, not a substitute for
   the spec layer.
 
-So: no existing standard expresses what Parallax must express — sealed
+So: no existing standard expresses what Parallax must express, namely sealed
 authority as a schema property, matched-arm families, and
 RunFailure-separated verdicts. Nothing to adopt wholesale; nothing being
 reinvented by building a Parallax-internal schema. Equally, the METR lesson
@@ -286,28 +286,28 @@ compiler framework.**
 
 For the sealing schema and conformance harness, the bar is met on three
 grounds. First, two consumers of the same spec shapes already exist in the
-tree — the in-process GSM8K runner and the HUD SWE build — and they have
+tree, the in-process GSM8K runner and the HUD SWE build, and they have
 already diverged in exactly the way the earlier arena feared: the runner
 preserves `Verification | RunFailure`, the compiled environment does not.
 Second, the failure is observed, not hypothetical: sealed bytes in the
 agent image and returncode-only grading are in `swebench_env.py` on `main`
-today. Third, `MODEL.md`'s own TODO gate — generalize only after another
-journey demonstrates *which fields* need a shared executable representation
-— has been satisfied by the SWE journey: the fields are the public/sealed
+today. Third, `MODEL.md`'s own TODO gate says to generalize only after
+another journey demonstrates *which fields* need a shared executable
+representation, and the SWE journey satisfied it: the fields are the public/sealed
 split and the verdict contract, and (importantly) **only** those. Nothing
 observed demands executable representations of $P$, $Z$, or
 $\mathcal S$; the environment spec should stay at image identity,
 workspace, tools, budgets, and schedule.
 
-For a general framework — plugin registries, N platforms, a transformation
-DSL — the bar is not met. There is exactly one real remote backend in
+For a general framework with plugin registries, N platforms, and a
+transformation DSL, the bar is not met. There is exactly one real remote backend in
 progress. The `verifiers` target has no experiment demanding it yet; it
 earns its existence as the vertical proof (§7), not before.
 
 ## 6. The lever
 
 Three pieces, in dependency order. Total new surface is one schema module,
-one compile function per platform, and one test harness — no new packages,
+one compile function per platform, and one test harness. No new packages and
 no runtime services.
 
 ### (i) `TaskSpec`/`EnvSpec` v1: sealing as a structural property
@@ -337,7 +337,7 @@ class EnvSpecV1(StrictModel):
 Sealing becomes structural through the compiler contract, not a review
 convention: every emitted artifact carries an `audience: "agent" |
 "evaluator"` tag, and the function that renders agent-audience artifacts
-takes `PublicTaskV1` as its argument type — it cannot mention sealed fields
+takes `PublicTaskV1` as its argument type, so it cannot mention sealed fields
 without a type error. The current bug is impossible to re-introduce
 silently because `render_environment(family)` (which received everything)
 no longer exists; its replacement is two functions with different input
@@ -347,7 +347,7 @@ generalizes into invariant 1 below.
 Checkpoint evolution's two extensions (family-valued output, monotone
 sealed accumulation) fit without schema surgery: a family is a tuple of
 `TaskSpecV1` plus a declared coupling, and accumulation is a validator over
-consecutive `sealed` fields — both already sketched in the method doc.
+consecutive `sealed` fields, both already sketched in the method doc.
 
 ### (ii) One compile function per platform, with a receipt
 
@@ -367,19 +367,19 @@ files in CI. For HUD, the compiled bundle changes placement, imitating
 Inspect's host-side scorer: the agent image gets only agent-audience
 artifacts (public `instance_public.json`, turn scripts); sealed material
 travels in an evaluator-audience artifact applied at grade time in a fresh
-verifier context (the official SWE-bench harness's own pattern — evaluate
-in a fresh container from the pinned image), never in the agent image
+verifier context, which is the official SWE-bench harness's own pattern of
+evaluating in a fresh container from the pinned image, never in the agent image
 build context.
 
 Invariants checked at compile time, all of which fail the build:
 
 1. **No sealed bytes in agent artifacts.** Byte-level scan of every
    agent-audience artifact (and the Dockerfile build context) for every
-   sealed field value — the belt to the type system's suspenders.
+   sealed field value. Belt to the type system's suspenders.
 2. **Verdict contract.** The emitted grader must be generated *from* the
    sealed spec (per-test FAIL_TO_PASS/PASS_TO_PASS resolution, not
    returncode), and must emit the `Verification | RunFailure` union with
-   `failure_kind` for harness/container faults — mirroring
+   `failure_kind` for harness/container faults, mirroring
    slop-code-bench's `infrastructure_failure` flag, which their artifacts
    prove is representable in a test-runner result.
 3. **Arm parity.** Re-validate the `ScriptFamily` invariants over compiled
@@ -395,18 +395,18 @@ the compiled platform grader, and require identical
 `(verdict, failure_kind)` vectors.
 
 - Inputs: a frozen `TaskSpecV1` fixture (for SWE, a miniature git repo with
-  one trivial FAIL_TO_PASS test — no official image pull needed for the
+  one trivial FAIL_TO_PASS test, so no official image pull is needed for the
   unit tier) and fixture submissions: known-good patch, known-bad patch,
   patch touching sealed test files, and a simulated harness crash.
-- Outputs: a conformance record — spec digest, target, per-fixture
-  `(expected, actual)` outcome pairs — retained as run evidence.
+- Outputs: a conformance record holding spec digest, target, and per-fixture
+  `(expected, actual)` outcome pairs, retained as run evidence.
 - The golden test: CI recompiles the frozen fixture spec, asserts artifact
   digests match the receipt (determinism), asserts the sealed-byte scan
   passes (would have caught `instance.json` in the agent image), and
   asserts the conformance vector matches (the harness-crash fixture returns
-  `RunFailure(failure_kind="verifier")`, not reward 0.0 — would have caught
-  returncode-only grading; the sealed-test-file fixture returns the same
-  verdict both sides — pins the restore-then-apply semantics).
+  `RunFailure(failure_kind="verifier")` rather than reward 0.0, which would
+  have caught returncode-only grading; the sealed-test-file fixture returns the
+  same verdict on both sides, which pins the restore-then-apply semantics).
 
 ### What NOT to build
 
@@ -433,14 +433,14 @@ transformation algebra, proposed when there was one method, no real
 backend, and no observed failure. Today there are two methods (one
 implemented, one specified), a real backend in progress, a second in-tree
 consumer, and a concrete observed failure of exactly the class the lever
-prevents — and the proposal is narrower than what was rejected: a schema
+prevents. And the proposal is narrower than what was rejected: a schema
 plus two ordinary functions plus a test, with the strategy and domain
 boundaries of ADR-001 left untouched.
 
 ## 7. Sequencing
 
 **The schema, the HUD compiler refactor, and the conformance check land
-before the screening path is declared stable — because the screening path
+before the screening path is declared stable, because the screening path
 is not stable without them.** Screening evidence graded returncode-only is
 not interpretable: a PASS_TO_PASS regression, a harness crash, and a real
 failure all read as the same zero, which breaks the
@@ -454,19 +454,19 @@ system. Order of work:
 
 1. Extract `TaskSpecV1`/`EnvSpecV1` from the existing models (type
    re-arrangement; no behavior change; `parallax/src` untouched by this
-   research folder — this is the next implementation slice).
+   research folder; this is the next implementation slice).
 2. Rewrite the HUD build as `compile_hud` with audience-tagged artifacts,
    evaluator-side sealed delivery, a per-test grader, and the receipt.
 3. Land the conformance harness with the miniature SWE fixture; wire the
    golden test into CI. Only then run paid screening.
 
 **First vertical proof** (in order): the SWE conformance fixture catching
-the two known bugs against the pre-refactor renderer — the lever validated
-against ground truth, cheap and offline. **Second proof, and the true
+the two known bugs against the pre-refactor renderer. That validates the lever
+against ground truth, cheaply and offline. **Second proof, and the true
 second-consumer test:** compile the existing GSM8K experiment spec to a
-`verifiers` env — dataset rows from `Problem`/`Script` public fields, the
-scripted user as `env_response` replaying turns, the rubric calling the
-same `grade` function — run the deterministic scripted agent from the
+`verifiers` env, with dataset rows from `Problem`/`Script` public fields, the
+scripted user as `env_response` replaying turns, and the rubric calling the
+same `grade` function. Then run the deterministic scripted agent from the
 existing offline tests through it, and require the paired report to match
 the in-process runner's report record-for-record (modulo transport
 fields). That proof is offline, free, and parallelizable with screening; if

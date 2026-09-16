@@ -16,7 +16,7 @@ for six in-code admission gates against the PR #20 branch's actual types
 (§2), and the design rationale for the judgment-side skill that ships in
 this same PR at `parallax/.cursor/skills/review-task-admission/` (§3).
 
-The gates are **specifications, not code** — implementation belongs to the
+The gates are **specifications, not code**. Implementation belongs to the
 `parallax/src` owner on the PR #20 branch
 (`cursor/parallax-screening-run`), which this unit deliberately does not
 touch. All module and type names below were read from that branch
@@ -27,7 +27,7 @@ the implementer can build without redesign.
 
 | Source | What was used | How consulted |
 |---|---|---|
-| [METR Task Development Guide](https://taskdev.metr.org/) — Desiderata, Quality Assurance | reviewer independence; invalid/partial/best solution score probes; "not difficult for incidental reasons"; scoring tolerant of format noise | full pages, 2026-08-02 |
+| [METR Task Development Guide](https://taskdev.metr.org/), Desiderata and Quality Assurance | reviewer independence; invalid/partial/best solution score probes; "not difficult for incidental reasons"; scoring tolerant of format noise | full pages, 2026-08-02 |
 | [HUD "Designing tasks"](https://docs.hud.ai/v6/reference/advice) | cheapest-path principle; four-way leakage taxonomy; prompt–grader alignment; same-shape taskset diagnostic | full page, 2026-08-02 |
 | [slop-code-bench contributing checklists](https://github.com/SprocketLab/slop-code-bench/tree/main/docs/contributing-problems) (`checklist.md`, `review-checklist.md`) | "could two correct implementations differ?"; what-not-how leakage rules; deliberate under-specification of error text | raw files, repo `main`, 2026-08-02 |
 | [Prime Intellect verifiers v1 GUIDE](https://github.com/PrimeIntellect-ai/verifiers/blob/main/verifiers/v1/GUIDE.md) + [Environments Hub docs](https://docs.primeintellect.ai/verifiers/overview) | shipped model-free `validate` gold check; per-task error isolation ("one bad task is data, not a crash"); Hub no-op + flaky-retry practice (via audit Q2) | GUIDE full text, 2026-08-02 |
@@ -43,7 +43,7 @@ not authoring guidance, so it is not cited.
 
 ---
 
-## 1 — Distilled best practices
+## 1: Distilled best practices
 
 Seven findings, each with the practice it implies for Parallax.
 
@@ -54,8 +54,8 @@ only instances whose gold patch improves the test outcome; Prime Intellect
 ships `uv run validate` as a model-free gold check and its Hub practice adds
 the no-op direction (task must fail with zero edits). METR's "pre-validated
 tasks" alternative asks authors to submit an invalid, a partial, and a best
-solution and confirm each score. The bidirectional pair — gold must pass,
-no-op must fail — bounds both false negatives (broken reference) and false
+solution and confirm each score. The bidirectional pair (gold must pass,
+no-op must fail) bounds both false negatives (broken reference) and false
 positives (vacuous task). *Implication: gates G3/G4 below are the admission
 bar; nothing semantic substitutes for them.*
 
@@ -85,7 +85,7 @@ text. HUD's taxonomy names three more kinds a lint cannot catch:
 root-cause leakage (prose that names the fix), grader leakage (prompt
 vocabulary that exists only to satisfy the verifier), and eval-context
 leakage (text implying the task is a test). slop-code-bench's review rules
-add structural leakage — specs that prescribe *how* rather than *what*
+add structural leakage: specs that prescribe *how* rather than *what*
 ("no design-pressure paragraphs"). *Implication: the mechanical lint (G2)
 is necessary but not sufficient; paraphrase-level leakage is skill
 question 3.*
@@ -95,7 +95,7 @@ correct implementations produce different outputs?" Anthropic: success
 criteria "two domain experts would grade identically." Both are the same
 test at different layers, and both efforts treat *deliberate*
 under-specification (exact error strings, internal architecture) as
-correct — reviewers must not manufacture false ambiguity by demanding
+correct. Reviewers must not manufacture false ambiguity by demanding
 everything be pinned. *Implication: skill question 1, with the
 false-ambiguity caveat stated.*
 
@@ -103,7 +103,7 @@ false-ambiguity caveat stated.*
 METR: tasks "shouldn't be weird or confusing in a way that might unfairly
 throw the agent off" and shouldn't be difficult for incidental reasons.
 SWE-smith's paper concedes its generated issue text got *no* checks for
-under-specification or solution leakage — the audit flags this as exactly
+under-specification or solution leakage. The audit flags this as exactly
 the hole a rendered-turn review closes. HUD's same-shape diagnostic ("if
 you can summarize every task with one sentence varying only the nouns") is
 the family-level version. *Implication: skill question 2, asked over
@@ -119,7 +119,7 @@ asks whether a proposed fix changes the population selectively.*
 
 ---
 
-## 2 — Gate specifications (in-code half)
+## 2: Gate specifications (in-code half)
 
 ### Pipeline placement
 
@@ -142,7 +142,7 @@ flowchart TD
 
 G1/G5/G6 are cheap and run per candidate family immediately after
 construction. G2 runs on the compiled bundle (it must see what the agent
-will actually see). G3/G4 need the pinned container and run last — they are
+will actually see). G3/G4 need the pinned container and run last, because they are
 the expensive gates, and there is no point paying for them on a family that
 already failed a cheap gate. All gates must pass before
 `screening.build_screening_plan` freezes the `DesignDigest`; a source
@@ -181,7 +181,7 @@ class AdmissionRecordV1(StrictModel):
 
 Written with `canonical.atomic_write` beside the screening evidence
 (pattern: `screening.run_screening`'s append-fsync JSONL). Rejections are
-retained, not deleted — Prime Intellect persists exclusions for public
+retained, not deleted. Prime Intellect persists exclusions for public
 audit, and rejected records are what the skill's triage reads.
 Per-gate isolation follows the verifiers `validate` contract: a gate that
 *errors* produces a failed `GateResultV1` with the error as evidence; it
@@ -194,7 +194,7 @@ pipeline seat.
 
 ---
 
-**G1 — schema validity**
+**G1: schema validity**
 
 - **Input:** the candidate `SweScriptFamily`, and the frozen
   `TaskSpecV1` + `EnvSpecV1` from `freeze_swe_specs`.
@@ -217,10 +217,10 @@ pipeline seat.
 
 ---
 
-**G2 — sealed-leakage lint**
+**G2: sealed-leakage lint**
 
 - **Input:** `TaskSpecV1.sealed` (`SealedAuthorityV1`) and the compiled
-  `CompiledBundleV1.agent_artifacts` — the compiled surface, not just the
+  `CompiledBundleV1.agent_artifacts`: the compiled surface, not just the
   script turns, because agent artifacts are what the agent actually reads.
 - **Predicate:** pass iff `hud_compile.assert_agent_artifacts_clean(task.sealed,
   bundle.artifacts)` does not raise `SealedLeakError`. The fragment set is
@@ -228,7 +228,7 @@ pipeline seat.
   `fail_to_pass`/`pass_to_pass` name, hunk headers, added lines ≥4 chars,
   and added `test_*` function names.
 - **Failure evidence:** the artifact `path`, the *digest* and byte-length
-  of the matched fragment — **never the fragment itself**. Admission
+  of the matched fragment and **never the fragment itself**. Admission
   records get read into agent and reviewer contexts; quoting the sealed
   fragment in evidence would make the record a new leakage surface.
   (Requires a small extension to `assert_agent_artifacts_clean` or a
@@ -236,16 +236,16 @@ pipeline seat.
   `SealedLeakError` message names only the path.)
 - **Seat:** immediately after `compile_hud`, before any container work.
 - Note: this lint is byte-level by design. Paraphrase-level leakage
-  (root-cause prose, grader vocabulary, eval-context tells — HUD's
+  (root-cause prose, grader vocabulary, eval-context tells) from HUD's
   taxonomy) is not mechanically checkable and belongs to the skill.
 
 ---
 
-**G3 — no-op check** (task must fail with zero edits)
+**G3. No-op check** (task must fail with zero edits)
 
 - **Input:** `TaskSpecV1` + `EnvSpecV1`; executes in the pinned container
   via `swebench_harness.run_official_harness`.
-- **Predicate:** submit an **identity patch** — a syntactically valid,
+- **Predicate:** submit an **identity patch**: a syntactically valid,
   semantically inert diff that applies cleanly (e.g. appending a blank
   line to a file the tests never import). Pass iff the resulting
   `HarnessEvaluation` has `outcome.verdict != Verdict.PASS` **and**
@@ -253,7 +253,7 @@ pipeline seat.
   `patch_successfully_applied == True`.
 - **Why not an empty patch:** `run_official_harness` maps an empty
   `model_patch` to `patch_exists=False` and returns WRONG *without
-  executing any tests* — a naive "empty submission must fail" check passes
+  executing any tests*. A naive "empty submission must fail" check passes
   vacuously and certifies nothing. The identity patch forces actual test
   execution, so the gate observes the F2P tests genuinely failing on the
   unmodified tree (SWE-smith's pre-gold baseline run, expressed through
@@ -265,19 +265,19 @@ pipeline seat.
 - **Failure evidence:** the full `HarnessEvaluation` (report digest,
   `fail_to_pass_success`, `pass_to_pass_success`), the identity patch
   digest, and the verdict. A failure here means the task is solvable with
-  zero edits — the F2P tests already pass — and the source must be
+  zero edits, because the F2P tests already pass, and the source must be
   rejected, not patched.
 - **Seat:** after G2, sharing container setup with G4 (same image pull,
-  run G3 first — it is cheaper to interpret).
+  run G3 first, since it is cheaper to interpret).
 
 ---
 
-**G4 — gold check** (reference must pass, with flaky-retry)
+**G4: gold check** (reference must pass, with flaky-retry)
 
 - **Input:** `TaskSpecV1` + `EnvSpecV1` + the source gold patch;
   executes via `run_official_harness(task, environment, gold_patch, ...)`.
 - **Schema prerequisite (the one change to existing types):** the gold
-  patch is parsed today (`swebench._DatasetRow.patch`) but dropped —
+  patch is parsed today (`swebench._DatasetRow.patch`) but dropped, so
   neither `SweBenchProblem` nor `SealedAuthorityV1` carries it. The
   implementer must thread it through as sealed material
   (`SweBenchVerifier.gold_patch: NonEmptyText` and
@@ -286,17 +286,17 @@ pipeline seat.
 - **Predicate:** pass iff `HarnessEvaluation.outcome.verdict ==
   Verdict.PASS` within at most 3 attempts, where a retry is permitted
   **only** after an infrastructure failure (`OfficialHarnessError` /
-  `RunFailure`) — a graded `Verdict.WRONG` is terminal and fails the gate
+  `RunFailure`). A graded `Verdict.WRONG` is terminal and fails the gate
   on the spot. Verdicts are deterministic evidence; retrying one is
   shopping for flakiness.
 - **Classification:** pass on attempt 1 → `admitted`; pass after ≥1 infra
   failure → `admitted_flaky` (recorded in `AdmissionRecordV1.decision`,
   Prime Intellect's flaky/broken separation with a budget of 3 instead of
-  their 10 — each attempt here is a full container evaluation, and an
+  their 10, because each attempt here is a full container evaluation and an
   environment needing more than 3 tries is itself broken); all attempts
   exhausted or WRONG → `rejected`.
 - **GSM8K analogue:** `grade(problem, f"FINAL_ANSWER: {problem.answer}")`
-  must return `Verdict.PASS` (deterministic — no retry needed).
+  must return `Verdict.PASS` (deterministic, no retry needed).
 - **Failure evidence:** every attempt's `Outcome` in order
   (`GateResultV1.attempts`), every `report_digest`,
   `fail_to_pass_success` of the last attempt (which F2P tests the gold
@@ -306,7 +306,7 @@ pipeline seat.
 
 ---
 
-**G5 — budget matching**
+**G5: budget matching**
 
 - **Input:** the candidate `SweScriptFamily` (or `PublicTaskV1`) and
   `EnvSpecV1`.
@@ -318,23 +318,23 @@ pipeline seat.
   (`EnvSpecV1.budget.total_agent_steps == static.total_agent_steps`, same
   for tokens). (a), (b), (d) re-assert existing validators
   (`SweScriptFamily.controlled_family`, `compile_hud`'s budget check);
-  (c) is new — `controlled_family` currently compares totals and turn
+  (c) is new, `controlled_family` currently compares totals and turn
   counts but not the per-turn step split, and an unequal split is exactly
   the upstream SWE budget confound the audit's Q1 refused to inherit.
 - **Failure evidence:** the offending per-arm tuples, verbatim (they are
   public material).
-- **Seat:** with G1, immediately after construction — it needs no
+- **Seat:** with G1, immediately after construction, since it needs no
   container and any failure is a constructor bug.
 
 ---
 
-**G6 — arm-completeness (simulation viability)**
+**G6: arm-completeness (simulation viability)**
 
 - **Input:** the construction attempt for one source: either a
   `SweScriptFamily` or the `SweBenchError`/`ConstructionError` that
   aborted `construct_swe_intent`/`build_swe_script_family`, plus the
   planned arm set for the experiment.
-- **Predicate:** pass iff construction produced a complete family — every
+- **Predicate:** pass iff construction produced a complete family, meaning every
   planned arm present with ≥1 turn (`SweScriptFamily.controlled_family`
   guarantees the three-arm shape when the object exists; the gate's job is
   to catch the *doesn't-exist* case and make it a recorded rejection
@@ -349,7 +349,7 @@ pipeline seat.
   fail construction for *some* arms but are admitted for others silently
   change the population between conditions and invalidate the paired
   design. Rejection must be per-source, uniform across arms, and recorded
-  — so the skill's triage can later ask whether the rejections are
+  so the skill's triage can later ask whether the rejections are
   selective (e.g. all multi-argument sources failing predecessor
   generation would bias the admitted population toward trivial
   evolutions).
@@ -359,14 +359,14 @@ pipeline seat.
 ### What is deliberately *not* a gate
 
 - **LLM-judge checks** (counterfactual minimality, predecessor
-  plausibility — evolving-intent App. D semantics). Both the audit and
+  plausibility, per evolving-intent App. D semantics). Both the audit and
   `docs/methods/checkpoint-evolution.md` hold that rubric judgments are
   excluded from admission. They may run as below-the-bar evidence
   (majority-voted, transcripts retained) but never flip
   `AdmissionRecordV1.decision`.
 - **Conformance** (`conformance.run_conformance`). It answers a different
-  question — does the *compiled grader* agree with the reference grader on
-  the fixed submission set — and stays its own record
+  question of whether the *compiled grader* agrees with the reference grader
+  on the fixed submission set, and it stays its own record
   (`ConformanceRecordV1`). A conformance failure is a compiler bug, not a
   task rejection; conflating the two records would misfile it.
 - **Ambiguity, naturalness, paraphrase leakage, cheapest-path review.**
@@ -374,7 +374,7 @@ pipeline seat.
 
 ---
 
-## 3 — The judgment half: `review-task-admission` skill
+## 3: The judgment half: `review-task-admission` skill
 
 Ships in this PR at
 [`parallax/.cursor/skills/review-task-admission/`](../../.cursor/skills/review-task-admission/SKILL.md).
@@ -384,13 +384,13 @@ Design decisions, per the approval constraints:
   naturalness, paraphrase leakage, cheapest path, failure triage) are
   phrased as questions with the evidence worth looking at, not as
   checkboxes. The slop-code-bench checklists were mined for their
-  *questions*; their 50-checkbox format was deliberately not copied — the
+  *questions*; their 50-checkbox format was deliberately not copied, since the
   skill states that a review that finds nothing wrong should say so in
   three sentences, not produce a filled-out form.
 - **Rendered turns, not internal state.** The reviewer reads what the agent
   will read: `PublicScriptV1.turns` / `CompiledBundleV1.agent_artifacts`,
   in delivery order, per arm. Internal intents, schedules, and sealed
-  authority are out of bounds for the first pass — METR's QA independence
+  authority are out of bounds for the first pass, following METR's QA independence
   rule (the reviewer sees only what the agent sees) applied to an agent
   reviewer. Sealed material may be consulted only afterward, for leakage
   adjudication, and never quoted into the verdict.
@@ -402,7 +402,7 @@ Design decisions, per the approval constraints:
   decision (`admit` / `admit-with-notes` / `reject`), and at least one
   observation tied to a specific rendered turn. A minimal validator
   (following the `distill-research-learnings` validator pattern) checks
-  only these mechanical properties — it validates the record's shape,
+  only these mechanical properties: it validates the record's shape,
   never the judgment.
 
 ---
@@ -439,6 +439,6 @@ Implement G3+G4 only, and run them over the 10 `INITIAL_SCREENING_IDS`
 sources in `swebench.py`. **Pass:** all 10 gold patches admit (SWE-bench
 Verified is human-validated, so a rejection would indicate our harness
 wiring, not the data) and all 10 no-op checks fail the identity patch.
-**Fail:** any gold rejection or vacuous no-op pass — either finding means
+**Fail:** any gold rejection or vacuous no-op pass, either finding means
 the pipeline, not the dataset, needs fixing before any screening result is
 interpretable.

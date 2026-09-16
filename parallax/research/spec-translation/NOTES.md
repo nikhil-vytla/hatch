@@ -1,4 +1,4 @@
-# Working notes — spec translation research
+# Working notes: spec translation research
 
 ## 2026-08-02
 
@@ -32,7 +32,7 @@
   and `Dockerfile.hud` does `COPY env.py instance.json /app/` into the SAME
   image where the agent works (`/testbed`, same filesystem). Nothing
   structural prevented it: the sealed/public split exists in the Pydantic
-  models but serialization flattens it — sealing is a convention at the
+  models but serialization flattens it, so sealing is a convention at the
   serialization boundary, not a property of it.
 - **Confirmed pain (grading)**: `_grade()` in the generated env.py decides
   pass/fail by `result.returncode == 0` on the whole test command. No
@@ -43,14 +43,14 @@
 ### Key observation for second-consumer question
 
 Consumers of a "task spec → platform artifact" translation that exist today:
-1. HUD SWE env build (`render_environment`) — implemented, has the leak.
-2. GSM8K local runner (`run_script`) — implemented; the "platform" is a
+1. HUD SWE env build (`render_environment`): implemented, has the leak.
+2. GSM8K local runner (`run_script`), implemented; the "platform" is a
    trivial in-process loop, but it consumes the same Script/Problem shapes.
 Proposed: checkpoint-evolution families (docs/methods/checkpoint-evolution.md)
 and a verifiers-library target. So: one real compiler exists (buggy), a second
 in-process consumer exists, a third+fourth are on paper. Honest read: the bar
 is *met for the sealing schema + conformance check*, arguably *not yet met*
-for a multi-platform compiler framework — hence build the smallest lever.
+for a multi-platform compiler framework, hence build the smallest lever.
 
 ### Research plan
 
@@ -96,8 +96,8 @@ for a multi-platform compiler framework — hence build the smallest lever.
   `EnvironmentSpec` (Pydantic, `type` discriminator picks runtime backend;
   docker/local). Agents/models/runs are separate YAML configs.
 - Reward contract: marker-based GroupType (CORE/FUNCTIONALITY/ERROR/
-  REGRESSION; prior-checkpoint tests auto-reclassify to REGRESSION), and —
-  notable — `CorrectnessResults.infrastructure_failure` derived from pytest
+  REGRESSION; prior-checkpoint tests auto-reclassify to REGRESSION), and
+  `CorrectnessResults.infrastructure_failure` derived from pytest
   exit codes 2–5. That is a native RunFailure/Verification separation at the
   artifact level. `include_prior_tests: false` is a silent verifier change
   (checkpoint-evolution.md already flags it).
@@ -115,12 +115,12 @@ for a multi-platform compiler framework — hence build the smallest lever.
   `tasks.start`, `tasks.grade`); capabilities: ssh (workspace shell), mcp,
   cdp, rfb. Grading env-side; `EvaluationResult(reward, content, info,
   subscores)`.
-- Sealing: NO structural boundary — sealed material lives wherever the env
+- Sealing: NO structural boundary. Sealed material lives wherever the env
   author puts it in the container; with the ssh capability the agent can
   reach the whole container filesystem. Exactly the failure mode we hit.
 - RunFailure: no verdict/failure discrimination in EvaluationResult; must be
   encoded in `info` by convention.
-- Matched arms: template args (our `episode(arm)`) — fits.
+- Matched arms: template args (our `episode(arm)`) fit.
 
 **Prime Intellect verifiers** (github.com/PrimeIntellect-ai/verifiers;
 docs.primeintellect.ai/verifiers):
@@ -142,7 +142,7 @@ docs.primeintellect.ai/verifiers):
 **Inspect AI** (inspect.aisi.org.uk): Task = dataset + solver + scorer (+
 sandbox, epochs, setup, approval). Sample = input/target/metadata/files/
 sandbox. KEY property: scorer runs host-side; `target` never enters the
-sandbox unless the author puts it there — the strongest structural sealing
+sandbox unless the author puts it there. That is the strongest structural sealing
 story of the surveyed platforms. Per-sample sandboxes (Docker/K8s/Proxmox).
 Sample-level error handling distinguishes errors from scores (`fail_on_error`,
 retry). METR is migrating to Inspect (see below).
@@ -155,7 +155,7 @@ NVIDIA, Modal...). Watch, don't target yet.
 
 **SWE-smith / SWE-gym lineage** (arXiv 2504.21798): env-first construction
 (one image per repo, tasks synthesized inside), task formulation identical
-to SWE-bench instance schema — the de-facto SWE interchange format, which
+to SWE-bench instance schema, which is the de-facto SWE interchange format and which
 `SweBenchProblem` already mirrors. 50k instances / 295 GB vs SWE-bench's
 per-instance images.
 
@@ -170,7 +170,7 @@ per-instance images.
   decays into a bridge.
 - **Harbor / Terminal-Bench 2.x** (tbench.ai, arXiv 2601.11868): one harness,
   20+ benchmark ADAPTERS (SWE-bench, SWE-smith, Aider Polyglot...). Direction
-  is many-specs→one-platform — the inverse of our need. Harbor task format =
+  is many-specs→one-platform, the inverse of our need. Harbor task format =
   task.toml + instruction.md + env/test scripts; RL rollout interfaces.
 - **CUBE** (arXiv 2603.15798, AI Alliance, alpha): protocol standard (MCP +
   Gym-style) to wrap a benchmark once and use it on any compliant platform.
@@ -186,7 +186,7 @@ per-instance images.
 - Second-consumer bar: MET for the sealing schema + conformance harness
   (HUD SWE path and the in-process GSM8K runner are two live consumers of
   the same spec shapes today, and the observed leak is the exact error class
-  the lever prevents). NOT met for a general N-platform compiler framework —
+  the lever prevents). NOT met for a general N-platform compiler framework,
   build the verifiers compiler only as the vertical proof, nothing beyond.
 - The lever = (i) TaskSpec/EnvSpec v1 frozen Pydantic schema where
   public/sealed is structural (agent artifacts constructible only from the

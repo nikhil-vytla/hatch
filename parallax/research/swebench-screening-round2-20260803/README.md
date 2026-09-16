@@ -18,7 +18,7 @@ Every manifest was canonical and fsynced before paid execution. Every episode
 recorded the provider-reported model and token usage. Candidate patches were
 graded evaluator-side with official SWE-bench revision
 `f7bbbb2ccdf479001d6467c9e34af59e44a840f9` and digest-pinned official images.
-These small screens remain underpowered and make no advance/reject claim.
+These are screens, not comparisons. They locate operating points.
 
 ## Outcomes
 
@@ -39,20 +39,20 @@ Sonnet 4.6:
 
 ## Spend
 
-Actual token-metered spend was $2.972512 against the $5 cap:
+Actual token-metered spend was \$2.972512 against the \$5 cap:
 
-- Initial construction: $0.023495.
-- Initial Opus screen: $0.858160.
-- Sonnet tier-down: $0.106100.
-- Remaining construction: $0.027712.
-- Remaining first two Opus trials: $1.335095.
-- Uniform third Opus trials: $0.621950.
+- Initial construction: \$0.023495.
+- Initial Opus screen: \$0.858160.
+- Sonnet tier-down: \$0.106100.
+- Remaining construction: \$0.027712.
+- Remaining first two Opus trials: \$1.335095.
+- Uniform third Opus trials: \$0.621950.
 
 The original runtime priced Opus 4.8 with the retired Opus 4.1 rate and priced
 Haiku construction as Opus. The retained usage was recalculated at current
-model-specific rates. Runtime pricing constants now use $5/$25 per million
-Opus input/output tokens and $1/$5 for Haiku. Sonnet 4.6 used its current
-introductory $2/$10 rate.
+model-specific rates. Runtime pricing constants now use \$5/\$25 per million
+Opus input/output tokens and \$1/\$5 for Haiku. Sonnet 4.6 used its current
+introductory \$2/\$10 rate.
 
 ## Evidence
 
@@ -85,8 +85,16 @@ resume path used the immutable pinned parquet with a verified SHA-256 digest.
 
 - Normal tests: 124 passed.
 - Optimized tests: 124 passed under `PYTHONOPTIMIZE=1`.
-- Mutation gates: 28/28 Pydantic/core mutants and 49/49 Slice 2 mutants
-  killed.
+- Mutation testing: reported killed at the time, but **not reproducible from
+  this repo**. The core and Slice 2 gauntlets were run in-session and never
+  committed, and the reported Slice 2 mutant count drifts between folders
+  (36, 44, 48, 49), so treat those numbers as unverified. The only committed
+  gauntlets are
+  [`../swebench-experiment-prerequisites-20260803/mutation_gate.py`](../swebench-experiment-prerequisites-20260803/mutation_gate.py)
+  (6 mutants) and
+  [`../checkpoint-evolution-slice/mutants/run_gauntlet.py`](../checkpoint-evolution-slice/mutants/run_gauntlet.py)
+  (24 mutants). The per-session counts stay in `NOTES.md` as a record of what
+  was run, not as a certification.
 - Ruff: passed for `src`, `tests`, and both screening research directories.
 - `ty`: passed for `src`.
 - Package build: source distribution and wheel succeeded.

@@ -11,8 +11,8 @@ slope; arms as defined in the algorithmic model.
 
 ---
 
-**RQ1 — Self-accumulation.** *Does building on one's own artifact — rather
-than a correctness-matched reference artifact — cause later-stage
+**RQ1: Self-accumulation.** *Does building on one's own artifact, rather
+than a correctness-matched reference artifact, cause later-stage
 verification failure?*
 
 Estimand: $\Delta_{\mathrm{evolved},\,\mathrm{carry\text{-}reference}}(i)$
@@ -24,18 +24,18 @@ design decisions" in other benchmarks) loses its teeth. The paper asserts
 this mechanism but never runs the matched control; this is the single
 highest-value experiment in the design space.
 
-**RQ2 — Silent degradation.** *Does quality degrade across stages even
+**RQ2: Silent degradation.** *Does quality degrade across stages even
 conditional on sustained strict correctness?*
 
 Estimand: $\mathbb E[Q_{i+1}-Q_i \mid Y_1=\cdots=Y_i=1]$ vs the
 unconditional slope. The paper reports 77%/75.5% of trajectories rising in
 erosion/verbosity but never conditions on correctness (§3.2); with strict
 pass at 14.8%, its slopes are dominated by already-failing trajectories.
-Falsified if the conditional slope is ≈ 0 — then "slop" is a symptom of
+Falsified if the conditional slope is ≈ 0; then "slop" is a symptom of
 being lost, not a tax paid by successful agents, which inverts the
 interpretation.
 
-**RQ3 — Context discipline and the slope.** *Do wsff-style persistent design
+**RQ3: Context discipline and the slope.** *Do wsff-style persistent design
 artifacts change the degradation slope, or only the intercept?*
 
 Intervention: an arm where a frozen architecture/program-design document
@@ -49,7 +49,7 @@ Falsified if $\Delta^{\beta}\approx 0$: degradation is then not a
 context/steering problem, supporting wsff's stronger claim that it is a
 training-signal problem no harness fixes.
 
-**RQ4 — Granularity vs requirement mass.** *Holding the terminal
+**RQ4: Granularity vs requirement mass.** *Holding the terminal
 specification fixed, does finer checkpoint partitioning cause more
 degradation?*
 
@@ -57,11 +57,11 @@ Design: one seed compiled at $n \in \{2, 4, 8\}$ partitions of the same
 final spec, matched total budget. Estimands: terminal $Q_n$ and terminal
 strict verification vs $n$; slope vs per-stage requirement mass.
 Falsified if terminal outcomes are flat in $n$: iteration count per se is
-then harmless, and degradation loads on total requirement mass — which would
+then harmless, and degradation loads on total requirement mass, which would
 also say monolithic single-shot evaluation was never the blind spot the
 iterative-benchmark movement claims.
 
-**RQ5 — Probe validity of static quality.** *Do sealed static metrics
+**RQ5: Probe validity of static quality.** *Do sealed static metrics
 predict the behavioral price of the artifact better than chance, and better
 or worse than a probe agent does?*
 
@@ -75,7 +75,7 @@ Falsifiable both ways: if $Q_i$ predicts nothing the probe doesn't, Class B
 metrics can be dropped from primary reporting; if $Q_i$ matches the probe,
 Parallax saves the probe compute.
 
-**RQ6 — The price of the unknown future.** *Does disclosing the full roadmap
+**RQ6: The price of the unknown future.** *Does disclosing the full roadmap
 at stage 1 eliminate degradation while iteration continues?*
 
 Estimand: $\Delta_{\mathrm{foresight},\,\mathrm{evolved}}(i)$ on both
@@ -83,10 +83,10 @@ $Y_i$ and $\beta$. The paper's premise is that unknown future
 requirements force architectural bets; foresight removes the uncertainty but
 keeps the iteration. Falsified if foresight doesn't help: then degradation
 is not about anticipating requirements at all, but about the mechanics of
-repeated self-editing — a materially different failure mode with different
+repeated self-editing, a materially different failure mode with different
 training implications.
 
-**RQ7 — Reversibility.** *Can a declared refactor-only stage (no new
+**RQ7: Reversibility.** *Can a declared refactor-only stage (no new
 requirements, $`T_{\mathrm{new}}=\varnothing`$, sealed suite unchanged)
 recover subsequent verification or flatten the slope?*
 
@@ -94,10 +94,10 @@ Estimand: $\Delta_{\mathrm{repair\text{-}scheduled},\,\mathrm{evolved}}$
 on post-repair $Y_j$ and $\beta$, budget-matched (repair stages consume
 budget the control spends on regular stages).
 Falsified if repair stages buy nothing: degradation would then be effectively
-irreversible by the agent that caused it — strong evidence for the wsff
+irreversible by the agent that caused it, which is strong evidence for the wsff
 position that the same model cannot judge or fix its own quality debt.
 
-**RQ8 — Goodhart under sealed quality gates.** *When a Class B quality
+**RQ8: Goodhart under sealed quality gates.** *When a Class B quality
 threshold is added to the verifier (declared intervention), do agents
 satisfy the letter of the metric while quality-adjacent behavior worsens?*
 
@@ -107,20 +107,20 @@ metrics + probe cost), and correctness. The paper found prompt-level quality
 pressure costs 2.4–3.6 pp strict (§3.4); a verdict-level gate is the
 sharper intervention.
 Falsified if gated and held-out quality move together with no correctness
-loss — that would be genuine (and surprising) evidence that cheap static
+loss. That would be genuine (and surprising) evidence that cheap static
 gates are safe backpressure, contra HumanLayer's reward-hacking expectation.
 
 ---
 
 ## The strongest three
 
-1. **RQ1** — it tests the causal mechanism the entire benchmark is built on,
+1. **RQ1**. It tests the causal mechanism the entire benchmark is built on,
    with a control upstream deliberately omitted. Any result is informative.
-2. **RQ5** — it adjudicates the live dispute between the paper (static
+2. **RQ5**. It adjudicates the live dispute between the paper (static
    metrics as degradation evidence) and HumanLayer (behavioral probes as the
    only trustworthy oracle), and its outcome determines Parallax's own
    measurement policy for every later CE experiment.
-3. **RQ3** — it converts the most influential practitioner claim in this
+3. **RQ3**. It converts the most influential practitioner claim in this
    space (wsff: "no amount of harness engineering can solve a model-training
    issue") into a matched-arm test with a clean slope estimand.
 

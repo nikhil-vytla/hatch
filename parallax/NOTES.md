@@ -248,11 +248,11 @@
 - Screening uses a strict manifest, source and verifier digests, trial seeds,
   canonical JSONL outcomes, and the existing Verification/RunFailure split.
   Executor exceptions remain operational failures. The harness refuses every
-  unapproved run and hard-stops any plan with an upper estimate above $20.
+  unapproved run and hard-stops any plan with an upper estimate above \$20.
 - The recommended first gate is five published instances, two static trials,
-  and one boundary model. At the plan's calibrated $0.10-$0.50 per episode,
-  ten episodes cost an estimated $1-$5. The ten-instance version costs $2-$10.
-  The 135-episode pilot remains $13.50-$67.50 and is explicitly outside the
+  and one boundary model. At the plan's calibrated \$0.10-\$0.50 per episode,
+  ten episodes cost an estimated \$1-\$5. The ten-instance version costs \$2-\$10.
+  The 135-episode pilot remains \$13.50-\$67.50 and is explicitly outside the
   screening approval.
 - No provider call, image pull, environment build, HUD deployment, or paid
   episode ran. A read-only live metadata probe loaded
@@ -283,7 +283,7 @@
   official harness grading, and digests binding scripts/environment/provider
   settings remain blockers.
 - The no-spend branch adds an eager HUD credential adapter, revision-bound
-  dataset rows, typed verifier failures, a $5 default cap, manifest-first
+  dataset rows, typed verifier failures, a \$5 default cap, manifest-first
   execution, per-unit atomic receipts, resumability, and usage/cost fields.
 - A scripted transport dry run made zero network and paid calls. Certification
   passes 102 tests normally and under `python -O`, Ruff, `ty`, build, the
@@ -337,7 +337,7 @@
 - Resolved immutable Docker Hub manifests for five preregistered instances.
   HUD model discovery authenticated, but the first Claude Haiku 4.5
   construction request returned HTTP 403 before any response. The stop rule
-  terminated screening at zero recorded tokens and $0 estimated spend.
+  terminated screening at zero recorded tokens and \$0 estimated spend.
 
 ## Checkpoint-evolution slice
 
@@ -388,16 +388,29 @@
   timeout stays a case failure, docker faults are verifier RunFailures).
 - `checkpoint_screening.py` drives the preregistered design in two
   modes: an offline dry run (scripted gateway transport, no key, no
-  spend — evidence committed for the full 10-seed shape and for a
-  sandbox-routed variant) and the live run (spend approval + $5 hard
+  spend, with evidence committed for the full 10-seed shape and for a
+  sandbox-routed variant) and the live run (spend approval + \$5 hard
   cap enforced before and during, mandatory sandbox with no host
   fallback, execution identity bound into the evidence digests).
 - Certification: 197 tests in normal and optimized Python (including
   real-container integration probes for network/rootfs containment),
   Ruff, ty, compileall, builds, and the gauntlet extended to 24 mutants
   (sandbox-bypass, isolation-drop, timeout-reclassify, metering-drop,
-  fence-unwrap-drop, approval-drop all killed). Still no paid call: the
-  screening awaits user approval and a rotated HUD key.
+  fence-unwrap-drop, approval-drop all killed).
+- The screening then ran, approved, on 2026-08-03: 60/60 Haiku 4.5 stage calls,
+  \$0.2813 metered, receipt chain confirmed on all 60. Stages 1 and 2 verified
+  strict in both arms on every seed. At stage 3 the arms split completely, but on
+  the declared 4096-byte reply cap rather than on any verdict.
+- A disambiguation run the same evening settled it. Raising the ceiling to
+  escalating 4096/8192/12288 caps and 4096 output tokens, with every other input
+  byte-identical, put the evolved arm at strict 10/10 on every stage and paired
+  bounds [0, 0]. One lever moved and the whole effect moved with it, so the effect
+  was the lever. What survives is a cost and bloat signature: evolved workspaces
+  2.3x carry's, spend 1.52x. Slice total \$0.56 over 120 calls, zero
+  infrastructure failures. `budget_headroom_violations` now refuses families whose
+  caps cannot cover reference growth, and rejects the original family at stages 2
+  and 3, so the gate would have caught this before the first dollar. Retraction
+  and surviving finding in `docs/FINDINGS.md`.
 
 ## Power gate removed
 
@@ -427,5 +440,5 @@
   carried its own `MAXIMUM_DECISION_MDE` and `powered` flag, now deleted; its
   committed `experiment-report.json` keeps the old `powered` key, so the script
   no longer reproduces that file byte-for-byte. `admission.py`, `delivery.py`,
-  and the checkpoint-evolution modules are clean — the `advance_trigger` names
+  and the checkpoint-evolution modules are clean. The `advance_trigger` names
   in delivery describe turn scheduling, not a statistical decision.

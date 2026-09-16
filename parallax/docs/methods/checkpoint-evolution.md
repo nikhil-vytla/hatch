@@ -1,21 +1,21 @@
 # Checkpoint Evolution method
 
 > [!IMPORTANT]
-> This method has an executable offline vertical slice:
-> `src/parallax/checkpoint_evolution.py` (domain model, entrypoint
-> verifier, admission gates) and `src/parallax/checkpoint_runner.py`
-> (harness-owned checkpoint delivery, `evolved` and `carry-reference`
-> arms, evidence records), exercised end to end by the hand-verified
-> `ce-tally-1` seed family in `tests/fixtures/checkpoint_family.json`.
-> The screening prerequisites are also implemented:
+> This method has an executable slice: `src/parallax/checkpoint_evolution.py`
+> (domain model, entrypoint verifier, admission gates),
+> `src/parallax/checkpoint_runner.py` (harness-owned checkpoint delivery,
+> `evolved` and `carry-reference` arms, evidence records),
 > `src/parallax/checkpoint_agent.py` (provider adapter),
 > `src/parallax/checkpoint_sandbox.py` (container verifier), and
-> `src/parallax/checkpoint_screening.py` (dry-run and live screening).
-> All existing runs use scripted agents or a scripted gateway transport;
-> no real-model evidence exists. Sections marked *implemented* describe
-> executable behavior; everything else remains a specification target.
-> The slice's scope, deferrals, and divergences are listed in
-> [Implemented slice](#implemented-slice).
+> `src/parallax/checkpoint_screening.py` (dry-run and live screening). The
+> hand-verified `ce-tally-1` family in `tests/fixtures/checkpoint_family.json`
+> exercises all of it end to end. Two paid screening runs have executed, 120
+> Haiku 4.5 stage calls for \$0.56, and the second retracted the first's headline.
+> Both are reported in
+> [`FINDINGS.md`](../FINDINGS.md#the-checkpoint-evolution-separation-was-our-byte-cap).
+> Sections marked *implemented* describe executable behavior. Everything else is
+> a specification target. [Implemented slice](#implemented-slice) lists the
+> scope, the deferrals, and the divergences.
 
 Checkpoint Evolution is a synthesis strategy $\mathcal G_{\mathrm{CE}}$ in
 the [Parallax research model](../MODEL.md). It perturbs the initial workspace
@@ -44,11 +44,11 @@ Measurement critique was checked against HumanLayer's
 and
 ["Why Software Factories Fail"](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/wsff.md).
 
-The research trail behind this document — the full algorithmic model with
-derivations and citations, the quality-measurement audit, the research
-questions with estimands, and the synthesis-workflow and admission-gate
-design — lives in
-[`parallax/research/slopcodebench-method/`](../../research/slopcodebench-method/README.md).
+The research trail behind this document lives in
+[`parallax/research/slopcodebench-method/`](../../research/slopcodebench-method/README.md):
+the algorithmic model with derivations and citations, the quality-measurement
+audit, the research questions with estimands, and the synthesis-workflow and
+admission-gate design.
 
 ## Strategy
 
@@ -61,8 +61,8 @@ persistent agent state.
 
 > [!NOTE]
 > Proposed `MODEL.md` extension, not applied here: `MODEL.md` defines
-> $\mathcal G_\theta(\tau,\varepsilon;\omega)=(\tau',\varepsilon')$ — a
-> single output pair — and treats sealed evaluator information as fixed per
+> $\mathcal G_\theta(\tau,\varepsilon;\omega)=(\tau',\varepsilon')$, a
+> single output pair, and treats sealed evaluator information as fixed per
 > task. Checkpoint Evolution needs two method-agnostic additions: (1) a
 > family-valued strategy output whose members are coupled by cross-episode
 > persistent state ($\mu_{0,i+1}$ a declared function of the agent's
@@ -72,8 +72,8 @@ persistent agent state.
 > deserves its own review.
 
 **Definition (persistent state and obligations).** Agent-side state
-$W_i = (y_i, d_i)$ carries the produced workspace and dependency manifest;
-nothing else persists between stages — no conversation, no tool state, no
+$W_i = (y_i, d_i)$ carries the produced workspace and dependency manifest.
+Nothing else persists between stages: no conversation, no tool state, no
 evaluator feedback. Evaluator-side obligations accumulate as
 $\Omega_i = \Omega_{i-1} \cup T_i$, $\Omega_0 = \varnothing$, where
 $T_i$ is stage $i$'s sealed test set.
@@ -112,7 +112,7 @@ Evolution never invalidates the past. Dropping inherited obligations is a
 declared verifier intervention, never a silent default.
 
 **Invariant (workspace fidelity).** $\mu_{0,i+1}$ equals the agent's own
-terminal $W_i$ exactly — no repair or reference substitution. Substituting
+terminal $W_i$ exactly, with no repair or reference substitution. Substituting
 a reference workspace severs the causal chain from early decisions to later
 outcomes and is only permitted as the declared `carry-reference` control
 arm.
@@ -132,21 +132,20 @@ stages, which are recorded and bounded worst-case, not dropped.
 
 Correctness verdicts and probe outcomes (a pinned probe policy attempting
 stage $i{+}1$ on a frozen $y_i$) are native sealed verification. Static
-composites — structural erosion and verbosity per the paper's §2.3
-definitions, plus the wider deterministic panel — are sealed measurements
-when the measuring tool release and rule set are pinned and digest-branded;
-they support slope estimands but not maintainability claims on their own.
-Rubric-based LLM judgments cannot be sealed and are labeled judged outcomes:
-secondary, transcript-retained, agreement-audited, excluded from admission
-and from primary estimands.
+composites are sealed measurements when the measuring tool release and rule set
+are pinned and digest-branded: structural erosion and verbosity per the paper's
+§2.3 definitions, plus the wider deterministic panel. They support slope
+estimands, not maintainability claims. Rubric-based LLM judgments cannot be
+sealed and are labeled judged outcomes: secondary, transcript-retained,
+agreement-audited, excluded from admission and from primary estimands.
 
 > [!WARNING]
 > The paper's own sensitivity analysis reports near-zero predictive
 > correlation between erosion and next-checkpoint pass rate, and independent
-> benchmarking found 89–98% of agent-written lines trip at least one
-> verbosity rule. Sealed static quality scores are evidence about
-> rule-flagged redundancy and complexity concentration, not established
-> proxies for maintainability.
+> benchmarking found 89 to 98% of agent-written lines trip at least one
+> verbosity rule. A sealed static quality score is evidence about rule-flagged
+> redundancy and complexity concentration. It is not an established proxy for
+> maintainability, and this project does not treat it as one.
 
 ## Controlled comparison
 
@@ -160,60 +159,63 @@ verifier intervention and cannot be combined silently with any other
 contrast.
 
 **Hypothesis.** Iterative extension of an agent's own artifact can expose
-compounding failure modes — verification decay and quality degradation —
-that matched single-episode or reference-workspace presentations of the same
+compounding failure modes, verification decay and quality degradation, that
+matched single-episode or reference-workspace presentations of the same
 requirements do not. The effect is an empirical estimand under the
 controlled-arm rules in `MODEL.md`, not a property assumed by construction.
 
+Neither paid run supports this hypothesis. The first separated the arms on the
+declared byte cap, before any verdict. The second raised the cap, changed nothing
+else, and the separation vanished: evolved strict 10/10 at every stage, paired
+bounds [0, 0]. So the cap was the effect, and at this scale the arms do not differ
+on verdicts. Accumulation shows up instead as 2.3x workspace growth and 1.52x
+spend. See
+[`FINDINGS.md`](../FINDINGS.md#the-checkpoint-evolution-separation-was-our-byte-cap).
+
 ## Required behavioral coverage
 
-An implementation requires Parallax-owned regression coverage for:
+An implementation requires Parallax-owned regression coverage for each of the
+following. These are semantic contracts, not byte parity with the consulted
+repository's runner.
 
-- family compilation from an admitted plan: operator labeling, first-stage
-  core-problem immutability, non-destructive sequencing — *implemented*:
-  `CheckpointFamily` validators (closed operator set, `core` exactly at
-  stage 1, contiguous indices, family-unique sealed case ids, per-stage
-  core case);
-- obligation accumulation and automatic regression reclassification of
-  prior-stage tests — *implemented*: `CheckpointFamily.obligations` and
-  `verify_stage` reclassify every prior-stage case as `regression`
-  regardless of its authored category; stage 1 has no regression
-  obligations; a mutation gauntlet kills obligation-dropping mutants;
-- workspace carry-forward fidelity, including environment reset of
-  everything outside $W$ — *implemented*: the agent boundary is a pure
-  function of (public spec, carried workspace, budget); `FamilyRun`
-  validators make a broken digest chain unrepresentable; each sealed case
-  executes in a fresh materialization, so nothing outside the file tree
-  persists;
-- entrypoint-only verifier execution and the strict/isolated/core verdict
-  vector — *implemented*: subprocess execution through the declared
-  entrypoint with pinned normalization (exact stdout bytes, exit-code
-  equality, unpinned stderr text asserted non-empty for error cases),
-  `StageVerification` self-validates its verdict vector against its case
-  results;
-- RunFailure vs Verification classification and censoring of missing
-  workspaces — *implemented*: case timeouts are Verification failures;
-  interpreter-spawn faults, agent faults, and budget faults are
-  RunFailures; a failing verdict never halts a family; a missing
-  workspace censors exactly the undelivered suffix, recorded per stage
-  (worst-case identification bounds remain report-side future work);
-- pinned, digest-branded static quality measurement with retained
-  workspace snapshots — **not implemented** (deferred with the Class B
-  panel);
-- matched-arm construction for each declared intervention — *implemented*
-  for `evolved` vs `carry-reference` (shared sealed suites, obligations,
-  per-stage budgets, contract; the control opens every stage from the
-  frozen reference); `monolithic`, `foresight`, and `repair-scheduled`
-  are **not implemented**;
-- admission gates — *implemented*: schema round-trip, completeness,
-  leakage lint, incremental gold, per-stage no-op, recorded in a
-  digest-bound `AdmissionReceipt`; an unadmitted family is
-  unrepresentable to the runner (`AdmittedFamily`). Dual references,
-  mutant/ambiguity checks, churn-ratio design pressure, and headroom
-  calibration are **deferred** (see the slice notes).
-
-These are semantic contracts. They do not require byte parity with the
-consulted repository's runner.
+- Family compilation from an admitted plan: operator labeling, first-stage
+  core-problem immutability, non-destructive sequencing. *Implemented* as
+  `CheckpointFamily` validators: closed operator set, `core` exactly at stage 1,
+  contiguous indices, family-unique sealed case ids, per-stage core case.
+- Obligation accumulation and automatic regression reclassification of
+  prior-stage tests. *Implemented*: `CheckpointFamily.obligations` and
+  `verify_stage` reclassify every prior-stage case as `regression` whatever its
+  authored category, stage 1 has no regression obligations, and the mutation
+  gauntlet kills obligation-dropping mutants.
+- Workspace carry-forward fidelity, including environment reset of everything
+  outside $W$. *Implemented*: the agent boundary is a pure function of (public
+  spec, carried workspace, budget), `FamilyRun` validators make a broken digest
+  chain unrepresentable, and each sealed case executes in a fresh
+  materialization, so nothing outside the file tree persists.
+- Entrypoint-only verifier execution and the strict/isolated/core verdict
+  vector. *Implemented*: execution through the declared entrypoint with pinned
+  normalization (exact stdout bytes, exit-code equality, stderr text unpinned
+  but asserted non-empty for error cases), and `StageVerification` validates its
+  own verdict vector against its case results.
+- RunFailure versus Verification classification, and censoring of missing
+  workspaces. *Implemented*: case timeouts are Verification failures, while
+  spawn faults, agent faults, and budget faults are RunFailures. A failing
+  verdict never halts a family. A missing workspace censors exactly the
+  undelivered suffix, recorded per stage. Worst-case identification bounds
+  remain report-side future work.
+- Pinned, digest-branded static quality measurement with retained workspace
+  snapshots. **Not implemented**, deferred with the Class B panel.
+- Matched-arm construction for each declared intervention. *Implemented* for
+  `evolved` versus `carry-reference`: shared sealed suites, obligations,
+  per-stage budgets, and contract, with the control opening every stage from the
+  frozen reference. `monolithic`, `foresight`, and `repair-scheduled` are **not
+  implemented**.
+- Admission gates. *Implemented*: schema round-trip, completeness, leakage lint,
+  incremental gold, and per-stage no-op, recorded in a digest-bound
+  `AdmissionReceipt`, with unadmitted families unrepresentable to the runner via
+  `AdmittedFamily`. Dual references, mutant and ambiguity checks, churn-ratio
+  design pressure, and headroom calibration are **deferred**; see the slice
+  notes.
 
 ## Interpretation and limits
 
@@ -241,85 +243,87 @@ or intended.
 
 The first-slice choices the earlier draft left open are frozen as:
 
-- **Seed class**: one hand-verified CLI family (`ce-tally-1`, three
-  checkpoints: `core` → `extension` → `input-source`), in the upstream
-  problem shape — spec prose with examples and pinned normalization,
-  sealed argv/stdin/stdout/exit cases, black-box execution through the
-  declared entrypoint. Hand-authoring matches upstream practice (paper
-  §2.2); the agent-assisted synthesis pipeline (workflow stages S1–S6)
-  remains future work.
-- **Family length**: three (the upstream minimum).
-- **Probe policy and quality-measurement pinning**: deferred; no Class B
-  panel or probe agent is implemented, so no quality claim of any class
-  is available.
-- **Controlled arms**: `evolved` vs `carry-reference`, matched on sealed
+- **Seed class**: one hand-verified CLI family, `ce-tally-1`, three checkpoints
+  (`core`, then `extension`, then `input-source`), in the upstream problem
+  shape: spec prose with examples and pinned normalization, sealed
+  argv/stdin/stdout/exit cases, black-box execution through the declared
+  entrypoint. Hand-authoring matches upstream practice (paper §2.2). The
+  agent-assisted synthesis pipeline, workflow stages S1 through S6, remains
+  future work.
+- **Family length**: three, the upstream minimum.
+- **Probe policy and quality-measurement pinning**: deferred. No Class B panel
+  or probe agent is implemented, so no quality claim of any class is available.
+- **Controlled arms**: `evolved` versus `carry-reference`, matched on sealed
   suites, obligation accumulation, contract, and per-stage budgets.
 
-Interpretations and divergences declared by the slice, beyond the three
-listed above:
+Interpretations and divergences the slice declares, beyond those four:
 
-- **Language track**: the entrypoint contract pins `python3` (resolved to
-  the running interpreter) plus a declared entry file, in place of
-  upstream's `%%%ENTRYPOINT%%%` placeholders. Determinism pins:
-  `PYTHONHASHSEED=0`, UTF-8 stdio, minimal environment.
-- **Per-case fresh materialization**: each sealed case runs against a
-  fresh copy of the workspace (upstream shares one container per
-  checkpoint across a pytest suite). Stricter about inter-case
-  independence; declared, covered by regression tests.
+- **Language track**: the entrypoint contract pins `python3`, resolved to the
+  running interpreter, plus a declared entry file, in place of upstream's
+  `%%%ENTRYPOINT%%%` placeholders. Determinism pins are `PYTHONHASHSEED=0`,
+  UTF-8 stdio, and a minimal environment.
+- **Per-case fresh materialization**: each sealed case runs against a fresh copy
+  of the workspace, where upstream shares one container per checkpoint across a
+  pytest suite. Stricter about inter-case independence, declared, and covered by
+  regression tests.
 - **Budget semantics**: the per-stage budget is a declared cap on
-  returned-workspace bytes. Upstream's wall-clock exhaustion grades the
-  partial working directory; a synchronous workspace-in/workspace-out
-  boundary has no partial state, so an oversized return is a budget
-  RunFailure with no workspace (censoring the evolved suffix), and an
-  agent-raised budget fault is classified the same way.
-- **Dependency manifest**: $W_i$'s declared manifest $d_i$ is not
-  separately modeled; the single-file Python track has an empty manifest
-  by construction.
-- **Single incremental reference**: admission uses one hand-verified
-  incremental reference build rather than workflow stage S4's dual
-  independent references; dual references exist to catch spec ambiguity
-  in generated families and return with the synthesis pipeline.
-- **`include_prior_tests: false`** has no representation: obligation
-  accumulation is unconditional in this implementation, so dropping
-  inherited obligations is not constructible rather than merely
-  discouraged.
+  returned-workspace bytes. Upstream's wall-clock exhaustion grades the partial
+  working directory, but a synchronous workspace-in, workspace-out boundary has
+  no partial state, so an oversized return is a budget RunFailure with no
+  workspace, censoring the evolved suffix. An agent-raised budget fault is
+  classified the same way. This interpretation dominated the first paid run: the
+  evolved arm overran the cap on every seed at stage 3, so nothing reached the
+  verifier. The cap schedule is therefore a design parameter, not an incidental
+  setting, and `budget_headroom_violations` now refuses a family whose caps cannot
+  cover reference growth.
+- **Dependency manifest**: $W_i$'s declared manifest $d_i$ is not separately
+  modeled, because the single-file Python track has an empty manifest by
+  construction.
+- **Single incremental reference**: admission uses one hand-verified incremental
+  reference build rather than workflow stage S4's dual independent references.
+  Dual references exist to catch spec ambiguity in generated families, and they
+  return with the synthesis pipeline.
+- **`include_prior_tests: false`** has no representation. Obligation
+  accumulation is unconditional here, so dropping inherited obligations is not
+  constructible rather than merely discouraged.
 
 The screening prerequisites extend the slice without changing its
 harness semantics:
 
 - **Provider adapter** (*implemented*): `ProviderCheckpointAgent` renders
-  (public spec, carried workspace, budget) into chat messages, parses the
-  reply's strict JSON file map back into a `Workspace` (one exact
-  ```json fence tolerated), and meters per-stage tokens and conservative
-  cost into `StageReceipt.usage` — including on stages that fail after
-  spend. Truncated replies are budget RunFailures; malformed replies,
-  reported-model drift, and unmeterable (usage-less) replies are agent
-  RunFailures. Rendering has no access to sealed material by
-  construction.
-- **Sandboxed verification** (*implemented*): on the live screening path
-  every sealed case executes in a disposable digest-pinned container
-  (`--platform=linux/amd64`, no network, read-only rootfs except the
-  working directory, non-root user, CPU/memory/pid limits). The case
-  deadline is enforced inside the container and remains a case failure;
-  container spawn or daemon faults are verifier RunFailures. The host
-  subprocess path (`run_case_trusted`) is reserved for trusted code —
-  reference builds in admission gates and clearly marked fixtures in
-  tests — and is not reachable from the live screening branch.
+  (public spec, carried workspace, budget) into chat messages, parses the reply's
+  strict JSON file map back into a `Workspace`, tolerating one exact ```json
+  fence, and meters per-stage tokens and conservative cost into
+  `StageReceipt.usage`, including on stages that fail after spend. Truncated
+  replies are budget RunFailures. Malformed replies, reported-model drift, and
+  replies with no usage block are agent RunFailures. Rendering has no access to
+  sealed material by construction.
+- **Sandboxed verification** (*implemented*): on the live screening path every
+  sealed case executes in a disposable digest-pinned container
+  (`--platform=linux/amd64`, no network, read-only rootfs except the working
+  directory, non-root user, CPU/memory/pid limits). The case deadline is enforced
+  inside the container and remains a case failure. Container spawn and daemon
+  faults are verifier RunFailures. The host subprocess path,
+  `run_case_trusted`, is reserved for trusted code (reference builds in
+  admission gates, and clearly marked fixtures in tests) and is not reachable
+  from the live screening branch.
 - **Screening driver** (*implemented*): `run_ce_screening` produces the
-  preregistered manifest, arms, receipts, and evidence for either an
-  offline dry run (scripted gateway transport, no key, no network) or
-  the live run (spend approval and hard cap enforced before and during
-  the run; execution identity bound into the evidence digests).
+  preregistered manifest, arms, receipts, and evidence for either an offline dry
+  run (scripted gateway transport, no key, no network) or the live run (spend
+  approval and hard cap enforced before and during the run, execution identity
+  bound into the evidence digests).
 
-Verification evidence for the slice: the offline suite in
-`tests/test_checkpoint_evolution.py`, `tests/test_checkpoint_runner.py`,
-`tests/test_checkpoint_agent.py`, `tests/test_checkpoint_sandbox.py`,
-and `tests/test_checkpoint_screening.py` runs the seed family end to end
-under both arms with scripted agents and the full screening path with a
-scripted gateway; real-container integration tests execute a gold stage
-and a containment probe inside the pinned sandbox; and a
-twenty-four-mutant behavioral gauntlet (checkpoint-skip,
-obligation-drop, role-mislabel, gate-inversion, chain-break, censoring,
-digest-binding, sandbox-bypass, isolation-drop, timeout-reclassify,
-metering-drop, approval-drop mutants) is fully killed; see
-[`../../research/checkpoint-evolution-slice/`](../../research/checkpoint-evolution-slice/README.md).
+Verification evidence for the slice sits in `tests/test_checkpoint_evolution.py`,
+`tests/test_checkpoint_runner.py`, `tests/test_checkpoint_agent.py`,
+`tests/test_checkpoint_sandbox.py`, and `tests/test_checkpoint_screening.py`.
+Those run the seed family end to end under both arms with scripted agents, and
+the full screening path against a scripted gateway. Real-container integration
+tests execute a gold stage and a containment probe inside the pinned sandbox. A
+24-mutant behavioral gauntlet covers checkpoint-skip, obligation-drop,
+role-mislabel, gate-inversion, chain-break, censoring, digest-binding,
+sandbox-bypass, isolation-drop, timeout-reclassify, metering-drop, and
+approval-drop; it is committed at
+[`research/checkpoint-evolution-slice/mutants/run_gauntlet.py`](../../research/checkpoint-evolution-slice/mutants/run_gauntlet.py)
+and reports 24/24 killed, so you can re-run it rather than take the number on
+faith. Folder:
+[`research/checkpoint-evolution-slice/`](../../research/checkpoint-evolution-slice/README.md).
