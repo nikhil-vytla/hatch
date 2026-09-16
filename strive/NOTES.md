@@ -7,7 +7,7 @@ implementation findings and verification; they do not replace that design.
 ## Current implementation
 
 The current code is `src/strive/vnext`, with independent run formats and artifact
-roots. Legacy modules remain available but do not define the current protocol.
+roots. The pre-vNext kernel has been removed (see "Post-merge cleanup" below).
 A local serial supervisor owns effects, reservations, continuation and revision
 activation over authenticated journals and immutable objects. Pure replay checks
 that history without importing candidate, runtime or benchmark implementations.
@@ -71,3 +71,22 @@ The sandbox denied the parent repository's Git index lock, so the authorized
 files were deleted directly and all changes remain unstaged for the orchestrator.
 No commit or PR was created. The temporary cleanup work folder was removed after
 its findings were incorporated here and in the permanent documentation.
+
+## Post-merge cleanup (2026-09-16)
+
+With PRs #50–#52 fully merged, `investigations/` and `tau2-egress-counting-fix/`
+moved to `archive/strive/` at the repo root — their findings were already
+folded into this file and the permanent docs, so only the raw records moved,
+not the module tree. `live-tau2-budget-proof/` stayed put: `pilot-5usd.toml`
+and `prices/openai-2026-09-10.json` under it are live fixtures read by
+`tests/vnext/test_live_campaign.py`, not just historical record. The legacy
+pre-vNext implementation
+(`kernel.py`, `substrate.py`, `runtime.py`, `sandbox*.py`, `policy.py`/`policies/`,
+`refine.py`, `budget.py`, `operate.py`, `cas.py`, `framing.py`, `codec.py`,
+`events.py`, `evaluate.py`, `strategy_runner.py`, `surfaces.py`, `tasks.py`,
+`contracts.py`, `model.py`, and their tests) and its dual-mode CLI branch were
+removed; the installed `strive` command now delegates directly to
+`strive.vnext.cli.app`. Removing legacy also removes its `view`/`history`/
+`inspect`/`revert`/`repair`/`sandbox` subcommands, which had no vNext
+equivalents — any pre-vNext run histories on disk no longer have a CLI to
+inspect or repair them.

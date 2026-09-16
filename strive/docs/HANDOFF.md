@@ -4,8 +4,8 @@ The current system is `src/strive/vnext`. Start with
 [ARCHITECTURE.md](ARCHITECTURE.md), [the ADR index](adrs/README.md) and
 [ROADMAP.md](ROADMAP.md). The architecture defines the five guarantees and the
 implemented mechanisms; the roadmap distinguishes qualification from deferred
-capabilities. Legacy modules and earlier ADR implementation descriptions are not
-the vNext API.
+capabilities. The pre-vNext kernel has been removed; earlier ADR implementation
+descriptions are historical, not the vNext API.
 
 ## Host workflow
 

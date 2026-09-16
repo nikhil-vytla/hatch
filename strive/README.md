@@ -45,8 +45,8 @@ uv run python -m strive.vnext.cli --root .cache/counter-runs resume adapting-17
 The example uses recorded responses and makes no paid calls. Run IDs are unique;
 resume reuses the original bindings and retained state. The manifest CLI also
 provides `experiment`, `compare` and `project`; `--help` lists their arguments.
-The installed `strive` command routes these manifest-shaped commands to vNext.
-Legacy flag-based commands and run formats remain separate.
+The installed `strive` command delegates directly to vNext; there is no
+separate legacy CLI or run format.
 
 ## Current limits
 

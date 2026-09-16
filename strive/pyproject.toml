@@ -1,12 +1,10 @@
 [project]
 name = "strive"
 version = "0.2.0"
-description = "Durable mechanisms for model-led adaptation: a run-scoped, semantically-verified event/CAS substrate and a result-driven resumable policy kernel."
+description = "Durable mechanisms for model-led adaptation: a content-addressed store, hash-chained journal, pure verifier and adaptation policy over allowlisted surfaces."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "dspy>=3.3.0",
-]
+dependencies = []
 
 [project.scripts]
 strive = "strive.cli:main"
@@ -31,12 +29,6 @@ testpaths = ["tests"]
 strict = true
 files = ["src", "tests", "adapters/tau2/src", "adapters/counter/src"]
 mypy_path = ["adapters/tau2/src", "adapters/counter/src"]
-
-# DSPy ships no py.typed marker; the deno-pyodide backend uses it behind a
-# narrow typed wrapper (strive.sandbox_backends).
-[[tool.mypy.overrides]]
-module = ["dspy.*"]
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["tau2.*"]
