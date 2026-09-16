@@ -135,10 +135,10 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
         "            else SandboxCaseExecution(PINNED_SANDBOX, runner=sandbox_runner)\n"
         "        )\n"
         '        execution_identity = f"sandbox:{PINNED_SANDBOX.image}"\n'
-        "        if not math.isfinite(spend_cap_usd)",
+        "        # Refuse budget-confounded designs",
         "        execute = run_case_trusted\n"
         '        execution_identity = f"sandbox:{PINNED_SANDBOX.image}"\n'
-        "        if not math.isfinite(spend_cap_usd)",
+        "        # Refuse budget-confounded designs",
     ),
     (
         "M16 sandbox network isolation dropped",
@@ -198,6 +198,12 @@ MUTANTS: tuple[tuple[str, Path, str, str], ...] = (
         "M24 live spend approval gate removed",
         SCREENING,
         "        if not approve_spend:\n",
+        "        if False:\n",
+    ),
+    (
+        "M25 budget-headroom refusal removed from the live path",
+        SCREENING,
+        "        if headroom:\n",
         "        if False:\n",
     ),
 )

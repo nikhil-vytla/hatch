@@ -1,5 +1,13 @@
 # Checkpoint-evolution screening report (first paid run)
 
+> **Superseded on the headline contrast.** The stage-3 separation
+> reported below was manufactured by the instrument (flat byte caps ×
+> full-file-map replies), not by self-accumulation: the preregistered
+> disambiguation run removed byte pressure with everything else
+> unchanged and the separation vanished completely. See
+> [disambiguation-report.md](disambiguation-report.md). The
+> harness-gate conclusions below stand.
+
 Executed 2026-08-03, 22:33–22:39 PT, against the preregistered design in
 [PREREGISTRATION-DRAFT.md](PREREGISTRATION-DRAFT.md). Evidence:
 [`evidence/screening.jsonl`](evidence/screening.jsonl) (22 canonical

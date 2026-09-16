@@ -21,6 +21,7 @@ from parallax.checkpoint_evolution import (
     Workspace,
     WorkspaceFile,
     admit_family,
+    budget_headroom_violations,
     load_seed_family,
     verify_stage,
 )
@@ -276,6 +277,53 @@ def test_verdict_vector_must_match_case_results(seed_fixture) -> None:
             core_pass=honest.core_pass,
             case_results=honest.case_results,
         )
+
+
+def _with_caps(seed_fixture, caps):
+    family = CheckpointFamily(
+        family_id=SourceId("ce-tally-caps-test"),
+        contract=seed_fixture.family.contract,
+        checkpoints=tuple(
+            checkpoint.model_copy(update={"max_output_bytes": cap})
+            for checkpoint, cap in zip(
+                seed_fixture.family.checkpoints, caps, strict=True
+            )
+        ),
+    )
+    references = ReferenceBuild(
+        family_digest=family.digest,
+        stages=seed_fixture.references.stages,
+    )
+    return family, references
+
+
+def test_flat_caps_leave_the_arms_effectively_unmatched(seed_fixture) -> None:
+    """The seed family's flat caps guarantee zero increment after stage 1."""
+    violations = budget_headroom_violations(
+        seed_fixture.family, seed_fixture.references
+    )
+    assert len(violations) == 2
+    assert violations[0].startswith("stage 2:")
+    assert violations[1].startswith("stage 3:")
+
+
+def test_escalating_caps_satisfy_budget_headroom(seed_fixture) -> None:
+    family, references = _with_caps(seed_fixture, (4096, 8192, 12288))
+    assert budget_headroom_violations(family, references) == ()
+
+
+def test_budget_headroom_factor_scales_the_requirement(seed_fixture) -> None:
+    family, references = _with_caps(seed_fixture, (4096, 8192, 12288))
+    assert budget_headroom_violations(family, references, factor=0.0) == ()
+    huge = budget_headroom_violations(family, references, factor=100.0)
+    assert len(huge) == 3
+
+
+def test_shrinking_caps_violate_headroom_even_at_factor_zero(seed_fixture) -> None:
+    family, references = _with_caps(seed_fixture, (4096, 2048, 4096))
+    violations = budget_headroom_violations(family, references, factor=0.0)
+    assert len(violations) == 1
+    assert violations[0].startswith("stage 2:")
 
 
 def test_admission_admits_the_seed_family(seed_fixture) -> None:

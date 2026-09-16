@@ -1,0 +1,158 @@
+{
+  "delivered_receipts": 60,
+  "design_digest": "7ea18ed0cded244fd756eb53243243b66486d8bb6ede4fff54c878f95ba78798",
+  "evidence": "screening-headroom.jsonl",
+  "family_digest": "f3693a94df8884df956fcffb1804e14924c48ad34b95a98abdf9b25388215812",
+  "paired_strict_contrast": {
+    "2": {
+      "bound_lower": 0,
+      "bound_upper": 0,
+      "observed_diff_sum": 0,
+      "observed_pairs": 10
+    },
+    "3": {
+      "bound_lower": 0,
+      "bound_upper": 0,
+      "observed_diff_sum": 0,
+      "observed_pairs": 10
+    }
+  },
+  "per_seed_outcomes": {
+    "101": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "102": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "103": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "104": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "105": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "106": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "107": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "108": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "109": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    },
+    "110": {
+      "carry-reference": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "evolved": [
+        "strict",
+        "strict",
+        "strict"
+      ]
+    }
+  },
+  "receipt_chain_confirmed": 60,
+  "records": {
+    "all_validated": true,
+    "family": 1,
+    "manifest": 1,
+    "runs": 20
+  },
+  "run_failure_rate": 0.0,
+  "scheduled_stage_calls": 60,
+  "spend": {
+    "completion_tokens": 46455,
+    "estimated_cost_usd": 0.279563,
+    "prompt_tokens": 47288
+  },
+  "stage_run_failures": {},
+  "verified_stages": 60
+}
