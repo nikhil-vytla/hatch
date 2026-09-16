@@ -1,11 +1,11 @@
 """In-memory configuration and identities; no providers, files, or execution."""
 
-from strive.vnext.contracts.lifecycle import DispatchStage, RecoveryCapability, RecoveryContract
-from strive.vnext.contracts.primitives import (
+from strive.contracts.lifecycle import DispatchStage, RecoveryCapability, RecoveryContract
+from strive.contracts.primitives import (
     AccessScope, ArtifactRef, CommandId, EffectId, EnvironmentId, LineageId,
     Reservation, Resource, ResourceQuantity, RunId,
 )
-from strive.vnext.contracts.records import EffectAuthorization
+from strive.contracts.records import EffectAuthorization
 
 REF = ArtifactRef("sha256:" + "a" * 64)
 SCOPE = AccessScope(RunId("run-1"), LineageId("development"), REF)

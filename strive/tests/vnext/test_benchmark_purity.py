@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext import codec
-from strive.vnext.contracts.records import CausalIdentity, ProducerKind
-from strive.vnext.benchmarks.api import BenchmarkDescriptor
+from strive import codec
+from strive.contracts.records import CausalIdentity, ProducerKind
+from strive.benchmarks.api import BenchmarkDescriptor
 from .benchmark_fixtures import BenchmarkFixture
 from .fresh_probe import fresh_replay
 from .install_adapter import install_light_adapter
@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_static_verifier_import_boundary_and_unchanged_codec_registry() -> None:
-    sources = ROOT / "src/strive/vnext"
+    sources = ROOT / "src/strive"
     files = [*sources.joinpath("verify").glob("*.py"), *sources.joinpath("contracts").glob("*.py"), sources / "codec.py",
-             sources / "__init__.py", sources.parent / "__init__.py"]
+             sources / "__init__.py"]
     forbidden = {"tau2", "strive_benchmark_tau2", "strive_benchmark_counter", "benchmarks", "runtime", "harness", "dspy", "litellm", "openai", "pydantic"}
     for path in files:
         for node in ast.walk(ast.parse(path.read_text())):

@@ -9,11 +9,11 @@ from typing import BinaryIO
 
 import pytest
 
-from strive.vnext.contracts.commands import Finish
-from strive.vnext.runtime import confined_sandbox
-from strive.vnext.runtime.confined_sandbox import DenoSandbox
-from strive.vnext.runtime.linux_jail import Capability, JailUnavailable, LinuxJail
-from strive.vnext.runtime.sandbox import SandboxFailure, SandboxLimits
+from strive.contracts.commands import Finish
+from strive.runtime import confined_sandbox
+from strive.runtime.confined_sandbox import DenoSandbox
+from strive.runtime.linux_jail import Capability, JailUnavailable, LinuxJail
+from strive.runtime.sandbox import SandboxFailure, SandboxLimits
 
 from .test_linux_jail import require_jail
 from .test_runtime_sandbox import RETURN_FINISH, view
@@ -161,7 +161,7 @@ def test_reaped_launcher_still_kills_cgroup_without_signaling_old_pid(tmp_path: 
     def unexpected_signal(pid: int, sig: int) -> None:
         pytest.fail("a reaped launcher's PID may have been reused")
 
-    monkeypatch.setattr("strive.vnext.runtime.linux_jail.os.killpg", unexpected_signal)
+    monkeypatch.setattr("strive.runtime.linux_jail.os.killpg", unexpected_signal)
     jail.kill()
     assert (jail.group / "cgroup.kill").read_text() == "1"
     jail._created = False  # This test directory is not a kernel cgroup.

@@ -8,14 +8,14 @@ import shutil
 
 import pytest
 
-from strive.vnext.codec import decode, encode
-from strive.vnext.contracts.harness import DurableEvidence, Indeterminate, RecordedReturn
-from strive.vnext.contracts.lifecycle import EffectState
-from strive.vnext.contracts.primitives import ExecutionStatus, Resource
-from strive.vnext.contracts.records import OutcomeStatus
-from strive.vnext.errors import VerificationError
-from strive.vnext.harness.profiles import NATIVE_RESIDUAL, native_profile
-from strive.vnext.runtime import Boundary
+from strive.codec import decode, encode
+from strive.contracts.harness import DurableEvidence, Indeterminate, RecordedReturn
+from strive.contracts.lifecycle import EffectState
+from strive.contracts.primitives import ExecutionStatus, Resource
+from strive.contracts.records import OutcomeStatus
+from strive.errors import VerificationError
+from strive.harness.profiles import NATIVE_RESIDUAL, native_profile
+from strive.runtime import Boundary
 
 from .harness_support import HarnessFixture, ProcessCrash
 
@@ -94,7 +94,7 @@ def test_fixture_process_denies_files_network_tools_credentials(tmp_path: Path, 
         state = fixture.gateway.read(context)
         assert state is not None and state.returned is not None
         result = decode(fixture.store.objects.read(state.returned))
-        from strive.vnext.contracts.harness import HarnessReturn
+        from strive.contracts.harness import HarnessReturn
         assert isinstance(result, HarnessReturn)
         assert b"ESCAPES_DENIED:9" in fixture.store.objects.read(result.captured_output_references[1])
         launches = fixture.gateway.events(context, "launch")
@@ -252,7 +252,7 @@ def test_nondeterministic_decoder_preserves_incomplete(tmp_path: Path) -> None:
         assert state.effects[0].outcome is OutcomeStatus.FAILED
         assert {q.resource for q in state.obligations} == {Resource.WALL_MILLISECONDS}
         assert state.effects[0].response is not None
-        from strive.vnext.contracts.harness import HarnessReturn, CompletionClassification
+        from strive.contracts.harness import HarnessReturn, CompletionClassification
         result = decode(fixture.store.objects.read(state.effects[0].response))
         assert isinstance(result, HarnessReturn) and result.completion_classification is CompletionClassification.INCOMPLETE
     finally:
@@ -266,14 +266,14 @@ def test_core_unchanged_and_adapters_selected_by_manifest(tmp_path: Path) -> Non
     # the telemetry profile trim, and the contracts architecture docstring link.
     # Preserve the historical baseline for every other core file.
     current = json.loads((root / "tests/vnext/baselines/second-benchmark-core-freeze.json").read_text())
-    approved = {"src/strive/vnext/runtime/broker.py", "src/strive/vnext/runtime/supervisor.py",
-                "src/strive/vnext/verify/engine.py", "src/strive/vnext/contracts/manifest.py",
-                "src/strive/vnext/contracts/__init__.py"}
+    approved = {"src/strive/runtime/broker.py", "src/strive/runtime/supervisor.py",
+                "src/strive/verify/engine.py", "src/strive/contracts/manifest.py",
+                "src/strive/contracts/__init__.py"}
     assert {name for name in baseline if baseline[name] != current[name]} == approved
     baseline.update({name: current[name] for name in approved})
     for name, digest in baseline.items():
         assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest, name
-    for path in (root / "src/strive/vnext/harness/adapters").glob("*.py"):
+    for path in (root / "src/strive/harness/adapters").glob("*.py"):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):

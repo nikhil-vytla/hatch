@@ -5,13 +5,13 @@ from decimal import Decimal, localcontext
 
 import pytest
 
-from strive.vnext.contracts.bindings import ModelResolution
-from strive.vnext.contracts.lifecycle import RecoveryCapability
-from strive.vnext.contracts.manifest import (
+from strive.contracts.bindings import ModelResolution
+from strive.contracts.lifecycle import RecoveryCapability
+from strive.contracts.manifest import (
     CostPhase, ManifestError, PolicyObject, ResolvedClosure, ResolvedManifest,
     ResolvedModel, ResolvedOperation, load_authored_manifest, load_resolved_configuration,
 )
-from strive.vnext.contracts.primitives import ArtifactRef, SeedSupport, Usd
+from strive.contracts.primitives import ArtifactRef, SeedSupport, Usd
 
 from .fixtures import AUTHORED_TOML, REF, RESOLVED_TOML
 

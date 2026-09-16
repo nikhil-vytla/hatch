@@ -2,8 +2,8 @@
 import hashlib
 import re
 
-from strive.vnext.benchmarks.json_data import canonical, obj, string
-from strive.vnext.errors import VerificationError
+from strive.benchmarks.json_data import canonical, obj, string
+from strive.errors import VerificationError
 
 ALGORITHM = "tau2-base-template/1"
 DEFAULT_SEED = "strive-amendment-3-60-14-40-v1"

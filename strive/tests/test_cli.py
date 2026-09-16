@@ -1,4 +1,4 @@
-"""strive CLI smoke tests: the installed entry point delegates to vNext."""
+"""strive CLI smoke tests for the installed entry point."""
 
 import subprocess
 import sys
@@ -20,8 +20,8 @@ def test_cli_help_exits_cleanly() -> None:
     assert excinfo.value.code == 0
 
 
-def test_installed_entry_point_delegates_to_vnext() -> None:
-    """`uv run strive` (the console script) is installed and delegates to vNext."""
+def test_installed_entry_point_runs() -> None:
+    """`uv run strive` (the console script) is installed and works."""
     result = subprocess.run(
         [sys.executable, "-m", "strive.cli", "--help"],
         capture_output=True, text=True, timeout=60,

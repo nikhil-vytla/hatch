@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.cli.data import mapping, read_json, sequence
-from strive.vnext.cli.fixture import example
-from strive.vnext.cli.runner import reader, resume, run, run_directory
-from strive.vnext.contracts.manifest import ManifestError, TelemetryProfile, load_authored_manifest, load_resolved_configuration
-from strive.vnext.report.history import expenditure
-from strive.vnext.telemetry.projector import HTTPExporter, MemoryExporter, Projector, cursor_status, project, project_metrics
+from strive.cli.data import mapping, read_json, sequence
+from strive.cli.fixture import example
+from strive.cli.runner import reader, resume, run, run_directory
+from strive.contracts.manifest import ManifestError, TelemetryProfile, load_authored_manifest, load_resolved_configuration
+from strive.report.history import expenditure
+from strive.telemetry.projector import HTTPExporter, MemoryExporter, Projector, cursor_status, project, project_metrics
 
 from .fixtures import AUTHORED_TOML, RESOLVED_TOML
 
@@ -88,7 +88,7 @@ def test_manifest_rejects_deferred_telemetry_profiles(profile: str) -> None:
 
 
 def test_execution_does_not_import_projection_or_reporting() -> None:
-    root = Path(__file__).resolve().parents[2] / "src/strive/vnext"
+    root = Path(__file__).resolve().parents[2] / "src/strive"
     for directory in ("runtime", "policy", "benchmarks", "verify", "store", "harness"):
         for path in (root / directory).glob("*.py"):
             for node in ast.walk(ast.parse(path.read_text())):
@@ -98,7 +98,7 @@ def test_execution_does_not_import_projection_or_reporting() -> None:
 
 @pytest.mark.parametrize("development", [None, "https://shared.invalid/v1/traces"])
 def test_audit_http_alias_cannot_share_development_endpoint(development: str | None) -> None:
-    from strive.vnext.errors import VerificationError
+    from strive.errors import VerificationError
     exporter = HTTPExporter("https://shared.invalid/v1/traces", development_endpoint=development)
     with pytest.raises(VerificationError, match="distinct"):
         exporter.export("audit:reference", {})

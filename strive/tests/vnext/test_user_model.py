@@ -3,20 +3,20 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.benchmarks.json_data import canonical, obj, parse
-from strive.vnext.codec import encode
-from strive.vnext.contracts.bindings import ModelBinding
-from strive.vnext.contracts.commands import ExecuteEffect, StepOutput
-from strive.vnext.contracts.harness import GenerationInput
-from strive.vnext.contracts.manifest import load_resolved_configuration
-from strive.vnext.contracts.primitives import AccessScope, LineageId, ModelRole, RunId
-from strive.vnext.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
-from strive.vnext.errors import VerificationError
-from strive.vnext.harness.gateway import ModelGateway
-from strive.vnext.harness.provider import ProviderContract
-from strive.vnext.harness.user_model import DirectUserModelAdapter, UserProviderContract
-from strive.vnext.runtime import Capability, CapabilityBroker, EffectRequest, Supervisor
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.json_data import canonical, obj, parse
+from strive.codec import encode
+from strive.contracts.bindings import ModelBinding
+from strive.contracts.commands import ExecuteEffect, StepOutput
+from strive.contracts.harness import GenerationInput
+from strive.contracts.manifest import load_resolved_configuration
+from strive.contracts.primitives import AccessScope, LineageId, ModelRole, RunId
+from strive.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
+from strive.errors import VerificationError
+from strive.harness.gateway import ModelGateway
+from strive.harness.provider import ProviderContract
+from strive.harness.user_model import DirectUserModelAdapter, UserProviderContract
+from strive.runtime import Capability, CapabilityBroker, EffectRequest, Supervisor
+from strive.store import ArtifactStore
 from .fixtures import AUTHORED_TOML
 from .harness_support import FixtureUpstream, ProcessCrash
 

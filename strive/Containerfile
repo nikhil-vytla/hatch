@@ -22,7 +22,7 @@ WORKDIR /workspace/strive
 COPY . .
 RUN mkdir -p /opt/strive-jail \
  && cc -std=c11 -O2 -Wall -Wextra -Werror scripts/compile-seccomp.c -lseccomp -o /opt/strive-jail/compile-seccomp \
- && /opt/strive-jail/compile-seccomp src/strive/vnext/runtime/linux/seccomp.allow > /opt/strive-jail/seccomp.bpf \
+ && /opt/strive-jail/compile-seccomp src/strive/runtime/linux/seccomp.allow > /opt/strive-jail/seccomp.bpf \
  && python scripts/build-jail-rootfs.py /opt/strive-jail/rootfs \
  && uv sync --frozen --python /usr/local/bin/python3.12
 CMD ["bash", "scripts/verify-in-container.sh"]

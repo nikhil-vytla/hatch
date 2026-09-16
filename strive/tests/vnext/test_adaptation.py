@@ -6,19 +6,19 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.codec import decode, encode
-from strive.vnext.contracts.commands import ApplyChange, Continue, ExecuteEffect, StepOutput
-from strive.vnext.contracts.feedback import FeedbackContract
-from strive.vnext.contracts.lifecycle import EffectState
-from strive.vnext.contracts.primitives import AccessScope, ArtifactRef, LineageId, Resource, RevisionId, ScopedArtifact
-from strive.vnext.contracts.records import RevisionActivation
-from strive.vnext.errors import VerificationError
-from strive.vnext.policy import Dependency, Edit, EvidenceSelector, Origin, Proposal
-from strive.vnext.policy.data import FileVersion, dumps
-from strive.vnext.runtime.ledger import amounts
-from strive.vnext.runtime.sandbox import SandboxFailure
-from strive.vnext.runtime.supervisor import Boundary
-from strive.vnext.contracts.primitives import ExecutionStatus
+from strive.codec import decode, encode
+from strive.contracts.commands import ApplyChange, Continue, ExecuteEffect, StepOutput
+from strive.contracts.feedback import FeedbackContract
+from strive.contracts.lifecycle import EffectState
+from strive.contracts.primitives import AccessScope, ArtifactRef, LineageId, Resource, RevisionId, ScopedArtifact
+from strive.contracts.records import RevisionActivation
+from strive.errors import VerificationError
+from strive.policy import Dependency, Edit, EvidenceSelector, Origin, Proposal
+from strive.policy.data import FileVersion, dumps
+from strive.runtime.ledger import amounts
+from strive.runtime.sandbox import SandboxFailure
+from strive.runtime.supervisor import Boundary
+from strive.contracts.primitives import ExecutionStatus
 
 from .adaptation_fixtures import ACTOR, AdaptationFixture, CounterProgram
 from .fresh_probe import fresh_replay
@@ -192,9 +192,9 @@ def test_handover_rejects_pending_command_and_unconsumed_result(tmp_path: Path) 
         driver = fixture.initialize()
         current = fixture.supervisor.state.environment
         assert current is not None
-        from strive.vnext.benchmarks.payloads import loads as load_benchmark
-        from strive.vnext.benchmarks.api import EpisodeSnapshot
-        from strive.vnext.benchmarks.bridge import OperationRequest
+        from strive.benchmarks.payloads import loads as load_benchmark
+        from strive.benchmarks.api import EpisodeSnapshot
+        from strive.benchmarks.bridge import OperationRequest
         snapshot = load_benchmark(fixture.objects.read(current), EpisodeSnapshot)
         driver.perform(OperationRequest(snapshot.episode, snapshot.environment, current, snapshot, "snapshot", ()))
         proposal = replace(proposal, expected_revision=fixture.supervisor.state.active_revision or RevisionId("missing"))
@@ -335,10 +335,10 @@ def test_validation_provenance_survives_summary_and_import(tmp_path: Path) -> No
 
 @pytest.mark.parametrize("contract,expected", [(FeedbackContract.A, False), (FeedbackContract.B, True)])
 def test_validation_operation_observation_does_not_become_development(tmp_path: Path, contract: FeedbackContract, expected: bool) -> None:
-    from strive.vnext.benchmarks.bridge import OperationRequest
-    from strive.vnext.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
-    from strive.vnext.contracts.feedback import EvidencePool
-    from strive.vnext.contracts.primitives import EnvironmentId, EpisodeId
+    from strive.benchmarks.bridge import OperationRequest
+    from strive.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
+    from strive.contracts.feedback import EvidencePool
+    from strive.contracts.primitives import EnvironmentId, EpisodeId
     fixture = AdaptationFixture(tmp_path, contract=contract)
     try:
         task = fixture.adapter.enumerate_tasks()[1]
@@ -380,7 +380,7 @@ def test_stripping_handover_state_cannot_activate(tmp_path: Path) -> None:
 
 
 def test_refiner_must_match_retained_model_binding(adaptation: AdaptationFixture) -> None:
-    from strive.vnext.policy import ContinualRefine
+    from strive.policy import ContinualRefine
     route = replace(adaptation.policy.refiner, model=replace(adaptation.model, model="unbound-model"))
     with pytest.raises(VerificationError, match="model differs from run binding"):
         ContinualRefine(adaptation.supervisor, adaptation.bundles, adaptation.sandbox, adaptation.selector, adaptation.provenance, route)
@@ -395,7 +395,7 @@ def test_binary_memory_is_retained_as_file_data_in_refiner_context(adaptation: A
 
 
 def test_open_annotation_payload_cannot_break_policy_decision_lookup(adaptation: AdaptationFixture) -> None:
-    from strive.vnext.contracts.annotations import Annotation
+    from strive.contracts.annotations import Annotation
     adaptation.supervisor.accept(StepOutput(Continue(), b"", (Annotation("policy.decision", b"[]"),)),
         expected_head=adaptation.supervisor.state.head)
     assert adaptation.policy.refine("opaque-annotation") == "keep"

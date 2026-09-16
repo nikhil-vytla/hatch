@@ -24,9 +24,9 @@ _PROGRAM = textwrap.dedent('''
         assert importlib.metadata.version("strive-benchmark-tau2") == "0.1.0"
 
     forbidden = ("dspy", "litellm", "openai", "anthropic", "numpy", "torch", "candidate", "tau2", "strive_benchmark_tau2", "strive_benchmark_counter",
-                 "pandas", "pydantic", "httpx", "requests", "fastapi", "tenacity", "deepdiff", "dotenv", "tiktoken", "tokenizers", "strive.vnext.benchmarks")
-    allowed_strive = {"strive", "strive.vnext"} | {
-        "strive.vnext." + name for name in (
+                 "pandas", "pydantic", "httpx", "requests", "fastapi", "tenacity", "deepdiff", "dotenv", "tiktoken", "tokenizers", "strive.benchmarks")
+    allowed_strive = {"strive"} | {
+        "strive." + name for name in (
             "codec", "errors", "wire", "verify", "verify.engine", "store", "store.cas", "store.journal",
             "contracts", "contracts.annotations", "contracts.bindings", "contracts.commands",
             "contracts.feedback", "contracts.harness", "contracts.lifecycle", "contracts.manifest",
@@ -58,11 +58,11 @@ _PROGRAM = textwrap.dedent('''
             raise AssertionError("side effect attempted: " + event)
 
     sys.addaudithook(audit)
-    from strive.vnext.verify import replay, VerificationError
-    assert "strive.vnext.store" not in sys.modules, "verifier imported mutable storage"
-    from strive.vnext.store import RunReader
-    from strive.vnext.contracts.primitives import RunId
-    from strive.vnext.contracts.annotations import Annotation
+    from strive.verify import replay, VerificationError
+    assert "strive.store" not in sys.modules, "verifier imported mutable storage"
+    from strive.store import RunReader
+    from strive.contracts.primitives import RunId
+    from strive.contracts.annotations import Annotation
 
     reader = RunReader(Path(sys.argv[2]), RunId("run-1"))
     expected_corruption = sys.argv[3] == "corrupt"

@@ -5,19 +5,19 @@ import sys
 
 import pytest
 
-from strive.vnext.cli.app import main, status
-from strive.vnext.cli.data import json_bytes, mapping, read_json, sequence, toml
-from strive.vnext.cli.fixture import example
-from strive.vnext.cli.runner import Session, manifest_for, reader, resume, run, run_directory
-from strive.vnext.codec import encode
-from strive.vnext.contracts.annotations import Annotation
-from strive.vnext.contracts.primitives import ExecutionStatus, Resource
-from strive.vnext.contracts.records import CausalIdentity, ProducerKind
-from strive.vnext.errors import VerificationError
-from strive.vnext.report.compare import compare, comparison_spec, export
-from strive.vnext.report.history import expenditure, history, invocation_inputs
-from strive.vnext.runtime.supervisor import Boundary
-from strive.vnext.study.experiment import allocate, experiment
+from strive.cli.app import main, status
+from strive.cli.data import json_bytes, mapping, read_json, sequence, toml
+from strive.cli.fixture import example
+from strive.cli.runner import Session, manifest_for, reader, resume, run, run_directory
+from strive.codec import encode
+from strive.contracts.annotations import Annotation
+from strive.contracts.primitives import ExecutionStatus, Resource
+from strive.contracts.records import CausalIdentity, ProducerKind
+from strive.errors import VerificationError
+from strive.report.compare import compare, comparison_spec, export
+from strive.report.history import expenditure, history, invocation_inputs
+from strive.runtime.supervisor import Boundary
+from strive.study.experiment import allocate, experiment
 
 from .workflow_fixtures import campaign, edit_manifest, spec
 
@@ -34,7 +34,7 @@ def test_run_resolves_displays_before_dispatch_and_rejects_id_reuse(tmp_path: Pa
     resolved = manifest_for(reader(root, "run-1"))
     assert reader(root, "run-1").objects.read(resolved.authored_manifest) == path.read_bytes()
     import shutil
-    from strive.vnext.codec import content_ref
+    from strive.codec import content_ref
     deno = shutil.which("deno")
     assert deno is not None
     executable = Path(deno).read_bytes()
@@ -171,7 +171,7 @@ def test_cli_commands_use_real_runner(tmp_path: Path, capsys: pytest.CaptureFixt
 @pytest.mark.parametrize("setting,value", [("provider", "openai"), ("model", "latest"), ("request_options", "builtin:prices")])
 def test_resolver_refuses_scientific_provider_conflicts(tmp_path: Path, setting: str, value: str) -> None:
     path = example(tmp_path)
-    from strive.vnext.cli.data import toml, mapping
+    from strive.cli.data import toml, mapping
     import tomllib
     data = mapping(tomllib.loads(path.read_text()))
     models = mapping(data["models"])
@@ -212,7 +212,7 @@ def test_declared_runs_with_incomplete_setup_remain_in_report(tmp_path: Path, st
 
 
 def test_missing_usage_is_unknown_not_zero(tmp_path: Path) -> None:
-    from strive.vnext.cli.fixture import FixtureProvider
+    from strive.cli.fixture import FixtureProvider
     class MissingUsage(FixtureProvider):
         def generate(self, request: bytes, operation_key: str) -> bytes:
             response = read_json(super().generate(request, operation_key))
@@ -230,7 +230,7 @@ def test_missing_usage_is_unknown_not_zero(tmp_path: Path) -> None:
 
 
 def test_changed_actor_bytes_cannot_hide_behind_allowed_policy_change(tmp_path: Path) -> None:
-    from strive.vnext.cli.fixture import ACTOR
+    from strive.cli.fixture import ACTOR
     path = example(tmp_path)
     root = tmp_path / "state"
     edit_manifest(path, "comparison", "allowed_differences", ["policy.package"])
@@ -248,7 +248,7 @@ def test_changed_actor_bytes_cannot_hide_behind_allowed_policy_change(tmp_path: 
 
 
 def test_policy_package_cannot_smuggle_actor_components(tmp_path: Path) -> None:
-    from strive.vnext.cli.fixture import CONTROLLER
+    from strive.cli.fixture import CONTROLLER
     path = example(tmp_path)
     package = tmp_path / "policy"
     for name, data in {"controller/step.js": CONTROLLER, "memory/hidden.txt": b"undeclared actor intervention"}.items():
@@ -261,7 +261,7 @@ def test_policy_package_cannot_smuggle_actor_components(tmp_path: Path) -> None:
 
 
 def test_cli_routing_does_not_treat_root_as_command() -> None:
-    from strive.vnext.cli.app import accepts
+    from strive.cli.app import accepts
     assert not accepts(["--root", "project", "run", "--seed", "1"])
     assert accepts(["--root", "project", "resume", "run-1"])
 

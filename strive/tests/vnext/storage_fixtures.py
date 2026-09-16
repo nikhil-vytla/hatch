@@ -3,21 +3,21 @@
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from strive.vnext.codec import opaque_annotation
-from strive.vnext.contracts.lifecycle import DispatchStage, EffectState, RecoveryCapability, RecoveryContract
-from strive.vnext.contracts.manifest import load_resolved_configuration
-from strive.vnext.contracts.primitives import (
+from strive.codec import opaque_annotation
+from strive.contracts.lifecycle import DispatchStage, EffectState, RecoveryCapability, RecoveryContract
+from strive.contracts.manifest import load_resolved_configuration
+from strive.contracts.primitives import (
     AccessScope, ArtifactRef, CommandId, EffectId, EnvironmentId, ExecutionStatus,
     InvocationId, LineageId, Reservation, Resource, ResourceQuantity, ResultCursor, RunId,
 )
-from strive.vnext.contracts.records import (
+from strive.contracts.records import (
     CausalIdentity, ContinuationCommit, DeclaredLineage, EffectAuthorization,
     EffectObservationSettlement, OutcomeStatus, ProducerKind, RecordPayload,
     ReservationDisposition, RevisionActivation, RunBinding, UsageCompleteness,
     UsageKind, UsageObservation, UsageProvenance,
 )
-from strive.vnext.store import ArtifactStore, RunReader, RunWriter
-from strive.vnext.wire import Frame
+from strive.store import ArtifactStore, RunReader, RunWriter
+from strive.wire import Frame
 
 from .fixtures import AUTHORED_TOML
 

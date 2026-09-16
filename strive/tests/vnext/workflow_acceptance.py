@@ -5,16 +5,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from strive.vnext.cli.data import json_bytes, mapping, read_json, sequence
-from strive.vnext.cli.runner import reader, resume, run_directory
-from strive.vnext.codec import encode
-from strive.vnext.contracts.primitives import ArtifactRef, ScopedArtifact
-from strive.vnext.contracts.records import ContinuationCommit
-from strive.vnext.store import ArtifactStore
-from strive.vnext.errors import VerificationError
-from strive.vnext.study.audit import execute_audit, freeze, release
-from strive.vnext.study.experiment import allocate, experiment
-from strive.vnext.telemetry.projector import MemoryExporter, Projector
+from strive.cli.data import json_bytes, mapping, read_json, sequence
+from strive.cli.runner import reader, resume, run_directory
+from strive.codec import encode
+from strive.contracts.primitives import ArtifactRef, ScopedArtifact
+from strive.contracts.records import ContinuationCommit
+from strive.store import ArtifactStore
+from strive.errors import VerificationError
+from strive.study.audit import execute_audit, freeze, release
+from strive.study.experiment import allocate, experiment
+from strive.telemetry.projector import MemoryExporter, Projector
 
 from .benchmark_acceptance import BenchmarkRuntimeDriver
 from .test_acceptance_contracts import RuntimeEvidence
@@ -23,8 +23,8 @@ from .workflow_fixtures import campaign
 
 
 def noninterference(root: Path) -> None:
-    from strive.vnext.runtime import supervisor
-    from strive.vnext.policy import refiner
+    from strive.runtime import supervisor
+    from strive.policy import refiner
     views: list[bytes] = []
     audit_scores: list[list[str]] = []
     # Runtime durations are a permitted input, fixed for the counterfactual pair.
