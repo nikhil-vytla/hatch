@@ -1,0 +1,20 @@
+[project]
+name = "strive-benchmark-tau2"
+version = "0.1.0"
+requires-python = ">=3.12,<3.14"
+dependencies = []
+
+[project.optional-dependencies]
+telecom = ["tau2 @ git+https://github.com/sierra-research/tau2-bench@a2c024725189473d2d7cea3a5cfdbcc67478e41f"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The pinned tau2 commit is a direct git reference; hatchling requires this
+# opt-in to build the package metadata that declares it in the telecom extra.
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/strive_benchmark_tau2"]

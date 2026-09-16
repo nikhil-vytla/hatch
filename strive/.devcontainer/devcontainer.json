@@ -1,0 +1,21 @@
+{
+  "name": "strive vNext verification",
+  "build": {
+    "dockerfile": "../Containerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace/strive",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/strive,type=bind",
+  "runArgs": [
+    "--privileged",
+    "--cgroupns=private"
+  ],
+  "containerUser": "root",
+  "remoteUser": "root",
+  "mounts": [
+    "source=strive-linux-venv,target=/workspace/strive/.venv,type=volume",
+    "source=strive-linux-tau2-venv,target=/workspace/strive/adapters/tau2/.venv,type=volume"
+  ],
+  "postCreateCommand": "uv sync --frozen --python /usr/local/bin/python3.12",
+  "overrideCommand": true
+}
