@@ -8,10 +8,10 @@ and whether a change helped. The execution core decides what was authorized,
 what was observed, what remains uncertain and which revision is active.
 
 The current implementation is `src/strive/vnext`. Its local run format, commands
-and artifact roots are independent of the legacy modules still in the package.
-There is no migration or dual-writing path. Historical implementation decisions
-are identified in the [ADR index](adrs/README.md); earlier project documents
-remain in [the archive](archive/README.md).
+and artifact roots are the only ones in the package; the pre-vNext kernel was
+removed. There is no migration or dual-writing path. Historical implementation
+decisions are identified in the [ADR index](adrs/README.md); earlier project
+documents remain in [the archive](archive/README.md).
 
 ## Five integrity guarantees
 
@@ -313,9 +313,8 @@ example uses A. A contract label alone never grants retrieval. See
 
 The manifest CLI offers `run`, `resume`, `experiment`, `compare`, `status` and
 `project`. Use `uv run python -m strive.vnext.cli` for the unambiguous vNext entry
-point. The installed `strive` command routes manifest-shaped commands here and
-retains the legacy flag-based interface separately. The current composition
-runs the counter benchmark with a recorded provider. Unsupported models,
+point; the installed `strive` command delegates directly to it. The current
+composition runs the counter benchmark with a recorded provider. Unsupported models,
 workloads and native harness campaign manifests fail validation. The installed
 tau2 adapter and standalone fixed-stock runner do not by themselves provide an
 adaptive telecom CLI campaign.
