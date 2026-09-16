@@ -78,7 +78,6 @@ def main() -> None:
             "SUMMARY": EVIDENCE / "remaining-medium-screening-summary.json",
             "SPEND_CAP_USD": 4.012245,
             "BOUNDARY_MODEL": "claude-opus-4-8",
-            "CONSTRUCTION_SEED": 20260803,
             "TRIAL_SEEDS": (2026080321, 2026080322),
             "PREREGISTERED_EPISODE_UPPER_USD": 0.12,
             "FETCH_BATCH_SIZE": 1,

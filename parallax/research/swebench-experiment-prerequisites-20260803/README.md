@@ -80,12 +80,15 @@ No experiment unit has run.
 - `evidence/<instance>/admission.json` records every gate, official report
   digest, image digest, and outcome without sealed text.
 - `decision-trail.tsv` links each implementation unit to its check.
-- `mutation_gate.py` kills six focused delivery and admission mutants.
+- `mutation_gate.py` kills six focused delivery and admission mutants. Its
+  successor is committed as `tests/test_mutation_gauntlet.py`, which runs under
+  `pytest -m mutation`.
 
 Verification passed 136 tests under normal Python and 136 under `python -O`.
-The core mutation suite killed 28 of 28 mutants. The Slice 2 suite killed 48 of
-48. The focused suite killed 6 of 6. Ruff, Ruff format, `ty`, `uv build`, and
-`git diff --check` passed.
+Ruff, Ruff format, `ty`, `uv build`, and `git diff --check` passed. The
+"core" and "Slice 2" mutation scores this report originally cited came from
+gauntlets that were never committed and cannot be reproduced; the reproducible
+gauntlet is `tests/test_mutation_gauntlet.py`.
 
 Reproduce the compute-only admission run with:
 

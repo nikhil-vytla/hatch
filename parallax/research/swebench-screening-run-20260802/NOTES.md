@@ -170,3 +170,27 @@
   `evidence/live-work/episodes/`, `evidence/screening.jsonl`, and
   `evidence/screening-summary.json`. Preflight and wheel-grader failures remain
   as separate immutable receipts.
+
+## Cost correction, 2026-08-03
+
+The spend figures above and in this run's evidence files are overstated. The
+pricing constant in use was the retired Opus 4.1 rate card, $15/$75 per million
+input/output tokens, and the construction receipts were priced through it as
+well even though Haiku 4.5 did that work at $1/$5. Token counts were retained
+correctly, so the true cost is recoverable; the receipts are left as written.
+
+| Component | As written | Re-metered at correct rates |
+| --- | --- | --- |
+| Construction (Haiku 4.5, 3350/1245 tokens) | $0.143625 | $0.009575 |
+| Ten Opus 4.8 episodes (240/20299 tokens) | $1.526025 | $0.508675 |
+| Metered total | $1.669650 | $0.518250 |
+| Reserve for 3 unmetered construction calls | $0.477790 | $0.022779 |
+| All-in upper bound | $2.147440 | $0.541029 |
+
+The reserve keeps the original method — one token charged per prompt UTF-8 byte
+plus the full 1,024-token output allowance — and only fixes the rate card to the
+Haiku rates that actually applied. `evidence/screening.jsonl` and
+`evidence/screening-wheel-harness-failure.jsonl` are the same ten paid episodes:
+the second grading pass replayed cached episodes, so summing both files
+double-counts. `research/spend-audit-20260803/` recomputes all of this from the
+committed tokens and fails if the replay relation stops holding.

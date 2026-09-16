@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-import math
-from collections import defaultdict
 from pathlib import Path
 from typing import assert_never
 
 from parallax.canonical import atomic_write, canonical_bytes
+from parallax.metering import total
 from parallax.outcome import RunFailure, Verification
+from parallax.paired import paired_bounds
 from parallax.screening import ScreeningPlan, ScreeningRun, read_screening_jsonl
 
 ROOT = Path(__file__).parent
@@ -131,59 +131,30 @@ def main() -> None:
         if key.endswith(":evolved")
     )
 
-    # Paired single-minus-evolved delta. A run failure leaves that side's
-    # potential score unidentified in {0, 1}, so the pair contributes an
-    # interval instead of a point.
-    bounds: dict[str, list[tuple[float, float]]] = defaultdict(list)
-    complete: dict[str, list[int]] = defaultdict(list)
-    paired = 0
-    for source in sources:
-        for trial in trials:
-            static_y = _score(indexed[(source, trial, "static")])
-            evolved_y = _score(indexed[(source, trial, "evolved")])
-            if static_y is not None and evolved_y is not None:
-                delta = static_y - evolved_y
-                bounds[source].append((float(delta), float(delta)))
-                complete[source].append(delta)
-                paired += 1
-            elif static_y is not None:
-                bounds[source].append((float(static_y - 1), float(static_y)))
-            elif evolved_y is not None:
-                bounds[source].append((float(-evolved_y), float(1 - evolved_y)))
-            else:
-                bounds[source].append((-1.0, 1.0))
-    source_bounds = [
-        (
-            sum(lower for lower, _ in values) / len(values),
-            sum(upper for _, upper in values) / len(values),
-        )
-        for _, values in sorted(bounds.items())
-    ]
-    source_count = len(source_bounds)
-    identification = (
-        sum(lower for lower, _ in source_bounds) / source_count,
-        sum(upper for _, upper in source_bounds) / source_count,
-    )
-    source_means = [
-        sum(values) / len(values) for _, values in sorted(complete.items()) if values
-    ]
-    point_delta = sum(source_means) / len(source_means) if source_means else None
-    epsilon = math.sqrt(2 * math.log(40) / source_count)
-    interval = (
-        max(-1.0, identification[0] - epsilon),
-        min(1.0, identification[1] + epsilon),
+    bounds = paired_bounds(
+        {
+            source: [
+                (
+                    _score(indexed[(source, trial, "static")]),
+                    _score(indexed[(source, trial, "evolved")]),
+                )
+                for trial in trials
+            ]
+            for source in sources
+        },
+        estimand="single_minus_evolved_pass_rate",
     )
 
+    def arm_spend(arm: str) -> float:
+        return total(run.usage for run in runs if str(run.unit.arm) == arm).cost_usd
+
+    metered = total(run.usage for run in runs)
     spend = {
-        "total_usd": sum(run.estimated_cost_usd for run in runs),
-        "static_usd": sum(
-            run.estimated_cost_usd for run in runs if str(run.unit.arm) == "static"
-        ),
-        "evolved_usd": sum(
-            run.estimated_cost_usd for run in runs if str(run.unit.arm) == "evolved"
-        ),
-        "prompt_tokens": sum(run.prompt_tokens for run in runs),
-        "completion_tokens": sum(run.completion_tokens for run in runs),
+        "total_usd": metered.cost_usd,
+        "static_usd": arm_spend("static"),
+        "evolved_usd": arm_spend("evolved"),
+        "prompt_tokens": metered.prompt_tokens,
+        "completion_tokens": metered.completion_tokens,
     }
     receipts = {
         "official_harness_receipts": sum(
@@ -206,20 +177,20 @@ def main() -> None:
             "per_unit": delivery,
         },
         "paired_analysis": {
-            "estimand": "single_minus_evolved_pass_rate",
-            "paired_complete": paired,
-            "point_delta_complete_pairs": point_delta,
+            "estimand": bounds.estimand,
+            "paired_complete": bounds.paired_complete,
+            "point_delta_complete_pairs": bounds.point_delta_complete_pairs,
             "identification_bounds": {
-                "lower": identification[0],
-                "upper": identification[1],
+                "lower": bounds.identification_lower,
+                "upper": bounds.identification_upper,
             },
             "interval": {
                 "confidence": 0.95,
                 "method": "source_clustered_hoeffding",
-                "epsilon": epsilon,
-                "lower": interval[0],
-                "upper": interval[1],
-                "minimum_detectable_effect": epsilon,
+                "epsilon": bounds.epsilon,
+                "lower": bounds.interval_lower,
+                "upper": bounds.interval_upper,
+                "minimum_detectable_effect": bounds.minimum_detectable_effect,
             },
             "language": "bounds_only",
         },

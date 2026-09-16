@@ -429,3 +429,140 @@
   no longer reproduces that file byte-for-byte. `admission.py`, `delivery.py`,
   and the checkpoint-evolution modules are clean — the `advance_trigger` names
   in delivery describe turn scheduling, not a statistical decision.
+## Consolidation pass, 2026-08-04
+
+Subtractions. `conformance.py` and its test went: no caller outside that test,
+and the test only compared two fakes it defined itself. `INITIAL_SCREENING_IDS`
+had one consumer, a test asserting its length. `build_swe_script_family`'s
+`seed` was recorded into `SweScriptFamily` and `PublicTaskV1` but could not
+change a deterministic construction, so it was a false reproducibility claim in
+the task spec rather than a missing feature. `PositiveInt` was defined four
+times and `StrictModel`/`NonEmptyText` twice; they live in `types.py` now.
+
+Four of the six admission gates could not fail. `arm_completeness` was the
+literal `True`. `schema` round-tripped Pydantic through its own serializer.
+`budget_match` re-checked equal arm budgets (already a `SweScriptFamily`
+validator), agreement with the environment (already `compile_hud`), and equal
+matched/evolved per-turn steps (`_allocate_steps` is a pure function of total
+and turn count). `sealed_leakage` called `find_sealed_leak` on a bundle
+`compile_hud` had just refused to return unless that same call found nothing.
+The committed receipts show it: those four rows recorded hardcoded passes and
+echoes of their inputs, while `noop` and `gold` carry harness revisions, report
+digests and test counts. `AdmittedSweFamily`'s validator recompiled the whole
+HUD bundle on every construction; the digest binding it enforced is real, so it
+moved to `assert_admission_identity`, called once per family from
+`build_admitted_screening_plan`, where spending is authorized.
+
+Encodings, strongest rung available for each:
+
+- `metering.py` is the only place a dollar figure is produced. Rates key on the
+  exact model identifier, and an unlisted model raises rather than being priced
+  at zero. `tests/test_metering.py` fails once `PRICING_AS_OF` is more than 90
+  days old, so staleness is a test failure and not a silent misprice.
+- `hud_wire.py` is the only boundary where a HUD or provider payload becomes a
+  domain model, tolerant on input and strict on consumption, with recorded
+  fixtures under `tests/fixtures/wire/` replaying each quirk offline for $0.
+- Per-unit paths in `HudExecutor` carry the whole unit identity, so the
+  cross-arm cache collision a driver worked around with one executor per arm is
+  now unrepresentable.
+- `preflight.py` holds the operational lore as code: `require_docker()` runs
+  inside `_docker_build`, so no image build can skip the platform pin, daemon
+  probe or disk headroom check; `sleepless()` and `terminate_group()` are the
+  supported ways to hold a long run open and to stop one.
+- `single_writer()` takes an exclusive flock for the whole of `run_screening`,
+  so a second session writing the same evidence file is refused by the kernel
+  rather than by a human reading a process list.
+- `paired.py` holds the source-clustered paired-bounds math that a driver had
+  reimplemented line-for-line. It decides nothing: no threshold, no action, no
+  power verdict.
+- `tests/test_mutation_gauntlet.py` is a committed gauntlet, 19 mutants over
+  delivery, admission, metering, the wire boundary, the arm cache key, the
+  evidence lock, preflight and paired bounds. Run it with `pytest -m mutation`.
+
+Two findings from doing the work:
+
+- `screening.jsonl` from the first round-two screen carries receipts priced at
+  retired Opus rates, 15/75 per million against the current 5/25, overstating
+  that component 3x. `summarize_round2.py` had always re-derived cost from
+  recorded token counts rather than summing the receipts, which is why its
+  report was right; it now re-derives through the canonical table, and the
+  comment says why summing the receipts would be wrong.
+- The drifted operating-point copy in `summarize_round2.py` (`== 0`/`== 1`
+  against the package's `<= 0.1`/`>= 0.9`) did not mis-select anything. The two
+  rules agree for every pass rate reachable in nine or fewer verified trials
+  and first disagree at ten, and round two used three. It was a latent
+  divergence, which is why it survived; `test_screening.py` now pins the
+  boundary. Re-running `summarize_round2.py`, `analyze_experiment.py` and
+  `preregister_experiment.py` after the hoist reproduces their committed
+  reports byte-for-byte.
+
+Consequence worth recording: removing `construction_seed` changed
+`PublicTaskV1`, so the committed admission receipts' spec and bundle digests no
+longer describe current specs. Re-running the single-vs-evolved experiment needs
+re-admission first. The receipts keep their recorded `noop` and `gold` rows
+verbatim.
+
+Merged the checkpoint-evolution slice (#27) mid-pass. It had landed its own
+copies of two consolidated fixes: an exact-prefix/suffix JSON fence unwrap in
+`checkpoint_agent.py`, and `HAIKU_STAGE_PRICING` restating the Haiku rate as
+literals. Both now go through `strip_json_fence` and `pricing_for`. Its
+budget-based `StagePricing` estimator keeps its own shape, because it prices a
+worst case from a token budget rather than metering spend that happened; only
+its rates come from the canonical table. Two gauntlet mutants cover both.
+Follow-ups after PR #30 merged, 2026-08-03 late:
+
+- `report.py` now calls `paired.py`. The decision gate that had entangled that
+  block with report-local state is gone, so the last copy of the paired math
+  went with it: 41 lines out, 18 in, and regenerating the flagship experiment
+  report reproduces every field bit-for-bit except the `powered` flag that #30
+  deleted. `paired_bounds` takes a `TypeVar` bound to `str` for its source key,
+  because `Mapping` is invariant in its key and `report.py` keys by `SourceId`.
+- Audited what the paid runs actually cost, in `research/spend-audit-20260803/`.
+  The short version: round 1 is overstated on record ($1.669650 written,
+  $0.518250 true), round 2's widely quoted $2.972512 is correct and
+  token-derived, the single-vs-evolved $1.219080 is correct but its unmetered
+  band was retired-rate-derived ($0.31-0.52, not $0.40-0.80), and the
+  checkpoint slice's $0.281291 is correct. Total: $4.991133 metered,
+  $5.30-$5.53 all-in.
+- Two things made this worth encoding as a script rather than a paragraph.
+  Receipts cannot be summed, because several were written at retired rates and
+  because a resume replays cached episodes into a new file, so a naive sum over
+  all evidence gives $14.381233 against a true $4.991133. `audit_spend.py`
+  therefore re-meters from retained tokens only, and asserts each replay
+  relation instead of assuming it: if a supposed replay's token counts moved, it
+  re-paid, and the audit fails rather than merging the rows.
+- Zero-token rows needed reading one by one. Round 1's preflight failures and
+  round 2's leak-scan and Docker-disk failures aborted before inference and cost
+  nothing. The single-vs-evolved run-1 rows recorded zero on episodes that had
+  already run and been billed, because the pre-fix failure path raised before
+  capturing usage. Only that one is an unmetered gap.
+- The gauntlet gained two mutants over the audit itself (trust the recorded
+  dollars; count replayed episodes again) and now copies `research/` into its
+  sandbox. It had been excluding it, which meant every evidence-replay test
+  failed for a missing file inside the sandbox and read as a kill regardless of
+  what the mutation did. 23 mutants, all killed.
+
+Four gaps the wire and pricing surveys turned up, closed after the spend audit
+made their cost concrete:
+
+- `HudEpisode` no longer stores a price. It keeps tokens and the reported model
+  and derives `usage` through `meter()`, so a cached episode cannot carry a
+  retired rate into a resumed run's evidence. This is the mechanism behind the
+  defect the audit priced: round one's regrade copied each cached episode's
+  recorded cost into fresh rows, which is how retired-rate figures spread from
+  the episodes into `screening.jsonl`. `regrade_screening.py` re-meters too.
+- `swebench_harness.py` parsed the official report with
+  `model_validate_json(json.dumps(...))`, the same JSON-mode round-trip
+  `hud_wire` exists to own. Both the report and the summary go through
+  `parse_wire` now, and its type variable is bound to `BaseModel` so the
+  harness's `extra="ignore"` wire models can use it.
+- `_DatasetRow.parse_test_list` only understood the rows service's
+  string-encoded arrays, so a plain array — what a pinned parquet read
+  produces — would have been rejected by the strict tuple field for the reason
+  `wire_tuple` documents. It now routes the non-string case through
+  `wire_tuple`.
+- The round-one construction loop appended receipts with a bare `open("ab")`
+  while deciding what to pay for by reading the same file. Two sessions would
+  each have seen the other's work as absent. `_construct` now holds
+  `single_writer(CONSTRUCTIONS)` across the whole phase, matching what
+  `run_screening` already does for episodes.

@@ -159,23 +159,26 @@ Suggested shapes, composing existing types (`StrictModel`, `DigestText`
 from `types.py`; `Outcome` from `outcome.py`):
 
 ```python
-GateName = Literal["schema", "sealed_leakage", "noop", "gold",
-                   "budget_match", "arm_completeness"]
+GateName = Literal[
+    "schema", "sealed_leakage", "noop", "gold", "budget_match", "arm_completeness"
+]
+
 
 class GateResultV1(StrictModel):
     gate: GateName
     passed: bool
-    evidence: str                      # human-readable, sealed-clean (see G2)
-    attempts: tuple[Outcome, ...] = () # execution gates only
+    evidence: str  # human-readable, sealed-clean (see G2)
+    attempts: tuple[Outcome, ...] = ()  # execution gates only
     report_digests: tuple[DigestText, ...] = ()
+
 
 class AdmissionRecordV1(StrictModel):
     schema_version: Literal[1] = 1
     source_id: SourceId
-    spec_digest: DigestText            # TaskSpecV1.spec_digest
-    environment_digest: DigestText     # EnvSpecV1.digest
-    bundle_digest: DigestText          # canonical_digest(CompiledBundleV1)
-    gates: tuple[GateResultV1, ...]    # all six, in pipeline order
+    spec_digest: DigestText  # TaskSpecV1.spec_digest
+    environment_digest: DigestText  # EnvSpecV1.digest
+    bundle_digest: DigestText  # canonical_digest(CompiledBundleV1)
+    gates: tuple[GateResultV1, ...]  # all six, in pipeline order
     decision: Literal["admitted", "admitted_flaky", "rejected"]
 ```
 
