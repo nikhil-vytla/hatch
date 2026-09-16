@@ -7,14 +7,17 @@ import pytest
 from pydantic import ValidationError
 
 import parallax.gsm8k as gsm8k
+from parallax.canonical import canonical_digest
 from parallax.gsm8k import (
+    CONTRACT,
+    SUBMISSION_MARKER,
     Gsm8kError,
-    Problem,
+    Gsm8kTask,
     Verdict,
-    grade,
     load_gsm8k,
     parse_final_answer,
     parse_source_answer,
+    verify,
 )
 from parallax.types import SourceAnswer, SourceId
 
@@ -24,7 +27,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "gsm8k.jsonl"
 def test_loads_real_shaped_row_and_derives_authority() -> None:
     problem = load_gsm8k(FIXTURE)[0]
 
-    assert problem == Problem(
+    assert problem == Gsm8kTask(
         record_id=SourceId("gsm8k-1"),
         question=(
             "Janet's ducks lay 16 eggs per day. She eats 3 for breakfast and "
@@ -65,22 +68,22 @@ def test_submission_policy_distinguishes_pass_wrong_and_invalid() -> None:
     problem = load_gsm8k(FIXTURE)[0]
 
     assert parse_final_answer("Reasoning.\nFINAL_ANSWER: 18") == "18"
-    assert grade(problem, "FINAL_ANSWER: 18").verdict is Verdict.PASS
-    assert grade(problem, "FINAL_ANSWER: 17").verdict is Verdict.WRONG
-    assert grade(problem, "18").verdict is Verdict.INVALID
-    assert grade(problem, "FINAL_ANSWER: 018").verdict is Verdict.INVALID
+    assert verify(problem, "FINAL_ANSWER: 18").verdict is Verdict.PASS
+    assert verify(problem, "FINAL_ANSWER: 17").verdict is Verdict.WRONG
+    assert verify(problem, "18").verdict is Verdict.INVALID
+    assert verify(problem, "FINAL_ANSWER: 018").verdict is Verdict.INVALID
 
 
 def test_problem_rejects_invalid_authority_at_construction() -> None:
     with pytest.raises(ValidationError, match="canonical integer"):
-        Problem(
+        Gsm8kTask(
             record_id=SourceId("bad"),
             question="Question?",
             answer=SourceAnswer("not-an-answer"),
         )
 
     with pytest.raises(ValidationError, match="at least 1 character"):
-        Problem(
+        Gsm8kTask(
             record_id=SourceId(""),
             question="Question?",
             answer=SourceAnswer("1"),
@@ -119,7 +122,7 @@ def test_grade_trusts_validated_source_authority(
 
     monkeypatch.setattr(gsm8k, "validate_answer", tracked)
 
-    assert grade(problem, "FINAL_ANSWER: 18").verdict is Verdict.PASS
+    assert verify(problem, "FINAL_ANSWER: 18").verdict is Verdict.PASS
     assert calls == 1
 
 
@@ -128,3 +131,30 @@ def test_domain_models_are_frozen() -> None:
 
     with pytest.raises(ValidationError, match="frozen"):
         problem.question = "Changed?"
+
+
+def test_the_grader_and_the_instructions_cannot_drift_apart() -> None:
+    """The contract names the marker the parser requires.
+
+    A full round graded every episode on a `FINAL_ANSWER:` line that no prompt
+    ever asked for. Both now come from one constant, and the contract is inside
+    the verifier digest, so changing what the grader accepts changes the task's
+    identity rather than silently regrading old evidence.
+    """
+
+    assert SUBMISSION_MARKER in CONTRACT.instructions
+    assert CONTRACT.required_markers == (SUBMISSION_MARKER,)
+    task = load_gsm8k(FIXTURE)[0]
+    assert task.agent_contract == CONTRACT
+    relaxed = CONTRACT.model_copy(update={"required_markers": ()})
+    assert canonical_digest(relaxed.model_dump(mode="json")) != canonical_digest(
+        CONTRACT.model_dump(mode="json")
+    )
+
+
+def test_a_fenced_submission_is_read_rather_than_failed() -> None:
+    """`swebench.py` tolerated fences; the GSM8K parser did not, until now."""
+
+    assert parse_final_answer("Work.\nFINAL_ANSWER: 42") == "42"
+    assert parse_final_answer("```\nWork.\nFINAL_ANSWER: 42\n```") == "42"
+    assert parse_final_answer("```text\nWork.\nFINAL_ANSWER: 42\n```") == "42"

@@ -1,41 +1,51 @@
+"""Admission: prove a task's verifier discriminates before paying to run it.
+
+Two gates remain, and both cost real compute because both actually run the
+official harness. `noop` applies a patch that changes nothing and requires the
+verifier to fail it; `gold` applies the reference solution and requires the
+verifier to pass it. Together they establish that the sealed authority responds
+to the thing being measured, which is the only claim admission was ever able to
+support.
+
+Four other gates were deleted. `arm_completeness` and `budget_match` re-checked
+Pydantic validators and, worse, checked shape rather than meaning: `budget_match`
+compared turn counts and per-turn allowances, which is why it certified a
+control arm that delivered the whole issue statement in both turns and therefore
+accumulated no information at all. `schema` round-tripped models through their
+own serializer and compared digests. `sealed_leakage` was unreachable —
+`compile_bundle` raises on a leak, so a record could only ever be written with
+that gate passing.
+
+Admission binds the task spec and the environment, not the compiled bundle.
+Those are the two things the gates exercise; the bundle also contains whichever
+conditions an experiment happened to compile, and binding it meant that editing
+an unrelated condition invalidated a completed admission.
+"""
+
 from __future__ import annotations
 
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import Literal, Self
 
 from pydantic import model_validator
 
 from .canonical import atomic_write, canonical_bytes, canonical_digest
-from .hud_compile import CompiledBundleV1, compile_hud, find_sealed_leak
 from .outcome import Outcome, RunFailure, Verdict
-from .specs import EnvSpecV1, TaskSpecV1, freeze_swe_specs
-from .swebench import SweScriptFamily
+from .swebench import SweBenchTask
 from .swebench_harness import (
     HarnessEvaluation,
     OfficialHarnessError,
     run_official_harness,
 )
+from .swebench_specs import SweEnvSpec, SweTaskSpec, freeze_swe_task
 from .types import DigestText, NonEmptyText, SourceId, StrictModel
 
-GateName = Literal[
-    "arm_completeness",
-    "schema",
-    "budget_match",
-    "sealed_leakage",
-    "noop",
-    "gold",
-]
+GateName = Literal["noop", "gold"]
 AdmissionDecision = Literal["admitted", "admitted_flaky", "rejected"]
-GATE_ORDER: tuple[GateName, ...] = (
-    "arm_completeness",
-    "schema",
-    "budget_match",
-    "sealed_leakage",
-    "noop",
-    "gold",
-)
+GATE_ORDER: tuple[GateName, ...] = ("noop", "gold")
+GOLD_ATTEMPTS = 3
 IDENTITY_PATCH = (
     "diff --git a/.parallax_admission_noop b/.parallax_admission_noop\n"
     "new file mode 100644\n"
@@ -45,8 +55,17 @@ IDENTITY_PATCH = (
     "+parallax admission identity probe\n"
 )
 
+AdmissionHarness = Callable[
+    [SweTaskSpec, SweEnvSpec, str, Path],
+    HarnessEvaluation,
+]
 
-class GateResultV1(StrictModel):
+
+class AdmissionError(ValueError):
+    pass
+
+
+class GateResult(StrictModel):
     gate: GateName
     passed: bool
     evidence: NonEmptyText
@@ -54,25 +73,22 @@ class GateResultV1(StrictModel):
     report_digests: tuple[DigestText, ...] = ()
 
 
-class AdmissionRecordV1(StrictModel):
+class AdmissionRecord(StrictModel):
     kind: Literal["admission_record"] = "admission_record"
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     source_id: SourceId
     spec_digest: DigestText | None = None
     environment_digest: DigestText | None = None
-    bundle_digest: DigestText | None = None
-    gates: tuple[GateResultV1, ...]
+    gates: tuple[GateResult, ...]
     decision: AdmissionDecision
 
     @model_validator(mode="after")
-    def complete_decision(self):
+    def complete_decision(self) -> Self:
         if tuple(gate.gate for gate in self.gates) != GATE_ORDER:
             raise ValueError("admission gates are incomplete or out of pipeline order")
         admitted = self.decision in {"admitted", "admitted_flaky"}
-        if admitted and not all(
-            (self.spec_digest, self.environment_digest, self.bundle_digest)
-        ):
-            raise ValueError("admitted record requires all identity digests")
+        if admitted and not all((self.spec_digest, self.environment_digest)):
+            raise ValueError("admitted record requires both identity digests")
         if admitted and not all(gate.passed for gate in self.gates):
             raise ValueError("admitted record contains a failed gate")
         if self.decision == "admitted_flaky":
@@ -83,33 +99,37 @@ class AdmissionRecordV1(StrictModel):
                 )
         return self
 
-
-class AdmittedSweFamily(StrictModel):
-    family: SweScriptFamily
-    admission: AdmissionRecordV1
-
-    @model_validator(mode="after")
-    def matching_admission(self):
-        if self.admission.decision not in {"admitted", "admitted_flaky"}:
-            raise ValueError("scheduling requires an admitted family")
-        if self.admission.source_id != self.family.static.problem.record_id:
-            raise ValueError("admission source differs from family")
-        task, environment = freeze_swe_specs(self.family)
-        bundle = compile_hud(task, environment)
-        if (
-            self.admission.spec_digest != task.spec_digest
-            or self.admission.environment_digest != environment.digest
-            or self.admission.bundle_digest != canonical_digest(bundle)
-        ):
-            raise ValueError("admission identity differs from family")
-        return self
+    @property
+    def admitted(self) -> bool:
+        return self.decision in {"admitted", "admitted_flaky"}
 
 
-AdmissionHarness = Callable[
-    [TaskSpecV1, EnvSpecV1, str, Path],
-    HarnessEvaluation,
-]
-ModelT = TypeVar("ModelT", bound=StrictModel)
+def check_admission(
+    spec: SweTaskSpec,
+    environment: SweEnvSpec,
+    record: AdmissionRecord,
+) -> None:
+    """Refuse to schedule a task whose committed admission does not match it.
+
+    This is a function rather than a model validator because the check needs the
+    specs, and reconstructing them inside a validator meant re-running the
+    compiler on every deserialization of a stored record.
+    """
+
+    if not record.admitted:
+        raise AdmissionError(f"{record.source_id} was not admitted")
+    if record.source_id != spec.public.record_id:
+        raise AdmissionError("admission record is for a different task")
+    if record.spec_digest != spec.spec_digest:
+        raise AdmissionError(
+            f"{record.source_id}: admitted spec digest {record.spec_digest} "
+            f"differs from {spec.spec_digest}"
+        )
+    if record.environment_digest != environment.digest:
+        raise AdmissionError(
+            f"{record.source_id}: admitted environment digest "
+            f"{record.environment_digest} differs from {environment.digest}"
+        )
 
 
 def _evidence(value: object) -> NonEmptyText:
@@ -122,15 +142,6 @@ def _evidence(value: object) -> NonEmptyText:
     )
 
 
-def _round_trip(value: ModelT) -> ModelT:
-    restored = type(value).model_validate_json(canonical_bytes(value))
-    if canonical_digest(restored) != canonical_digest(value):
-        raise ValueError(
-            f"{type(value).__name__} canonical digest changed on round-trip"
-        )
-    return restored
-
-
 def _gate(
     name: GateName,
     passed: bool,
@@ -138,8 +149,8 @@ def _gate(
     *,
     attempts: tuple[Outcome, ...] = (),
     reports: tuple[DigestText, ...] = (),
-) -> GateResultV1:
-    return GateResultV1(
+) -> GateResult:
+    return GateResult(
         gate=name,
         passed=passed,
         evidence=_evidence(evidence),
@@ -151,91 +162,16 @@ def _gate(
 def construction_rejection(
     source_id: SourceId,
     error: Exception,
-) -> AdmissionRecordV1:
-    gates = [
-        _gate(
-            "arm_completeness",
-            False,
-            {"error_type": type(error).__name__, "message": str(error)},
-        )
-    ]
-    gates.extend(
-        _gate(name, False, {"not_run": "arm construction failed"})
-        for name in GATE_ORDER[1:]
-    )
-    return AdmissionRecordV1(
+) -> AdmissionRecord:
+    detail = {"error_type": type(error).__name__, "message": str(error)}
+    return AdmissionRecord(
         source_id=source_id,
-        gates=tuple(gates),
+        gates=tuple(
+            _gate(name, False, {"not_run": "construction failed", **detail})
+            for name in GATE_ORDER
+        ),
         decision="rejected",
     )
-
-
-def _cheap_gates(
-    family: SweScriptFamily,
-    task: TaskSpecV1,
-    environment: EnvSpecV1,
-    bundle: CompiledBundleV1,
-) -> tuple[GateResultV1, GateResultV1, GateResultV1, GateResultV1]:
-    completeness = _gate(
-        "arm_completeness",
-        True,
-        {"arms": [script.arm for script in family.scripts]},
-    )
-    try:
-        for value in (family, task, environment):
-            _round_trip(value)
-    except ValueError as error:
-        schema = _gate("schema", False, {"message": str(error)})
-    else:
-        schema = _gate(
-            "schema",
-            True,
-            {"round_tripped": ["SweScriptFamily", "TaskSpecV1", "EnvSpecV1"]},
-        )
-    scripts = family.scripts
-    shared_budget = {
-        (script.total_agent_steps, script.max_output_tokens) for script in scripts
-    }
-    per_turn_match = family.matched.agent_steps == family.evolved.agent_steps
-    environment_match = shared_budget == {
-        (
-            environment.budget.total_agent_steps,
-            environment.budget.max_output_tokens,
-        )
-    }
-    budget = _gate(
-        "budget_match",
-        len(shared_budget) == 1 and per_turn_match and environment_match,
-        {
-            "arm_budgets": {
-                script.arm: {
-                    "agent_steps": script.agent_steps,
-                    "max_output_tokens": script.max_output_tokens,
-                }
-                for script in scripts
-            },
-            "environment": environment.budget.model_dump(mode="json"),
-        },
-    )
-    leak = find_sealed_leak(
-        task.sealed,
-        bundle.agent_artifacts,
-        public=task.public,
-    )
-    leakage = _gate(
-        "sealed_leakage",
-        leak is None,
-        (
-            {"matched": False}
-            if leak is None
-            else {
-                "artifact_path": leak.artifact_path,
-                "fragment_digest": leak.fragment_digest,
-                "fragment_length": leak.fragment_length,
-            }
-        ),
-    )
-    return completeness, schema, budget, leakage
 
 
 def _execution_evidence(
@@ -255,11 +191,11 @@ def _execution_evidence(
 
 
 def _noop_gate(
-    task: TaskSpecV1,
-    environment: EnvSpecV1,
+    task: SweTaskSpec,
+    environment: SweEnvSpec,
     run_directory: Path,
     run_harness: AdmissionHarness,
-) -> GateResultV1:
+) -> GateResult:
     patch_digest = canonical_digest(IDENTITY_PATCH)
     try:
         evaluation = run_harness(task, environment, IDENTITY_PATCH, run_directory)
@@ -290,16 +226,16 @@ def _noop_gate(
 
 
 def _gold_gate(
-    task: TaskSpecV1,
-    environment: EnvSpecV1,
+    task: SweTaskSpec,
+    environment: SweEnvSpec,
     run_directory: Path,
     run_harness: AdmissionHarness,
-) -> GateResultV1:
+) -> GateResult:
     patch_digest = canonical_digest(task.sealed.gold_patch)
     attempts: list[Outcome] = []
     reports: list[DigestText] = []
     last_evidence: object = {"message": "gold check did not run"}
-    for attempt in range(1, 4):
+    for attempt in range(1, GOLD_ATTEMPTS + 1):
         try:
             evaluation = run_harness(
                 task,
@@ -323,14 +259,10 @@ def _gold_gate(
             continue
         attempts.append(evaluation.outcome)
         reports.append(evaluation.report_digest)
-        last_evidence = _execution_evidence(
-            evaluation,
-            patch_digest=patch_digest,
-        )
         return _gate(
             "gold",
             evaluation.outcome.verdict == Verdict.PASS,
-            last_evidence,
+            _execution_evidence(evaluation, patch_digest=patch_digest),
             attempts=tuple(attempts),
             reports=tuple(reports),
         )
@@ -343,34 +275,21 @@ def _gold_gate(
     )
 
 
-def admit_swe_family(
-    family: SweScriptFamily,
+def admit_swe_task(
+    task: SweBenchTask,
     *,
     work_directory: Path,
     harness_source_directory: Path | None = None,
     run_harness: AdmissionHarness | None = None,
-) -> AdmissionRecordV1:
-    task, environment = freeze_swe_specs(family)
-    bundle = compile_hud(task, environment)
-    cheap = _cheap_gates(family, task, environment, bundle)
-    if not all(gate.passed for gate in cheap):
-        skipped = (
-            _gate("noop", False, {"not_run": "a cheap admission gate failed"}),
-            _gate("gold", False, {"not_run": "a cheap admission gate failed"}),
-        )
-        return AdmissionRecordV1(
-            source_id=family.static.problem.record_id,
-            spec_digest=task.spec_digest,
-            environment_digest=environment.digest,
-            bundle_digest=canonical_digest(bundle),
-            gates=(*cheap, *skipped),
-            decision="rejected",
-        )
+) -> tuple[AdmissionRecord, SweTaskSpec, SweEnvSpec]:
+    """Run both gates against one task and return the record with its specs."""
+
+    spec, environment = freeze_swe_task(task)
     if run_harness is None:
 
         def invoke(
-            selected_task: TaskSpecV1,
-            selected_environment: EnvSpecV1,
+            selected_task: SweTaskSpec,
+            selected_environment: SweEnvSpec,
             patch: str,
             run_directory: Path,
         ) -> HarnessEvaluation:
@@ -384,41 +303,34 @@ def admit_swe_family(
             )
 
         run_harness = invoke
-    noop = _noop_gate(
-        task,
-        environment,
-        work_directory / "noop",
-        run_harness,
-    )
-    gold = _gold_gate(
-        task,
-        environment,
-        work_directory / "gold",
-        run_harness,
-    )
-    passed = all(gate.passed for gate in (*cheap, noop, gold))
+    noop = _noop_gate(spec, environment, work_directory / "noop", run_harness)
+    gold = _gold_gate(spec, environment, work_directory / "gold", run_harness)
+    passed = noop.passed and gold.passed
     flaky = gold.passed and any(isinstance(item, RunFailure) for item in gold.attempts)
     decision: AdmissionDecision = (
         "admitted_flaky" if passed and flaky else "admitted" if passed else "rejected"
     )
-    return AdmissionRecordV1(
-        source_id=family.static.problem.record_id,
-        spec_digest=task.spec_digest,
-        environment_digest=environment.digest,
-        bundle_digest=canonical_digest(bundle),
-        gates=(*cheap, noop, gold),
-        decision=decision,
+    return (
+        AdmissionRecord(
+            source_id=spec.public.record_id,
+            spec_digest=spec.spec_digest,
+            environment_digest=environment.digest,
+            gates=(noop, gold),
+            decision=decision,
+        ),
+        spec,
+        environment,
     )
 
 
-def write_admission_record(record: AdmissionRecordV1, path: Path) -> None:
+def write_admission_record(record: AdmissionRecord, path: Path) -> None:
     if path.exists():
-        existing = AdmissionRecordV1.model_validate_json(path.read_bytes())
+        existing = AdmissionRecord.model_validate_json(path.read_bytes())
         if existing != record:
             raise FileExistsError(f"admission evidence differs: {path}")
         return
     atomic_write(path, canonical_bytes(record) + b"\n")
 
 
-def read_admission_record(path: Path) -> AdmissionRecordV1:
-    return AdmissionRecordV1.model_validate_json(path.read_bytes())
+def read_admission_record(path: Path) -> AdmissionRecord:
+    return AdmissionRecord.model_validate_json(path.read_bytes())

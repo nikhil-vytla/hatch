@@ -1,10 +1,12 @@
+"""SWE-bench Verified as a `Task`: the issue is public, the tests are sealed."""
+
 from __future__ import annotations
 
 import json
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping
-from typing import Annotated, Literal, NewType, Self, TypeAlias
+from typing import Annotated, NewType, TypeAlias
 
 from pydantic import (
     Field,
@@ -12,15 +14,14 @@ from pydantic import (
     StringConstraints,
     ValidationError,
     field_validator,
-    model_validator,
 )
 
 from .canonical import canonical_digest
-from .evolving_intent import Arm, Chat, Message
+from .task import AgentContract
 from .types import (
-    ConstructionSeed,
     DigestText,
     NonEmptyText,
+    PositiveInt,
     SourceId,
     StrictModel,
 )
@@ -28,7 +29,6 @@ from .types import (
 SWE_BENCH_DATASET = "SWE-bench/SWE-bench_Verified"
 SWE_BENCH_REVISION = "91aa3ed51b709be6457e12d00300a6a596d4c6a3"
 SWE_BENCH_HARNESS_REVISION = "f7bbbb2ccdf479001d6467c9e34af59e44a840f9"
-UPSTREAM_EVOLVING_INTENT_REVISION = "993d6be9597ac03854b46362ccd647eb1bfd267a"
 
 PUBLISHED_INSTANCE_IDS = (
     "astropy__astropy-13236",
@@ -83,29 +83,19 @@ PUBLISHED_INSTANCE_IDS = (
     "sympy__sympy-15599",
 )
 
-INITIAL_SCREENING_IDS = (
-    "astropy__astropy-13236",
-    "django__django-10914",
-    "django__django-13089",
-    "matplotlib__matplotlib-20676",
-    "psf__requests-5414",
-    "pydata__xarray-6461",
-    "pylint-dev__pylint-6903",
-    "pytest-dev__pytest-6202",
-    "sphinx-doc__sphinx-9230",
-    "sympy__sympy-13091",
-)
-
 InstanceId = NewType("InstanceId", NonEmptyText)
 ImageDigest = NewType("ImageDigest", DigestText)
 CommitSha = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
-PositiveInt = Annotated[int, Field(gt=0)]
-ArgumentCategory: TypeAlias = Literal[
-    "symptom",
-    "context",
-    "constraint",
-    "implementation",
-]
+
+WORKSPACE_ROOT = "/testbed"
+CONTRACT = AgentContract(
+    instructions=(
+        f"Your submission is the working tree at {WORKSPACE_ROOT}. Edit the "
+        "repository source in place; the harness exports your changes as a git "
+        "diff when the episode ends, so anything you do not write to disk is "
+        "not submitted. Do not edit or add test files, and do not commit."
+    ),
+)
 
 
 class SweBenchError(ValueError):
@@ -117,6 +107,8 @@ class VerifierRuntime(StrictModel):
 
 
 class SweBenchVerifier(StrictModel):
+    """The sealed grading authority: gold patch, test patch, and test sets."""
+
     harness_revision: CommitSha
     image_ref: NonEmptyText
     image_digest: ImageDigest
@@ -126,12 +118,11 @@ class SweBenchVerifier(StrictModel):
     pass_to_pass: tuple[NonEmptyText, ...]
 
     @property
-    def digest(self) -> str:
+    def digest(self) -> DigestText:
         return canonical_digest(self)
 
 
-class SweBenchProblem(StrictModel):
-    kind: Literal["swebench"] = "swebench"
+class SweBenchTask(StrictModel):
     record_id: SourceId
     instance_id: InstanceId
     repo: NonEmptyText
@@ -139,18 +130,25 @@ class SweBenchProblem(StrictModel):
     problem_statement: NonEmptyText
     version: NonEmptyText
     difficulty: str
-    dataset: Literal["SWE-bench/SWE-bench_Verified"] = SWE_BENCH_DATASET
+    dataset: NonEmptyText = SWE_BENCH_DATASET
     dataset_revision: CommitSha = SWE_BENCH_REVISION
     verifier: SweBenchVerifier
 
     @property
-    def public_digest(self) -> str:
-        return canonical_digest(
-            self.model_dump(
-                mode="json",
-                exclude={"verifier"},
-            )
-        )
+    def task_id(self) -> SourceId:
+        return self.record_id
+
+    @property
+    def public_digest(self) -> DigestText:
+        return canonical_digest(self.model_dump(mode="json", exclude={"verifier"}))
+
+    @property
+    def verifier_digest(self) -> DigestText:
+        return self.verifier.digest
+
+    @property
+    def agent_contract(self) -> AgentContract:
+        return CONTRACT
 
 
 class _DatasetRow(StrictModel):
@@ -228,7 +226,7 @@ def load_swebench_rows(
     runtimes: Mapping[str, VerifierRuntime],
     dataset_revision: str = SWE_BENCH_REVISION,
     harness_revision: str = SWE_BENCH_HARNESS_REVISION,
-) -> tuple[SweBenchProblem, ...]:
+) -> tuple[SweBenchTask, ...]:
     requested = tuple(InstanceId(value) for value in instance_ids)
     if not requested or len(set(requested)) != len(requested):
         raise SweBenchError("instance ids must be non-empty and unique")
@@ -251,7 +249,7 @@ def load_swebench_rows(
     missing_runtime = set(requested) - set(runtimes)
     if missing_runtime:
         raise SweBenchError(f"missing verifier runtime: {missing_runtime}")
-    problems: list[SweBenchProblem] = []
+    tasks: list[SweBenchTask] = []
     for instance_id in requested:
         row = parsed[instance_id]
         runtime = runtimes[instance_id]
@@ -264,8 +262,8 @@ def load_swebench_rows(
             fail_to_pass=row.FAIL_TO_PASS,
             pass_to_pass=row.PASS_TO_PASS,
         )
-        problems.append(
-            SweBenchProblem(
+        tasks.append(
+            SweBenchTask(
                 record_id=SourceId(f"swebench:{instance_id}"),
                 instance_id=instance_id,
                 repo=row.repo,
@@ -277,7 +275,7 @@ def load_swebench_rows(
                 verifier=verifier,
             )
         )
-    return tuple(problems)
+    return tuple(tasks)
 
 
 def fetch_swebench_verified(
@@ -286,7 +284,7 @@ def fetch_swebench_verified(
     runtimes: Mapping[str, VerifierRuntime],
     fetch: Fetch = _fetch,
     dataset_revision: str = SWE_BENCH_REVISION,
-) -> tuple[SweBenchProblem, ...]:
+) -> tuple[SweBenchTask, ...]:
     unknown = set(instance_ids) - set(PUBLISHED_INSTANCE_IDS)
     if unknown:
         raise SweBenchError(f"instance ids are not in the published set: {unknown}")
@@ -336,323 +334,4 @@ def fetch_swebench_verified(
         instance_ids,
         runtimes=runtimes,
         dataset_revision=dataset_revision,
-    )
-
-
-class SweArgument(StrictModel):
-    identifier: NonEmptyText
-    value: NonEmptyText
-    category: ArgumentCategory
-
-    @field_validator("value", mode="before")
-    @classmethod
-    def scalar_value_as_text(cls, value: object) -> object:
-        if isinstance(value, bool | int | float):
-            return json.dumps(value, allow_nan=False, separators=(",", ":"))
-        return value
-
-
-class SweIntent(StrictModel):
-    function: NonEmptyText
-    arguments: tuple[SweArgument, ...]
-
-    @model_validator(mode="after")
-    def unique_arguments(self) -> Self:
-        identifiers = tuple(argument.identifier for argument in self.arguments)
-        if len(set(identifiers)) != len(identifiers):
-            raise ValueError("intent argument identifiers must be unique")
-        return self
-
-
-class SweConstruction(StrictModel):
-    source: SweIntent
-    predecessors: Annotated[tuple[SweIntent, ...], Field(min_length=1)]
-
-    @model_validator(mode="after")
-    def changing_functions(self) -> Self:
-        functions = tuple(item.function for item in (*self.predecessors, self.source))
-        if len(set(functions)) != len(functions):
-            raise ValueError("predecessor functions must be distinct")
-        return self
-
-
-class SweConstructionEvidence(StrictModel):
-    model: NonEmptyText
-    output: str
-    construction: SweConstruction
-
-
-def construct_swe_intent(
-    problem: SweBenchProblem,
-    chat: Chat,
-    *,
-    model: str,
-    max_output_tokens: int = 1024,
-) -> SweConstructionEvidence:
-    messages = (
-        Message(
-            role="system",
-            content=(
-                "Extract one source software intent and one immediate predecessor. "
-                'Return only JSON with top-level keys "source" and "predecessors". '
-                "Do not use Markdown fences. Each intent has exactly function and "
-                "arguments. Each argument has exactly identifier, value, and "
-                "category. Value is always a JSON string, including booleans and "
-                "numbers. Category is symptom, context, constraint, or implementation."
-            ),
-        ),
-        Message(
-            role="user",
-            content=json.dumps(
-                {
-                    "instance_id": problem.instance_id,
-                    "problem_statement": problem.problem_statement,
-                    "repo": problem.repo,
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
-        ),
-    )
-    output = chat(messages, max_output_tokens)
-    payload = output
-    if output.startswith("```json\n") and output.endswith("\n```"):
-        payload = output[8:-4]
-    try:
-        construction = SweConstruction.model_validate_json(payload)
-    except ValidationError as error:
-        detail = error.errors(include_url=False)[0]["msg"]
-        raise SweBenchError(f"SWE intent construction is invalid: {detail}") from error
-    return SweConstructionEvidence(
-        model=model,
-        output=output,
-        construction=construction,
-    )
-
-
-class SweIntentState(StrictModel):
-    intent: SweIntent
-    revealed_identifiers: tuple[str, ...]
-
-    @model_validator(mode="after")
-    def valid_reveals(self) -> Self:
-        identifiers = {argument.identifier for argument in self.intent.arguments}
-        if set(self.revealed_identifiers) != identifiers:
-            raise ValueError("SWE phase state must reveal its full intent")
-        return self
-
-
-class SweTurn(StrictModel):
-    text: NonEmptyText
-    state_after: SweIntentState
-
-
-class SweScript(StrictModel):
-    arm: Arm
-    problem: SweBenchProblem
-    turns: Annotated[tuple[SweTurn, ...], Field(min_length=1)]
-    agent_steps: tuple[PositiveInt, ...]
-    max_output_tokens: PositiveInt
-
-    @model_validator(mode="after")
-    def aligned_budget(self) -> Self:
-        if len(self.turns) != len(self.agent_steps):
-            raise ValueError("turns and step allocations must align")
-        derived = (
-            value
-            for value in (
-                *self.problem.verifier.fail_to_pass,
-                *self.problem.verifier.pass_to_pass,
-            )
-            if value not in self.problem.problem_statement
-        )
-        sealed = (self.problem.verifier.test_patch, *derived)
-        if any(value and value in turn.text for value in sealed for turn in self.turns):
-            raise ValueError("agent turn contains sealed verifier material")
-        return self
-
-    @property
-    def total_agent_steps(self) -> int:
-        return sum(self.agent_steps)
-
-
-class SweOverlayReceipt(StrictModel):
-    upstream_revision: Literal["993d6be9597ac03854b46362ccd647eb1bfd267a"] = (
-        UPSTREAM_EVOLVING_INTENT_REVISION
-    )
-    stripped_symptoms: tuple[tuple[str, tuple[str, ...]], ...]
-    injected_argument_order: tuple[tuple[str, tuple[str, ...]], ...]
-
-
-class SweScriptFamily(StrictModel):
-    construction_seed: ConstructionSeed
-    construction: SweConstruction
-    static: SweScript
-    matched: SweScript
-    evolved: SweScript
-    overlay: SweOverlayReceipt
-
-    @model_validator(mode="after")
-    def controlled_family(self) -> Self:
-        scripts = (self.static, self.matched, self.evolved)
-        if tuple(script.arm for script in scripts) != (
-            "static",
-            "matched",
-            "evolved",
-        ):
-            raise ValueError("SWE family must contain all three arms")
-        if any(script.problem != self.static.problem for script in scripts):
-            raise ValueError("SWE arms must share one source and verifier")
-        budgets = {
-            (script.total_agent_steps, script.max_output_tokens) for script in scripts
-        }
-        if len(budgets) != 1:
-            raise ValueError("SWE arms must have equal episode budgets")
-        if len(self.matched.turns) != len(self.evolved.turns):
-            raise ValueError("matched and evolved turn counts must match")
-        if self.matched.agent_steps != self.evolved.agent_steps:
-            raise ValueError("matched and evolved per-turn budgets must match")
-        source = self.construction.source
-        if self.evolved.turns[-1].state_after.intent != source:
-            raise ValueError("evolved arm does not restore source intent")
-        if any(turn.state_after.intent != source for turn in self.matched.turns):
-            raise ValueError("matched arm changes source intent")
-        return self
-
-    @property
-    def scripts(self) -> tuple[SweScript, SweScript, SweScript]:
-        return self.static, self.matched, self.evolved
-
-
-def _ordered(intent: SweIntent) -> tuple[SweArgument, ...]:
-    symptoms = tuple(
-        argument for argument in intent.arguments if argument.category == "symptom"
-    )
-    scheduled = tuple(
-        argument for argument in intent.arguments if argument.category != "symptom"
-    )
-    return (*symptoms, *scheduled)
-
-
-def _render_arguments(intent: SweIntent) -> str:
-    return " ".join(
-        f"{argument.identifier.replace('_', ' ')}: {argument.value}."
-        for argument in _ordered(intent)
-    )
-
-
-def _state(intent: SweIntent) -> SweIntentState:
-    return SweIntentState(
-        intent=intent,
-        revealed_identifiers=tuple(
-            argument.identifier for argument in intent.arguments
-        ),
-    )
-
-
-def _allocate_steps(total: int, turns: int) -> tuple[int, ...]:
-    if total < turns:
-        raise SweBenchError("total agent steps must cover every turn")
-    base, remainder = divmod(total, turns)
-    return tuple(base + int(index < remainder) for index in range(turns))
-
-
-def build_swe_script_family(
-    problem: SweBenchProblem,
-    construction: SweConstruction,
-    *,
-    seed: int,
-    total_agent_steps: int,
-    max_output_tokens: int,
-) -> SweScriptFamily:
-    phases = (*construction.predecessors, construction.source)
-    evolved_turns = tuple(
-        SweTurn(
-            text=(
-                (
-                    f"Work toward this intermediate intent: {intent.function}. "
-                    f"{_render_arguments(intent)} Do not implement the final issue yet."
-                )
-                if index < len(phases) - 1
-                else (
-                    f"{problem.problem_statement}\n\n"
-                    f"The final intent is {intent.function}. "
-                    f"{_render_arguments(intent)} Implement it now and run "
-                    "focused tests."
-                )
-            ),
-            state_after=_state(intent),
-        )
-        for index, intent in enumerate(phases)
-    )
-    matched_turns = tuple(
-        SweTurn(
-            text=(
-                f"{problem.problem_statement}\n\n"
-                f"The unchanged intent is {construction.source.function}. "
-                f"{_render_arguments(construction.source)} "
-                + (
-                    "Inspect the repository without changing the requirements."
-                    if index < len(phases) - 1
-                    else "Implement the unchanged issue now and run focused tests."
-                )
-            ),
-            state_after=_state(construction.source),
-        )
-        for index in range(len(phases))
-    )
-    static_turns = (
-        SweTurn(
-            text=problem.problem_statement,
-            state_after=_state(construction.source),
-        ),
-    )
-    static = SweScript(
-        arm="static",
-        problem=problem,
-        turns=static_turns,
-        agent_steps=(total_agent_steps,),
-        max_output_tokens=max_output_tokens,
-    )
-    matched = SweScript(
-        arm="matched",
-        problem=problem,
-        turns=matched_turns,
-        agent_steps=_allocate_steps(total_agent_steps, len(matched_turns)),
-        max_output_tokens=max_output_tokens,
-    )
-    evolved = SweScript(
-        arm="evolved",
-        problem=problem,
-        turns=evolved_turns,
-        agent_steps=_allocate_steps(total_agent_steps, len(evolved_turns)),
-        max_output_tokens=max_output_tokens,
-    )
-    overlay = SweOverlayReceipt(
-        stripped_symptoms=tuple(
-            (
-                intent.function,
-                tuple(
-                    argument.identifier
-                    for argument in intent.arguments
-                    if argument.category == "symptom"
-                ),
-            )
-            for intent in phases
-        ),
-        injected_argument_order=tuple(
-            (
-                intent.function,
-                tuple(argument.identifier for argument in _ordered(intent)),
-            )
-            for intent in phases
-        ),
-    )
-    return SweScriptFamily(
-        construction_seed=ConstructionSeed(seed),
-        construction=construction,
-        static=static,
-        matched=matched,
-        evolved=evolved,
-        overlay=overlay,
     )

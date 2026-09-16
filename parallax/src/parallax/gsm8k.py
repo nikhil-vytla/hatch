@@ -1,3 +1,5 @@
+"""GSM8K as a `Task`: the question is public, the `#### <integer>` is sealed."""
+
 from __future__ import annotations
 
 import re
@@ -5,20 +7,39 @@ from pathlib import Path
 
 from pydantic import ValidationError, field_validator
 
-from .outcome import Verdict, Verification
-from .types import CanonicalInteger, SourceAnswer, SourceId, StrictModel
+from .canonical import canonical_digest
+from .outcome import Outcome, RunFailure, Verdict, Verification
+from .provider import unfence
+from .task import AgentContract
+from .types import (
+    CanonicalInteger,
+    DigestText,
+    SourceAnswer,
+    SourceId,
+    StrictModel,
+)
 
 SOURCE_MARKER = "#### "
 SUBMISSION_MARKER = "FINAL_ANSWER: "
 MAXIMUM_DIGITS = 100
 _INTEGER = re.compile(r"0|-?[1-9][0-9]*")
 
+CONTRACT = AgentContract(
+    instructions=(
+        f"Finish your reply with a line reading exactly `{SUBMISSION_MARKER}"
+        "<integer>` and nothing after it. The integer must be plain digits with "
+        "an optional leading minus: no commas, no units, no currency symbol, no "
+        "leading zeros. Anything else is graded as invalid."
+    ),
+    required_markers=(SUBMISSION_MARKER,),
+)
+
 
 class Gsm8kError(ValueError):
     pass
 
 
-class Problem(StrictModel):
+class Gsm8kTask(StrictModel):
     record_id: SourceId
     question: str
     answer: SourceAnswer
@@ -36,6 +57,28 @@ class Problem(StrictModel):
     @classmethod
     def valid_answer(cls, value: object) -> SourceAnswer:
         return SourceAnswer(validate_answer(value))
+
+    @property
+    def task_id(self) -> SourceId:
+        return self.record_id
+
+    @property
+    def public_digest(self) -> DigestText:
+        return canonical_digest({"id": self.record_id, "question": self.question})
+
+    @property
+    def verifier_digest(self) -> DigestText:
+        return canonical_digest(
+            {
+                "contract": CONTRACT.model_dump(mode="json"),
+                "grader": "gsm8k-final-answer",
+                "answer": self.answer,
+            }
+        )
+
+    @property
+    def agent_contract(self) -> AgentContract:
+        return CONTRACT
 
 
 class _Gsm8kRow(StrictModel):
@@ -92,11 +135,11 @@ def parse_source_answer(text: object) -> SourceAnswer:
 def parse_final_answer(text: object) -> CanonicalInteger:
     if not isinstance(text, str):
         raise Gsm8kError("submission must be text")
-    return _last_nonempty_line(text, SUBMISSION_MARKER, "submission")
+    return _last_nonempty_line(unfence(text), SUBMISSION_MARKER, "submission")
 
 
-def load_gsm8k(path: Path) -> tuple[Problem, ...]:
-    problems: list[Problem] = []
+def load_gsm8k(path: Path) -> tuple[Gsm8kTask, ...]:
+    tasks: list[Gsm8kTask] = []
     questions: set[str] = set()
     with path.open(encoding="utf-8") as source:
         for line_number, line in enumerate(source, 1):
@@ -107,26 +150,39 @@ def load_gsm8k(path: Path) -> tuple[Problem, ...]:
             except ValidationError as error:
                 detail = error.errors(include_url=False)[0]["msg"]
                 raise Gsm8kError(f"line {line_number}: {detail}") from error
-            problem = Problem(
+            task = Gsm8kTask(
                 record_id=SourceId(f"gsm8k-{line_number}"),
                 question=row.question,
                 answer=row.answer,
             )
-            if problem.question in questions:
+            if task.question in questions:
                 raise Gsm8kError(f"line {line_number}: duplicate question")
-            questions.add(problem.question)
-            problems.append(problem)
-    if not problems:
+            questions.add(task.question)
+            tasks.append(task)
+    if not tasks:
         raise Gsm8kError("dataset is empty")
-    return tuple(problems)
+    return tuple(tasks)
 
 
-def grade(problem: Problem, submission: object) -> Verification:
+def verify(task: Gsm8kTask, submission: str) -> Outcome:
+    """Grade one submission against the sealed answer.
+
+    A malformed submission is `invalid` rather than a run failure: the model
+    was reachable and answered, it just did not answer in the required form.
+    Only a fault in the harness itself is a `RunFailure`.
+    """
+
     try:
         prediction = parse_final_answer(submission)
     except Gsm8kError as error:
         return Verification(verdict=Verdict.INVALID, reason=str(error))
-    if prediction == problem.answer:
+    except Exception as error:  # pragma: no cover - defensive
+        return RunFailure(
+            failure_kind="verifier",
+            error_type=type(error).__name__,
+            message=str(error),
+        )
+    if prediction == task.answer:
         return Verification(
             verdict=Verdict.PASS,
             reason="final answer matches source authority",

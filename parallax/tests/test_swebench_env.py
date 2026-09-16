@@ -9,14 +9,9 @@ from hud.environment import Answer
 from test_swebench import INSTANCE_ID, construction, row, runtime
 
 from parallax.delivery import CompleteDeliveryReceiptV1, PhaseActivityV1
-from parallax.hud_compile import compile_hud
-from parallax.hud_screening import (
-    CLAUDE_HAIKU_PRICING,
-    CLAUDE_OPUS_PRICING,
-    _docker_runtime,
-)
-from parallax.specs import freeze_swe_specs
-from parallax.swebench import build_swe_script_family, load_swebench_rows
+from parallax.intent_phases import build_phase_variants
+from parallax.swebench import load_swebench_rows
+from parallax.swebench_executor import _docker_runtime
 from parallax.swebench_runtime import (
     collect_patch,
     isolation_probe_argv,
@@ -24,26 +19,29 @@ from parallax.swebench_runtime import (
     workspace,
     workspace_owner_argv,
 )
+from parallax.swebench_specs import compile_bundle, freeze_swe_task
 
 
-def family():
-    problem = load_swebench_rows(
+def task():
+    return load_swebench_rows(
         (row(),),
         (INSTANCE_ID,),
         runtimes={INSTANCE_ID: runtime()},
     )[0]
-    return build_swe_script_family(
-        problem,
+
+
+def family():
+    return build_phase_variants(
+        task(),
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
 
 
 def bundle():
-    task, environment = freeze_swe_specs(family())
-    return compile_hud(task, environment)
+    spec, environment = freeze_swe_task(task())
+    return compile_bundle(spec, environment, family())
 
 
 def test_environment_bundle_is_public_deterministic_and_importable() -> None:
@@ -90,13 +88,6 @@ def test_local_docker_runtime_allows_inner_bubblewrap() -> None:
     assert runtime.runtime_config.image == "screening-image"
 
 
-def test_screening_uses_current_model_specific_pricing() -> None:
-    assert CLAUDE_OPUS_PRICING.input_usd_per_million == 5.0
-    assert CLAUDE_OPUS_PRICING.output_usd_per_million == 25.0
-    assert CLAUDE_HAIKU_PRICING.input_usd_per_million == 1.0
-    assert CLAUDE_HAIKU_PRICING.output_usd_per_million == 5.0
-
-
 def test_environment_git_commands_drop_to_workspace_owner() -> None:
     command = workspace_owner_argv(["git", "status"], effective_uid=0)
 
@@ -114,7 +105,7 @@ def test_environment_git_commands_drop_to_workspace_owner() -> None:
 
 def test_compiled_environment_has_no_agent_turn_control_tool() -> None:
     compiled = bundle()
-    task, environment = freeze_swe_specs(family())
+    _, environment = freeze_swe_task(task())
     runtime_source = next(
         artifact.content
         for artifact in compiled.agent_artifacts
@@ -124,7 +115,6 @@ def test_compiled_environment_has_no_agent_turn_control_tool() -> None:
     assert tuple(tool.name for tool in environment.tools) == ("shell",)
     assert b"def advance(" not in runtime_source
     assert b"FastMCP" not in runtime_source
-    assert task.public.scripts[2].agent_steps == task.public.scripts[1].agent_steps
 
 
 def test_environment_rejects_receipt_for_incomplete_script() -> None:
@@ -149,20 +139,19 @@ def test_environment_rejects_receipt_for_incomplete_script() -> None:
         )
 
 
-def test_all_arms_receive_one_equal_episode_budget() -> None:
+def test_every_condition_is_compiled_with_the_same_total_step_budget() -> None:
     compiled = bundle()
     instance = next(
         artifact.content
         for artifact in compiled.agent_artifacts
         if artifact.path == "instance.json"
     )
-    config = json.loads(instance)
-    scripts = config["scripts"]
+    conditions = json.loads(instance)["conditions"]
 
-    assert sum(scripts["static"]["agent_steps"]) == 12
-    assert sum(scripts["matched"]["agent_steps"]) == 12
-    assert sum(scripts["evolved"]["agent_steps"]) == 12
-    assert scripts["static"]["agent_steps"] == [12]
+    assert set(conditions) == {"base", "matched", "evolved"}
+    assert conditions["base"]["steps"] == [12]
+    assert all(sum(item["steps"]) == 12 for item in conditions.values())
+    assert len(conditions["matched"]["turns"]) == len(conditions["evolved"]["turns"])
     runtime_source = next(
         artifact.content
         for artifact in compiled.agent_artifacts
@@ -186,6 +175,7 @@ def test_bundle_writes_only_expected_files(tmp_path: Path) -> None:
         "parallax/__init__.py",
         "parallax/delivery.py",
         "parallax/swebench_runtime.py",
+        "parallax/types.py",
     }
     expected = next(
         artifact.content

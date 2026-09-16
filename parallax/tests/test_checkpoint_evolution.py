@@ -9,6 +9,7 @@ from parallax.checkpoint_evolution import (
     EMPTY_WORKSPACE,
     GATES,
     AdmissionReceipt,
+    CheckpointError,
     CheckpointFamily,
     CheckpointSpec,
     EntrypointContract,
@@ -337,37 +338,46 @@ def test_admission_rejects_a_broken_reference(seed_fixture) -> None:
     assert failed == {"gold-incremental"}
 
 
-def test_admission_rejects_misaligned_references(seed_fixture) -> None:
+def test_misaligned_references_are_a_precondition_not_a_gate(seed_fixture) -> None:
+    """A reference build that does not match the family cannot be graded at all.
+
+    Recording this as a failed gate reported three failures for one cause and
+    obscured which of the two real gates had actually been tried.
+    """
+
     family = seed_fixture.family
     misaligned = ReferenceBuild(
         family_digest=family.digest,
         stages=seed_fixture.references.stages[:2],
     )
-    receipt = admit_family(family, misaligned)
-    assert receipt.decision == "rejected"
-    failed = {result.gate for result in receipt.gates if not result.passed}
-    assert failed == {"completeness", "gold-incremental", "no-op"}
+    with pytest.raises(CheckpointError, match="do not cover"):
+        admit_family(family, misaligned)
     rebound = ReferenceBuild(
         family_digest=canonical_digest("something else"),
         stages=seed_fixture.references.stages,
     )
-    assert not admit_family(family, rebound).gates[1].passed
+    with pytest.raises(CheckpointError, match="different family digest"):
+        admit_family(family, rebound)
 
 
-def test_admission_catches_leakage_in_unvalidated_families(seed_fixture) -> None:
+def test_a_leaky_family_is_unrepresentable(seed_fixture) -> None:
+    """Leakage is a type error, not an admission finding.
+
+    The gate that re-checked this could only fire on a family built by bypassing
+    validation, which no real path does, so it was deleted rather than kept as a
+    second line of defence against an impossible state.
+    """
+
     family = seed_fixture.family
     leaky_stage = family.checkpoints[0].model_copy(
-        update={
-            "public_spec": "hint: the sealed grader includes t2-top-tie",
-        }
+        update={"public_spec": "hint: the sealed grader includes t2-top-tie"}
     )
-    leaky = family.model_copy(
-        update={"checkpoints": (leaky_stage, *family.checkpoints[1:])}
-    )
-    receipt = admit_family(leaky, seed_fixture.references)
-    assert receipt.decision == "rejected"
-    failed = {result.gate for result in receipt.gates if not result.passed}
-    assert "leakage" in failed
+    with pytest.raises(ValidationError, match="leaks sealed case id"):
+        CheckpointFamily(
+            family_id=family.family_id,
+            contract=family.contract,
+            checkpoints=(leaky_stage, *family.checkpoints[1:]),
+        )
 
 
 def test_admission_receipt_decision_cannot_contradict_gates(

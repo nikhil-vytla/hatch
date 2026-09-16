@@ -16,7 +16,7 @@ from parallax.delivery import (
     PhaseActivityV1,
     TurnDeliveryController,
 )
-from parallax.hud_screening import HarnessTurnAgent, parse_delivery_receipt
+from parallax.swebench_executor import HarnessTurnAgent, parse_delivery_receipt
 
 
 class ScriptedPolicy:

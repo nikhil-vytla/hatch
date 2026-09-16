@@ -152,25 +152,25 @@ async def _verify_isolation() -> None:
 
 
 @env.template(id="episode", returns=CompleteDeliveryReceiptV1)
-async def episode(arm: str):
-    scripts = CONFIG["scripts"]
-    if arm not in scripts:
-        raise ValueError(f"unknown arm: {arm}")
+async def episode(condition: str):
+    conditions = CONFIG["conditions"]
+    if condition not in conditions:
+        raise ValueError(f"unknown condition: {condition}")
     source = CONFIG["source"]
     await asyncio.to_thread(reset_workspace, source["base_commit"])
-    script = scripts[arm]
-    answer = yield script["turns"][0]
+    scheduled = conditions[condition]
+    answer = yield scheduled["turns"][0]
     receipt = require_complete_delivery(
         answer,
-        turns=script["turns"],
-        step_budgets=script["agent_steps"],
+        turns=scheduled["turns"],
+        step_budgets=scheduled["steps"],
     )
     patch = await asyncio.to_thread(collect_patch, source["base_commit"])
     yield EvaluationResult(
         reward=0.0,
         content="candidate patch exported for evaluator-side official grading",
         info={
-            "arm": arm,
+            "condition": condition,
             "delivery": receipt.model_dump(mode="json"),
             "final_turn": receipt.turn_count - 1,
             "model_patch": patch,

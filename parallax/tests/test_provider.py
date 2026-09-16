@@ -6,10 +6,11 @@ from collections.abc import Mapping
 import pytest
 from pydantic import ValidationError
 
-from parallax.evolving_intent import Message
+from parallax.outcome import BudgetError
 from parallax.provider import (
     HUD_GATEWAY_ENDPOINT,
     HudGatewayProvider,
+    Message,
     OpenAICompatibleProvider,
     ProviderConfig,
     ProviderError,
@@ -17,7 +18,6 @@ from parallax.provider import (
     ProviderTool,
     ProviderToolFunction,
 )
-from parallax.runner import BudgetError
 
 
 def config() -> ProviderConfig:
