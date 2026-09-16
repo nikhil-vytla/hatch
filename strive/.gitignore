@@ -9,3 +9,14 @@ artifacts/*
 
 # advisory writer locks are runtime artifacts, never content
 artifacts/demo*/ledger/*.lock
+
+# Container and upstream qualification outputs; definitions remain tracked.
+.container-results/
+adapters/tau2/retained-data/
+adapters/tau2/upstream-source/
+adapters/tau2/uv.lock
+
+.cache/
+
+# live campaign runtime outputs (response hashes, transport dbs) — never commit
+live-results/

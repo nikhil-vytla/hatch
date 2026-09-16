@@ -29,10 +29,15 @@ testpaths = ["tests"]
 
 [tool.mypy]
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "adapters/tau2/src", "adapters/counter/src"]
+mypy_path = ["adapters/tau2/src", "adapters/counter/src"]
 
 # DSPy ships no py.typed marker; the deno-pyodide backend uses it behind a
 # narrow typed wrapper (strive.sandbox_backends).
 [[tool.mypy.overrides]]
 module = ["dspy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tau2.*"]
 ignore_missing_imports = true

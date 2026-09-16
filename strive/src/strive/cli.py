@@ -347,6 +347,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from strive.vnext.cli.app import accepts, main as research_main
+    arguments = sys.argv[1:] if argv is None else argv
+    if accepts(arguments):
+        return research_main(arguments)
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

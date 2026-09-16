@@ -1,0 +1,28 @@
+# Linux verification image for linux/arm64 and linux/amd64.
+# Architecture and qualification limits: docs/ARCHITECTURE.md; commands: docs/HANDOFF.md.
+FROM ghcr.io/astral-sh/uv:0.9.18 AS uv
+FROM denoland/deno:bin-2.9.5 AS deno
+FROM python:3.12.12-slim-trixie
+
+# Use the base image's own (already-correct) trixie sources. The base tag
+# python:3.12.12-slim-trixie is the primary pin; it ships libc6 2.41-12+deb13u1
+# (a security point-update), so a fixed snapshot.debian.org date that predates
+# deb13u1 caused libc6-dev to attempt a downgrade -> held broken packages. A
+# strict apt snapshot can be re-added later pinned to a deb13u1-inclusive date
+# (main + security suites) if byte-reproducible apt inputs are required.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential ca-certificates curl git bubblewrap libseccomp-dev pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=uv /uv /uvx /usr/local/bin/
+COPY --from=deno /deno /usr/local/bin/deno
+ENV UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy \
+    STRIVE_JAIL_HOME=/opt/strive-jail \
+    STRIVE_CGROUP_ROOT=/sys/fs/cgroup/strive-jobs
+WORKDIR /workspace/strive
+COPY . .
+RUN mkdir -p /opt/strive-jail \
+ && cc -std=c11 -O2 -Wall -Wextra -Werror scripts/compile-seccomp.c -lseccomp -o /opt/strive-jail/compile-seccomp \
+ && /opt/strive-jail/compile-seccomp src/strive/vnext/runtime/linux/seccomp.allow > /opt/strive-jail/seccomp.bpf \
+ && python scripts/build-jail-rootfs.py /opt/strive-jail/rootfs \
+ && uv sync --frozen --python /usr/local/bin/python3.12
+CMD ["bash", "scripts/verify-in-container.sh"]

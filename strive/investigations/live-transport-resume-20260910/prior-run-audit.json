@@ -1,0 +1,56 @@
+[
+  {
+    "run": "budget-stop-5c",
+    "role": "actor",
+    "tables": [
+      "calls"
+    ],
+    "paid_dispatch_records": 13,
+    "response_records": 13
+  },
+  {
+    "run": "budget-stop-5c",
+    "role": "user",
+    "tables": [
+      "calls"
+    ],
+    "paid_dispatch_records": 18,
+    "response_records": 18
+  },
+  {
+    "run": "budget-stop-5c",
+    "role": "user",
+    "tables": [
+      "calls"
+    ],
+    "paid_dispatch_records": 0,
+    "response_records": 0
+  },
+  {
+    "run": "budget-stop-5c",
+    "role": "user",
+    "tables": [
+      "calls"
+    ],
+    "paid_dispatch_records": 0,
+    "response_records": 0
+  },
+  {
+    "run": "budget-stop-5c",
+    "role": "user",
+    "tables": [
+      "calls"
+    ],
+    "paid_dispatch_records": 0,
+    "response_records": 0
+  },
+  {
+    "run": "budget-stop-5c",
+    "role": "user",
+    "tables": [
+      "calls"
+    ],
+    "paid_dispatch_records": 0,
+    "response_records": 0
+  }
+]

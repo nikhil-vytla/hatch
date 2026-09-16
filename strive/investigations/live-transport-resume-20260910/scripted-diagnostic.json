@@ -1,0 +1,27 @@
+{
+  "live": false,
+  "http_attempts": 2,
+  "diagnostic": {
+    "action": "no retry; retain reservation",
+    "caller_netns": "net:[gateway-only]",
+    "connect_timeout_seconds": 10.0,
+    "deadline_exceeded": false,
+    "elapsed_seconds": 0.0,
+    "endpoint": "/v1/responses",
+    "errno": 51,
+    "exception_type": "OSError",
+    "http_status": null,
+    "kind": "transport",
+    "message": "[Errno 51] scripted upstream route unavailable",
+    "netns": "net:[egress]",
+    "operation": "scripted-egress-proof",
+    "owner_netns": "net:[egress]",
+    "owner_pid": 71528,
+    "phase": "connect",
+    "pid": 71528,
+    "read_timeout_seconds": 0.0,
+    "route": "direct",
+    "schema": "strive.openai-transport-error/1",
+    "upstream_thread": 12053057
+  }
+}

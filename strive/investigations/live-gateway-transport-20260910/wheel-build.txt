@@ -1,0 +1,2 @@
+/tmp/strive-transport-hatch-wheel/strive-0.2.0-py3-none-any.whl
+Verified wheel contains deadline.py, openai_live.py, opencode_pipe.mjs, and manual_change.toml.
