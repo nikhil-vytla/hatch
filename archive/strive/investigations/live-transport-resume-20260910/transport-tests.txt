@@ -1,0 +1,4 @@
+Command: uv run pytest tests/vnext/test_openai_live_transport.py -q
+33 passed, 1 skipped in 20.00s
+The final version also passed within the complete vnext suite.
+Linux-only real-thread namespace test skipped on macOS.

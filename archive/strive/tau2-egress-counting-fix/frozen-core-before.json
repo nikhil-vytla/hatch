@@ -1,0 +1,5 @@
+{
+  "baseline": "tests/vnext/baselines/second-benchmark-core-freeze.json",
+  "checked": 30,
+  "changed": []
+}
