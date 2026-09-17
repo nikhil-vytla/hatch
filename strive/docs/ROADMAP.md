@@ -1,6 +1,6 @@
 # strive roadmap
 
-The [architecture](ARCHITECTURE.md) describes the implemented `strive.vnext`
+The [architecture](ARCHITECTURE.md) describes the implemented `strive`
 boundaries. Work remaining is qualification and explicit capability extensions,
 not the earlier kernel rollout described in the historical ADRs.
 

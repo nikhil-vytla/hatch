@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.benchmarks.closure import REQUIRED, retain_closure, verify_closure
-from strive.vnext.benchmarks.json_data import canonical, items, obj, parse
-from strive.vnext.errors import VerificationError
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.closure import REQUIRED, retain_closure, verify_closure
+from strive.benchmarks.json_data import canonical, items, obj, parse
+from strive.errors import VerificationError
+from strive.store import ArtifactStore
 from strive_benchmark_tau2.qualification import QualificationFailure, qualify, load_qualification
 from strive_benchmark_tau2.splits import group_tasks, scenario_group, size_error, validate_partition, whole_group_split
 

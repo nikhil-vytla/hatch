@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.benchmarks.json_data import canonical, obj, parse
-from strive.vnext.errors import VerificationError
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.json_data import canonical, obj, parse
+from strive.errors import VerificationError
+from strive.store import ArtifactStore
 from strive_benchmark_tau2.fixed_stock import USER_MODEL, USER_TEMPERATURE, configuration, run_fixed_stock
 from strive_benchmark_tau2.qualification import QualificationFailure, qualify
 from .benchmark_fixtures import inventory

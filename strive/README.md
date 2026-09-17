@@ -6,7 +6,7 @@ accounts for effects, records exact revisions and recovers without hiding
 uncertainty. Policies decide whether a change helped; comparative evaluation is
 optional.
 
-The current implementation lives in `src/strive/vnext`. Read
+The current implementation lives in `src/strive`. Read
 [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the five integrity guarantees and
 [the ADRs](docs/adrs/README.md) for the decisions behind them.
 [HANDOFF.md](docs/HANDOFF.md) has verification commands and qualification gates;
@@ -33,20 +33,20 @@ uv sync --frozen
 export PYTHONPATH="$PWD/adapters/counter/src${PYTHONPATH:+:$PYTHONPATH}"
 uv run python - <<'PY'
 from pathlib import Path
-from strive.vnext.cli.fixture import example
+from strive.cli.fixture import example
 print(example(Path(".cache/counter-example")))
 PY
-uv run python -m strive.vnext.cli --root .cache/counter-runs \
+uv run python -m strive.cli --root .cache/counter-runs \
   run .cache/counter-example/counter.toml --id adapting-17
-uv run python -m strive.vnext.cli --root .cache/counter-runs status adapting-17
-uv run python -m strive.vnext.cli --root .cache/counter-runs resume adapting-17
+uv run python -m strive.cli --root .cache/counter-runs status adapting-17
+uv run python -m strive.cli --root .cache/counter-runs resume adapting-17
 ```
 
 The example uses recorded responses and makes no paid calls. Run IDs are unique;
 resume reuses the original bindings and retained state. The manifest CLI also
 provides `experiment`, `compare` and `project`; `--help` lists their arguments.
-The installed `strive` command routes these manifest-shaped commands to vNext.
-Legacy flag-based commands and run formats remain separate.
+The installed `strive` command delegates directly to vNext; there is no
+separate legacy CLI or run format.
 
 ## Current limits
 

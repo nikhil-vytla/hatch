@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from strive.vnext.benchmarks.api import BenchmarkAdapter
+from strive.benchmarks.api import BenchmarkAdapter
 from strive_benchmark_tau2.client import Tau2Client
 from .benchmark_fixtures import BenchmarkFixture
 
@@ -25,7 +25,7 @@ class Guard(importlib.abc.MetaPathFinder):
         if fullname.split('.')[0] in {{'tau2', 'dspy', 'litellm', 'openai', 'pydantic'}}:
             raise AssertionError('fixture must not import live tau2: ' + fullname)
 sys.meta_path.insert(0, Guard())
-from strive.vnext.contracts.primitives import ArtifactRef
+from strive.contracts.primitives import ArtifactRef
 from vnext.benchmark_fixtures import SyntheticTelecom
 from strive_benchmark_tau2 import server
 server.IsolatedTau2 = lambda *args: SyntheticTelecom(ArtifactRef({fixture.pin.digest!r}))
@@ -56,8 +56,8 @@ server.main()
 
 
 def test_client_preserves_virtualenv_interpreter_symlink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from strive.vnext.benchmarks.api import BenchmarkDescriptor
-    from strive.vnext.codec import content_ref
+    from strive.benchmarks.api import BenchmarkDescriptor
+    from strive.codec import content_ref
     pin = content_ref(b"interpreter path regression fixture")
     descriptor = BenchmarkDescriptor("strive.benchmark/1", pin, pin, "fixture", pin, pin, (), True, False)
     def describe(self: Tau2Client, *args: object) -> BenchmarkDescriptor:

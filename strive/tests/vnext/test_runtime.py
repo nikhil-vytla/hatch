@@ -4,15 +4,15 @@ from typing import Iterator
 
 import pytest
 
-from strive.vnext.codec import decode, encode
-from strive.vnext.contracts.annotations import Annotation
-from strive.vnext.contracts.commands import ApplyChange, Continue, Finish, StepOutput, Suspend
-from strive.vnext.contracts.lifecycle import DispatchStage, EffectState, RecoveryCapability, RecoveryContract
-from strive.vnext.contracts.primitives import ArtifactRef, ExecutionStatus, LineageId, Resource, ResourceQuantity
-from strive.vnext.contracts.records import ContinuationCommit, EffectAuthorization, EffectObservationSettlement
-from strive.vnext.errors import LeaseError, VerificationError
-from strive.vnext.runtime import Boundary, EffectRequest
-from strive.vnext.runtime.ledger import amounts
+from strive.codec import decode, encode
+from strive.contracts.annotations import Annotation
+from strive.contracts.commands import ApplyChange, Continue, Finish, StepOutput, Suspend
+from strive.contracts.lifecycle import DispatchStage, EffectState, RecoveryCapability, RecoveryContract
+from strive.contracts.primitives import ArtifactRef, ExecutionStatus, LineageId, Resource, ResourceQuantity
+from strive.contracts.records import ContinuationCommit, EffectAuthorization, EffectObservationSettlement
+from strive.errors import LeaseError, VerificationError
+from strive.runtime import Boundary, EffectRequest
+from strive.runtime.ledger import amounts
 
 from .runtime_fixtures import RuntimeFixture
 
@@ -297,7 +297,7 @@ def test_upstream_stage_crash_recovery(runtime: RuntimeFixture, boundary: Bounda
 
 def test_durable_request_and_reservation_exist_inside_dispatch(runtime: RuntimeFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     original = runtime.provider.invoke
-    from strive.vnext.runtime import DispatchContext, Receipt
+    from strive.runtime import DispatchContext, Receipt
 
     def invoke(context: DispatchContext, request: EffectRequest) -> Receipt:
         state = runtime.reader.verify()

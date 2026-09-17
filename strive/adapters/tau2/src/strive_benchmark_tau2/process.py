@@ -2,12 +2,12 @@
 from pathlib import Path
 import subprocess
 
-from strive.vnext.benchmarks.closure import verify_closure
-from strive.vnext.benchmarks.json_data import canonical, obj, parse
-from strive.vnext.codec import encode
-from strive.vnext.contracts.primitives import ArtifactRef
-from strive.vnext.errors import VerificationError
-from strive.vnext.store.cas import CAS
+from strive.benchmarks.closure import verify_closure
+from strive.benchmarks.json_data import canonical, obj, parse
+from strive.codec import encode
+from strive.contracts.primitives import ArtifactRef
+from strive.errors import VerificationError
+from strive.store.cas import CAS
 from .data import verify_data
 
 

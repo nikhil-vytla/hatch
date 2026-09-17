@@ -2,11 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.cli.data import mapping, read_json, sequence
-from strive.vnext.cli.runner import Session, reader, resume, run_directory
-from strive.vnext.errors import VerificationError
-from strive.vnext.study.audit import execute_audit, freeze, release
-from strive.vnext.study.experiment import allocate, experiment
+from strive.cli.data import mapping, read_json, sequence
+from strive.cli.runner import Session, reader, resume, run_directory
+from strive.errors import VerificationError
+from strive.study.audit import execute_audit, freeze, release
+from strive.study.experiment import allocate, experiment
 
 from .workflow_fixtures import campaign
 

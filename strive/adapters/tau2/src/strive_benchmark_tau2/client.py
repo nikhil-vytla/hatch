@@ -8,12 +8,12 @@ from pathlib import Path
 import subprocess
 from typing import TypeVar
 
-from strive.vnext.benchmarks.api import (BenchmarkDescriptor, CapturedGeneration, EpisodeSnapshot, FoundOperation,
+from strive.benchmarks.api import (BenchmarkDescriptor, CapturedGeneration, EpisodeSnapshot, FoundOperation,
     LookupResult, OperationContext, OperationReceipt, ProvenAbsent, RewardResult, ScoringInput, SplitSpec,
     TaskSpec, ToolInvocation, UnknownOperation, UserTurnPlan)
-from strive.vnext.benchmarks.payloads import dumps, loads
-from strive.vnext.contracts.primitives import ArtifactRef, EffectId, EpisodeId
-from strive.vnext.errors import VerificationError
+from strive.benchmarks.payloads import dumps, loads
+from strive.contracts.primitives import ArtifactRef, EffectId, EpisodeId
+from strive.errors import VerificationError
 
 T = TypeVar("T")
 

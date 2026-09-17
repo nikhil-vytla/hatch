@@ -4,19 +4,19 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.benchmarks.api import FoundOperation, OperationReceipt, ProvenAbsent, ScoringInput, UnknownOperation
-from strive.vnext.benchmarks.json_data import canonical, obj, parse
-from strive.vnext.benchmarks.payloads import dumps, loads
-from strive.vnext.codec import encode
-from strive.vnext.contracts.commands import ApplyChange, Finish, RestoreBundle, StepOutput
-from strive.vnext.contracts.lifecycle import EffectState, RecoveryCapability, RecoveryContract
-from strive.vnext.contracts.primitives import EffectId, EpisodeId, ExecutionStatus, Resource, ScopedArtifact
-from strive.vnext.contracts.records import CausalIdentity, Measurement, ProducerKind
-from strive.vnext.errors import VerificationError
-from strive.vnext.runtime import Boundary
-from strive.vnext.runtime.ledger import amounts
-from strive.vnext.runtime.admission import ValidatedArguments
-from strive.vnext.benchmarks.store import OperationStore
+from strive.benchmarks.api import FoundOperation, OperationReceipt, ProvenAbsent, ScoringInput, UnknownOperation
+from strive.benchmarks.json_data import canonical, obj, parse
+from strive.benchmarks.payloads import dumps, loads
+from strive.codec import encode
+from strive.contracts.commands import ApplyChange, Finish, RestoreBundle, StepOutput
+from strive.contracts.lifecycle import EffectState, RecoveryCapability, RecoveryContract
+from strive.contracts.primitives import EffectId, EpisodeId, ExecutionStatus, Resource, ScopedArtifact
+from strive.contracts.records import CausalIdentity, Measurement, ProducerKind
+from strive.errors import VerificationError
+from strive.runtime import Boundary
+from strive.runtime.ledger import amounts
+from strive.runtime.admission import ValidatedArguments
+from strive.benchmarks.store import OperationStore
 
 from .benchmark_fixtures import BenchmarkFixture, action_matches
 from .test_runtime import Crash
@@ -143,7 +143,7 @@ def test_store_dedup_fencing_corruption_and_no_rewind(tmp_path: Path) -> None:
         receipts = fixture.driver.receipts()
         original = receipts[-1][1]
         auth = fixture.supervisor.state.effects[-1].authorization
-        from strive.vnext.benchmarks.api import OperationContext
+        from strive.benchmarks.api import OperationContext
         context = OperationContext(auth, original.after.episode, original.arguments, original.before)
         assert fixture.operations.commit(context, lambda state: (_ for _ in ()).throw(AssertionError("duplicate mutation"))) == original
         with pytest.raises(VerificationError, match="context"):
@@ -193,8 +193,8 @@ def test_dynamic_admission_rejects_forged_scopes_and_protected_reads(tmp_path: P
         fixture.initialize()
         operation = fixture.operation("snapshot")
         arguments = fixture.store.objects.publish(operation.to_bytes())
-        from strive.vnext.runtime.broker import EffectRequest
-        from strive.vnext.contracts.commands import ExecuteEffect
+        from strive.runtime.broker import EffectRequest
+        from strive.contracts.commands import ExecuteEffect
         ref = fixture.store.objects.publish(EffectRequest("local://telecom", arguments, fixture.scope).to_bytes())
         command = ExecuteEffect("benchmark.snapshot", "benchmark", ref)
         with pytest.raises(VerificationError, match="provenance"):
@@ -211,12 +211,12 @@ def test_dynamic_admission_rejects_forged_scopes_and_protected_reads(tmp_path: P
 
 
 def test_user_batch_restart_uses_captured_generation_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from strive.vnext.benchmarks.api import CapturedGeneration
-    from strive.vnext.contracts.harness import GenerationInput
-    from strive.vnext.contracts.primitives import ModelRole, ScopedArtifact
-    from strive.vnext.runtime.broker import PreparedEffect, EffectRequest, Receipt
-    from strive.vnext.contracts.commands import ExecuteEffect
-    from strive.vnext.contracts.records import EffectAuthorization
+    from strive.benchmarks.api import CapturedGeneration
+    from strive.contracts.harness import GenerationInput
+    from strive.contracts.primitives import ModelRole, ScopedArtifact
+    from strive.runtime.broker import PreparedEffect, EffectRequest, Receipt
+    from strive.contracts.commands import ExecuteEffect
+    from strive.contracts.records import EffectAuthorization
     fixture = BenchmarkFixture(tmp_path)
     try:
         fixture.initialize()
@@ -334,9 +334,9 @@ def test_corrupt_receipt_and_missing_store_cannot_prove_absence(tmp_path: Path) 
 
 @pytest.mark.parametrize("change", ["destination", "operation", "scope", "schema", "bound"])
 def test_scoped_admission_checks_every_request_dimension(tmp_path: Path, change: str) -> None:
-    from strive.vnext.contracts.commands import ExecuteEffect
-    from strive.vnext.contracts.primitives import LineageId, ResourceQuantity
-    from strive.vnext.runtime.broker import EffectRequest
+    from strive.contracts.commands import ExecuteEffect
+    from strive.contracts.primitives import LineageId, ResourceQuantity
+    from strive.runtime.broker import EffectRequest
     fixture = BenchmarkFixture(tmp_path)
     try:
         fixture.initialize()

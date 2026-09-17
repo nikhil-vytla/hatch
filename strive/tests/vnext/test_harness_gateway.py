@@ -8,13 +8,13 @@ from typing import Iterator
 
 import pytest
 
-from strive.vnext.codec import decode, encode
-from strive.vnext.contracts.harness import ExecutionContext, PreparedGeneration, Unsupported
-from strive.vnext.contracts.primitives import EffectId, InvocationId
-from strive.vnext.errors import VerificationError
-from strive.vnext.harness.gateway import ModelGateway
-from strive.vnext.harness.http_gateway import GatewayHTTPServer
-from strive.vnext.runtime import Boundary
+from strive.codec import decode, encode
+from strive.contracts.harness import ExecutionContext, PreparedGeneration, Unsupported
+from strive.contracts.primitives import EffectId, InvocationId
+from strive.errors import VerificationError
+from strive.harness.gateway import ModelGateway
+from strive.harness.http_gateway import GatewayHTTPServer
+from strive.runtime import Boundary
 
 from .harness_support import HarnessFixture, ProcessCrash
 
@@ -52,7 +52,7 @@ def test_capability_stale_epoch_expiry_and_revocation(fixture: HarnessFixture, m
         fixture.gateway.dispatch(stale, token, request(fixture), forward)
     with pytest.raises(VerificationError, match="stale"):
         fixture.gateway.dispatch(prepared.execution_context, "wrong-token", request(fixture), forward)
-    monkeypatch.setattr("strive.vnext.harness.gateway.time.time", lambda: 10**12)
+    monkeypatch.setattr("strive.harness.gateway.time.time", lambda: 10**12)
     with pytest.raises(VerificationError, match="expired"):
         fixture.gateway.dispatch(prepared.execution_context, token, request(fixture), forward)
     fixture.gateway.revoke(prepared.execution_context)
@@ -180,7 +180,7 @@ def test_no_launch_restart_requires_new_epoch_and_effect(fixture: HarnessFixture
 
 
 def test_native_admission_fails_before_process_or_capability(fixture: HarnessFixture) -> None:
-    from strive.vnext.harness.process import ProcessServices
+    from strive.harness.process import ProcessServices
     profile = replace(fixture.profile, fixture_script=None)
     services = ProcessServices(fixture.gateway, profile, fixture.root / "scratch", forward)
     try:
@@ -226,7 +226,7 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 class Guard(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.startswith(("strive.vnext.harness", "strive.vnext.runtime", "subprocess", "socket", "openai", "anthropic")):
+        if fullname.startswith(("strive.harness", "strive.runtime", "subprocess", "socket", "openai", "anthropic")):
             raise AssertionError("forbidden runtime import: " + fullname)
 sys.meta_path.insert(0, Guard())
 def audit(event, args):
@@ -235,11 +235,11 @@ def audit(event, args):
     if event == "open" and isinstance(args[2], int) and args[2] & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND):
         raise AssertionError("write")
 sys.addaudithook(audit)
-from strive.vnext.store import RunReader
-from strive.vnext.contracts.primitives import RunId
+from strive.store import RunReader
+from strive.contracts.primitives import RunId
 state = RunReader(Path(sys.argv[2]), RunId("runtime")).verify()
 assert len(state.consumed_results) == 1
-assert not any(name.startswith(("strive.vnext.harness", "strive.vnext.runtime")) for name in sys.modules)
+assert not any(name.startswith(("strive.harness", "strive.runtime")) for name in sys.modules)
 print("PURE_HARNESS_REPLAY")
 '''
     result = subprocess.run([sys.executable, "-I", "-B", "-c", program,
@@ -249,7 +249,7 @@ print("PURE_HARNESS_REPLAY")
 
 
 def test_http_provider_owns_credentials_fixed_route_and_never_retries(fixture: HarnessFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    from strive.vnext.harness.provider import HTTPProvider
+    from strive.harness.provider import HTTPProvider
     calls: list[tuple[str, str, bytes, dict[str, str]]] = []
     class Response:
         status = 200
@@ -264,7 +264,7 @@ def test_http_provider_owns_credentials_fixed_route_and_never_retries(fixture: H
             return Response()
         def close(self) -> None:
             pass
-    monkeypatch.setattr("strive.vnext.harness.provider.http.client.HTTPConnection", Connection)
+    monkeypatch.setattr("strive.harness.provider.http.client.HTTPConnection", Connection)
     provider = HTTPProvider(fixture.contract, "gateway-only-secret", fixture.upstream.lookup)
     assert provider.generate(request(fixture), "operation") == fixture.upstream.response
     assert calls[0][3]["Authorization"] == "Bearer gateway-only-secret"
@@ -278,8 +278,8 @@ def test_http_provider_owns_credentials_fixed_route_and_never_retries(fixture: H
 
 def test_recovery_revokes_then_terminates_identified_old_process(fixture: HarnessFixture) -> None:
     import os
-    from strive.vnext.harness.process import ProcessServices
-    from strive.vnext.harness.process_identity import birth, terminate_recorded
+    from strive.harness.process import ProcessServices
+    from strive.harness.process_identity import birth, terminate_recorded
     prepared = prepare(fixture)
     services = ProcessServices(fixture.gateway, fixture.profile, fixture.root / "scratch", forward, mode="hang")
     other = ModelGateway(fixture.root / "gateway", fixture.store.objects, fixture.contract, fixture.upstream)
@@ -299,15 +299,15 @@ def test_recovery_revokes_then_terminates_identified_old_process(fixture: Harnes
 
 
 def test_recovery_never_signals_a_reused_process_id(fixture: HarnessFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    from strive.vnext.harness.process_identity import terminate_recorded
+    from strive.harness.process_identity import terminate_recorded
     prepared = prepare(fixture)
     fixture.gateway.issue(prepared)
     fixture.gateway.event(prepared.execution_context, "pid",
                           fixture.store.objects.publish(encode(("process-identity/1", 12345, "old-birth"))))
-    monkeypatch.setattr("strive.vnext.harness.process_identity.birth", lambda pid: "new-birth")
+    monkeypatch.setattr("strive.harness.process_identity.birth", lambda pid: "new-birth")
     def fail(pid: int, sig: int) -> None:
         raise AssertionError("must not signal a different process incarnation")
-    monkeypatch.setattr("strive.vnext.harness.process_identity.os.killpg", fail)
+    monkeypatch.setattr("strive.harness.process_identity.os.killpg", fail)
     terminate_recorded(fixture.gateway, prepared.execution_context)
 
 
@@ -338,7 +338,7 @@ def test_gateway_contract_change_cannot_resume_old_capability(fixture: HarnessFi
 
 
 def test_registered_implementation_source_is_part_of_adapter_pin(fixture: HarnessFixture) -> None:
-    from strive.vnext.harness.adapters.base import TextHarnessAdapter
+    from strive.harness.adapters.base import TextHarnessAdapter
     class InstalledAdapter(TextHarnessAdapter):
         pass
     installed = InstalledAdapter(fixture.store.objects, fixture.profile, fixture.contract)
@@ -349,7 +349,7 @@ def test_registered_implementation_source_is_part_of_adapter_pin(fixture: Harnes
 
 
 def test_profile_cannot_weaken_mechanical_deno_permissions(fixture: HarnessFixture) -> None:
-    from strive.vnext.harness.process import ProcessServices
+    from strive.harness.process import ProcessServices
     weak = replace(fixture.profile, arguments=tuple(a for a in fixture.profile.arguments if a != "--deny-net"))
     services = ProcessServices(fixture.gateway, weak, fixture.root / "scratch", forward)
     try:
@@ -361,7 +361,7 @@ def test_profile_cannot_weaken_mechanical_deno_permissions(fixture: HarnessFixtu
 
 
 def test_frozen_effect_scoped_gateway_interface_uses_same_single_dispatch(fixture: HarnessFixture) -> None:
-    from strive.vnext.harness.process import ProcessServices
+    from strive.harness.process import ProcessServices
     services = ProcessServices(fixture.gateway, fixture.profile, fixture.root / "scratch", forward, mode="hang")
     try:
         prepared = prepare(fixture)

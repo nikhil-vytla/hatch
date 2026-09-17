@@ -4,7 +4,7 @@ Status: historical implementation, superseded by the current
 [vNext architecture](../ARCHITECTURE.md). The policy-neutral principle remains:
 comparative evaluation is optional, not a universal promotion gate. The APIs,
 module names and completion claims below describe the earlier implementation,
-not `strive.vnext`. Current mechanisms and qualification limits are recorded in
+not the current `strive` package. Current mechanisms and qualification limits are recorded in
 ADRs 0009–0013 and the architecture document.
 
 ## Context

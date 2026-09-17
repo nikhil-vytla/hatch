@@ -8,21 +8,21 @@ import pytest
 import os
 from decimal import Decimal
 
-from strive.vnext.codec import content_ref, decode, encode, opaque_annotation
-from strive.vnext.contracts.annotations import Annotation, MAX_ANNOTATION_BYTES
-from strive.vnext.contracts.commands import ApplyChange, ExecuteEffect
-from strive.vnext.contracts.lifecycle import DispatchStage, EffectState
-from strive.vnext.contracts.primitives import ArtifactRef, CommandId, EffectId, ExecutionStatus, InvocationId, RecordId, Resource, ResourceQuantity, ResultCursor, RevisionId, RunId
-from strive.vnext.contracts.records import (
+from strive.codec import content_ref, decode, encode, opaque_annotation
+from strive.contracts.annotations import Annotation, MAX_ANNOTATION_BYTES
+from strive.contracts.commands import ApplyChange, ExecuteEffect
+from strive.contracts.lifecycle import DispatchStage, EffectState
+from strive.contracts.primitives import ArtifactRef, CommandId, EffectId, ExecutionStatus, InvocationId, RecordId, Resource, ResourceQuantity, ResultCursor, RevisionId, RunId
+from strive.contracts.records import (
     CausalIdentity, ContinuationCommit, EffectObservationSettlement, IntegrityLinkage, Measurement, RecordClass,
     OutcomeStatus, ProducerIdentity, ProducerKind, RecordPayload, ReservationDisposition,
     RevisionActivation, UsageCompleteness, UsageKind, UsageObservation, UsageProvenance,
 )
-from strive.vnext.errors import IncompleteTail, JournalCorruption, LeaseError, VerificationError
-from strive.vnext.store import ArtifactStore
-from strive.vnext.store.journal import RunWriter
-from strive.vnext.verify import preflight, replay
-from strive.vnext.wire import Frame, ZERO_REF, pack_frame, record_digest
+from strive.errors import IncompleteTail, JournalCorruption, LeaseError, VerificationError
+from strive.store import ArtifactStore
+from strive.store.journal import RunWriter
+from strive.verify import preflight, replay
+from strive.wire import Frame, ZERO_REF, pack_frame, record_digest
 
 from .storage_fixtures import LocalHistory, local_history
 

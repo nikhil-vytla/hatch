@@ -1,11 +1,11 @@
 # strive handoff
 
-The current system is `src/strive/vnext`. Start with
+The current system is `src/strive`. Start with
 [ARCHITECTURE.md](ARCHITECTURE.md), [the ADR index](adrs/README.md) and
 [ROADMAP.md](ROADMAP.md). The architecture defines the five guarantees and the
 implemented mechanisms; the roadmap distinguishes qualification from deferred
-capabilities. Legacy modules and earlier ADR implementation descriptions are not
-the vNext API.
+capabilities. The pre-vNext kernel has been removed; earlier ADR implementation
+descriptions are historical, not the vNext API.
 
 ## Host workflow
 
@@ -15,7 +15,7 @@ From the project directory, use Python 3.12 or newer, uv and Deno:
 uv sync --frozen
 uv run mypy --strict
 uv run pytest tests/vnext -q
-uv run python -m strive.vnext.cli --help
+uv run python -m strive.cli --help
 ```
 
 The [root README](../README.md) creates and runs the recorded counter example.
@@ -45,11 +45,11 @@ image's repositories, so the build is not a fully byte-reproducible package
 snapshot. Image tags are not registry digest pins.
 
 ```sh
-docker build --file Containerfile --tag strive-vnext .
+docker build --file Containerfile --tag strive .
 mkdir -p .container-results
 docker run --rm --privileged --cgroupns=private \
   --mount "type=bind,src=$PWD/.container-results,dst=/workspace/strive/.container-results" \
-  strive-vnext
+  strive
 ```
 
 Inside an already prepared container, run `bash scripts/verify-in-container.sh`.
@@ -96,7 +96,7 @@ Three tests read these fixtures: the adaptation all-30-hashes test, the harness
 baseline/adapter-selection test, and the second-benchmark operation/recovery
 test. The harness test checks an exact five-file historical changed set:
 `runtime/broker.py`, `runtime/supervisor.py`, `verify/engine.py`,
-`contracts/manifest.py` and `contracts/__init__.py`, all under `src/strive/vnext`.
+`contracts/manifest.py` and `contracts/__init__.py`, all under `src/strive`.
 The initializer's sole change is its design-document pointer. The other four
 entries reflect earlier approved admission, restoration and telemetry changes.
 Never blanket-regenerate baseline hashes to hide unrelated drift.

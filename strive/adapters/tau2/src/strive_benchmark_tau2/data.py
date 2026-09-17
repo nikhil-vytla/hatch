@@ -1,10 +1,10 @@
 """Retained read-only data tree. Resume never downloads or trusts ambient files."""
 from pathlib import Path
 
-from strive.vnext.codec import decode, encode
-from strive.vnext.contracts.primitives import ArtifactRef
-from strive.vnext.errors import VerificationError
-from strive.vnext.store.cas import CAS, atomic_file, durable_directory
+from strive.codec import decode, encode
+from strive.contracts.primitives import ArtifactRef
+from strive.errors import VerificationError
+from strive.store.cas import CAS, atomic_file, durable_directory
 
 
 def retain_data(objects: CAS, source: Path, destination: Path) -> ArtifactRef:

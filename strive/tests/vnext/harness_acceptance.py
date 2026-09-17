@@ -2,11 +2,11 @@
 from dataclasses import replace
 from decimal import Decimal
 
-from strive.vnext.contracts.commands import Finish
-from strive.vnext.contracts.lifecycle import EffectState
-from strive.vnext.contracts.primitives import ExecutionStatus
-from strive.vnext.runtime import Boundary
-from strive.vnext.runtime.confined_sandbox import DenoSandbox
+from strive.contracts.commands import Finish
+from strive.contracts.lifecycle import EffectState
+from strive.contracts.primitives import ExecutionStatus
+from strive.runtime import Boundary
+from strive.runtime.confined_sandbox import DenoSandbox
 
 from .harness_support import HarnessFixture, ProcessCrash
 from .test_acceptance_contracts import RuntimeEvidence, StorageRuntimeDriver

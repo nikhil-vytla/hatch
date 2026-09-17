@@ -1,6 +1,6 @@
 # Architecture decision records
 
-[ARCHITECTURE.md](../ARCHITECTURE.md) describes the current `strive.vnext`
+[ARCHITECTURE.md](../ARCHITECTURE.md) describes the current `strive`
 implementation. ADRs 0009 onward record its harness, benchmark, feedback and
 confinement decisions. ADRs 0001–0008 document earlier implementations and their
 rationale; their module names, APIs and rollout status are historical.

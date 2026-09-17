@@ -7,9 +7,9 @@ import socket
 import sys
 from unittest.mock import patch
 
-from strive.vnext.benchmarks.closure import retain_closure
-from strive.vnext.benchmarks.json_data import canonical, obj, parse, items, string
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.closure import retain_closure
+from strive.benchmarks.json_data import canonical, obj, parse, items, string
+from strive.store import ArtifactStore
 from .adapter import implementation_identity
 from .data import retain_data
 from .native_worker import deny_network, run

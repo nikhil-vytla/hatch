@@ -1,181 +1,172 @@
-"""One shared serialization codec for every persisted contract.
+"""Canonical, closed serialization of the existing contracts, with no data imports.
 
-Every record on disk is a JSON object carrying a ``"schema": "<kind>@<version>"``
-field. The same registered dataclasses are used in memory and on disk, so there
-is exactly one source of truth for each contract's shape (HANDOFF decision:
-eliminate dict drift between `types` and persisted records).
-
-Decoding is strict and loud (D9): unknown kinds, unsupported versions, missing
-fields, unexpected fields, and wrong types all raise ``SchemaError`` with a
-precise message. There is no silent fallback.
+Tags select only statically imported dataclasses/enums. Field types are checked
+as well as constructors: dataclass annotations alone do not validate JSON.
+Annotation payloads are the deliberate exception, retained as opaque bytes.
 """
 
-from __future__ import annotations
-
-import dataclasses
+import base64
+from dataclasses import fields, is_dataclass
+from decimal import Decimal
+from enum import Enum
+import hashlib
 import json
-import types as _types
-import typing
-from typing import Any, TypeVar
+from types import UnionType
+from typing import Literal, NewType, TypeAliasType, TypeVar, Union, get_args, get_origin, get_type_hints
 
-T = TypeVar("T")
+from .contracts import annotations, bindings, commands, feedback, harness, lifecycle, manifest, primitives, records
+from .contracts.annotations import Annotation, MAX_ANNOTATION_BYTES
+from .contracts.primitives import ArtifactRef
+from .errors import VerificationError
 
-
-class SchemaError(Exception):
-    """A record failed schema identification or validation."""
-
-
-_BY_KIND: dict[str, tuple[type[Any], int]] = {}
-_BY_TYPE: dict[type[Any], tuple[str, int]] = {}
-
-
-def register(kind: str, version: int) -> Any:
-    """Class decorator registering a frozen dataclass as a persisted contract."""
-
-    def decorate(cls: type[T]) -> type[T]:
-        if kind in _BY_KIND:
-            raise ValueError(f"schema kind already registered: {kind}")
-        _BY_KIND[kind] = (cls, version)
-        _BY_TYPE[cls] = (kind, version)
-        return cls
-
-    return decorate
+_MODULES = (annotations, bindings, commands, feedback, harness, lifecycle, manifest, primitives, records)
+_TYPES: dict[str, type[object]] = {
+    value.__name__: value
+    for module in _MODULES
+    for value in vars(module).values()
+    if isinstance(value, type) and value.__module__ == module.__name__
+    and (is_dataclass(value) or issubclass(value, Enum))
+}
 
 
-def schema_of(cls: type[Any]) -> str:
-    kind, version = _BY_TYPE[cls]
-    return f"{kind}@{version}"
+def opaque_annotation(namespace: str, payload: bytes) -> Annotation:
+    """Reuse the frozen type without interpreting diagnostic content on read."""
+    if not isinstance(namespace, str) or "." not in namespace or any(not p for p in namespace.split(".")):
+        raise VerificationError("invalid annotation namespace")
+    if type(payload) is not bytes or len(payload) > MAX_ANNOTATION_BYTES:
+        raise VerificationError("annotation exceeds byte quota or is not bytes")
+    result = object.__new__(Annotation)
+    object.__setattr__(result, "namespace", namespace)
+    object.__setattr__(result, "payload", payload)
+    return result
 
 
-def encode(obj: Any) -> dict[str, Any]:
-    """Encode a registered contract instance to a JSON-safe dict with schema tag."""
-    cls = type(obj)
-    if cls not in _BY_TYPE:
-        raise SchemaError(f"type not registered with codec: {cls.__name__}")
-    kind, version = _BY_TYPE[cls]
-    data = {
-        field.name: _encode_value(getattr(obj, field.name))
-        for field in dataclasses.fields(obj)
-    }
-    data["schema"] = f"{kind}@{version}"
-    return data
+def content_ref(data: bytes) -> ArtifactRef:
+    return ArtifactRef("sha256:" + hashlib.sha256(data).hexdigest())
 
 
-def _encode_value(value: Any) -> Any:
-    if type(value) in _BY_TYPE:
-        return encode(value)
-    if isinstance(value, (tuple, list)):
-        return [_encode_value(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _encode_value(val) for key, val in value.items()}
-    if value is None or isinstance(value, (str, int, float, bool)):
+def _encode(value: object) -> object:
+    if isinstance(value, Enum):
+        return {"enum": type(value).__name__, "value": value.value}
+    if value is None or type(value) in (str, int, bool):
         return value
-    raise SchemaError(f"unencodable value of type {type(value).__name__}")
+    if isinstance(value, bytes):
+        return {"bytes": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise VerificationError("nonfinite decimal")
+        return {"decimal": str(value)}
+    if isinstance(value, (tuple, frozenset)):
+        items = [_encode(item) for item in value]
+        if isinstance(value, frozenset):
+            items.sort(key=lambda item: json.dumps(item, sort_keys=True))
+        return {"set" if isinstance(value, frozenset) else "tuple": items}
+    if is_dataclass(value) and not isinstance(value, type) and type(value) in _TYPES.values():
+        return {"type": type(value).__name__, "fields": {f.name: _encode(getattr(value, f.name)) for f in fields(value)}}
+    raise VerificationError(f"unsupported wire value: {type(value).__name__}")
 
 
-def dumps(obj: Any) -> str:
-    """Encode to a single canonical JSON line (no trailing newline)."""
-    return json.dumps(encode(obj), sort_keys=True, separators=(",", ":"))
-
-
-def decode(record: Any, expect: type[T] | None = None) -> T:
-    """Decode a dict into its registered contract, validating strictly."""
-    if not isinstance(record, dict):
-        raise SchemaError(f"record is not an object: {type(record).__name__}")
-    schema = record.get("schema")
-    if not isinstance(schema, str) or "@" not in schema:
-        raise SchemaError(f"missing or malformed schema field: {schema!r}")
-    kind, _, version_text = schema.partition("@")
-    if kind not in _BY_KIND:
-        raise SchemaError(f"unknown schema kind: {kind!r}")
-    cls, current_version = _BY_KIND[kind]
+def encode(value: object) -> bytes:
     try:
-        version = int(version_text)
-    except ValueError:
-        raise SchemaError(f"malformed schema version: {schema!r}") from None
-    if version != current_version:
-        raise SchemaError(
-            f"unsupported {kind} version {version} (this build supports "
-            f"{current_version}); refusing to guess"
-        )
-    if expect is not None and cls is not expect:
-        raise SchemaError(f"expected {schema_of(expect)}, found {schema}")
-    body = {key: value for key, value in record.items() if key != "schema"}
-    return typing.cast(T, _decode_as(cls, body, kind))
+        return json.dumps(_encode(value), sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("ascii")
+    except (ValueError, TypeError, RecursionError) as error:
+        raise VerificationError("cannot encode contract") from error
 
 
-def loads(line: str, expect: type[T] | None = None) -> T:
+def _matches(value: object, expected: object) -> bool:
+    if isinstance(expected, TypeAliasType):
+        return _matches(value, expected.__value__)
+    if isinstance(expected, TypeVar):
+        # All serialized Ref parameters are resolved artifact references.
+        return isinstance(value, ArtifactRef)
+    if isinstance(expected, NewType):
+        return type(value) is str and bool(value)
+    origin, args = get_origin(expected), get_args(expected)
+    if origin in (UnionType, Union):
+        return any(_matches(value, arg) for arg in args)
+    if origin is Literal:
+        return any(type(value) is type(arg) and value == arg for arg in args)
+    if origin in (tuple, frozenset):
+        if not isinstance(value, origin):
+            return False
+        if origin is frozenset or len(args) == 2 and args[1] is Ellipsis:
+            return all(_matches(item, args[0]) for item in value)
+        return len(value) == len(args) and all(_matches(item, arg) for item, arg in zip(value, args))
+    if isinstance(origin, type):
+        return type(value) is origin
+    return isinstance(expected, type) and type(value) is expected
+
+
+def _decode(value: object) -> object:
+    if value is None or type(value) in (str, int, bool):
+        return value
+    if not isinstance(value, dict):
+        raise VerificationError("invalid wire object")
+    if set(value) == {"bytes"} and isinstance(value["bytes"], str):
+        return base64.b64decode(value["bytes"], validate=True)
+    if set(value) == {"decimal"} and isinstance(value["decimal"], str):
+        result = Decimal(value["decimal"])
+        if not result.is_finite():
+            raise VerificationError("nonfinite decimal")
+        return result
+    for tag in ("tuple", "set"):
+        if set(value) == {tag} and isinstance(value[tag], list):
+            items = tuple(_decode(item) for item in value[tag])
+            if tag == "tuple":
+                return items
+            if len(frozenset(items)) != len(items):
+                raise VerificationError("duplicate set member")
+            return frozenset(items)
+    if set(value) == {"enum", "value"} and isinstance(value["enum"], str):
+        enum_type = _TYPES.get(value["enum"])
+        if enum_type is not None and issubclass(enum_type, Enum):
+            return enum_type(value["value"])
+    if set(value) == {"type", "fields"} and isinstance(value["type"], str):
+        cls = _TYPES.get(value["type"])
+        raw = value["fields"]
+        if cls is None or not is_dataclass(cls) or not isinstance(raw, dict):
+            raise VerificationError("unknown contract type")
+        if set(raw) != {f.name for f in fields(cls)}:
+            raise VerificationError("unknown or missing contract fields")
+        decoded = {key: _decode(item) for key, item in raw.items()}
+        hints = get_type_hints(cls)
+        if any(not _matches(item, hints[key]) for key, item in decoded.items()):
+            raise VerificationError(f"invalid field type in {cls.__name__}")
+        if cls is Annotation:
+            namespace, payload = decoded["namespace"], decoded["payload"]
+            assert isinstance(namespace, str) and isinstance(payload, bytes)
+            return opaque_annotation(namespace, payload)
+        return cls(**decoded)
+    raise VerificationError("invalid wire tags")
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise VerificationError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
+def decode(data: bytes) -> object:
     try:
-        raw = json.loads(line)
-    except json.JSONDecodeError as exc:
-        raise SchemaError(f"invalid JSON: {exc}") from None
-    return decode(raw, expect)
+        value = _decode(json.loads(data, object_pairs_hook=_unique_object))
+        if encode(value) != data:
+            raise VerificationError("noncanonical contract bytes")
+        return value
+    except (ValueError, TypeError, KeyError, ArithmeticError, RecursionError) as error:
+        raise VerificationError(f"malformed contract: {error}") from error
 
 
-def _decode_as(cls: type[Any], body: dict[str, Any], kind: str) -> Any:
-    hints = typing.get_type_hints(cls)
-    field_names = {field.name for field in dataclasses.fields(cls)}
-    missing = field_names - body.keys()
-    if missing:
-        raise SchemaError(f"{kind}: missing fields {sorted(missing)}")
-    extra = body.keys() - field_names
-    if extra:
-        raise SchemaError(f"{kind}: unexpected fields {sorted(extra)}")
-    kwargs = {
-        name: _decode_value(hints[name], body[name], f"{kind}.{name}")
-        for name in field_names
-    }
-    return cls(**kwargs)
-
-
-def _decode_value(hint: Any, value: Any, where: str) -> Any:
-    origin = typing.get_origin(hint)
-    if origin in (typing.Union, _types.UnionType):
-        args = [arg for arg in typing.get_args(hint) if arg is not type(None)]
-        if value is None:
-            if len(args) == len(typing.get_args(hint)):
-                raise SchemaError(f"{where}: null not permitted")
-            return None
-        if len(args) != 1:
-            raise SchemaError(f"{where}: unsupported union {hint}")
-        return _decode_value(args[0], value, where)
-    if origin is tuple:
-        item_hint = typing.get_args(hint)[0]
-        if not isinstance(value, list):
-            raise SchemaError(f"{where}: expected array, got {type(value).__name__}")
-        return tuple(
-            _decode_value(item_hint, item, f"{where}[{i}]")
-            for i, item in enumerate(value)
-        )
-    if origin is dict:
-        _, value_hint = typing.get_args(hint)
-        if not isinstance(value, dict):
-            raise SchemaError(f"{where}: expected object, got {type(value).__name__}")
-        return {
-            key: _decode_value(value_hint, val, f"{where}.{key}")
-            for key, val in value.items()
-        }
-    if hint in _BY_TYPE:
-        decoded: Any = decode(value)
-        if type(decoded) is not hint:
-            raise SchemaError(f"{where}: expected {schema_of(hint)}")
-        return decoded
-    if hint is float:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise SchemaError(f"{where}: expected number, got {type(value).__name__}")
-        return float(value)
-    if hint is int:
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise SchemaError(f"{where}: expected integer, got {type(value).__name__}")
-        return value
-    if hint is bool:
-        if not isinstance(value, bool):
-            raise SchemaError(f"{where}: expected boolean, got {type(value).__name__}")
-        return value
-    if hint is str:
-        if not isinstance(value, str):
-            raise SchemaError(f"{where}: expected string, got {type(value).__name__}")
-        return value
-    if hint in (Any, object):
-        return value
-    raise SchemaError(f"{where}: unsupported field type {hint!r}")
+def references(value: object) -> frozenset[ArtifactRef]:
+    """Walk typed references, never strings or annotation content."""
+    if isinstance(value, ArtifactRef):
+        return frozenset({value})
+    if isinstance(value, Annotation):
+        return frozenset()
+    if is_dataclass(value) and not isinstance(value, type):
+        return frozenset(ref for field in fields(value) for ref in references(getattr(value, field.name)))
+    if isinstance(value, (tuple, frozenset)):
+        return frozenset(ref for item in value for ref in references(item))
+    return frozenset()

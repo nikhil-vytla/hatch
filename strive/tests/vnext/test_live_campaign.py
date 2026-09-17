@@ -8,25 +8,25 @@ import threading
 
 import pytest
 
-from strive.vnext.benchmarks.api import BenchmarkAdapter, TaskSpec
-from strive.vnext.benchmarks.json_data import canonical, obj, parse
-from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.cli.budget_proof import prove, dispatches
-from strive.vnext.cli.campaign import Campaign
-from strive.vnext.contracts.primitives import ArtifactRef, RunId, Resource
-from strive.vnext.errors import VerificationError
-from strive.vnext.harness.openai_live import OpenAIContract, OpenAITransport, CONTROLS, load_contract, network_namespace
-from strive.vnext.harness.profiles import fixture_profile
-from strive.vnext.harness.provider import Upstream
-from strive.vnext.runtime.ledger import amounts
-from strive.vnext.store.cas import CAS
+from strive.benchmarks.api import BenchmarkAdapter, TaskSpec
+from strive.benchmarks.json_data import canonical, obj, parse
+from strive.benchmarks.store import OperationStore
+from strive.cli.budget_proof import prove, dispatches
+from strive.cli.campaign import Campaign
+from strive.contracts.primitives import ArtifactRef, RunId, Resource
+from strive.errors import VerificationError
+from strive.harness.openai_live import OpenAIContract, OpenAITransport, CONTROLS, load_contract, network_namespace
+from strive.harness.profiles import fixture_profile
+from strive.harness.provider import Upstream
+from strive.runtime.ledger import amounts
+from strive.store.cas import CAS
 from strive_benchmark_tau2.adapter import Tau2Adapter, implementation_identity
 from strive_benchmark_tau2.qualification import qualify
 from strive_benchmark_tau2.splits import scenario_group
 from .benchmark_fixtures import SyntheticTelecom, inventory
 
 ROOT = Path(__file__).resolve().parents[2]
-PRICE = ROOT / "live-tau2-budget-proof/prices/openai-2026-09-10.json"
+PRICE = ROOT / "tests/vnext/fixtures/budget-proof/prices/openai-2026-09-10.json"
 
 
 class CampaignBackend(SyntheticTelecom):
@@ -82,7 +82,7 @@ class Setup:
         assert deno
         self.launch = fixture_profile("opencode", Path(deno), Path(__file__).with_name("harness_fixtures") / "campaign.js")
         self.manifest = root / "pilot.toml"
-        source = (ROOT / "live-tau2-budget-proof/pilot-5usd.toml").read_text()
+        source = (ROOT / "tests/vnext/fixtures/budget-proof/pilot-5usd.toml").read_text()
         self.manifest.write_text(source.replace('usd = 5.00', 'usd = ' + cap).replace('version = "1.18.30"', 'version = "fixture/1"')
             .replace('deadline_seconds = 150', 'deadline_seconds = 10').replace('prices/openai-2026-09-10.json', str(PRICE)))
         self.backend = CampaignBackend(ArtifactRef("sha256:" + "a" * 64))
@@ -207,7 +207,7 @@ def test_live_transport_refuses_macos_before_reading_key(tmp_path: Path) -> None
 
 
 def test_invalid_credential_is_not_in_error_or_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from strive.vnext.harness import openai_live
+    from strive.harness import openai_live
     monkeypatch.setattr(openai_live, "require_live_container", lambda: None)
     monkeypatch.setenv("OPENAI_API_KEY", "private-value\ninvalid")
     objects = CAS(tmp_path)
@@ -221,7 +221,7 @@ def test_invalid_credential_is_not_in_error_or_artifacts(tmp_path: Path, monkeyp
 @pytest.mark.parametrize("count,fail,expected_paid", [(32769, False, 0), (10, True, 1), (10, False, 1)])
 def test_transport_counts_before_paid_dispatch_and_never_retries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
                                                                count: int, fail: bool, expected_paid: int) -> None:
-    from strive.vnext.harness import openai_live
+    from strive.harness import openai_live
     monkeypatch.setattr(openai_live, "require_live_container", lambda: None)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-must-not-be-retained")
     objects = CAS(tmp_path / "cas")
@@ -259,7 +259,7 @@ def test_transport_counts_before_paid_dispatch_and_never_retries(tmp_path: Path,
 
 def test_native_opencode_inside_linux_jail_without_spending(tmp_path: Path) -> None:
     import sys
-    from strive.vnext.harness.native_opencode import profile
+    from strive.harness.native_opencode import profile
     if sys.platform != "linux" or shutil.which("opencode") is None:
         pytest.skip("native OpenCode jail qualification runs in the orchestrator container")
     setup = Setup(tmp_path, cap="0.10")

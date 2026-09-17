@@ -15,14 +15,14 @@ from typing import Iterator
 
 import pytest
 
-from strive.vnext.codec import decode
-from strive.vnext.contracts.primitives import ExecutionStatus, Resource
-from strive.vnext.errors import VerificationError
-from strive.vnext.harness import openai_live
-from strive.vnext.harness.deadline import upstream_deadline
-from strive.vnext.harness.openai_live import CONTROLS, OpenAIEgress, OpenAITransport, canonical, load_contract
-from strive.vnext.runtime.ledger import amounts
-from strive.vnext.store.cas import CAS
+from strive.codec import decode
+from strive.contracts.primitives import ExecutionStatus, Resource
+from strive.errors import VerificationError
+from strive.harness import openai_live
+from strive.harness.deadline import upstream_deadline
+from strive.harness.openai_live import CONTROLS, OpenAIEgress, OpenAITransport, canonical, load_contract
+from strive.runtime.ledger import amounts
+from strive.store.cas import CAS
 from .test_live_campaign import PRICE, Setup
 
 KEY = "test-secret-openai-key"
@@ -121,9 +121,9 @@ def install_wire(monkeypatch: pytest.MonkeyPatch, wire: Wire, *, clock: bool = T
         monkeypatch.delenv(name, raising=False)
     def connection(host: str, port: int | None = None, *, timeout: float) -> ScriptedConnection:
         return ScriptedConnection(wire, host, port, timeout)
-    monkeypatch.setattr("strive.vnext.harness.openai_live.http.client.HTTPSConnection", connection)
+    monkeypatch.setattr("strive.harness.openai_live.http.client.HTTPSConnection", connection)
     if clock:
-        monkeypatch.setattr("strive.vnext.harness.openai_live.time.monotonic", lambda: wire.now)
+        monkeypatch.setattr("strive.harness.openai_live.time.monotonic", lambda: wire.now)
 
 
 @pytest.fixture
@@ -396,7 +396,7 @@ def test_transport_refuses_a_move_into_child_or_other_netns(rig: tuple[OpenAITra
         monkeypatch: pytest.MonkeyPatch, change: str) -> None:
     transport, wire, request = rig
     if change == "pid":
-        monkeypatch.setattr("strive.vnext.harness.openai_live.os.getpid", lambda: transport._owner_pid + 1)
+        monkeypatch.setattr("strive.harness.openai_live.os.getpid", lambda: transport._owner_pid + 1)
     else:
         monkeypatch.setattr(openai_live, "network_namespace", lambda: "net:[confined]")
     with pytest.raises(VerificationError, match="trusted owner"):
@@ -579,8 +579,8 @@ def test_upstream_error_survives_child_broken_pipe(tmp_path: Path, monkeypatch: 
     import io
     import subprocess
     from typing import cast
-    from strive.vnext.contracts.harness import ExecutionContext
-    from strive.vnext.harness.process import ProcessServices
+    from strive.contracts.harness import ExecutionContext
+    from strive.harness.process import ProcessServices
     from .harness_support import HarnessFixture
     from .test_harness_gateway import prepare
 
