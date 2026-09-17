@@ -1,9 +1,8 @@
-# vNext implementation
+# strive package layout
 
-[Architecture](../../../docs/ARCHITECTURE.md) defines the current design and its
-five integrity guarantees. [ADRs](../../../docs/adrs/README.md) record the durable
-decisions. This package has its own run format and artifact roots; it neither
-reads nor migrates legacy histories.
+[Architecture](../../docs/ARCHITECTURE.md) defines the current design and its
+five integrity guarantees. [ADRs](../../docs/adrs/README.md) record the durable
+decisions.
 
 | Package | Responsibility |
 | --- | --- |
@@ -37,13 +36,13 @@ Linux jail adds namespaces, seccomp, hard cgroup limits and bounded scratch.
 Unsupported hosts retain the permission sandbox with an explicit deferred OS
 floor. Native CLI qualification is a separate gate from jail availability.
 
-`uv run python -m strive.vnext.cli --help` lists the manifest workflow commands.
+`uv run python -m strive.cli --help` lists the manifest workflow commands.
 The current composition runs the counter adapter and a recorded provider; it
 rejects native harness campaign manifests. The tau2 adapter is separately
 installed and qualified. `EvaluateFork` enactment, private-veto feedback C and
 funded reference campaigns remain deferred or gated.
 
-[Tests](../../../tests/vnext/) cover the runtime boundaries, recovery, scoped
+[Tests](../../tests/vnext/) cover the runtime boundaries, recovery, scoped
 feedback, report provenance and replay purity. Permanent core hash fixtures live
-in [baselines](../../../tests/vnext/baselines/README.md). See the
-[handoff](../../../docs/HANDOFF.md) for host and Linux verification commands.
+in [baselines](../../tests/vnext/baselines/README.md). See the
+[handoff](../../docs/HANDOFF.md) for host and Linux verification commands.

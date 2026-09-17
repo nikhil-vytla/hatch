@@ -5,20 +5,20 @@ from pathlib import Path
 
 import pytest
 
-from strive.vnext.benchmarks.api import BenchmarkAdapter, EpisodeSnapshot, ToolInvocation
-from strive.vnext.benchmarks.bridge import BenchmarkEffectAdapter, OperationRequest, OperationValidator
-from strive.vnext.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
-from strive.vnext.benchmarks.json_data import canonical
-from strive.vnext.benchmarks.payloads import loads
-from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.contracts.manifest import load_resolved_configuration
-from strive.vnext.contracts.primitives import AccessScope, EnvironmentId, EpisodeId, LineageId, RunId
-from strive.vnext.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
-from strive.vnext.errors import VerificationError
-from strive.vnext.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
-from strive.vnext.runtime.broker import CapabilityBroker
-from strive.vnext.runtime.supervisor import Supervisor
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.api import BenchmarkAdapter, EpisodeSnapshot, ToolInvocation
+from strive.benchmarks.bridge import BenchmarkEffectAdapter, OperationRequest, OperationValidator
+from strive.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
+from strive.benchmarks.json_data import canonical
+from strive.benchmarks.payloads import loads
+from strive.benchmarks.store import OperationStore
+from strive.contracts.manifest import load_resolved_configuration
+from strive.contracts.primitives import AccessScope, EnvironmentId, EpisodeId, LineageId, RunId
+from strive.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
+from strive.errors import VerificationError
+from strive.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
+from strive.runtime.broker import CapabilityBroker
+from strive.runtime.supervisor import Supervisor
+from strive.store import ArtifactStore
 from strive_benchmark_counter import CounterAdapter
 from .fixtures import AUTHORED_TOML
 from .fresh_probe import fresh_replay

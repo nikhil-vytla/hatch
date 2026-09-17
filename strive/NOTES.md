@@ -6,8 +6,8 @@ implementation findings and verification; they do not replace that design.
 
 ## Current implementation
 
-The current code is `src/strive/vnext`, with independent run formats and artifact
-roots. Legacy modules remain available but do not define the current protocol.
+The current code is `src/strive`, with independent run formats and artifact
+roots. The pre-vNext kernel has been removed (see "Post-merge cleanup" below).
 A local serial supervisor owns effects, reservations, continuation and revision
 activation over authenticated journals and immutable objects. Pure replay checks
 that history without importing candidate, runtime or benchmark implementations.
@@ -71,3 +71,47 @@ The sandbox denied the parent repository's Git index lock, so the authorized
 files were deleted directly and all changes remain unstaged for the orchestrator.
 No commit or PR was created. The temporary cleanup work folder was removed after
 its findings were incorporated here and in the permanent documentation.
+
+## Post-merge cleanup (2026-09-16)
+
+With PRs #50–#52 fully merged, `investigations/`, `tau2-egress-counting-fix/`
+and the investigation narrative from `live-tau2-budget-proof/` (README, NOTES,
+changes.patch, proof/log files) moved to `archive/strive/` at the repo root —
+their findings were already folded into this file and the permanent docs, so
+only the raw records moved, not the module tree. `live-tau2-budget-proof/`'s
+three actual test fixtures (`pilot-5usd.toml`, `budget-stop-5c.toml`,
+`prices/openai-2026-09-10.json` — read by `test_live_campaign.py` and
+`tests/live/test_budget_stop_live.py`, not just historical record) moved
+instead to `tests/vnext/fixtures/budget-proof/`. The legacy pre-vNext
+implementation
+(`kernel.py`, `substrate.py`, `runtime.py`, `sandbox*.py`, `policy.py`/`policies/`,
+`refine.py`, `budget.py`, `operate.py`, `cas.py`, `framing.py`, `codec.py`,
+`events.py`, `evaluate.py`, `strategy_runner.py`, `surfaces.py`, `tasks.py`,
+`contracts.py`, `model.py`, and their tests) and its dual-mode CLI branch were
+removed; the installed `strive` command now delegates directly to
+`strive.cli.app`. Removing legacy also removes its `view`/`history`/
+`inspect`/`revert`/`repair`/`sandbox` subcommands, which had no vNext
+equivalents — any pre-vNext run histories on disk no longer have a CLI to
+inspect or repair them.
+
+## Collapse `strive.vnext` into `strive` (2026-09-16)
+
+With the legacy kernel gone, `vnext` no longer distinguished anything from
+anything else, so `src/strive/vnext/*` moved up to `src/strive/*` directly
+(the old `strive/cli.py` delegator was deleted; `strive/vnext/cli/` took over
+the `cli` name and its `__init__.py` re-exports `main` so the
+`strive = "strive.cli:main"` entry point is unchanged). Internal relative
+imports needed no changes (the whole subtree shifted up by one uniform
+level), but two `Path(__file__).parents[N]` computations that reached
+*outside* the moved subtree needed their index decremented by one
+(`cli/campaign.py`'s `repository` lookup), and a few hardcoded
+`"src/strive/vnext"` path strings and `strive.vnext.*` dotted references in
+tests, the two benchmark adapters, docs, the Containerfile and
+`scripts/verify-in-container.sh` were updated. Left untouched on purpose:
+`tests/vnext/` (the test tree keeps its name), and the on-disk format/default
+strings that happen to contain "vnext" — `wire.py`'s
+`FORMAT = b"strive-vnext-store/1\n"` (a versioned wire-format tag) and the
+`artifacts-vnext`/`artifacts-vnext-workflow` default root names in
+`store/journal.py`/`cli/app.py` — none of those are naming artifacts of the
+package split; they're data-format/runtime-default identifiers, out of scope
+for a Python-import-path rename.

@@ -11,9 +11,9 @@ from copy import deepcopy
 import math
 from pathlib import Path
 
-from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
-from strive.vnext.errors import VerificationError
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.json_data import canonical, items, obj, parse, string
+from strive.errors import VerificationError
+from strive.store import ArtifactStore
 from . import UPSTREAM_REVISION
 from .qualification import Qualification
 

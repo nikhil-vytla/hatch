@@ -4,11 +4,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
-from strive.vnext.codec import decode, encode
-from strive.vnext.contracts.primitives import ArtifactRef
-from strive.vnext.errors import VerificationError
-from strive.vnext.store.cas import CAS
+from strive.benchmarks.json_data import canonical, items, obj, parse, string
+from strive.codec import decode, encode
+from strive.contracts.primitives import ArtifactRef
+from strive.errors import VerificationError
+from strive.store.cas import CAS
 from .splits import (ALGORITHM, DEFAULT_SEED, OBJECTIVE, TARGET, crossing_report,
                      group_tasks, normalized, validate_partition, whole_group_split)
 

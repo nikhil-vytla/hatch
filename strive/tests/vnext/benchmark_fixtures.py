@@ -3,22 +3,22 @@ from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
-from strive.vnext.benchmarks.api import EpisodeSnapshot, TaskSpec, ToolInvocation
-from strive.vnext.benchmarks.bridge import BenchmarkEffectAdapter, OperationRequest, OperationValidator
-from strive.vnext.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
-from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
-from strive.vnext.benchmarks.payloads import loads
-from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.codec import encode
-from strive.vnext.contracts.commands import ExecuteEffect, StepOutput
-from strive.vnext.contracts.manifest import load_resolved_configuration
-from strive.vnext.contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, EpisodeId, LineageId, RunId
-from strive.vnext.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
-from strive.vnext.errors import VerificationError
-from strive.vnext.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
-from strive.vnext.runtime.broker import Capability, CapabilityBroker, EffectRequest
-from strive.vnext.runtime.supervisor import Supervisor
-from strive.vnext.store import ArtifactStore
+from strive.benchmarks.api import EpisodeSnapshot, TaskSpec, ToolInvocation
+from strive.benchmarks.bridge import BenchmarkEffectAdapter, OperationRequest, OperationValidator
+from strive.benchmarks.episodes import EpisodeAssignment, EpisodeDriver
+from strive.benchmarks.json_data import canonical, items, obj, parse, string
+from strive.benchmarks.payloads import loads
+from strive.benchmarks.store import OperationStore
+from strive.codec import encode
+from strive.contracts.commands import ExecuteEffect, StepOutput
+from strive.contracts.manifest import load_resolved_configuration
+from strive.contracts.primitives import AccessScope, ArtifactRef, EnvironmentId, EpisodeId, LineageId, RunId
+from strive.contracts.records import CausalIdentity, DeclaredLineage, ProducerKind, RunBinding
+from strive.errors import VerificationError
+from strive.runtime.admission import AdmissionRule, ArtifactProvenance, ScopedAdmission
+from strive.runtime.broker import Capability, CapabilityBroker, EffectRequest
+from strive.runtime.supervisor import Supervisor
+from strive.store import ArtifactStore
 from strive_benchmark_tau2.adapter import Tau2Adapter, implementation_identity
 from strive_benchmark_tau2.qualification import qualify
 from strive_benchmark_tau2.splits import scenario_group

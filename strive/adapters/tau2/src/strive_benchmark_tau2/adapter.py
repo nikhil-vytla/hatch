@@ -3,17 +3,17 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
 
-from strive.vnext.benchmarks.api import (BenchmarkDescriptor, CapturedGeneration, EpisodeSnapshot, LookupResult,
+from strive.benchmarks.api import (BenchmarkDescriptor, CapturedGeneration, EpisodeSnapshot, LookupResult,
     Metric, OperationContext, OperationReceipt, OperationSpec, RewardResult, ScoringInput, SplitSpec, TaskSpec,
     ToolInvocation, UserTurnPlan)
-from strive.vnext.benchmarks.json_data import canonical, obj, parse, items, string
-from strive.vnext.benchmarks.payloads import dumps, loads
-from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.codec import encode
-from strive.vnext.contracts.lifecycle import RecoveryCapability, RecoveryContract
-from strive.vnext.contracts.primitives import ArtifactRef, EffectId, EpisodeId
-from strive.vnext.errors import VerificationError
-from strive.vnext.store.cas import CAS
+from strive.benchmarks.json_data import canonical, obj, parse, items, string
+from strive.benchmarks.payloads import dumps, loads
+from strive.benchmarks.store import OperationStore
+from strive.codec import encode
+from strive.contracts.lifecycle import RecoveryCapability, RecoveryContract
+from strive.contracts.primitives import ArtifactRef, EffectId, EpisodeId
+from strive.errors import VerificationError
+from strive.store.cas import CAS
 from . import UPSTREAM_REVISION
 from .qualification import Qualification
 from .splits import scenario_group

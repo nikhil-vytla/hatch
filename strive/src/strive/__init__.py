@@ -1,15 +1,12 @@
-"""strive: durable mechanisms for model-led adaptation (vNext, Phase A).
+"""strive: durable mechanisms for model-led adaptation.
 
-Strive provides Exo-like durable mechanisms — one revision-native event and
-artifact substrate plus a resumable policy command boundary — that let a
-policy apply, observe, checkpoint, and revert EXACT composite changes to
-allowlisted surfaces. Comparative evaluation is an optional mechanism a
-policy may request, not a universal activation prerequisite.
+Strive lets an agent revise its code, prompts and memory while a fixed
+execution core enforces permissions, accounts for effects, records exact
+revisions and recovers without hiding uncertainty. Comparative evaluation is
+optional, not a universal promotion gate.
 
-- `strive.substrate` — the append-only event store + CAS + composite state.
-- `strive.policy` — the policy/strategy protocols, kernel commands, catalog.
-- `strive.kernel` — the resumable command loop.
-- `strive.policies.*` — policy packages (code + TOML config + prompts).
+See `strive.cli` for the manifest-shaped CLI and `docs/ARCHITECTURE.md` for
+the five integrity guarantees.
 """
 
 __version__ = "0.2.0"

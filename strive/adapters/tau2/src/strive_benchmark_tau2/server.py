@@ -3,13 +3,13 @@ import os
 from pathlib import Path
 import sys
 
-from strive.vnext.benchmarks.api import (CapturedGeneration, EpisodeSnapshot, OperationContext, TaskSpec, ToolInvocation, UserTurnPlan, ScoringInput)
-from strive.vnext.benchmarks.json_data import canonical, items, obj, parse, string
-from strive.vnext.benchmarks.payloads import dumps, loads
-from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.contracts.primitives import ArtifactRef, EffectId, EpisodeId, RunId
-from strive.vnext.errors import VerificationError
-from strive.vnext.store.cas import CAS
+from strive.benchmarks.api import (CapturedGeneration, EpisodeSnapshot, OperationContext, TaskSpec, ToolInvocation, UserTurnPlan, ScoringInput)
+from strive.benchmarks.json_data import canonical, items, obj, parse, string
+from strive.benchmarks.payloads import dumps, loads
+from strive.benchmarks.store import OperationStore
+from strive.contracts.primitives import ArtifactRef, EffectId, EpisodeId, RunId
+from strive.errors import VerificationError
+from strive.store.cas import CAS
 from .adapter import Tau2Adapter, implementation_identity
 from .process import IsolatedTau2
 from .qualification import load_qualification

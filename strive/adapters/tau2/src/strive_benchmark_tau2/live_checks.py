@@ -14,18 +14,18 @@ import sys
 from typing import Any
 from unittest.mock import patch
 
-from strive.vnext.benchmarks.api import (FoundOperation, OperationContext,
+from strive.benchmarks.api import (FoundOperation, OperationContext,
     OperationReceipt, ScoringInput, TaskSpec)
-from strive.vnext.benchmarks.json_data import canonical, parse
-from strive.vnext.benchmarks.payloads import dumps, loads
-from strive.vnext.benchmarks.store import OperationStore
-from strive.vnext.codec import content_ref
-from strive.vnext.contracts.lifecycle import DispatchStage, RecoveryCapability, RecoveryContract
-from strive.vnext.contracts.primitives import (AccessScope, ArtifactRef, CommandId, EffectId,
+from strive.benchmarks.json_data import canonical, parse
+from strive.benchmarks.payloads import dumps, loads
+from strive.benchmarks.store import OperationStore
+from strive.codec import content_ref
+from strive.contracts.lifecycle import DispatchStage, RecoveryCapability, RecoveryContract
+from strive.contracts.primitives import (AccessScope, ArtifactRef, CommandId, EffectId,
     EnvironmentId, EpisodeId, LineageId, Reservation, RunId)
-from strive.vnext.contracts.records import EffectAuthorization
-from strive.vnext.errors import VerificationError
-from strive.vnext.store.cas import CAS, durable_directory
+from strive.contracts.records import EffectAuthorization
+from strive.errors import VerificationError
+from strive.store.cas import CAS, durable_directory
 from .adapter import TelecomScorer
 from .native_worker import deny_network, run
 from .prepare import check_install
