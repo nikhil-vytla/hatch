@@ -8,7 +8,7 @@ The user requested one subagent per experiment. The platform exhausted its total
 
 The strongest improvements connect model decisions to a complete, inspectable artifact. Music now has one six-track score shared by audio, piano roll, editing and MIDI. Café Jev maintains real menu constraints through conversation, customization and confirmation. The new visual archive ranks a complete declared collection, and the wardrobe demo preserves actual transcription, typed wardrobe edits and video evidence.
 
-| Work | Current local result | Evidence or limitation |
+| Work | Result | Evidence or limitation |
 |---|---|---|
 | Music arranger | 14 recorded arrangements, six instrument parts, audition/edit/locks/MIDI | Strong arch-contour preference remains visible; not a musical-quality win |
 | Café Jev | 102 recorded cases, 304 legal recipes, deterministic order checks | 89/102 exact extractions; zero hard-constraint violations among 65 admitted recommendations |
@@ -22,7 +22,7 @@ The strongest improvements connect model decisions to a complete, inspectable ar
 | JudgeBench reliability | Frozen full 620-pair study running, complete source text and provenance explorer | 14,880 planned question decisions; final statistics await completion |
 | Continuous worlds | Complete Tetris, twelve-resident courtyard and Ghost Brush, with preserved synchronized branches | Small genuine crowd/brush demonstrations; full live-game model performance remains unmeasured |
 
-These changes are local work on `jev-quality-simulation-review`, not a claim that the canonical deployment already contains them. Subfolder reports give exact requests, counts and verification commands.
+These changes are published at [jev-experiments.vercel.app](https://jev-experiments.vercel.app) and proposed in [PR 57](https://github.com/nikhil-vytla/hatch/pull/57). [deployment.json](deployment.json) records the exact published commit and project root; [production-check.json](production-check.json) records deployed asset and API boundary checks. Subfolder reports give exact requests, counts and verification commands.
 
 ## What could be better
 
@@ -51,6 +51,10 @@ bun run test
 bun run build
 ```
 
-Strict review validation passes for 33/33 original experiments. The integrated app passes 166 tests with 148,007 assertions across 27 files and a production build, including the live-world implementations. The eight recently integrated routes loaded at 390 px without overflow or page exceptions; a follow-up with the correct music selector confirmed all 14 arrangements loaded. Detailed interaction checks are recorded in each experiment folder. The independent timing-sketch review caught restoration bugs and is preserved with follow-up notes rather than removed.
+Strict review validation passes for 33/33 original experiments. The integrated app passes 168 tests with 148,041 assertions across 28 files and a production build, including the live-world implementations. The eight recently integrated routes loaded at 390 px without overflow or page exceptions; a follow-up with the correct music selector confirmed all 14 arrangements loaded. Detailed interaction checks are recorded in each experiment folder. The independent timing-sketch review caught restoration bugs and is preserved with follow-up notes rather than removed.
 
-The new components load on demand, reducing initial JavaScript from about 1,078 KB to 853 KB before compression. Sixteen literal credential values read privately from local configuration had no matches in 415 changed/new source files and 734 built files at the expanded scan point. [SECURITY.md](SECURITY.md) records the bounded key and attack-path review. BYOK isolation and missing-key behavior have dedicated tests; this is a bounded key-exposure check, not an assurance that all possible security issues are absent. Generated library copies, build output, caches and recording logs are excluded from the intended commit.
+The new components load on demand, reducing initial JavaScript from about 1,078 KB to 853 KB before compression. Sixteen literal credential values read privately from local configuration had no matches in 462 changed/new source files and 734 built files at the expanded scan point. [SECURITY.md](SECURITY.md) records the bounded key and attack-path review; [security-scan.json](security-scan.json) records the latest literal-scan result. BYOK isolation and missing-key behavior have dedicated tests; this is a bounded key-exposure check, not an assurance that all possible security issues are absent. Generated library copies, build output, caches and recording logs are excluded from the intended commit.
+
+## Deployed interaction checks
+
+The [independent production browser review](../live-worlds/production-review/README.md) verified continuously falling Tetris pieces, identical paired clocks, human takeover, rewind and exact restoration of preserved games. Crowd checkpoints retained resident memory, RNG, disturbances and settings; all exported paired clocks matched. Root also played Ghost Brush on the canonical site, replayed its recorded Coral nerve choice and inspected the same-stroke comparison at desktop and 390 px dark mobile sizes. These checks used local policies or recorded decisions and made no live provider requests.
