@@ -1,0 +1,118 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "labels",
+      "case": "agent_trace_observability_000000",
+      "max_cache_readout_error": 6.67572021484375e-05,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "labels",
+      "case": "customer_service_000000",
+      "max_cache_readout_error": 0.0001239776611328125,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "labels",
+      "case": "invoice_processing_000000",
+      "max_cache_readout_error": 0.0001049041748046875,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "labels",
+      "case": "security_incidents_000000",
+      "max_cache_readout_error": 0.00011444091796875,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+      "method": "labels",
+      "case": "agent_trace_observability_000000",
+      "max_cache_readout_error": 0.000118255615234375,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+      "method": "labels",
+      "case": "customer_service_000000",
+      "max_cache_readout_error": 0.000202178955078125,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+      "method": "labels",
+      "case": "invoice_processing_000000",
+      "max_cache_readout_error": 0.000125885009765625,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+      "method": "labels",
+      "case": "security_incidents_000000",
+      "max_cache_readout_error": 0.000118255615234375,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "method": "labels",
+      "case": "agent_trace_observability_000000",
+      "max_cache_readout_error": 1.71661376953125e-05,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "method": "labels",
+      "case": "customer_service_000000",
+      "max_cache_readout_error": 3.814697265625e-06,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "method": "labels",
+      "case": "invoice_processing_000000",
+      "max_cache_readout_error": 1.9073486328125e-05,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "method": "labels",
+      "case": "security_incidents_000000",
+      "max_cache_readout_error": 9.5367431640625e-06,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "sequence",
+      "case": "agent_trace_observability_000000",
+      "max_cache_readout_error": 9.775161743164062e-06,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "sequence",
+      "case": "customer_service_000000",
+      "max_cache_readout_error": 1.1861324310302734e-05,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "sequence",
+      "case": "invoice_processing_000000",
+      "max_cache_readout_error": 1.3947486877441406e-05,
+      "max_question_order_probability_error": 0.0
+    },
+    {
+      "model": "mlx-community/Qwen3-0.6B-4bit",
+      "method": "sequence",
+      "case": "security_incidents_000000",
+      "max_cache_readout_error": 2.47955322265625e-05,
+      "max_question_order_probability_error": 0.0
+    }
+  ],
+  "note": "Readout error is in raw label logits for first-token methods and mean token log likelihood for full-option scoring. Question-order errors are probability differences. Float32 activations; packed quantized weights unchanged."
+}
