@@ -60,7 +60,7 @@ class Session:
     def __init__(self, directory: Path, run_id: str, *, source: str | None = None, base: Path | None = None,
                  lineage: str = "development", upstream: Upstream | None = None,
                  imported_actor: dict[str, bytes] | None = None, audit_target: int | None = None,
-                 context: dict[str, str] | None = None) -> None:
+                 context: dict[str, str] | None = None, rounds: int = 2) -> None:
         # All resources are private to this execution. No shared CAS, retrieval
         # DB, provider spool, environment, grant registry or budget object.
         try:
@@ -145,10 +145,10 @@ class Session:
                     "builtin:capabilities": self.objects.publish(b"counter operations and bounded fixture refinement/1"),
                     "builtin:initial": self.objects.publish(b"{}"), "builtin:options": self.objects.publish(b"{}"),
                     "builtin:prices": price_ref,
-                    "builtin:stream": self.objects.publish(json_bytes({"tasks": ["reach-seven", "reach-seven"]})),
+                    "builtin:stream": self.objects.publish(json_bytes({"tasks": ["reach-seven"] * rounds})),
                     "builtin:corpus": self.objects.publish(json_bytes({"tasks": ["reach-seven"], "update": "pinned"})),
                     "builtin:audit-plan": self.objects.publish(json_bytes({"selection": "final_valid_active_actor_from_every_trajectory", "release": "after-campaign-freeze"})),
-                    "builtin:comparison-plan": self.objects.publish(json_bytes({"horizon": 2, "pairing": "workload_seed", "metric": "cumulative_successes", "exclusions": [], "stopping": "budget-or-horizon", "uncertainty": "paired-normal-95"}))}
+                    "builtin:comparison-plan": self.objects.publish(json_bytes({"horizon": rounds, "pairing": "workload_seed", "metric": "cumulative_successes", "exclusions": [], "stopping": "budget-or-horizon", "uncertainty": "paired-normal-95"}))}
                 assert base is not None
                 config = Resolver(self.objects, base, builtins).configuration(authored)
             expected = (self.pin, self.adapter.scorer.identity, self.gateway.identity, self.adapter.workload)
@@ -283,12 +283,12 @@ class Session:
 
 
 def run(root: Path, path: Path, run_id: str, *, display: Callable[[str], None] = print,
-        dispatch: bool = True) -> VerifiedState:
+        dispatch: bool = True, rounds: int = 2) -> VerifiedState:
     directory = run_directory(root, run_id)
     durable_directory(directory.parent)
     directory.mkdir(mode=0o700)  # Existing identity, even interrupted setup, is never reused.
     fsync_directory(directory.parent)
-    with Session(directory, run_id, source=path.read_text(), base=path.parent) as session:
+    with Session(directory, run_id, source=path.read_text(), base=path.parent, rounds=rounds) as session:
         display("Resolved configuration before dispatch:\n" + json_bytes(session.manifest).decode())
         return session.drive() if dispatch else session.reader.verify()
 

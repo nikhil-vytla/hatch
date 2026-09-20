@@ -115,3 +115,37 @@ strings that happen to contain "vnext" — `wire.py`'s
 `store/journal.py`/`cli/app.py` — none of those are naming artifacts of the
 package split; they're data-format/runtime-default identifiers, out of scope
 for a Python-import-path rename.
+
+## Non-benchmark workload finding + round-count proof (2026-09-20)
+
+Traced whether `ContinualRefine` actually requires scoring/episode structure
+(it does not — `refine()` never touches score; `EvidenceSelector` uses episode
+only as an opaque key) versus what's actually missing for non-benchmark work
+(a real-environment adapter; a generic adapter-agnostic driver; open-ended
+loop termination). See [ADR-0014](docs/adrs/0014-non-benchmark-workloads-scope.md)
+for the full finding and evidence.
+
+Made the counter fixture's round count configurable (`Session`/`run()` gained
+`rounds: int = 2`, default unchanged) instead of a hardcoded 2-task stream.
+This surfaced a real bug caught by a Codex stop-hook review before it shipped:
+the fixture's comparison plan hardcoded `"horizon": 2`, which
+`report/compare.py` checks against `coverage.planned` and would have rejected
+any non-default-`rounds` run as a horizon mismatch. Fixed by tying `horizon`
+to `rounds`.
+
+Ran the fixture at `rounds=20` (with `model_calls` raised from the default 10
+to 30 to get past an early suspension): 19/20 episodes admitted, 18/20
+completed, 0.85 observed fulfilment, then safely suspended at `runtime.step`
+on the manifest's `wall_seconds=120` budget — real sandboxed subprocess
+overhead per round, not an episode-count or scoring ceiling. That suspension
+is itself further evidence for the finding: nothing about scaling past 2
+rounds broke; the mechanism is bounded only by declared resource budgets.
+
+Also fixed, unrelated but discovered along the way: an earlier `uv sync
+--frozen` (verifying the README quickstart) had silently stripped `pydantic`/
+`python-dotenv` from the venv, which `adapters/tau2/src` needs at type-check
+time (its own runtime uses a separate `--extra telecom` venv). They were only
+ever present as transitive dependencies of the now-removed `dspy`. Added both
+as explicit dev dependencies in `pyproject.toml` and regenerated `uv.lock` so
+`uv sync --frozen` reliably restores them; `uv run mypy --strict` is clean
+again (146 files).

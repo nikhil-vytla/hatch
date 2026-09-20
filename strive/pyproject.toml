@@ -13,6 +13,11 @@ strive = "strive.cli:main"
 dev = [
     "pytest>=8.0",
     "mypy>=1.10",
+    # adapters/tau2/src imports these at type-check time (its own runtime uses
+    # a separate --extra telecom venv per scripts/install-tau2.sh); without
+    # them here, `uv sync --frozen` silently leaves mypy unable to check tau2.
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
 ]
 
 [build-system]

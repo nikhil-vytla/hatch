@@ -62,5 +62,15 @@ budget coordination, persistent verification caches, external history anchors,
 host-loss recovery and additional viewer profiles. A custom web UI and hosted
 experiment service are outside the present scope.
 
+A real-environment `BenchmarkAdapter` — one whose `agent_tool`/`deliver_message`
+execute real file edits and test runs against a real sandboxed repo, reusing
+the existing `CandidateExecutor`/sandbox infrastructure, instead of the
+synthetic in-memory state both Counter and tau2 use today — is unbuilt. So is
+collapsing `cli/runner.py`'s `Session` and `cli/campaign.py`'s `Campaign` into
+one adapter-agnostic driver selected by the manifest, and removing the
+closed-horizon `len(assignments)`-reached completion condition for workloads
+with no natural finite horizon. See
+[ADR-0014](adrs/0014-non-benchmark-workloads-scope.md).
+
 [HANDOFF.md](HANDOFF.md) contains operational verification commands. Earlier
 roadmaps remain in [the archive](archive/README.md).
