@@ -1,21 +1,21 @@
 # Jev experience prototypes
 
-[Open the deployed prototype](https://jev-experiences.vercel.app). This branch rebuilds the experiment gallery around things people can manipulate, play, hear, compare, and inspect. It contains 29 experiment pages, shared light/dark/system themes, and three shareable layouts on the same routes.
+[Open Jev experiments](https://jev-experiments.vercel.app). This is the deployed source for the experiment gallery around things people can manipulate, play, hear, compare, and inspect. It contains 29 experiment pages, shared light/dark/system themes, and three shareable layouts on the same routes.
 
 The design question is whether an artifact-first studio, a controls-first comparison desk, or a narrative evidence notebook makes the experiments easier to understand. These are reviewable prototypes on `jev-experience-prototypes`. No winning layout has been selected yet.
 
 ## Try these first
 
-- [Interfaces that listen](https://jev-experiences.vercel.app/#experiment/ui): replay a recorded construction, fill real fields, trigger local actions, compose another interface, or revise a version. Jev selects typed components through json-render. Layout and entrance animations reveal the changes. Account settings, apartment comparison, and event planning each have completed recorded builds.
-- [Paste what belongs](https://jev-experiences.vercel.app/#experiment/paste): follow source facts into destination fields, accept individual values, fill a form, undo, and distinguish personal from work or obsolete information. The downloadable [browser companion](https://jev-experiences.vercel.app/companion.zip) applies the same interaction to ordinary website forms. See [installation and limitations](extension/README.md).
-- [The next useful question](https://jev-experiences.vercel.app/#experiment/journeys): navigate a branching drink-order journey. One Jev request evaluated all 81 possible preference states. The independent menu filter checks compatibility and determines when a unique drink exists. No live token is needed to explore the recorded paths.
-- [A table that understands](https://jev-experiences.vercel.app/#experiment/semantic-table): ask a semantic question of eight complete support conversations, filter the answers, inspect the evidence, correct labels, and export the review.
-- [Undo what you meant](https://jev-experiences.vercel.app/#experiment/undo): select changes by meaning, review that selection, and animate their reversal without reverting unrelated changes.
-- [What changed that matters?](https://jev-experiences.vercel.app/#experiment/changes): alter a source fact and inspect which conclusions need review against an independent dependency list.
-- [Navigation replays](https://jev-experiences.vercel.app/#experiment/games): play and scrub actual MiniGrid traces, change policies and seeds, and inspect the agent's observation. There are 239 completed episodes, including unsuccessful episodes. One interrupted episode remains in the evidence download.
-- [Music](https://jev-experiences.vercel.app/#experiment/music): hear recorded Jev motifs in a four-part procedural arrangement, change tempo, mute parts, alter notes, request another arrangement, and export MIDI or JSON.
-- [Pixel compositions](https://jev-experiences.vercel.app/#experiment/pixels) and [animated worlds](https://jev-experiences.vercel.app/#experiment/worlds): Jev selects composition parameters; code supplies a visible drawing vocabulary. Palette, environment, density, motifs, and movement affect the render. These are constrained composition experiments, not unrestricted image generation.
-- [JudgeBench](https://jev-experiences.vercel.app/#experiment/judge): read the full question and both candidate answers before revealing the dataset label and Jev judgment. Search the cases or inspect only mistakes. The language experiment likewise shows every writer candidate and the reference answer, with executable instruction-check outcomes.
+- [Interfaces that listen](https://jev-experiments.vercel.app/#experiment/ui): replay a recorded construction, fill real fields, trigger local actions, compose another interface, or revise a version. Jev selects typed components through json-render. Layout and entrance animations reveal the changes. Account settings, apartment comparison, and event planning each have completed recorded builds.
+- [Paste what belongs](https://jev-experiments.vercel.app/#experiment/paste): follow source facts into destination fields, accept individual values, fill a form, undo, and distinguish personal from work or obsolete information. The downloadable [browser companion](https://jev-experiments.vercel.app/companion.zip) applies the same interaction to ordinary website forms. See [installation and limitations](extension/README.md).
+- [The next useful question](https://jev-experiments.vercel.app/#experiment/journeys): navigate a branching drink-order journey. One Jev request evaluated all 81 possible preference states. The independent menu filter checks compatibility and determines when a unique drink exists. No live token is needed to explore the recorded paths.
+- [A table that understands](https://jev-experiments.vercel.app/#experiment/semantic-table): ask a semantic question of eight complete support conversations, filter the answers, inspect the evidence, correct labels, and export the review.
+- [Undo what you meant](https://jev-experiments.vercel.app/#experiment/undo): select changes by meaning, review that selection, and animate their reversal without reverting unrelated changes.
+- [What changed that matters?](https://jev-experiments.vercel.app/#experiment/changes): alter a source fact and inspect which conclusions need review against an independent dependency list.
+- [Navigation replays](https://jev-experiments.vercel.app/#experiment/games): play and scrub actual MiniGrid traces, change policies and seeds, and inspect the agent's observation. There are 239 completed episodes, including unsuccessful episodes. One interrupted episode remains in the evidence download.
+- [Music](https://jev-experiments.vercel.app/#experiment/music): hear recorded Jev motifs in a four-part procedural arrangement, change tempo, mute parts, alter notes, request another arrangement, and export MIDI or JSON.
+- [Pixel compositions](https://jev-experiments.vercel.app/#experiment/pixels) and [animated worlds](https://jev-experiments.vercel.app/#experiment/worlds): Jev selects composition parameters; code supplies a visible drawing vocabulary. Palette, environment, density, motifs, and movement affect the render. These are constrained composition experiments, not unrestricted image generation.
+- [JudgeBench](https://jev-experiments.vercel.app/#experiment/judge): read the full question and both candidate answers before revealing the dataset label and Jev judgment. Search the cases or inspect only mistakes. The language experiment likewise shows every writer candidate and the reference answer, with executable instruction-check outcomes.
 
 ## Compare the page layouts
 
@@ -23,11 +23,11 @@ The state stays mounted while the layout changes. Use the floating bar or left/r
 
 | Layout | Link | Emphasis |
 | --- | --- | --- |
-| Studio | [Open](https://jev-experiences.vercel.app/?variant=studio#experiment/paste) | Large artifact, compact controls |
-| Comparison | [Open](https://jev-experiences.vercel.app/?variant=comparison#experiment/paste) | Controls first, followed by a full-width comparison |
-| Notebook | [Open](https://jev-experiences.vercel.app/?variant=notebook#experiment/paste) | Question first, stacked artifact and controls |
+| Studio | [Open](https://jev-experiments.vercel.app/?variant=studio#experiment/paste) | Large artifact, compact controls |
+| Comparison | [Open](https://jev-experiments.vercel.app/?variant=comparison#experiment/paste) | Controls first, followed by a full-width comparison |
+| Notebook | [Open](https://jev-experiments.vercel.app/?variant=notebook#experiment/paste) | Question first, stacked artifact and controls |
 
-The floating layout selector intentionally remains visible on this separately deployed prototype. It should be removed when a design is promoted into the main application.
+The layout selector offers three views of the same experiments in the main application. All views share the same route and retain entered state.
 
 ## What happens to failed runs
 
@@ -69,6 +69,8 @@ Context filtering now makes kept and dropped text visible, but needs a downstrea
 
 ## Run and deploy
 
+This folder is the current application source for the existing `jev-experiments` Vercel project. Deploy it to https://jev-experiments.vercel.app. The older `../web` folder is the preceding implementation.
+
 From this folder:
 
 ```sh
@@ -85,9 +87,10 @@ bun run recover
 bun run record
 bun scripts/record-journeys.ts
 bun scripts/record-pixels.ts
-bun scripts/configure-cloud.ts
-bunx --bun vercel deploy --prod --yes
+bun run deploy
 ```
+
+`bun run deploy` pins the existing Vercel project, builds the prepared evidence locally, and deploys production. Production credentials are already configured on that project.
 
 Preparation overlays new results onto the original lab's records and joins full inputs from pinned upstream datasets. Local recovery/metric recomputation needs the parent lab's request logs, dataset cache, and Python environment. A fresh checkout can use the original lab's documented dataset preparation to restore that cache. Vercel uploads prepared `public/data`; it does not fetch repositories or run training during the build. `public/data`, dependencies, provider credentials, caches, and upstream checkouts are excluded from the commit.
 

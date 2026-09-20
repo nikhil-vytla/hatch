@@ -6,6 +6,7 @@
     "dev": "bun scripts/prepare.ts && vite --host 127.0.0.1 --port 5191",
     "server": "bun server/dev.ts",
     "build": "bun scripts/prepare.ts && tsc --noEmit && vite build",
+    "deploy": "bun scripts/deploy.ts",
     "test": "bun test server",
     "start": "bun scripts/start.ts",
     "record": "bun scripts/record.ts",
