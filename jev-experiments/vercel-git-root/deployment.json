@@ -1,0 +1,19 @@
+{
+  "id": "dpl_CR6Hp4pYMaJ5jDSCaYFnWE95UppT",
+  "url": "jev-experiments-asik329ez-nikhil-vytla.vercel.app",
+  "readyState": "ERROR",
+  "target": "production",
+  "gitSource": {
+    "type": "github",
+    "repoId": 1092203195,
+    "ref": "main",
+    "sha": "9e712282a711eac747f0c32353938fd4978835a5"
+  },
+  "errorCode": "BUILD_UTILS_SPAWN_1",
+  "errorMessage": "Command \"bun run build\" exited with 1",
+  "alias": [
+    "jev-experiments-nikhil-vytla.vercel.app",
+    "jev-experiments-git-main-nikhil-vytla.vercel.app"
+  ],
+  "aliasAssigned": false
+}

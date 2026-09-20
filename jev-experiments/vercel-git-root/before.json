@@ -1,0 +1,17 @@
+{
+  "id": "prj_D85FuYXgN0CQm4l1OcsuCQnfK1DO",
+  "name": "jev-experiments",
+  "rootDirectory": null,
+  "sourceFilesOutsideRootDirectory": true,
+  "framework": "vite",
+  "buildCommand": "bun run build",
+  "installCommand": null,
+  "outputDirectory": "dist",
+  "link": {
+    "type": "github",
+    "org": "nikhil-vytla",
+    "repo": "hatch",
+    "repoId": 1092203195,
+    "productionBranch": "main"
+  }
+}
