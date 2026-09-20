@@ -1,0 +1,321 @@
+[
+  {
+    "id": "paste",
+    "before": {
+      "title": "Paste what belongs",
+      "category": "New"
+    },
+    "after": {
+      "title": "Smart paste",
+      "category": "Productivity"
+    }
+  },
+  {
+    "id": "ui",
+    "before": {
+      "title": "Interfaces that listen",
+      "category": "Create"
+    },
+    "after": {
+      "title": "Generative interfaces",
+      "category": "Creative tools"
+    }
+  },
+  {
+    "id": "worlds",
+    "before": {
+      "title": "A world in motion",
+      "category": "Create"
+    },
+    "after": {
+      "title": "Living scenes",
+      "category": "Creative tools"
+    }
+  },
+  {
+    "id": "games",
+    "before": {
+      "title": "Find a way through",
+      "category": "Agents"
+    },
+    "after": {
+      "title": "Key & door",
+      "category": "Games"
+    }
+  },
+  {
+    "id": "music",
+    "before": {
+      "title": "A small orchestra",
+      "category": "Create"
+    },
+    "after": {
+      "title": "Music arranger",
+      "category": "Creative tools"
+    }
+  },
+  {
+    "id": "pixels",
+    "before": {
+      "title": "Picture by picture",
+      "category": "Create"
+    },
+    "after": {
+      "title": "Pixel studio",
+      "category": "Creative tools"
+    }
+  },
+  {
+    "id": "semantic-table",
+    "before": {
+      "title": "A table that understands",
+      "category": "New"
+    },
+    "after": {
+      "title": "Semantic spreadsheet",
+      "category": "Productivity"
+    }
+  },
+  {
+    "id": "undo",
+    "before": {
+      "title": "Undo what you meant",
+      "category": "New"
+    },
+    "after": {
+      "title": "Intent-based undo",
+      "category": "Productivity"
+    }
+  },
+  {
+    "id": "changes",
+    "before": {
+      "title": "What changed that matters?",
+      "category": "New"
+    },
+    "after": {
+      "title": "Change impact",
+      "category": "Productivity"
+    }
+  },
+  {
+    "id": "logos",
+    "before": {
+      "title": "Marks with character",
+      "category": "Create"
+    },
+    "after": {
+      "title": "Logo studio",
+      "category": "Creative tools"
+    }
+  },
+  {
+    "id": "beverage",
+    "before": {
+      "title": "Find my drink",
+      "category": "Decide"
+    },
+    "after": {
+      "title": "Drink finder",
+      "category": "Productivity"
+    }
+  },
+  {
+    "id": "journeys",
+    "before": {
+      "title": "The next useful question",
+      "category": "Decide"
+    },
+    "after": {
+      "title": "Adaptive forms",
+      "category": "Productivity"
+    }
+  },
+  {
+    "id": "decisions",
+    "before": {
+      "title": "What matters to you",
+      "category": "Decide"
+    },
+    "after": {
+      "title": "Preference explorer",
+      "category": "Productivity"
+    }
+  },
+  {
+    "id": "routing",
+    "before": {
+      "title": "The right mind for the job",
+      "category": "Agents"
+    },
+    "after": {
+      "title": "Model router",
+      "category": "Agents & tooling"
+    }
+  },
+  {
+    "id": "verify",
+    "before": {
+      "title": "Show your evidence",
+      "category": "Agents"
+    },
+    "after": {
+      "title": "Agent verifier",
+      "category": "Agents & tooling"
+    }
+  },
+  {
+    "id": "search",
+    "before": {
+      "title": "Find the useful passage",
+      "category": "Agents"
+    },
+    "after": {
+      "title": "Search reranker",
+      "category": "Agents & tooling"
+    }
+  },
+  {
+    "id": "context",
+    "before": {
+      "title": "Make room for what matters",
+      "category": "Agents"
+    },
+    "after": {
+      "title": "Context filter",
+      "category": "Agents & tooling"
+    }
+  },
+  {
+    "id": "micro",
+    "before": {
+      "title": "Small agents, one task",
+      "category": "Agents"
+    },
+    "after": {
+      "title": "Micro-agent team",
+      "category": "Agents & tooling"
+    }
+  },
+  {
+    "id": "vision",
+    "before": {
+      "title": "Look a little closer",
+      "category": "Agents"
+    },
+    "after": {
+      "title": "Vision to action",
+      "category": "Agents & tooling"
+    }
+  },
+  {
+    "id": "classify",
+    "before": {
+      "title": "Read between the labels",
+      "category": "Benchmarks"
+    },
+    "after": {
+      "title": "Intent recognition",
+      "category": "Benchmarks"
+    }
+  },
+  {
+    "id": "judge",
+    "before": {
+      "title": "Which answer holds up?",
+      "category": "Benchmarks"
+    },
+    "after": {
+      "title": "JudgeBench",
+      "category": "Benchmarks"
+    }
+  },
+  {
+    "id": "robustness",
+    "before": {
+      "title": "Same meaning, new disguise",
+      "category": "Benchmarks"
+    },
+    "after": {
+      "title": "Decision stability",
+      "category": "Benchmarks"
+    }
+  },
+  {
+    "id": "latency",
+    "before": {
+      "title": "Many questions, one moment",
+      "category": "Measure"
+    },
+    "after": {
+      "title": "Batching & latency",
+      "category": "Benchmarks"
+    }
+  },
+  {
+    "id": "optimize",
+    "before": {
+      "title": "Teach the question to improve",
+      "category": "Learn"
+    },
+    "after": {
+      "title": "Prompt evolution",
+      "category": "Training & local"
+    }
+  },
+  {
+    "id": "teach",
+    "before": {
+      "title": "A teacher in the loop",
+      "category": "Learn"
+    },
+    "after": {
+      "title": "Active labeling",
+      "category": "Training & local"
+    }
+  },
+  {
+    "id": "reward",
+    "before": {
+      "title": "Reward is not the result",
+      "category": "Learn"
+    },
+    "after": {
+      "title": "Learning from rewards",
+      "category": "Training & local"
+    }
+  },
+  {
+    "id": "replica",
+    "before": {
+      "title": "A little model learns decisions",
+      "category": "Learn"
+    },
+    "after": {
+      "title": "SmolLM decision model",
+      "category": "Training & local"
+    }
+  },
+  {
+    "id": "rewardbench2",
+    "before": {
+      "title": "RewardBench 2",
+      "category": "Benchmarks"
+    },
+    "after": {
+      "title": "RewardBench 2",
+      "category": "Benchmarks"
+    }
+  },
+  {
+    "id": "adapters",
+    "before": {
+      "title": "Types become questions",
+      "category": "Build"
+    },
+    "after": {
+      "title": "Typed schema adapters",
+      "category": "Agents & tooling"
+    }
+  }
+]
