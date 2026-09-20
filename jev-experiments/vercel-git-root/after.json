@@ -1,0 +1,17 @@
+{
+  "id": "prj_D85FuYXgN0CQm4l1OcsuCQnfK1DO",
+  "name": "jev-experiments",
+  "rootDirectory": "jev-experiments/experience-prototypes",
+  "sourceFilesOutsideRootDirectory": true,
+  "framework": "vite",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install --frozen-lockfile",
+  "outputDirectory": "dist",
+  "link": {
+    "type": "github",
+    "org": "nikhil-vytla",
+    "repo": "hatch",
+    "repoId": 1092203195,
+    "productionBranch": "main"
+  }
+}

@@ -5,6 +5,7 @@ dist
 .cache
 .playwright-cli
 output
-results
+**/results/access.json
+**/results/smoke.json
 NOTES.md
 bun.lockb

@@ -1,0 +1,11 @@
+{
+  "name": "jev-experiments",
+  "project": "prj_D85FuYXgN0CQm4l1OcsuCQnfK1DO",
+  "target": "production",
+  "gitSource": {
+    "type": "github",
+    "repoId": 1092203195,
+    "ref": "main",
+    "sha": "9e712282a711eac747f0c32353938fd4978835a5"
+  }
+}
