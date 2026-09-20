@@ -9,3 +9,6 @@
 - Created a production deployment directly from the GitHub `main` commit to verify a clean Git checkout, rather than uploading locally prepared assets.
 
 - The first clean Git deployment failed because `.vercelignore` matched both result directories and removed the committed JSONL inputs. Build logs identified `../results/adapters.jsonl` as the first missing file. Replaced the broad `results` exclusion with explicit exclusions for private access/smoke JSON fixtures; environment files and caches remain excluded.
+
+- Pushed the small ignore correction to `main` as `90e8e94`. The GitHub integration automatically created production deployment `dpl_o2fEfjgweCTyRsbFJdKzAKx1fCj4`, proving the new integration and root work together without a local upload.
+- Deployment reached READY and received `jev-experiments.vercel.app`. Public checks passed for the homepage, all 200 full JudgeBench cases, the companion ZIP, and missing-key API rejection.
