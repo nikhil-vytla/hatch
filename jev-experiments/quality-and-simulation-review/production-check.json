@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-20T22:06:15.357Z",
+  "at": "2026-09-20T22:11:31.029Z",
   "origin": "https://jev-experiments.vercel.app",
   "passed": true,
   "results": [
@@ -113,6 +113,24 @@
       "bytes": 66,
       "cacheControl": "no-store",
       "error": "This endpoint only connects the wardrobe try-on model.",
+      "passed": true
+    }
+  ],
+  "media": [
+    {
+      "path": "/wardrobe/try-on-demo.webm",
+      "status": 200,
+      "bytes": 905077,
+      "sha256": "beb3e7b1ea086e86821fe691189438e61a8e72602cf3843297373c3ac532f3a9",
+      "expectedDurationSeconds": 29.905,
+      "passed": true
+    },
+    {
+      "path": "/wardrobe/spoken-try-on-demo.webm",
+      "status": 200,
+      "bytes": 994578,
+      "sha256": "1e0f9b6c2b1f847208267835c835b1dad6b5d8875593040ba0d201e2a3456d26",
+      "expectedDurationSeconds": 29.954,
       "passed": true
     }
   ]

@@ -35,3 +35,5 @@ bun jev-experiments/wardrobe-lab/media-remux/serve.ts
 The wardrobe suite passes 22 tests with 138 assertions. The new artifact tests parse EBML metadata, verify cue offsets point to actual clusters, require cues before the first cluster, and verify exact manifest hashes and byte lengths. Existing tests retain the separate control/spoken provenance and VP8/Opus track checks.
 
 Chrome reports 29.905s and 29.954s, with finite seekable ranges. Both clips sought to 4, 29, 13 and 1 seconds, reached `readyState === 4`, and resumed playback without a media error. The [browser observations](browser.json) and [inspected screenshot](browser.png) record that check. The local review page produced only an unrelated missing favicon request. All changed binary files remain below 2MB.
+
+The canonical app also passed [production playback and seek checks](production-browser.json). Both deployed file hashes match the remuxed manifests; spoken playback sought forward to20s and backward to4s without errors. See the [deployed player](../output/production-spoken-video.png).
