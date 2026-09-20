@@ -1,0 +1,50 @@
+{
+  "site": "https://jev-experiments.vercel.app",
+  "review_date": "2026-09-20",
+  "initial_frontend_commit": "f97ae27",
+  "subsequent_commit_with_same_frontend": "7438545",
+  "session": "production-review",
+  "blockers_found": [],
+  "owner_credentials_used": false,
+  "live_model_requests": 0,
+  "wardrobe_route_tested": false,
+  "api_requests_blocked_after_initial_home_load": true,
+  "home": {
+    "both_preview_canvases_animated": true,
+    "main_tetris_link_worked": true,
+    "desktop_1440_no_overflow": true,
+    "mobile_390_no_overflow": true
+  },
+  "tetris": {
+    "source": "local timing demo",
+    "artificial_delay_ms": 1200,
+    "world_advanced_with_pending_decision": true,
+    "game_times_ms": [14180, 14180],
+    "pieces_placed": [12, 9],
+    "scores": [610, 508],
+    "pause_stable": true,
+    "rewind_checkpoint_ms": 7400,
+    "branch_preserves_both_games_queues_settings": true,
+    "preserved_tail_restores_exact_games": true,
+    "human_takeover_and_touch_drop": true,
+    "desktop_1440_no_overflow": true,
+    "mobile_390_no_overflow": true
+  },
+  "crowd": {
+    "default_local_scenes_advanced": true,
+    "recorded_replay_seconds": [5.1, 5.1],
+    "recorded_replay_ticks": [153, 153],
+    "recorded_decisions": [12, 12],
+    "live_decisions": [0, 0],
+    "both_resident_sets_moved": true,
+    "pause_clock_and_canvas_stable": true,
+    "rewind_to_zero": true,
+    "posting_disabled_during_replay": true,
+    "branch_and_preservation_export_checks": "crowd-export-checks.json",
+    "mobile_390_no_overflow": true,
+    "mobile_dark_canvas_widths": [344, 344]
+  },
+  "console_errors_observed": 0,
+  "console_warnings_observed": 0,
+  "screenshots_under_2mb_each": true
+}

@@ -1,0 +1,119 @@
+{
+  "at": "2026-09-20T22:06:15.357Z",
+  "origin": "https://jev-experiments.vercel.app",
+  "passed": true,
+  "results": [
+    {
+      "path": "/",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 963,
+      "passed": true
+    },
+    {
+      "path": "/data/live-worlds.json",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 467,
+      "result": {
+        "kind": "interactive prototypes",
+        "recordedModelResults": true,
+        "recordedCoverage": {
+          "crowd": "One authored notice, 12 fictional resident plans",
+          "ghostBrush": "Two authored phrases, 20 recipe-fit judgments",
+          "liveTetris": "No new model recording; local timing demo and visitor-key play"
+        },
+        "description": "Original playable worlds with separate local, recorded and visitor-key Jev attribution. These demonstration examples are not a benchmark."
+      },
+      "passed": true
+    },
+    {
+      "path": "/research/quality-review/review.html",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 338306,
+      "passed": true
+    },
+    {
+      "path": "/data/judgment-reliability.json",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 306029,
+      "availability": {
+        "planned": 7440,
+        "completed": 4430,
+        "unavailable": 3010,
+        "planned_decisions": 14880,
+        "completed_decisions": 8844,
+        "completed_batches": 696,
+        "transient_failed_invocations": 2,
+        "blocked_invocations": 0,
+        "attempts": 1088,
+        "unsuccessful_attempts": 392,
+        "median_latency_ms": 492,
+        "p95_latency_ms": 44587,
+        "returned_models": [
+          "typesafe-ai/jev"
+        ],
+        "reported_cost_usd": 0,
+        "first_at": "2026-09-20T20:05:27.680Z",
+        "last_at": "2026-09-20T21:53:54.183Z"
+      },
+      "passed": true
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "POST",
+      "expectedStatus": 401,
+      "status": 401,
+      "bytes": 108,
+      "cacheControl": "no-store",
+      "error": "Enter your Vercel AI Gateway API key to run live. Recorded examples are available without a key.",
+      "passed": true
+    },
+    {
+      "path": "/api/compose",
+      "method": "POST",
+      "expectedStatus": 401,
+      "status": 401,
+      "bytes": 61,
+      "cacheControl": "no-store",
+      "error": "Enter your Vercel AI Gateway API key to run live.",
+      "passed": true
+    },
+    {
+      "path": "/api/wardrobe-token",
+      "method": "POST",
+      "expectedStatus": 401,
+      "status": 401,
+      "bytes": 56,
+      "cacheControl": "no-store",
+      "error": "Enter your own fal API key to connect video.",
+      "passed": true
+    },
+    {
+      "path": "/api/wardrobe-token",
+      "method": "GET",
+      "expectedStatus": 405,
+      "status": 405,
+      "bytes": 21,
+      "cacheControl": "no-store",
+      "error": "Use POST.",
+      "passed": true
+    },
+    {
+      "path": "/api/wardrobe-token",
+      "method": "POST",
+      "expectedStatus": 400,
+      "status": 400,
+      "bytes": 66,
+      "cacheControl": "no-store",
+      "error": "This endpoint only connects the wardrobe try-on model.",
+      "passed": true
+    }
+  ]
+}

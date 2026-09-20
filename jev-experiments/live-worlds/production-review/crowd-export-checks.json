@@ -1,0 +1,10 @@
+{
+  "branchedFromZero": true,
+  "branchRestoresAllSubstantiveWorldFields": true,
+  "uiSettingsRestored": true,
+  "archivedPriorTailRetainsActors": true,
+  "archivedPriorTailTime": 5.1,
+  "branchTime": 0,
+  "allCurrentAndArchivedCheckpointsSynchronized": true,
+  "zeroLiveRequests": true
+}

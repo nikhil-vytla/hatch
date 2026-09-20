@@ -4,7 +4,7 @@ A working wardrobe experiment: choose tagged clothing, say or type a change, let
 
 ## What actually ran
 
-The **spoken recording** is [assets/spoken-try-on-demo.webm](assets/spoken-try-on-demo.webm): 30.0035 seconds of actual Lucy 2.1 output, 720×1280, 994,156 bytes, with an Opus track containing the original synthetic speech. It starts from an original illustrated adult presenter, not a user's camera. Four commands add a denim jacket, add black square sunglasses, “Make them pink,” and “Make them bigger.” The accepted states keep the jacket throughout. Actual sampled frames show the navy jacket and black-to-pink eyewear; the final size increase is not conclusive. Sleeve/coat proportions and pose drift, trousers turn cream in an intermediate frame, and small unrequested shirt markings appear. Canonical-state correctness does not guarantee pixel-level preservation.
+The **spoken recording** is [assets/spoken-try-on-demo.webm](assets/spoken-try-on-demo.webm): a 30.0035-second capture of actual Lucy 2.1 output, 720×1280, now 994,578 bytes, with an Opus track containing the original synthetic speech. Its stored media timeline is 29.954 seconds. It starts from an original illustrated adult presenter, not a user's camera. Four commands add a denim jacket, add black square sunglasses, “Make them pink,” and “Make them bigger.” The accepted states keep the jacket throughout. Actual sampled frames show the navy jacket and black-to-pink eyewear; the final size increase is not conclusive. Sleeve/coat proportions and pose drift, trousers turn cream in an intermediate frame, and small unrequested shirt markings appear. Canonical-state correctness does not guarantee pixel-level preservation.
 
 The speech files were generated with macOS `say`, Samantha at 145 words/minute, then transcribed locally with [MLX Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper), `mlx-community/whisper-base.en-mlx`. No transcript was corrected by hand. Each exact transcript and canonical input matched an already recorded Jev response; `record-spoken.ts` verified both before reusing that genuine response. The resulting guarded outfit states drove Lucy, with no expected-state substitution. Actual STT/model decisions were recorded before the video session, then replayed every 7.5 seconds after the corresponding audio. **The clip demonstrates all pipeline stages, with replayed decision timing; it is not a measurement of live end-to-end latency.**
 
@@ -17,7 +17,9 @@ The speech files were generated with macOS `say`, Samantha at 145 words/minute, 
 
 `spoken-pipeline.json` contains original transcripts, model responses, accepted states, guard explanations, original timings and audio hashes. `spoken-recording.json` records the actual provider session and changes. The last model call's long wall latency is preserved; the 30-second replay does not conceal that measurement. Warm STT timing excludes model installation/download; the first transcription includes model startup.
 
-A separate [authored control clip](assets/try-on-demo.webm) is 30 seconds / 904,639 bytes. Its outfit steps were authored rather than Jev-selected, and are labeled accordingly. An initial failed Fal attempt produced zero frames; `recording-attempt-1.json` preserves it. No failed attempt is presented as generated output. Earlier Tiny/base STT trials misheard pronouns; their transcripts are retained, along with an empty-audio scripting diagnostic.
+A separate [authored control clip](assets/try-on-demo.webm) is a 30-second capture, now 905,077 bytes with a 29.905-second stored timeline. Its outfit steps were authored rather than Jev-selected, and are labeled accordingly. An initial failed Fal attempt produced zero frames; `recording-attempt-1.json` preserves it. No failed attempt is presented as generated output. Earlier Tiny/base STT trials misheard pronouns; their transcripts are retained, along with an empty-audio scripting diagnostic.
+
+Both original MediaRecorder files lacked duration and seek cues. A [lossless container repair](media-remux/README.md) added finite duration and front-loaded seek indexes without re-encoding. Every encoded packet, presentation/decode timestamp, and decoded video/audio hash matched before and after. Capture wall time remains in `actualRecordedSeconds`; `containerDurationSeconds` describes the actual saved packet timeline. Each manifest records original and current file hashes and sizes. Chrome now reports finite duration and successfully seeks forward and backward in both clips.
 
 ## Jev evidence and code constraints
 
@@ -50,7 +52,7 @@ The publication data key is `wardrobe`, decoded from `wardrobe.jsonl` via the ex
 
 ```sh
 # From wardrobe-lab; real model/video commands require authorized local credentials.
-bun test engine.test.ts privacy.test.ts
+bun test engine.test.ts privacy.test.ts media.test.ts
 zsh synthesize-speech.sh
 uv run --no-project --with mlx-whisper --with soundfile python transcribe.py
 bun run record-spoken.ts
@@ -61,4 +63,4 @@ WARDROBE_SPOKEN=1 bun run record-server.ts
 
 `record-jev.ts` resumes checkpointed fixture recording and preserves provider failures. `summarize.ts` calculates raw versus guarded outcomes without new model calls. `review-video.ts` serves the saved clip and samples actual decoded frames. Browser speech and user camera tests were deliberately not run; the synthetic source exercised actual Fal authorization, signaling, WebRTC output, cumulative updates and disconnect.
 
-Validation: 20 Bun tests / 104 assertions pass, covering catalog legality, atomic edits, pronoun scope, cumulative preservation, evidence replay, session/revision guards, visitor-only token authorization, cancellation before token/socket completion, older video revisions and media artifact audio/video tracks. TypeScript compilation passes. Browser interaction and visual QA are recorded in `NOTES.md` and `output/`.
+Validation: 22 Bun tests / 138 assertions pass, covering catalog legality, atomic edits, pronoun scope, cumulative preservation, evidence replay, session/revision guards, visitor-only token authorization, cancellation before token/socket completion, older video revisions, media artifact audio/video tracks, finite duration, seek cue targets and exact manifest hashes. TypeScript compilation passes. Browser interaction and visual QA are recorded in `NOTES.md`, `output/` and `media-remux/`.

@@ -29,3 +29,5 @@
 - Variants now preserve and restore `brushReceiptId`. Recorded and live Jev origin survive restoring a saved brush.
 - Added two regression tests, bringing the suite to 18 tests and 164 assertions. Two actual browser regression checks passed for active-second-stroke Ctrl+Z and restored recorded Blue fabric attribution. Combined browser coverage is 21 checks, with no additional real model calls.
 - Root added `live-worlds/prepare.ts` to derive ignored `examples.json` from the committed manifest and event JSONL. README now gives the standalone preparation command; app build and test run it automatically. The pretty example JSON should not be committed.
+
+- Canonical production QA on2026-09-20: drew an Indigo loom sample, replayed the actual recorded Violet coral decision, drew a second sample, and opened same-stroke comparison against Coastal wind. Both original recipes stayed on the sheet; UI showed Recorded Jev example and02strokes. No page errors, no overflow at1440px or390px dark mode. Saved production-comparison.png and production-mobile-dark.png under screenshots and personally inspected both. No live provider calls.

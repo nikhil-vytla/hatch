@@ -8,7 +8,7 @@ The user chose a complete game and crowd simulation with synchronized side-by-si
 | [The square at five](https://jev-experiments.vercel.app/#experiment/crowd) | Twelve fictional residents, queues, needs, visits, weather and scheduled events | Per-resident destinations and responses to a notice | Matched courtyards, a keyword baseline, local fallback on/off, per-resident intervention and saved branches |
 | [Ghost Brush](https://jev-experiments.vercel.app/#experiment/ghost-brush) | Immediate procedural drawing | Fit scores for ten original brush descriptions | Same gesture and seed through different materials, queued changes at pen-up, rewind and named preserved variants |
 
-The URLs are the canonical app destinations. See the parent quality report and release notes for deployment status, rather than assuming a local implementation has already shipped.
+These prototypes are deployed at the canonical app destinations above. The [production browser review](production-review/README.md) verifies progression, synchronized clocks, preserved branches, human takeover and mobile layouts using local or recorded controllers. See the parent quality report for the exact deployment commit and API checks.
 
 ## Evidence and limits
 
