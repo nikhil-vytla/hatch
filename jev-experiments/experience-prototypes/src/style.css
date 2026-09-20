@@ -3432,7 +3432,309 @@ nav a {
   }
 }
 
-.key-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.key-privacy { font-size: 12px; line-height: 1.6; }
-.key-privacy a { white-space: nowrap; text-decoration: underline; }
-.key-privacy svg { display: inline; vertical-align: middle; }
+.key-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.key-privacy {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.key-privacy a {
+  white-space: nowrap;
+  text-decoration: underline;
+}
+.key-privacy svg {
+  display: inline;
+  vertical-align: middle;
+}
+
+/* Benchmark provenance and inspectable reward judgments. */
+.dataset-provenance {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 19px 23px;
+  margin: 0 0 24px;
+  background: var(--surface);
+}
+.provenance-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding-top: 9px;
+}
+.provenance-source a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.provenance-source p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0;
+}
+.provenance-source code {
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.provenance-source .provenance-description {
+  flex-basis: 100%;
+}
+.benchmark-overview {
+  display: grid;
+  grid-template-columns: 1.65fr 1fr;
+  gap: 30px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0 30px;
+}
+.benchmark-mission h2 {
+  font-size: clamp(24px, 3vw, 36px);
+  letter-spacing: -0.04em;
+  margin: 12px 0;
+}
+.benchmark-mission p {
+  font-size: 14px;
+  line-height: 1.7;
+  max-width: 660px;
+  color: var(--muted);
+}
+.benchmark-flow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  font: 10px var(--mono);
+  margin-top: 21px;
+  color: var(--sage);
+}
+.benchmark-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-left: 1px solid var(--line);
+  padding-left: 30px;
+  justify-content: center;
+}
+.benchmark-coverage {
+  font-size: 12px;
+}
+.subset-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 25px 0 30px;
+}
+.subset-card {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 15px;
+  background: var(--surface);
+  color: var(--ink);
+  transition:
+    border-color 0.18s,
+    transform 0.18s;
+}
+.subset-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sage);
+}
+.subset-card.active {
+  border-color: var(--sage);
+  box-shadow: inset 0 0 0 1px var(--sage);
+}
+.subset-card > span {
+  display: block;
+  font-size: 12px;
+}
+.subset-card strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  margin: 9px 0;
+}
+.subset-card small {
+  color: var(--muted);
+  font: 9px var(--mono);
+}
+.subset-track {
+  height: 3px;
+  background: var(--soft);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.subset-track i {
+  display: block;
+  height: 100%;
+  background: var(--sage);
+}
+.case-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font: 10px var(--mono);
+  color: var(--muted);
+  margin: 18px 0 12px;
+}
+.case-provenance a {
+  color: var(--sage);
+}
+.reward-candidates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  margin: 18px 0;
+}
+.case-verdict {
+  padding: 16px 18px;
+  margin-top: 16px;
+  border-left: 3px solid var(--coral);
+  background: var(--soft);
+  font-size: 13px;
+}
+.case-verdict p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.rewardbench-workspace .question-card p {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.rewardbench-workspace .controls {
+  display: grid;
+  gap: 20px;
+}
+.rewardbench-workspace .controls > .pane {
+  position: static;
+}
+.reward-candidate {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.reward-candidate .candidate-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 460px;
+  overflow-y: auto;
+  flex: 1;
+}
+.reward-candidate .button {
+  align-self: flex-start;
+  margin-top: 15px;
+}
+.benchmark-reveal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.candidate-score {
+  margin-top: 15px;
+  border-top: 1px solid var(--line);
+  padding-top: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+}
+.candidate-score > span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.candidate-score small {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.tie-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+.rubric-list {
+  list-style: decimal;
+  padding-left: 22px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.rubric-list li {
+  margin-bottom: 8px;
+}
+.content-review {
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+  margin-top: 15px;
+}
+.content-review > svg {
+  color: var(--gold);
+}
+.content-review h3 {
+  font-size: 18px;
+  margin: 12px 0;
+}
+.content-review p {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.content-review .decision-chips {
+  margin: 15px 0;
+}
+.content-caption {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 10px 0;
+}
+.content-caption svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+@media (max-width: 1050px) {
+  .subset-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .benchmark-overview {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .benchmark-headline {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 18px 0 0;
+  }
+  .reward-candidates {
+    grid-template-columns: 1fr;
+  }
+  .subset-card {
+    padding: 12px;
+  }
+  .subset-card strong {
+    font-size: 21px;
+  }
+  .content-review {
+    padding: 20px;
+  }
+}

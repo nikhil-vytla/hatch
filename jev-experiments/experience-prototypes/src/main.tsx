@@ -32,6 +32,8 @@ import { GeneratedUI } from "./generated-ui";
 import { Worlds, Pixels, Music } from "./creative";
 import { Games, GameGrid } from "./games";
 import { Benchmarks, Learning } from "./benchmarks";
+import { RewardBench } from "./rewardbench";
+import { Provenance } from "./provenance";
 import { AgentExperiment, Beverage } from "./agent-experiments";
 import { Logos, Decisions, Vision, Adapters } from "./misc";
 import { Journeys } from "./journeys";
@@ -326,7 +328,7 @@ function MiniPreview({ kind }: { kind: string }) {
         />
       </svg>
     );
-  if (["judge", "classify", "robustness", "language"].includes(kind))
+  if (["judge", "classify", "robustness", "rewardbench2"].includes(kind))
     return (
       <div className="mini-answers">
         <div>
@@ -546,8 +548,9 @@ function View({
     case "judge":
     case "classify":
     case "robustness":
-    case "language":
       return <Benchmarks id={exp.id} result={result} />;
+    case "rewardbench2":
+      return <RewardBench result={result} />;
     case "reward":
     case "teach":
     case "replica":
@@ -642,6 +645,7 @@ function Detail({ id }: { id: string }) {
         </p>
       </div>
       {error && <Notice error>{error}</Notice>}
+      {record && <Provenance result={record.result ?? {}} />}
       {record ? (
         <View
           key={id}
