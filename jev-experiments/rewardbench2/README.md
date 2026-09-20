@@ -66,3 +66,7 @@ Ten benchmark/publication tests and 17 existing server/credential tests passed. 
 The live exact-equality check **did not pass**: the same authored question scored 8.88 alone and 8.86 with an unrelated question on the native 0–9 scale. Four subsequent repeats in each condition both ranged from 8.87 to 8.88, with identical means of 8.8775. [Initial check](isolation-check.json) and [repeat controls](repeat-check.json) preserve the observations. This small study shows request-to-request variation and cannot isolate a general batching effect. Structural input isolation and the provider's documented contract do not imply bit-for-bit numerical reproducibility; tiny score gaps need caution.
 
 See [NOTES.md](NOTES.md) for implementation findings and the discarded integration pilot.
+
+## Deployment
+
+[PR #55](https://github.com/nikhil-vytla/hatch/pull/55) is open under `nikhil-vytla`. The existing [public app](https://jev-experiments.vercel.app/#experiment/rewardbench2) runs Git commit `97093d30deb824c818dbd32536b4c605358a00e8`, built by Vercel from GitHub with the configured app root. [Production verification](deployment-verification.json) confirms all 1,865 cases, an exact data-file hash match with the verified local build, content omissions, and removal of the old public language artifact. The PR remains unmerged.
