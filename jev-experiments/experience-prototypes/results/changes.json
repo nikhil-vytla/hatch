@@ -1,0 +1,48 @@
+{
+  "manifest": {
+    "experiment": "changes",
+    "created": "2026-09-20T07:34:19.572Z",
+    "status": "complete"
+  },
+  "result": {
+    "answers": {
+      "travel": {
+        "type": "noul",
+        "value": 0.95,
+        "probabilities": null,
+        "confidence": null
+      },
+      "calendar": {
+        "type": "noul",
+        "value": 0.84,
+        "probabilities": null,
+        "confidence": null
+      },
+      "catering": {
+        "type": "noul",
+        "value": 0.09,
+        "probabilities": null,
+        "confidence": null
+      },
+      "reminder": {
+        "type": "noul",
+        "value": 0.09,
+        "probabilities": null,
+        "confidence": null
+      }
+    },
+    "latency_ms": 300,
+    "service_latency_ms": 300,
+    "retries": 0,
+    "attempts": [
+      {
+        "attempt": 1,
+        "status": 200,
+        "latency_ms": 300
+      }
+    ],
+    "cost_usd": "0",
+    "model": "typesafe-ai/jev",
+    "source": "live"
+  }
+}

@@ -1,0 +1,308 @@
+{
+  "manifest": {
+    "experiment": "paste",
+    "created": "2026-09-20T07:34:18.711Z",
+    "status": "complete"
+  },
+  "result": {
+    "rows": [
+      {
+        "preset": "Conference",
+        "source_text": "Event: Small Worlds Conference\nOrganizer: Fieldwork Collective\nOrganizer address: 18 Pine Street, Portland\nVenue: Glasshouse Hall\nVenue address: 240 Oak Avenue, Seattle\nEvent date: October 12, 2026\nRegistration deadline: September 28, 2026\nContact email: hello@smallworlds.example\nStart time: 9:30 AM",
+        "answers": {
+          "f0": {
+            "type": "choice",
+            "value": "fact0",
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact0": 0.98,
+              "none": 0.02,
+              "fact5": 0,
+              "fact4": 0,
+              "fact1": 0,
+              "fact7": 0,
+              "fact2": 0
+            },
+            "confidence": 0.98
+          },
+          "f1": {
+            "type": "choice",
+            "value": "fact4",
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0.02,
+              "fact6": 0,
+              "fact0": 0,
+              "none": 0.01,
+              "fact4": 0.97,
+              "fact5": 0,
+              "fact2": 0,
+              "fact7": 0,
+              "fact1": 0
+            },
+            "confidence": 0.96
+          },
+          "f2": {
+            "type": "choice",
+            "value": "fact5",
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0,
+              "fact4": 0,
+              "fact0": 0,
+              "fact6": 0,
+              "fact5": 1,
+              "none": 0,
+              "fact1": 0,
+              "fact7": 0,
+              "fact2": 0
+            },
+            "confidence": 1
+          },
+          "f3": {
+            "type": "choice",
+            "value": "fact8",
+            "probabilities": {
+              "fact8": 1,
+              "fact5": 0,
+              "fact4": 0,
+              "fact0": 0,
+              "fact6": 0,
+              "none": 0,
+              "fact3": 0,
+              "fact2": 0,
+              "fact7": 0,
+              "fact1": 0
+            },
+            "confidence": 1
+          },
+          "f4": {
+            "type": "choice",
+            "value": "fact7",
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact0": 0,
+              "fact5": 0,
+              "none": 0,
+              "fact4": 0,
+              "fact2": 0,
+              "fact7": 1,
+              "fact1": 0
+            },
+            "confidence": 1
+          }
+        },
+        "latency_ms": 632,
+        "service_latency_ms": 632,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 631
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      {
+        "preset": "Contact",
+        "source_text": "Person: Maya Chen\nRole: Design director\nCompany: Northstar Studio\nWork email: maya@northstar.example\nPersonal email: maya.chen@example.com\nOffice address: 440 Market Street, San Francisco\nCompany website: https://northstar.example",
+        "answers": {
+          "f0": {
+            "type": "choice",
+            "value": "fact0",
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact2": 0,
+              "none": 0,
+              "fact0": 1,
+              "fact4": 0
+            },
+            "confidence": 0.99
+          },
+          "f1": {
+            "type": "choice",
+            "value": "fact1",
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 1,
+              "fact3": 0,
+              "fact6": 0,
+              "fact2": 0,
+              "none": 0,
+              "fact0": 0,
+              "fact4": 0
+            },
+            "confidence": 1
+          },
+          "f2": {
+            "type": "choice",
+            "value": "fact2",
+            "probabilities": {
+              "fact5": 0,
+              "fact4": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact2": 1,
+              "none": 0,
+              "fact0": 0,
+              "fact1": 0
+            },
+            "confidence": 1
+          },
+          "f3": {
+            "type": "choice",
+            "value": "fact3",
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 0,
+              "fact3": 1,
+              "fact6": 0,
+              "fact4": 0,
+              "none": 0,
+              "fact0": 0,
+              "fact2": 0
+            },
+            "confidence": 1
+          },
+          "f4": {
+            "type": "choice",
+            "value": "fact6",
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 0,
+              "fact3": 0,
+              "fact6": 1,
+              "fact2": 0,
+              "none": 0,
+              "fact0": 0,
+              "fact4": 0
+            },
+            "confidence": 1
+          }
+        },
+        "latency_ms": 301,
+        "service_latency_ms": 301,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 301
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      {
+        "preset": "Memory",
+        "source_text": "Full name: Alex Morgan\nCurrent home address: 17 Cedar Lane, Oakland\nPrevious home address: 80 Lake Road, Berkeley (until June 2025)\nEmployer: Lantern Studio\nOffice address: 210 Mission Street, San Francisco\nPreferred shipping address: 17 Cedar Lane, Oakland\nPersonal email: alex@example.com\nWork email: alex@lantern.example",
+        "answers": {
+          "f0": {
+            "type": "choice",
+            "value": "fact0",
+            "probabilities": {
+              "fact0": 1,
+              "fact3": 0,
+              "fact6": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 0,
+              "fact5": 0,
+              "fact4": 0
+            },
+            "confidence": 1
+          },
+          "f1": {
+            "type": "choice",
+            "value": "fact5",
+            "probabilities": {
+              "fact6": 0,
+              "fact3": 0,
+              "fact0": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 0,
+              "fact5": 1,
+              "fact4": 0
+            },
+            "confidence": 0.99
+          },
+          "f2": {
+            "type": "choice",
+            "value": "fact2",
+            "probabilities": {
+              "fact0": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 1,
+              "fact5": 0,
+              "fact4": 0
+            },
+            "confidence": 1
+          },
+          "f3": {
+            "type": "choice",
+            "value": "fact4",
+            "probabilities": {
+              "fact0": 0,
+              "fact3": 0.01,
+              "fact6": 0,
+              "none": 0.48,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 0,
+              "fact5": 0,
+              "fact4": 0.51
+            },
+            "confidence": 0.45
+          },
+          "f4": {
+            "type": "choice",
+            "value": "fact6",
+            "probabilities": {
+              "fact6": 1,
+              "fact3": 0,
+              "fact0": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact2": 0,
+              "fact1": 0,
+              "fact5": 0,
+              "fact4": 0
+            },
+            "confidence": 1
+          }
+        },
+        "latency_ms": 432,
+        "service_latency_ms": 432,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 432
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    ]
+  }
+}
