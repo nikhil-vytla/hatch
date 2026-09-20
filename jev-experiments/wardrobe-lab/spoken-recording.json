@@ -123,7 +123,7 @@
     "height": 1280
   },
   "actualRecordedSeconds": 30.0035,
-  "videoBytes": 994156,
+  "videoBytes": 994578,
   "error": null,
   "prompts": [
     {
@@ -216,5 +216,15 @@
       "Indigo trousers shift toward cream in an intermediate frame",
       "Small unrequested shirt markings appear; exact catalog geometry is not preserved"
     ]
+  },
+  "videoSha256": "1e0f9b6c2b1f847208267835c835b1dad6b5d8875593040ba0d201e2a3456d26",
+  "containerDurationSeconds": 29.954,
+  "mediaPostprocessing": {
+    "operation": "lossless WebM remux for finite duration and front-loaded seek cues",
+    "originalVideoBytes": 994156,
+    "originalVideoSha256": "464599f202aa23301fcc7962c33395fdbea720823046dad6f530f8d52c637471",
+    "evidenceFile": "media-remux/verification.json",
+    "unchangedEncodedPackets": true,
+    "captureWallTimePreservedIn": "actualRecordedSeconds"
   }
 }

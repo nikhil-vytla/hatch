@@ -91,7 +91,7 @@
     "height": 1280
   },
   "actualRecordedSeconds": 30.00089999997616,
-  "videoBytes": 904639,
+  "videoBytes": 905077,
   "error": null,
   "prompts": [
     {
@@ -163,5 +163,15 @@
   "jevExtractionEvidence": "Separate wardrobe.jsonl fixture; not used to drive this Fal recording",
   "attempt": 2,
   "costRateUsdPerSecond": 0.02,
-  "sessionWallSeconds": 33.418
+  "sessionWallSeconds": 33.418,
+  "videoSha256": "beb3e7b1ea086e86821fe691189438e61a8e72602cf3843297373c3ac532f3a9",
+  "containerDurationSeconds": 29.905,
+  "mediaPostprocessing": {
+    "operation": "lossless WebM remux for finite duration and front-loaded seek cues",
+    "originalVideoBytes": 904639,
+    "originalVideoSha256": "267b89b4c1e77980a9ca19544f1689e0535dc3c77573bdea1d68ab864fd4c069",
+    "evidenceFile": "media-remux/verification.json",
+    "unchangedEncodedPackets": true,
+    "captureWallTimePreservedIn": "actualRecordedSeconds"
+  }
 }

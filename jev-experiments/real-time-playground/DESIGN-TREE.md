@@ -17,7 +17,7 @@ Settled by the user: the live world keeps running; model speed and parallelism a
 
 The existing HTML is an interaction sketch. It exposes flight and crowd timing, three fallback choices, and sequential preserved branches; it does not yet implement synchronized side-by-side branches. Its local default is not a measured Jev run. No ADR yet: these prototype choices remain cheap to reverse.
 
-The first round is settled. Implementing a full Tetris game, a living courtyard crowd and an independent Ghost Brush prototype in `../live-worlds/`. Those prototypes will make the next questions concrete before further design decisions.
+The first round is settled. A full Tetris game, a living courtyard crowd and an independent Ghost Brush prototype are implemented in `../live-worlds/` and published in the canonical app. Their paired clocks, restored branches and attribution passed independent production browser checks. Those prototypes make the next questions concrete before further design decisions.
 
 ## Round 2, exposed by play
 

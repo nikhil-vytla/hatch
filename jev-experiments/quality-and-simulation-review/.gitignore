@@ -1,3 +1,4 @@
 dev-api.log
 .playwright-cli/
 build-verification.log
+test-verification.log

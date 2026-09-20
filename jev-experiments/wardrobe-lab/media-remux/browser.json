@@ -1,0 +1,82 @@
+{
+  "url": "http://127.0.0.1:8898/",
+  "session": "tetris-cross-review",
+  "originalSpokenDuration": "Infinity",
+  "after": [
+    {
+      "id": "try-on-demo",
+      "duration": 29.905,
+      "width": 720,
+      "height": 1280,
+      "readyState": 4,
+      "seekable": [
+        [
+          0,
+          29.905
+        ]
+      ],
+      "seeks": [
+        {
+          "requested": 4,
+          "actual": 4,
+          "readyState": 4
+        },
+        {
+          "requested": 29,
+          "actual": 29,
+          "readyState": 4
+        },
+        {
+          "requested": 13,
+          "actual": 13,
+          "readyState": 4
+        },
+        {
+          "requested": 1,
+          "actual": 1,
+          "readyState": 4
+        }
+      ],
+      "playbackAdvanced": true,
+      "error": null
+    },
+    {
+      "id": "spoken-try-on-demo",
+      "duration": 29.954,
+      "width": 720,
+      "height": 1280,
+      "readyState": 4,
+      "seekable": [
+        [
+          0,
+          29.954
+        ]
+      ],
+      "seeks": [
+        {
+          "requested": 4,
+          "actual": 4,
+          "readyState": 4
+        },
+        {
+          "requested": 29,
+          "actual": 29,
+          "readyState": 4
+        },
+        {
+          "requested": 13,
+          "actual": 13,
+          "readyState": 4
+        },
+        {
+          "requested": 1,
+          "actual": 1,
+          "readyState": 4
+        }
+      ],
+      "playbackAdvanced": true,
+      "error": null
+    }
+  ],
+  "providerCalls": 0
+}

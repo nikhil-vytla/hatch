@@ -40,4 +40,4 @@ Give visitors an A/B switch between fixed music, a rule-based adaptive score, an
 
 ## Where to start
 
-Repair the score representation and build Café Jev first. They expose the difference between semantic choices and executable outcomes in ways visitors can hear and see. Then combine the paste, undo, and change-impact work in a document or canvas editor. The notebook and game director are good later experiments because they reuse evaluation and simulation infrastructure instead of creating another isolated demo.
+The score representation and Café Jev redesign are now implemented, providing a base for the adaptive soundtrack and workshop proposals. Next, combine the paste, undo, and change-impact work in a document or canvas editor. The notebook and game director are good later experiments because they reuse evaluation and simulation infrastructure instead of creating another isolated demo.
