@@ -35,7 +35,7 @@ import { Benchmarks, Learning } from "./benchmarks";
 import { AgentExperiment, Beverage } from "./agent-experiments";
 import { Logos, Decisions, Vision, Adapters } from "./misc";
 import { Journeys } from "./journeys";
-import { token } from "./api";
+import { getApiKey, setApiKey } from "./api";
 import "./style.css";
 const cache = new Map<string, any>();
 async function load(name: string) {
@@ -51,7 +51,20 @@ function Header() {
       localStorage.getItem("jev-theme") ?? "system",
     ),
     [open, setOpen] = useState(false),
-    [key, setKey] = useState(token());
+    [key, setKey] = useState(""),
+    [connected, setConnected] = useState(!!getApiKey());
+  const close = () => {
+    setKey("");
+    setOpen(false);
+  };
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", dismiss);
+    return () => window.removeEventListener("keydown", dismiss);
+  }, [open]);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme:dark)");
     const apply = () => {
@@ -97,16 +110,16 @@ function Header() {
             ))}
           </div>
           <button
-            className={"key-button " + (key ? "connected" : "")}
+            className={"key-button " + (connected ? "connected" : "")}
             onClick={() => setOpen(true)}
           >
             <KeyRound size={14} />
-            <span>{key ? "Live connected" : "Connect live"}</span>
+            <span>{connected ? "API key added" : "Connect live"}</span>
           </button>
         </nav>
       </header>
       {open && (
-        <div className="modal-backdrop" onClick={() => setOpen(false)}>
+        <div className="modal-backdrop" onClick={close}>
           <section
             className="modal"
             role="dialog"
@@ -114,36 +127,70 @@ function Header() {
             aria-labelledby="token-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              className="close-button"
-              aria-label="Close"
-              onClick={() => setOpen(false)}
-            >
+            <button className="close-button" aria-label="Close" onClick={close}>
               <X size={18} />
             </button>
             <span className="eyebrow">LIVE EXPERIMENTS</span>
-            <h2 id="token-title">Bring your curiosity.</h2>
+            <h2 id="token-title">Try it with your key.</h2>
             <p>
-              Recorded runs are open to everyone. Enter the private lab token to
-              send your own inputs to Jev. Your token stays in this tab’s
-              session.
+              Enter your Vercel AI Gateway API key to run these experiments with
+              your own inputs. Usage is billed to your gateway account. Recorded
+              examples are free to explore.
             </p>
-            <Field label="Lab access token">
-              <input
-                type="password"
-                autoComplete="off"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-              />
-            </Field>
-            <Button
-              onClick={() => {
-                sessionStorage.setItem("jev-live-token", key);
-                setOpen(false);
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!key.trim()) return;
+                setApiKey(key);
+                setConnected(true);
+                close();
               }}
             >
-              Connect to the lab <ArrowRight size={15} />
-            </Button>
+              <Field label="Vercel AI Gateway API key">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  autoFocus
+                  spellCheck={false}
+                  placeholder={
+                    connected ? "Enter a replacement key" : "Paste your API key"
+                  }
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                />
+              </Field>
+              <p className="key-privacy">
+                Your key stays in this page’s memory and is cleared on reload or
+                disconnect. Requests pass through this app to Vercel AI Gateway;
+                the app does not save your key.{" "}
+                <a
+                  href="https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Get an API key <ArrowUpRight size={13} />
+                </a>
+              </p>
+              <div className="key-actions">
+                <Button type="submit" disabled={!key.trim()}>
+                  {connected ? "Replace API key" : "Use my API key"}{" "}
+                  <ArrowRight size={15} />
+                </Button>
+                {connected && (
+                  <Button
+                    type="button"
+                    secondary
+                    onClick={() => {
+                      setApiKey("");
+                      setConnected(false);
+                      close();
+                    }}
+                  >
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+            </form>
           </section>
         </div>
       )}

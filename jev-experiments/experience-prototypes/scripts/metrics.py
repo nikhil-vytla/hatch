@@ -2,11 +2,12 @@
 import json,sys
 from pathlib import Path
 sys.path.insert(0,str(Path('../src').resolve()))
+from jev_lab.records import read_record,write_record
 from jev_lab.metrics import classification,paired_bootstrap
 for name in ['classify','judge','robustness','routing','visuals']:
- path=Path('results')/(name+'.json')
+ path=Path('results')/(name+'.jsonl')
  if not path.exists():continue
- doc=json.loads(path.read_text());r=doc['result']
+ doc=read_record(path);r=doc['result']
  if name=='classify':
   for e in r['experiments'].values():
    e.setdefault('initial_metrics',{'jev':e['jev'],'paired_difference':e['paired_difference']})
@@ -31,5 +32,5 @@ for name in ['classify','judge','robustness','routing','visuals']:
  r['recovery']['recovered_cases']=sum(bool(x.get('original_error')) for x in rows)
  # Timing and cost in `transport` describe the original run only. New attempts have separate logs.
  r['recovery']['reported_usd']=sum(float(x.get('cost_usd') or 0) for x in r['recovery']['attempts'] if x['status']=='completed')
- path.write_text(json.dumps(doc,ensure_ascii=False,separators=(',',':'))+'\n')
+ write_record(path,doc)
  print(name,r['availability'])

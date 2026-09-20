@@ -1,9 +1,11 @@
+import { readRecord } from "../../experience-prototypes/scripts/records";
 import {
   copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
   unlinkSync,
+  writeFileSync,
 } from "node:fs";
 const source = new URL("../../results/", import.meta.url);
 const destination = new URL("../public/results/", import.meta.url);
@@ -14,8 +16,8 @@ if (existsSync(source)) {
   for (const name of readdirSync(destination))
     if (name.endsWith(".json")) unlinkSync(new URL(name, destination));
   for (const name of readdirSync(source)) {
-    if (name.endsWith(".json") && !["smoke.json", "access.json"].includes(name))
-      copyFileSync(new URL(name, source), new URL(name, destination));
+    if (name.endsWith(".jsonl"))
+      writeFileSync(new URL(name.replace(/\.jsonl$/, ".json"), destination), JSON.stringify(readRecord(new URL(name, source))) + "\n");
   }
 }
 const reports = new URL("../public/research/", import.meta.url);

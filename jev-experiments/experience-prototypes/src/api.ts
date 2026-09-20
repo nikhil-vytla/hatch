@@ -1,7 +1,22 @@
-export const token = () =>
-  sessionStorage.getItem("jev-live-token") ??
-  sessionStorage.getItem("lab-token") ??
-  "";
+// Deliberately in memory. Reloading or disconnecting forgets the key.
+let apiKey = "";
+export const getApiKey = () => apiKey;
+export const setApiKey = (value: string) => {
+  apiKey = value.trim();
+};
+if (typeof sessionStorage !== "undefined") {
+  sessionStorage.removeItem("jev-live-token");
+  sessionStorage.removeItem("lab-token");
+}
+export async function readResponse(response: Response) {
+  if (!response.headers.get("content-type")?.includes("application/json"))
+    throw new Error(
+      response.headers.get("x-vercel-mitigated") === "challenge"
+        ? "The site's security check interrupted this request. Reload the page and try again."
+        : "The server could not complete this request. Your input is preserved; try again shortly.",
+    );
+  return response.json();
+}
 export async function run(
   state: unknown,
   questions: Record<string, unknown>,
@@ -11,12 +26,12 @@ export async function run(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token()}`,
+      Authorization: `Bearer ${getApiKey()}`,
     },
     body: JSON.stringify({ state, questions }),
     signal,
   });
-  const body = await response.json();
+  const body = await readResponse(response);
   if (!response.ok)
     throw new Error(body.error ?? "The run could not complete.");
   return body;

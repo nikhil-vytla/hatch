@@ -1,3 +1,4 @@
+import { readRecord, writeRecord } from "./records";
 /** Resume only transport failures. Never retry a completed judgment to improve its score. */
 import "./credentials";
 import {
@@ -6,12 +7,13 @@ import {
   existsSync,
   appendFileSync,
 } from "node:fs";
-import { evaluate, GatewayError } from "../server/gateway";
-const read = (p: string) => JSON.parse(readFileSync(p, "utf8"));
+import { evaluate, GatewayError } from "./local-model";
+const read = (p: string) =>
+  p.endsWith(".jsonl") ? readRecord(p) : JSON.parse(readFileSync(p, "utf8"));
 const names = ["classify", "judge", "robustness", "routing", "visuals"];
 for (const name of names) {
-  const path = `results/${name}.json`,
-    original = read(`../results/${name}.json`);
+  const path = `results/${name}.jsonl`,
+    original = read(`../results/${name}.jsonl`);
   const doc = existsSync(path) ? read(path) : read(`public/data/${name}.json`),
     result = doc.result;
   const log = readFileSync(
@@ -56,7 +58,7 @@ for (const name of names) {
       tasks.push({ row, req, group });
     }
   }
-  const save = () => writeFileSync(path, JSON.stringify(doc, null, 2));
+  const save = () => writeRecord(path, doc);
   result.recovery ??= {
     started: new Date().toISOString(),
     original_run: original.manifest.id,
