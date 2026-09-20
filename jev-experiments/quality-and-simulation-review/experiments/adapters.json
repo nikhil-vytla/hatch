@@ -1,0 +1,135 @@
+{
+  "id": "adapters",
+  "title": "Typed schema adapters",
+  "evidenceStatus": "One recorded response decoded in four languages; 40 offline fixture executions and existing tests; frozen main 4c0c40d5; no provider calls",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "All four adapters reproduce the recorded ticket and preserve its answers. A two-level score rubric loses its levels, TypeScript raw decoding accepts inherited option names, and absent confidence produces cross-language disagreement. The page needs executable semantic examples and a common conformance contract.",
+  "strengths": [
+    "The page accurately discloses one shared response rather than four model runs.",
+    "Four recorded values and answer maps match; typed wrappers reject invalid options and numeric bounds.",
+    "Four TypeScript tests, five Rust tests, the Go suite and two Python contract tests passed."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "A two-level rubric loses its semantics",
+      "evidence": "TypeScript index.ts:81–100, Rust lib.rs:109–124, Go adapter.go:144–159 choose 0–1 noul before x-jev-levels. Probe confirms lost levels and TS acceptance of numeric/256 levels.",
+      "impact": "Explicit score semantics silently become a predicate/probability question, with language-specific supported shapes.",
+      "fix": "Prioritize explicit semantic metadata; validate rubric bounds/types and enum uniqueness against a shared schema profile."
+    },
+    {
+      "priority": "P1",
+      "title": "Raw decoding and acceptance policies diverge",
+      "evidence": "TypeScript index.ts:112 uses in; raw decode accepts constructor but final Zod parse rejects. Probe missing confidence is accepted in Python/Rust/Go, rejected in TS; optional distributions and choice/argmax disagreement are accepted by all.",
+      "impact": "A raw decoder violates its option contract and evidence completeness/coherence remain unspecified.",
+      "fix": "Use own-key/string checks and define missing/null, required evidence, coherence and extra-answer policies; preserve diagnostics and raw evidence."
+    },
+    {
+      "priority": "P1",
+      "title": "Visible examples omit mandatory descriptions",
+      "evidence": "misc.tsx:368–376 has no descriptions in all four snippets; TS probe fails with semantic description required: area. Actual repository demos include descriptions.",
+      "impact": "The central examples fail before transport and omit the information that makes a type semantic.",
+      "fix": "Generate UI snippets from executable, CI-compiled examples and display emitted questions."
+    },
+    {
+      "priority": "P2",
+      "title": "The live panel bypasses its adapter",
+      "evidence": "misc.tsx:377–439 manually maps answers and thresholds refund, keeps initial Python row when selecting another language and lacks input revision checks.",
+      "impact": "Validated value is presented without the advertised runtime adapter and stale responses can appear under changed text.",
+      "fix": "Run the TS compile/decode/Zod path, label actual execution language and bind evidence to input/schema revisions."
+    },
+    {
+      "priority": "P2",
+      "title": "One happy-path ticket is insufficient conformance evidence",
+      "evidence": "src/jev_lab/adapters.py:22–69 records one three-field input, discards child emitted questions and records child errors without a run-level assertion.",
+      "impact": "Question parity, reference/rubric behavior and failure semantics cannot be established from shared values alone.",
+      "fix": "Publish a common versioned conformance corpus and require exact compiler/decoder agreement for supported features."
+    }
+  ],
+  "simulation": {
+    "title": "A contract workbench",
+    "description": "Edit a fictional ticket field description or rubric, inspect emitted questions, replay recorded/manual/live answers through decoders, adjust review thresholds and undo complete revisions.",
+    "jevsRole": "Judge support-request meaning under explicit field semantics; never issue a refund.",
+    "codeRole": "Compile and validate schemas, preserve raw evidence, apply thresholds/review rules, own revisions and reject stale responses.",
+    "acceptanceCriteria": [
+      "Visible snippets execute and supported questions match across languages.",
+      "Each result identifies input/schema revision and recorded/manual/live origin.",
+      "Invalid fixtures fail at the declared stage; no malformed answer becomes a valid ticket.",
+      "Changing thresholds preserves raw scores and undo restores the full checkpoint.",
+      "Keyboard users can inspect schema and evidence differences."
+    ]
+  },
+  "evaluation": {
+    "design": "120 fixed conformance cases plus 1000 generated cases for each of five seeds produce 5120 cases/20480 four-language executions without provider calls. Optional 60-message semantic study, three repeats, yields 180 evaluations/540 decisions reused by all languages; 18 ten-message requests or 180 unbatched before retries. Independently label 30 counterfactual pairs, separate development data and report pair-clustered intervals.",
+    "baselines": [
+      "Canonical compiler specification and direct language validators",
+      "Majority and keyword rules for the separate semantic study"
+    ],
+    "metrics": [
+      "Exact emitted-question parity and typed/evidence equality",
+      "False acceptance/rejection and failure stage",
+      "Per-field/whole-ticket accuracy and error versus accepted coverage",
+      "Provider failure/retry counts and input/schema provenance"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "One recorded model input with three decisions, four decoders; audit adds ten fixtures × four decoder executions, not model judgments.",
+      "full": "No external benchmark. Proposed declared 120 fixed and 5000 generated conformance cases, plus a separate 60-message semantic study.",
+      "feasibility": "Conformance is offline and all toolchains already exist locally. A semantic study needs an explicit request plan; none was run."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Zod",
+      "url": "https://zod.dev/api",
+      "use": "Validate the browser live path with the same typed schema used to compile questions."
+    },
+    {
+      "name": "fast-check",
+      "url": "https://fast-check.dev/docs/introduction/",
+      "use": "Generate and shrink common cross-language schema/answer counterexamples."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Fix rubric precedence, bounds and own-key validation with regression fixtures."
+    },
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Generate snippets from executable semantic examples."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Specify common null/evidence/threshold rules and retain emitted questions."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Connect the live adapter to revision guards and explicit provenance."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Build shared conformance corpus and interactive workbench."
+    }
+  ],
+  "sources": [
+    {
+      "label": "JSON Schema enum uniqueness",
+      "url": "https://json-schema.org/understanding-json-schema/reference/enum"
+    },
+    {
+      "label": "Zod schema and runtime validation",
+      "url": "https://zod.dev/api"
+    },
+    {
+      "label": "fast-check property-based testing",
+      "url": "https://fast-check.dev/docs/introduction/"
+    }
+  ]
+}

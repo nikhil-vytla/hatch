@@ -1,0 +1,251 @@
+{
+  "method": "Frozen original component callback probe with mocked React hooks, element serialization and deferred results; no real browser, rasterization or provider requests. SVG serialization tests structure, not optical quality.",
+  "baselineCommit": "4c0c40d",
+  "currentBlockUnchanged": true,
+  "sourceHash": "669874ffda08dd2b4bae8f7ff107a32282d3c33dc90e822f6b644bc4adead06e",
+  "evidenceHash": "0cd41d223a11aa9156c7d02ea3ba32ad5db68f58754e6912fe31e8d07c95a693",
+  "evidence": {
+    "attempted": 6,
+    "completed": 5,
+    "decisions": 20,
+    "failures": [
+      {
+        "id": "2",
+        "error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr"
+      }
+    ],
+    "structureCounts": {
+      "single": 5,
+      "paired": 0,
+      "nested": 0,
+      "orbit": 0
+    },
+    "weightCounts": {
+      "light": 4,
+      "medium": 1,
+      "bold": 0
+    },
+    "transport": {
+      "attempts": 16,
+      "status_counts": {
+        "200": 5,
+        "429": 11
+      },
+      "successful_attempt_latency_ms": {
+        "p50": 299.2660839809105,
+        "p95": 365.7769253710285
+      },
+      "logical_request_latency_ms_including_retries_excluding_queue": {
+        "p50": 18615.6858744629,
+        "p95": 20897.15192674582
+      },
+      "reported_usd": 0,
+      "attempts_without_cost_metadata": 11,
+      "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+    },
+    "recordedCases": [
+      {
+        "brief": "A neighborhood seed library",
+        "spec": {
+          "symbol": "leaf",
+          "palette": "teal",
+          "structure": "single",
+          "weight": "light"
+        },
+        "latency_ms": 10639.521792007145
+      },
+      {
+        "brief": "A quiet music app",
+        "spec": {
+          "symbol": "wave",
+          "palette": "teal",
+          "structure": "single",
+          "weight": "light"
+        },
+        "latency_ms": 20925.600333022885
+      },
+      {
+        "brief": "A hiking journal",
+        "spec": {
+          "symbol": "mountain",
+          "palette": "ink",
+          "structure": "single",
+          "weight": "light"
+        },
+        "latency_ms": 20762.584540992975
+      },
+      {
+        "brief": "An ocean conservation group",
+        "spec": {
+          "symbol": "wave",
+          "palette": "teal",
+          "structure": "single",
+          "weight": "medium"
+        },
+        "latency_ms": 16682.78674996691
+      },
+      {
+        "brief": "A minimal writing tool",
+        "spec": {
+          "symbol": "circle",
+          "palette": "ink",
+          "structure": "single",
+          "weight": "light"
+        },
+        "latency_ms": 5596.370916988235
+      }
+    ]
+  },
+  "initialInspector": {
+    "spec": {
+      "symbol": "leaf",
+      "palette": "teal",
+      "structure": "single",
+      "weight": "light"
+    },
+    "run": null
+  },
+  "renderedRecordedBriefCount": 1,
+  "staleResult": {
+    "requestedBrief": "A neighborhood seed library",
+    "visibleBrief": "A playful astronomy club",
+    "manualBeforeReply": {
+      "spec": {
+        "symbol": "leaf",
+        "palette": "coral",
+        "structure": "single",
+        "weight": "light"
+      },
+      "run": null
+    },
+    "afterReply": {
+      "spec": {
+        "symbol": "leaf",
+        "palette": "teal",
+        "structure": "single",
+        "weight": "light"
+      },
+      "run": {
+        "answers": {
+          "symbol": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "star": 0,
+              "leaf": 1,
+              "wave": 0,
+              "circle": 0,
+              "mountain": 0
+            },
+            "confidence": 1
+          },
+          "palette": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0.03,
+              "violet": 0.04,
+              "ink": 0.02,
+              "teal": 0.91
+            },
+            "confidence": 0.88
+          },
+          "structure": {
+            "type": "choice",
+            "value": "single",
+            "probabilities": {
+              "orbit": 0.14,
+              "paired": 0.08,
+              "nested": 0.15,
+              "single": 0.63
+            },
+            "confidence": 0.5
+          },
+          "weight": {
+            "type": "choice",
+            "value": "light",
+            "probabilities": {
+              "bold": 0.01,
+              "light": 0.8,
+              "medium": 0.19
+            },
+            "confidence": 0.71
+          }
+        }
+      }
+    }
+  },
+  "manualProvenance": {
+    "afterManualStructure": {
+      "spec": {
+        "symbol": "leaf",
+        "palette": "teal",
+        "structure": "orbit",
+        "weight": "light"
+      },
+      "run": {
+        "answers": {
+          "symbol": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "star": 0,
+              "leaf": 1,
+              "wave": 0,
+              "circle": 0,
+              "mountain": 0
+            },
+            "confidence": 1
+          },
+          "palette": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0.03,
+              "violet": 0.04,
+              "ink": 0.02,
+              "teal": 0.91
+            },
+            "confidence": 0.88
+          },
+          "structure": {
+            "type": "choice",
+            "value": "single",
+            "probabilities": {
+              "orbit": 0.14,
+              "paired": 0.08,
+              "nested": 0.15,
+              "single": 0.63
+            },
+            "confidence": 0.5
+          },
+          "weight": {
+            "type": "choice",
+            "value": "light",
+            "probabilities": {
+              "bold": 0.01,
+              "light": 0.8,
+              "medium": 0.19
+            },
+            "confidence": 0.71
+          }
+        }
+      }
+    },
+    "briefRetainedInInspector": false
+  },
+  "exported": {
+    "mime": "image/svg+xml",
+    "hasNamespace": true,
+    "hasResolvedColor": true,
+    "containsBrief": false
+  },
+  "grammar": {
+    "nominalSpecifications": 240,
+    "uniqueGeometryStrings": 60,
+    "note": "Palette is inherited outside the SVG and excluded from these geometry strings; five symbols times four structures times three weights equals sixty shapes.",
+    "smallestOrbitStrokeAt16px": 0.10800000000000001,
+    "lightSingleStrokeAt16px": 0.24,
+    "smallSizeRasterCheckPerformed": false
+  }
+}

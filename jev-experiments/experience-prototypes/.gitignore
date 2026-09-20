@@ -10,3 +10,10 @@ public/companion.zip
 
 .playwright-cli/
 output/
+
+# Generated from original experiment sources by scripts/prepare.ts.
+public/judgment-reliability/
+public/outcome-framing/
+public/visual-search/
+public/wardrobe/
+public/icon-studio/

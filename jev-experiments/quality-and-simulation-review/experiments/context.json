@@ -1,0 +1,142 @@
+{
+  "id": "context",
+  "title": "Context filter",
+  "evidenceStatus": "Five authored search records shared by context; 65 judgments over six documents; no downstream reader trials; offline 101-position and actual-callback probes",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The allowance slider changes retained-card styling but never the live model input: zero retained sources still sends all six documents and displays the full-context choice. Recorded and live filtering policies also differ, and late responses replace newly selected examples. Build a versioned token-budget selector plus a separately scored downstream reader before claiming useful context reduction.",
+  "strengths": [
+    "Visible document text and stable source IDs make selection inspectable.",
+    "Recorded cases correctly preserve all four labeled positive sources and abstain on the one absent-answer case.",
+    "The UI explicitly states that downstream reduced-context success is not measured.",
+    "The recording note correctly describes filtering as a heuristic rather than a security boundary."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "The allowance changes a preview without changing evaluation inputs",
+      "evidence": "src/agent-experiments.tsx:139 uses kept only for styling; line 234 always sends all documents. Actual callbacks at 0% retain nothing but send six documents and show refund. The line-466 inspector omits budget/current subset and can export the original kept list.",
+      "impact": "The displayed answer and saved state do not establish any outcome from reduced context, despite the useful disclaimer.",
+      "fix": "Separate selector and reader results; send the exact inspected subset to a fixed reader and bind answer/citations/export to source/query/budget hashes."
+    },
+    {
+      "priority": "P1",
+      "title": "Live filtering omits recorded policy decisions",
+      "evidence": "compositions.py:202 retains relevant low-injection or host-critical records. src/agent-experiments.tsx:233 asks seven questions versus thirteen recorded, omitting injection judgments. A synthetic relevance .98/injection .99 source is retained by UI but excluded by the recorded rule.",
+      "impact": "Recorded filtering outcomes do not validate the live policy or the critical-record behavior. The synthetic mismatch is not an observed live compromise.",
+      "fix": "Share a versioned policy, keep host-mandatory retention explicit, and separate untrusted source data from executable instructions without treating model scores as an authorization boundary."
+    },
+    {
+      "priority": "P1",
+      "title": "Source-slot percentages do not measure useful token-budget tradeoffs",
+      "evidence": "src/agent-experiments.tsx:144 rounds budget/100 times six, combined with relevance >=.5. All 101 default settings yield only two subsets: empty through 8%, one source from 9% through 100%. Inputs total only 336 characters with one positive source per answerable query.",
+      "impact": "The demo cannot show token savings or survival of multi-source dependencies, exceptions and critical facts.",
+      "fix": "Count exact serialized-reader tokens, pack spans/dependency groups under budget, expose infeasible mandatory retention and test independently labeled sufficient-evidence groups."
+    },
+    {
+      "priority": "P1",
+      "title": "A late response replaces a newly selected example",
+      "evidence": "src/agent-experiments.tsx:261 accepts any completion. Probe starts refund, selects invoice, then resolves refund: selector/input remain invoice while output and row text become refund.",
+      "impact": "Selection, visible inputs, output and evidence provenance describe different runs.",
+      "fix": "Bind results to example/query/corpus/budget revisions; reject stale application and preserve older completed runs only in comparison history."
+    }
+  ],
+  "simulation": {
+    "title": "An evidence tray with measured downstream consequences",
+    "description": "Inspect current/outdated policy, a user exception and tool outcomes; pin required facts, lower a token allowance, compare full and reduced reader runs, restore missing evidence and finish with a supported answer or explicit insufficient-evidence result.",
+    "jevsRole": "Judge which source spans or dependency groups matter to the query and identify unresolved semantic relevance.",
+    "codeRole": "Own source versions, trust metadata, mandatory retention, tokenizer counts, packing, exact reader payloads, revision checks and independent outcome scoring.",
+    "acceptanceCriteria": [
+      "Reader input exactly equals inspected retained context, including at zero budget.",
+      "Every quote maps to an immutable source/version without changing negation, numbers or temporal scope.",
+      "Mandatory records fit or yield an explicit infeasible-budget state.",
+      "Answer support and abstention are checked independently of selector judgments.",
+      "Late results cannot attach to another example, query, corpus or budget.",
+      "Export contains tokenizer/version, actual prompt, selected spans, raw decisions and full/reduced outcomes."
+    ]
+  },
+  "evaluation": {
+    "design": "Independently label 24 development and 120 held-out 32-chunk bundles across six strata. Two orderings produce 240 presentations. One 64-judgment Jev selection per presentation plus three selectors at two token budgets and one full reader baseline gives 1920 future calls before retries. Use a fixed reader, independent sufficient-evidence groups, exact answer predicates and 10000 paired bundle-clustered bootstrap samples. Optional complete RULER 4K follow-up covers all 13 default tasks with 500 samples each.",
+    "baselines": [
+      "Full-context fixed reader",
+      "Frozen lexical/BM25 selection with identical host retention and token packing",
+      "Pinned local LLMLingua-2 at matched budgets",
+      "Independent gold evidence groups as a diagnostic bound"
+    ],
+    "metrics": [
+      "Sufficient-evidence-group retention and critical-record preservation",
+      "Independent answer correctness, support and abstention",
+      "Exception/negation/temporal-scope loss",
+      "Exact serialized tokens, infeasible budgets and total selector-plus-reader latency/cost",
+      "All-attempt availability, stale-result failures and paired quality/resource curves",
+      "Official RULER string-match scoring separately from stricter optional diagnostics"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Five shared search fixtures, 65 judgments, six documents/336 characters, 4/4 positive evidence retention and 1/1 abstention. Zero downstream runs and zero external benchmark cases.",
+      "full": "Authored plan: 120 held-out bundles times two orders, 240 Jev calls/15,360 selector judgments plus 1,680 reader calls = 1,920. External follow-up: RULER default 13 tasks times 500 = 6,500 samples at a declared 4K length; three selectors/two budgets/full baseline require 45,500 reader calls plus at least 6,500 selection calls = 52,000 before retries or splits.",
+      "feasibility": "Authored study is manageable once a fixed reader and token/packing system exist. Full RULER needs pinned generation/scoring/tokenizer, source preparation, local compressor resources and substantial future call budget; longer lengths are separate complete runs. No model calls, datasets or weights were acquired during this audit."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Transformers.js tokenizers",
+      "url": "https://huggingface.co/docs/transformers.js/api/tokenizers",
+      "use": "Count the actual reader prompt with its pinned tokenizer/chat template; do not present another model's tokenizer as exact provider accounting."
+    },
+    {
+      "name": "LLMLingua-2",
+      "url": "https://github.com/microsoft/LLMLingua",
+      "use": "Provide a local rate-controlled compression baseline, with protected sections where applicable; compare independent reader quality and total cost rather than assuming published gains transfer."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Connect retained spans to a separate reader run and export the actual reduced payload."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Share recorded/live selection policy, host retention and revision guards."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Implement exact token accounting and dependency-aware packing."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Build and independently label the complete authored outcome comparison."
+    },
+    {
+      "priority": "P2",
+      "size": "L",
+      "action": "Run all 6,500 default RULER cases at 4K after reader, resource and call-budget preparation."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Transformers.js tokenizer documentation",
+      "url": "https://huggingface.co/docs/transformers.js/api/tokenizers"
+    },
+    {
+      "label": "LLMLingua official project",
+      "url": "https://github.com/microsoft/LLMLingua"
+    },
+    {
+      "label": "RULER official repository",
+      "url": "https://github.com/NVIDIA/RULER"
+    },
+    {
+      "label": "RULER default task/sample configuration",
+      "url": "https://github.com/NVIDIA/RULER/blob/main/scripts/config_tasks.sh"
+    },
+    {
+      "label": "RULER official scoring functions",
+      "url": "https://github.com/NVIDIA/RULER/blob/main/scripts/eval/synthetic/constants.py"
+    }
+  ]
+}

@@ -7,15 +7,17 @@
     "server": "bun server/dev.ts",
     "build": "bun scripts/prepare.ts && tsc --noEmit && vite build",
     "deploy": "bun scripts/deploy.ts",
-    "test": "bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts",
+    "test": "bun ../live-worlds/prepare.ts && bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../quality-and-simulation-review/paste-transactions.test.ts ../quality-and-simulation-review/composition-stream.test.ts ../visual-search/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
     "start": "bun scripts/start.ts",
     "record": "bun scripts/record.ts",
     "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.10.1",
     "@json-render/core": "0.21.0",
     "@json-render/react": "0.21.0",
     "@json-render/shadcn": "0.21.0",
+    "@msgpack/msgpack": "^3.1.3",
     "@tanstack/react-table": "^8.21.3",
     "@tonejs/midi": "^2.0.28",
     "@xyflow/react": "^12.10.0",

@@ -1,0 +1,912 @@
+{
+  "created": "2026-09-20T20:39:35.613Z",
+  "version": "wardrobe-v2",
+  "source": "macOS say synthetic speech; no user microphone",
+  "recognizer": "mlx-whisper",
+  "sttModel": "mlx-community/whisper-base.en-mlx",
+  "sttInference": "local after downloading model weights",
+  "model": "typesafe-ai/jev",
+  "schedule": "Actual STT and Jev stages recorded first; accepted states replayed into a 30-second real Fal session. Replay timing is not end-to-end latency.",
+  "turns": [
+    {
+      "id": "jacket",
+      "audio": "speech/01-jacket.wav",
+      "text": "Put a denim jacket on me.",
+      "seconds": 1.63225,
+      "transcriptionMs": 273,
+      "segments": [
+        {
+          "id": 0,
+          "seek": 0,
+          "start": 0,
+          "end": 1.58,
+          "text": " Put a denim jacket on me.",
+          "tokens": [
+            50363,
+            5930,
+            257,
+            43152,
+            15224,
+            319,
+            502,
+            13,
+            50442
+          ],
+          "temperature": 0,
+          "avg_logprob": -0.368642520904541,
+          "compression_ratio": 0.7575757575757576,
+          "no_speech_prob": 0.004209033213555813
+        }
+      ],
+      "jevSource": "Previously recorded Jev response for identical transcript and canonical input",
+      "reusedJevCaseId": "jacket",
+      "originalJevRecordCreated": "2026-09-20T20:35:03.557Z",
+      "before": {
+        "jacket": "none",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "none",
+        "glassesColor": "black",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "none"
+      },
+      "rawResponse": {
+        "answers": {
+          "action": {
+            "type": "choice",
+            "value": "apply",
+            "probabilities": {
+              "unsupported": 0.01,
+              "reset": 0,
+              "undo": 0,
+              "apply": 0.94,
+              "clarify": 0.05
+            },
+            "confidence": 0.93
+          },
+          "jacket": {
+            "type": "choice",
+            "value": "denim",
+            "probabilities": {
+              "keep": 0.01,
+              "bomber": 0,
+              "none": 0.01,
+              "denim": 0.98,
+              "raincoat": 0,
+              "blazer": 0
+            },
+            "confidence": 0.98
+          },
+          "jacketColor": {
+            "type": "choice",
+            "value": "navy",
+            "probabilities": {
+              "cream": 0,
+              "keep": 0.37,
+              "black": 0,
+              "olive": 0,
+              "pink": 0,
+              "navy": 0.63
+            },
+            "confidence": 0.55
+          },
+          "fit": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.61,
+              "regular": 0.39,
+              "fitted": 0,
+              "oversized": 0
+            },
+            "confidence": 0.47
+          },
+          "glasses": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.89,
+              "wayfarer": 0,
+              "none": 0.11,
+              "sport": 0,
+              "round": 0
+            },
+            "confidence": 0.85
+          },
+          "glassesColor": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.89,
+              "amber": 0,
+              "pink": 0,
+              "black": 0.11
+            },
+            "confidence": 0.85
+          },
+          "glassesSize": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.78,
+              "large": 0,
+              "regular": 0.22,
+              "small": 0
+            },
+            "confidence": 0.7
+          },
+          "shirt": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.59,
+              "black": 0,
+              "white": 0.41
+            },
+            "confidence": 0.39
+          },
+          "trousers": {
+            "type": "choice",
+            "value": "indigo",
+            "probabilities": {
+              "keep": 0.41,
+              "indigo": 0.59,
+              "cream": 0
+            },
+            "confidence": 0.38
+          }
+        },
+        "latency_ms": 410,
+        "service_latency_ms": 410,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 410,
+            "retry_after_ms": 0
+          }
+        ],
+        "cost_usd": 0,
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      "rawDecision": {
+        "action": "apply",
+        "patch": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "trousers": "indigo"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "fit": "regular",
+          "glasses": "none",
+          "glassesColor": "black",
+          "glassesSize": "regular",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "jacket"
+        },
+        "discarded": [],
+        "reason": ""
+      },
+      "decision": {
+        "action": "apply",
+        "patch": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "trousers": "indigo"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "fit": "regular",
+          "glasses": "none",
+          "glassesColor": "black",
+          "glassesSize": "regular",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "jacket"
+        },
+        "discarded": [],
+        "reason": ""
+      },
+      "after": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "none",
+        "glassesColor": "black",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "jacket"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. No sunglasses or eyewear. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories.",
+      "audioSha256": "781edd7fcb7a20dc85c0dd65270896de4c962aa63b259ba77e743040790298f6"
+    },
+    {
+      "id": "sunglasses",
+      "audio": "speech/02-sunglasses.wav",
+      "text": "Add black square sunglasses, and keep the jacket.",
+      "seconds": 3.199,
+      "transcriptionMs": 27,
+      "segments": [
+        {
+          "id": 0,
+          "seek": 0,
+          "start": 0,
+          "end": 3.12,
+          "text": " Add black square sunglasses, and keep the jacket.",
+          "tokens": [
+            50363,
+            3060,
+            2042,
+            6616,
+            36251,
+            11,
+            290,
+            1394,
+            262,
+            15224,
+            13,
+            50519
+          ],
+          "temperature": 0,
+          "avg_logprob": -0.34349771646352917,
+          "compression_ratio": 0.875,
+          "no_speech_prob": 0.0021112191025167704
+        }
+      ],
+      "jevSource": "Previously recorded Jev response for identical transcript and canonical input",
+      "reusedJevCaseId": "sunglasses",
+      "originalJevRecordCreated": "2026-09-20T20:35:03.557Z",
+      "before": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "none",
+        "glassesColor": "black",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "jacket"
+      },
+      "rawResponse": {
+        "answers": {
+          "action": {
+            "type": "choice",
+            "value": "apply",
+            "probabilities": {
+              "unsupported": 0.02,
+              "undo": 0,
+              "reset": 0,
+              "apply": 0.97,
+              "clarify": 0.01
+            },
+            "confidence": 0.96
+          },
+          "jacket": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "blazer": 0,
+              "bomber": 0,
+              "none": 0,
+              "raincoat": 0,
+              "keep": 0.55,
+              "denim": 0.45
+            },
+            "confidence": 0.45
+          },
+          "jacketColor": {
+            "type": "choice",
+            "value": "navy",
+            "probabilities": {
+              "olive": 0,
+              "keep": 0.47,
+              "pink": 0,
+              "cream": 0,
+              "black": 0.04,
+              "navy": 0.49
+            },
+            "confidence": 0.38
+          },
+          "fit": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "fitted": 0,
+              "oversized": 0,
+              "keep": 0.7,
+              "regular": 0.3
+            },
+            "confidence": 0.6
+          },
+          "glasses": {
+            "type": "choice",
+            "value": "wayfarer",
+            "probabilities": {
+              "wayfarer": 0.93,
+              "sport": 0,
+              "keep": 0.06,
+              "none": 0.01,
+              "round": 0
+            },
+            "confidence": 0.91
+          },
+          "glassesColor": {
+            "type": "choice",
+            "value": "black",
+            "probabilities": {
+              "keep": 0.21,
+              "pink": 0,
+              "amber": 0,
+              "black": 0.79
+            },
+            "confidence": 0.72
+          },
+          "glassesSize": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "large": 0,
+              "keep": 0.64,
+              "regular": 0.36,
+              "small": 0
+            },
+            "confidence": 0.52
+          },
+          "shirt": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.57,
+              "white": 0.42,
+              "black": 0.01
+            },
+            "confidence": 0.36
+          },
+          "trousers": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "indigo": 0.49,
+              "keep": 0.51,
+              "cream": 0
+            },
+            "confidence": 0.26
+          }
+        },
+        "latency_ms": 390,
+        "service_latency_ms": 390,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 390,
+            "retry_after_ms": 0
+          }
+        ],
+        "cost_usd": 0,
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      "rawDecision": {
+        "action": "apply",
+        "patch": {
+          "jacketColor": "navy",
+          "glasses": "wayfarer",
+          "glassesColor": "black"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "fit": "regular",
+          "glasses": "wayfarer",
+          "glassesColor": "black",
+          "glassesSize": "regular",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "glasses"
+        },
+        "discarded": [],
+        "reason": ""
+      },
+      "decision": {
+        "action": "apply",
+        "patch": {
+          "jacketColor": "navy",
+          "glasses": "wayfarer",
+          "glassesColor": "black"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "fit": "regular",
+          "glasses": "wayfarer",
+          "glassesColor": "black",
+          "glassesSize": "regular",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "glasses"
+        },
+        "discarded": [],
+        "reason": ""
+      },
+      "after": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "black",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. Wear black wayfarer sunglasses, with regular frames. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories.",
+      "audioSha256": "747f8979b6b5e02dcd09451124281671fb4c01a39cb43b1d6a2ac98b69e3d2f5"
+    },
+    {
+      "id": "pink",
+      "audio": "speech/03-pink.wav",
+      "text": "Make them pink.",
+      "seconds": 0.9424375,
+      "transcriptionMs": 20,
+      "segments": [
+        {
+          "id": 0,
+          "seek": 0,
+          "start": 0,
+          "end": 1,
+          "text": " Make them pink.",
+          "tokens": [
+            50363,
+            6889,
+            606,
+            11398,
+            13,
+            50413
+          ],
+          "temperature": 0,
+          "avg_logprob": -0.459371737071446,
+          "compression_ratio": 0.6521739130434783,
+          "no_speech_prob": 0.007302801124751568
+        }
+      ],
+      "jevSource": "Previously recorded Jev response for identical transcript and canonical input",
+      "reusedJevCaseId": "pink",
+      "originalJevRecordCreated": "2026-09-20T20:35:03.557Z",
+      "before": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "black",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "rawResponse": {
+        "answers": {
+          "action": {
+            "type": "choice",
+            "value": "apply",
+            "probabilities": {
+              "unsupported": 0,
+              "clarify": 0.01,
+              "undo": 0,
+              "apply": 0.99,
+              "reset": 0
+            },
+            "confidence": 0.99
+          },
+          "jacket": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "denim": 0.36,
+              "raincoat": 0,
+              "keep": 0.64,
+              "none": 0,
+              "bomber": 0,
+              "blazer": 0
+            },
+            "confidence": 0.56
+          },
+          "jacketColor": {
+            "type": "choice",
+            "value": "pink",
+            "probabilities": {
+              "navy": 0.03,
+              "olive": 0,
+              "keep": 0.08,
+              "black": 0,
+              "pink": 0.89,
+              "cream": 0
+            },
+            "confidence": 0.86
+          },
+          "fit": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "oversized": 0,
+              "fitted": 0,
+              "keep": 0.7,
+              "regular": 0.3
+            },
+            "confidence": 0.59
+          },
+          "glasses": {
+            "type": "choice",
+            "value": "wayfarer",
+            "probabilities": {
+              "sport": 0,
+              "keep": 0.3,
+              "wayfarer": 0.7,
+              "none": 0,
+              "round": 0
+            },
+            "confidence": 0.62
+          },
+          "glassesColor": {
+            "type": "choice",
+            "value": "pink",
+            "probabilities": {
+              "keep": 0.02,
+              "black": 0.01,
+              "amber": 0,
+              "pink": 0.97
+            },
+            "confidence": 0.95
+          },
+          "glassesSize": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "regular": 0.3,
+              "large": 0,
+              "small": 0,
+              "keep": 0.7
+            },
+            "confidence": 0.59
+          },
+          "shirt": {
+            "type": "choice",
+            "value": "white",
+            "probabilities": {
+              "white": 0.48,
+              "keep": 0.48,
+              "black": 0.04
+            },
+            "confidence": 0.22
+          },
+          "trousers": {
+            "type": "choice",
+            "value": "indigo",
+            "probabilities": {
+              "keep": 0.45,
+              "cream": 0,
+              "indigo": 0.55
+            },
+            "confidence": 0.33
+          }
+        },
+        "latency_ms": 228,
+        "service_latency_ms": 228,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 228,
+            "retry_after_ms": 0
+          }
+        ],
+        "cost_usd": 0,
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      "rawDecision": {
+        "action": "apply",
+        "patch": {
+          "jacketColor": "pink",
+          "glasses": "wayfarer",
+          "glassesColor": "pink",
+          "shirt": "white",
+          "trousers": "indigo"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "pink",
+          "fit": "regular",
+          "glasses": "wayfarer",
+          "glassesColor": "pink",
+          "glassesSize": "regular",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "glasses"
+        },
+        "discarded": [],
+        "reason": ""
+      },
+      "decision": {
+        "action": "apply",
+        "patch": {
+          "glasses": "wayfarer",
+          "glassesColor": "pink"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "fit": "regular",
+          "glasses": "wayfarer",
+          "glassesColor": "pink",
+          "glassesSize": "regular",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "glasses"
+        },
+        "discarded": [
+          "jacketColor"
+        ],
+        "reason": "Jev also proposed changing jacketColor. The focus rule kept this pronoun edit on the glasses."
+      },
+      "after": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "pink",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. Wear pink wayfarer sunglasses, with regular frames. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories.",
+      "audioSha256": "bc0c0ef21189ddaf7f0f15b53e431b132b95a728ce80504d15094617152a9263"
+    },
+    {
+      "id": "bigger",
+      "audio": "speech/04-bigger.wav",
+      "text": "Make them bigger.",
+      "seconds": 0.9193125,
+      "transcriptionMs": 20,
+      "segments": [
+        {
+          "id": 0,
+          "seek": 0,
+          "start": 0,
+          "end": 1,
+          "text": " Make them bigger.",
+          "tokens": [
+            50363,
+            6889,
+            606,
+            5749,
+            13,
+            50413
+          ],
+          "temperature": 0,
+          "avg_logprob": -0.44300637926374165,
+          "compression_ratio": 0.68,
+          "no_speech_prob": 0.0035024501848965883
+        }
+      ],
+      "jevSource": "Previously recorded Jev response for identical transcript and canonical input",
+      "reusedJevCaseId": "bigger",
+      "originalJevRecordCreated": "2026-09-20T20:35:03.557Z",
+      "before": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "pink",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "rawResponse": {
+        "answers": {
+          "action": {
+            "type": "choice",
+            "value": "apply",
+            "probabilities": {
+              "clarify": 0.01,
+              "undo": 0,
+              "apply": 0.93,
+              "unsupported": 0.06,
+              "reset": 0
+            },
+            "confidence": 0.92
+          },
+          "jacket": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "blazer": 0,
+              "raincoat": 0,
+              "keep": 0.6900000000000001,
+              "none": 0,
+              "bomber": 0,
+              "denim": 0.31
+            },
+            "confidence": 0.62
+          },
+          "jacketColor": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "navy": 0.13,
+              "pink": 0.04,
+              "black": 0,
+              "keep": 0.83,
+              "cream": 0,
+              "olive": 0
+            },
+            "confidence": 0.78
+          },
+          "fit": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.63,
+              "oversized": 0.06,
+              "regular": 0.31,
+              "fitted": 0
+            },
+            "confidence": 0.51
+          },
+          "glasses": {
+            "type": "choice",
+            "value": "wayfarer",
+            "probabilities": {
+              "round": 0,
+              "keep": 0.39,
+              "wayfarer": 0.61,
+              "none": 0,
+              "sport": 0
+            },
+            "confidence": 0.5
+          },
+          "glassesColor": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.72,
+              "pink": 0.28,
+              "black": 0,
+              "amber": 0
+            },
+            "confidence": 0.62
+          },
+          "glassesSize": {
+            "type": "choice",
+            "value": "large",
+            "probabilities": {
+              "small": 0,
+              "keep": 0,
+              "large": 1,
+              "regular": 0
+            },
+            "confidence": 0.99
+          },
+          "shirt": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.76,
+              "black": 0,
+              "white": 0.24
+            },
+            "confidence": 0.63
+          },
+          "trousers": {
+            "type": "choice",
+            "value": "keep",
+            "probabilities": {
+              "keep": 0.52,
+              "cream": 0,
+              "indigo": 0.48
+            },
+            "confidence": 0.28
+          }
+        },
+        "latency_ms": 38509,
+        "service_latency_ms": 403,
+        "retries": 2,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": "network",
+            "latency_ms": 18001
+          },
+          {
+            "attempt": 2,
+            "status": "network",
+            "latency_ms": 18001
+          },
+          {
+            "attempt": 3,
+            "status": 200,
+            "latency_ms": 403,
+            "retry_after_ms": 0
+          }
+        ],
+        "cost_usd": 0,
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      "rawDecision": {
+        "action": "apply",
+        "patch": {
+          "glasses": "wayfarer",
+          "glassesSize": "large"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "fit": "regular",
+          "glasses": "wayfarer",
+          "glassesColor": "pink",
+          "glassesSize": "large",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "glasses"
+        },
+        "discarded": [],
+        "reason": ""
+      },
+      "decision": {
+        "action": "apply",
+        "patch": {
+          "glasses": "wayfarer",
+          "glassesSize": "large"
+        },
+        "outfit": {
+          "jacket": "denim",
+          "jacketColor": "navy",
+          "fit": "regular",
+          "glasses": "wayfarer",
+          "glassesColor": "pink",
+          "glassesSize": "large",
+          "shirt": "white",
+          "trousers": "indigo",
+          "focus": "glasses"
+        },
+        "discarded": [],
+        "reason": ""
+      },
+      "after": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "pink",
+        "glassesSize": "large",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. Wear pink wayfarer sunglasses, with large frames. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories.",
+      "audioSha256": "e4391df8fa6f189b80e9b64452f9fd2311a697aac2141fad0702fe260a5fbd3a"
+    }
+  ],
+  "providerFailures": [],
+  "status": "complete",
+  "audioGeneration": {
+    "engine": "macOS say",
+    "voice": "Samantha",
+    "wordsPerMinute": 145,
+    "capture": "synthetic WAV files; no microphone"
+  }
+}

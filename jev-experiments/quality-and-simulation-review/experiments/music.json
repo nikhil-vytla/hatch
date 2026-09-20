@@ -1,0 +1,130 @@
+{
+  "id": "music",
+  "title": "Music arranger",
+  "evidenceStatus": "Five completed authored eight-note motifs; three provider-429 failures; no listening evaluation.",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "All five completed motifs rise or repeat until a final tonic reset; four are literal scale walks. Playback overrides 31 of 40 note durations and all three sine-voice choices, while the default ABAB transposition creates 20 of 160 notes outside the recorded scale and 80 piano-roll pitch mismatches. Build a shared score and contextual phrase candidates before judging Jev's musical quality.",
+  "strengths": [
+    "Uses Tone's scheduled audio time after user-initiated audio startup.",
+    "Four separately audible and muteable parts make the arrangement inspectable.",
+    "Preserves full typed decisions and distributions and explicitly credits procedural arrangement code.",
+    "Existing Tone.js and @tonejs/midi dependencies can support a much richer implementation."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Ordinal note questions collapse to ascending scale walks",
+      "evidence": "src/jev_lab/compositions.py:374; results/music.jsonl:2; probes/music.probe.json: 4/5 literal scale walks, 29 upward intervals, 1 repeat, 5 final downward resets, no earlier descent.",
+      "impact": "Independent questions see no phrase history and ordinal positions echo degree names, preventing meaningful musical-context decisions. The suspected naming cause still needs an ablation.",
+      "fix": "Generate coherent two-bar phrase candidates with varied contours, rhythm and rests, then have Jev choose against the brief, harmony and previous phrase. Test neutral identifiers and relative-motion questions separately."
+    },
+    {
+      "priority": "P1",
+      "title": "Audio discards most recorded rhythm and timbre decisions",
+      "evidence": "experience-prototypes/src/creative.tsx:478, :511, :545; 31/40 durations differ from fixed eighth-note playback; 3/5 recorded voices are sine but playback always uses triangle.",
+      "impact": "The audible result does not represent the model choices being presented. Original phrase lengths of 16, 7.5, 9, 4 and 8 beats all become four beats.",
+      "fix": "Compile explicit beat-offset, duration, pitch, velocity, instrument and rest events. Enforce phrase length in candidates and use the score for playback and export."
+    },
+    {
+      "priority": "P1",
+      "title": "Form and harmony ignore the chosen key and phrase",
+      "evidence": "experience-prototypes/src/creative.tsx:499, :515; default ABAB transposes by two semitones over fixed C/F/G/C roots; 20/160 melody events leave the recorded scale.",
+      "impact": "Chromatic notes and major chords over minor motifs arise without a musical decision, and B sections are fixed transpositions rather than phrase development.",
+      "fix": "Use tonic/mode-aware progressions, explicit permitted chromaticism, voice-leading code and phrase transformations such as inversion, rhythmic variation and instrument exchange."
+    },
+    {
+      "priority": "P2",
+      "title": "Visual and exported scores disagree with playback",
+      "evidence": "experience-prototypes/src/creative.tsx:569, :734, :747, :756; default ABAB has 80/160 displayed pitch mismatches; MIDI and audio use different durations.",
+      "impact": "Visitors cannot inspect or edit what they hear, and exported files change articulation and timing.",
+      "fix": "Use one event list for piano roll, playback, MIDI and JSON; add pitch up/down, rest, duration, undo and phrase-lock controls; verify a one-tick MIDI round trip."
+    },
+    {
+      "priority": "P2",
+      "title": "Coverage and quality evaluation are incomplete",
+      "evidence": "results/music.jsonl:1, :6, :7, :8; human_preference is null; scripts/recover.ts:13 excludes music; package.json:10 has no music tests.",
+      "impact": "Five examples cannot establish coherence or superiority to procedural arrangement, and provider overload leaves three briefs unrepresented.",
+      "fix": "Recover only the three failed requests, preserve every completed choice, publish eight-case coverage and compare against rule and random baselines with independent blind listening."
+    },
+    {
+      "priority": "P2",
+      "title": "Pending audio startup can survive stop or navigation",
+      "evidence": "experience-prototypes/src/creative.tsx:470, :476, :547, :616; async startup completes before engine.current and playing are set. Static risk, not browser-reproduced.",
+      "impact": "Rapid actions can leave stale audio startup or use stale motif state, undermining the interactive demo.",
+      "fix": "Add explicit playback states, generation tokens after awaits, ownership-aware disposal and score-version checks for late arrangement responses."
+    }
+  ],
+  "simulation": {
+    "title": "Score a tiny film",
+    "description": "An eight-bar film scene drives a six-track score. Visitors audition alternatives for each two-bar scene, request a falling answer or more tension, lock phrases, edit notes and hear accepted changes at bar boundaries.",
+    "jevsRole": "Choose semantic global settings and one coherent phrase candidate at a time, conditioned on scene direction, actual candidate events, harmony and prior selected phrases.",
+    "codeRole": "Generate valid candidates; enforce meter, register, permitted harmony and locks; compute voice leading; schedule audio and synchronized animation; render and export one canonical score.",
+    "acceptanceCriteria": [
+      "Audio, piano roll and MIDI share pitches, onset times and durations within one MIDI tick.",
+      "Six contour families, rests and syncopation are available, selectable and audible.",
+      "Eight bars span 32 beats at 4/4; each phrase spans eight beats including rests.",
+      "Chord labels match actual notes and inversions; intentional chromaticism is explicit.",
+      "Changes apply on bar boundaries without a transport restart or network call in the scheduler.",
+      "Stop and navigation cancel pending startup and all owned audio work.",
+      "Overload leaves the current score playing and never relabels a procedural fallback as Jev.",
+      "Keyboard editing works in both pitch directions and supports rests, mutes, undo and phrase locks.",
+      "One complete recorded session can be replayed without an API key, with candidates and decision provenance."
+    ]
+  },
+  "evaluation": {
+    "design": "Recover the three original transient failures. Freeze 48 authored briefs spanning six contours, four emotional trajectories and two phrase contexts; use four candidate-generation seeds for 192 new-system cases. Evaluate every score mechanically and compare methods with blind scene-fit judgments. New Jev arrangements require 960 logical calls, the original formulation 48, and two option-order checks for 48 final-phrase prompts 96, totaling 1,104 study calls plus three recoveries and retries. For listening, use 96 held-out A/B comparisons with five ratings each, randomized order, ties allowed and confidence intervals clustered by brief. No outcomes from this proposed study exist yet.",
+    "baselines": [
+      "Original independent-note question formulation through the corrected shared renderer",
+      "Declared rule-based arranger over the same candidate pool",
+      "Uniform random selection over the same valid candidate pool"
+    ],
+    "metrics": [
+      "Full event parity across audio, piano roll and MIDI",
+      "Meter, register and user-lock constraint satisfaction",
+      "Exact contour, rhythm and instrumentation compliance where objectively specified",
+      "Blind scene-fit preference with ties worth half and 95% intervals clustered by brief; proposed success requires lower bound above 50%",
+      "Listener-rated phrase shape and distracting transitions",
+      "Unique interval/rhythm patterns, interval directions and terminal leaps as diagnostics",
+      "Option-order stability and neutral-identifier ablations",
+      "Edit latency, bar-boundary adoption, stale-response rejection, audio discontinuities and separate provider availability"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "5 completed motifs from 8 authored briefs, 40 notes and 95 typed answers; 3 provider HTTP 429 failures.",
+      "full": "All 8 original briefs, then a proposed 48-brief by 4-seed candidate study. There is no external music benchmark or official split in the current experiment.",
+      "feasibility": "Completing the original set needs 3 logical calls with 19 questions each. The richer automated study needs 1,104 logical calls and the independent listening study needs 480 human judgments. Candidate generation, a shared score and renderer parity must be implemented first."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Tone.js",
+      "url": "https://tonejs.github.io/",
+      "use": "Keep the existing scheduler and synths; schedule score events, named instrument banks, buses and optional licensed samples while Jev selects semantic arrangement changes."
+    },
+    {
+      "name": "Tonal",
+      "url": "https://github.com/tonaljs/tonal",
+      "use": "Use notes, keys, chord progressions, voicings and voice-leading modules to generate valid contextual candidates that Jev can rank by scene fit."
+    },
+    {
+      "name": "@tonejs/midi",
+      "url": "https://github.com/Tonejs/Midi",
+      "use": "Export and import MIDI from the shared event score, round-trip pitches and timings, and let Jev arrange a visitor's motif."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "M", "action": "Build the canonical score and parity across renderer, piano roll and MIDI; preserve predicted durations and timbres." },
+    { "priority": "P1", "size": "L", "action": "Add contextual phrase candidates, key-aware harmony, voice leading and an editable six-track arrangement." },
+    { "priority": "P1", "size": "M", "action": "Add playback generation guards, score-version checks and bar-quantized editing." },
+    { "priority": "P2", "size": "S", "action": "Recover only the three failed authored requests and publish coverage separately from quality." },
+    { "priority": "P2", "size": "M", "action": "Run the frozen 48-brief evaluation and blind listening before claiming quality improvements." },
+    { "priority": "P2", "size": "M", "action": "Reuse the conductor for context-sensitive Snake or Orbital rescue music with a fixed soundtrack-table baseline." }
+  ],
+  "sources": [
+    { "label": "TypeSafe question independence and typed decisions", "url": "https://docs.typesafe.ai/introduction" },
+    { "label": "Tone.js transport, synths, sampling and audio startup", "url": "https://tonejs.github.io/" },
+    { "label": "Tonal music theory and voice-leading modules", "url": "https://github.com/tonaljs/tonal" },
+    { "label": "Tone MIDI file reading, writing and event representation", "url": "https://github.com/Tonejs/Midi" }
+  ]
+}

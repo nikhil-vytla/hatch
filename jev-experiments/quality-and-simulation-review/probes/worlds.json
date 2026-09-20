@@ -1,0 +1,344 @@
+{
+  "method": "Offline actual React callback harness and actual MotionArt drawing code with a recording Canvas stub. Canvas command differences are not rendered screenshot or perceptual comparisons. No browser or model calls.",
+  "sourceHashes": {
+    "src/creative.tsx": "b9da4b93d6ac50841508af6534171943219b829b0c263f0b482bbfaceea54040",
+    "src/motion-art.tsx": "f490b6656fbe9ad4e5b63099b6c19cb590e688267ed885e42c616838cdb4417e",
+    "results/visuals.jsonl": "49c70e644f5113941b434664e8d20a5ccb22ee271e5883c9e1faf34bdee14b50"
+  },
+  "evidence": {
+    "scenes": 20,
+    "choices": 160,
+    "recovered": 12,
+    "checks": {
+      "expected_scenes": 20,
+      "valid_scenes": 20
+    },
+    "humanPreference": null,
+    "availability": {
+      "planned": 20,
+      "completed": 20,
+      "unavailable": 0
+    }
+  },
+  "currentLiveQuestions": {
+    "palette": {
+      "type": "choice",
+      "instructions": "Choose the visual palette",
+      "criteria": {
+        "garden": "garden",
+        "night": "night",
+        "ocean": "ocean",
+        "warm": "warm",
+        "neon": "neon"
+      }
+    },
+    "terrain": {
+      "type": "choice",
+      "instructions": "Choose the environment",
+      "criteria": {
+        "hills": "hills",
+        "buildings": "buildings",
+        "waves": "waves",
+        "stars": "stars"
+      }
+    },
+    "motion": {
+      "type": "choice",
+      "instructions": "Choose the feeling of movement",
+      "criteria": {
+        "drift": "drift",
+        "orbit": "orbit",
+        "pulse": "pulse",
+        "grow": "grow"
+      }
+    },
+    "density": {
+      "type": "choice",
+      "instructions": "Choose how crowded",
+      "criteria": {
+        "sparse": "sparse",
+        "balanced": "balanced",
+        "dense": "dense"
+      }
+    }
+  },
+  "recordedQuestionKeys": [
+    "palette",
+    "terrain",
+    "density",
+    "motion",
+    "shape0",
+    "shape1",
+    "shape2",
+    "shape3"
+  ],
+  "unsupportedRecordedPlans": [
+    {
+      "index": 4,
+      "brief": "A bright geometric playground with bouncing shapes",
+      "unsupported": {
+        "terrain": "flat",
+        "motion": "bounce"
+      }
+    },
+    {
+      "index": 5,
+      "brief": "A snowy forest with slow falling snowflakes",
+      "unsupported": {
+        "palette": "monochrome"
+      }
+    },
+    {
+      "index": 8,
+      "brief": "A clockwork greenhouse with rotating flowers",
+      "unsupported": {
+        "terrain": "flat"
+      }
+    },
+    {
+      "index": 15,
+      "brief": "A carnival of colorful kites moving in a breeze",
+      "unsupported": {
+        "terrain": "flat"
+      }
+    },
+    {
+      "index": 18,
+      "brief": "A field of flowers growing toward the sun",
+      "unsupported": {
+        "terrain": "flat"
+      }
+    },
+    {
+      "index": 19,
+      "brief": "A minimalist black and white dance of circles",
+      "unsupported": {
+        "palette": "monochrome",
+        "terrain": "flat"
+      }
+    }
+  ],
+  "droppedShapeDecisions": 80,
+  "allRecordedFramesDifferWithoutShapes": true,
+  "frameComparisons": [
+    {
+      "index": 0,
+      "fullHash": "df2a3b6fd3454b009489f4590c7b463a9f133c7f5ab69ca51e2a5ec8ec33d1e9",
+      "withoutShapesHash": "e9e44137687b8a938eecc4173c9abb58085ad8b9089fc599f091d2865ccaed4c",
+      "differs": true
+    },
+    {
+      "index": 1,
+      "fullHash": "84c4a6e6611ae90f22bacb236aafe0a18a2cbdc84c7ab8d417752240b79156ff",
+      "withoutShapesHash": "aadb1ffafeb1a5fb5e73cd9a126cbbdafdf30b9925e6a056404e37f818677129",
+      "differs": true
+    },
+    {
+      "index": 2,
+      "fullHash": "46c40bb3769eb5466f8b6a45c590e4aa72ea4c0695b78968900a5fdd8296669f",
+      "withoutShapesHash": "9d4556ebfd69141270405a47d9e58087095684d89ded1727a181c82d02e1f864",
+      "differs": true
+    },
+    {
+      "index": 3,
+      "fullHash": "ee25f222b842063bbc68f468847ff01838e1ad3746df79e3a8af523fb9b2503d",
+      "withoutShapesHash": "e873cc5d1532b30c7d72773e3e2543b61759671e4d01602a5fdf156b8cef0de6",
+      "differs": true
+    },
+    {
+      "index": 4,
+      "fullHash": "20a5e8580536d3b18df27203b69b891676d416c137fd9d9b6ea240b9d527ae6f",
+      "withoutShapesHash": "6b691def2f6fc4cee1fda475a58d071b379d1006e3ebdab62993f071b544a290",
+      "differs": true
+    },
+    {
+      "index": 5,
+      "fullHash": "9a8e775e9e895b9fed7c86c28f2444d5aa9a41a4f6f5a0ae3fb315f242cf9cfe",
+      "withoutShapesHash": "2908278a8ae9a420b50008f52d48b075948a4a397d0a98fd6158249df0dbc7b4",
+      "differs": true
+    },
+    {
+      "index": 6,
+      "fullHash": "2fd6f3ffcb5125e2d45a7fa910cc631c1888ae71b9d8724729266484d6929373",
+      "withoutShapesHash": "181aa7a1000cb2d93a041ec88a0a51c7e18d1d9540990a74733cd079aa29ede9",
+      "differs": true
+    },
+    {
+      "index": 7,
+      "fullHash": "a6af3cb47a54cf715e975a37ca346d78115567a13dadb6e302742734e4c2148e",
+      "withoutShapesHash": "6b0c1d8525ca1f15289d75d39a2f3a493d6000ae89914da379b2739a755a8515",
+      "differs": true
+    },
+    {
+      "index": 8,
+      "fullHash": "e9786ecbc62efacc2a81945759fe2ce4bb3f5a9d05a7696fc9cad64c5565df19",
+      "withoutShapesHash": "b7f9d3a097a8a0df609b5848160af713122388896c69613ccde535473dda2b91",
+      "differs": true
+    },
+    {
+      "index": 9,
+      "fullHash": "caa306bee7d06d8ad48ddb7e400283cf2d18408b6fccb73eb4df19e17aa4a316",
+      "withoutShapesHash": "9eb078b05afe6e2ec799a5ae9c2a74fa02626e5a84260e8af0a8cb127f5a2b8f",
+      "differs": true
+    },
+    {
+      "index": 10,
+      "fullHash": "25329df1ff720b67da65519bb5bbb821e736a0ce7fc7e30380cc144837dd4b6d",
+      "withoutShapesHash": "afd0e6b8200d3f841d87bc51a84ee91edb63ec9176f8f4314be017e0e33be948",
+      "differs": true
+    },
+    {
+      "index": 11,
+      "fullHash": "f0978e55a717b12f5b88f2199a30127965d935d1ec0f538cfe7879fecbd15790",
+      "withoutShapesHash": "6b0c1d8525ca1f15289d75d39a2f3a493d6000ae89914da379b2739a755a8515",
+      "differs": true
+    },
+    {
+      "index": 12,
+      "fullHash": "3c7c5e40c9a2ae10d24f50a3ee647001484bce61acbbdc59da17201c657611d7",
+      "withoutShapesHash": "3cfea993e917f05015058ceaff3b2570779c204281a5224b6d0aaeb0b67375b5",
+      "differs": true
+    },
+    {
+      "index": 13,
+      "fullHash": "84620246be3f2f9c25e88d9ff2938507208034bffd87f2b76d2bce2708c1afcb",
+      "withoutShapesHash": "68aa53c46168059578c0bf5042235c93986086ddded145aee99dad1b078d4d36",
+      "differs": true
+    },
+    {
+      "index": 14,
+      "fullHash": "1f315d11c655a4691b9b863657a334fcc815386f38ef62dd12b3e48d2024983f",
+      "withoutShapesHash": "e0afb735b6529161343a07489dc6fe87f3a3109c4648038a31de4d7bf4e7faf5",
+      "differs": true
+    },
+    {
+      "index": 15,
+      "fullHash": "5196d8ee5e8e63b825f2c1410a3cd2b9f9c226f4783a5b19f634f4a86117104a",
+      "withoutShapesHash": "6651efc2fc0bdecbe61db51287b9d80ce6cd272af70922fcc602a1885c7ceeef",
+      "differs": true
+    },
+    {
+      "index": 16,
+      "fullHash": "dfcfcf8d0a05d8f9d5be389396b587b7101c71e17d100940a9c0cb6cf3373668",
+      "withoutShapesHash": "aadb1ffafeb1a5fb5e73cd9a126cbbdafdf30b9925e6a056404e37f818677129",
+      "differs": true
+    },
+    {
+      "index": 17,
+      "fullHash": "b79c8dae8952653167e68cbc8ff0ed8d20ebe6bdfb66155c226770c1c1a55cdc",
+      "withoutShapesHash": "29845830454476ca9e491a18898e05c61aa6ebb61e0cf755daeda172b0dfaee9",
+      "differs": true
+    },
+    {
+      "index": 18,
+      "fullHash": "a1a997521cf936a7d9d94d23611084815ec374ac11388040ced06d42123d9d9b",
+      "withoutShapesHash": "35842d24503a7d7957fb4b4a25f177c3ff4f1c3251b935bce37dd89d44ea4f52",
+      "differs": true
+    },
+    {
+      "index": 19,
+      "fullHash": "567832fe3dbbc8a530d47b14eec451ca48062898ab726af8eb276683c2e89bf1",
+      "withoutShapesHash": "3a1e4c5da6d44e94453371af1f5b94034cf045aea569d2f218836995407147d1",
+      "differs": true
+    }
+  ],
+  "recordedExamples": [
+    {
+      "brief": "A quiet moonlit garden with drifting fireflies and a small pond",
+      "scene": {
+        "palette": "night",
+        "terrain": "stars",
+        "density": "sparse",
+        "motion": "drift",
+        "shape0": "circle",
+        "shape1": "circle",
+        "shape2": "circle",
+        "shape3": "circle"
+      },
+      "particleCount": 12,
+      "ellipseCount": 0,
+      "moonOrSunCircle": [
+        "arc",
+        532,
+        120,
+        24,
+        0,
+        6.283185307179586
+      ]
+    },
+    {
+      "brief": "An orange desert at sunset with windblown dunes",
+      "scene": {
+        "palette": "warm",
+        "terrain": "hills",
+        "density": "sparse",
+        "motion": "drift",
+        "shape0": "line",
+        "shape1": "line",
+        "shape2": "line",
+        "shape3": "line"
+      },
+      "particleCount": 12,
+      "ellipseCount": 18,
+      "moonOrSunCircle": [
+        "arc",
+        532,
+        120,
+        24,
+        0,
+        6.283185307179586
+      ]
+    }
+  ],
+  "pause": {
+    "activeAt13Seconds": "df2a3b6fd3454b009489f4590c7b463a9f133c7f5ab69ca51e2a5ec8ec33d1e9",
+    "pausedAt13Seconds": "f610e4ea447e8f71508414536a736122a18b575cc79d1fa29dc83c379c318053",
+    "activeAt4Seconds": "f610e4ea447e8f71508414536a736122a18b575cc79d1fa29dc83c379c318053",
+    "pauseChangesFrame": true,
+    "pausedEqualsFixed4Seconds": true,
+    "firstParticleBefore": {
+      "x": -24.671096462580913,
+      "y": 53.829180348192224
+    },
+    "firstParticleAfter": {
+      "x": 24.63624324971151,
+      "y": 54.01985780187086
+    }
+  },
+  "growth": {
+    "brief": "A field of flowers growing toward the sun",
+    "samples": [
+      {
+        "timeMs": 0,
+        "firstParticle": {
+          "x": 0,
+          "y": 350
+        },
+        "firstParticleRadius": 4
+      },
+      {
+        "timeMs": 20000,
+        "firstParticle": {
+          "x": 16.424664967969726,
+          "y": 199.99999999999997
+        },
+        "firstParticleRadius": 4
+      },
+      {
+        "timeMs": 40000,
+        "firstParticle": {
+          "x": 24.76518389237176,
+          "y": 350
+        },
+        "firstParticleRadius": 4
+      }
+    ]
+  },
+  "lateResponse": {
+    "submittedBrief": "A quiet moonlit garden with drifting fireflies and a small pond",
+    "selectedRecordedIndex": 1,
+    "draftBrief": "A busy coral reef with curious fish and waving plants",
+    "displayedBrief": "A quiet moonlit garden with drifting fireflies and a small pond",
+    "displayedSource": "live"
+  }
+}

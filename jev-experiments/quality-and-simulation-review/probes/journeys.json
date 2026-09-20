@@ -1,0 +1,962 @@
+{
+  "method": "Shared readRecord plus exhaustive original helpers and actual rendered callback transitions through mocked React hooks. No browser/model calls. Full-profile compatibility is an explicitly different task from identifying one of the eight menu items.",
+  "baselineCommit": "4c0c40d",
+  "sourceUnchanged": true,
+  "sourceHash": "a49d9a68dc124ffda510ee31688d9e8c980acd27fe430cc77cc819b08f1af719",
+  "evidenceHash": "813585ac4c3b7230a3e2b1260a6b702bb625f07cbb18ac53163ac70d358e0965",
+  "evidence": {
+    "requests": 1,
+    "questions": 81,
+    "states": 81,
+    "stateCounts": {
+      "conflict": 16,
+      "one": 29,
+      "multiple": 36
+    },
+    "valid": 81,
+    "optimal": 80,
+    "nonOptimal": [
+      {
+        "id": "s11xx",
+        "remaining": 2,
+        "next": "sweet",
+        "valid": true,
+        "best": [
+          "dairy"
+        ],
+        "optimal": false,
+        "nonSplitting": true
+      }
+    ],
+    "nonSplitting": [
+      {
+        "id": "s11xx",
+        "remaining": 2,
+        "next": "sweet",
+        "valid": true,
+        "best": [
+          "dairy"
+        ],
+        "optimal": false,
+        "nonSplitting": true
+      }
+    ],
+    "latencyMs": 638,
+    "attempts": [
+      {
+        "attempt": 1,
+        "status": 200,
+        "latency_ms": 637,
+        "retry_after_ms": 0
+      }
+    ],
+    "payloadBytes": 50515
+  },
+  "rollouts": {
+    "profiles": 16,
+    "feasibleProfiles": 8,
+    "fullPreferenceCorrect": 8,
+    "noMatchDetected": 0,
+    "meanQuestions": 3,
+    "reachableStates": 15,
+    "unreachableStateCount": 66,
+    "allTraces": [
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": false,
+          "dairy": false,
+          "sweet": false
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s00xx",
+            "next": "dairy",
+            "remaining": [
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s000x",
+            "next": "done",
+            "remaining": [
+              "lemonade"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "lemonade",
+        "allPreferencesSatisfied": false
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": false,
+          "dairy": false,
+          "sweet": false
+        },
+        "feasible": [
+          "herbal_tea"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x0x",
+            "next": "caffeine",
+            "remaining": [
+              "espresso",
+              "herbal_tea"
+            ]
+          },
+          {
+            "key": "s100x",
+            "next": "done",
+            "remaining": [
+              "herbal_tea"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "herbal_tea",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": true,
+          "dairy": false,
+          "sweet": false
+        },
+        "feasible": [
+          "iced_coffee"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s01xx",
+            "next": "dairy",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte"
+            ]
+          },
+          {
+            "key": "s010x",
+            "next": "done",
+            "remaining": [
+              "iced_coffee"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "iced_coffee",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": true,
+          "dairy": false,
+          "sweet": false
+        },
+        "feasible": [
+          "espresso"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x0x",
+            "next": "caffeine",
+            "remaining": [
+              "espresso",
+              "herbal_tea"
+            ]
+          },
+          {
+            "key": "s110x",
+            "next": "done",
+            "remaining": [
+              "espresso"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "espresso",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": false,
+          "dairy": true,
+          "sweet": false
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s00xx",
+            "next": "dairy",
+            "remaining": [
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s001x",
+            "next": "done",
+            "remaining": [
+              "milkshake"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "milkshake",
+        "allPreferencesSatisfied": false
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": false,
+          "dairy": true,
+          "sweet": false
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x1x",
+            "next": "sweet",
+            "remaining": [
+              "latte",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x10",
+            "next": "done",
+            "remaining": [
+              "latte"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "latte",
+        "allPreferencesSatisfied": false
+      },
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": true,
+          "dairy": true,
+          "sweet": false
+        },
+        "feasible": [
+          "iced_latte"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s01xx",
+            "next": "dairy",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte"
+            ]
+          },
+          {
+            "key": "s011x",
+            "next": "done",
+            "remaining": [
+              "iced_latte"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "iced_latte",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": true,
+          "dairy": true,
+          "sweet": false
+        },
+        "feasible": [
+          "latte"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x1x",
+            "next": "sweet",
+            "remaining": [
+              "latte",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x10",
+            "next": "done",
+            "remaining": [
+              "latte"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "latte",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": false,
+          "dairy": false,
+          "sweet": true
+        },
+        "feasible": [
+          "lemonade"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s00xx",
+            "next": "dairy",
+            "remaining": [
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s000x",
+            "next": "done",
+            "remaining": [
+              "lemonade"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "lemonade",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": false,
+          "dairy": false,
+          "sweet": true
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x0x",
+            "next": "caffeine",
+            "remaining": [
+              "espresso",
+              "herbal_tea"
+            ]
+          },
+          {
+            "key": "s100x",
+            "next": "done",
+            "remaining": [
+              "herbal_tea"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "herbal_tea",
+        "allPreferencesSatisfied": false
+      },
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": true,
+          "dairy": false,
+          "sweet": true
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s01xx",
+            "next": "dairy",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte"
+            ]
+          },
+          {
+            "key": "s010x",
+            "next": "done",
+            "remaining": [
+              "iced_coffee"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "iced_coffee",
+        "allPreferencesSatisfied": false
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": true,
+          "dairy": false,
+          "sweet": true
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x0x",
+            "next": "caffeine",
+            "remaining": [
+              "espresso",
+              "herbal_tea"
+            ]
+          },
+          {
+            "key": "s110x",
+            "next": "done",
+            "remaining": [
+              "espresso"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "espresso",
+        "allPreferencesSatisfied": false
+      },
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": false,
+          "dairy": true,
+          "sweet": true
+        },
+        "feasible": [
+          "milkshake"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s00xx",
+            "next": "dairy",
+            "remaining": [
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s001x",
+            "next": "done",
+            "remaining": [
+              "milkshake"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "milkshake",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": false,
+          "dairy": true,
+          "sweet": true
+        },
+        "feasible": [
+          "hot_chocolate"
+        ],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x1x",
+            "next": "sweet",
+            "remaining": [
+              "latte",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x11",
+            "next": "done",
+            "remaining": [
+              "hot_chocolate"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "hot_chocolate",
+        "allPreferencesSatisfied": true
+      },
+      {
+        "profile": {
+          "hot": false,
+          "caffeine": true,
+          "dairy": true,
+          "sweet": true
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s0xxx",
+            "next": "caffeine",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s01xx",
+            "next": "dairy",
+            "remaining": [
+              "iced_coffee",
+              "iced_latte"
+            ]
+          },
+          {
+            "key": "s011x",
+            "next": "done",
+            "remaining": [
+              "iced_latte"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "iced_latte",
+        "allPreferencesSatisfied": false
+      },
+      {
+        "profile": {
+          "hot": true,
+          "caffeine": true,
+          "dairy": true,
+          "sweet": true
+        },
+        "feasible": [],
+        "trace": [
+          {
+            "key": "sxxxx",
+            "next": "hot",
+            "remaining": [
+              "espresso",
+              "latte",
+              "iced_coffee",
+              "iced_latte",
+              "herbal_tea",
+              "hot_chocolate",
+              "lemonade",
+              "milkshake"
+            ]
+          },
+          {
+            "key": "s1xxx",
+            "next": "dairy",
+            "remaining": [
+              "espresso",
+              "latte",
+              "herbal_tea",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x1x",
+            "next": "sweet",
+            "remaining": [
+              "latte",
+              "hot_chocolate"
+            ]
+          },
+          {
+            "key": "s1x11",
+            "next": "done",
+            "remaining": [
+              "hot_chocolate"
+            ]
+          }
+        ],
+        "questions": 3,
+        "recommendation": "hot_chocolate",
+        "allPreferencesSatisfied": false
+      }
+    ]
+  },
+  "backButton": {
+    "afterAnswer": "s1xxx",
+    "afterBack": "sxxxx"
+  },
+  "terminalOverride": {
+    "state": {
+      "state": "s100x",
+      "preferences": {
+        "hot": true,
+        "dairy": false,
+        "caffeine": false
+      },
+      "remaining": [
+        "herbal_tea"
+      ],
+      "jev_decision": {
+        "type": "choice",
+        "value": "conflict",
+        "probabilities": {
+          "caffeine": 0,
+          "dairy": 0.04,
+          "hot": 0,
+          "conflict": 0.02,
+          "sweet": 0.03,
+          "done": 0.91
+        },
+        "confidence": 0.89
+      },
+      "recorded_latency_ms": 638
+    },
+    "visibleHeading": "herbal tea"
+  }
+}

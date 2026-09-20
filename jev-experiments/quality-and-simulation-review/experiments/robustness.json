@@ -1,0 +1,128 @@
+{
+  "id": "robustness",
+  "title": "Decision stability",
+  "evidenceStatus": "200 completed evaluations of 40 BANKING77 utterances across five authored conditions; 23 transport failures recovered without changing 177 prior successes",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "Reversing the 77 choices changes 3 of 40 predicted intents while accuracy remains 32/40, so the current pooled-accuracy gallery hides the experiment's central result. All recorded transformations are real and their full state texts are preserved, but matched format controls, paired metrics, and full-source coverage are missing. A counterfactual desk should show both complete inputs, option order, and probability transitions for every source case.",
+  "strengths": [
+    "All 200 public state texts match original request logs; 40 identical-repeat payloads and 40 exact option reversals were verified.",
+    "All 177 initially completed predictions and probability maps remained unchanged when 23 transport failures were recovered.",
+    "Stable intent IDs permit correct label alignment across option permutations, and provenance identifies BANKING77 plus authored interventions.",
+    "The UI distinguishes unavailable requests from wrong judgments and warns that model probabilities are not guarantees."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Pooled accuracy conceals paired label changes",
+      "evidence": "experience-prototypes/scripts/metrics.py:26 and src/benchmarks.tsx:39 pool 200 rows. Reconstructed original and reversed accuracy are both 32/40, but reversal flips 3/40 labels, all between wrong intents. See probes/robustness-results.json.",
+      "impact": "Visitors cannot see decision instability, and 200 evaluations can be mistaken for 200 independent source cases.",
+      "fix": "Show 40 independent cases and a paired transition matrix with stable-correct, stable-wrong, corrected, regressed, and changed-between-wrong-labels counts. Bootstrap complete source cases rather than individual variants."
+    },
+    {
+      "priority": "P1",
+      "title": "The fixed experiment covers only 1.30% of the source test split",
+      "evidence": "src/jev_lab/benchmarks.py:171 selects 40 cases across 40 of 77 intents. Official BANKING77 test coverage is 3,080 cases; the pinned cached CSV confirms 40 per intent. Zero repeat flips in 40 cases has a descriptive Wilson 95% upper bound of 8.76%.",
+      "impact": "The sample cannot support a broad reliability claim, and many intents receive no stability test.",
+      "fix": "Run all 3,080 source cases for a declared fixed matrix, while labeling broader permutation and authored challenge suites separately. Preserve the distinction between an external dataset and our own robustness protocol."
+    },
+    {
+      "priority": "P1",
+      "title": "Distractor and injection conditions also change the state format",
+      "evidence": "src/jev_lab/benchmarks.py:182 changes a plain utterance into a JSON object while adding background or an untrusted footer. No clean JSON-wrapper condition exists. Distractor accuracy improves from 32/40 to 34/40.",
+      "impact": "The observed improvement cannot be assigned to irrelevant context; explicit customer_message structure and context length are confounded.",
+      "fix": "Add matched clean wrappers, then vary one factor per condition: context content, position, length, or trust label. Add combined stress only after the individual factors are measured."
+    },
+    {
+      "priority": "P1",
+      "title": "The injection evidence is one narrow footer test",
+      "evidence": "src/jev_lab/benchmarks.py:189 uses the same visibly untrusted instruction targeting card_arrival for every case. None of the 40 true labels is card_arrival; there are zero target captures but three changed decisions.",
+      "impact": "The result supports resistance to that exact footer, not general prompt-injection resistance. Any label change and attack success are different outcomes.",
+      "fix": "Declare a threat model, add three frozen attack templates with deterministic wrong targets and matched clean wrappers, and measure target capture, utility loss, and generic flips separately. Include benign quoted imperative controls."
+    },
+    {
+      "priority": "P2",
+      "title": "The visitor cannot directly inspect the paired intervention",
+      "evidence": "experience-prototypes/src/benchmarks.tsx:29 filters individual rows; :127 displays one request; :245 offers a raw row. Public rows contain no question payload or ordered input criteria. Reversal therefore looks textually unchanged.",
+      "impact": "A reader must reconstruct pairs and inspect source code to understand what changed. Mistakes filtering can remove the correct half of a pair.",
+      "fix": "Publish instructions, ordered criteria, request hashes, and transform versions. Display complete before/after inputs together, animate option order by stable label ID, and retain whole pairs under filters."
+    },
+    {
+      "priority": "P2",
+      "title": "Repeatability needs more than one unchanged-label comparison",
+      "evidence": "The probe finds 0/40 repeat label flips but 17/40 changed probability maps. Reversal reaches 0.45 total variation. Provider confidence differs from selected-label probability in 90/200 rows; metrics.py:23 uses selected-label probability for calibration.",
+      "impact": "Label agreement conceals distribution changes, and mixing confidence fields or time periods can create misleading stability conclusions.",
+      "fix": "Add declared time-block repeats, retain provider precision and available model identity, measure label and probability drift separately, and keep service time, retry time, and unavailable attempts separate."
+    }
+  ],
+  "simulation": {
+    "title": "Counterfactual stability desk",
+    "description": "Pin a real request on the left, select one declared transformation, and inspect the exact changed state and ordered options on the right. Predict whether the intent should stay the same, then reveal paired recorded outputs with aligned probability bars and explicit stable-wrong, corrected, regressed, or wrong-to-wrong transitions. Human-reviewed meaning-changing pairs test appropriate sensitivity. Visitor-key exploratory runs remain outside recorded benchmark scores.",
+    "jevsRole": "Return the named intent and distribution for each exact input snapshot. Jev does not decide whether its own transform preserves meaning or supply the benchmark's expected answer.",
+    "codeRole": "Apply versioned transformations, preserve option order, schedule and record requests, align labels, calculate paired measures, show text diffs and transitions, and handle unavailable partners without fabricating outcomes.",
+    "acceptanceCriteria": [
+      "Both full input states, instructions, ordered criteria, source labels, and provenance are visible for each pair.",
+      "A 3/40 reversal flip rate remains visible even when clean and reversed accuracy are equal.",
+      "Filters retain both members of each pair; the full 77-label distribution is inspectable.",
+      "Unavailable partners remain pending or unavailable and do not enter paired semantic metrics; all retry attempts remain recorded.",
+      "Edits and resets cannot apply stale responses, and live exploration uses only the existing in-memory visitor key.",
+      "Animations represent actual recorded transformations and respect keyboard navigation and reduced motion."
+    ]
+  },
+  "evaluation": {
+    "design": "Freeze five basic conditions over all 3,080 BANKING77 test cases: original, identical repeat, reversed choices, clean JSON wrapper, and the same wrapper plus neutral context. This takes 15,400 logical requests. Three matched injection templates over the full split add 9,240, for 24,640 before retries. A separately labeled 770-case stratified stress set adds four random permutations and three further repeats, 5,390 requests; 154 human-reviewed meaning-changing pairs add 308. Preserve all conditions by source case for a 10,000-replicate stratified paired bootstrap. Use training/validation for tuning, immutable completed predictions, separate time-block analysis, exact provenance, and no cross-case state batching.",
+    "baselines": [
+      "Existing TF-IDF logistic classifier trained only on BANKING77 training data",
+      "Constant-intent classifier to expose the inadequacy of invariance without accuracy",
+      "The same Jev model with a deterministic, label-blind format canonicalizer, tested only on transformations it is allowed to undo"
+    ],
+    "metrics": [
+      "Official clean classification accuracy over 3,080 completed source cases",
+      "Per-condition accuracy, per-intent recall, and completed/planned coverage",
+      "Paired flip, regression, correction, stable-wrong, and wrong-to-wrong rates",
+      "Canonical-label probability total variation, Brier score, and reliability",
+      "Attack target capture and independent task accuracy under each attack",
+      "Expected-label accuracy for human-reviewed meaning-changing pairs",
+      "Whole-case bootstrap intervals, time-block repeat variation, and separate service/retry latency",
+      "Prospective canonicalizer target: at least 50% fewer invariant-condition flips with at most one percentage point clean and meaning-change accuracy loss, reporting paired intervals"
+    ],
+    "coverage": {
+      "kind": "mixed",
+      "current": "40 external BANKING77 test utterances, one each from 40 intents; five authored conditions each; 200/200 completed judgments after recovery. This is 1.30% of the 3,080-case test split.",
+      "full": "BANKING77 official test split has 3,080 utterances across 77 intents. The proposed full fixed basic matrix requires 15,400 calls, or 24,640 including three full-source attack templates. Full robustness beyond a declared matrix has no finite exhaustive definition.",
+      "feasibility": "Feasible with already pinned data and the existing typed-choice API. Needed work is matched controls, full request manifests, resumable scheduling, sustained provider capacity, and paired scoring. No model training, human judge calls, or large data downloads are needed for the full-source fixed matrix. The extended sampled stress and reviewed semantic-change plan totals 30,338 logical requests before retries."
+    }
+  },
+  "libraries": [
+    {
+      "name": "CheckList",
+      "url": "https://github.com/marcotcr/checklist",
+      "use": "Reuse offline templates, invariance and directional tests, and paired expectations to define reviewed NLP challenge suites; publish JSONL for the app. Jev provides the typed endpoint being exercised."
+    },
+    {
+      "name": "fast-check",
+      "url": "https://fast-check.dev/docs/introduction/",
+      "use": "Generate seeded permutations and shrink failures in label alignment, transform preservation, pairing, and recovery tests without model calls. An optional recorded model-testing mode must reconfirm failures rather than assuming deterministic responses."
+    },
+    {
+      "name": "jsdiff",
+      "url": "https://github.com/kpdecker/jsdiff",
+      "use": "Use diffWordsWithSpace for complete input text and diffArrays for ordered criteria. Avoid diffJson for criteria because its alphabetical key ordering hides option-order changes."
+    }
+  ],
+  "nextSteps": [
+    {"priority":"P1","size":"S","action":"Publish paired metrics from current evidence and replace the pooled 200-case headline with 40 independent cases and visible 3/40 reversal flips."},
+    {"priority":"P1","size":"M","action":"Add exact question payloads, ordered criteria, matched JSON controls, versioned transforms, and pairing/recovery invariants."},
+    {"priority":"P1","size":"M","action":"Build the paired counterfactual desk using existing records, then add visitor-key exploratory comparisons."},
+    {"priority":"P1","size":"M","action":"Run the full 15,400-call basic matrix and 9,240-call attack track; separate provisional availability from final scoring."},
+    {"priority":"P2","size":"M","action":"Add the declared repeat/permutation stress matrix and reviewed semantic changes; reuse the machinery for routers, context filtering, and agent-verifier regression suites."}
+  ],
+  "sources": [
+    {"label":"BANKING77 official repository and split counts","url":"https://github.com/PolyAI-LDN/task-specific-datasets#banking"},
+    {"label":"Pinned BANKING77 data revision","url":"https://github.com/PolyAI-LDN/task-specific-datasets/tree/57ec275d8078af65b7731c2a98be812d844a6d6b/banking_data"},
+    {"label":"Original BANKING77 paper and accuracy scoring","url":"https://aclanthology.org/2020.nlp4convai-1.5.pdf"},
+    {"label":"CheckList official implementation","url":"https://github.com/marcotcr/checklist"},
+    {"label":"fast-check official introduction","url":"https://fast-check.dev/docs/introduction/"},
+    {"label":"jsdiff official API","url":"https://github.com/kpdecker/jsdiff"}
+  ]
+}

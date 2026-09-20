@@ -1,0 +1,21 @@
+{
+  "route": "http://127.0.0.1:5195/#experiment/crowd",
+  "browser_session": "crowd",
+  "provider_calls": 0,
+  "owner_key_used": false,
+  "network": "Explicit Playwright interception with a dummy memory-held key",
+  "checks": {
+    "pending_receipt_at_issuance": true,
+    "pending_receipt_matches_exact_wire_input_and_questions": true,
+    "pause_cancels_pending_receipt": true,
+    "cancelled_receipt_retains_exact_payload": true,
+    "delayed_aborted_response_not_stored": true,
+    "issue_checkpoint_remains_pending_without_future_response": true,
+    "failed_receipt_retains_exact_wire_input_and_questions": true,
+    "mock_503_status_preserved": true,
+    "mock_retry_after_1100ms_preserved": true,
+    "mock_attempt_status_preserved": true,
+    "dummy_key_absent_from_receipts": true,
+    "reload_clears_memory_key": true
+  }
+}

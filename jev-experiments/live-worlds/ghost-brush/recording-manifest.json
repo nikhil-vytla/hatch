@@ -1,0 +1,19 @@
+{
+  "protocol": "ghost-brush-description-fit/v1",
+  "engine": "ghost-brush/1.0.0",
+  "label": "Two authored demonstration examples, not a held-out benchmark",
+  "bankSha256": "deaff8516adb1a3ec9d92d4f00af1cc9dbebca44217b99d916e2f92a9c1a6832",
+  "modelSourceSha256": "6015e4f07dab967a02f40ab235ef0b99c0bc8ccbaa4b2086666d65ba38bcbd94",
+  "cases": [
+    {
+      "id": "quiet-fabric",
+      "prompt": "A quiet fabric made of blue threads",
+      "requestSha256": "6cb3bbe4e429b959f60f8aba7be8fc2806d43e840596b0250f0966c89869a181"
+    },
+    {
+      "id": "violet-coral",
+      "prompt": "Strange branching violet coral",
+      "requestSha256": "59664d51baed3c1b383637f5f0e4753a74e07cbc5718ab1e91e43989c8d577ac"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "id": "changes",
+  "title": "Change impact",
+  "evidenceStatus": "One authored venue replacement, one successful 300 ms request, four complete Noul scores. All four threshold judgments match a dependency lookup using metadata included in the request. Actual-callback offline probes; no browser or new model calls.",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The current request supplies the authored dependencies described as an independent check, so its four matching answers do not establish semantic impact detection. A delayed venue response can attach to an edited date and mislabel two conclusions. Versioned evidence, honest result states and an annotation-free evaluation would preserve the useful source-change interaction.",
+  "strengths": [
+    "Stable conclusion IDs and a readable before/after comparison make the small scenario inspectable.",
+    "Draft edits clear badges immediately, and busy/error handling exists.",
+    "The published result is complete and retains provider attempts/timing; the live gateway validates every requested answer."
+  ],
+  "findings": [
+    {"priority":"P1", "title":"The independent dependency check is included in model input", "evidence":"experience-prototypes/src/new-experiments.tsx:795, :800, :805, :810, :867, :903; scripts/record.ts:97. probes/changes.json reconstructs all 4 saved predictions by intersecting changed fields with supplied depends arrays.", "impact":"The example cannot distinguish semantic impact detection from reading authored dependency metadata. This is an available shortcut, not proof of causal model reliance.", "fix":"Withhold annotations from the primary semantic protocol, show the code propagation baseline, and separate supplied-graph/shuffled-graph diagnostics from independent labels."},
+    {"priority":"P1", "title":"A late response is attached to the edited draft", "evidence":"experience-prototypes/src/new-experiments.tsx:875, :889, :914; shared.tsx:214. Actual callback probe starts a venue request, edits the date, then installs the old response; travel and reminder disagree with the current draft baseline.", "impact":"Two of four cards describe the wrong input, and the inspector retains an old run next to current facts even before completion.", "fix":"Bind runs to immutable input/conclusion hashes and draft revision, abort obsolete work and reject stale commits. Display the submitted snapshot for historical runs."},
+    {"priority":"P1", "title":"A negative or missing review score is presented as support", "evidence":"experience-prototypes/src/new-experiments.tsx:852 and :909. A synthetic record with only travel marks the three absent answers Still supported. The actual record is complete; server/gateway.ts:189 rejects incomplete live responses.", "impact":"Not being flagged for review does not independently prove support, and missing data must not become a reassuring result.", "fix":"Use explicit current/pending/stale/failed/unknown states and label negative outcomes Not flagged by this check. Evaluate support separately if that claim is needed."},
+    {"priority":"P1", "title":"Saved evidence lacks exact inputs and differs from the live prompt", "evidence":"experience-prototypes/scripts/record.ts:18, :27, :103; src/new-experiments.tsx:909; results/changes.jsonl. No state/questions/hashes are stored. Only live requests instruct the model to ignore spelling-only changes; existing files skip recording without compatibility checks.", "impact":"Current fixtures can be paired with older scores without proof they match, and one venue example does not validate the live protocol or general quality.", "fix":"Persist exact requests and versions, share a pure builder between live/recording paths, preserve the original record and label reconstructed context honestly."},
+    {"priority":"P2", "title":"The workflow ends at badges and leaves edit semantics undefined", "evidence":"experience-prototypes/src/new-experiments.tsx:813, :875, :901. Actual callbacks submit both empty capacity and an exact no-op; no model outcomes were measured for them. There is no conclusion repair, revision history or causal-path interaction.", "impact":"Visitors cannot close the review loop or distinguish deletion, unchanged meaning and meaningful replacement.", "fix":"Add explicit edit types, short-circuit exact no-ops, retain deletion as unknown, and provide a revisioned review queue with evidence, causal paths and scoped human decisions."}
+  ],
+  "simulation": {
+    "title": "An event plan that stays current",
+    "description": "Edit an event brief beside its invitation, travel note, catering order and reminder. See code-derived candidate dependencies immediately, then inspect semantic review decisions and supporting text. Repair or mark each conclusion reviewed, commit a revision, and fork alternatives from history.",
+    "jevsRole": "Judge semantic materiality, indirect references and conditional impact from allowed evidence. Gold annotations stay outside primary model input; known product dependencies are explicitly labeled when supplied.",
+    "codeRole": "Own immutable revisions, stable IDs, diffs, known-edge reachability, date arithmetic, per-item status, invalidation, asynchronous guards, scoped overrides, exports and timeline branching.",
+    "acceptanceCriteria": [
+      "Every badge, override and export references its exact source/conclusion revisions; no delayed response can become current for another draft.",
+      "No-op edits request zero judgments; explicit deletions and missing/failed responses never imply support.",
+      "Revert and fork preserve prior history and restore the correct comparison.",
+      "Only affected current conclusions enter the queue, with visible evidence and dependency provenance.",
+      "Deterministic reminder-date arithmetic agrees with the current event date.",
+      "The graph has a keyboard-accessible list equivalent."
+    ]
+  },
+  "evaluation": {
+    "design": "Author 64 independent eight-conclusion packs, each with eight edit families. Reserve 16 packs for development and 48 for held-out testing, split by scenario/template family. Two independent reviewers label material-review need, support/unknown and evidence, with adjudication. The 384 held-out snapshots have 3,072 conclusion decisions. Run annotation-free input three unchanged times, supplied-graph once and shuffled-graph once: 15,360 primitive decisions and 1,920 eight-question requests before splits/retries. Freeze threshold 0.5 and protocol hashes, retain wrong answers, and retry only transient failures. Use 10,000 paired bootstrap resamples clustered by 48 packs. Provisional gate: at least 90% recall lower bound on determinate affected conclusions and at most 10% false review on semantic no-ops. Separately exercise 1,000 offline schedules across seeds 0–99 and ten event patterns. None of these proposed runs were performed.",
+    "baselines": ["Always review and never review.", "Frozen changed-text overlap with declared normalization.", "Exact supplied-graph propagation, explicitly a different information condition.", "Independent date/quantity formulas where all assumptions are specified."],
+    "metrics": ["Review precision/recall and exact affected-set accuracy per edit.", "False reviews on no-op/formatting/paraphrase edits and unknown-support coverage.", "Unchanged-repeat agreement and dependence on supplied/shuffled graph metadata.", "Wrong-revision commits, missing-as-supported states, export identity and revert integrity.", "All-scheduled and completed coverage, retries, payload size, latency and cost."],
+    "coverage": {
+      "kind":"authored",
+      "current":"One venue replacement, four judgments, four matches to a supplied-metadata code baseline; no date/capacity/compound/no-op/spelling evaluation.",
+      "full":"Proposed 48 held-out document packs, 384 edits, 3,072 labeled conclusion outcomes and 15,360 judgments across five passes/conditions; 16 development packs and 1,000 offline integrity schedules.",
+      "feasibility":"No external benchmark or official score claimed. Needs independent labeling, exact input capture, a later recording run and provider capacity for 1,920 logical requests. A separate reviewer study is needed before claiming time savings."
+    }
+  },
+  "libraries": [
+    {"name":"React Flow", "url":"https://reactflow.dev/learn/advanced-use/computing-flows", "use":"Already installed; render facts, conclusions and dependency paths while canonical revisions remain separate from transient graph input state. Jev adds semantic impact beyond structural reachability."},
+    {"name":"jsdiff", "url":"https://github.com/kpdecker/jsdiff", "use":"Show word/whitespace changes as evidence; leave semantic equivalence to declared rules and Jev rather than treating every text difference as material."}
+  ],
+  "nextSteps": [
+    {"priority":"P1", "size":"S", "action":"Repair dependency-independence claims, stale response commits, result statuses and exact request provenance."},
+    {"priority":"P1", "size":"M", "action":"Add independently labeled edit families and annotation-free/supplied/shuffled dependency comparisons."},
+    {"priority":"P2", "size":"M", "action":"Build the revisioned impact queue with graph/list views, evidence, repairs and scoped overrides; reuse it for policy-document update review."}
+  ],
+  "sources": [
+    {"label":"React Flow computing flows", "url":"https://reactflow.dev/learn/advanced-use/computing-flows"},
+    {"label":"jsdiff primary API", "url":"https://github.com/kpdecker/jsdiff"}
+  ]
+}

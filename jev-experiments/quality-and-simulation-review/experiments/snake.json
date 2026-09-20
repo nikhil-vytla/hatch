@@ -1,0 +1,154 @@
+{
+  "id": "snake",
+  "title": "Snake",
+  "evidenceStatus": "Six completed episode records on seeds 7, 19 and 42: 248 Jev actions and 248 greedy actions; all 496 transitions replay exactly. Source remains at 4c0c40d.",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The finite records show Jev scoring 9/12/10 food versus greedy 12/12/10; all safe Jev choices minimize the supplied immediate distance, so these runs do not establish escape planning. Live play waits for model replies, mode switches restart the game, and the shared 90-move limit makes the coded full-board victory unreachable. Preserve that evidence and build real-time play, handoff and checkpoint branches as a separate interaction.",
+  "strengths": [
+    "Pure shared rules and explicit PRNG state support exact deterministic replay; every recorded Snake before-state and terminal state was reproduced.",
+    "Manual controls require no key, replay includes its terminal state, and observation/action distributions are inspectable.",
+    "Reset and unmount revoke pending requests through abort and epoch checks.",
+    "Existing tail-collision and replay tests pass; current copy already discloses the small demonstration scope and lack of advantage over greedy."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Live movement waits for the model and handoff resets the game",
+      "evidence": "experience-prototypes/src/arcade.tsx:379-429 awaits run, advances once, then schedules another request after 200ms; :339-348 and :446 reset canonical state when switching controller modes. Manual movement at :372 has no independent clock.",
+      "impact": "Provider delay freezes play; the visitor cannot hand the current position to Jev or resume it after takeover.",
+      "fix": "Run a fixed-step world clock independently; queue model commands for explicit tick deadlines, use a visible declared fallback on misses, and separate controller changes from reset."
+    },
+    {
+      "priority": "P1",
+      "title": "A full-board victory cannot be reached under the shared cutoff",
+      "evidence": "local-models-and-games/arcade/engine.ts:64 starts at length 3, :204 requires length 100, :211 stops at 90 moves. Maximum possible length is 93, even with food every move.",
+      "impact": "Manual and live games cannot reach their coded win condition; an evaluation budget ends ordinary play.",
+      "fix": "Move the 90-action horizon into a separately versioned evaluation wrapper. Classic gameplay continues to collision, attainable victory or an explicit user stop."
+    },
+    {
+      "priority": "P1",
+      "title": "The assisted three-seed setup does not identify planning benefit",
+      "evidence": "engine.ts:138 supplies exact next-cell safety and distance; :238 uses them in greedy. probes/snake.json: Jev scores 9/12/10 vs 12/12/10, agrees with greedy on 225/248 actions and takes zero safe longer-distance actions. Both seed-42 traces are identical and end at move 68 with no safe immediate action.",
+      "impact": "The headline about leaving an escape route is not tested against immediate heuristics or delayed counterfactual consequences. Seeded starts also do not guarantee identical later food locations because placement depends on body occupancy.",
+      "fix": "Lock new seeds, ablate action previews, add escape-aware and Hamiltonian baselines, and compare first actions from identical full checkpoints using an independently specified continuation policy."
+    },
+    {
+      "priority": "P1",
+      "title": "Pause does not revoke the pending move",
+      "evidence": "arcade.tsx:548 only changes playing; :399 checks the reset epoch and :414 applies advance(current, answer) even if Pause was pressed while awaiting the request. Source-level finding; no browser reproduction claimed.",
+      "impact": "A late answer can advance a supposedly paused game; this pattern would also corrupt future checkpoint or handoff behavior.",
+      "fix": "Pause/takeover/restore must increment a controller epoch and clear pending commands. Apply each response only at its target tick after validating session, branch and source-state hash."
+    },
+    {
+      "priority": "P2",
+      "title": "Recorded service timing is labeled like live request timing",
+      "evidence": "arcade/record.ts:64-74 copies batch service latency and total batch cost to each game row; arcade.tsx:410 uses wall latency for live rows while :623 labels both Request time. Recorded Snake median/p95/max service values are 313/430/1011ms, with batch sizes 2-6. Failed attempts and physical request IDs are absent from the published record.",
+      "impact": "The record cannot support live deadline reliability or physical request/cost totals; summing repeated batch costs would double count.",
+      "fix": "Persist a request-level ledger with wall/service timings, retries, cost and decision IDs; label the replay values precisely and report deadline misses, fallback share and all-scheduled availability separately."
+    }
+  ],
+  "simulation": {
+    "title": "Take the wheel, then fork the mistake",
+    "description": "Play a complete keyless Classic game on an independent clock, hand its current position to Jev, take over immediately, then restore a checkpoint before a trap and branch without changing the original run. Keep finite comparison and recorded replay separate.",
+    "jevsRole": "Choose a bounded action for an identified upcoming tick from the declared observation. It does not own elapsed time, collision rules, state restoration or the fallback. Later semantic-goal or queued-plan controllers require separate evidence.",
+    "codeRole": "Own deterministic rules, RNG, clock, input queue, exact state hashes, deadline validation, visible fallback attribution and immutable checkpoint lineage. Start at 500ms per logical step; never await provider work inside that loop.",
+    "acceptanceCriteria": [
+      "Keyless play supports loss, restart, new seeds, small-board victory and Classic sessions beyond 90 moves.",
+      "Human/Jev handoff preserves the game state and immediately revokes the old controller epoch.",
+      "A hung request cannot prevent 20 active ticks in ten seconds at the default virtual-clock rate, unless the game ends or the player pauses.",
+      "Late, duplicate or out-of-order responses cannot advance paused/terminal states, overwrite a branch or apply twice.",
+      "Every committed tick names human, Jev or fallback provenance and the reason for fallback.",
+      "Checkpoint restore plus logged inputs reproduces every state hash; child branches cannot mutate their parent.",
+      "Keyboard, touch, rendering speed and reduced-motion settings do not change deterministic outcomes."
+    ]
+  },
+  "evaluation": {
+    "design": "First test 1,000 generated lifecycle/request schedules without a provider. Then freeze 20 development and 100 held-out seeds for the separate 90-action comparison: 3 fresh Jev replicates in each of 2 observation tracks, 600 model episodes and at most 54,000 logical decisions, plus 400 code episodes. Add 200 locked counterfactual checkpoints, 3 first-action branches followed by the same 20-tick code continuation, and 1,200 model decisions across tracks/replicates. A 10-seed one-replicate pilot costs at most 1,800 decisions and is not the held-out result. Cluster paired 10,000-bootstrap intervals by seed, never by action; preserve provider interruptions. Separately evaluate real-time deadlines/fallback on 100 seeds with at most 50 model decisions per run, and a 24-player four-run handoff study with 48 assisted runs capped at 50 decisions each. These add ceilings of 5,000 and 2,400 calls. No new model runs were performed.",
+    "baselines": [
+      "Safe random",
+      "Existing immediate greedy",
+      "Flood-fill/tail-aware escape controller",
+      "Verified Hamiltonian-cycle survival controller",
+      "Manual play for the separate handoff study"
+    ],
+    "metrics": [
+      "Food at the declared horizon and paired food difference",
+      "Collision-free survival and time to collision",
+      "No-safe-action traps and fixed-continuation branch outcomes",
+      "Food per move and repeated-state loops",
+      "Wall/service latency, deadline misses and provider completion",
+      "Actual Jev versus fallback share",
+      "Physical requests, retries and request-level cost",
+      "Deterministic replay and stale-command violations"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Three seeds, two controllers, six completed finite episodes, 496 actions. Jev has 248 recorded decisions. No preview ablation, live deadline trial, checkpoint study or external benchmark coverage.",
+      "full": "Proposed local protocol: 100 held-out seeds, 600 Jev episodes, 400 code episodes and 200 counterfactual checkpoint states. This is not an official external split; the engine is original.",
+      "feasibility": "Rules and replay checks are local and cheap. The policy study needs a new seed manifest, escape-aware baselines and request ledger; its ceiling is 55,200 model decisions before retries including checkpoint tests. Real-time/human studies are separate and require future budget and working handoff/checkpoint code."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Phaser",
+      "url": "https://docs.phaser.io/phaser/concepts/time",
+      "use": "Optional scene clock and keyboard/touch input for richer real-time play. Keep the pure transition engine and fixed-step schedule independent of asynchronous Jev requests; retaining the current SVG renderer is also viable."
+    },
+    {
+      "name": "XState",
+      "url": "https://stately.ai/docs/persistence",
+      "use": "Explicit controller and running/paused/terminal actors plus persisted session data. Application logic still validates deadlines, branches and deterministic checkpoints; pending promises must not be revived as valid actions."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Separate the 90-action evaluation wrapper from playable rules and exercise reachable victory."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Implement an independent tick queue, controller epochs, visible fallback and pause cancellation."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Preserve state during takeover and add immutable checkpoints, restore and branch replay."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Add escape-aware baselines, preview ablation and locked test seeds/checkpoints."
+    },
+    {
+      "priority": "P2",
+      "size": "S",
+      "action": "Record physical-request timing/cost/failure ledgers and correct latency labels."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Study semantic-goal or queued-plan assistance as a separately labeled controller, reusing the clock/checkpoint work in Orbital later."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Phaser scene time",
+      "url": "https://docs.phaser.io/phaser/concepts/time"
+    },
+    {
+      "label": "Phaser keyboard, pointer and gamepad input",
+      "url": "https://docs.phaser.io/phaser/concepts/input"
+    },
+    {
+      "label": "XState actors",
+      "url": "https://stately.ai/docs/actors"
+    },
+    {
+      "label": "XState persistence",
+      "url": "https://stately.ai/docs/persistence"
+    }
+  ]
+}

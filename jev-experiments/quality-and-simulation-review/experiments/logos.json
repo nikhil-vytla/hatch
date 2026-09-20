@@ -1,0 +1,43 @@
+{
+  "id":"logos","title":"Logo studio",
+  "evidenceStatus":"Six authored briefs, five completed specifications and one HTTP 429 failure; 20 choices; offline original-component and 240-spec serialization probes",
+  "verdict":"repair","highestPriority":"P1",
+  "summary":"The original bounded SVG renderer consumes every model choice, but the page exposes only the first recorded mark and has no independent fit evidence. Late results overwrite manual palette edits under a changed brief. Keep the visible grammar, repair revision/provenance handling and test actual exported marks at their intended sizes.",
+  "strengths":["All four model fields affect deterministic geometry, palette or line weight.","The finite symbol vocabulary and model/code boundary are stated explicitly.","Manual arrangement, palette and weight controls and standalone SVG export are useful.","The complete recorded evidence remains downloadable, including failures."],
+  "findings":[
+    {"priority":"P1","title":"Late responses overwrite manual work under a new brief","evidence":"src/misc.tsx:119 changes the brief without invalidation; line 151 replaces the whole spec. Probe changes seed-library to astronomy and teal to coral, then receives the old answer: astronomy shows the old teal leaf.","impact":"The current artifact no longer corresponds to its visible brief and loses a visitor correction.","fix":"Separate committed marks from suggestions; bind results to brief/spec/lock revisions and preserve newer manual changes."},
+    {"priority":"P1","title":"Most recorded evidence is absent from the interaction and provenance goes stale","evidence":"src/misc.tsx:19 filters failed rows and uses only rows[0]; line 31 initializes last null; line 201 omits the brief. Manual orbit selection retains a model single answer. The raw footer download still contains all six cases.","impact":"Visitors cannot compare saved outcomes or inspect the original source of the current edited mark accurately.","fix":"Add a six-case selector, explicit failures/timings, full original request/spec provenance and a separate manual revision log."},
+    {"priority":"P1","title":"Current examples do not establish semantic fit beyond a small grammar","evidence":"src/misc.tsx:40 defines five paths and fixed transforms; all five completed records choose single. There are no independent fit ratings or unsupported outcome, and line 127 sends only a fresh brief rather than the current editable document.","impact":"Confidence and plausible symbol matches cannot establish design quality, originality or useful iterative refinement.","fix":"Expose symbol selection and unsupported handling, use bounded edits for iteration, and compare independent fit/constraint outcomes against rules and manual selection."},
+    {"priority":"P2","title":"Small-size output has no optical validation","evidence":"src/misc.tsx:54 uses a 200-unit viewBox and line widths 3/5/9; orbit scales strokes by 0.45. A light orbit line is 0.108 px at 16 px output. CSS shows only 200 px/90 px proofs.","impact":"Syntax-valid SVG may lose readable features at icon sizes. The calculated width is a risk indicator, not a measured raster failure.","fix":"Add exact-size, monochrome and light/dark proofs plus export/raster parity and independently reviewed feature-loss checks."}
+  ],
+  "simulation":{
+    "title":"A constrained vector workbench with locked details",
+    "description":"A visitor edits paths and spacing, asks for a semantic revision, compares a proposed change with the committed mark and usage proofs, locks the silhouette, accepts one operation, undoes and exports a chosen revision.",
+    "jevsRole":"Select meaningful bounded operations and parameters from the current document, brief and locks, or indicate unsupported intent.",
+    "codeRole":"Own stable path IDs, geometry, constraints, revisions, transactions, direct manipulation, proof rendering and SVG export.",
+    "acceptanceCriteria":["Every model field maps to a visible operation.","Locked paths remain unchanged and late replies cannot replace newer edits.","Undo restores the exact prior document.","All size/background proofs and export derive from one accepted document.","Unsupported requests and provider failures leave committed work intact.","Brief, grammar version, model decisions and manual revisions travel with the artifact."]
+  },
+  "evaluation":{
+    "design":"First render all 240 specifications at four sizes/two backgrounds without model calls. Independently annotate 24 development and 120 held-out briefs across six strata. Two paraphrases, two option-order seeds and two prompt versions require 960 requests/3840 choices. Forty four-step interaction scripts add at most 120 requests. Use blinded human ratings, independent constraints, and paired 10000-sample bootstrap clustered by brief.",
+    "baselines":["Frozen keyword/rule selector within the same grammar","Uniform valid specifications with seeds 42, 43 and 44","Manual parameter selection with the same proof/editor controls"],
+    "metrics":["Hard-constraint satisfaction and unsupported recognition","Independent brief-fit and legibility ratings with rater disagreement","All-attempt availability and retry-inclusive latency/cost","Option-order sensitivity and diversity within accepted constraints","Locked-path preservation, stale writes, export parity and correction effort"],
+    "coverage":{"kind":"authored","current":"Six attempted briefs, five outputs, 20 choices, no independent quality ratings. Probe enumerates 240 specs/60 geometry strings but does not rasterize them.","full":"24 development and 120 held-out briefs; 1920 deterministic size/background renders; 960 model requests plus at most 120 interaction requests, totaling 1080 before retries.","feasibility":"Small authored suite needs no external dataset or weights. Independent design annotation, rendering proofs and a future call budget are required. No planned model requests, raster evaluations or user study were performed."}
+  },
+  "libraries":[
+    {"name":"Paper.js","url":"https://paperjs.org/features/","use":"Provide editable paths, groups, direct manipulation and SVG I/O for bounded semantic edits with deterministic geometry."},
+    {"name":"SVGO","url":"https://github.com/svg/svgo","use":"Optimize exported SVG under a pinned configuration, followed by visual parity checks; does not assess design quality."}
+  ],
+  "nextSteps":[
+    {"priority":"P1","size":"M","action":"Add revision-bound suggestions and property locks."},
+    {"priority":"P1","size":"S","action":"Expose all saved cases and failures with source/current provenance."},
+    {"priority":"P1","size":"M","action":"Add symbol controls, unsupported handling and shared versioned prompts."},
+    {"priority":"P2","size":"M","action":"Implement exhaustive grammar and size/background export checks."},
+    {"priority":"P1","size":"M","action":"Run independent fit and constraint comparisons before making quality claims."},
+    {"priority":"P2","size":"L","action":"Develop the locked-path interactive editor if evaluations justify semantic assistance."}
+  ],
+  "sources":[
+    {"label":"Paper.js features","url":"https://paperjs.org/features/"},
+    {"label":"Paper.js path operations","url":"https://paperjs.org/reference/pathitem/"},
+    {"label":"SVGO official repository","url":"https://github.com/svg/svgo"}
+  ]
+}

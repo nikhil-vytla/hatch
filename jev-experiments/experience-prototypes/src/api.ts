@@ -17,6 +17,12 @@ export async function readResponse(response: Response) {
     );
   return response.json();
 }
+export class EvaluationError extends Error {
+  constructor(message: string, public status: number, public response: unknown) {
+    super(message);
+    this.name = "EvaluationError";
+  }
+}
 export async function run(
   state: unknown,
   questions: Record<string, unknown>,
@@ -33,7 +39,7 @@ export async function run(
   });
   const body = await readResponse(response);
   if (!response.ok)
-    throw new Error(body.error ?? "The run could not complete.");
+    throw new EvaluationError(body.error ?? "The run could not complete.", response.status, body);
   return body;
 }
 export const choice = (

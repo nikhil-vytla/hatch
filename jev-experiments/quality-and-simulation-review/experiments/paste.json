@@ -1,0 +1,122 @@
+{
+  "id": "paste",
+  "title": "Smart paste",
+  "evidenceStatus": "Three authored recorded forms, 15 choices, zero abstentions; offline source probes and three passing companion privacy/auth tests",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The recorded Memory example fills Company headquarters from an office address without evidence that it is headquarters; its low-confidence choice receives the normal bulk-fill action. Offline probes also reproduce stale-response reuse, lost manual edits, cross-preset undo, damaged URL/time candidates, and an oversized companion request. Preserve source-backed selection, then repair parsing and transaction state before making broader quality claims.",
+  "strengths": [
+    "Finite source-fact choices and an explicit none option limit generated values; gateway validation checks returned option IDs.",
+    "Visible source attribution and full recorded answers make the unsupported headquarters choice inspectable.",
+    "The companion checks target changes and write-back, reviews values individually, preserves later edits during undo, and never submits forms.",
+    "Existing companion privacy/authentication tests pass: three tests, 17 assertions."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Unsupported headquarters choice is offered as a normal fill suggestion",
+      "evidence": "experience-prototypes/results/paste.jsonl:4 selects Office address for Company headquarters with confidence 0.45, probability 0.51 versus none 0.48. src/new-experiments.tsx:112 keeps only a.value. All 15 recorded choices select a fact; scripts/record.ts:39 supplies no independent labels, schema snapshot, or baseline.",
+      "impact": "The recorded case fails the experiment's recognize-when-help-is-needed question. Three authored examples cannot establish selection accuracy, and app evidence does not validate the separate companion prompt.",
+      "fix": "Keep and label the failure; preserve full versioned requests and independent accepted-source labels. Distinguish unresolved suggestions, exclude them from bulk fill, calibrate any review threshold on disjoint development data, and evaluate app and companion separately until their protocol is shared."
+    },
+    {
+      "priority": "P1",
+      "title": "Line parsing removes content and typed fields lack usable values",
+      "evidence": "src/new-experiments.tsx:63 and extension/background.js:61 split at the first colon. probes/paste.json reproduces https://northstar.example becoming //northstar.example and 9:30 AM becoming 30 AM; a multi-fact sentence stays indivisible. public/companion-demo/destination.html:61 uses native date/time controls while extension/content.js:148 copies unnormalized source values.",
+      "impact": "Correct field values may be absent from the choice set, so a perfect model cannot finish the task. The default companion's date/time fields require manual formatting.",
+      "fix": "Share span-preserving candidate extraction, recognize labels without corrupting URL/time punctuation, extract typed spans, and create validated formatting alternatives. Preserve raw text and require clarification for uncertain date locale/reference context."
+    },
+    {
+      "priority": "P1",
+      "title": "Late answers apply to text the model never evaluated",
+      "evidence": "src/new-experiments.tsx:309 clears suggestions on source edit, but :331 and :335 install every eventual response. probes/paste.json starts a request on Conference, changes the source, and accepts the old fact0 choice as the newly edited value.",
+      "impact": "Positional fact and field IDs let an obsolete model decision appear to justify a different source or destination.",
+      "fix": "Bind requests, records, suggestions and acceptance to source/form revisions, stable field IDs, exact source spans and expected current values. Cancel or ignore obsolete requests and make prior results read-only."
+    },
+    {
+      "priority": "P1",
+      "title": "Bulk fill and snapshot undo discard manual work across form sessions",
+      "evidence": "src/new-experiments.tsx:120 overwrites populated fields; :260 restores a whole old values object; :290 and :142 change preset without clearing history. probes/paste.json reproduces an overwritten manual title, undo removing a later manual edit, and a conference title restored into Contact's Full name.",
+      "impact": "The app's acceptance and undo behavior can corrupt the visitor's current form even when the semantic choice was correct.",
+      "fix": "Use field-level before/applied transactions scoped to a destination revision. Fill only eligible empty fields by default, review replacements explicitly, preserve later manual edits during undo, and reset or scope history on preset/schema changes. Share the companion's existing guards."
+    },
+    {
+      "priority": "P1",
+      "title": "Duplicated candidates exceed request budgets and truncation is hidden",
+      "evidence": "extension/background.js:65 slices 80 lines, content.js:55 slices 24 fields, and background.js:97 duplicates facts per question. Actual mocked request for 7,189 source bytes, 80 lines and 24 fields is 205,107 bytes and fails server/gateway.ts:33's 100,000-byte limit. An 81-line probe retains 80 with no omission metadata.",
+      "impact": "A modest page can fail before inference; a missing result can mean silently excluded evidence rather than model abstention.",
+      "fix": "Preflight serialized bytes, use shared source text and compact candidate references, batch within limits, preserve revision bindings, and show omitted fields/lines. Distinguish unsupported, not evaluated, too large, and unavailable outcomes."
+    }
+  ],
+  "simulation": {
+    "title": "Resolve a mixed-source travel form",
+    "description": "Combine a current conference page, old event notice and personal notes into an eight-field native form. Compare a deterministic baseline, accept supported values, resolve an unsupported headquarters field, change a date during a pending request, then undo while preserving a manual correction.",
+    "jevsRole": "Choose source-backed typed candidates or finite unresolved reasons using destination purpose, entity and effective time. Never invent missing values or submit a form.",
+    "codeRole": "Extract immutable source spans, format and validate typed values, maintain source/form revisions and request IDs, guard acceptance, batch within limits, maintain field-level undo, and score independently labelled final states.",
+    "acceptanceCriteria": [
+      "Office-address-only headquarters stays unresolved and outside bulk fill.",
+      "Conference date and time produce valid native-control values with source attribution.",
+      "Every accepted value is bound to its evaluated source revision and approved formatting rule.",
+      "Source, field-schema or target-value changes invalidate acceptance and late responses cannot restore it.",
+      "Undo preserves later manual edits and never crosses destination sessions.",
+      "All 81 source lines and 25 fields are evaluated or explicitly marked excluded; payload budgets are enforced before requests.",
+      "Recorded replay, deterministic baseline and live exploratory results remain separately labelled."
+    ]
+  },
+  "evaluation": {
+    "design": "Freeze independently reviewed source spans, permitted normalization, abstentions and final values for 60 development cases and 300 held-out eight-field cases across six strata of 50. Hold out semantic templates and entities. Three order/paraphrase seeds give 900 logical requests and 7,200 field decisions per prompt protocol; app plus companion need 1,800 requests and 14,400 decisions. Thirty cases repeated five times per protocol add 300 requests and 2,400 decisions, for 2,100 requests and 16,800 decisions total before retries. Evaluate extraction with an oracle selector and use identical candidate sets for selector comparisons. Use 10,000 stratified paired bootstrap resamples clustered by source/form bundle, keeping all presentation variants together. Require a 95% lower supported-selection-precision bound of at least 98% at at least 85% answerable coverage, an upper unsupported-selection-rate bound below 2%, positive lower-bound full-form improvement over the strongest deterministic baseline, and zero transaction failures in 1,000 offline seeded sequences. Follow with native-control browser checks and a counterbalanced 12-person, 12-form usability study. None of these proposed model or participant runs occurred during this audit.",
+    "baselines": [
+      "Always abstain to expose misleading precision-only claims.",
+      "Case-insensitive exact field/label matching, abstaining on ties.",
+      "Frozen synonym mapping and typed-parser rules.",
+      "Existing Jev prompt on identical candidates, with app and companion scored separately.",
+      "Oracle candidate selector to measure extraction and formatting limits.",
+      "Ordinary manual copy/paste in the counterbalanced workflow study."
+    ],
+    "metrics": [
+      "Supported-selection precision, answerable-field recall, unsupported-selection rate, and abstention recall.",
+      "Exact normalized field-value accuracy, full-form success, candidate recall, and valid-control rate.",
+      "Stale accepts, unintended overwrites, later-edit loss, and cross-session undo failures.",
+      "Paired clustered 95% intervals, repeat variation, stratum counts, and risk versus coverage.",
+      "Human corrections, clarifications, final errors and completion time.",
+      "Availability, attempts, retry-inclusive latency, serialized payload size and cost per correct completed field."
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Three recorded authored source/form examples, five fields each, 15 choices and no none selections. No frozen gold labels or independent score. Three companion privacy/auth tests pass, and offline source probes reproduce deterministic defects.",
+      "full": "Proposed complete held-out suite is 300 eight-field bundles across six strata, plus 60 disjoint development cases. Two prompt protocols with three presentation seeds and repeat controls require 2,100 logical requests and 16,800 field decisions before retries. No external dataset split or official benchmark score is claimed.",
+      "feasibility": "Small local authored fixtures require no large downloads or model weights. Independent labels, shared parser/state repairs, a checkpointed runner and a future provider budget are prerequisites; failed requests remain in coverage. Full coverage is practical after these prerequisites, but no paid calls were made in this audit."
+    }
+  },
+  "libraries": [
+    {
+      "name": "XState",
+      "url": "https://stately.ai/docs/invoke",
+      "use": "Manage request lifetimes and explicit editing/evaluating/reviewing states, discarding results after a state exits. Keep write-time revision guards; Jev handles semantic candidate selection."
+    },
+    {
+      "name": "Chrono",
+      "url": "https://github.com/wanasit/chrono",
+      "use": "Extract date/time spans with offsets, known components, reference instants and locales. Code validates formatted alternatives while Jev chooses the relevant source fact; ambiguous context requires clarification."
+    },
+    {
+      "name": "fast-check",
+      "url": "https://fast-check.dev/docs/introduction/",
+      "use": "Generate and shrink seeded sequences of edits, late answers, accepts and undo under Bun to test transaction invariants. Generated regression cases do not establish independent model accuracy."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "S", "action": "Label the three authored demonstrations accurately, expose the headquarters miss, and retain complete versioned requests and independent labels." },
+    { "priority": "P1", "size": "M", "action": "Share revision-bound suggestions and field-level write/undo transactions between app and companion; add the reproduced failures as regressions." },
+    { "priority": "P1", "size": "M", "action": "Share span-preserving typed parsing, validate native formats, and preflight request budgets with visible omissions." },
+    { "priority": "P1", "size": "M", "action": "Author and review the complete disjoint evaluation and run paired protocols only after offline checks pass." },
+    { "priority": "P2", "size": "M", "action": "Build the mixed-source form journey and baseline comparison, then reuse transactions for a structured-document paste experiment." }
+  ],
+  "sources": [
+    { "label": "XState invoked actors and discarded obsolete promise results", "url": "https://stately.ai/docs/invoke" },
+    { "label": "Chrono parser, source offsets, reference date/timezone and certainty", "url": "https://github.com/wanasit/chrono" },
+    { "label": "fast-check generated and shrunk property-based tests", "url": "https://fast-check.dev/docs/introduction/" },
+    { "label": "HTML native input date value contract", "url": "https://html.spec.whatwg.org/multipage/input.html#date-state-(type=date)" },
+    { "label": "HTML native input time value contract", "url": "https://html.spec.whatwg.org/multipage/input.html#time-state-(type=time)" }
+  ]
+}

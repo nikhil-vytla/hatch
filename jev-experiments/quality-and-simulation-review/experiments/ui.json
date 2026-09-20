@@ -1,0 +1,125 @@
+{
+  "id": "ui",
+  "title": "Generative interfaces",
+  "evidenceStatus": "Three finished authored initial trees, three retained earlier attempts, one recorded state-preserving server revision, offline lifecycle probes, and four passing BYOK tests",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "Jev genuinely composes and edits a tree from 10 to 12 prepared recipes, while code owns every component's content, binding and action. Offline probes show current-version selection resets draft data, a late settings result overwrites an apartments session, and shortlist only displays a success notice. The evidence mixes old catalogue rules and a separate layout-classification study, so it does not establish reliable multi-step interaction.",
+  "strengths": [
+    "Real tree selection, placement and edit operations run through a catalog-constrained composer and fixed React registry.",
+    "Bound inputs and an inert preview support normal revisions; one recorded cloud edit removes a toggle while preserving an edited name.",
+    "The composer preserves user state without automatically including raw state in evaluator inputs.",
+    "Earlier incomplete attempts remain published, and the page acknowledges prepared content and local demonstration actions.",
+    "Four BYOK tests pass with 71 assertions covering credential and transport behavior."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Version selection resets the current draft",
+      "evidence": "experience-prototypes/src/generated-ui.tsx:330 keys StateProvider by epoch with spec.state; :365 increments epoch on any version click. probes/ui.json supplies User-edited draft through the observer, reselects the current version, and sees key 1 become 2 with initial name Alex Morgan and no external store.",
+      "impact": "Layout history and replay can discard entered values, contradicting the central preserve-edits question even though the normal server revision path preserves state.",
+      "fix": "Keep canonical user data in a stable external store per session. Version structure separately, avoid remounting active versions, and make restoring historical data an explicit action."
+    },
+    {
+      "priority": "P1",
+      "title": "Unbound stream results overwrite another session and incomplete streams retain active labels",
+      "evidence": "src/generated-ui.tsx:392 changes domain without aborting live composition; :278 installs all snapshots. probes/ui.json starts settings, switches to apartments, then accepts the old settings tree as Live Jev composition. A stream ending after one step remains Jev is composing with no interruption notice.",
+      "impact": "The selected domain/version can disagree with the rendered tree, and visitors cannot reliably distinguish an incomplete attempt from active or successful generation.",
+      "fix": "Bind every request and replay to domain, base version and session revision; abort/invalidate on navigation. Require explicit terminal outcomes for finish, limit, unavailable, cancellation, errors and premature EOF, preserving partial work on an incomplete branch."
+    },
+    {
+      "priority": "P1",
+      "title": "Save and shortlist acknowledge success without stateful outcomes",
+      "evidence": "src/generated-ui.tsx:337 handlers only call setNotice. probes/ui.json announces Sunlit studio added to your shortlist without adding a collection. ui-catalog.ts:149 binds budget, but apartment records at :159 have no eligibility/filtering logic.",
+      "impact": "Successful rendering and status text do not establish that the generated interface helps complete an application task. Entered preferences have no downstream effect.",
+      "fix": "Add deterministic draft/saved preferences, stable selected IDs, validated save behavior and computed affordability/commute status. Let Jev select presentation and order while code owns data, calculations and effects. Score independently inspected action outcomes."
+    },
+    {
+      "priority": "P1",
+      "title": "Evidence mixes catalogue versions and a different classifier without a workflow scorer",
+      "evidence": "results/composed-ui.jsonl has 3 finished initial trees and 3 earlier attempts; settings/event lack catalogue versions and use column 2/3 times versus current maxUses=1 at ui-catalog.ts:132. record.ts:128 reuses finished rows without config hashes and :142 drops terminal decisions. main.tsx:658 loads old ui metadata while :672 loads composed-ui. Legacy ui has 20 planned, 12 complete, 12 matching layouts and 9 preserved labels; stored 0.60/0.45 rates conflate missing outcomes with quality.",
+      "impact": "Historical trees remain renderable but do not reproduce current candidate rules. Layout classification and one successful server edit cannot establish generated-action correctness or multi-step preservation. Synthetic final-tree replay is not an actual event/timing trace.",
+      "fix": "Use one manifest for current composition evidence; keep historical classifier metrics separately labelled. Hash candidate/catalog/composer/protocol identities, retain all terminal choices, attempts and costs, invalidate stale checkpoints, replay actual snapshots, and score independent multi-step workflow postconditions."
+    },
+    {
+      "priority": "P2",
+      "title": "The wrapper and composer disagree on the batch strategy name",
+      "evidence": "server/compose.ts:15 allows batched, while installed @json-render/core/dist/index.js:3724 allows batch. Actual offline wrapper probes reject batched with Unknown composition strategy and batch with Invalid composition request before any provider call.",
+      "impact": "The working sequential default remains usable, but batch creation and controlled latency/call-count comparisons are blocked.",
+      "fix": "Derive the request enum from the pinned composer type or translate it explicitly; add mocked tests for both supported strategies, edits and invalid inputs, and record evaluator calls separately from primitive choices."
+    }
+  ],
+  "simulation": {
+    "title": "An apartment decision desk",
+    "description": "Compare six synthetic apartments, edit budget and commute, save preferences and maintain a shortlist, then revise section order and visibility while switching layout branches. Include a cancelled stream and an unsupported booking request to expose the capability boundary.",
+    "jevsRole": "Select prepared presentation recipes, grouping and ordering using candidate descriptions plus explicitly approved derived context. It cannot invent records, perform application actions or change arbitrary bindings.",
+    "codeRole": "Own canonical preferences and saved snapshots, apartment data, selected IDs, affordability/commute calculations, action validation, tree checks, branch/request identity, stream terminal states and independent outcome scoring.",
+    "acceptanceCriteria": [
+      "All six rendered apartment records preserve supplied prices and commute facts.",
+      "Shortlist changes an inspectable set exactly once and removal reverses it.",
+      "Save produces a visible validated snapshot separate from draft preferences.",
+      "Inputs and selected IDs survive reorder, hide/show, layout history and replay; restoring old data is explicit.",
+      "Late responses cannot overwrite another domain or branch.",
+      "Cancellation and failure leave a usable prior layout and accurate terminal status.",
+      "Unsupported booking requests cannot produce a success notice.",
+      "Visitors can inspect tree changes, decisions, the baseline and independently measured outcomes separately."
+    ]
+  },
+  "evaluation": {
+    "design": "Author 30 development and 120 held-out workflows balanced across three domains and six task families. Each contains creation, three revisions and intervening user edits/actions. Freeze independent semantic postconditions, allowed tree alternatives, immutable data and action outcomes. Three candidate-order/paraphrase seeds give 360 workflows and 1,440 composition sessions per protocol. Compare sequential creation/edits with repaired batch creation/sequential edits: at current budgets the pair has 2,880 sessions and at most 46,800 logical evaluator requests before retries, 28,800 sequential plus 18,000 batch-create. Use 10,000 paired bootstrap resamples clustered by original workflow, preserving all seeds/revisions. Require zero data resets or stale writes in 1,000 offline sequences and held-out workflows, a 95% lower supported-workflow success bound of at least 90%, and zero observed false successes on unsupported tasks. Use exact rare-failure bounds: zero failures in 20 independent negative workflows has a one-sided 95% upper bound of 13.9%, insufficient for a below-2% claim, which needs at least 149 independent negative workflows with zero failures. Compare batch using a two-percentage-point correctness noninferiority margin and positive latency-reduction interval. Follow with native-control/keyboard/accessibility checks and a counterbalanced 12-person, eight-task usability study. No proposed model or participant run was performed during this audit.",
+    "baselines": [
+      "Fixed complete form/comparison using identical supplied data.",
+      "Deterministic rule-based command parser over the same candidates.",
+      "Manual component command palette.",
+      "Current sequential Jev composition versus batch creation with sequential edits.",
+      "Oracle operation planner to isolate renderer and state-management failures."
+    ],
+    "metrics": [
+      "Semantic postcondition and complete-workflow pass rates, required-field recall, and irrelevant-control count.",
+      "Valid bindings, action outcomes, unsupported-request recognition and change scope outside the request.",
+      "Field/shortlist preservation, stale writes, replay correctness and explicit stream terminal outcomes.",
+      "Availability and limit stops separately from conditional semantic quality.",
+      "First usable preview and completed-workflow latency, evaluator calls, choice slots, attempts, cost and payload bytes.",
+      "Clustered paired 95% intervals by family, viewport interaction checks, automated accessibility findings and keyboard/focus review.",
+      "Participant completion time and final errors on counterbalanced tasks."
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Three finished prepared initial trees, three retained prior attempts and one recorded server revision preserving a name/removing a toggle. Separate legacy classifier has 20 planned cases, 12 completed, 12 matching layouts and 9 preserved layout labels. No complete-workflow scorer exists.",
+      "full": "Proposed held-out coverage is 120 workflows, three presentation seeds, creation plus three revisions, and two model protocols: 2,880 composition sessions with a current-budget upper bound of 46,800 logical evaluator requests before retries. No external split or official benchmark score is claimed.",
+      "feasibility": "No large dataset or weights are required. Full coverage needs independently reviewed workflow labels, session/action repairs, versioned candidates, a checkpointed runner and a future provider budget. A ten-workflow preflight estimates actual volume but does not replace complete evaluation."
+    }
+  },
+  "libraries": [
+    {
+      "name": "json-render controlled StateStore",
+      "url": "https://json-render.dev/docs/data-binding#external-store-controlled-mode",
+      "use": "Reuse createStateStore and StateProvider store to keep canonical session data stable while Jev changes tree structure; retain bounded candidate composition and existing catalog validation."
+    },
+    {
+      "name": "fast-check",
+      "url": "https://fast-check.dev/docs/advanced/model-based-testing/",
+      "use": "Generate and shrink edit/compose/navigate/replay/cancel/action sequences under Bun against a small independent session model to expose data-loss and stale-response failures."
+    },
+    {
+      "name": "axe-core",
+      "url": "https://github.com/dequelabs/axe-core",
+      "use": "Check rendered revisions for automated accessibility violations, paired with manual keyboard/focus and task-outcome checks. This evaluates code/rendered output rather than assigning accessibility authority to Jev."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "M", "action": "Separate canonical data from layout versions; add domain/branch/request identity and explicit terminal stream outcomes." },
+    { "priority": "P1", "size": "M", "action": "Implement inspectable save/shortlist state and deterministic apartment eligibility calculations." },
+    { "priority": "P1", "size": "S", "action": "Correct current evidence wiring, configuration/checkpoint identity, terminal trace retention and historical classifier labels." },
+    { "priority": "P2", "size": "S", "action": "Fix batch strategy spelling and add mocked protocol coverage." },
+    { "priority": "P1", "size": "M", "action": "Build the independently labelled multi-step suite and run complete paired protocols after offline checks pass." },
+    { "priority": "P2", "size": "M", "action": "Build the apartment decision desk and reuse its session/version machinery in adaptive forms and structured-document editing." }
+  ],
+  "sources": [
+    { "label": "json-render bounded Jev composition and edit contract", "url": "https://json-render.dev/docs/jev" },
+    { "label": "json-render controlled external state store", "url": "https://json-render.dev/docs/data-binding#external-store-controlled-mode" },
+    { "label": "React key-driven state reset semantics", "url": "https://react.dev/learn/preserving-and-resetting-state" },
+    { "label": "fast-check model-based command sequences", "url": "https://fast-check.dev/docs/advanced/model-based-testing/" },
+    { "label": "axe-core accessibility engine and automation limits", "url": "https://github.com/dequelabs/axe-core" }
+  ]
+}

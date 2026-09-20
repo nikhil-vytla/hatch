@@ -1,0 +1,124 @@
+{
+  "id": "micro",
+  "title": "Micro-agent team",
+  "evidenceStatus": "Three planned goals: one beverage selection, one unsupported outcome and one route-stage rate-limit failure. Five successful calls produce eleven primitive decisions; zero completed search examples. Offline wire/callback audit and one deterministic menu check.",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The saved drink satisfies the supplied menu, but its checker receives earlier model opinions without the menu facts. Live composition changes the protocol and displays a search document ID as the answer. Per-stage receipts, canonical resolved answers and bounded clarification are needed before judging end-to-end usefulness.",
+  "strengths": [
+    "Routes and tool candidates are bounded; the recorded unsupported request does not perform an external account action.",
+    "Failure rows and planned/completed availability are preserved.",
+    "The UI explicitly says the checker is a model judgment, and the one recorded drink passes an independent menu-property check."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Live protocol differs and search returns an internal ID",
+      "evidence": "src/jev_lab/compositions.py:465, :476; experience-prototypes/src/agent-experiments.tsx:155, :191, :377. Recorded search joins retained passages; actual live callback stores/displays billing and passes it to the checker. Route vocabulary, menu schema and question counts also differ.",
+      "impact": "Live answers and saved examples are not equivalent pipelines; an ID alone does not answer the invoice question.",
+      "fix": "Version/share stage contracts and resolve selected IDs into canonical answer text/properties with evidence references before checking/rendering."
+    },
+    {
+      "priority": "P1",
+      "title": "The recorded checker lacks original menu facts",
+      "evidence": "src/jev_lab/compositions.py:482; probes/micro.json shows prior drink probability 1 and model judgments in tool_result, but no menu. Support/completeness return 0.98/0.97; independent menu check confirms only this actual selection.",
+      "impact": "The checker can agree with an earlier model without independently checking its factual constraints; error-detection value is unmeasured.",
+      "fix": "Supply exact source/menu facts and resolved answers, use code for explicit constraints, and withhold prior model probabilities in the primary checking condition."
+    },
+    {
+      "priority": "P1",
+      "title": "Late pipelines replace a new goal and failed final checks lose earlier stages",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:151, :199; src/jev_lab/compositions.py:507. Actual callbacks retain only the prior row after a verifier failure despite completed route/selection; finishing invoice after selecting password installs invoice/billing while editor/selector stay on password.",
+      "impact": "Completed work cannot be inspected/resumed, and the active case can be replaced by stale results.",
+      "fix": "Checkpoint immutable stage events with episode/input hashes, reject stale commits, and resume only unfinished compatible stages without duplicating tool actions."
+    },
+    {
+      "priority": "P2",
+      "title": "Ask terminates without a question or dialogue state",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:162. Actual ask branch returns More context needed after one call, with no concrete follow-up or accumulated answer state.",
+      "impact": "Clarification cannot progress, and unsupported capability is conflated with missing context.",
+      "fix": "Separate unsupported/unavailable/needs-context and select a concrete allowed question; preserve a bounded two-turn conversation."
+    },
+    {
+      "priority": "P2",
+      "title": "Three goals do not evaluate composition or independent outcomes",
+      "evidence": "src/jev_lab/compositions.py:500; results/micro.jsonl. Only one supported tool episode completes; invoice routing is unavailable. Final rows omit route probabilities and failed-stage identity despite raw logs retaining them.",
+      "impact": "Provider completion, appropriate refusal and high checker scores cannot be counted as task success or error-detection evidence.",
+      "fix": "Measure route, candidate, rendered answer and final outcome separately with independent labels, oracle-stage baselines and source/menu counterfactuals."
+    }
+  ],
+  "simulation": {
+    "title": "A small help desk with a visible case file",
+    "description": "Inspect dispatch, bounded-tool and evidence-check receipts; obtain a cited invoice passage or constraint-checked drink, answer one concrete clarification, and branch a tool/source change from the same goal.",
+    "jevsRole": "Interpret goals, select among eligible bounded routes/candidates and judge relevance using actual source evidence.",
+    "codeRole": "Own capabilities, schemas, static tool execution, ID resolution, exact validators, receipt history, cancellation, retries and one tool action per turn/two turns maximum.",
+    "acceptanceCriteria": [
+      "Resolved answers contain text/properties and source references rather than only IDs.",
+      "Checker and user receive the same answer and source version.",
+      "Unavailable, unsupported and needs-context outcomes are distinct.",
+      "Stage failure preserves earlier receipts; resume never duplicates completed tool actions.",
+      "Old episodes cannot replace the active case.",
+      "Explicit menu constraints and tool limits are independently enforced and exported."
+    ]
+  },
+  "evaluation": {
+    "design": "Author 200 independent goals across policy/menu/clarification/unsupported families; use 40 development and 160 held out. Two annotators label routes, follow-ups and final outcomes; supplied source IDs/menu predicates give independent checks. Normal/unavailable-tool states and 3 repeats yield 960 first-turn episodes, at most 2,880 requests/3,840 decisions. Predeclared follow-ups for 40 clarification goals add at most 720 requests/960 decisions: upper bound 3,600 requests/4,800 decisions. Preserve early stops, failures and exact stage receipts. Bootstrap by 160 base goals; compare oracle stages and independently declared checker fault injections separately. Run 1,000 offline event schedules over 100 seeds with zero stale commits, duplicate tool actions or unsupported execution required. Proposed runs were not performed.",
+    "baselines": [
+      "Frozen lexical dispatch plus deterministic validators.",
+      "Oracle routing with the same candidate selector.",
+      "Full Jev composition checked by code versus a source-grounded model, with prior-score exposure separated."
+    ],
+    "metrics": [
+      "Admissible routing, source/answer correctness and final constraint satisfaction.",
+      "Unsupported handling, useful clarification and stage-wise failures.",
+      "Checker agreement with independent outcomes and response to declared wrong-answer/source mutations.",
+      "Planned/completed coverage, per-stage/episode latency and cost.",
+      "Stale commits, preserved receipts and resume duplication."
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Three goals, two completed rows, one unavailable route; the refusal is not completion of the requested password action. One drink answer independently checked; no completed search path.",
+      "full": "Proposed 160 held-out goals under two availability states and three repeats, plus bounded clarification follow-ups; at most 3,600 logical requests/4,800 primitive decisions and 1,000 offline schedules.",
+      "feasibility": "Needs shared schemas, stage persistence, independent expected outcomes and later provider budget. No external benchmark, model training or actual external actions required; extra checker fault-injection calls need a separate manifest."
+    }
+  },
+  "libraries": [
+    {
+      "name": "XState",
+      "url": "https://stately.ai/docs/machines",
+      "use": "Model bounded stages, clarification, failure and resume explicitly, using a pinned stable version."
+    },
+    {
+      "name": "Zod",
+      "url": "https://zod.dev/basics",
+      "use": "Already installed; validate distinct route/tool/answer/check receipts and handler arguments."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Share stage schemas, resolve answer IDs and pass original source facts to checking."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Add stage checkpoints, stale guards and resume integrity tests."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Build bounded clarification/case-file UI and independent stage/outcome evaluation."
+    }
+  ],
+  "sources": [
+    {
+      "label": "XState state machines",
+      "url": "https://stately.ai/docs/machines"
+    },
+    {
+      "label": "Zod basics",
+      "url": "https://zod.dev/basics"
+    }
+  ]
+}

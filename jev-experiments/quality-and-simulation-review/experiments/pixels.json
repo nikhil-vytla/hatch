@@ -1,0 +1,114 @@
+{
+  "id": "pixels",
+  "title": "Pixel studio",
+  "evidenceStatus": "Three current compositions with 87 answers; legacy 8x8 evidence has three successes/192 answers and one HTTP 503 failure, not rendered by the current component. Offline renderer/raster/callback probe only; no quality ratings.",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The current tool makes one batch of 29 composition decisions and does not test staged composition against independent pixels. Patterns consume only the palette answer, while geometry and document-state flaws can clip sprites or apply a result to the wrong artifact. A versioned layer/mask editor with bounded motion recipes and matched evaluations would make continuous creative interaction testable.",
+  "strengths": [
+    "The page accurately describes its bounded object library and exposes plans and available objects.",
+    "Recording and live calls share pixelQuestions; integer Canvas drawing gives a stable grid, transparent sprite backgrounds, and PNG export.",
+    "Current plans are supplied on live edits, palette locking works when enabled at dispatch, prior plans are retained, and recorded responses keep model/timing/attempt metadata."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "There is no staged-versus-independent comparison",
+      "evidence": "experience-prototypes/src/catalog.ts:83 asks the comparison, but src/creative.tsx:267 and :394 send all 29 fields in one request. src/jev_lab/pilots.py:80 produced different 8x8 briefs/palettes without templates; the current component reads only compositions. Current records omit the current plan supplied by live edits (scripts/record-pixels.ts:18).",
+      "impact": "Three composition timings and unrelated legacy pixel outputs cannot establish a staged quality or latency advantage; templates, resolution, tasks, and inputs are confounded.",
+      "fix": "Separate matched pixel and object-composition studies, condition later stages on actual earlier results where implemented, and record full inputs and protocol versions. Do not use the enclosing 20-scene availability count as pixel quality evidence."
+    },
+    {
+      "priority": "P1",
+      "title": "Pattern mode ignores 28 of 29 returned decisions",
+      "evidence": "experience-prototypes/src/creative.tsx:182 returns after rendering a fixed formula using only palette. Altering every other field leaves identical pixels. Across the three recorded plans, the actual renderer does not read 59/87 answers: 14 Scenes, 17 Sprites, 28 Patterns (probes/pixels.json).",
+      "impact": "Most returned decisions cannot affect the pattern, and the model cannot control its speed, frequency, shape, or symmetry. Unused positions/weather add work without affecting the artifact.",
+      "fix": "Use mode-specific, fully consumed contracts. Expose real pattern recipe parameters, request positions for selected entities, omit unsupported weather and locked palettes, and track model-to-renderer field coverage."
+    },
+    {
+      "priority": "P1",
+      "title": "Capabilities, anchors, and alpha masks do not match the art contract",
+      "evidence": "experience-prototypes/src/creative.tsx:141, :210, :253, :275. The recorded noodle-shop scene includes only cat/cloud/rain and omits the requested shop/window/awning. Exhaustive offline rendering finds 49/225 offered single-object placements with out-of-canvas rectangles. The moon sprite cutout paints opaque palette background; sampled pixel (36,20) is RGBA [20,32,50,255].",
+      "impact": "The main subject can be unrepresentable, valid coordinate choices can clip sprites, fixed layer order prevents explicit occlusion, and cutouts can break transparent exports.",
+      "fix": "Define template bounds, anchors, instance IDs, legal coordinates, layers, and alpha masks. Validate relationships/clipping, disclose unsupported clauses, and preserve the library's capability limits in quality scoring."
+    },
+    {
+      "priority": "P1",
+      "title": "Pending results and version selection lose artifact identity",
+      "evidence": "experience-prototypes/src/creative.tsx:360, :392. Actual callback probes show a scene response overwriting the sprite plan after mode switch; a palette lock enabled during the request does not preserve night; selecting an older night plan leaves the latest warm response and brief in the inspector/UI.",
+      "impact": "The displayed artifact can disagree with the selected mode, checked lock, brief, and reported model result, undermining editing and evidence attribution.",
+      "fix": "Store immutable complete document versions and bind requests to revisions. Mode, lock, version, and manual edits invalidate stale commits. Restore plan/brief/mode/phase/source together and validate locks at commit."
+    },
+    {
+      "priority": "P2",
+      "title": "Animation and export lack explicit phase control",
+      "evidence": "experience-prototypes/src/creative.tsx:164, :314, :413. Canvas dimensions and content reset every frame, including static sprites/reduced motion. Pattern rendering makes 4,097 fill calls per frame. There is no pause/scrub/frame export, and each plan change restarts animation time.",
+      "impact": "Continuous redraw is not continuous semantic interaction, static states waste work, and exports/version comparisons depend on the frame captured by chance. Browser performance was not measured.",
+      "fix": "Use a document-local clock, explicit phase and pause/step/scrub, render static/reduced-motion states only on change, stop hidden loops, and export the selected reproducible frame or sprite sheet."
+    }
+  ],
+  "simulation": {
+    "title": "A living pixel postcard",
+    "description": "A 64x64 indexed-color editor lets visitors move layers, paint, select a region, and protect a face or palette. Requests such as making only the background windy propose bounded motion/placement changes while code keeps the preview running. Visitors compare, accept, undo, pause, scrub, and export a selected frame or sprite sheet; unsupported operations remain explicit.",
+    "jevsRole": "Choose entities or selected-region patches, placement conditioned on chosen entities and bounds, and supported attribute/motion recipes. Pattern recipes expose kernels, frequency, direction, symmetry, and speed; Jev does not execute arbitrary code or decide every animation frame.",
+    "codeRole": "Maintain document revisions, palette roles, layers/bitmaps, IDs, anchors/bounds, masks, layer order, locks, seed/phase, and complete history. Validate and composite masked changes, preserve protected pixels, draw templates, and run deterministic animation. Reject stale or overlapping proposals without overwriting newer edits.",
+    "acceptanceCriteria": [
+      "Unmasked and locked pixels remain byte-identical, and locked palette roles retain their values.",
+      "Every model field affects a declared layer or recipe; modes do not request unsupported controls.",
+      "Required objects/relations are represented or identified as unsupported; clipping requires explicit permission.",
+      "Version selection restores artifact, brief, mode, phase, source, and run metadata together; undo restores the previous committed document exactly.",
+      "Seed, document version, and phase reproduce RGBA bytes; pause, scrub, and export use the same phase.",
+      "Manual edits, mode changes, and version selection prevent stale commits; static/reduced-motion views stop continuous drawing."
+    ]
+  },
+  "evaluation": {
+    "design": "Use two authored matched suites. Object editing: 60 held-out briefs (20/mode), two initial canvas seeds, two wordings, and initial composition plus two edits yield 240 sessions and 720 turns/protocol. Flat one-call versus three-stage composition uses 720+2,160=2,880 logical requests with identical renderer/capabilities. Pixel coordination: 40 held-out 8x8 exact-target briefs, two wordings, and two initial/background states yield 160 matched cases; one 64-question batch versus eight sequential row calls uses 160+1,280=1,440 requests and 20,480 pixel decisions. Combined volume is 4,320 logical requests before retries. Freeze inputs/schema/thresholds/renderer after development; author independent constraints and valid targets before predictions. Use 10,000 paired bootstrap resamples clustered by base brief, retaining variants and edits. Claim staged benefit only if the prespecified fidelity difference has a 95% interval above zero, with added latency/cost reported. Require zero mask/lock/stale-commit violations in 1,000 offline interaction schedules and byte-exact export replay. Collect 180 blinded judgments over 60 matched composition pairs, separating fidelity/preservation from aesthetic preference. Proposed runs were not performed.",
+    "baselines": [
+      "Keyword/rule composer with deterministic placement using the same templates, palette, and renderer.",
+      "Legal random plans with identical capabilities.",
+      "Independent oracle plans to separate renderer capability from planning failures.",
+      "Flat versus explicitly conditioned staged object decisions using the same artifact representation.",
+      "Independent 64-pixel decisions versus eight row requests with preceding selected rows, using the same 8x8 canvas and four-color palette."
+    ],
+    "metrics": [
+      "Supported whole-session object/relationship constraint pass rate and unsupported-request handling.",
+      "Locked/unmasked byte preservation, unchanged-field preservation, geometry violations, stale commits, and exact undo/export replay.",
+      "Pixel accuracy, per-color intersection-over-union, boundary agreement, and requested connectedness/symmetry against predeclared valid targets.",
+      "Consumed/discarded decisions, primitive choices, logical requests, retries/failures, p50/p95 preview/completion latency, and cost.",
+      "Local direct-manipulation preview latency on declared devices; provisional p95 target below 50 ms independently of remote completion.",
+      "Blinded brief fidelity, preservation, aesthetic preference, agreement, missing judgments, and brief-clustered intervals."
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Three current 64x64 object/pattern plans (87 answers), with one recorded call per mode and no quality labels. Legacy 8x8 evidence has three completed grids/192 answers plus one HTTP 503 row and is not displayed. Enclosing 20/20 availability refers to Living scenes. Offline probe covers all three plans, 225 offered placements, and targeted callback/alpha/redraw cases.",
+      "full": "Proposed 60-brief composition/edit suite (240 sessions, 720 turns per protocol) plus a separate 40-brief matched 8x8 pixel suite (160 cases), totaling 4,320 logical requests before retries. Additional 1,000 offline interaction schedules and 180 blinded judgments. No external benchmark, official split, or unrestricted image-generation score claimed.",
+      "feasibility": "Requires independent labels, complete version/mask state, actual staged conditioning, and future provider/rater budget. No large data/weight download. A 64x64 independent baseline has 4,096 pixel choices and needs at least 32 calls under the current 128-question limit, so the proposed matched pixel study stays at 8x8."
+    }
+  },
+  "libraries": [
+    {
+      "name": "p5.js",
+      "url": "https://p5js.org/reference/p5/noLoop/",
+      "use": "Optional bounded creative-coding kernels with noLoop/redraw and seeded noise for explicit timing and repeatable fields. Jev selects recipe parameters; the existing Canvas renderer could implement these controls without migration."
+    },
+    {
+      "name": "fast-check",
+      "url": "https://fast-check.dev/docs/advanced/model-based-testing/",
+      "use": "Generate, shrink, and replay mask/lock/version/edit/response-order schedules against independent document invariants, protecting continuous creative interaction from state corruption."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "S", "action": "Describe the actual one-batch design and separate Pixel studio evidence from enclosing scenes counters." },
+    { "priority": "P1", "size": "M", "action": "Bind requests, locks, versions, briefs, and provenance to document revisions." },
+    { "priority": "P1", "size": "M", "action": "Create consumed-field mode contracts and explicit template bounds/anchors/alpha masks; fix invalid offered placements." },
+    { "priority": "P1", "size": "L", "action": "Add direct layer/mask editing and genuinely conditioned composition using the same renderer." },
+    { "priority": "P2", "size": "M", "action": "Add local phase, pause/scrub, stopped static loops, and deterministic PNG/sprite-sheet export." },
+    { "priority": "P1", "size": "M", "action": "Build independent paired suites with oracle/rule baselines before claiming staged gains; reuse the document/mask system for editable game sprites or reactive pixel art." }
+  ],
+  "sources": [
+    { "label": "p5.js noLoop", "url": "https://p5js.org/reference/p5/noLoop/" },
+    { "label": "p5.js redraw", "url": "https://p5js.org/reference/p5/redraw/" },
+    { "label": "p5.js noiseSeed", "url": "https://p5js.org/reference/p5/noiseSeed/" },
+    { "label": "fast-check model-based testing", "url": "https://fast-check.dev/docs/advanced/model-based-testing/" }
+  ]
+}

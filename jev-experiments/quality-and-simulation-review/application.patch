@@ -1,0 +1,573 @@
+diff --git a/jev-experiments/experience-prototypes/.gitignore b/jev-experiments/experience-prototypes/.gitignore
+index 0b24774..949f1e7 100644
+--- a/jev-experiments/experience-prototypes/.gitignore
++++ b/jev-experiments/experience-prototypes/.gitignore
+@@ -12,0 +13,7 @@ output/
++
++# Generated from original experiment sources by scripts/prepare.ts.
++public/judgment-reliability/
++public/outcome-framing/
++public/visual-search/
++public/wardrobe/
++public/icon-studio/
+diff --git a/jev-experiments/experience-prototypes/bun.lock b/jev-experiments/experience-prototypes/bun.lock
+index 212bf65..bcfa019 100644
+--- a/jev-experiments/experience-prototypes/bun.lock
++++ b/jev-experiments/experience-prototypes/bun.lock
+@@ -7,0 +8 @@
++        "@fal-ai/client": "^1.10.1",
+@@ -10,0 +12 @@
++        "@msgpack/msgpack": "^3.1.3",
+@@ -129,0 +132,2 @@
++    "@fal-ai/client": ["@fal-ai/client@1.10.1", "", { "dependencies": { "@msgpack/msgpack": "^3.0.0-beta2", "eventsource-parser": "^1.1.2", "robot3": "^0.4.1" } }, "sha512-c3AVeH31OioiI2J1BfW8Cryi1DhUYldnY3X35nv6xLMq3fU2NQOo+eYaR5mL2O8MoHHh+HzXdQuIyanIyeq+ug=="],
++
+@@ -153,0 +158,2 @@
++    "@msgpack/msgpack": ["@msgpack/msgpack@3.1.3", "", {}, "sha512-47XIizs9XZXvuJgoaJUIE2lFoID8ugvc0jzSHP+Ptfk8nTbnR8g788wv48N03Kx0UkAv559HWRQ3yzOgzlRNUA=="],
++
+@@ -465,0 +472,2 @@
++    "eventsource-parser": ["eventsource-parser@1.1.2", "", {}, "sha512-v0eOBUbiaFojBu2s2NPBfYUoRR9GjcDNvCXVaqEf5vVfpIAh9f8RCo4vXTP8c63QRKCFwoLpMpTdPwwhEKVgzA=="],
++
+@@ -553,0 +562,2 @@
++    "robot3": ["robot3@0.4.1", "", {}, "sha512-hzjy826lrxzx8eRgv80idkf8ua1JAepRc9Efdtj03N3KNJuznQCPlyCJ7gnUmDFwZCLQjxy567mQVKmdv2BsXQ=="],
++
+diff --git a/jev-experiments/experience-prototypes/extension/background.js b/jev-experiments/experience-prototypes/extension/background.js
+index 9bcc224..cc954ac 100644
+--- a/jev-experiments/experience-prototypes/extension/background.js
++++ b/jev-experiments/experience-prototypes/extension/background.js
+@@ -61,14 +61,6 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
+-    const facts = text
+-      .split(/\n+/)
+-      .map((line) => line.trim())
+-      .filter(Boolean)
+-      .slice(0, 80)
+-      .map((line, i) => {
+-        const colon = line.indexOf(":");
+-        return {
+-          id: `f${i}`,
+-          label:
+-            colon > 0 && colon < 60 ? line.slice(0, colon) : `Line ${i + 1}`,
+-          value: colon > 0 && colon < 60 ? line.slice(colon + 1).trim() : line,
+-        };
+-      });
++    const lines = text.split(/\n+/).map(line=>line.trim()).filter(Boolean);
++    if (lines.length > 240) throw new Error("This selection contains more than240source lines. Shorten it first; no lines were silently omitted.");
++    const facts = lines.map((line, i) => {
++      const match = /^([A-Za-z][A-Za-z0-9 _/()-]{0,58}):\s+(.+)$/.exec(line);
++      return {id:`f${i}`,label:match?match[1]:`Line ${i+1}`,value:match?match[2]:line};
++    });
+@@ -105 +97 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
+-              facts.map((f) => [f.id, `${f.label}: ${f.value}`]),
++              facts.map((f) => [f.id, `Source ${f.id}: ${f.label}`]),
+@@ -112,14 +104,17 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
+-    const response = await fetch(new URL("/api/evaluate", endpoint), {
+-      method: "POST",
+-      headers: {
+-        "Content-Type": "application/json",
+-        Authorization: `Bearer ${apiKey}`,
+-      },
+-      body: JSON.stringify({
+-        state: { source: facts, fields },
+-        questions,
+-      }),
+-    });
+-    const result = await response.json();
+-    if (!response.ok)
+-      throw new Error(result.error || `Request failed: ${response.status}`);
++    const state={source:facts,fields}, batches=[]; let current={};
++    const bytes=q=>new TextEncoder().encode(JSON.stringify({state,questions:q})).length;
++    for(const [id,q] of Object.entries(questions)){
++      if(Object.keys(current).length && bytes({...current,[id]:q})>60000){batches.push(current);current={};}
++      current[id]=q;
++      if(bytes(current)>60000)throw new Error("The source is too large for one field. Shorten the selection; no source was silently omitted.");
++    }
++    if(Object.keys(current).length)batches.push(current);
++    const result={answers:{},retries:0};
++    for(const batch of batches){
++      const response = await fetch(new URL("/api/evaluate", endpoint), {
++        method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${apiKey}`},body:JSON.stringify({state,questions:batch})
++      });
++      const body=await response.json();
++      if(!response.ok)throw new Error(body.error||`Request failed: ${response.status}`);
++      Object.assign(result.answers,body.answers);result.retries+=body.retries??0;
++    }
+diff --git a/jev-experiments/experience-prototypes/package.json b/jev-experiments/experience-prototypes/package.json
+index 2acb46a..9a3f1ee 100644
+--- a/jev-experiments/experience-prototypes/package.json
++++ b/jev-experiments/experience-prototypes/package.json
+@@ -10 +10 @@
+-    "test": "bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts",
++    "test": "bun ../live-worlds/prepare.ts && bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../quality-and-simulation-review/paste-transactions.test.ts ../quality-and-simulation-review/composition-stream.test.ts ../visual-search/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
+@@ -15,0 +16 @@
++    "@fal-ai/client": "^1.10.1",
+@@ -18,0 +20 @@
++    "@msgpack/msgpack": "^3.1.3",
+diff --git a/jev-experiments/experience-prototypes/publication.json b/jev-experiments/experience-prototypes/publication.json
+index 0297bce..cd5e00d 100644
+--- a/jev-experiments/experience-prototypes/publication.json
++++ b/jev-experiments/experience-prototypes/publication.json
+@@ -37 +37,10 @@
+-  "local-models": "../local-models-and-games/apple/results.jsonl"
++  "local-models": "../local-models-and-games/apple/results.jsonl",
++  "music-v2": "../music-arranger-v2/music-v2.jsonl",
++  "cafe": "../cafe-jev/cafe.jsonl",
++  "judgment-reliability": "../judgment-reliability/results.jsonl",
++  "tetris-framing": "../outcome-framing/tetris.jsonl",
++  "drawing-framing": "../outcome-framing/drawing.jsonl",
++  "visual-search": "../visual-search/results.jsonl",
++  "wardrobe": "../wardrobe-lab/wardrobe.jsonl",
++  "icon-studio": "../icon-studio/results.jsonl",
++  "live-worlds": "../live-worlds/manifest.jsonl"
+diff --git a/jev-experiments/experience-prototypes/scripts/prepare.ts b/jev-experiments/experience-prototypes/scripts/prepare.ts
+index 7622529..cf0249a 100644
+--- a/jev-experiments/experience-prototypes/scripts/prepare.ts
++++ b/jev-experiments/experience-prototypes/scripts/prepare.ts
+@@ -7,0 +8 @@ import {
++  cpSync,
+@@ -12,0 +14,2 @@ import { enrichProvenance } from "./provenance";
++import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
++import { prepareLiveWorlds } from "../../live-worlds/prepare";
+@@ -19,0 +23,5 @@ const hasSources = existsSync("results") || existsSync(resolve(lab, "results"));
++if (hasSources) {
++  prepareLiveWorlds();
++  const built = spawnSync("bun", [resolve(lab, "visual-search/build.ts")], { stdio: "inherit" });
++  if (built.status !== 0) throw new Error("Visual search evidence preparation failed.");
++}
+@@ -60,0 +69,30 @@ mkdirSync("public/research", { recursive: true });
++const qualityReview = resolve(lab, "quality-and-simulation-review");
++if (existsSync(resolve(qualityReview, "review.html"))) {
++  mkdirSync("public/research/quality-review", { recursive: true });
++  for (const name of ["review.html", "README.md", "FUTURE-EXPERIMENTS.md"])
++    if (existsSync(resolve(qualityReview, name))) copyFileSync(resolve(qualityReview, name), resolve("public/research/quality-review", name));
++}
++if (existsSync(resolve(lab, "real-time-playground/show-me-realtime.html")))
++  copyFileSync(resolve(lab, "real-time-playground/show-me-realtime.html"), resolve("public/research/show-me-realtime.html"));
++if (hasSources) {
++  const iconBuild = spawnSync("bun", [resolve(lab, "icon-studio/collection.ts"), resolve("public/icon-studio")], { stdio: "inherit" });
++  if (iconBuild.status !== 0) throw new Error("Icon collection preparation failed.");
++  if (existsSync(resolve(lab, "icon-studio/events.jsonl")))
++    copyFileSync(resolve(lab, "icon-studio/events.jsonl"), resolve("public/icon-studio/evidence.jsonl"));
++  const document = prepareJudgmentReliability(resolve("public/judgment-reliability"));
++  writeFileSync(resolve(dest, "judgment-reliability.json"), JSON.stringify(document) + "\n");
++  mkdirSync(resolve("public/outcome-framing"), { recursive: true });
++  if (existsSync(resolve(lab, "outcome-framing/events.jsonl")))
++    copyFileSync(resolve(lab, "outcome-framing/events.jsonl"), resolve("public/outcome-framing/events.jsonl"));
++  mkdirSync(resolve("public/visual-search"), { recursive: true });
++  copyFileSync(resolve(lab, "visual-search/collection.jsonl"), resolve("public/visual-search/collection.jsonl"));
++  if (existsSync(resolve(lab, "visual-search/events.jsonl")))
++    copyFileSync(resolve(lab, "visual-search/events.jsonl"), resolve("public/visual-search/evidence.jsonl"));
++  mkdirSync(resolve("public/wardrobe"), { recursive: true });
++  if (existsSync(resolve(lab, "wardrobe-lab/recording.json")))
++    copyFileSync(resolve(lab, "wardrobe-lab/recording.json"), resolve("public/wardrobe/recording.json"));
++  if (existsSync(resolve(lab, "wardrobe-lab/assets")))
++    cpSync(resolve(lab, "wardrobe-lab/assets"), resolve("public/wardrobe"), { recursive: true });
++  for (const name of ["spoken-recording.json", "spoken-pipeline.json"])
++    if (existsSync(resolve(lab, "wardrobe-lab", name))) copyFileSync(resolve(lab, "wardrobe-lab", name), resolve("public/wardrobe", name));
++}
+diff --git a/jev-experiments/experience-prototypes/server/browser-api.test.ts b/jev-experiments/experience-prototypes/server/browser-api.test.ts
+index 7b47b09..1222184 100644
+--- a/jev-experiments/experience-prototypes/server/browser-api.test.ts
++++ b/jev-experiments/experience-prototypes/server/browser-api.test.ts
+@@ -2 +2 @@ import { test, expect } from "bun:test";
+-import { readResponse, getApiKey, setApiKey } from "../src/api";
++import { readResponse, getApiKey, setApiKey, run, EvaluationError } from "../src/api";
+@@ -11,0 +12,13 @@ test("disconnect forgets the in-memory key", () => {
++test("failed evaluations retain sanitized attempts for exported run evidence", async () => {
++  const original = globalThis.fetch;
++  const body = { error: "Provider temporarily unavailable", attempts: [{ status: 503, latency_ms: 12 }], retryAfterMs: 1000 };
++  globalThis.fetch = (async () => Response.json(body, { status: 503 })) as typeof fetch;
++  try {
++    await run({ scene: "fictional" }, {});
++    throw Error("Expected an evaluation failure");
++  } catch (error) {
++    expect(error).toBeInstanceOf(EvaluationError);
++    expect((error as EvaluationError).status).toBe(503);
++    expect((error as EvaluationError).response).toEqual(body);
++  } finally { globalThis.fetch = original; }
++});
+diff --git a/jev-experiments/experience-prototypes/server/compose.ts b/jev-experiments/experience-prototypes/server/compose.ts
+index bc4ec3b..79eabed 100644
+--- a/jev-experiments/experience-prototypes/server/compose.ts
++++ b/jev-experiments/experience-prototypes/server/compose.ts
+@@ -16 +16 @@ export async function* compose(body: any, signal: AbortSignal, apiKey: string) {
+-      !["sequential", "batched"].includes(body.strategy))
++      !["sequential", "batch"].includes(body.strategy))
+diff --git a/jev-experiments/experience-prototypes/server/dev.ts b/jev-experiments/experience-prototypes/server/dev.ts
+index 194dc5b..b161bf5 100644
+--- a/jev-experiments/experience-prototypes/server/dev.ts
++++ b/jev-experiments/experience-prototypes/server/dev.ts
+@@ -1,0 +2 @@ import evaluateHandler from "../api/evaluate";
++import wardrobeTokenHandler from "../api/wardrobe-token";
+@@ -60 +61,3 @@ Bun.serve({
+-    await evaluateHandler(
++    const path = new URL(req.url).pathname;
++    if (!["/api/evaluate", "/api/wardrobe-token"].includes(path)) return Response.json({ error: "Not found." }, { status: 404 });
++    await (path === "/api/wardrobe-token" ? wardrobeTokenHandler : evaluateHandler)(
+diff --git a/jev-experiments/experience-prototypes/server/extension.test.ts b/jev-experiments/experience-prototypes/server/extension.test.ts
+index 763a994..1e6ec26 100644
+--- a/jev-experiments/experience-prototypes/server/extension.test.ts
++++ b/jev-experiments/experience-prototypes/server/extension.test.ts
+@@ -55,0 +56 @@ function fixture() {
++    TextEncoder,
+diff --git a/jev-experiments/experience-prototypes/src/api.ts b/jev-experiments/experience-prototypes/src/api.ts
+index a777856..d4ca65b 100644
+--- a/jev-experiments/experience-prototypes/src/api.ts
++++ b/jev-experiments/experience-prototypes/src/api.ts
+@@ -19,0 +20,6 @@ export async function readResponse(response: Response) {
++export class EvaluationError extends Error {
++  constructor(message: string, public status: number, public response: unknown) {
++    super(message);
++    this.name = "EvaluationError";
++  }
++}
+@@ -36 +42 @@ export async function run(
+-    throw new Error(body.error ?? "The run could not complete.");
++    throw new EvaluationError(body.error ?? "The run could not complete.", response.status, body);
+diff --git a/jev-experiments/experience-prototypes/src/catalog.ts b/jev-experiments/experience-prototypes/src/catalog.ts
+index 83ed47c..5b62069 100644
+--- a/jev-experiments/experience-prototypes/src/catalog.ts
++++ b/jev-experiments/experience-prototypes/src/catalog.ts
+@@ -65 +65 @@ export const experiments = [
+-    "Games",
++    "Games & simulations",
+@@ -71 +71 @@ export const experiments = [
+-    "music",
++    "music-v2",
+@@ -119,2 +119,2 @@ export const experiments = [
+-    "beverage",
+-    "Drink finder",
++    "cafe",
++    "Café Jev",
+@@ -199 +199 @@ export const experiments = [
+-    "judge",
++    "judgment-reliability",
+@@ -202,2 +202,2 @@ export const experiments = [
+-    "Read both answers. Make your own call.",
+-    "Does Jev choose the correct answer, regardless of its position?",
++    "Read both answers. Compare order, repeats and scoring methods.",
++    "How reliable are Jev's judgments across the full JudgeBench dataset?",
+@@ -273 +273 @@ export const experiments = [
+-    "Games",
++    "Games & simulations",
+@@ -281 +281 @@ export const experiments = [
+-    "Games",
++    "Games & simulations",
+@@ -300,0 +301,7 @@ export const experiments = [
++  e("tetris", "tetris-framing", "Tetris: play and branch", "Games & simulations", "Gravity keeps going. Take control, rewind, and try another future.", "What changes when Jev chooses actions, landings or a plan?"),
++  e("drawing-framing", "drawing-framing", "Pixel questions", "Creative tools", "One canvas, four ways to ask what belongs there.", "How do intensity, membership, formulas and sequential context change a drawing?"),
++  e("visual-search", "visual-search", "The visual archive", "Creative tools", "Search 204 public-domain artworks by subject, mood and detail.", "What can Jev find through museum metadata and captions?"),
++  e("wardrobe", "wardrobe", "A change of clothes", "Creative tools", "A spoken edit becomes a wardrobe choice, then a moving image.", "Can small semantic decisions keep a video try-on coherent across edits?"),
++  e("icon-studio", "icon-studio", "A symbol for an idea", "Creative tools", "Find an icon by meaning, then try it in a real interface.", "Can Jev choose a useful visual metaphor from 1,703 library icons?"),
++  e("crowd", "live-worlds", "The square at five", "Games & simulations", "A small town keeps moving while its residents make up their minds.", "Can a sentence change many independent decisions in a living world?"),
++  e("ghost-brush", "live-worlds", "Ghost Brush", "Creative tools", "Draw a gesture. Give it a feeling. Follow another line.", "Can a typed style judgment turn a procedural brush into a semantic instrument?"),
+@@ -306 +313 @@ export const categories = [
+-  "Games",
++  "Games & simulations",
+diff --git a/jev-experiments/experience-prototypes/src/generated-ui.tsx b/jev-experiments/experience-prototypes/src/generated-ui.tsx
+index 0d47293..e595423 100644
+--- a/jev-experiments/experience-prototypes/src/generated-ui.tsx
++++ b/jev-experiments/experience-prototypes/src/generated-ui.tsx
+@@ -0,0 +1 @@
++import { compositionEvents } from "../../quality-and-simulation-review/composition-stream";
+@@ -174,0 +176,2 @@ export function GeneratedUI({ record }: { record: any }) {
++  const requestVersion = useRef(0);
++  const [shortlist, setShortlist] = useState<string[]>([]);
+@@ -181 +184 @@ export function GeneratedUI({ record }: { record: any }) {
+-      controller.current?.abort();
++      requestVersion.current++; controller.current?.abort();
+@@ -239 +242,3 @@ export function GeneratedUI({ record }: { record: any }) {
+-      controller.current = new AbortController();
++      const version=++requestVersion.current;
++      const requestController = new AbortController(); controller.current = requestController;
++      setVersions(v=>v.map((item,i)=>i===active?{...item,spec:{...item.spec,state:structuredClone(state.current)}}:item));
+@@ -241,0 +247 @@ export function GeneratedUI({ record }: { record: any }) {
++      try {
+@@ -254 +260 @@ export function GeneratedUI({ record }: { record: any }) {
+-        signal: controller.current.signal,
++        signal: requestController.signal,
+@@ -260,14 +266,5 @@ export function GeneratedUI({ record }: { record: any }) {
+-      const reader = response.body!.getReader(),
+-        decoder = new TextDecoder();
+-      let pending = "",
+-        final: any = null;
+-      while (true) {
+-        const { value, done } = await reader.read();
+-        if (done) break;
+-        pending += decoder.decode(value, { stream: true });
+-        let cut;
+-        while ((cut = pending.indexOf("\n")) >= 0) {
+-          const raw = pending.slice(0, cut);
+-          pending = pending.slice(cut + 1);
+-          if (!raw) continue;
+-          const event = JSON.parse(raw);
++      if(version!==requestVersion.current)return;
++      let final:any=null, complete=false;
++      for await(const event of compositionEvents(response.body!,requestController.signal)) {
++          if(version!==requestVersion.current)return;
++          if(event.type === "complete")complete=true;
+@@ -296 +292,0 @@ export function GeneratedUI({ record }: { record: any }) {
+-        }
+@@ -297,0 +294,2 @@ export function GeneratedUI({ record }: { record: any }) {
++      if(version!==requestVersion.current)return;
++      if (!complete) { setSource("Partial composition"); setNotice("The stream ended before completion. The visible partial interface is preserved; it is not a completed run."); }
+@@ -309,0 +308 @@ export function GeneratedUI({ record }: { record: any }) {
++      } catch(error) { if(requestController.signal.aborted || version!==requestVersion.current)return; setSource("Interrupted composition"); throw error; }
+@@ -344,2 +343,4 @@ export function GeneratedUI({ record }: { record: any }) {
+-                    shortlist: async (p: any) =>
+-                      setNotice(`${p.name} added to your shortlist.`),
++                    shortlist: async (p: any) => {
++                      const name=String(p.name??"Apartment"); setShortlist(items=>items.includes(name)?items:[...items,name]);
++                      setNotice(`${name} added to your shortlist.`);
++                    },
+@@ -359,0 +361 @@ export function GeneratedUI({ record }: { record: any }) {
++        {shortlist.length>0&&<Pane title="Your shortlist">{shortlist.map(name=><Button key={name} secondary onClick={()=>setShortlist(items=>items.filter(item=>item!==name))}>{name} · Remove</Button>)}</Pane>}
+@@ -364,0 +367 @@ export function GeneratedUI({ record }: { record: any }) {
++              disabled={busy || replaying}
+@@ -365,0 +369,2 @@ export function GeneratedUI({ record }: { record: any }) {
++                if(i===active)return;
++                setVersions(items=>items.map((item,n)=>n===active?{...item,spec:{...item.spec,state:structuredClone(state.current)}}:item));
+@@ -392,0 +398 @@ export function GeneratedUI({ record }: { record: any }) {
++              requestVersion.current++; controller.current?.abort(); setShortlist([]); setNotice("");
+@@ -449 +455 @@ export function GeneratedUI({ record }: { record: any }) {
+-            <Button secondary onClick={() => controller.current?.abort()}>
++            <Button secondary onClick={() => {requestVersion.current++;controller.current?.abort();setSource("Interrupted composition");setNotice("Stopped. The partial preview is preserved.");}}>
+diff --git a/jev-experiments/experience-prototypes/src/main.tsx b/jev-experiments/experience-prototypes/src/main.tsx
+index 3da092f..1184019 100644
+--- a/jev-experiments/experience-prototypes/src/main.tsx
++++ b/jev-experiments/experience-prototypes/src/main.tsx
+@@ -32 +32 @@ import { GeneratedUI } from "./generated-ui";
+-import { Worlds, Pixels, Music } from "./creative";
++import { Worlds, Pixels } from "./creative";
+@@ -38 +38 @@ import { Provenance } from "./provenance";
+-import { AgentExperiment, Beverage } from "./agent-experiments";
++import { AgentExperiment } from "./agent-experiments";
+@@ -42,0 +43,12 @@ import "./style.css";
++const Music = lazy(() => import("./music-arranger").then(m => ({ default: m.Music })));
++const JudgeBench = lazy(() => import("./judgment-reliability").then(m => ({ default: m.JudgeBench })));
++const Beverage = lazy(() => import("./cafe-jev").then(m => ({ default: m.Beverage })));
++const VisualSearch = lazy(() => import("./visual-search").then(m => ({ default: m.VisualSearch })));
++const Wardrobe = lazy(() => import("./wardrobe").then(m => ({ default: m.Wardrobe })));
++const IconStudio = lazy(() => import("./icon-studio").then(m => ({ default: m.IconStudio })));
++const TetrisExperience = lazy(() => import("./tetris-experience").then(m => ({ default: m.TetrisExperience })));
++const GhostBrush = lazy(() => import("./ghost-brush").then(m => ({ default: m.GhostBrush })));
++const LiveCrowd = lazy(() => import("./live-crowd").then(m => ({ default: m.LiveCrowd })));
++const LiveWorldPreview = lazy(() => import("./live-world-preview").then(m => ({ default: m.LiveWorldPreview })));
++const MiniExperimentPreview = lazy(() => import("./live-world-preview").then(m => ({ default: m.MiniExperimentPreview })));
++const DrawingFraming = lazy(() => import("./outcome-framing").then(m => ({ default: m.DrawingFraming })));
+@@ -207,0 +220,2 @@ function MiniPreview({ kind }: { kind: string }) {
++  if (["tetris", "crowd", "ghost-brush", "visual-search", "wardrobe", "icon-studio", "drawing-framing"].includes(kind))
++    return <Suspense fallback={null}><MiniExperimentPreview kind={kind} /></Suspense>;
+@@ -438,2 +452,2 @@ function Home() {
+-            <a className="button" href="#experiment/ui">
+-              Make an interface <ArrowUpRight size={16} />
++            <a className="button" href="#experiment/tetris">
++              Play and branch <ArrowUpRight size={16} />
+@@ -441,2 +455,2 @@ function Home() {
+-            <a className="text-link" href="#experiment/paste">
+-              Try a smarter paste <ArrowRight size={15} />
++            <a className="text-link" href="#experiment/ghost-brush">
++              Draw with Ghost Brush <ArrowRight size={15} />
+@@ -449,2 +463,2 @@ function Home() {
+-        <a className="hero-window" href="#experiment/worlds">
+-          <MotionArt scene="garden" />
++        <a className="hero-window" href="#experiment/crowd">
++          <Suspense fallback={<div className="loading-stage">Opening the square…</div>}><LiveWorldPreview /></Suspense>
+@@ -454 +468 @@ function Home() {
+-              <strong>A quiet world, coming to life</strong>
++              <strong>A notice can change an afternoon</strong>
+@@ -475,2 +489,2 @@ function Home() {
+-        <a href="#experiment/local-models">
+-          Decision models on a Mac <ArrowUpRight size={12} />
++        <a href="#experiment/tetris">
++          Tetris: play and branch <ArrowUpRight size={12} />
+@@ -478,2 +492,2 @@ function Home() {
+-        <a href="#experiment/snake">
+-          Snake <ArrowUpRight size={12} />
++        <a href="#experiment/crowd">
++          The square at five <ArrowUpRight size={12} />
+@@ -481,2 +495,2 @@ function Home() {
+-        <a href="#experiment/orbital">
+-          Orbital rescue <ArrowUpRight size={12} />
++        <a href="#experiment/ghost-brush">
++          Ghost Brush <ArrowUpRight size={12} />
+@@ -484,2 +498,2 @@ function Home() {
+-        <a href="#experiment/benchmark-atlas">
+-          The next experiments <ArrowUpRight size={12} />
++        <a href="#experiment/wardrobe">
++          A change of clothes <ArrowUpRight size={12} />
+@@ -567,0 +582 @@ function Home() {
++          <a href="/research/quality-review/review.html">Review all 33 original experiments ↗</a>
+@@ -629,0 +645,15 @@ function View({
++      return <JudgeBench result={result} />;
++    case "tetris":
++      return <TetrisExperience result={result} />;
++    case "drawing-framing":
++      return <DrawingFraming result={result} />;
++    case "visual-search":
++      return <VisualSearch result={result} />;
++    case "wardrobe":
++      return <Wardrobe result={result} />;
++    case "icon-studio":
++      return <IconStudio result={result} />;
++    case "ghost-brush":
++      return <GhostBrush />;
++    case "crowd":
++      return <LiveCrowd />;
+@@ -676,0 +707,10 @@ function Detail({ id }: { id: string }) {
++    "music",
++    "beverage",
++    "judge",
++    "tetris",
++    "drawing-framing",
++    "visual-search",
++    "wardrobe",
++    "icon-studio",
++    "ghost-brush",
++    "crowd",
+@@ -742,0 +783 @@ function Detail({ id }: { id: string }) {
++        <Suspense fallback={<div className="loading-stage"><span className="loader" /> Opening the experiment…</div>}>
+@@ -748,0 +790 @@ function Detail({ id }: { id: string }) {
++        </Suspense>
+diff --git a/jev-experiments/experience-prototypes/src/new-experiments.tsx b/jev-experiments/experience-prototypes/src/new-experiments.tsx
+index 7d706d3..900c066 100644
+--- a/jev-experiments/experience-prototypes/src/new-experiments.tsx
++++ b/jev-experiments/experience-prototypes/src/new-experiments.tsx
+@@ -1 +1 @@
+-import { useEffect, useMemo, useState } from "react";
++import { useEffect, useMemo, useRef, useState } from "react";
+@@ -31,0 +32 @@ import {
++import { extractLineFacts, fillEmpty, undoFill, pasteBatches, type Patch } from "../../quality-and-simulation-review/paste-transactions";
+@@ -63,15 +64 @@ export const pasteFields = {
+-export function extractFacts(source: string) {
+-  return source
+-    .split("\n")
+-    .filter((s) => s.trim())
+-    .map((line, i) => ({
+-      id: "fact" + i,
+-      label: line.includes(":")
+-        ? line.slice(0, line.indexOf(":")).trim()
+-        : "Source " + (i + 1),
+-      value: line.includes(":")
+-        ? line.slice(line.indexOf(":") + 1).trim()
+-        : line.trim(),
+-      source: line,
+-    }));
+-}
++export const extractFacts = extractLineFacts;
+@@ -89 +76 @@ export function pasteQuestions(
+-          ...Object.fromEntries(facts.map((f) => [f.id, f.source])),
++          ...Object.fromEntries(facts.map((f) => [f.id, `Source line ${f.line}: ${f.label}`])),
+@@ -102 +89,2 @@ export function Paste({ record }: { record: any }) {
+-    [history, setHistory] = useState<Record<string, string>[]>([]),
++    [history, setHistory] = useState<Patch[][]>([]),
++    [reviewed, setReviewed] = useState<Record<string, boolean>>({}),
+@@ -107 +95,5 @@ export function Paste({ record }: { record: any }) {
+-  const { busy, error, execute } = useRun();
++  const [busy, setBusy] = useState(false), [error, setError] = useState("");
++  const revision = useRef(0), controller = useRef<AbortController|null>(null);
++  const valuesRef = useRef(values); valuesRef.current = values;
++  const invalidate = () => { revision.current++; controller.current?.abort(); setBusy(false); setReviewed({}); setSuggestions({}); setLast(null); };
++  useEffect(() => () => { revision.current++; controller.current?.abort(); }, []);
+@@ -111 +103,2 @@ export function Paste({ record }: { record: any }) {
+-    if (r) {
++    if (r && source === pasteSources[preset] && fields.join("\n") === pasteFields[preset].join("\n")) {
++      setReviewed({});
+@@ -121,10 +114,3 @@ export function Paste({ record }: { record: any }) {
+-    setHistory((h) => [...h, values]);
+-    setValues((v) => ({
+-      ...v,
+-      ...Object.fromEntries(
+-        fields.flatMap((f, i) => {
+-          const id = "f" + i,
+-            s = facts.find((x) => x.id === suggestions[id]);
+-          return s && (!key || key === id) ? [[id, s.value]] : [];
+-        }),
+-      ),
++    const candidates = Object.fromEntries(fields.flatMap((_, i) => {
++      const id = "f" + i, fact = facts.find(f => f.id === suggestions[id]);
++      return fact && (key ? key === id : reviewed[id]) ? [[id, fact.value]] : [];
+@@ -131,0 +118,6 @@ export function Paste({ record }: { record: any }) {
++    const next = fillEmpty(valuesRef.current, candidates);
++    if (!next.patch.length) return;
++    setHistory(h => [...h, next.patch]); valuesRef.current = next.values; setValues(next.values);
++  };
++  const changePreset = (p: keyof typeof pasteSources) => {
++    invalidate(); setPreset(p); setSource(pasteSources[p]); setFields(pasteFields[p]); setValues({}); valuesRef.current={}; setHistory([]); setActive(null);
+@@ -132,0 +125,12 @@ export function Paste({ record }: { record: any }) {
++  async function findSuggestions() {
++    invalidate(); const version=revision.current, abort=new AbortController(); controller.current=abort; setBusy(true); setError("");
++    const input={source,destination:preset}, questions=pasteQuestions(fields,facts,preset);
++    try {
++      const answers:Record<string,any>={}, batches=pasteBatches(input,questions), responses:any[]=[];
++      for(const batch of batches){const response=await run(input,batch,abort.signal);if(revision.current!==version)return;Object.assign(answers,response.answers);responses.push(response);}
++      if(revision.current!==version)return;
++      setSuggestions(Object.fromEntries(Object.entries(answers).map(([k,a])=>[k,a.value])));
++      setLast({source:"live",answers,request:{state:input,questions},responses,latency_ms:responses.reduce((n,r)=>n+r.latency_ms,0)});
++    } catch(e) {if(!abort.signal.aborted)setError(e instanceof Error?e.message:String(e));}
++    finally {if(revision.current===version)setBusy(false);}
++  }
+@@ -143,6 +147 @@ export function Paste({ record }: { record: any }) {
+-                setPreset("Memory");
+-                setSource(pasteSources.Memory);
+-                setFields(pasteFields.Memory);
+-                setSuggestions({});
+-                setValues({});
+-                setLast(null);
++                changePreset("Memory");
+@@ -177 +176 @@ export function Paste({ record }: { record: any }) {
+-                    · {f.id.replace("fact", "line ")}
++                    · {`line ${f.line}`}
+@@ -231,3 +230,2 @@ export function Paste({ record }: { record: any }) {
+-                          <small onMouseEnter={() => setActive(fact.id)}>
+-                            {fact.label}
+-                          </small>
++                          <small onMouseEnter={() => setActive(fact.id)}>{fact.label} · confidence {Number(last?.answers?.[key]?.confidence ?? 0).toFixed(2)}, uncalibrated</small>
++                          <label><input type="checkbox" checked={!!reviewed[key]} onChange={e=>setReviewed(r=>({...r,[key]:e.target.checked}))}/> I reviewed this source for this field</label>
+@@ -250 +248 @@ export function Paste({ record }: { record: any }) {
+-                  disabled={!Object.keys(suggestions).length}
++                  disabled={mode === "Smart paste" ? !suggestions[focused] || suggestions[focused] === "none" : !Object.values(reviewed).some(Boolean)}
+@@ -255 +253 @@ export function Paste({ record }: { record: any }) {
+-                    : "Fill suggestions"}
++                    : "Fill reviewed suggestions"}
+@@ -261 +259 @@ export function Paste({ record }: { record: any }) {
+-                    setValues(history.at(-1)!);
++                    const next = undoFill(valuesRef.current, history.at(-1)!); valuesRef.current=next; setValues(next);
+@@ -284,2 +282 @@ export function Paste({ record }: { record: any }) {
+-            Jev chooses source facts for each field. The source stays visible so
+-            you can inspect and correct every suggestion.
++            Jev chooses source facts for each field. Review each source before filling. Existing values and later manual edits are preserved. The three authored examples include mistakes, including an office address suggested as company headquarters.
+@@ -292,6 +289 @@ export function Paste({ record }: { record: any }) {
+-                setPreset(p);
+-                setSource(pasteSources[p]);
+-                setFields(pasteFields[p]);
+-                setSuggestions({});
+-                setValues({});
+-                setLast(null);
++                changePreset(p);
+@@ -310,3 +302 @@ export function Paste({ record }: { record: any }) {
+-                setSource(e.target.value);
+-                setSuggestions({});
+-                setLast(null);
++                invalidate(); setSource(e.target.value);
+@@ -321,2 +311 @@ export function Paste({ record }: { record: any }) {
+-                setFields(e.target.value.split("\n"));
+-                setSuggestions({});
++                invalidate(); setFields(e.target.value.split("\n")); setValues({}); valuesRef.current={}; setHistory([]);
+@@ -329,17 +318 @@ export function Paste({ record }: { record: any }) {
+-            onClick={() =>
+-              execute(async () => {
+-                const r = await run(
+-                  { source, destination: preset },
+-                  pasteQuestions(fields, facts, preset),
+-                );
+-                setSuggestions(
+-                  Object.fromEntries(
+-                    Object.entries(r.answers).map(([k, a]: any) => [
+-                      k,
+-                      a.value,
+-                    ]),
+-                  ),
+-                );
+-                setLast(r);
+-              })
+-            }
++            onClick={() => void findSuggestions()}

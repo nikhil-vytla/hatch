@@ -1,0 +1,111 @@
+{
+  "id": "semantic-table",
+  "title": "Semantic spreadsheet",
+  "evidenceStatus": "Eight authored conversation rows and eight saved judgments from one successful 264 ms request. All threshold decisions match the derived promised && !completed fixture predicate (3 positive, 5 negative). Offline callback/TanStack probe only; no general accuracy or reviewer-time study.",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The basic semantic-column interaction works on its eight fixtures, with annotations excluded from model input. Late responses can attach old judgments to a new question, and human corrections do not affect badges or filters. Versioned cell identity, effective overrides, immutable evidence, and explicit coverage are needed before expanding it into an editable review sheet.",
+  "strengths": [
+    "The page exposes source conversations and judgments and explicitly calls the eight rows authored examples rather than a general benchmark.",
+    "Authored promised/completed labels are not sent to Jev; filtering changes display rather than which underlying rows are evaluated.",
+    "Business selection uses stable domain IDs, and ordinary query edits immediately clear scores, providing foundations for versioned dependency handling."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "A late response labels and exports the wrong question",
+      "evidence": "experience-prototypes/src/new-experiments.tsx:546, :562. The actual callback probe starts the outstanding-refund query, changes to Is a successful refund evidenced?, and resolves the old request. The old 0.88 appears and exports under the new question.",
+      "impact": "The saved review can attribute an answer to a question that was never evaluated, independently of model quality.",
+      "fix": "Bind results to question version, row ID/content hash, and prompt/schema version. Reject stale commits and export only compatible cells, retaining old runs separately if needed."
+    },
+    {
+      "priority": "P1",
+      "title": "Corrections do not correct the effective result",
+      "evidence": "experience-prototypes/src/new-experiments.tsx:430, :449, :517. Marking row 01 Already resolved leaves Yes/0.88 and the row in matches 01/04/08. Export keeps the raw score; changing query resets supportRows and deletes the correction.",
+      "impact": "A user's review action does not change the queue and can be lost when the semantic question changes.",
+      "fix": "Define current human override > current model judgment > unknown, use it in every badge/filter/summary/export, and retain version-scoped override history. Use correction labels that fit the active question."
+    },
+    {
+      "priority": "P1",
+      "title": "Scores and fixture facts lack an immutable evidence contract",
+      "evidence": "experience-prototypes/scripts/record.ts:51 saves responses without conversations/question/hash; src/new-experiments.tsx:405 joins them to current supportRows. Row 02 annotates promised=true while its text states completion without an explicit prior promise. The recording prompt omits the live row-isolation sentence.",
+      "impact": "Old scores can silently bind to edited fixtures, and authored evidence annotations may be mistaken for externally verified facts. Absence of payment evidence is not proof about a payment ledger.",
+      "fix": "Persist exact inputs, question/policy/annotation versions, and hashes. Define present/absent/uncertain evidence labels and supporting spans, separate annotations from predictions, and mark incompatible recorded input versions."
+    },
+    {
+      "priority": "P2",
+      "title": "Filtered coverage and view identity are implicit",
+      "evidence": "experience-prototypes/src/new-experiments.tsx:449, :494. Only matches plus a query edit hides all eight unevaluated rows with no coverage message. Installed TanStack maps table ID 1 from domain row 02 to 04 after filtering because getRowId is absent. Headers have no sorting handlers; selection itself correctly uses domain IDs.",
+      "impact": "An empty view does not distinguish no matches from no current evaluations, and index keys are an unreliable base for future editing/selection. There is no current aggregate summary or row-text editor to audit.",
+      "fix": "Set stable domain row IDs, wire sorting deliberately, display evaluated/stale/pending/failed coverage, and preserve these statuses in future aggregates instead of treating missing values as No."
+    },
+    {
+      "priority": "P1",
+      "title": "One shared-context batch does not establish row isolation or review savings",
+      "evidence": "experience-prototypes/src/new-experiments.tsx:547 sends all eight conversations as shared state. The only saved run has eight short authored cases, no row-order/distractor/isolated comparison, no rule/manual baseline, and null probability/confidence metadata despite percentage display.",
+      "impact": "The record demonstrates a small working interaction, not general semantic accuracy, calibrated probabilities, independence from neighboring rows, or reduced reviewer effort.",
+      "fix": "Compare isolated, row-local batched, and shared-table protocols with held-out labels and code baselines. Measure time/errors in a separate reviewer study, freeze thresholds, and call the returned number a model score unless calibrated."
+    }
+  ],
+  "simulation": {
+    "title": "A review sheet that stays current",
+    "description": "Import or author rows with stable case IDs, add semantic columns, inspect supporting text, and apply human overrides. Editing source text marks only dependent cells stale; sorting/filtering stay usable. Recompute affected rows, pause/resume batches, and export source data, definitions, effective decisions, raw results, overrides, and coverage.",
+    "jevsRole": "Interpret the declared semantic property from allowed row evidence, optionally supplying separate promise/success evidence decisions and references. Jev does not decide aggregation, row visibility, or arbitrary formulas.",
+    "codeRole": "Maintain row/content/column versions, dependencies, per-cell status, request identity, raw judgments and scoped overrides. Own invalidation, bounded batching, joins, deterministic formulas, stable view identity, aggregation, and export. Reject old results and preserve completed work on interruption.",
+    "acceptanceCriteria": [
+      "Each current cell matches one row-content hash and column version; delayed results cannot become current through view changes.",
+      "Current human overrides control effective values consistently and remain auditable after edits.",
+      "A source-row edit invalidates only dependent cells; sorting/filtering never causes new inference.",
+      "Duplicate names, row reorder/insertion/deletion, and asynchronous completion do not change result identity.",
+      "Summary/export denominators reconcile all current values, overrides, unknowns, stale cells, pending work, and failures.",
+      "Interrupted batches retain valid completed cells and resume only unfinished compatible work."
+    ]
+  },
+  "evaluation": {
+    "design": "Keep current eight plus 60 new cases for development. Hold out 300 conversations, 50 each covering pending promises, successful evidence, denial/credit, temporal/tool uncertainty, quoted/conditional/multiple-actor language, and confusing case references. Two blind annotators label promise/success evidence, follow-up and spans; adjudicate disagreement and retain unknowns. Split by source/template family. With two question wordings, compare isolated direct questions (600 decisions/600 requests), row-local batches of 12 (600/50), shared-table batches with two scheduling permutations (1,200/100), and two evidence decisions plus a code formula (1,200/50). Total: 3,600 primitive decisions and 800 logical requests before retries, subject to byte-limit splits. Use scheduling seeds 42/43, freeze prompts/thresholds/versions, and perform 10,000 paired bootstrap resamples clustered by base conversation. Provisional supported-case gate: 95% recall lower bound at least 90%, with precision and unknown coverage published. Run 1,000 offline edit/query/override/order/interruption/export schedules requiring zero stale commits, lost current overrides, or denominator mismatches. A separate 12-reviewer two-block pilot has 600 case reviews, half manual/half assisted, using frozen predictions. No proposed requests or reviewer sessions were run.",
+    "baselines": [
+      "Frozen keyword filter without access to authored labels.",
+      "Negation/temporal rule parser evaluated on the same held-out source records.",
+      "Oracle compound formula using independent human evidence labels to isolate combination versus extraction error.",
+      "Isolated, row-local batched, and shared-table direct judgments, plus decomposed evidence decisions with deterministic combination.",
+      "Manual review versus semantic-column assistance in a separate counterbalanced reviewer study."
+    ],
+    "metrics": [
+      "Effective follow-up precision/recall, balanced accuracy, semantic unknown coverage, and supporting-span agreement.",
+      "Row/order/distractor invariance and changed-row versus unaffected-row behavior.",
+      "Wrong-version commits, preserved overrides, coverage denominator consistency, and current export identity.",
+      "All-scheduled/provider-completed coverage, payload bytes, primitive decisions, logical requests, retries, p50/p95 elapsed time, and cost.",
+      "Manual/assisted review time, missed follow-ups, false follow-ups, corrections, and reviewer/case variability."
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Eight short authored conversation fixtures, one saved shared-state request, eight threshold matches to the derived promised && !completed predicate. This is not a general benchmark or calibration result; no review-time, row-edit, sorting, or aggregate-summary study exists.",
+      "full": "Proposed 300 held-out conversations in six strata, two question wordings, four protocols, 3,600 decisions and 800 logical requests; 1,000 offline integrity schedules plus 600 human case reviews. No external dataset, official split size, or external score claimed.",
+      "feasibility": "Needs independent labeling, versioned cell state, provider/reviewer budget, and payload validation. Gateway permits 1–128 questions under 100 KB; long rows may add batches. No large download or model weights are needed, and all proposed runs remain unperformed."
+    }
+  },
+  "libraries": [
+    {
+      "name": "TanStack Table v8",
+      "url": "https://tanstack.com/table/v8/docs/guide/rows",
+      "use": "Already installed as 8.21.3. Configure getRowId from stable domain IDs and keep edits/overrides independent of visible position; the library handles view row models while custom code must manage semantic dependencies and versioned results."
+    },
+    {
+      "name": "DuckDB-Wasm",
+      "url": "https://duckdb.org/docs/current/clients/wasm/query",
+      "use": "Optional for larger imported tables: prepared queries and Arrow result batches support reproducible filters and coverage-aware aggregation over typed cell-status/provenance columns. Plain TypeScript is sufficient for the current eight rows."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "M", "action": "Bind results and exports to row/question revisions and reject stale commits." },
+    { "priority": "P1", "size": "M", "action": "Apply human overrides through one effective-value rule and retain scoped correction history." },
+    { "priority": "P1", "size": "S", "action": "Save exact source/question snapshots, identify recorded/live provenance, and clarify evidence labels and score meaning." },
+    { "priority": "P2", "size": "S", "action": "Use stable table IDs, explicit coverage/empty states, and actual sorting if offered." },
+    { "priority": "P1", "size": "M", "action": "Add editable rows, dependency invalidation, bounded resumable batches, and summaries that preserve incomplete statuses." },
+    { "priority": "P1", "size": "M", "action": "Evaluate row isolation and code baselines independently of review effort; later reuse provenance/dependencies for semantic joins and review checklists." }
+  ],
+  "sources": [
+    { "label": "TanStack Table v8 row identity", "url": "https://tanstack.com/table/v8/docs/guide/rows" },
+    { "label": "DuckDB-Wasm queries, prepared statements, and Arrow results", "url": "https://duckdb.org/docs/current/clients/wasm/query" }
+  ]
+}

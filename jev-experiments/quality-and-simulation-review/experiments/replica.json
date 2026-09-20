@@ -1,0 +1,164 @@
+{
+  "id": "replica",
+  "title": "SmolLM decision model",
+  "evidenceStatus": "One supervised training seed; 77 derived Banking77 test cases; 32/77 hosted references completed",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "Four-way intent accuracy improves from 25/77 to 51/77, but yes/no predicts yes on 74/77 cases and the score task has no middle-level labels. The current page shows aggregate accuracy rather than inspectable learning; full 77-way classification, independent binary/ordinal labels, useful baselines, and case-level replay are needed.",
+  "strengths": [
+    "Real LoRA and pointer-head updates with a pinned SmolLM2 base, separate upstream train/test splits, and validation-based checkpoint selection.",
+    "All published before/after accuracy and Brier metrics reproduce from recorded distributions; selected splits have no normalized exact-text overlap.",
+    "The UI correctly says this uses labeled data rather than distilling Jev, and the model card discloses endpoint-only scores and narrow equivalence checks.",
+    "Existing branch-mask test passes; one recorded packed/separate example differs by only 1.64e-6."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "The ordinal task duplicates binary intent matching and has no middle labels",
+      "evidence": "jev-experiments/src/jev_lab/replica.py:26 and :51; probes/replica.results.json: training scores are 154 at 0, zero at 1, and 154 at 2. After training, yes/no says yes on 74/77 cases and score never chooses 1.",
+      "impact": "The experiment does not establish ordinal ability or calibrated binary probabilities. Yes/no Brier worsens from 0.5460 to 0.7202; both secondary tasks underperform a descriptive constant-negative accuracy of 47/77.",
+      "fix": "Show priors, class counts, Brier, and confidence errors; label current scores endpoint-only. Collect independently judged middle cases and a distinct binary criterion before making separate capability claims."
+    },
+    {
+      "priority": "P1",
+      "title": "One small four-choice run lacks useful baselines and multi-task selection",
+      "evidence": "jev-experiments/src/jev_lab/replica.py:168, :194, and :231. Test coverage is 77/3,080, validation covers 40/77 classes, and the baseline has a random readout. The 240 replacement-sampled updates visit 163 of 308 available records.",
+      "impact": "The observed gain supports this shortlist pilot, not full intent classification or broad multi-task learning. Choice-only checkpoint selection can retain degraded secondary-task probabilities.",
+      "fix": "Freeze candidate seeds and splits, record per-task validation curves, add prior, equal-data lexical and head-only baselines, and evaluate five training seeds on the full 77-way test."
+    },
+    {
+      "priority": "P2",
+      "title": "Hosted comparison needs separate availability and quality",
+      "evidence": "jev-experiments/src/jev_lab/replica.py:333; results/replica.jsonl:184 through :260 contain 32 correct completed Jev answers and 45 HTTP 429 failures. The replica gets 19/32 on the same answered cases.",
+      "impact": "The recorded 41.6% all-attempted success is valid service evidence but cannot alone compare model accuracy. The UI currently makes no superiority claim.",
+      "fix": "Publish attempted, completed, unavailable, answered accuracy, end-to-end success, and paired-subset metrics. Pace and bound future retries; retain unresolved cases as unavailable."
+    },
+    {
+      "priority": "P1",
+      "title": "The page cannot inspect the examples or run the local model",
+      "evidence": "jev-experiments/experience-prototypes/src/benchmarks.tsx:473 and :618 render aggregate bars plus raw JSON. src/jev_lab/replica.py:332 removes test_records before publication; probability rows lack utterances and option text. replica_infer.py:62 provides only a CLI.",
+      "impact": "Visitors cannot explain errors, inspect what changed, test branch isolation, or distinguish exploratory predictions from measured results through the central interaction.",
+      "fix": "Persist readable case/question/option records and implement a recorded before/after inspector. Add an optional local runtime connection with explicit loading, identity, limits, and unavailable states; keep edits outside benchmark metrics."
+    },
+    {
+      "priority": "P2",
+      "title": "Artifact identity and equivalence checks are incomplete",
+      "evidence": "jev-experiments/src/jev_lab/replica.py:162 resolves a base revision; replica_infer.py:11 hard-codes one for every --weights file. The result lacks train/validation IDs, selected checkpoint step, artifact hash, and code revision. Equivalence uses one example at replica.py:250.",
+      "impact": "The current artifact matches, but future checkpoints can load a same-shaped wrong base. Reproduction depends on current sampling code, and one case cannot establish broad output isolation.",
+      "fix": "Save and validate a checkpoint manifest with revisions, hashes, split IDs, seeds, selected step, and head configuration. Add generated packing/branch property checks and separate performance measurements."
+    }
+  ],
+  "simulation": {
+    "title": "Decision-model inspection bench",
+    "description": "Replay a labeled case before and after training, inspect baseline and confidence errors, and expose missing score levels. With an optional local runtime, add or remove a sibling question, reorder options, or edit the utterance; edited cases remain outside the frozen benchmark.",
+    "jevsRole": "Jev is an optional hosted reference with its own availability status. The trained local model supplies probabilities; neither model supplies the evaluation truth.",
+    "codeRole": "Code owns immutable manifests, stable option IDs, packing and token validation, checkpoint identity, case selection, metric computation, and recorded versus new-result labeling.",
+    "acceptanceCriteria": [
+      "Replay all 77 current cases with readable text/options and the exact saved targets/probabilities; filters preserve visible denominators.",
+      "Show the 74/77 yes predictions, zero middle-label examples, prior scores, and Brier without opening JSON.",
+      "Identify every result's checkpoint hash and recorded/live status; edited cases cannot alter held-out scores.",
+      "For 100 seeded valid FP32 requests, unrelated sibling addition/removal changes probabilities by at most 1e-5; report option-order disagreements separately.",
+      "Without a local runtime, recorded inspection remains usable and requires no API key; invalid or overlength requests fail clearly without silent truncation."
+    ]
+  },
+  "evaluation": {
+    "design": "Freeze source pins, all split IDs and candidate seeds. Use 308 training records plus disjoint validation and calibration partitions of 308 each, four records per intent per partition. Compare five seeds of LoRA-plus-head and head-only against equal-data baselines; select checkpoints only on preregistered per-task validation metrics. Report the full official test plus the 3,003 previously uninspected records. Use 10,000 paired bootstrap resamples grouped by utterance and publish seed ranges. Independently annotate a separate 360-case ordinal test balanced over three levels and a distinct 360-case binary test with 180 positives and 180 negatives; Jev agreement is never correctness truth.",
+    "baselines": [
+      "Training-label prior and uniform probabilities with declared tie handling",
+      "Original random readout on the frozen base",
+      "Head-only training with the same records and update budget",
+      "TF-IDF plus logistic regression trained on the same labeled records",
+      "Optional ordinary SmolLM option-likelihood readout, named separately",
+      "Optional Jev reference with availability and answered-case metrics"
+    ],
+    "metrics": [
+      "Official 77-way accuracy and macro-F1; four-way shortlist accuracy remains a separate derived metric",
+      "Summed multiclass Brier, log loss, confident-error rate at 0.9, and retained accuracy versus coverage",
+      "Binary balanced accuracy; ordinal MAE, quadratic-weighted kappa, per-level recall, and annotation agreement",
+      "Paired 95% intervals grouped by utterance plus variation across five training seeds",
+      "Proposed choice gate: at least +5 percentage points over strongest equal-budget baseline with positive paired interval",
+      "Proposed binary gate: balanced accuracy at least 0.70 and Brier better than prior; ordinal gate: macro recall at least 0.60 and MAE at most 0.50",
+      "Runtime availability, cold/warm latency, and packed/separate output difference, reported apart from quality"
+    ],
+    "coverage": {
+      "kind": "external",
+      "current": "77/3,080 Banking77 test utterances, 2.5%, with a gold-containing four-way shortlist and two derived endpoint-label questions; one training seed. Only 32/77 hosted references completed.",
+      "full": "Official Banking77 has 10,003 train examples, 3,080 test examples, and 77 intents. Full scoring predicts one of all 77 labels and reports accuracy. New binary/ordinal annotations are a separate task-specific evaluation.",
+      "feasibility": "Full local coverage needs 3,080 requests per checkpoint, or 46,200 for three model states across five seeds. Cached-tokenizer preflight found maximum document length 83 and total 592 tokens for a 77-option request; extend/test the current 32-option cap. Optional full Jev reference needs 3,080 logical requests, at most 6,160 attempts with two attempts per case; current 429s block a clean comparison until pacing/quota are settled. A three-distractor-seed by four-order stress pass adds 36,960 four-way requests per chosen checkpoint. No new inference or paid run was performed."
+    }
+  },
+  "libraries": [
+    {
+      "name": "scikit-learn",
+      "url": "https://scikit-learn.org/stable/modules/calibration.html",
+      "use": "Use lexical baselines, confusion/probability metrics, and calibration fit only on a separate partition. Link summaries to per-case changes in the inspector."
+    },
+    {
+      "name": "PEFT checkpoint support",
+      "url": "https://huggingface.co/docs/peft/en/developer_guides/checkpoint",
+      "use": "Reuse adapter configuration and serialization with the custom head and a strict manifest, so every small local artifact identifies its exact base and evaluation."
+    },
+    {
+      "name": "Hypothesis",
+      "url": "https://hypothesis.readthedocs.io/en/latest/",
+      "use": "Generate and shrink branch-isolation, packing, boundary, and ordering counterexamples, then expose the minimal failures as inspectable examples."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Expose class collapse, priors, Brier, endpoint-only labels, and complete case/question/option records."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Build recorded case inspection with before/after comparison and separate optional local runtime states."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Freeze splits and metadata, add baselines, extend/test 77-option inference, and prepare the full independent evaluation."
+    },
+    {
+      "priority": "P1",
+      "size": "L",
+      "action": "Collect independent ordinal middle cases and a distinct binary task; train/evaluate five seeds with per-task selection guardrails when authorized."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Add paced comparator recovery, artifact checks, and generated branch properties; reuse calibration for a future abstaining local-to-Jev router."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Official Banking77 dataset counts",
+      "url": "https://github.com/PolyAI-LDN/task-specific-datasets#banking"
+    },
+    {
+      "label": "Original Banking77 evaluation and accuracy scoring",
+      "url": "https://arxiv.org/html/2003.04807v1"
+    },
+    {
+      "label": "Kev architecture and scope",
+      "url": "https://github.com/jaredpalmer/kev"
+    },
+    {
+      "label": "scikit-learn probability calibration",
+      "url": "https://scikit-learn.org/stable/modules/calibration.html"
+    },
+    {
+      "label": "scikit-learn metric definitions",
+      "url": "https://scikit-learn.org/stable/modules/model_evaluation.html"
+    },
+    {
+      "label": "PEFT checkpoint format",
+      "url": "https://huggingface.co/docs/peft/en/developer_guides/checkpoint"
+    },
+    {
+      "label": "Hypothesis official documentation",
+      "url": "https://hypothesis.readthedocs.io/en/latest/"
+    }
+  ]
+}

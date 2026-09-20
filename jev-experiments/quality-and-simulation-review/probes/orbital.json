@@ -1,0 +1,417 @@
+{
+  "sourceHashes": {
+    "local-models-and-games/arcade/engine.ts": "76854aaa07c476d8294d04193d2bd65f5ae5b4a65d825a34078149ae6944f15c",
+    "local-models-and-games/arcade/record.ts": "f6b39d4061455be6466a7f092bdc649142539d8a5494f01b801d8e59c8486f08",
+    "local-models-and-games/arcade/results.jsonl": "ccc4022446a59f984c0dca7bd631609b88428272d2873aacb7ac4228614cc8d6",
+    "experience-prototypes/src/arcade.tsx": "3e4e64b4cd8a4f68db0c7ddfc35331b56317fcc3e8e47f7608efcd8265bd3198"
+  },
+  "episodes": [
+    {
+      "id": "orbital-7-jev",
+      "seed": 7,
+      "policy": "jev",
+      "moves": 42,
+      "score": 3,
+      "status": "won",
+      "health": 3,
+      "greedyAgreement": 42,
+      "unsafeSelected": 0,
+      "nonGreedyDistanceMoves": 0,
+      "unsafeAlternatives": 0,
+      "optimalNoDamageMoves": 42,
+      "oracleVerified": {
+        "status": "won",
+        "health": 3,
+        "score": 3
+      },
+      "excessMoves": 0
+    },
+    {
+      "id": "orbital-7-greedy",
+      "seed": 7,
+      "policy": "greedy",
+      "moves": 42,
+      "score": 3,
+      "status": "won",
+      "health": 3,
+      "greedyAgreement": 42,
+      "unsafeSelected": 0,
+      "nonGreedyDistanceMoves": 0,
+      "unsafeAlternatives": 0,
+      "optimalNoDamageMoves": 42,
+      "oracleVerified": {
+        "status": "won",
+        "health": 3,
+        "score": 3
+      },
+      "excessMoves": 0
+    },
+    {
+      "id": "orbital-19-jev",
+      "seed": 19,
+      "policy": "jev",
+      "moves": 24,
+      "score": 3,
+      "status": "won",
+      "health": 3,
+      "greedyAgreement": 24,
+      "unsafeSelected": 0,
+      "nonGreedyDistanceMoves": 0,
+      "unsafeAlternatives": 0,
+      "optimalNoDamageMoves": 24,
+      "oracleVerified": {
+        "status": "won",
+        "health": 3,
+        "score": 3
+      },
+      "excessMoves": 0
+    },
+    {
+      "id": "orbital-19-greedy",
+      "seed": 19,
+      "policy": "greedy",
+      "moves": 24,
+      "score": 3,
+      "status": "won",
+      "health": 3,
+      "greedyAgreement": 24,
+      "unsafeSelected": 0,
+      "nonGreedyDistanceMoves": 0,
+      "unsafeAlternatives": 0,
+      "optimalNoDamageMoves": 24,
+      "oracleVerified": {
+        "status": "won",
+        "health": 3,
+        "score": 3
+      },
+      "excessMoves": 0
+    },
+    {
+      "id": "orbital-42-jev",
+      "seed": 42,
+      "policy": "jev",
+      "moves": 30,
+      "score": 3,
+      "status": "won",
+      "health": 3,
+      "greedyAgreement": 29,
+      "unsafeSelected": 0,
+      "nonGreedyDistanceMoves": 0,
+      "unsafeAlternatives": 0,
+      "optimalNoDamageMoves": 26,
+      "oracleVerified": {
+        "status": "won",
+        "health": 3,
+        "score": 3
+      },
+      "excessMoves": 4
+    },
+    {
+      "id": "orbital-42-greedy",
+      "seed": 42,
+      "policy": "greedy",
+      "moves": 30,
+      "score": 3,
+      "status": "won",
+      "health": 3,
+      "greedyAgreement": 30,
+      "unsafeSelected": 0,
+      "nonGreedyDistanceMoves": 0,
+      "unsafeAlternatives": 0,
+      "optimalNoDamageMoves": 26,
+      "oracleVerified": {
+        "status": "won",
+        "health": 3,
+        "score": 3
+      },
+      "excessMoves": 4
+    }
+  ],
+  "replayMismatches": [],
+  "modelCalls": 0,
+  "paired": [
+    {
+      "seed": 7,
+      "identicalActions": true,
+      "identicalStates": true
+    },
+    {
+      "seed": 19,
+      "identicalActions": true,
+      "identicalStates": true
+    },
+    {
+      "seed": 42,
+      "identicalActions": false,
+      "identicalStates": false
+    }
+  ],
+  "craftedDetour": {
+    "input": {
+      "game": "orbital",
+      "seed": 7,
+      "tick": 0,
+      "score": 2,
+      "status": "playing",
+      "reason": "",
+      "rng": 768150900,
+      "drone": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      },
+      "health": 3,
+      "cores": [
+        {
+          "x": 3,
+          "y": 2,
+          "z": 0
+        }
+      ],
+      "hazards": [
+        {
+          "x": 1,
+          "y": 2,
+          "z": 0
+        },
+        {
+          "x": 1,
+          "y": 3,
+          "z": 0
+        },
+        {
+          "x": 5,
+          "y": 4,
+          "z": 5
+        },
+        {
+          "x": -5,
+          "y": 4,
+          "z": 5
+        },
+        {
+          "x": -5,
+          "y": 4,
+          "z": -5
+        }
+      ]
+    },
+    "greedy": {
+      "status": "timeout",
+      "score": 2,
+      "health": 3,
+      "moves": 70,
+      "firstActions": [
+        "up",
+        "down",
+        "up",
+        "down",
+        "up",
+        "down",
+        "up",
+        "down",
+        "up",
+        "down",
+        "up",
+        "down"
+      ]
+    },
+    "independentOracle": {
+      "moves": 10,
+      "actions": [
+        "down",
+        "east",
+        "east",
+        "east",
+        "up",
+        "west",
+        "down",
+        "west",
+        "west",
+        "up"
+      ],
+      "visited": 1144,
+      "result": {
+        "game": "orbital",
+        "seed": 7,
+        "tick": 10,
+        "score": 3,
+        "status": "won",
+        "reason": "All cores recovered; drone returned to beacon",
+        "rng": 768150900,
+        "drone": {
+          "x": 0,
+          "y": 2,
+          "z": 0
+        },
+        "health": 3,
+        "cores": [],
+        "hazards": [
+          {
+            "x": 1,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 3,
+            "z": 0
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "z": 5
+          },
+          {
+            "x": -5,
+            "y": 4,
+            "z": 5
+          },
+          {
+            "x": -5,
+            "y": 4,
+            "z": -5
+          }
+        ]
+      }
+    }
+  },
+  "docking": {
+    "ringPlaneState": {
+      "game": "orbital",
+      "seed": 7,
+      "tick": 1,
+      "score": 3,
+      "status": "playing",
+      "reason": "",
+      "rng": 768150900,
+      "drone": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "health": 3,
+      "cores": [],
+      "hazards": [
+        {
+          "x": 5,
+          "y": 4,
+          "z": 0
+        },
+        {
+          "x": 3,
+          "y": 4,
+          "z": -1
+        },
+        {
+          "x": 0,
+          "y": 4,
+          "z": -2
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "z": 3
+        },
+        {
+          "x": 4,
+          "y": 2,
+          "z": -4
+        }
+      ]
+    },
+    "actualDockState": {
+      "game": "orbital",
+      "seed": 7,
+      "tick": 3,
+      "score": 3,
+      "status": "won",
+      "reason": "All cores recovered; drone returned to beacon",
+      "rng": 768150900,
+      "drone": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      },
+      "health": 3,
+      "cores": [],
+      "hazards": [
+        {
+          "x": 5,
+          "y": 4,
+          "z": 0
+        },
+        {
+          "x": 3,
+          "y": 4,
+          "z": -1
+        },
+        {
+          "x": 0,
+          "y": 4,
+          "z": -2
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "z": 3
+        },
+        {
+          "x": 4,
+          "y": 2,
+          "z": -4
+        }
+      ]
+    }
+  },
+  "extraCodeOnlyProbe": {
+    "seeds": "integers 0..999",
+    "duplicateHazardSeeds": [
+      33,
+      72,
+      103,
+      110,
+      114,
+      150,
+      156,
+      192,
+      243,
+      248,
+      316,
+      348,
+      388,
+      561,
+      598,
+      659,
+      679,
+      691,
+      709,
+      747,
+      787,
+      836,
+      881,
+      889,
+      980,
+      997
+    ],
+    "greedyWins": 1000,
+    "greedyTimeouts": 0,
+    "notPublishedJevEvidence": true
+  },
+  "coverage": {
+    "episodes": 6,
+    "seeds": [
+      7,
+      19,
+      42
+    ],
+    "jevActions": 96,
+    "allActions": 192,
+    "jevServiceLatency": {
+      "median": 318,
+      "p95": 428,
+      "max": 1011
+    },
+    "physicalRequestsIdentifiable": false
+  }
+}

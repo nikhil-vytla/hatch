@@ -1,0 +1,101 @@
+{
+  "verified": true,
+  "episodes": 35,
+  "transitions": 611,
+  "modelDecisions": 291,
+  "maps": 33,
+  "pixels": 8448,
+  "acceptedRequests": 292,
+  "transportAttempts": 369,
+  "tetris": [
+    {
+      "policy": "goal",
+      "episodes": 5,
+      "meanPieces": 10.8,
+      "meanLines": 0,
+      "totalDecisions": 54,
+      "topOuts": 5,
+      "firstPlacementChoices": 0
+    },
+    {
+      "policy": "button",
+      "episodes": 5,
+      "meanPieces": 9.4,
+      "meanLines": 0,
+      "totalDecisions": 66,
+      "topOuts": 5,
+      "firstPlacementChoices": 0
+    },
+    {
+      "policy": "landing",
+      "episodes": 5,
+      "meanPieces": 9.8,
+      "meanLines": 0,
+      "totalDecisions": 49,
+      "topOuts": 5,
+      "firstPlacementChoices": 30
+    },
+    {
+      "policy": "outcome",
+      "episodes": 5,
+      "meanPieces": 11.4,
+      "meanLines": 0,
+      "totalDecisions": 57,
+      "topOuts": 5,
+      "firstPlacementChoices": 49
+    },
+    {
+      "policy": "lookahead",
+      "episodes": 5,
+      "meanPieces": 13,
+      "meanLines": 0,
+      "totalDecisions": 65,
+      "topOuts": 5,
+      "firstPlacementChoices": 50
+    },
+    {
+      "policy": "greedy",
+      "episodes": 5,
+      "meanPieces": 32,
+      "meanLines": 10.6,
+      "totalDecisions": 0,
+      "topOuts": 0,
+      "firstPlacementChoices": 10
+    },
+    {
+      "policy": "planner",
+      "episodes": 5,
+      "meanPieces": 32,
+      "meanLines": 11.4,
+      "totalDecisions": 0,
+      "topOuts": 0,
+      "firstPlacementChoices": 6
+    }
+  ],
+  "drawing": [
+    {
+      "method": "intensity",
+      "geometryCases": 6,
+      "meanIoU": 0.5733074974920819,
+      "meanPixelAccuracy": 0.8072916666666666
+    },
+    {
+      "method": "membership",
+      "geometryCases": 6,
+      "meanIoU": 0.5660581014856984,
+      "meanPixelAccuracy": 0.767578125
+    },
+    {
+      "method": "formula",
+      "geometryCases": 6,
+      "meanIoU": 0.6223330919857918,
+      "meanPixelAccuracy": 0.8444010416666666
+    },
+    {
+      "method": "scanline",
+      "geometryCases": 6,
+      "meanIoU": 0.5197247743457393,
+      "meanPixelAccuracy": 0.7649739583333334
+    }
+  ]
+}
