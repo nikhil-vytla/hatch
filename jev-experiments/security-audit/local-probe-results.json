@@ -1,0 +1,24 @@
+{
+  "network": "Every provider request was intercepted; no live API calls.",
+  "auth_checks": "Missing and incorrect credentials rejected; correct synthetic token accepted.",
+  "extra_fields": {
+    "model_override_forwarded": true,
+    "extra_gateway_options_forwarded": true,
+    "provider_acceptance_tested": false
+  },
+  "sequential_evaluations": {
+    "sent": 100,
+    "accepted": 100,
+    "context": "One local handler instance; mocked provider."
+  },
+  "concurrent_compositions": {
+    "sent": 8,
+    "simultaneous_mock_provider_calls": 8,
+    "context": "No production load test was performed."
+  },
+  "companion_url": {
+    "query_sent_to_provider": true,
+    "fragment_sent_to_provider": true,
+    "fixture": "https://forms.example/reset?token=AUDIT_QUERY_SENTINEL#AUDIT_FRAGMENT_SENTINEL"
+  }
+}
