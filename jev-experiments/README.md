@@ -54,13 +54,13 @@ Small authored routing, search, beverage, UI, and verifier fixtures establish th
 
 The final small reruns answered 5/5 search cases correctly, 20/20 verifier variants correctly, 19/20 routing cases correctly with one request failure, and 23/24 beverage cases correctly with one request failure. Earlier runs were dominated by overload errors. Both attempts appear in the run history, so these improved completion rates should not be mistaken for an improvement to the model itself.
 
-The latest optimization and navigation tables are in the app and in [optimization results](results/optimize.json) and [navigation results](results/games.json). Navigation uses exact-state decision caching, including history for the memory policy. Every step records cache use. Shared decisions mean the 30-seed episodes are not independent fresh model samples. All policies use the same partial observations and a 64-step limit.
+The latest optimization and navigation tables are in the app and in [optimization results](results/optimize.jsonl) and [navigation results](results/games.jsonl). Navigation uses exact-state decision caching, including history for the memory policy. Every step records cache use. Shared decisions mean the 30-seed episodes are not independent fresh model samples. All policies use the same partial observations and a 64-step limit.
 
 All 240 navigation episodes completed. In the empty room, success was 70% for random actions, 100% for visible BFS, 0% for reactive Jev, and 100% for Jev with recent actions. In DoorKey, success was 6.7%, 100%, 46.7%, and 96.7% respectively; the memory policy had one request failure. The empty-room task repeats the same layout across seeds, and cached judgments are shared. This is evidence that recent actions can break a policy's loops in this tiny environment, not evidence of general planning ability. The exact geometric baseline remains better. The run used 419 distinct cached request states and reused decisions on 3,886 steps.
 
 ## Evidence and reproducibility
 
-`results/*.json` contains the published measurements, source pins, split IDs, distributions, failures, and model metadata. `results/history.json` lists failed, interrupted, and superseded runs. The gallery selects the latest complete or partial run; it does not silently reinterpret a missing result as success. A separate Gemini pass reused existing Qwen candidates and Jev choices, and a corrected GEPA run reused completed validation searches without changing their prompts from test outcomes.
+`results/*.jsonl` contains the published measurements, source pins, split IDs, distributions, failures, and model metadata. `results/history.jsonl` lists failed, interrupted, and superseded runs. The gallery selects the latest complete or partial run; it does not silently reinterpret a missing result as success. A separate Gemini pass reused existing Qwen candidates and Jev choices, and a corrected GEPA run reused completed validation searches without changing their prompts from test outcomes.
 
 Navigation publication removes duplicated observations without dropping frames: `frame.state_id` indexes the result's `observations` array. This keeps the complete replay small enough to load comfortably. Local `runs/` files retain the original expanded traces.
 
@@ -115,18 +115,20 @@ Typed adapter code lives under `adapters/`. Each compiler accepts a deliberate s
 
 ## Deployment and validation
 
-The production URL is [jev-experiments.vercel.app](https://jev-experiments.vercel.app). Replay is public. Live calls require the separate private lab token, stored locally in `.cache/live-access-token` with mode 0600. Paste it into "Unlock live calls"; it stays in browser session storage. The token and gateway key are sensitive Vercel environment variables. Neither is part of the repository.
+The production URL is [jev-experiments.vercel.app](https://jev-experiments.vercel.app), deployed from `experience-prototypes/`. Replay is public. Select **Connect live** and enter your own Vercel AI Gateway API key. The playground holds the key only in page memory, clearing it on reload or disconnect. Requests pass through the app to Vercel AI Gateway with that key; deployed handlers never fall back to an environment key. Live inputs are not added to the published benchmark.
 
-The function validates request sizes, supported types, returned distributions, and authorization. It limits requests per warm function instance. Those limits are not a durable global quota, and production live calls do not pass through the local research ledger. The gateway account's own limits still apply. Live browser inputs are not added to the published benchmark.
+The function validates request sizes, supported types, and returned distributions. There are no shared usage limits in this PR. The visitor's gateway account handles its own billing and provider limits. Recorded evidence is stored in JSONL and reconstructed into ordinary JSON for the site and downloads, with a reviewed publication manifest.
 
 ```sh
-.venv/bin/jev-lab deploy
-.venv/bin/jev-lab cloudcheck
+cd experience-prototypes
+bun run deploy
+# Uses your authorized local key as an ordinary caller:
+bun scripts/cloudcheck.ts
 ```
 
-The deployment command uses Bun and the Vercel CLI. A new Vercel project needs `deploy --configure` to set its two secrets through stdin. This project's private GitHub connection was unavailable, so deployment uses the local project rather than a Git integration.
+The deployment command uses Bun and pins the established Vercel project. No server-side model credentials are needed. `jev-lab deploy` delegates to the same command.
 
-Validation includes Python contract, budget, mask, reward-update, and sklearn/browser parity tests; TypeScript adapter tests and compilation; Rust and Go tests; and the production build. Browser checks exercised desktop/mobile layouts, local inference, local vision and writing, and interactive controls. Production checks returned 401 without a token, 400 for malformed authorized input, and 200 for a valid authorized judgment. See [NOTES.md](NOTES.md) for changes and observed failures, and [architecture decisions](agents/adrs/README.md) for the reasoning behind the experiment design.
+Validation includes Python contract, budget, mask, reward-update, and sklearn/browser parity tests; TypeScript adapter tests and compilation; Rust and Go tests; and the production build. Browser checks exercised desktop/mobile layouts, local inference, local vision and writing, and interactive controls. Current merge-readiness checks cover caller-key isolation, missing-key rejection, malformed input, production inference, and JSONL reconstruction. See [NOTES.md](NOTES.md) for changes and observed failures, and [architecture decisions](agents/adrs/README.md) for the reasoning behind the experiment design.
 
 ```sh
 .venv/bin/pytest -q

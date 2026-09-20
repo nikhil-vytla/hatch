@@ -1,9 +1,9 @@
+import { readRecord, writeRecord } from "./records";
 import "./credentials";
-import { readFileSync, writeFileSync } from "node:fs";
-import { evaluate } from "../server/gateway";
+import { evaluate } from "./local-model";
 import { pixelQuestions } from "../src/creative";
-const path = "results/visuals.json",
-  doc = JSON.parse(readFileSync(path, "utf8"));
+const path = "results/visuals.jsonl",
+  doc = readRecord(path);
 doc.result.compositions ??= [];
 for (const [mode, brief] of [
   [
@@ -36,6 +36,6 @@ for (const [mode, brief] of [
     ]),
   );
   doc.result.compositions.push({ mode, brief, plan, ...response });
-  writeFileSync(path, JSON.stringify(doc, null, 2));
+  writeRecord(path, doc);
   console.log(mode + " composition saved");
 }

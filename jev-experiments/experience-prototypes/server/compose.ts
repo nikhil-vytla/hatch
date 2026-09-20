@@ -1,9 +1,27 @@
 import { experimental_composeSpec } from "@json-render/core";
 import { uiCatalog, uiCandidates, uiInitial } from "../src/ui-catalog.js";
-import { evaluate } from "./gateway.js";
-export async function* compose(body: any, signal: AbortSignal) {
-  if (typeof body?.prompt !== "string" || body.prompt.length > 4000)
-    throw new Error("Supply a prompt under 4000 characters.");
+import { evaluate, GatewayError } from "./gateway.js";
+export async function* compose(body: any, signal: AbortSignal, apiKey: string) {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    Object.keys(body).some(
+      (key) => !["prompt", "domain", "strategy", "state", "spec"].includes(key),
+    ) ||
+    Buffer.byteLength(JSON.stringify(body)) > 100000 ||
+    (body.domain !== undefined &&
+      !["settings", "apartments", "event"].includes(body.domain)) ||
+    (body.strategy !== undefined &&
+      !["sequential", "batched"].includes(body.strategy))
+  )
+    throw new GatewayError("Invalid composition request.", 400);
+  if (
+    typeof body.prompt !== "string" ||
+    !body.prompt.trim() ||
+    body.prompt.length > 4000
+  )
+    throw new GatewayError("Supply a prompt under 4000 characters.", 400);
   yield* experimental_composeSpec({
     catalog: uiCatalog,
     candidates: uiCandidates(body.domain ?? "settings"),
@@ -14,7 +32,7 @@ export async function* compose(body: any, signal: AbortSignal) {
     evaluate: async ({ state, questions, signal }) => {
       const r = await evaluate(
         { state, questions },
-        { signal, deadlineMs: 22000 },
+        { apiKey, signal, deadlineMs: 22000 },
       );
       return {
         answers: Object.fromEntries(

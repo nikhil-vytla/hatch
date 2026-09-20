@@ -51,7 +51,7 @@ The API retry loop is bounded and the batch worker resumes from files. This prot
 
 ## Components reused and findings
 
-- [json-render](https://json-render.dev/docs/jev), pinned at 0.21.0, supplies the catalog, schema checks, composition loop, renderer, state bindings, and action contract. Its documentation still calls the APIs unreleased, but the installed 0.21.0 package exports them. We supply a native Jev Gateway adapter and original React components. A batched layout produced an unreachable tree; sequential composition was inspectable. Apartment generation improved after the catalog offered complete apartment cards instead of independent rent/button fragments. Earlier partial attempts remain in `results/composed-ui.json`.
+- [json-render](https://json-render.dev/docs/jev), pinned at 0.21.0, supplies the catalog, schema checks, composition loop, renderer, state bindings, and action contract. Its documentation still calls the APIs unreleased, but the installed 0.21.0 package exports them. We supply a native Jev Gateway adapter and original React components. A batched layout produced an unreachable tree; sequential composition was inspectable. Apartment generation improved after the catalog offered complete apartment cards instead of independent rent/button fragments. Earlier partial attempts remain in `results/composed-ui.jsonl`.
 - [TanStack Table](https://tanstack.com/table/latest/docs/introduction) handles table mechanics. Jev contributes semantic cells rather than replacing sorting or table state.
 - [React Flow](https://reactflow.dev/learn) renders the routing and verification handoffs. A diagram of a route is not evidence that the downstream task succeeded, so those claims stay separate.
 - [Tone.js](https://tonejs.github.io/) supplies audio scheduling and synthesis; [@tonejs/midi](https://github.com/Tonejs/Midi) supplies MIDI encoding. Motion supplies animated layout changes. These libraries do the mechanical work; the model contributes bounded decisions.
@@ -78,7 +78,9 @@ bun install --frozen-lockfile
 bun start
 ```
 
-The app runs on port 5191 and its API on 8793. Existing local credentials are read privately from the authorized zshrc and the parent lab's private access-token file. Environment variables `AI_GATEWAY_API_KEY` and `LAB_ACCESS_TOKEN` can be supplied instead. Public visitors can use recorded examples; live calls require the private lab token. No gateway key is bundled into the client or extension.
+The app runs on port 5191 and its API binds to `127.0.0.1:8793`. Recorded examples are public. Live calls accept the visitor's own [Vercel AI Gateway API key](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys), kept only in browser memory until reload or disconnect. The app forwards that key per request to the fixed Jev endpoint without saving it. Deployed handlers never load environment credentials. Recording CLIs alone read `AI_GATEWAY_API_KEY` or the authorized literal assignment in zshrc. The companion explicitly saves the visitor's key in trusted extension storage and provides Disconnect.
+
+Evidence is committed as `jev-records-v1` JSONL. The first line holds document metadata with empty arrays; subsequent lines contain `{path, index, value}` entries, one array item per line. `scripts/records.ts` and `../src/jev_lab/records.py` reconstruct the original document. `publication.json` explicitly lists the 33 public results. `bun run build` emits ordinary `/data/*.json` files; UI rendering and JSON downloads retain complete evidence. Unlisted public data files fail the build.
 
 ```sh
 bun run build
@@ -90,14 +92,14 @@ bun scripts/record-pixels.ts
 bun run deploy
 ```
 
-`bun run deploy` pins the existing Vercel project, builds the prepared evidence locally, and deploys production. Production credentials are already configured on that project.
+`bun run deploy` pins the existing Vercel project, builds the prepared evidence locally, and deploys production. Visitors supply their own gateway keys; deployment needs no model credentials.
 
-Preparation overlays new results onto the original lab's records and joins full inputs from pinned upstream datasets. Local recovery/metric recomputation needs the parent lab's request logs, dataset cache, and Python environment. A fresh checkout can use the original lab's documented dataset preparation to restore that cache. Vercel uploads prepared `public/data`; it does not fetch repositories or run training during the build. `public/data`, dependencies, provider credentials, caches, and upstream checkouts are excluded from the commit.
+Preparation reconstructs the files listed in `publication.json`, including full benchmark inputs already embedded in the evidence. Local recovery/metric recomputation needs the parent lab's request logs, dataset cache, and Python environment. A fresh checkout can build and browse all evidence without that cache. Rerunning recovery still requires its original local request logs. Vercel uploads prepared `public/data`; it does not fetch repositories or run training during the build. `public/data`, dependencies, provider credentials, caches, and upstream checkouts are excluded from the commit.
 
 ## Validation
 
 - TypeScript and Vite production build pass with Bun.
-- Six retry/validation tests pass, covering 19 assertions.
+- Seventeen focused tests pass, covering 127 assertions, including caller-key isolation, companion privacy, retries, and JSONL interoperability.
 - All 29 experiment pages opened in a real browser without JavaScript exceptions at desktop width. No horizontal overflow appeared at 1440px or 390px.
 - Real deployed checks returned 401 for anonymous calls, 400 for an invalid authenticated payload, and 200 for a live Jev judgment. A streamed interface revision finished in 832 ms, removed the requested switch, and preserved an edited form value; this is one observation, not a latency benchmark.
 - The evidence audit confirms all 200 JudgeBench cases include both full candidates and verifies original completed predictions were not replaced.

@@ -1,0 +1,235 @@
+{
+  "files": 38,
+  "all_round_trips_equal": true,
+  "predictions_unchanged": true,
+  "details": [
+    {
+      "file": "experience-prototypes/results/changes.jsonl",
+      "records": 1,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/classify.jsonl",
+      "records": 2546,
+      "unchanged_values": false,
+      "retained_published_input_text": true
+    },
+    {
+      "file": "experience-prototypes/results/cloudcheck.jsonl",
+      "records": 3,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/composed-ui.jsonl",
+      "records": 6,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/evidence-audit.jsonl",
+      "records": 0,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/journeys.jsonl",
+      "records": 129,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/judge.jsonl",
+      "records": 254,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/paste.jsonl",
+      "records": 3,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/robustness.jsonl",
+      "records": 392,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/routing.jsonl",
+      "records": 43,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/semantic-table.jsonl",
+      "records": 1,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/undo.jsonl",
+      "records": 1,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "experience-prototypes/results/visuals.jsonl",
+      "records": 53,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/adapters.jsonl",
+      "records": 7,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/beverage.jsonl",
+      "records": 37,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/classify.jsonl",
+      "records": 2395,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/decisions.jsonl",
+      "records": 21,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/deployment-check.jsonl",
+      "records": 0,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/games.jsonl",
+      "records": 380,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/history.jsonl",
+      "records": 39,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/index.jsonl",
+      "records": 3,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/judge.jsonl",
+      "records": 214,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/language.jsonl",
+      "records": 70,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/latency.jsonl",
+      "records": 135,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/logos.jsonl",
+      "records": 7,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/micro.jsonl",
+      "records": 4,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/music.jsonl",
+      "records": 9,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/optimize.jsonl",
+      "records": 477,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/replica.jsonl",
+      "records": 260,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/reward.jsonl",
+      "records": 155,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/robustness.jsonl",
+      "records": 266,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/routing.jsonl",
+      "records": 32,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/search.jsonl",
+      "records": 8,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/teach.jsonl",
+      "records": 313,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/ui.jsonl",
+      "records": 21,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/verify.jsonl",
+      "records": 34,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/vision.jsonl",
+      "records": 1,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    },
+    {
+      "file": "results/visuals.jsonl",
+      "records": 25,
+      "unchanged_values": true,
+      "retained_published_input_text": false
+    }
+  ]
+}

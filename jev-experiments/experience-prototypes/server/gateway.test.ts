@@ -26,6 +26,7 @@ test("429 waits for Retry-After and records attempts separately from the answer"
   let calls = 0;
   const waits: number[] = [];
   const result = await evaluate(payload, {
+    apiKey: "caller-owned-key",
     fetcher: (async () =>
       ++calls === 1
         ? new Response("", { status: 429, headers: { "Retry-After": "2" } })
@@ -43,6 +44,7 @@ test("authorization rejection is not retried", async () => {
   let calls = 0;
   await expect(
     evaluate(payload, {
+      apiKey: "caller-owned-key",
       fetcher: (async () => {
         calls++;
         return new Response("", { status: 403 });
@@ -55,6 +57,7 @@ test("a cooldown exceeding the deadline is returned for later resumption", async
   let waits = 0;
   await expect(
     evaluate(payload, {
+      apiKey: "caller-owned-key",
       fetcher: (async () =>
         new Response("", {
           status: 429,
@@ -71,6 +74,7 @@ test("a cooldown exceeding the deadline is returned for later resumption", async
 test("network failure may retry, but an explicit cancellation stops", async () => {
   let calls = 0;
   const result = await evaluate(payload, {
+    apiKey: "caller-owned-key",
     fetcher: (async () => {
       if (++calls === 1) throw new TypeError("network");
       return ok();
@@ -82,6 +86,7 @@ test("network failure may retry, but an explicit cancellation stops", async () =
   controller.abort();
   await expect(
     evaluate(payload, {
+      apiKey: "caller-owned-key",
       signal: controller.signal,
       fetcher: (async () => {
         throw new Error("must not fetch");
@@ -98,6 +103,7 @@ test("malformed model answers remain inspectable failures, never silently reroll
     let calls = 0;
     await expect(
       evaluate(payload, {
+        apiKey: "caller-owned-key",
         fetcher: (async () => {
           calls++;
           return Response.json({ answers: { greeting: data } });

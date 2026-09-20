@@ -1,14 +1,24 @@
 const $ = (id) => document.getElementById(id);
 const status = (text) => ($("status").textContent = text);
+await chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+await chrome.storage.local.remove("token");
 const stored = await chrome.storage.local.get([
   "source",
   "sourceUrl",
   "memory",
   "useMemory",
   "endpoint",
-  "token",
+  "apiKey",
 ]);
-for (const key of ["source", "memory", "endpoint", "token"])
+if (stored.sourceUrl) {
+  try {
+    stored.sourceUrl = new URL(stored.sourceUrl).origin;
+  } catch {
+    stored.sourceUrl = "";
+  }
+  await chrome.storage.local.set({ sourceUrl: stored.sourceUrl });
+}
+for (const key of ["source", "memory", "endpoint", "apiKey"])
   if (stored[key]) $(key).value = stored[key];
 $("sourceUrl").textContent = stored.sourceUrl || "No page captured yet";
 $("useMemory").checked = !!stored.useMemory;
@@ -25,10 +35,11 @@ $("capture").onclick = async () => {
     });
     if (!result.trim()) return status("Select text on the page first.");
     $("source").value = result.slice(0, 30000);
-    $("sourceUrl").textContent = tab.url;
+    const sourceOrigin = new URL(tab.url).origin;
+    $("sourceUrl").textContent = sourceOrigin;
     await chrome.storage.local.set({
       source: $("source").value,
-      sourceUrl: tab.url,
+      sourceUrl: sourceOrigin,
     });
     status("Selection captured. Open the destination page.");
   } catch (e) {
@@ -51,16 +62,23 @@ $("connect").onclick = async () => {
       !/^http:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(endpoint)
     )
       throw new Error("Use HTTPS or localhost.");
+    if (!$("apiKey").value.trim())
+      throw new Error("Enter your Vercel AI Gateway API key.");
     if (!(await chrome.permissions.request({ origins: [`${endpoint}/*`] })))
       return status("Connection permission was not granted.");
     await chrome.storage.local.set({
       endpoint,
-      token: $("token").value.trim(),
+      apiKey: $("apiKey").value.trim(),
     });
     status("Connected.");
   } catch (e) {
     status(e.message);
   }
+};
+$("disconnect").onclick = async () => {
+  await chrome.storage.local.remove(["endpoint", "apiKey"]);
+  $("apiKey").value = "";
+  status("Disconnected. The saved API key was removed.");
 };
 async function suggest(mode) {
   try {

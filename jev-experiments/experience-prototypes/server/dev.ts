@@ -1,33 +1,18 @@
-import { readFileSync, existsSync } from "node:fs";
-import { homedir } from "node:os";
 import evaluateHandler from "../api/evaluate";
-import { authorize } from "./gateway";
+import { apiKeyFromHeader, GatewayError } from "./gateway";
 import { compose } from "./compose";
-if (!process.env.AI_GATEWAY_API_KEY) {
-  const line = readFileSync(homedir() + "/.zshrc", "utf8")
-    .split("\n")
-    .find((l) => /^\s*(export\s+)?AI_GATEWAY_API_KEY\s*=/.test(l));
-  if (line) {
-    const v = line
-      .replace(/^\s*(export\s+)?AI_GATEWAY_API_KEY\s*=\s*/, "")
-      .trim()
-      .replace(/^['"]|['"]$/g, "");
-    if (!/[$`;]/.test(v)) process.env.AI_GATEWAY_API_KEY = v;
-  }
-}
-if (!process.env.LAB_ACCESS_TOKEN && existsSync("../.cache/live-access-token"))
-  process.env.LAB_ACCESS_TOKEN = readFileSync(
-    "../.cache/live-access-token",
-    "utf8",
-  ).trim();
 Bun.serve({
+  hostname: "127.0.0.1",
   port: 8793,
   async fetch(req) {
+    if (!["POST", "OPTIONS"].includes(req.method))
+      return Response.json({ error: "Use POST." }, { status: 405 });
     if (req.method === "OPTIONS") return new Response(null, { status: 204 });
     if (new URL(req.url).pathname === "/api/compose") {
-      if (!authorize(req.headers.get("authorization") ?? undefined))
+      const apiKey = apiKeyFromHeader(req.headers.get("authorization"));
+      if (!apiKey)
         return Response.json(
-          { error: "Enter the private lab token." },
+          { error: "Enter your Vercel AI Gateway API key to run live." },
           { status: 401 },
         );
       const body = await req.json();
@@ -35,12 +20,18 @@ Bun.serve({
         new ReadableStream({
           async start(c) {
             try {
-              for await (const e of compose(body, req.signal))
+              for await (const e of compose(body, req.signal, apiKey))
                 c.enqueue(new TextEncoder().encode(JSON.stringify(e) + "\n"));
             } catch (e) {
               c.enqueue(
                 new TextEncoder().encode(
-                  JSON.stringify({ type: "error", error: String(e) }) + "\n",
+                  JSON.stringify({
+                    type: "error",
+                    error:
+                      e instanceof GatewayError
+                        ? e.message
+                        : "Composition interrupted.",
+                  }) + "\n",
                 ),
               );
             } finally {
@@ -78,5 +69,5 @@ Bun.serve({
   },
 });
 console.log(
-  "Jev API listening on http://127.0.0.1:8793. Credentials loaded privately.",
+  "Jev API listening on http://127.0.0.1:8793. Live requests use the caller’s API key.",
 );

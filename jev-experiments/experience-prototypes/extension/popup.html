@@ -92,19 +92,20 @@
   <details>
     <summary>Connection</summary>
     <label
-      >Lab URL<input
+      >Playground URL<input
         id="endpoint"
         type="url"
         value="https://jev-experiments.vercel.app" /></label
     ><label
-      >Private lab access token<input
-        id="token"
+      >Vercel AI Gateway API key<input
+        id="apiKey"
         type="password"
         autocomplete="off" /></label
-    ><button id="connect">Connect</button
+    ><button id="connect">Connect</button><button id="disconnect">Disconnect</button
     ><small
-      >Only the lab token is stored here. The gateway key stays on the
-      server.</small
+      >Your API key is saved in this browser’s extension storage. Requests
+      pass through the selected playground to Vercel AI Gateway. Disconnect
+      removes the saved key.</small
     >
   </details>
   <button id="clear">Clear captured information and notes</button>

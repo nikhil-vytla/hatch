@@ -2,6 +2,13 @@
 
 Audited PR #54 at `f6926cc548682df8ac5921b09c02d5ad0f0aed13` on September 20, 2026. The user's priority is exposed credentials and reachable attack paths. This is an audit and a proposed data-format measurement; application code, result formats, and the deployment have not been changed.
 
+
+## Remediation update for PR #54
+
+The findings below describe the original `f6926cc` deployment. The [merge-readiness report](../merge-readiness/README.md) tracks the fixes and current verification. Live requests now use each visitor's own Vercel AI Gateway key, with no server-environment fallback. The website keeps keys in memory; the extension stores the visitor's key in trusted extension storage and provides Disconnect. Payload forwarding is restricted, page URLs are omitted from model requests, the development server binds to loopback, public data has an explicit allowlist, and framing is blocked. Shared limits are deliberately out of scope at the user's direction.
+
+All 38 result files have been converted to JSONL, while the 33 published JSON documents retain their original values and complete benchmark text. The original audit evidence and line counts below remain historical; current measurements are recorded separately. `local-probes.ts` now runs the remediation tests; the original reproduction code is preserved at commit `49a46b7`.
+
 ## Where the diff comes from
 
 The PR adds 177 files, 284,666 text lines, and 14.95 MB of file content. Recorded JSON results account for **260,219 lines, or 91.4%**. The large count mostly comes from pretty-printing probability distributions, case records, transport metadata, and individual game frames across many lines. The earlier application and the rebuilt application are both retained, as are original and recovered result snapshots.
@@ -104,4 +111,4 @@ bun jev-experiments/security-audit/public-surface.ts
 
 The local probes use fake credentials and intercept every provider request. The secret scan reads the owner's authorized local credentials privately and reports only counts and filenames. Public-surface checks make small unauthenticated requests to the authorized app. The existing six gateway tests also pass, covering 19 assertions.
 
-Machine-readable evidence is in `diff-breakdown.json`, `jsonl-estimate.json`, `local-probe-results.json`, `secret-scan-results.json`, `public-surface-results.json`, and the three small npm audit outputs. Findings remain open; remediation should be verified with regression checks before merge.
+Machine-readable evidence is in `diff-breakdown.json`, `jsonl-estimate.json`, `local-probe-results.json`, `secret-scan-results.json`, `public-surface-results.json`, and the three small npm audit outputs. These artifacts describe the original audit. See the linked merge-readiness report for remediation checks.

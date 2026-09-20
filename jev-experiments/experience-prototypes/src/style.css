@@ -3431,3 +3431,8 @@ nav a {
     padding: 13px;
   }
 }
+
+.key-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.key-privacy { font-size: 12px; line-height: 1.6; }
+.key-privacy a { white-space: nowrap; text-decoration: underline; }
+.key-privacy svg { display: inline; vertical-align: middle; }

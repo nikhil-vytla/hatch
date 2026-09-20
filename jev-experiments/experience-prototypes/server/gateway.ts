@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 export type Question = {
   type: "choice" | "noul" | "score";
   instructions: string;
@@ -15,23 +14,23 @@ export class GatewayError extends Error {
     super(message);
   }
 }
-export function authorize(header: string | undefined) {
-  const expected = process.env.LAB_ACCESS_TOKEN;
-  const supplied = (header || "").replace(/^Bearer /, "");
-  return (
-    !!expected &&
-    Buffer.byteLength(expected) === Buffer.byteLength(supplied) &&
-    timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))
-  );
+export function apiKeyFromHeader(header: unknown): string {
+  if (typeof header !== "string" || !header.startsWith("Bearer ")) return "";
+  const supplied = header.slice(7);
+  return supplied.length <= 8192 && /^[!-~]+$/.test(supplied) ? supplied : "";
 }
 export function validate(body: unknown): asserts body is Payload {
   const b = body as Payload;
   if (
     !b ||
+    typeof b !== "object" ||
+    Array.isArray(b) ||
+    Object.keys(b).some((key) => !["state", "questions"].includes(key)) ||
     b.state === undefined ||
     !b.questions ||
+    typeof b.questions !== "object" ||
     Array.isArray(b.questions) ||
-    JSON.stringify(b).length > 100000 ||
+    Buffer.byteLength(JSON.stringify(b)) > 100000 ||
     Object.keys(b.questions).length < 1 ||
     Object.keys(b.questions).length > 128
   )
@@ -42,6 +41,12 @@ export function validate(body: unknown): asserts body is Payload {
   for (const q of Object.values(b.questions)) {
     if (
       !q ||
+      typeof q !== "object" ||
+      Array.isArray(q) ||
+      Object.keys(q).some(
+        (key) => !["type", "instructions", "criteria"].includes(key),
+      ) ||
+      (q.type === "noul" && q.criteria !== undefined) ||
       !["choice", "noul", "score"].includes(q.type) ||
       typeof q.instructions !== "string" ||
       !q.instructions.length ||
@@ -88,16 +93,21 @@ const transient = new Set([408, 429, 500, 502, 503, 504]);
 export async function evaluate(
   body: Payload,
   options: {
+    apiKey: string;
     signal?: AbortSignal;
     fetcher?: typeof fetch;
     wait?: (ms: number, signal?: AbortSignal) => Promise<void>;
     deadlineMs?: number;
     onAttempt?: (a: any) => void;
-  } = {},
+  },
 ) {
   validate(body);
-  const key = process.env.AI_GATEWAY_API_KEY;
-  if (!key) throw new GatewayError("Gateway is not configured.", 503);
+  const key = apiKeyFromHeader(`Bearer ${options.apiKey ?? ""}`);
+  if (!key)
+    throw new GatewayError(
+      "Enter your Vercel AI Gateway API key to run live.",
+      401,
+    );
   const started = Date.now(),
     end = started + (options.deadlineMs ?? 48000),
     attempts: any[] = [];
@@ -136,7 +146,11 @@ export async function evaluate(
             Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ model: "typesafe-ai/jev", ...body }),
+          body: JSON.stringify({
+            model: "typesafe-ai/jev",
+            state: body.state,
+            questions: body.questions,
+          }),
           signal,
         },
       );
@@ -153,7 +167,9 @@ export async function evaluate(
       if (!response.ok) {
         if (!transient.has(response.status))
           throw new GatewayError(
-            `Gateway rejected the request (${response.status}).`,
+            response.status === 401 || response.status === 403
+              ? "Vercel AI Gateway rejected this API key. Check the key and its access to Jev."
+              : `Gateway rejected the request (${response.status}).`,
             response.status,
             attempts,
           );

@@ -1,0 +1,92 @@
+{
+  "at": "2026-09-20T08:51:40.000Z",
+  "origin": "https://jev-experiments.vercel.app",
+  "results": [
+    {
+      "path": "/.env",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/.env.local",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/.git/config",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/.vercel/project.json",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/server/gateway.ts",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/scripts/credentials.ts",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/data/access.json",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/data/smoke.json",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "GET",
+      "status": 405
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "POST",
+      "credentials": "absent",
+      "status": 401
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "POST",
+      "credentials": "malformed",
+      "status": 401
+    },
+    {
+      "path": "/api/compose",
+      "method": "GET",
+      "status": 405
+    },
+    {
+      "path": "/api/compose",
+      "method": "POST",
+      "credentials": "absent",
+      "status": 401
+    },
+    {
+      "path": "/api/compose",
+      "method": "POST",
+      "credentials": "malformed",
+      "status": 401
+    },
+    {
+      "path": "/api/evaluate",
+      "credentials": "invalid caller key",
+      "status": 401,
+      "attempts": 1
+    }
+  ],
+  "headers": {
+    "content-security-policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+    "x-frame-options": "DENY",
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "strict-origin-when-cross-origin"
+  }
+}

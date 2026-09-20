@@ -48,6 +48,10 @@ def digest(value: Any) -> str:
 
 
 def save(path: Path, value: Any) -> None:
+    if path.suffix == ".jsonl":
+        from .records import write_record
+        write_record(path, value)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + f".{uuid.uuid4().hex}.tmp")
     tmp.write_text(json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + "\n")

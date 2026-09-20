@@ -1,12 +1,8 @@
+import { readRecord, writeRecord } from "./records";
 import "./credentials";
-import {
-  writeFileSync,
-  existsSync,
-  readFileSync,
-  appendFileSync,
-} from "node:fs";
-import { evaluate } from "../server/gateway";
-import { compose } from "../server/compose";
+import { existsSync } from "node:fs";
+import { evaluate } from "./local-model";
+import { compose } from "./local-model";
 import {
   pasteSources,
   pasteFields,
@@ -20,23 +16,16 @@ import {
 import { judge } from "../src/api";
 const dir = "results";
 const save = (name: string, result: unknown) =>
-  writeFileSync(
-    `${dir}/${name}.json`,
-    JSON.stringify(
-      {
-        manifest: {
-          experiment: name,
-          created: new Date().toISOString(),
-          status: "complete",
-        },
-        result,
-      },
-      null,
-      2,
-    ),
-  );
+  writeRecord(`${dir}/${name}.jsonl`, {
+    manifest: {
+      experiment: name,
+      created: new Date().toISOString(),
+      status: "complete",
+    },
+    result,
+  });
 const job = async (name: string, fn: () => Promise<void>) => {
-  if (existsSync(`${dir}/${name}.json`)) {
+  if (existsSync(`${dir}/${name}.jsonl`)) {
     console.log(name + ": checkpoint exists");
     return;
   }
@@ -119,10 +108,8 @@ await job("changes", async () =>
   ),
 );
 {
-  const path = "results/composed-ui.json";
-  const previous = existsSync(path)
-    ? JSON.parse(readFileSync(path, "utf8")).result
-    : { rows: [] };
+  const path = "results/composed-ui.jsonl";
+  const previous = existsSync(path) ? readRecord(path).result : { rows: [] };
   const rows = [];
   for (const [domain, prompt] of [
     [
