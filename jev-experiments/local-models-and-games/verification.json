@@ -1,0 +1,24 @@
+{
+  "build": "bun run build passed",
+  "bun_tests": 23,
+  "python_metric_tests": 3,
+  "mlx_pytorch_port": "passed; maximum absolute logit difference 0.000017524",
+  "shared_cache_checks": 16,
+  "question_order_probability_difference": 0,
+  "coreml_full_test_decisions": 2000,
+  "coreml_mlx_argmax_differences": 60,
+  "coreml_max_probability_difference": 0.14228208597338587,
+  "local_and_public_recording_key_scan": "No configured recording key found",
+  "public_evidence": "All three new JSON files match production build exactly",
+  "keyless_production_evaluate_status": 401,
+  "browser": [
+    "Snake button and focused-keyboard controls",
+    "Keyless live-mode message",
+    "Model and workflow selectors; 100 cases per selected workflow",
+    "Research tabs and category filtering",
+    "Dark mode",
+    "390px and desktop document width matches viewport",
+    "Production Orbital WebGL canvas and animated replay advanced to move 7; console had zero errors or warnings"
+  ],
+  "pr": "https://github.com/nikhil-vytla/hatch/pull/56"
+}

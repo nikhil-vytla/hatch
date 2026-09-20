@@ -1,0 +1,35 @@
+{
+  "url": "https://jev-experiments.vercel.app",
+  "deployment": "dpl_FLCjtZyax8SwJMvqYR64HtpoGiRS",
+  "commit": "06a39cb8f67a81059429ec6f8facd1f2938160d2",
+  "verified_at": "2026-09-20T19:07:09.227Z",
+  "home_status": 200,
+  "keyless_evaluate_status": 401,
+  "public_recording_key_exposed": false,
+  "checks": [
+    {
+      "file": "/data/arcade.json",
+      "status": 200,
+      "sha256": "b79f41ae952ffd1df1e16f434fd38a60599c8bed04c964a14e518d2ff1fe556a",
+      "bytes": 278812,
+      "episodes": 12
+    },
+    {
+      "file": "/data/local-models.json",
+      "status": 200,
+      "sha256": "b4c27b914d678575dbb8fe574a58e77af74edc84a2eddc48360418799198d330",
+      "bytes": 2766762,
+      "cases": 400,
+      "variants": 10,
+      "decisions_per_variant": 2000
+    },
+    {
+      "file": "/data/research-map.json",
+      "status": 200,
+      "sha256": "a7e9aa27e37d01672552389a96a176123745bd7d9ec42e1848a7f95e372af6d1",
+      "bytes": 13639,
+      "benchmarks": 8,
+      "proposals": 12
+    }
+  ]
+}
