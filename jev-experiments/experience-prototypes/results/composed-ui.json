@@ -1,0 +1,1418 @@
+{
+  "manifest": {
+    "experiment": "composed-ui",
+    "created": "2026-09-20T08:00:02.711Z",
+    "status": "complete"
+  },
+  "result": {
+    "rows": [
+      {
+        "domain": "settings",
+        "prompt": "Create account settings with name, email, notifications, and a save button.",
+        "type": "complete",
+        "spec": {
+          "root": "node_0",
+          "elements": {
+            "node_0": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "large"
+              },
+              "children": [
+                "node_1"
+              ]
+            },
+            "node_1": {
+              "type": "Card",
+              "props": {
+                "title": "Make yourself at home",
+                "subtitle": "Your profile and preferences, in one place."
+              },
+              "children": [
+                "node_2"
+              ]
+            },
+            "node_2": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_3",
+                "node_4",
+                "node_5",
+                "node_7"
+              ]
+            },
+            "node_3": {
+              "type": "Input",
+              "props": {
+                "label": "Your name",
+                "value": {
+                  "$bindState": "/name"
+                },
+                "placeholder": "Your name"
+              },
+              "children": []
+            },
+            "node_4": {
+              "type": "Input",
+              "props": {
+                "label": "Email address",
+                "value": {
+                  "$bindState": "/email"
+                },
+                "placeholder": "you@example.com"
+              },
+              "children": []
+            },
+            "node_5": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_6"
+              ]
+            },
+            "node_6": {
+              "type": "Toggle",
+              "props": {
+                "label": "Email notifications",
+                "checked": {
+                  "$bindState": "/notifications"
+                }
+              },
+              "children": []
+            },
+            "node_7": {
+              "type": "Button",
+              "props": {
+                "label": "Save changes",
+                "variant": "primary"
+              },
+              "on": {
+                "press": {
+                  "action": "save",
+                  "params": {}
+                }
+              },
+              "children": []
+            }
+          },
+          "state": {
+            "name": "Alex Morgan",
+            "email": "alex@example.com",
+            "city": "San Francisco",
+            "notifications": true,
+            "budget": "2400",
+            "commute": "30 minutes",
+            "guests": "24",
+            "event": "Dinner in the garden",
+            "dietary": "Vegetarian"
+          }
+        },
+        "steps": [
+          {
+            "index": 0,
+            "choice": "canvas",
+            "description": "The root vertical page layout",
+            "parent": null,
+            "slot": null,
+            "confidence": 0.95,
+            "parentConfidence": null,
+            "elapsedMs": 492,
+            "inputTokens": null
+          },
+          {
+            "index": 1,
+            "choice": "form",
+            "description": "Account preferences form",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.87,
+            "parentConfidence": null,
+            "elapsedMs": 330,
+            "inputTokens": null
+          },
+          {
+            "index": 2,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_1",
+            "slot": "default",
+            "confidence": 0.56,
+            "parentConfidence": 1,
+            "elapsedMs": 243,
+            "inputTokens": null
+          },
+          {
+            "index": 3,
+            "choice": "name",
+            "description": "Editable name field",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.78,
+            "parentConfidence": 1,
+            "elapsedMs": 317,
+            "inputTokens": null
+          },
+          {
+            "index": 4,
+            "choice": "email",
+            "description": "Editable email address",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.48,
+            "parentConfidence": 0.99,
+            "elapsedMs": 214,
+            "inputTokens": null
+          },
+          {
+            "index": 5,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.51,
+            "parentConfidence": 0.98,
+            "elapsedMs": 262,
+            "inputTokens": null
+          },
+          {
+            "index": 6,
+            "choice": "notifications",
+            "description": "Email notifications preference",
+            "parent": "node_5",
+            "slot": "default",
+            "confidence": 0.55,
+            "parentConfidence": 0.72,
+            "elapsedMs": 287,
+            "inputTokens": null
+          },
+          {
+            "index": 7,
+            "choice": "save",
+            "description": "Save changes locally",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.59,
+            "parentConfidence": 0.43,
+            "elapsedMs": 302,
+            "inputTokens": null
+          }
+        ],
+        "elapsedMs": 2753,
+        "inputTokens": null,
+        "stopReason": "finish"
+      },
+      {
+        "domain": "apartments",
+        "prompt": "Compare all three apartments. Show each rent, commute, budget, and a shortlist button for each apartment.",
+        "catalog_version": 2,
+        "type": "complete",
+        "spec": {
+          "root": "node_0",
+          "elements": {
+            "node_0": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "large"
+              },
+              "children": [
+                "node_1",
+                "node_2",
+                "node_3",
+                "node_4"
+              ]
+            },
+            "node_1": {
+              "type": "Apartment",
+              "props": {
+                "name": "Sunlit studio",
+                "rent": "$2,150",
+                "details": "18 min commute · laundry · 520 sq ft"
+              },
+              "on": {
+                "press": {
+                  "action": "shortlist",
+                  "params": {
+                    "name": "Sunlit studio"
+                  }
+                }
+              },
+              "children": []
+            },
+            "node_2": {
+              "type": "Input",
+              "props": {
+                "label": "Monthly budget",
+                "value": {
+                  "$bindState": "/budget"
+                },
+                "placeholder": "2400"
+              },
+              "children": []
+            },
+            "node_3": {
+              "type": "Apartment",
+              "props": {
+                "name": "Garden apartment",
+                "rent": "$2,350",
+                "details": "26 min commute · patio · 690 sq ft"
+              },
+              "on": {
+                "press": {
+                  "action": "shortlist",
+                  "params": {
+                    "name": "Garden apartment"
+                  }
+                }
+              },
+              "children": []
+            },
+            "node_4": {
+              "type": "Apartment",
+              "props": {
+                "name": "Corner loft",
+                "rent": "$2,600",
+                "details": "12 min commute · elevator · 740 sq ft"
+              },
+              "on": {
+                "press": {
+                  "action": "shortlist",
+                  "params": {
+                    "name": "Corner loft"
+                  }
+                }
+              },
+              "children": []
+            }
+          },
+          "state": {
+            "name": "Alex Morgan",
+            "email": "alex@example.com",
+            "city": "San Francisco",
+            "notifications": true,
+            "budget": "2400",
+            "commute": "30 minutes",
+            "guests": "24",
+            "event": "Dinner in the garden",
+            "dietary": "Vegetarian"
+          }
+        },
+        "steps": [
+          {
+            "index": 0,
+            "choice": "canvas",
+            "description": "The root vertical page layout",
+            "parent": null,
+            "slot": null,
+            "confidence": 0.81,
+            "parentConfidence": null,
+            "elapsedMs": 308,
+            "inputTokens": null
+          },
+          {
+            "index": 1,
+            "choice": "apt0",
+            "description": "Complete apartment card: Sunlit studio, $2,150, 18 min commute · laundry · 520 sq ft",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.28,
+            "parentConfidence": null,
+            "elapsedMs": 198,
+            "inputTokens": null
+          },
+          {
+            "index": 2,
+            "choice": "budget",
+            "description": "Editable maximum monthly rent budget",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.19,
+            "parentConfidence": null,
+            "elapsedMs": 244,
+            "inputTokens": null
+          },
+          {
+            "index": 3,
+            "choice": "apt1",
+            "description": "Complete apartment card: Garden apartment, $2,350, 26 min commute · patio · 690 sq ft",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.25,
+            "parentConfidence": null,
+            "elapsedMs": 260,
+            "inputTokens": null
+          },
+          {
+            "index": 4,
+            "choice": "apt2",
+            "description": "Complete apartment card: Corner loft, $2,600, 12 min commute · elevator · 740 sq ft",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.89,
+            "parentConfidence": null,
+            "elapsedMs": 242,
+            "inputTokens": null
+          }
+        ],
+        "elapsedMs": 1651,
+        "inputTokens": null,
+        "stopReason": "finish"
+      },
+      {
+        "domain": "event",
+        "prompt": "Create an event planning form with event name, location, guests, dietary preference, and save.",
+        "type": "complete",
+        "spec": {
+          "root": "node_0",
+          "elements": {
+            "node_0": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "large"
+              },
+              "children": [
+                "node_1"
+              ]
+            },
+            "node_1": {
+              "type": "Card",
+              "props": {
+                "title": "A night to remember",
+                "subtitle": "A small gathering, thoughtfully planned."
+              },
+              "children": [
+                "node_2"
+              ]
+            },
+            "node_2": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_3",
+                "node_4",
+                "node_6",
+                "node_7",
+                "node_8",
+                "node_9"
+              ]
+            },
+            "node_3": {
+              "type": "Input",
+              "props": {
+                "label": "Event name",
+                "value": {
+                  "$bindState": "/event"
+                },
+                "placeholder": "Your name"
+              },
+              "children": []
+            },
+            "node_4": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_5"
+              ]
+            },
+            "node_5": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": []
+            },
+            "node_6": {
+              "type": "Input",
+              "props": {
+                "label": "Guests",
+                "value": {
+                  "$bindState": "/guests"
+                },
+                "placeholder": "24"
+              },
+              "children": []
+            },
+            "node_7": {
+              "type": "Choice",
+              "props": {
+                "label": "Menu preference",
+                "value": {
+                  "$bindState": "/dietary"
+                },
+                "options": [
+                  "Vegetarian",
+                  "Vegan",
+                  "No preference"
+                ]
+              },
+              "children": []
+            },
+            "node_8": {
+              "type": "Button",
+              "props": {
+                "label": "Save the plan",
+                "variant": "primary"
+              },
+              "on": {
+                "press": {
+                  "action": "save",
+                  "params": {}
+                }
+              },
+              "children": []
+            },
+            "node_9": {
+              "type": "Input",
+              "props": {
+                "label": "Where",
+                "value": {
+                  "$bindState": "/city"
+                },
+                "placeholder": "San Francisco"
+              },
+              "children": []
+            }
+          },
+          "state": {
+            "name": "Alex Morgan",
+            "email": "alex@example.com",
+            "city": "San Francisco",
+            "notifications": true,
+            "budget": "2400",
+            "commute": "30 minutes",
+            "guests": "24",
+            "event": "Dinner in the garden",
+            "dietary": "Vegetarian"
+          }
+        },
+        "steps": [
+          {
+            "index": 0,
+            "choice": "canvas",
+            "description": "The root vertical page layout",
+            "parent": null,
+            "slot": null,
+            "confidence": 0.94,
+            "parentConfidence": null,
+            "elapsedMs": 18972,
+            "inputTokens": null
+          },
+          {
+            "index": 1,
+            "choice": "form",
+            "description": "Event planning form",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.9,
+            "parentConfidence": null,
+            "elapsedMs": 292,
+            "inputTokens": null
+          },
+          {
+            "index": 2,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_1",
+            "slot": "default",
+            "confidence": 0.65,
+            "parentConfidence": 0.99,
+            "elapsedMs": 281,
+            "inputTokens": null
+          },
+          {
+            "index": 3,
+            "choice": "name",
+            "description": "Editable name field",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.52,
+            "parentConfidence": 0.99,
+            "elapsedMs": 233,
+            "inputTokens": null
+          },
+          {
+            "index": 4,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.62,
+            "parentConfidence": 0.99,
+            "elapsedMs": 296,
+            "inputTokens": null
+          },
+          {
+            "index": 5,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_4",
+            "slot": "default",
+            "confidence": 0.55,
+            "parentConfidence": 0.52,
+            "elapsedMs": 232,
+            "inputTokens": null
+          },
+          {
+            "index": 6,
+            "choice": "guests",
+            "description": "Number of guests",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.27,
+            "parentConfidence": 0.42,
+            "elapsedMs": 233,
+            "inputTokens": null
+          },
+          {
+            "index": 7,
+            "choice": "diet",
+            "description": "Dietary preferences",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.37,
+            "parentConfidence": 0.62,
+            "elapsedMs": 261,
+            "inputTokens": null
+          },
+          {
+            "index": 8,
+            "choice": "save",
+            "description": "Save changes locally",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.47,
+            "parentConfidence": 0.67,
+            "elapsedMs": 273,
+            "inputTokens": null
+          },
+          {
+            "index": 9,
+            "choice": "city",
+            "description": "City field",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.51,
+            "parentConfidence": 0.33,
+            "elapsedMs": 267,
+            "inputTokens": null
+          }
+        ],
+        "elapsedMs": 21607,
+        "inputTokens": null,
+        "stopReason": "finish"
+      }
+    ],
+    "previous_attempts": [
+      {
+        "domain": "apartments",
+        "prompt": "Compare all three apartments. Show each rent, commute, budget, and a shortlist button for each apartment.",
+        "type": "complete",
+        "spec": {
+          "root": "node_0",
+          "elements": {
+            "node_0": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "large"
+              },
+              "children": [
+                "node_1"
+              ]
+            },
+            "node_1": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_2",
+                "node_3",
+                "node_4"
+              ]
+            },
+            "node_2": {
+              "type": "Card",
+              "props": {
+                "title": "Sunlit studio",
+                "subtitle": "18 min commute · laundry · 520 sq ft"
+              },
+              "children": [
+                "node_5",
+                "node_6"
+              ]
+            },
+            "node_3": {
+              "type": "Card",
+              "props": {
+                "title": "Garden apartment",
+                "subtitle": "26 min commute · patio · 690 sq ft"
+              },
+              "children": []
+            },
+            "node_4": {
+              "type": "Card",
+              "props": {
+                "title": "Corner loft",
+                "subtitle": "12 min commute · elevator · 740 sq ft"
+              },
+              "children": []
+            },
+            "node_5": {
+              "type": "Input",
+              "props": {
+                "label": "Monthly budget",
+                "value": {
+                  "$bindState": "/budget"
+                },
+                "placeholder": "2400"
+              },
+              "children": []
+            },
+            "node_6": {
+              "type": "Stack",
+              "props": {
+                "direction": "horizontal",
+                "gap": "medium"
+              },
+              "children": [
+                "node_7",
+                "node_8",
+                "node_9"
+              ]
+            },
+            "node_7": {
+              "type": "Stack",
+              "props": {
+                "direction": "horizontal",
+                "gap": "medium"
+              },
+              "children": []
+            },
+            "node_8": {
+              "type": "Stack",
+              "props": {
+                "direction": "horizontal",
+                "gap": "medium"
+              },
+              "children": []
+            },
+            "node_9": {
+              "type": "Metric",
+              "props": {
+                "label": "Monthly rent",
+                "value": "$2,350",
+                "detail": "Before utilities"
+              },
+              "children": []
+            }
+          },
+          "state": {
+            "name": "Alex Morgan",
+            "email": "alex@example.com",
+            "city": "San Francisco",
+            "notifications": true,
+            "budget": "2400",
+            "commute": "30 minutes",
+            "guests": "24",
+            "event": "Dinner in the garden",
+            "dietary": "Vegetarian"
+          }
+        },
+        "steps": [
+          {
+            "index": 0,
+            "choice": "canvas",
+            "description": "The root vertical page layout",
+            "parent": null,
+            "slot": null,
+            "confidence": 0.84,
+            "parentConfidence": null,
+            "elapsedMs": 368,
+            "inputTokens": null
+          },
+          {
+            "index": 1,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.32,
+            "parentConfidence": null,
+            "elapsedMs": 274,
+            "inputTokens": null
+          },
+          {
+            "index": 2,
+            "choice": "apt0",
+            "description": "Apartment Sunlit studio, $2,150, 18 min commute · laundry · 520 sq ft",
+            "parent": "node_1",
+            "slot": "default",
+            "confidence": 0.2,
+            "parentConfidence": 0.98,
+            "elapsedMs": 285,
+            "inputTokens": null
+          },
+          {
+            "index": 3,
+            "choice": "apt1",
+            "description": "Apartment Garden apartment, $2,350, 26 min commute · patio · 690 sq ft",
+            "parent": "node_1",
+            "slot": "default",
+            "confidence": 0.27,
+            "parentConfidence": 0.69,
+            "elapsedMs": 306,
+            "inputTokens": null
+          },
+          {
+            "index": 4,
+            "choice": "apt2",
+            "description": "Apartment Corner loft, $2,600, 12 min commute · elevator · 740 sq ft",
+            "parent": "node_1",
+            "slot": "default",
+            "confidence": 0.49,
+            "parentConfidence": 0.7,
+            "elapsedMs": 408,
+            "inputTokens": null
+          },
+          {
+            "index": 5,
+            "choice": "budget",
+            "description": "Editable maximum monthly rent budget",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.26,
+            "parentConfidence": 0.63,
+            "elapsedMs": 514,
+            "inputTokens": null
+          },
+          {
+            "index": 6,
+            "choice": "row",
+            "description": "A horizontal row of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.16,
+            "parentConfidence": 0.36,
+            "elapsedMs": 307,
+            "inputTokens": null
+          },
+          {
+            "index": 7,
+            "choice": "row",
+            "description": "A horizontal row of related content",
+            "parent": "node_6",
+            "slot": "default",
+            "confidence": 0.25,
+            "parentConfidence": 0.61,
+            "elapsedMs": 240,
+            "inputTokens": null
+          },
+          {
+            "index": 8,
+            "choice": "row",
+            "description": "A horizontal row of related content",
+            "parent": "node_6",
+            "slot": "default",
+            "confidence": 0.14,
+            "parentConfidence": 0.33,
+            "elapsedMs": 238,
+            "inputTokens": null
+          },
+          {
+            "index": 9,
+            "choice": "rent1",
+            "description": "Rent for Garden apartment",
+            "parent": "node_6",
+            "slot": "default",
+            "confidence": 0.17,
+            "parentConfidence": 0.22,
+            "elapsedMs": 335,
+            "inputTokens": null
+          }
+        ],
+        "elapsedMs": 3287,
+        "inputTokens": null,
+        "stopReason": "limit"
+      },
+      {
+        "domain": "event",
+        "prompt": "Create an event planning form with event name, location, guests, dietary preference, and save.",
+        "type": "complete",
+        "spec": {
+          "root": "node_0",
+          "elements": {
+            "node_0": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "large"
+              },
+              "children": [
+                "node_1"
+              ]
+            },
+            "node_1": {
+              "type": "Card",
+              "props": {
+                "title": "A night to remember",
+                "subtitle": "A small gathering, thoughtfully planned."
+              },
+              "children": [
+                "node_2"
+              ]
+            },
+            "node_2": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_3",
+                "node_4",
+                "node_6",
+                "node_7",
+                "node_8",
+                "node_9"
+              ]
+            },
+            "node_3": {
+              "type": "Input",
+              "props": {
+                "label": "Event name",
+                "value": {
+                  "$bindState": "/event"
+                },
+                "placeholder": "Your name"
+              },
+              "children": []
+            },
+            "node_4": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_5"
+              ]
+            },
+            "node_5": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": []
+            },
+            "node_6": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": []
+            },
+            "node_7": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": []
+            },
+            "node_8": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": []
+            },
+            "node_9": {
+              "type": "Input",
+              "props": {
+                "label": "Guests",
+                "value": {
+                  "$bindState": "/guests"
+                },
+                "placeholder": "24"
+              },
+              "children": []
+            }
+          },
+          "state": {
+            "name": "Alex Morgan",
+            "email": "alex@example.com",
+            "city": "San Francisco",
+            "notifications": true,
+            "budget": "2400",
+            "commute": "30 minutes",
+            "guests": "24",
+            "event": "Dinner in the garden",
+            "dietary": "Vegetarian"
+          }
+        },
+        "steps": [
+          {
+            "index": 0,
+            "choice": "canvas",
+            "description": "The root vertical page layout",
+            "parent": null,
+            "slot": null,
+            "confidence": 0.94,
+            "parentConfidence": null,
+            "elapsedMs": 322,
+            "inputTokens": null
+          },
+          {
+            "index": 1,
+            "choice": "form",
+            "description": "Event planning form",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.84,
+            "parentConfidence": null,
+            "elapsedMs": 310,
+            "inputTokens": null
+          },
+          {
+            "index": 2,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_1",
+            "slot": "default",
+            "confidence": 0.56,
+            "parentConfidence": 0.99,
+            "elapsedMs": 232,
+            "inputTokens": null
+          },
+          {
+            "index": 3,
+            "choice": "name",
+            "description": "Editable name field",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.54,
+            "parentConfidence": 0.99,
+            "elapsedMs": 242,
+            "inputTokens": null
+          },
+          {
+            "index": 4,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.57,
+            "parentConfidence": 0.99,
+            "elapsedMs": 321,
+            "inputTokens": null
+          },
+          {
+            "index": 5,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_4",
+            "slot": "default",
+            "confidence": 0.52,
+            "parentConfidence": 0.55,
+            "elapsedMs": 281,
+            "inputTokens": null
+          },
+          {
+            "index": 6,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.4,
+            "parentConfidence": 0.5,
+            "elapsedMs": 434,
+            "inputTokens": null
+          },
+          {
+            "index": 7,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.45,
+            "parentConfidence": 0.28,
+            "elapsedMs": 360,
+            "inputTokens": null
+          },
+          {
+            "index": 8,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.29,
+            "parentConfidence": 0.34,
+            "elapsedMs": 252,
+            "inputTokens": null
+          },
+          {
+            "index": 9,
+            "choice": "guests",
+            "description": "Number of guests",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.4,
+            "parentConfidence": 0.43,
+            "elapsedMs": 305,
+            "inputTokens": null
+          }
+        ],
+        "elapsedMs": 3068,
+        "inputTokens": null,
+        "stopReason": "limit"
+      },
+      {
+        "domain": "apartments",
+        "prompt": "Compare all three apartments. Show each rent, commute, budget, and a shortlist button for each apartment.",
+        "type": "complete",
+        "spec": {
+          "root": "node_0",
+          "elements": {
+            "node_0": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "large"
+              },
+              "children": [
+                "node_1"
+              ]
+            },
+            "node_1": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_2"
+              ]
+            },
+            "node_2": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": [
+                "node_3"
+              ]
+            },
+            "node_3": {
+              "type": "Stack",
+              "props": {
+                "direction": "horizontal",
+                "gap": "medium"
+              },
+              "children": [
+                "node_4",
+                "node_5",
+                "node_6",
+                "node_7",
+                "node_8",
+                "node_9",
+                "node_10",
+                "node_11",
+                "node_12",
+                "node_13"
+              ]
+            },
+            "node_4": {
+              "type": "Card",
+              "props": {
+                "title": "Sunlit studio",
+                "subtitle": "18 min commute · laundry · 520 sq ft"
+              },
+              "children": []
+            },
+            "node_5": {
+              "type": "Stack",
+              "props": {
+                "direction": "horizontal",
+                "gap": "medium"
+              },
+              "children": []
+            },
+            "node_6": {
+              "type": "Stack",
+              "props": {
+                "direction": "vertical",
+                "gap": "small"
+              },
+              "children": []
+            },
+            "node_7": {
+              "type": "Card",
+              "props": {
+                "title": "Garden apartment",
+                "subtitle": "26 min commute · patio · 690 sq ft"
+              },
+              "children": []
+            },
+            "node_8": {
+              "type": "Card",
+              "props": {
+                "title": "Corner loft",
+                "subtitle": "12 min commute · elevator · 740 sq ft"
+              },
+              "children": []
+            },
+            "node_9": {
+              "type": "Input",
+              "props": {
+                "label": "Monthly budget",
+                "value": {
+                  "$bindState": "/budget"
+                },
+                "placeholder": "2400"
+              },
+              "children": []
+            },
+            "node_10": {
+              "type": "Button",
+              "props": {
+                "label": "Shortlist Sunlit studio",
+                "variant": "secondary"
+              },
+              "on": {
+                "press": {
+                  "action": "shortlist",
+                  "params": {
+                    "name": "Sunlit studio"
+                  }
+                }
+              },
+              "children": []
+            },
+            "node_11": {
+              "type": "Stack",
+              "props": {
+                "direction": "horizontal",
+                "gap": "medium"
+              },
+              "children": []
+            },
+            "node_12": {
+              "type": "Choice",
+              "props": {
+                "label": "Commute limit",
+                "value": {
+                  "$bindState": "/commute"
+                },
+                "options": [
+                  "15 minutes",
+                  "30 minutes",
+                  "45 minutes"
+                ]
+              },
+              "children": []
+            },
+            "node_13": {
+              "type": "Heading",
+              "props": {
+                "text": "Find a place to call home"
+              },
+              "children": []
+            }
+          },
+          "state": {
+            "name": "Alex Morgan",
+            "email": "alex@example.com",
+            "city": "San Francisco",
+            "notifications": true,
+            "budget": "2400",
+            "commute": "30 minutes",
+            "guests": "24",
+            "event": "Dinner in the garden",
+            "dietary": "Vegetarian"
+          }
+        },
+        "steps": [
+          {
+            "index": 0,
+            "choice": "canvas",
+            "description": "The root vertical page layout",
+            "parent": null,
+            "slot": null,
+            "confidence": 0.78,
+            "parentConfidence": null,
+            "elapsedMs": 706,
+            "inputTokens": null
+          },
+          {
+            "index": 1,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_0",
+            "slot": "default",
+            "confidence": 0.3,
+            "parentConfidence": null,
+            "elapsedMs": 19022,
+            "inputTokens": null
+          },
+          {
+            "index": 2,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_1",
+            "slot": "default",
+            "confidence": 0.2,
+            "parentConfidence": 0.98,
+            "elapsedMs": 253,
+            "inputTokens": null
+          },
+          {
+            "index": 3,
+            "choice": "row",
+            "description": "A horizontal row of related content",
+            "parent": "node_2",
+            "slot": "default",
+            "confidence": 0.4,
+            "parentConfidence": 0.87,
+            "elapsedMs": 294,
+            "inputTokens": null
+          },
+          {
+            "index": 4,
+            "choice": "apt0",
+            "description": "Apartment Sunlit studio, $2,150, 18 min commute · laundry · 520 sq ft",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.24,
+            "parentConfidence": 0.83,
+            "elapsedMs": 355,
+            "inputTokens": null
+          },
+          {
+            "index": 5,
+            "choice": "row",
+            "description": "A horizontal row of related content",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.31,
+            "parentConfidence": 0.85,
+            "elapsedMs": 298,
+            "inputTokens": null
+          },
+          {
+            "index": 6,
+            "choice": "column",
+            "description": "A vertical group of related content",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.2,
+            "parentConfidence": 0.81,
+            "elapsedMs": 266,
+            "inputTokens": null
+          },
+          {
+            "index": 7,
+            "choice": "apt1",
+            "description": "Apartment Garden apartment, $2,350, 26 min commute · patio · 690 sq ft",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.17,
+            "parentConfidence": 0.81,
+            "elapsedMs": 287,
+            "inputTokens": null
+          },
+          {
+            "index": 8,
+            "choice": "apt2",
+            "description": "Apartment Corner loft, $2,600, 12 min commute · elevator · 740 sq ft",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.42,
+            "parentConfidence": 0.82,
+            "elapsedMs": 242,
+            "inputTokens": null
+          },
+          {
+            "index": 9,
+            "choice": "budget",
+            "description": "Editable maximum monthly rent budget",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.32,
+            "parentConfidence": 0.83,
+            "elapsedMs": 372,
+            "inputTokens": null
+          },
+          {
+            "index": 10,
+            "choice": "short0",
+            "description": "Shortlist Sunlit studio",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.26,
+            "parentConfidence": 0.86,
+            "elapsedMs": 337,
+            "inputTokens": null
+          },
+          {
+            "index": 11,
+            "choice": "row",
+            "description": "A horizontal row of related content",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.22,
+            "parentConfidence": 0.84,
+            "elapsedMs": 294,
+            "inputTokens": null
+          },
+          {
+            "index": 12,
+            "choice": "commute",
+            "description": "Preferred maximum commute",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.12,
+            "parentConfidence": 0.81,
+            "elapsedMs": 391,
+            "inputTokens": null
+          },
+          {
+            "index": 13,
+            "choice": "title",
+            "description": "Title for comparing apartments",
+            "parent": "node_3",
+            "slot": "default",
+            "confidence": 0.14,
+            "parentConfidence": 0.74,
+            "elapsedMs": 250,
+            "inputTokens": null
+          }
+        ],
+        "elapsedMs": 23637,
+        "inputTokens": null,
+        "stopReason": "unavailable"
+      }
+    ]
+  }
+}
