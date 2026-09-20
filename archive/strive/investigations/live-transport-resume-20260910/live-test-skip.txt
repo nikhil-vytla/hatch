@@ -1,2 +1,0 @@
-Command: uv run pytest tests/live -q
-1 skipped in 0.01s
