@@ -21,3 +21,6 @@
 
 - All 17 focused tests now pass with 127 assertions, including friendly handling of a hosting challenge instead of a JSON parse error. Python's 10 tests and Ruff pass. The previous web application also builds against the JSONL reader.
 - Production deployment `dpl_7MBzgNw8BMPkijBdhMPmVaK3d87m` contains the caller-key flow and improved hosting-error message. Owner-authenticated checks target its immutable URL, while the user-facing app remains at the canonical URL.
+
+- Final scan after the implementation commit checked five commits, 293 unique blobs, 48 built files, four deployed assets, all 33 deployed JSON files, and companion ZIP contents. It found no actual credentials or matching secret signatures.
+- Mobile QA at 390×844 found that the existing header hid the key button's text without an accessible name. Added an explicit aria-label. The light-mode dialog fits within the viewport and its key controls are accessible; desktop dark-mode was also visually inspected.
