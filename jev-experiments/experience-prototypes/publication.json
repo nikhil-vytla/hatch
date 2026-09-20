@@ -13,7 +13,7 @@
   "index": "../results/index.jsonl",
   "journeys": "results/journeys.jsonl",
   "judge": "results/judge.jsonl",
-  "language": "../results/language.jsonl",
+  "rewardbench2": "../rewardbench2/results.jsonl",
   "latency": "../results/latency.jsonl",
   "logos": "../results/logos.jsonl",
   "micro": "../results/micro.jsonl",

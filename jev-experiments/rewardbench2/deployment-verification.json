@@ -1,0 +1,32 @@
+{
+  "checked_at": "2026-09-20T10:43:35.320Z",
+  "origin": "https://jev-experiments.vercel.app",
+  "deployment_id": "dpl_AoinNmkLKeeXpU5Gwtr4qGAZDjmo",
+  "git_sha": "97093d30deb824c818dbd32536b4c605358a00e8",
+  "target": "production",
+  "state": "READY",
+  "canonical_alias_assigned": true,
+  "root_directory": "jev-experiments/experience-prototypes",
+  "source": "GitHub commit",
+  "public_http_status": 200,
+  "benchmark_http_status": 200,
+  "benchmark_sha256": "6242395de913f5cc4a2bd1f57fc694dcbfd570fca8b4e16bdce47dfcb71c141e",
+  "matches_verified_local_build": true,
+  "cases": 1865,
+  "candidates": 8977,
+  "macro_score": 0.8090020577506806,
+  "case_notices": 41,
+  "omitted_fields": 9,
+  "repeatability_finding_present": true,
+  "referenced_assets_available": 2,
+  "retired_language_data_status": 404,
+  "retired_language_data_is_unpublished": true,
+  "passed": true,
+  "browser_smoke": {
+    "completed_score_visible": true,
+    "blind_pick_and_reveal": true,
+    "next_case_resets_pick": true,
+    "dark_mode_inspected": true,
+    "no_horizontal_overflow_at_320px": true
+  }
+}
