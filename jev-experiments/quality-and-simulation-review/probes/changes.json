@@ -1,0 +1,226 @@
+{
+  "method": "Decoded the complete published record and executed the actual Changes JSX callbacks through Bun transpilation with mocked React hooks and a deferred run promise. No browser, API calls or app edits. Synthetic partial records test UI behavior, not provider behavior.",
+  "sourceHashes": {
+    "src/new-experiments.tsx": "8cdcdba29a13d2d7712615376ac5ab56f24feebf216766640b728f3b8bbd509d",
+    "scripts/record.ts": "ae77a3dd8cccb465867bc13f97c024aa58c070f972166ac7cff75dfc277b7953",
+    "results/changes.jsonl": "210d7ce35beeb6a61a512ca47e06d22747a955643137935777f232cde505bef5",
+    "publication.json": "3246f7ec022e0d72f2cf52627680380d92ae380842daba7c4e5240b9406e33a7"
+  },
+  "coverage": {
+    "scenarios": 1,
+    "sourceFacts": 3,
+    "conclusions": 4,
+    "dependencyEdges": 5,
+    "judgments": 4,
+    "recordedChangedFields": [
+      "venue"
+    ],
+    "unrecordedFields": [
+      "date",
+      "capacity"
+    ],
+    "initialLabels": [
+      "Needs another look",
+      "Needs another look",
+      "Still supported",
+      "Still supported"
+    ],
+    "latencyMs": 300,
+    "attempts": [
+      {
+        "attempt": 1,
+        "status": 200,
+        "latency_ms": 300
+      }
+    ],
+    "recordManifest": {
+      "experiment": "changes",
+      "created": "2026-09-20T07:34:19.572Z",
+      "status": "complete"
+    }
+  },
+  "leakage": {
+    "actualPayload": {
+      "state": {
+        "before": {
+          "venue": "Glasshouse Hall, Seattle",
+          "date": "October 12, 2026",
+          "capacity": "120 guests"
+        },
+        "after": {
+          "venue": "Waterfront Pavilion, Portland",
+          "date": "October 12, 2026",
+          "capacity": "120 guests"
+        },
+        "conclusions": [
+          {
+            "id": "travel",
+            "text": "Tell guests to travel to Glasshouse Hall in Seattle.",
+            "depends": [
+              "venue"
+            ]
+          },
+          {
+            "id": "calendar",
+            "text": "Calendar invitation: October 12, Glasshouse Hall, Seattle.",
+            "depends": [
+              "venue",
+              "date"
+            ]
+          },
+          {
+            "id": "catering",
+            "text": "Order food for up to 120 guests.",
+            "depends": [
+              "capacity"
+            ]
+          },
+          {
+            "id": "reminder",
+            "text": "Send a reminder on October 5, one week before the event.",
+            "depends": [
+              "date"
+            ]
+          }
+        ]
+      },
+      "questions": {
+        "travel": {
+          "type": "noul",
+          "instructions": "Does conclusion travel need review because the facts changed? Ignore spelling-only changes."
+        },
+        "calendar": {
+          "type": "noul",
+          "instructions": "Does conclusion calendar need review because the facts changed? Ignore spelling-only changes."
+        },
+        "catering": {
+          "type": "noul",
+          "instructions": "Does conclusion catering need review because the facts changed? Ignore spelling-only changes."
+        },
+        "reminder": {
+          "type": "noul",
+          "instructions": "Does conclusion reminder need review because the facts changed? Ignore spelling-only changes."
+        }
+      }
+    },
+    "explicitDependenciesSent": true,
+    "payloadOnlyVerdicts": {
+      "travel": true,
+      "calendar": true,
+      "catering": false,
+      "reminder": false
+    },
+    "recordedPredictions": {
+      "travel": true,
+      "calendar": true,
+      "catering": false,
+      "reminder": false
+    },
+    "suppliedGraphBaselineMatches": 4,
+    "graphOnlyGrid": [
+      {
+        "field": "venue",
+        "affected": [
+          "travel",
+          "calendar"
+        ]
+      },
+      {
+        "field": "date",
+        "affected": [
+          "calendar",
+          "reminder"
+        ]
+      },
+      {
+        "field": "capacity",
+        "affected": [
+          "catering"
+        ]
+      }
+    ],
+    "caveat": "This reconstructs the fixture answer from metadata already sent to Jev. It does not establish that Jev causally relied on those arrays."
+  },
+  "staleResponse": {
+    "requestedAfter": {
+      "venue": "Waterfront Pavilion, Portland",
+      "date": "October 12, 2026",
+      "capacity": "120 guests"
+    },
+    "currentAfter": {
+      "venue": "Glasshouse Hall, Seattle",
+      "date": "October 20, 2026",
+      "capacity": "120 guests"
+    },
+    "labelsBeforeOldResponse": [
+      "Waiting for a judgment",
+      "Waiting for a judgment",
+      "Waiting for a judgment",
+      "Waiting for a judgment"
+    ],
+    "oldRunStillInInspectorBeforeResolution": 0.95,
+    "labelsAfterOldResponse": [
+      "Needs another look",
+      "Needs another look",
+      "Still supported",
+      "Still supported"
+    ],
+    "observedAfterLateResponse": {
+      "travel": true,
+      "calendar": true,
+      "catering": false,
+      "reminder": false
+    },
+    "expectedForCurrentDraft": {
+      "travel": false,
+      "calendar": true,
+      "catering": false,
+      "reminder": true
+    },
+    "mismatchedConclusionIds": [
+      "travel",
+      "reminder"
+    ]
+  },
+  "syntheticPartial": {
+    "suppliedAnswerIds": [
+      "travel"
+    ],
+    "absentAnswerIds": [
+      "calendar",
+      "catering",
+      "reminder"
+    ],
+    "labels": [
+      "Needs another look",
+      "Still supported",
+      "Still supported",
+      "Still supported"
+    ],
+    "caveat": "The published record is complete; the gateway validates response coverage. This is a missing-record UI probe, not evidence of a live incomplete response."
+  },
+  "inputBoundaries": {
+    "emptyCapacitySubmitted": "",
+    "noOpSubmitted": true,
+    "blankRunButtonHasDisabledProp": false,
+    "noOpRunButtonHasDisabledProp": false,
+    "caveat": "No model outputs were measured for blank or no-op changes."
+  },
+  "provenance": {
+    "storedResultKeys": [
+      "answers",
+      "latency_ms",
+      "service_latency_ms",
+      "retries",
+      "attempts",
+      "cost_usd",
+      "model",
+      "source"
+    ],
+    "hasStoredState": false,
+    "hasStoredQuestions": false,
+    "savedQuestion": "`Does conclusion ${c.id} need review because the facts changed?`",
+    "liveQuestion": "Does conclusion travel need review because the facts changed? Ignore spelling-only changes.",
+    "probabilitiesAndConfidenceNull": true
+  }
+}

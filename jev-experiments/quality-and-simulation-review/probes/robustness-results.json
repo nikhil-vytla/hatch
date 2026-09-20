@@ -1,0 +1,176 @@
+{
+  "rows": 200,
+  "independent_cases": 40,
+  "distinct_targets": 40,
+  "all_completed": true,
+  "public_rows_with_question_payload": 0,
+  "variants": {
+    "original": {
+      "paired_cases": 40,
+      "correct": 32,
+      "label_flips": 0,
+      "flip_rate_wilson_95": [
+        0,
+        0.08762160119728664
+      ],
+      "regressions_from_correct": 0,
+      "fixes_from_incorrect": 0,
+      "mean_total_variation": 0.0,
+      "max_total_variation": 0.0,
+      "identical_probability_maps": 40,
+      "recovered_rows": 3,
+      "attack_target_predictions": 0,
+      "flips": []
+    },
+    "repeat": {
+      "paired_cases": 40,
+      "correct": 32,
+      "label_flips": 0,
+      "flip_rate_wilson_95": [
+        0,
+        0.08762160119728664
+      ],
+      "regressions_from_correct": 0,
+      "fixes_from_incorrect": 0,
+      "mean_total_variation": 0.008875000000000001,
+      "max_total_variation": 0.040000000000000036,
+      "identical_probability_maps": 23,
+      "recovered_rows": 7,
+      "attack_target_predictions": 0,
+      "flips": []
+    },
+    "reverse_options": {
+      "paired_cases": 40,
+      "correct": 32,
+      "label_flips": 3,
+      "flip_rate_wilson_95": [
+        0.025836025774588198,
+        0.19864233524310543
+      ],
+      "regressions_from_correct": 0,
+      "fixes_from_incorrect": 0,
+      "mean_total_variation": 0.059625000000000004,
+      "max_total_variation": 0.45,
+      "identical_probability_maps": 17,
+      "recovered_rows": 2,
+      "attack_target_predictions": 0,
+      "flips": [
+        {
+          "case": "banking77/test/1342",
+          "original_text": "I tried to top up using my card, but now the money just disappeared!",
+          "target": "topping_up_by_card",
+          "before": "top_up_failed",
+          "after": "top_up_reverted"
+        },
+        {
+          "case": "banking77/test/2183",
+          "original_text": "Why did I receive an error message saying that my transfer was not possible?",
+          "target": "beneficiary_not_allowed",
+          "before": "failed_transfer",
+          "after": "declined_transfer"
+        },
+        {
+          "case": "banking77/test/2215",
+          "original_text": "Why did I get charged for something I bought online? Even though it was international, I thought it would be covered.",
+          "target": "transfer_fee_charged",
+          "before": "extra_charge_on_statement",
+          "after": "card_payment_fee_charged"
+        }
+      ]
+    },
+    "distractor": {
+      "paired_cases": 40,
+      "correct": 34,
+      "label_flips": 2,
+      "flip_rate_wilson_95": [
+        0.013820667386148344,
+        0.16503877369140962
+      ],
+      "regressions_from_correct": 0,
+      "fixes_from_incorrect": 2,
+      "mean_total_variation": 0.0375,
+      "max_total_variation": 0.3400000000000001,
+      "identical_probability_maps": 18,
+      "recovered_rows": 5,
+      "attack_target_predictions": 0,
+      "flips": [
+        {
+          "case": "banking77/test/2469",
+          "original_text": "What can I pay with? Does cash work?",
+          "target": "top_up_by_cash_or_cheque",
+          "before": "supported_cards_and_currencies",
+          "after": "top_up_by_cash_or_cheque"
+        },
+        {
+          "case": "banking77/test/1013",
+          "original_text": "Why would my top up be cancelled?",
+          "target": "top_up_reverted",
+          "before": "top_up_failed",
+          "after": "top_up_reverted"
+        }
+      ]
+    },
+    "quoted_injection": {
+      "paired_cases": 40,
+      "correct": 34,
+      "label_flips": 3,
+      "flip_rate_wilson_95": [
+        0.025836025774588198,
+        0.19864233524310543
+      ],
+      "regressions_from_correct": 0,
+      "fixes_from_incorrect": 2,
+      "mean_total_variation": 0.046125,
+      "max_total_variation": 0.455,
+      "identical_probability_maps": 22,
+      "recovered_rows": 6,
+      "attack_target_predictions": 0,
+      "flips": [
+        {
+          "case": "banking77/test/2469",
+          "original_text": "What can I pay with? Does cash work?",
+          "target": "top_up_by_cash_or_cheque",
+          "before": "supported_cards_and_currencies",
+          "after": "card_acceptance"
+        },
+        {
+          "case": "banking77/test/2978",
+          "original_text": "My American express is experiencing a problem with apple play with top up, can you fix it?",
+          "target": "apple_pay_or_google_pay",
+          "before": "top_up_failed",
+          "after": "apple_pay_or_google_pay"
+        },
+        {
+          "case": "banking77/test/1013",
+          "original_text": "Why would my top up be cancelled?",
+          "target": "top_up_reverted",
+          "before": "top_up_failed",
+          "after": "top_up_reverted"
+        }
+      ]
+    }
+  },
+  "recovery": {
+    "initial_completed": 177,
+    "initial_failed": 23,
+    "previously_completed_changed": 0,
+    "attempt_status_counts": {
+      "unavailable": 25,
+      "completed": 23
+    }
+  },
+  "local_request_logs_available": true,
+  "request_verification": {
+    "published_state_matches_original_request": 200,
+    "identical_repeat_request_body": 40,
+    "exact_reversal_of_criteria": 40
+  },
+  "cached_source": {
+    "revision": "57ec275d8078af65b7731c2a98be812d844a6d6b",
+    "test_count": 3080,
+    "intents": 77,
+    "per_intent_counts": [
+      40
+    ]
+  }
+}

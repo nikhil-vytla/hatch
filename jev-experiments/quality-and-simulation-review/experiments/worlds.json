@@ -1,0 +1,109 @@
+{
+  "id": "worlds",
+  "title": "Living scenes",
+  "evidenceStatus": "20 decoded authored scenes, 160 choices, 12 recovered transport cases; no visual ratings or independent semantic score. Offline source, callback, and Canvas-command probes only.",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "Jev chooses finite scene labels while code supplies all geometry and motion; there is no persistent entity or relationship model. Recorded scenes use eight questions while live requests use four, and terrain inserts or omits objects independently of the brief. A small interactive garden with typed edits, stable entities, and independent temporal checks would make the central hypothesis testable.",
+  "strengths": [
+    "The interface explains that rendering is procedural and object-specific support is limited; displayed labels, brief, and raw results are inspectable.",
+    "Canvas sizing, device pixel ratio, animation cleanup, and reduced-motion support provide useful rendering foundations.",
+    "The runner leaves human preference unmeasured, and transport recovery retains completed predictions and original errors."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Recorded and live worlds use different decision contracts",
+      "evidence": "src/jev_lab/pilots.py:38 versus experience-prototypes/src/creative.tsx:73. Recorded scenes have eight choices; live has four and omits monochrome, flat, bounce, and four motifs. Six of 20 recorded plans use excluded values; all 20 Canvas command traces change when motif fields are removed (probes/worlds.json).",
+      "impact": "The live button cannot reproduce several showcased plans, and recorded results do not establish the behavior of the current live protocol.",
+      "fix": "Share a versioned schema and question builder across recording/live paths; persist prompt and renderer versions, label legacy results, and verify parity at the same local scene time."
+    },
+    {
+      "priority": "P1",
+      "title": "Terrain controls object presence and motions lack entity relationships",
+      "evidence": "experience-prototypes/src/motion-art.tsx:102, :138, :192. The default garden uses stars and omits its pond; the desert uses hills and receives 12 plants plus a pond. The growth example retains radius 4 while y changes 350 to 200 to 350 at 0/20/40 seconds. Four motif labels repeat cyclically across particles.",
+      "impact": "The current state cannot express explicit object presence, containment, attraction, rooted growth, or preserved local changes. An appealing frame does not show a coherent world.",
+      "fix": "Add stable entities, independent presence flags, anchors, and supported relationships. Jev selects typed semantic patches while deterministic code validates them and runs declared motion rules. Keep today's procedural renderer as a baseline."
+    },
+    {
+      "priority": "P2",
+      "title": "Pause jumps to a fixed four-second frame",
+      "evidence": "experience-prototypes/src/motion-art.tsx:41, :239. The actual drawing-code probe at 13 seconds produces a different frame when paused, exactly equal to the active four-second trace; the first particle moves about 49 pixels horizontally.",
+      "impact": "Pause does not preserve what the visitor was inspecting, and global timestamps prevent a stable scene-local replay contract.",
+      "fix": "Accumulate local elapsed time, retain state while paused, resume continuously, and provide an explicit reset/seed. Keep the reduced-motion static view separate from pause semantics."
+    },
+    {
+      "priority": "P1",
+      "title": "A late live response replaces a newly selected recorded world",
+      "evidence": "experience-prototypes/src/creative.tsx:99, :112. The actual callback harness starts a garden request, selects the reef, then resolves the garden: the selector/draft remain reef while the displayed row and caption return to garden.",
+      "impact": "The selected world and active artifact diverge, making recorded/live comparisons and follow-up edits unreliable.",
+      "fix": "Bind request IDs to the submitted brief and world revision, ignore or archive stale results, display provenance, and keep selection synchronized with the active artifact. Add a local regression without model calls."
+    },
+    {
+      "priority": "P1",
+      "title": "The score measures availability rather than coordinated scene quality",
+      "evidence": "src/jev_lab/pilots.py:121 counts presence of the scene key; :125 leaves human_preference null. Decoded evidence has 20 complete scenes and 12 recovered transport cases, with no independent object, temporal, baseline, or preference outcomes.",
+      "impact": "Renderability cannot support a claim about brief fidelity, coherent motion, or the value of model choices over a simple rule planner.",
+      "fix": "Use independently authored semantic and temporal constraints, renderer-matched rule/oracle baselines, held-out edits and interventions, and separate blinded aesthetic judgments. Report availability independently."
+    }
+  ],
+  "simulation": {
+    "title": "A garden that responds to edits and actions",
+    "description": "A visitor edits a moonlit courtyard with a pond, rooted plants, fireflies, loose leaves, and a draggable lantern. A stronger breeze affects declared behaviors; moving the lantern changes attraction; locks, pause, step, and seed restore expose preservation and causality. Invalid or stale patches leave the active world intact and show why they were not applied.",
+    "jevsRole": "Map natural-language requests to typed entity additions/removals, parameter changes, and supported relationships, with explicit unsupported clauses. No per-frame model calls.",
+    "codeRole": "Maintain IDs, positions, velocities, anchors, locks, relationships, wind, local time, seed, and request/world revisions; validate patches; implement stylized motion, collision, and containment rules; render and replay.",
+    "acceptanceCriteria": [
+      "Requested object presence is independent of terrain, and terrain does not force unrequested pond/plant decorations.",
+      "Local edits retain untouched IDs, positions, relationships, and locked attributes.",
+      "Wind and light interventions have the specified effects; roots remain anchored and contained entities stay inside their permitted regions.",
+      "Pause preserves state and resume is continuous; a fixed seed and event schedule repeat within declared tolerance on a pinned engine version.",
+      "Every applied patch matches the current world revision; unsupported and unapplied changes remain visible."
+    ]
+  },
+  "evaluation": {
+    "design": "Keep the existing 20 public briefs plus 30 new cases for development. Hold out 120 base sequences, 20 each for object/spatial constraints, local preservation, physical interventions, temporal/growth behavior, ambiguous aesthetics, and unsupported requests. Initial brief plus three semantic revisions, three seeds, and two wording variants yield 720 sequences and 2,880 logical Jev requests before retries for one planner. Author acceptable alternatives, forbidden additions, locks, and trajectory expectations before predictions; freeze prompts and schema. Use 10,000 paired bootstrap resamples clustered by base sequence. Primary target: 95% lower bound at least 90% supported full-sequence constraint success, with zero observed stale applications or lock/anchor violations in the declared suite. Twenty unsupported cases are screening only: zero failures still permits approximately 13.9% one-sided 95% upper failure probability. Add 1,000 offline seeded event schedules, plus 60 prespecified paired 12-second Jev/rule clips rated by three blinded raters each, totaling 180 judgments. Match rendering and randomize order; separate brief fidelity from aesthetic preference. None of the proposed model calls or human ratings were performed.",
+    "baselines": [
+      "Deterministic keyword/rule planner with the same entities, patches, renderer, seeds, and events.",
+      "Seeded legal random planner with the same capability set.",
+      "Independent oracle plans to measure the renderer's achievable ceiling.",
+      "Current procedural artwork as a separate limited-capability baseline, scored on only the constraints it can express."
+    ],
+    "metrics": [
+      "Supported full-sequence semantic, preservation, and temporal constraint pass rate; paired clustered confidence intervals against the rule planner.",
+      "Clause coverage, forbidden additions, unsupported-request handling, lock/ID preservation, anchor and containment violations.",
+      "Pause/resume discontinuities, stale-result applications, repeatability tolerance, and frame cadence.",
+      "End-to-end availability, primitive choices, logical/billed requests, latency, retries, and cost.",
+      "Blinded brief fidelity and aesthetic preference, rater agreement, missing judgments, and uncertainty clustered by sequence."
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "20 published authored initial scenes and 160 finite choices, including 12 transport recoveries. No independent semantic score or human ratings. Offline probe covers all 20 plan projections plus targeted pause, growth, geometry, and response-order cases.",
+      "full": "120 held-out base sequences in six families; three seeds by two wording variants give 720 four-decision sequences and 2,880 logical model requests. Separate 1,000 offline event schedules and 180 blinded paired judgments. No external benchmark or official score claimed.",
+      "feasibility": "Requires new independent labels, a bounded entity/relationship implementation, and future provider budget. No large datasets or weights are needed; proposed model calls and ratings have not been run."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Matter.js",
+      "url": "https://brm.io/matter-js/docs/classes/Engine.html",
+      "use": "Fixed-step bodies, forces, collision events, and time-scale control for movable garden entities. Pin engine version and verify numerical tolerance; it does not provide fluid or biological simulation. Jev chooses semantic entities and rules."
+    },
+    {
+      "name": "PixiJS",
+      "url": "https://pixijs.com/8.x/guides/components/events",
+      "use": "Entity hit areas and pointer interactions for selection/lantern dragging, with optional Ticker control for scene timing. Adopt only if interaction warrants replacing Canvas; Jev maps language to selected entities and available patches."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "S", "action": "Unify and version recorded/live questions; label source and verify equal-plan replay parity." },
+    { "priority": "P1", "size": "M", "action": "Bind responses to world revisions and regress the recorded-selection race." },
+    { "priority": "P2", "size": "S", "action": "Implement local scene time, true pause, step, and seed reset." },
+    { "priority": "P1", "size": "L", "action": "Build the garden entity model and limited causal rules while retaining current artwork as a baseline." },
+    { "priority": "P1", "size": "M", "action": "Author independent held-out constraints and oracle/rule baselines before adding visual polish; reuse state/patch checks in a later game or weather sandbox." }
+  ],
+  "sources": [
+    { "label": "Matter.js Engine API", "url": "https://brm.io/matter-js/docs/classes/Engine.html" },
+    { "label": "PixiJS Events and Interaction", "url": "https://pixijs.com/8.x/guides/components/events" },
+    { "label": "PixiJS Ticker", "url": "https://pixijs.com/8.x/guides/components/ticker" }
+  ]
+}

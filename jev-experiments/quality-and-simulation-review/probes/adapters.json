@@ -1,0 +1,1465 @@
+{
+  "baseline": "4c0c40d5",
+  "sha256": "b7ab141e5759d2081a13242f4a034eec54a84063fc17cf1f1795f8a0c8d70615",
+  "recordedCases": 1,
+  "recordedDecisions": 3,
+  "recordedLanguages": 4,
+  "recordedValues": [
+    {
+      "language": "Python / Pydantic",
+      "value": {
+        "area": "billing",
+        "refund": true,
+        "missing_context": 0.89
+      },
+      "evidence_preserved": true
+    },
+    {
+      "language": "TypeScript / Zod",
+      "value": {
+        "area": "billing",
+        "refund": true,
+        "missing_context": 0.89
+      },
+      "evidence_preserved": true,
+      "same_typed_value": true
+    },
+    {
+      "language": "Rust / Serde + Schemars",
+      "value": {
+        "area": "billing",
+        "refund": true,
+        "missing_context": 0.89
+      },
+      "evidence_preserved": true,
+      "same_typed_value": true
+    },
+    {
+      "language": "Go / JSON Schema + validator",
+      "value": {
+        "area": "billing",
+        "refund": true,
+        "missing_context": 0.89
+      },
+      "evidence_preserved": true,
+      "same_typed_value": true
+    }
+  ],
+  "compileProbes": {
+    "twoLevel": {
+      "accepted": true,
+      "result": {
+        "rating": {
+          "type": "noul",
+          "instructions": "Use the explicit ordered levels."
+        }
+      }
+    },
+    "threeLevel": {
+      "accepted": true,
+      "result": {
+        "rating": {
+          "type": "score",
+          "instructions": "Use the explicit ordered levels.",
+          "criteria": [
+            "deny",
+            "review",
+            "allow"
+          ]
+        }
+      }
+    },
+    "numericLevels": {
+      "accepted": true,
+      "result": {
+        "rating": {
+          "type": "score",
+          "instructions": "Use the explicit ordered levels.",
+          "criteria": [
+            0,
+            1,
+            2
+          ]
+        }
+      }
+    },
+    "tooManyLevels": {
+      "accepted": true,
+      "result": {
+        "type": "score",
+        "criteriaCount": 256
+      }
+    },
+    "duplicateEnum": {
+      "accepted": true,
+      "result": {
+        "x": {
+          "type": "choice",
+          "instructions": "Choose.",
+          "criteria": {
+            "a": "a"
+          }
+        }
+      }
+    },
+    "visibleSnippetMissingDescriptions": {
+      "accepted": false,
+      "error": "Error: A semantic description is required: area"
+    }
+  },
+  "rawDecodeInheritedOption": {
+    "accepted": true,
+    "result": {
+      "area": "constructor",
+      "refund": true,
+      "missing_context": 0.89
+    }
+  },
+  "outcomes": {
+    "recorded_valid": {
+      "Python": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        }
+      },
+      "TypeScript": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "billing": "billing",
+              "technical": "technical",
+              "account": "account",
+              "other": "other"
+            }
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          }
+        }
+      },
+      "Rust": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            },
+            "instructions": "Which support area applies?",
+            "type": "choice"
+          },
+          "missing_context": {
+            "instructions": "Is essential context missing?",
+            "type": "noul"
+          },
+          "refund": {
+            "instructions": "Is a refund requested?",
+            "type": "noul"
+          }
+        }
+      },
+      "Go": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            }
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          }
+        }
+      }
+    },
+    "null_choice_distribution": {
+      "Python": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": null,
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        }
+      },
+      "TypeScript": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": null,
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "billing": "billing",
+              "technical": "technical",
+              "account": "account",
+              "other": "other"
+            }
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          }
+        }
+      },
+      "Rust": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": null,
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            },
+            "instructions": "Which support area applies?",
+            "type": "choice"
+          },
+          "missing_context": {
+            "instructions": "Is essential context missing?",
+            "type": "noul"
+          },
+          "refund": {
+            "instructions": "Is a refund requested?",
+            "type": "noul"
+          }
+        }
+      },
+      "Go": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": null,
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            }
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          }
+        }
+      }
+    },
+    "missing_choice_distribution": {
+      "Python": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        }
+      },
+      "TypeScript": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "billing": "billing",
+              "technical": "technical",
+              "account": "account",
+              "other": "other"
+            }
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          }
+        }
+      },
+      "Rust": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": null,
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            },
+            "instructions": "Which support area applies?",
+            "type": "choice"
+          },
+          "missing_context": {
+            "instructions": "Is essential context missing?",
+            "type": "noul"
+          },
+          "refund": {
+            "instructions": "Is a refund requested?",
+            "type": "noul"
+          }
+        }
+      },
+      "Go": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": null,
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            }
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          }
+        }
+      }
+    },
+    "missing_confidence": {
+      "Python": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            }
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        }
+      },
+      "TypeScript": {
+        "accepted": false,
+        "error": " Bun v1.3.14 (macOS arm64)"
+      },
+      "Rust": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            },
+            "instructions": "Which support area applies?",
+            "type": "choice"
+          },
+          "missing_context": {
+            "instructions": "Is essential context missing?",
+            "type": "noul"
+          },
+          "refund": {
+            "instructions": "Is a refund requested?",
+            "type": "noul"
+          }
+        }
+      },
+      "Go": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            }
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          }
+        }
+      }
+    },
+    "choice_disagrees_with_distribution": {
+      "Python": {
+        "accepted": true,
+        "value": {
+          "area": "technical",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "technical",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        }
+      },
+      "TypeScript": {
+        "accepted": true,
+        "value": {
+          "area": "technical",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "technical",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "billing": "billing",
+              "technical": "technical",
+              "account": "account",
+              "other": "other"
+            }
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          }
+        }
+      },
+      "Rust": {
+        "accepted": true,
+        "value": {
+          "area": "technical",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "technical",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            },
+            "instructions": "Which support area applies?",
+            "type": "choice"
+          },
+          "missing_context": {
+            "instructions": "Is essential context missing?",
+            "type": "noul"
+          },
+          "refund": {
+            "instructions": "Is a refund requested?",
+            "type": "noul"
+          }
+        }
+      },
+      "Go": {
+        "accepted": true,
+        "value": {
+          "area": "technical",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "technical",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            }
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          }
+        }
+      }
+    },
+    "boolean_exact_half": {
+      "Python": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.5,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        }
+      },
+      "TypeScript": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.5,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "billing": "billing",
+              "technical": "technical",
+              "account": "account",
+              "other": "other"
+            }
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          }
+        }
+      },
+      "Rust": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.5,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            },
+            "instructions": "Which support area applies?",
+            "type": "choice"
+          },
+          "missing_context": {
+            "instructions": "Is essential context missing?",
+            "type": "noul"
+          },
+          "refund": {
+            "instructions": "Is a refund requested?",
+            "type": "noul"
+          }
+        }
+      },
+      "Go": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.5,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            }
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          }
+        }
+      }
+    },
+    "wrong_noul_type": {
+      "Python": {
+        "accepted": false,
+        "error": "    raise ValueError(f\"Out-of-range answer for {key}\") ValueError: Out-of-range answer for refund"
+      },
+      "TypeScript": {
+        "accepted": false,
+        "error": " Bun v1.3.14 (macOS arm64)"
+      },
+      "Rust": {
+        "accepted": false,
+        "error": "Error: Custom { kind: Other, error: \"Out-of-range value\" }"
+      },
+      "Go": {
+        "accepted": false,
+        "error": "main.main() \t/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/adapters/go/cmd/demo/main.go:8 +0x1b8"
+      }
+    },
+    "inherited_choice_constructor": {
+      "Python": {
+        "accepted": false,
+        "error": "    raise ValueError(f\"Unknown option for {key}\") ValueError: Unknown option for area"
+      },
+      "TypeScript": {
+        "accepted": false,
+        "error": " Bun v1.3.14 (macOS arm64)"
+      },
+      "Rust": {
+        "accepted": false,
+        "error": "Error: Custom { kind: Other, error: \"Unknown choice\" }"
+      },
+      "Go": {
+        "accepted": false,
+        "error": "main.main() \t/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/adapters/go/cmd/demo/main.go:8 +0x1b8"
+      }
+    },
+    "extra_answer": {
+      "Python": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "unrequested": {
+            "type": "noul",
+            "value": 1,
+            "probabilities": null,
+            "confidence": null
+          }
+        }
+      },
+      "TypeScript": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "technical": 0,
+              "other": 0
+            },
+            "confidence": 1
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "unrequested": {
+            "type": "noul",
+            "value": 1,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "billing": "billing",
+              "technical": "technical",
+              "account": "account",
+              "other": "other"
+            }
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          }
+        }
+      },
+      "Rust": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "unrequested": {
+            "type": "noul",
+            "value": 1,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            },
+            "instructions": "Which support area applies?",
+            "type": "choice"
+          },
+          "missing_context": {
+            "instructions": "Is essential context missing?",
+            "type": "noul"
+          },
+          "refund": {
+            "instructions": "Is a refund requested?",
+            "type": "noul"
+          }
+        }
+      },
+      "Go": {
+        "accepted": true,
+        "value": {
+          "area": "billing",
+          "refund": true,
+          "missing_context": 0.89
+        },
+        "answers": {
+          "area": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "account": 0,
+              "billing": 1,
+              "other": 0,
+              "technical": 0
+            },
+            "confidence": 1
+          },
+          "missing_context": {
+            "type": "noul",
+            "value": 0.89,
+            "probabilities": null,
+            "confidence": null
+          },
+          "refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "unrequested": {
+            "type": "noul",
+            "value": 1,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "questions": {
+          "area": {
+            "type": "choice",
+            "instructions": "Which support area applies?",
+            "criteria": {
+              "account": "account",
+              "billing": "billing",
+              "other": "other",
+              "technical": "technical"
+            }
+          },
+          "missing_context": {
+            "type": "noul",
+            "instructions": "Is essential context missing?"
+          },
+          "refund": {
+            "type": "noul",
+            "instructions": "Is a refund requested?"
+          }
+        }
+      }
+    },
+    "partial_distribution": {
+      "Python": {
+        "accepted": false,
+        "error": "    raise ValueError(f\"Malformed probability distribution: {key}\") ValueError: Malformed probability distribution: area"
+      },
+      "TypeScript": {
+        "accepted": false,
+        "error": " Bun v1.3.14 (macOS arm64)"
+      },
+      "Rust": {
+        "accepted": false,
+        "error": "Error: Custom { kind: Other, error: \"Malformed distribution\" }"
+      },
+      "Go": {
+        "accepted": false,
+        "error": "main.main() \t/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/adapters/go/cmd/demo/main.go:8 +0x1b8"
+      }
+    }
+  },
+  "providerCalls": 0
+}

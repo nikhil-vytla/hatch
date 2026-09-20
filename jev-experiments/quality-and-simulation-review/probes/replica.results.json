@@ -1,0 +1,527 @@
+{
+  "manifest": {
+    "id": "20260920T050432-replica-6d43d3",
+    "experiment": "replica",
+    "created": "2026-09-20T05:04:32.597531+00:00",
+    "config": {
+      "quick": false,
+      "seed": 42
+    },
+    "python": "3.13.11",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "status": "complete",
+    "finished": "2026-09-20T05:11:11.376254+00:00"
+  },
+  "result_keys": [
+    "base",
+    "revision",
+    "device",
+    "trainable_parameters",
+    "training_steps",
+    "training_seconds",
+    "before",
+    "after",
+    "best_validation_choice_accuracy",
+    "packed_separate_max_probability_difference",
+    "curve",
+    "before_rows",
+    "after_rows",
+    "sources",
+    "limitations",
+    "jev_reference",
+    "budget_at_finish",
+    "transport"
+  ],
+  "split_sizes": {
+    "train": {
+      "n": 308,
+      "classes": 77,
+      "targets": {
+        "choice": {
+          "0": 69,
+          "1": 75,
+          "3": 83,
+          "2": 81
+        },
+        "noul": {
+          "0": 154,
+          "1": 154
+        },
+        "score": {
+          "0": 154,
+          "2": 154
+        }
+      }
+    },
+    "validation": {
+      "n": 40,
+      "classes": 40,
+      "targets": {
+        "choice": {
+          "0": 7,
+          "2": 14,
+          "3": 10,
+          "1": 9
+        },
+        "noul": {
+          "1": 21,
+          "0": 19
+        },
+        "score": {
+          "2": 21,
+          "0": 19
+        }
+      }
+    },
+    "test": {
+      "n": 77,
+      "classes": 77,
+      "targets": {
+        "choice": {
+          "2": 23,
+          "3": 20,
+          "1": 19,
+          "0": 15
+        },
+        "noul": {
+          "0": 47,
+          "1": 30
+        },
+        "score": {
+          "0": 47,
+          "2": 30
+        }
+      }
+    }
+  },
+  "phases": {
+    "before": {
+      "choice": {
+        "correct": 25,
+        "n": 77,
+        "wilson95": [
+          0.23059379328779073,
+          0.4354191610320238
+        ],
+        "brier": 0.7414414008270456,
+        "predictions": {
+          "3": 33,
+          "2": 31,
+          "1": 13
+        },
+        "targets": {
+          "2": 23,
+          "3": 20,
+          "1": 19,
+          "0": 15
+        },
+        "confusion": {
+          "2->3": 14,
+          "2->2": 8,
+          "3->3": 11,
+          "1->2": 7,
+          "0->2": 8,
+          "3->2": 8,
+          "1->1": 6,
+          "1->3": 6,
+          "0->1": 5,
+          "0->3": 2,
+          "3->1": 1,
+          "2->1": 1
+        },
+        "mean_confidence": 0.27690116383812646,
+        "confident_errors_at_0_9": 0
+      },
+      "noul": {
+        "correct": 31,
+        "n": 77,
+        "wilson95": [
+          0.3002201729682805,
+          0.5142314683205054
+        ],
+        "brier": 0.5460019499082502,
+        "predictions": {
+          "1": 76,
+          "0": 1
+        },
+        "targets": {
+          "0": 47,
+          "1": 30
+        },
+        "confusion": {
+          "0->1": 46,
+          "1->1": 30,
+          "0->0": 1
+        },
+        "mean_confidence": 0.568446714382667,
+        "confident_errors_at_0_9": 0
+      },
+      "score": {
+        "correct": 26,
+        "n": 77,
+        "wilson95": [
+          0.24199921857053475,
+          0.44875351691077503
+        ],
+        "brier": 0.7058859580262071,
+        "predictions": {
+          "2": 69,
+          "1": 8
+        },
+        "targets": {
+          "0": 47,
+          "2": 30
+        },
+        "confusion": {
+          "0->2": 43,
+          "2->2": 26,
+          "0->1": 4,
+          "2->1": 4
+        },
+        "mean_confidence": 0.36694387375534354,
+        "confident_errors_at_0_9": 0
+      },
+      "latency_ms": {
+        "median": 23.385833017528057,
+        "max": 1643.7275829957798,
+        "sum": 3935.0541681051254
+      }
+    },
+    "after": {
+      "choice": {
+        "correct": 51,
+        "n": 77,
+        "wilson95": [
+          0.551246483089225,
+          0.7580007814294651
+        ],
+        "brier": 0.45642224722611174,
+        "predictions": {
+          "2": 22,
+          "3": 29,
+          "1": 10,
+          "0": 16
+        },
+        "targets": {
+          "2": 23,
+          "3": 20,
+          "1": 19,
+          "0": 15
+        },
+        "confusion": {
+          "2->2": 16,
+          "3->3": 16,
+          "1->1": 10,
+          "0->3": 6,
+          "3->2": 3,
+          "2->0": 3,
+          "1->2": 3,
+          "2->3": 4,
+          "1->3": 3,
+          "1->0": 3,
+          "0->0": 9,
+          "3->0": 1
+        },
+        "mean_confidence": 0.5753829591460042,
+        "confident_errors_at_0_9": 0
+      },
+      "noul": {
+        "correct": 31,
+        "n": 77,
+        "wilson95": [
+          0.3002201729682805,
+          0.5142314683205054
+        ],
+        "brier": 0.720240112357777,
+        "predictions": {
+          "1": 74,
+          "0": 3
+        },
+        "targets": {
+          "0": 47,
+          "1": 30
+        },
+        "confusion": {
+          "0->1": 45,
+          "1->1": 29,
+          "1->0": 1,
+          "0->0": 2
+        },
+        "mean_confidence": 0.745455657506918,
+        "confident_errors_at_0_9": 3
+      },
+      "score": {
+        "correct": 35,
+        "n": 77,
+        "wilson95": [
+          0.3481416088677176,
+          0.5652691570670489
+        ],
+        "brier": 0.6254828015142395,
+        "predictions": {
+          "2": 66,
+          "0": 11
+        },
+        "targets": {
+          "0": 47,
+          "2": 30
+        },
+        "confusion": {
+          "0->2": 39,
+          "2->2": 27,
+          "0->0": 8,
+          "2->0": 3
+        },
+        "mean_confidence": 0.7064635474960526,
+        "confident_errors_at_0_9": 0
+      },
+      "latency_ms": {
+        "median": 23.05775001877919,
+        "max": 26.819584018085152,
+        "sum": 1746.734548069071
+      }
+    }
+  },
+  "unique_training_records_drawn": 163,
+  "sample_exact_text_overlap": {
+    "train:validation": 0,
+    "train:test": 0,
+    "validation:test": 0
+  },
+  "choice_paired_transitions": {
+    "False->True": 32,
+    "True->True": 19,
+    "False->False": 20,
+    "True->False": 6
+  },
+  "jev_reference": {
+    "n": 77,
+    "answered": 32,
+    "errors": {
+      "HTTP 429": 45
+    },
+    "correct_answered": 32,
+    "recorded_accuracy_all_attempted": 0.4155844155844156,
+    "replica_correct_on_same_answered": 19
+  },
+  "curve": {
+    "points": 24,
+    "first": {
+      "step": 1,
+      "loss": 1.133649468421936,
+      "elapsed_s": 2.356096667004749
+    },
+    "last": {
+      "step": 231,
+      "loss": 0.8505592942237854,
+      "elapsed_s": 16.01355854200665
+    },
+    "reported_training_seconds": 19.335577792022377
+  },
+  "examples": [
+    {
+      "record": {
+        "id": "banking77/test/2647",
+        "text": "I attempted to top up but the app denied it.",
+        "target": "top_up_failed",
+        "questions": [
+          {
+            "type": "choice",
+            "instruction": "Which intent is expressed by the customer?",
+            "options": [
+              "unable to verify identity",
+              "top up by card charge",
+              "top up failed",
+              "country support"
+            ],
+            "label": 2
+          },
+          {
+            "type": "noul",
+            "instruction": "Is this about country support?",
+            "options": [
+              "no",
+              "yes"
+            ],
+            "label": 0
+          },
+          {
+            "type": "score",
+            "instruction": "How directly is this about country support?",
+            "options": [
+              "not about this",
+              "partly related",
+              "directly about this"
+            ],
+            "label": 0
+          }
+        ],
+        "candidate_labels": [
+          "unable_to_verify_identity",
+          "top_up_by_card_charge",
+          "top_up_failed",
+          "country_support"
+        ]
+      },
+      "before": {
+        "id": "banking77/test/2647",
+        "targets": [
+          2,
+          0,
+          0
+        ],
+        "probabilities": [
+          [
+            0.18081681430339813,
+            0.25078824162483215,
+            0.26651236414909363,
+            0.3018825650215149
+          ],
+          [
+            0.4137582778930664,
+            0.5862416625022888
+          ],
+          [
+            0.3015103042125702,
+            0.341860830783844,
+            0.35662880539894104
+          ]
+        ],
+        "latency_ms": 1643.7275829957798
+      },
+      "after": {
+        "id": "banking77/test/2647",
+        "targets": [
+          2,
+          0,
+          0
+        ],
+        "probabilities": [
+          [
+            0.1179099977016449,
+            0.1868472397327423,
+            0.39009568095207214,
+            0.30514705181121826
+          ],
+          [
+            0.18258154392242432,
+            0.8174184560775757
+          ],
+          [
+            0.2896052300930023,
+            0.01591349020600319,
+            0.6944813132286072
+          ]
+        ],
+        "latency_ms": 19.479208043776453
+      },
+      "after_source_line": 103
+    },
+    {
+      "record": {
+        "id": "banking77/test/2978",
+        "text": "My American express is experiencing a problem with apple play with top up, can you fix it?",
+        "target": "apple_pay_or_google_pay",
+        "questions": [
+          {
+            "type": "choice",
+            "instruction": "Which intent is expressed by the customer?",
+            "options": [
+              "transfer not received by recipient",
+              "apple pay or google pay",
+              "receiving money",
+              "edit personal details"
+            ],
+            "label": 1
+          },
+          {
+            "type": "noul",
+            "instruction": "Is this about receiving money?",
+            "options": [
+              "no",
+              "yes"
+            ],
+            "label": 0
+          },
+          {
+            "type": "score",
+            "instruction": "How directly is this about receiving money?",
+            "options": [
+              "not about this",
+              "partly related",
+              "directly about this"
+            ],
+            "label": 0
+          }
+        ],
+        "candidate_labels": [
+          "transfer_not_received_by_recipient",
+          "apple_pay_or_google_pay",
+          "receiving_money",
+          "edit_personal_details"
+        ]
+      },
+      "before": {
+        "id": "banking77/test/2978",
+        "targets": [
+          1,
+          0,
+          0
+        ],
+        "probabilities": [
+          [
+            0.19327524304389954,
+            0.26532670855522156,
+            0.2790955901145935,
+            0.262302428483963
+          ],
+          [
+            0.397438645362854,
+            0.602561354637146
+          ],
+          [
+            0.2553749680519104,
+            0.3539251983165741,
+            0.3906998634338379
+          ]
+        ],
+        "latency_ms": 32.66062500188127
+      },
+      "after": {
+        "id": "banking77/test/2978",
+        "targets": [
+          1,
+          0,
+          0
+        ],
+        "probabilities": [
+          [
+            0.042539726942777634,
+            0.4901445806026459,
+            0.3975367844104767,
+            0.06977882981300354
+          ],
+          [
+            0.042258601635694504,
+            0.9577414393424988
+          ],
+          [
+            0.13074839115142822,
+            0.007142478600144386,
+            0.8621091246604919
+          ]
+        ],
+        "latency_ms": 24.385917000472546
+      },
+      "after_source_line": 129
+    }
+  ],
+  "packed_separate_max_probability_difference": 1.6391277313232422e-06,
+  "full_test_token_preflight": {
+    "n": 3080,
+    "maximum_document_tokens": 83,
+    "documents_exceeding_160": 0,
+    "full_77_option_branch_tokens": 509,
+    "maximum_77_option_packed_tokens": 592
+  }
+}

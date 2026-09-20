@@ -1,0 +1,120 @@
+{
+  "model": "decart/lucy2-vton/realtime",
+  "created": "2026-09-20T20:29:11.116Z",
+  "source": "actual-provider-output",
+  "input": "original code-illustrated adult presenter; canvas.captureStream; no camera or microphone",
+  "commandSource": "authored demonstration text, not speech transcription",
+  "declaredSeconds": 30,
+  "commands": [
+    {
+      "id": "jacket",
+      "text": "Put a denim jacket on me."
+    },
+    {
+      "id": "sunglasses",
+      "text": "Add black square sunglasses, and keep the jacket."
+    },
+    {
+      "id": "pink",
+      "text": "Make them pink."
+    },
+    {
+      "id": "bigger",
+      "text": "Make them bigger."
+    }
+  ],
+  "events": [
+    {
+      "type": "authenticating",
+      "elapsedMs": 0
+    },
+    {
+      "type": "signaling-connected",
+      "elapsedMs": 499
+    },
+    {
+      "type": "prompt-sent",
+      "elapsedMs": 500,
+      "revision": 1
+    },
+    {
+      "type": "error",
+      "elapsedMs": 9306,
+      "detail": "The video provider rejected this session or update. Your outfit state is preserved."
+    },
+    {
+      "type": "disconnected",
+      "elapsedMs": 9308
+    }
+  ],
+  "status": "unavailable",
+  "actualRecordedSeconds": 0,
+  "videoBytes": 0,
+  "error": "The video provider rejected this session or update. Your outfit state is preserved.",
+  "prompts": [
+    {
+      "revision": 1,
+      "text": "Put a denim jacket on me.",
+      "outfit": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "none",
+        "glassesColor": "black",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "jacket"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. No sunglasses or eyewear. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories."
+    },
+    {
+      "revision": 2,
+      "text": "Add black square sunglasses, and keep the jacket.",
+      "outfit": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "black",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. Wear black wayfarer sunglasses, with regular frames. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories."
+    },
+    {
+      "revision": 3,
+      "text": "Make them pink.",
+      "outfit": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "pink",
+        "glassesSize": "regular",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. Wear pink wayfarer sunglasses, with regular frames. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories."
+    },
+    {
+      "revision": 4,
+      "text": "Make them bigger.",
+      "outfit": {
+        "jacket": "denim",
+        "jacketColor": "navy",
+        "fit": "regular",
+        "glasses": "wayfarer",
+        "glassesColor": "pink",
+        "glassesSize": "large",
+        "shirt": "white",
+        "trousers": "indigo",
+        "focus": "glasses"
+      },
+      "prompt": "Transform clothing and accessories only. Preserve the person's face, identity, hair, skin tone, body shape, pose, motion and background. The complete current outfit is: a white crew-neck T-shirt and indigo trousers. Wear a navy denim jacket in a regular fit. Keep the jacket's proportions appropriate to that fit. Wear pink wayfarer sunglasses, with large frames. Keep all listed garments and accessories together. Do not remove an existing listed item when adding another. Do not add logos, text, hats or extra accessories."
+    }
+  ]
+}

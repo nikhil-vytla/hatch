@@ -1,0 +1,67 @@
+{
+  "protocol": "Browser-only software fixture on rebuilt http://127.0.0.1:5195/#experiment/tetris. All evaluate requests intercepted; no provider/model calls. First phase checks success and 503 failure; separate held-request phase checks cancellation. A preliminary cancellation fixture used an unavailable timer helper and was restarted; its cancelled request explains the cumulative cancelled count of 2.",
+  "fixtureOnly": true,
+  "requestCount": 2,
+  "events": [
+    {
+      "status": "accepted",
+      "requestMatchesWire": true,
+      "instructions": true,
+      "httpStatus": 200,
+      "response": {
+        "answers": {
+          "decision": {
+            "type": "choice",
+            "value": "4_18-3_19-4_19-5_19",
+            "probabilities": {
+              "4_18-3_19-4_19-5_19": 0.83
+            },
+            "confidence": 0.83
+          }
+        },
+        "model": "fixture/jev",
+        "latency_ms": 17,
+        "service_latency_ms": 14,
+        "cost_usd": 0,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 14
+          }
+        ],
+        "source": "test-fixture"
+      }
+    },
+    {
+      "status": "failed",
+      "requestMatchesWire": true,
+      "instructions": true,
+      "httpStatus": 503,
+      "response": {
+        "error": "Synthetic provider unavailable",
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 503,
+            "latency_ms": 12
+          }
+        ],
+        "retry_after_ms": 1000
+      }
+    }
+  ],
+  "checkpoint": 1200,
+  "cancellation": {
+    "status": "cancelled",
+    "requestMatchesWire": true,
+    "hasResponse": false,
+    "reason": "Controls or timeline changed",
+    "pending": null,
+    "accepted": 1,
+    "failed": 1,
+    "cancelled": 2,
+    "checkpoint": 1580
+  }
+}

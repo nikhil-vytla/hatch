@@ -1,0 +1,123 @@
+{
+  "id": "games",
+  "title": "Key & door",
+  "evidenceStatus": "240 decoded episode rows: 156 wins, 83 lab cutoffs, one provider interruption; 7,933 trace rows and 129 observations. Offline record/source/React-element probe only.",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The route is a recorded-action viewer, with no playable engine, manual movement, or Jev handoff. Its 64-action cutoff differs from native MiniGrid limits and its traces omit resulting terminal states. Build a complete local maze campaign, then evaluate Jev in a separate seeded comparison with explicit information aids, native rules, and strong code baselines.",
+  "strengths": [
+    "Real MiniGrid execution records rewards, partial observations, action latency, and cache flags; the visible BFS comparator does not see a privileged full map.",
+    "Observation interning has a lossless round-trip test, and exact-observation decision reuse has a contract test.",
+    "README and result notes disclose the 64-step limit, shared decisions, repeated Empty layout, and superior geometric baseline; the UI identifies recorded playback and excludes the interrupted episode."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "There is no complete playable game",
+      "evidence": "experience-prototypes/src/games.tsx:66, :124. All controls select episodes or move a trace index; no game transition, manual action, live request, handoff, loss, new maze, or actual state restart exists.",
+      "impact": "The current replay matches its Watch copy but cannot deliver the user's requested full-game experience or demonstrate assistance in a live position.",
+      "fix": "Build a complete local manual maze with real win/loss/restart first. Route Jev and code policies through the same action dispatcher; separate Play, Recorded runs, and Compare. Provider failure returns control without ending play."
+    },
+    {
+      "priority": "P1",
+      "title": "Terminal state and stopping reasons are missing",
+      "evidence": "src/jev_lab/games.py:147 stores pre-action state with post-action reward and no next observation or termination flags. All 156 wins end with the goal still in front; 83 runs stop at the lab's 64-action cutoff. Native MiniGrid 3.1.0 limits are 100 Empty/250 DoorKey actions. The interrupted row counts 22 actions plus an error as 23 steps.",
+      "impact": "Replays never show the winning state, and goal failure, artificial cutoff, and provider unavailability cannot be treated as the same game outcome.",
+      "fix": "Store initial and resulting states, reward, executed action count, termination/truncation, and explicit goal/timeout/loss/cutoff/provider/user-stop reasons. Show the final board and report scheduled versus completed outcomes separately."
+    },
+    {
+      "priority": "P1",
+      "title": "Repeated layouts and shared cache limit the memory comparison",
+      "evidence": "src/jev_lab/games.py:113, :193. Empty's 30 seeds share one initial observation and one action trace per deterministic policy. Jev reuses cached decisions on 3,886 of 4,298 action rows (90.4%); 419 memoized request states are shared. DoorKey has 20 distinct initial observations, which are not necessarily 20 full worlds.",
+      "impact": "The existing results describe a small cached policy and do not estimate fresh-call variability or general navigation performance from 30 independent environments.",
+      "fix": "Keep fixed Empty as a diagnostic, use held-out generated layouts and request IDs, compare against a persistent observed-map planner, and separate uncached policy evaluation from cached system performance. Cluster uncertainty by unique layout."
+    },
+    {
+      "priority": "P1",
+      "title": "The assisted wrapper changes the benchmark and misnames toggle",
+      "evidence": "src/jev_lab/games.py:12, :15, :37. Text labels, inventory, and a five-action mask replace native seven-action interaction. open_door maps to toggle and is offered on open doors or without a key. Recorded random actions close an already open door ten times and try locked doors without a key 20 times.",
+      "impact": "The comparison is an assisted symbolic MiniGrid protocol, not a vision or unmodified action-space benchmark; action names can misdescribe actual consequences.",
+      "fix": "Use accurate toggle semantics, version the observation/action wrapper, and report native versus assisted tracks separately. Match information across competing policies and label privileged oracles as ceilings."
+    },
+    {
+      "priority": "P2",
+      "title": "Replay hides door status and the memory input",
+      "evidence": "experience-prototypes/src/games.tsx:34, :55, :241. Actual element trees are identical for locked/open doors and yellow/red doors. The inspector omits recent_actions even though src/jev_lab/games.py:103 supplies it to the memory policy.",
+      "impact": "Visitors cannot see whether a door changed state or inspect the exact history that supposedly improved the decision. Color is currently a future-extension issue because these worlds use yellow doors.",
+      "fix": "Render door state distinctly, show exact request history and inventory, distinguish pre-decision versus resulting frames, and provide understandable keyboard/touch controls and state feedback for play."
+    }
+  ],
+  "simulation": {
+    "title": "A complete three-room key maze with manual and Jev control",
+    "description": "A seedable three-level campaign has corridors, matching keys/doors, treasure, hazards, fog, and exits. Three hearts provide a real loss condition; hazards cost a heart and return the player to the level entrance while preserving collected items/opened doors. Final exit wins the campaign. Restart resets level state, and new game changes the seed. Human play, one-move suggestions, Jev takeover, and immediate manual takeover all use the same engine. This custom game is separate from literal MiniGrid evaluation.",
+    "jevsRole": "Choose one action from the declared contract using only current partial observation and the selected history/map mode. Pending answers are invalidated on human takeover, restart, revision change, or terminal state. No map edits, teleports, score changes, or rule changes.",
+    "codeRole": "Maintain serializable seed, map/object state, pose, inventory, hearts, turns, fog/history, controller, lifecycle, and revision. A pure transition function handles collisions, keys, locks, hazards, respawn, exit progression, win/loss, and reset. The observation adapter excludes hidden state from model requests.",
+    "acceptanceCriteria": [
+      "Without a provider key, a visitor can start, play, win or lose, restart, and begin a new campaign using keyboard or touch.",
+      "Key matching, door passage, hazard damage/respawn, lives, level progression, and final victory follow documented rules and expose their effects.",
+      "Each action applies at most once; takeover, restart, seed change, and terminal states reject pending answers.",
+      "The assistant receives only declared information; a labeled spectator map never leaks through the adapter.",
+      "Seed plus action list reproduces state hashes and terminal outcome; the final board is visible and restart resets all relevant state.",
+      "Game outcome, provider interruption, comparison-budget suspension, and user stop remain distinct; manual play can continue without the provider."
+    ]
+  },
+  "evaluation": {
+    "design": "First validate the custom game on 100 seeds in each of three difficulty tiers, four code policies per layout (1,200 complete local episodes), and 1,000 generated lifecycle/handoff schedules. Require zero accepted stale actions, exact replay, and demonstrated manual win/loss/restart/handoff. Separately define 30 held-out seeds per each of four official DoorKey sizes, totaling 120 environment/seed pairs. Six policies and native/assisted tracks yield 1,440 episodes, including 480 Jev episodes and at most 457,200 logical requests before retries under native 250/360/640/2,560 step limits. A five-seed 5x5 development pilot across two Jev policies/two tracks is 20 episodes and at most 5,000 calls. Disable cross-episode cache for fresh-call policy evaluation and separately measure cached operation. Report native return, goal rate, all-scheduled availability, stop reasons, actions, loops, path efficiency, latency, and cost. Use 10,000 paired bootstrap resamples clustered by unique generated layout, stratified by size; memory-improvement claims require a paired 95% interval above zero. A separate 24-player counterbalanced handoff study has 96 full games, with two manual/two assisted per player and at most 2,400 assistant calls; the assistant budget returns control without ending play. All proposed runs remain unperformed.",
+    "baselines": [
+      "Uniform random actions under the same declared action information within each track.",
+      "Current visible-grid BFS, retaining the strong existing comparator.",
+      "Persistent observed-map frontier/path planner with an explicit memory budget and the same observations.",
+      "Reactive Jev versus Jev with eight recent actions, differing only in the declared history ablation.",
+      "Privileged full-map shortest-path oracle, labeled as a ceiling rather than an equal-information competitor.",
+      "Manual-only versus optional Jev handoff in a separate counterbalanced human study."
+    ],
+    "metrics": [
+      "Native mean terminal return and goal success, with paired layout-clustered uncertainty and separate size strata.",
+      "All-scheduled completion, provider interruption, lab/budget suspension, and explicit termination/truncation reason.",
+      "Executed actions, cycles/no-progress, repeated toggles, and success-conditioned path efficiency versus the labeled oracle.",
+      "Request count, cache hits, fresh-call/end-to-end latency, retries, and cost.",
+      "Stale-action acceptance, deterministic replay, correct terminal state, restart completeness, and keyboard/touch lifecycle success.",
+      "Human completion/time, mistakes, takeovers, actual assistant use, and preserved state during handoff."
+    ],
+    "coverage": {
+      "kind": "mixed",
+      "current": "Two official MiniGrid configurations, one of four DoorKey sizes and one of six Empty configurations; 30 seed labels each across four policies yield 240 rows. Modified text/action-mask protocol and 64-action cap; fixed Empty repeats one layout. 156 wins, 83 lab cutoffs, one interruption. No fixed external dataset split or full-suite percentage is claimed.",
+      "full": "MiniGrid procedurally generates environments and has no finite official test split asserted here. Proposed local manifest covers all four DoorKey sizes with 30 held-out seeds each, six policies, and two information tracks: 1,440 episodes. Separate authored custom-game and human-handoff protocols cover complete play rather than truncated traces.",
+      "feasibility": "Future work requires terminal-complete logs, pinned environment/wrapper versions, new disjoint seeds, browser-port parity if used, human participants, and substantial provider budget. The full comparison has a 457,200-request worst-case ceiling; the declared pilot caps at 5,000. Provider budgets suspend rather than falsify game outcomes. No large data/weight download is needed; no new model or environment episodes were run."
+    }
+  },
+  "libraries": [
+    {
+      "name": "MiniGrid",
+      "url": "https://minigrid.farama.org/environments/minigrid/DoorKeyEnv/",
+      "use": "Retain the authoritative seeded reference environment for literal comparison. Verify any browser port against state-transition fixtures before sharing its name or scores. Jev is a policy, not the game rules."
+    },
+    {
+      "name": "Phaser",
+      "url": "https://docs.phaser.io/phaser/concepts/scenes",
+      "use": "Optional scene lifecycle, keyboard/touch input, and animation for the complete custom maze. Keep deterministic turn transitions independent of rendering and frame rate; the existing React grid can support a small initial version."
+    },
+    {
+      "name": "Gymnasium",
+      "url": "https://gymnasium.farama.org/api/env/",
+      "use": "Explicit reset/step/reward/termination/truncation contract for the comparison adapter, separating completed game outcomes from stopped traces and provider interruption."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "S", "action": "Correct outcome categories, executed action counts, toggle naming, and assisted-protocol labels." },
+    { "priority": "P1", "size": "M", "action": "Record resulting observations and terminal flags, display final state, and expose exact memory inputs." },
+    { "priority": "P1", "size": "L", "action": "Build the complete manual maze campaign with deterministic transitions, real win/loss, restart, and seed controls." },
+    { "priority": "P1", "size": "M", "action": "Add Jev suggestion/takeover through the same engine with immediate manual takeover and revision checks." },
+    { "priority": "P1", "size": "M", "action": "Create separate seeded comparison mode with matched information, strong code baselines, native/assisted tracks, and the declared pilot before expensive full runs." },
+    { "priority": "P2", "size": "S", "action": "Distinguish door status and inventory visually and verify keyboard/touch feedback; later reuse the engine for semantic object/hazard missions." }
+  ],
+  "sources": [
+    { "label": "Official DoorKey configurations, actions, and reward", "url": "https://minigrid.farama.org/environments/minigrid/DoorKeyEnv/" },
+    { "label": "Official Empty configurations and fixed/random starts", "url": "https://minigrid.farama.org/environments/minigrid/EmptyEnv/" },
+    { "label": "MiniGrid v3.1.0 DoorKey constructor and native limits", "url": "https://raw.githubusercontent.com/Farama-Foundation/Minigrid/v3.1.0/minigrid/envs/doorkey.py" },
+    { "label": "MiniGrid v3.1.0 Empty constructor and native limits", "url": "https://raw.githubusercontent.com/Farama-Foundation/Minigrid/v3.1.0/minigrid/envs/empty.py" },
+    { "label": "Gymnasium transition and terminal API", "url": "https://gymnasium.farama.org/api/env/" },
+    { "label": "Phaser scenes", "url": "https://docs.phaser.io/phaser/concepts/scenes" },
+    { "label": "Phaser input", "url": "https://docs.phaser.io/phaser/concepts/input" }
+  ]
+}

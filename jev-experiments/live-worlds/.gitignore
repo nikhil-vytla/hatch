@@ -1,0 +1,4 @@
+# Rebuilt from the compact reviewed JSONL evidence before tests and builds.
+crowd/demo.json
+ghost-brush/examples.json
+.playwright-cli/

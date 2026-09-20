@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-09-20T21:45:22.381Z",
+  "complete": false,
+  "cases": 620,
+  "source_clusters": 268,
+  "completed_evaluations": 3931,
+  "planned_evaluations": 7440,
+  "verified_questions": 7859,
+  "planned_questions": 14880,
+  "verified_wire_batches": 619,
+  "raw_normalized_question_agreements": 7593,
+  "immutable_successes": true,
+  "source_sha256": "8dd8388071d86c409c9574ce28c486b2a4b4f8cab0f9835a5a08f519305d61c4",
+  "protocol_sha256": "ca04ef0c259f983f048886adee244c3415af817fcd42456909351735ae0cef77"
+}

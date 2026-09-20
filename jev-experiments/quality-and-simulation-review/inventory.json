@@ -1,0 +1,335 @@
+{
+  "sourceCommit": "4c0c40d",
+  "experiments": [
+    {
+      "id": "paste",
+      "data": "paste",
+      "title": "Smart paste",
+      "category": "Productivity",
+      "description": "A whole page copied. Exactly the right thing pasted.",
+      "question": "Can a decision model match facts to fields and recognize when it needs help?",
+      "kind": "paste",
+      "accent": "gold"
+    },
+    {
+      "id": "ui",
+      "data": "ui",
+      "title": "Generative interfaces",
+      "category": "Creative tools",
+      "description": "Build it. Use it. Change your mind.",
+      "question": "Can Jev assemble and revise a working interface without losing your edits?",
+      "kind": "ui",
+      "accent": "coral"
+    },
+    {
+      "id": "worlds",
+      "data": "visuals",
+      "title": "Living scenes",
+      "category": "Creative tools",
+      "description": "A little place, alive with small decisions.",
+      "question": "Can a handful of semantic choices coordinate a living scene?",
+      "kind": "worlds",
+      "accent": "coral"
+    },
+    {
+      "id": "games",
+      "data": "games",
+      "title": "Key & door",
+      "category": "Games",
+      "description": "Watch an agent find the key, the door, and the way out.",
+      "question": "Does remembering what happened help an agent navigate?",
+      "kind": "games",
+      "accent": "gold"
+    },
+    {
+      "id": "music",
+      "data": "music",
+      "title": "Music arranger",
+      "category": "Creative tools",
+      "description": "One motif, many ways to make it move.",
+      "question": "Can typed musical decisions become a coherent arrangement?",
+      "kind": "music",
+      "accent": "coral"
+    },
+    {
+      "id": "pixels",
+      "data": "visuals",
+      "title": "Pixel studio",
+      "category": "Creative tools",
+      "description": "Scenes, sprites, and patterns that evolve.",
+      "question": "How does staged composition compare with independent pixel choices?",
+      "kind": "pixels",
+      "accent": "coral"
+    },
+    {
+      "id": "semantic-table",
+      "data": "semantic-table",
+      "title": "Semantic spreadsheet",
+      "category": "Productivity",
+      "description": "Ask a question of every row. Inspect every answer.",
+      "question": "Can semantic columns reduce the work of reviewing messy records?",
+      "kind": "semantic-table",
+      "accent": "gold"
+    },
+    {
+      "id": "undo",
+      "data": "undo",
+      "title": "Intent-based undo",
+      "category": "Productivity",
+      "description": "Keep the layout. Rewind just the colors.",
+      "question": "Can Jev select the intended edits without undoing unrelated work?",
+      "kind": "undo",
+      "accent": "gold"
+    },
+    {
+      "id": "changes",
+      "data": "changes",
+      "title": "Change impact",
+      "category": "Productivity",
+      "description": "One changed fact. See what needs a second look.",
+      "question": "Can we detect which conclusions a source edit invalidates?",
+      "kind": "changes",
+      "accent": "gold"
+    },
+    {
+      "id": "logos",
+      "data": "logos",
+      "title": "Logo studio",
+      "category": "Creative tools",
+      "description": "Explore a family of symbols, then make one yours.",
+      "question": "Which design decisions make a mark fit its brief?",
+      "kind": "logos",
+      "accent": "coral"
+    },
+    {
+      "id": "beverage",
+      "data": "beverage",
+      "title": "Drink finder",
+      "category": "Productivity",
+      "description": "A craving becomes a choice, one useful question at a time.",
+      "question": "Can we match preferences without inventing menu facts?",
+      "kind": "beverage",
+      "accent": "gold"
+    },
+    {
+      "id": "journeys",
+      "data": "journeys",
+      "title": "Adaptive forms",
+      "category": "Productivity",
+      "description": "A form that asks only what changes the answer.",
+      "question": "Can clarification reduce uncertainty with less effort?",
+      "kind": "journeys",
+      "accent": "gold"
+    },
+    {
+      "id": "decisions",
+      "data": "decisions",
+      "title": "Preference explorer",
+      "category": "Productivity",
+      "description": "Move your priorities. Watch the recommendation change.",
+      "question": "How sensitive is a recommendation to what you value?",
+      "kind": "decisions",
+      "accent": "gold"
+    },
+    {
+      "id": "routing",
+      "data": "routing",
+      "title": "Model router",
+      "category": "Agents & tooling",
+      "description": "A task arrives. Jev chooses where it goes.",
+      "question": "Can Jev identify the appropriate handler for a request?",
+      "kind": "routing",
+      "accent": "sage"
+    },
+    {
+      "id": "verify",
+      "data": "verify",
+      "title": "Agent verifier",
+      "category": "Agents & tooling",
+      "description": "A completion claim, put under the microscope.",
+      "question": "Does the trace actually support what the agent says it did?",
+      "kind": "verify",
+      "accent": "sage"
+    },
+    {
+      "id": "search",
+      "data": "search",
+      "title": "Search reranker",
+      "category": "Agents & tooling",
+      "description": "Read the evidence behind the search result.",
+      "question": "Which source actually answers the question?",
+      "kind": "search",
+      "accent": "sage"
+    },
+    {
+      "id": "context",
+      "data": "search",
+      "title": "Context filter",
+      "category": "Agents & tooling",
+      "description": "Trim context while keeping the facts that count.",
+      "question": "What evidence disappears as the context gets smaller?",
+      "kind": "context",
+      "accent": "sage"
+    },
+    {
+      "id": "micro",
+      "data": "micro",
+      "title": "Micro-agent team",
+      "category": "Agents & tooling",
+      "description": "Follow the handoffs from request to answer.",
+      "question": "Can bounded decisions compose into useful behavior?",
+      "kind": "micro",
+      "accent": "sage"
+    },
+    {
+      "id": "vision",
+      "data": "vision",
+      "title": "Vision to action",
+      "category": "Agents & tooling",
+      "description": "An image becomes evidence for the next action.",
+      "question": "What does Jev lose when a vision model reduces an image to words?",
+      "kind": "vision",
+      "accent": "sage"
+    },
+    {
+      "id": "classify",
+      "data": "classify",
+      "title": "Intent recognition",
+      "category": "Benchmarks",
+      "description": "Actual requests, predicted intents, and the mistakes between.",
+      "question": "When does Jev beat a simple classifier, and where does it miss?",
+      "kind": "classify",
+      "accent": "gold"
+    },
+    {
+      "id": "judge",
+      "data": "judge",
+      "title": "JudgeBench",
+      "category": "Benchmarks",
+      "description": "Read both answers. Make your own call.",
+      "question": "Does Jev choose the correct answer, regardless of its position?",
+      "kind": "judge",
+      "accent": "gold"
+    },
+    {
+      "id": "robustness",
+      "data": "robustness",
+      "title": "Decision stability",
+      "category": "Benchmarks",
+      "description": "Change the wrapping. See whether the judgment survives.",
+      "question": "Which changes to a question alter the answer?",
+      "kind": "robustness",
+      "accent": "gold"
+    },
+    {
+      "id": "latency",
+      "data": "latency",
+      "title": "Batching & latency",
+      "category": "Benchmarks",
+      "description": "Explore the relationship between batching and waiting.",
+      "question": "How much work can one request carry?",
+      "kind": "latency",
+      "accent": "gold"
+    },
+    {
+      "id": "optimize",
+      "data": "optimize",
+      "title": "Prompt evolution",
+      "category": "Training & local",
+      "description": "Follow the search for a better way to ask.",
+      "question": "Does optimizing a prompt improve unseen cases?",
+      "kind": "optimize",
+      "accent": "blue"
+    },
+    {
+      "id": "teach",
+      "data": "teach",
+      "title": "Active labeling",
+      "category": "Training & local",
+      "description": "Cheap labels become a local model.",
+      "question": "Which examples are worth labeling next?",
+      "kind": "teach",
+      "accent": "blue"
+    },
+    {
+      "id": "reward",
+      "data": "reward",
+      "title": "Learning from rewards",
+      "category": "Training & local",
+      "description": "Watch learning and independent success side by side.",
+      "question": "Does optimizing Jev’s feedback improve the task itself?",
+      "kind": "reward",
+      "accent": "blue"
+    },
+    {
+      "id": "replica",
+      "data": "replica",
+      "title": "SmolLM decision model",
+      "category": "Training & local",
+      "description": "Inspect what the replica learned, and what it did not.",
+      "question": "Can a small local model learn choices, probabilities, and scores?",
+      "kind": "replica",
+      "accent": "blue"
+    },
+    {
+      "id": "rewardbench2",
+      "data": "rewardbench2",
+      "title": "RewardBench 2",
+      "category": "Benchmarks",
+      "description": "Jev scores supplied answers without seeing their preference labels.",
+      "question": "Can Jev recognize the preferred answers across six kinds of judgment?",
+      "kind": "rewardbench2",
+      "accent": "gold"
+    },
+    {
+      "id": "adapters",
+      "data": "adapters",
+      "title": "Typed schema adapters",
+      "category": "Agents & tooling",
+      "description": "One semantic contract, four programming languages.",
+      "question": "Can typed schemas preserve the meaning of a decision?",
+      "kind": "adapters",
+      "accent": "sage"
+    },
+    {
+      "id": "snake",
+      "data": "arcade",
+      "title": "Snake",
+      "category": "Games",
+      "description": "A growing body. Three turns. Nowhere to hide.",
+      "question": "Can Jev collect food while leaving itself a way out?",
+      "kind": "snake",
+      "accent": "gold"
+    },
+    {
+      "id": "orbital",
+      "data": "arcade",
+      "title": "Orbital rescue",
+      "category": "Games",
+      "description": "Fly a drone through a three-dimensional field of hazards.",
+      "question": "Can a decision model collect every core and make it home?",
+      "kind": "orbital",
+      "accent": "gold"
+    },
+    {
+      "id": "local-models",
+      "data": "local-models",
+      "title": "Decision models on a Mac",
+      "category": "Training & local",
+      "description": "MLX, Core ML, and hosted Jev on the same questions.",
+      "question": "How do shared-prefix language models compare with a trained decision head?",
+      "kind": "local-models",
+      "accent": "blue"
+    },
+    {
+      "id": "benchmark-atlas",
+      "data": "research-map",
+      "title": "The next experiments",
+      "category": "Benchmarks",
+      "description": "A research map of benchmarks and things worth building.",
+      "question": "Which tests and interfaces would reveal something we do not yet know?",
+      "kind": "benchmark-atlas",
+      "accent": "gold"
+    }
+  ]
+}
