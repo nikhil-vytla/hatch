@@ -29,3 +29,9 @@
 The inherited sticky positioning made the three explanation cards overlap while scrolling on desktop. RewardBench now uses a spaced, static stack for those cards. A first combined patch failed on a stale notes heading and applied no changes; the corrected patch used exact source context. A notes append initially used a repository-relative path from the app directory and was retried from the repository root. The archived IFEval summary now explicitly says RewardBench 2 superseded it.
 
 The final build passed after the scroll fix. An exact-value gateway-key scan and token-signature scan found no secrets in the 50 staged files or 48 built public files. The default Bun Vercel CLI cache had a missing UUID dependency; retrying with an explicitly pinned CLI version uses a separate installation. A credential-helper search included a nonexistent legacy path; the existing helper was located under experience-prototypes/scripts.
+
+## Publication
+
+The pinned Bun Vercel CLI worked. Created PR #55 under nikhil-vytla, then deployed commit 97093d30deb824c818dbd32536b4c605358a00e8 directly from GitHub to the existing Vercel project. The build reached READY and assigned jev-experiments.vercel.app. Public HTTPS verification confirms an exact SHA-256 match for the benchmark JSON, all 1,865 cases and 8,977 answers, 41 case notices, nine omitted fields, the repeatability report, and HTTP 404 for the retired language JSON. No repository merge was performed.
+
+Production browser checks passed for the displayed completed score, a blind Math-category pick and reveal, resetting the pick on the next case, dark mode, and no horizontal overflow at 320 pixels. Final follow-up changes contain only research documentation and verification evidence; the deployed app code is unchanged.
