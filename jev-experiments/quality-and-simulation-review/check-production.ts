@@ -7,6 +7,7 @@ const checks = [
   { path: "/research/quality-review/review.html", status: 200 },
   { path: "/data/judgment-reliability.json", status: 200 },
   { path: "/api/evaluate", status: 401, body: { state: {}, questions: { ready: { type: "noul", instructions: "Ready?" } } } },
+  { path: "/api/compose", status: 401, body: { prompt: "A settings form" } },
   { path: "/api/wardrobe-token", status: 401, body: { model: "decart/lucy2-vton/realtime" } },
   { path: "/api/wardrobe-token", status: 405 },
   { path: "/api/wardrobe-token", status: 400, key: "synthetic-boundary-check", body: { model: "unsupported-model" } },
@@ -21,8 +22,9 @@ for (const check of checks) {
   });
   const body = await response.text();
   const data = response.headers.get("content-type")?.includes("application/json") ? JSON.parse(body) : undefined;
+  const result = data?.result ?? data;
   const cacheControl = response.headers.get("cache-control");
-  results.push({ path: check.path, method: check.body ? "POST" : "GET", expectedStatus: check.status, status: response.status, bytes: Buffer.byteLength(body), ...(check.path.startsWith("/api/") ? { cacheControl, error: data?.error } : {}), ...(check.path === "/data/live-worlds.json" ? { result: data } : {}), ...(check.path === "/data/judgment-reliability.json" ? { availability: data?.availability } : {}), passed: response.status === check.status && (!check.path.startsWith("/api/") || cacheControl === "no-store") });
+  results.push({ path: check.path, method: check.body ? "POST" : "GET", expectedStatus: check.status, status: response.status, bytes: Buffer.byteLength(body), ...(check.path.startsWith("/api/") ? { cacheControl, error: data?.error } : {}), ...(check.path === "/data/live-worlds.json" ? { result } : {}), ...(check.path === "/data/judgment-reliability.json" ? { availability: result?.availability } : {}), passed: response.status === check.status && (!check.path.startsWith("/api/") || cacheControl === "no-store") });
 }
 const report = { at: new Date().toISOString(), origin, passed: results.every(result => result.passed), results };
 writeFileSync(new URL("./production-check.json", import.meta.url), JSON.stringify(report, null, 2) + "\n");

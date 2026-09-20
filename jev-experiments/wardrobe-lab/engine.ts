@@ -1,6 +1,5 @@
 export const WARDROBE_VERSION = "wardrobe-v2";
-export const FAL_MODEL = "decart/lucy2-vton/realtime";
-export const SESSION_SECONDS = 60;
+export { FAL_MODEL, SESSION_SECONDS } from "../experience-prototypes/shared/wardrobe.js";
 export const COLORS = {
   navy: "#35465f",
   black: "#292d32",

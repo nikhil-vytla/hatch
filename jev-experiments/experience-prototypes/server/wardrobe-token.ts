@@ -1,4 +1,4 @@
-import { FAL_MODEL } from "../../wardrobe-lab/engine.js";
+import { FAL_MODEL } from "../shared/wardrobe.js";
 export class WardrobeTokenError extends Error {
   constructor(
     message: string,
