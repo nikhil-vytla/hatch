@@ -1,0 +1,1234 @@
+{
+  "runs": [
+    {
+      "manifest": {
+        "id": "20260920T044838-smoke-07287d",
+        "experiment": "smoke",
+        "created": "2026-09-20T04:48:38.426718+00:00",
+        "config": {},
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "running"
+      },
+      "transport": null
+    },
+    {
+      "manifest": {
+        "id": "20260920T044852-smoke-6188ad",
+        "experiment": "smoke",
+        "created": "2026-09-20T04:48:52.557703+00:00",
+        "config": {},
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "running"
+      },
+      "transport": {
+        "attempts": 3,
+        "status_counts": {
+          "transport_error": 3
+        },
+        "successful_attempt_latency_ms": null,
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 3022.3778340079,
+          "p95": 3022.3778340079
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 3,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T044914-smoke-cdd3dd",
+        "experiment": "smoke",
+        "created": "2026-09-20T04:49:14.597510+00:00",
+        "config": {},
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T04:49:15.385227+00:00"
+      },
+      "transport": {
+        "attempts": 1,
+        "status_counts": {
+          "200": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 760.3488329914398,
+          "p95": 760.3488329914398
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 760.3488329914398,
+          "p95": 760.3488329914398
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 0,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T045250-classify-6631e1",
+        "experiment": "classify",
+        "created": "2026-09-20T04:52:50.422276+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:37:53.642927+00:00"
+      },
+      "transport": {
+        "attempts": 1564,
+        "status_counts": {
+          "200": 721,
+          "503": 19,
+          "429": 822,
+          "504": 2
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 321.98262499878183,
+          "p95": 445.3137920354493
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 10475.172291488492,
+          "p95": 20654.1601209206
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 843,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T045406-visuals-376800",
+        "experiment": "visuals",
+        "created": "2026-09-20T04:54:06.247465+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "failed",
+        "finished": "2026-09-20T04:55:31.451554+00:00"
+      },
+      "transport": {
+        "attempts": 37,
+        "status_counts": {
+          "429": 17,
+          "200": 19,
+          "503": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 272.25858299061656,
+          "p95": 409.6847752749454
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 10396.526291991253,
+          "p95": 20463.478583002394
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 18,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T045514-judge-af6fa4",
+        "experiment": "judge",
+        "created": "2026-09-20T04:55:14.845281+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:08:52.724526+00:00"
+      },
+      "transport": {
+        "attempts": 427,
+        "status_counts": {
+          "429": 239,
+          "200": 186,
+          "503": 2
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 315.2786874852609,
+          "p95": 432.14510423422325
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 10488.379937491016,
+          "p95": 20740.655208310145
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 241,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T050318-replica-e05108",
+        "experiment": "replica",
+        "created": "2026-09-20T05:03:18.517537+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "failed",
+        "finished": "2026-09-20T05:03:39.824340+00:00"
+      },
+      "transport": null
+    },
+    {
+      "manifest": {
+        "id": "20260920T050432-replica-6d43d3",
+        "experiment": "replica",
+        "created": "2026-09-20T05:04:32.597531+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:11:11.376254+00:00"
+      },
+      "transport": {
+        "attempts": 206,
+        "status_counts": {
+          "429": 174,
+          "200": 32
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 286.8845835037064,
+          "p95": 351.78014592675027
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 20573.43933301345,
+          "p95": 21185.98536663396
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 174,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T050455-routing-0a84db",
+        "experiment": "routing",
+        "created": "2026-09-20T05:04:55.873026+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:06:32.317294+00:00"
+      },
+      "transport": {
+        "attempts": 53,
+        "status_counts": {
+          "429": 43,
+          "200": 10
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 284.5663960033562,
+          "p95": 366.548680930282
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 17684.2378545244,
+          "p95": 20993.508786898616
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 43,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T050632-verify-5a5d41",
+        "experiment": "verify",
+        "created": "2026-09-20T05:06:32.322875+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:08:11.731517+00:00"
+      },
+      "transport": {
+        "attempts": 57,
+        "status_counts": {
+          "429": 55,
+          "200": 2
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 301.22252050205134,
+          "p95": 311.5674017200945
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 20605.60077098504,
+          "p95": 20958.142187755173
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 55,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T050811-search-75a2ea",
+        "experiment": "search",
+        "created": "2026-09-20T05:08:11.738764+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:08:53.002616+00:00"
+      },
+      "transport": {
+        "attempts": 15,
+        "status_counts": {
+          "429": 15
+        },
+        "successful_attempt_latency_ms": null,
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 20538.62850000534,
+          "p95": 20682.535925026383
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 15,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T050853-beverage-9d92c9",
+        "experiment": "beverage",
+        "created": "2026-09-20T05:08:53.017441+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:11:11.368533+00:00"
+      },
+      "transport": {
+        "attempts": 69,
+        "status_counts": {
+          "429": 58,
+          "200": 11
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 286.9277499848977,
+          "p95": 362.81766652246006
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 20574.136667041486,
+          "p95": 21010.135542008084
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 58,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051111-music-6b3682",
+        "experiment": "music",
+        "created": "2026-09-20T05:11:11.380014+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:11:44.636716+00:00"
+      },
+      "transport": {
+        "attempts": 19,
+        "status_counts": {
+          "429": 13,
+          "200": 5,
+          "503": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 341.7662500287406,
+          "p95": 370.86648356635123
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 11649.015812975762,
+          "p95": 20498.13303309985
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 14,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051144-micro-793426",
+        "experiment": "micro",
+        "created": "2026-09-20T05:11:44.652442+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:12:33.657884+00:00"
+      },
+      "transport": {
+        "attempts": 11,
+        "status_counts": {
+          "429": 6,
+          "200": 5
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 305.91970804380253,
+          "p95": 483.60581701854244
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 5445.028812536593,
+          "p95": 19866.047458507936
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 6,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051233-logos-2beda5",
+        "experiment": "logos",
+        "created": "2026-09-20T05:12:33.676475+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:13:11.534036+00:00"
+      },
+      "transport": {
+        "attempts": 16,
+        "status_counts": {
+          "429": 11,
+          "200": 5
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 299.2660839809105,
+          "p95": 365.7769253710285
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 18615.6858744629,
+          "p95": 20897.15192674582
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 11,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051311-visuals-3d4e09",
+        "experiment": "visuals",
+        "created": "2026-09-20T05:13:11.543716+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:15:11.070426+00:00"
+      },
+      "transport": {
+        "attempts": 66,
+        "status_counts": {
+          "429": 53,
+          "200": 11,
+          "503": 2
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 329.1313340305351,
+          "p95": 3102.134062501136
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 20782.947604481342,
+          "p95": 21194.321118704327
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 55,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051327-browser-live-6a37a0",
+        "experiment": "browser-live",
+        "created": "2026-09-20T05:13:27.664834+00:00",
+        "config": {},
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "running"
+      },
+      "transport": {
+        "attempts": 10,
+        "status_counts": {
+          "200": 9,
+          "429": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 264.6340419887565,
+          "p95": 476.04014138923947
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 272.3872919450514,
+          "p95": 6532.547775197056
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 1,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051511-ui-aed7e5",
+        "experiment": "ui",
+        "created": "2026-09-20T05:15:11.082180+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:18:01.034500+00:00"
+      },
+      "transport": {
+        "attempts": 89,
+        "status_counts": {
+          "429": 61,
+          "200": 28
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 276.20622896938585,
+          "p95": 407.3778250050963
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 17796.66970852691,
+          "p95": 20990.47457323771
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 61,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051801-reward-a6bf90",
+        "experiment": "reward",
+        "created": "2026-09-20T05:18:01.055527+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:19:11.410509+00:00"
+      },
+      "transport": {
+        "attempts": 19,
+        "status_counts": {
+          "429": 8,
+          "200": 11
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 295.0926659977995,
+          "p95": 413.4218124963809
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 5390.400646003738,
+          "p95": 12926.350599982125
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 8,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T051911-teach-24a85f",
+        "experiment": "teach",
+        "created": "2026-09-20T05:19:11.427027+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:20:22.784779+00:00"
+      },
+      "transport": {
+        "attempts": 14,
+        "status_counts": {
+          "429": 7,
+          "200": 7
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 311.17091700434685,
+          "p95": 443.7014462251681
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 10540.437207967498,
+          "p95": 10613.54787940681
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 7,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T052254-decisions-f1ce1d",
+        "experiment": "decisions",
+        "created": "2026-09-20T05:22:54.966688+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:26:11.640067+00:00"
+      },
+      "transport": {
+        "attempts": 40,
+        "status_counts": {
+          "200": 18,
+          "429": 22
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 333.58235453488305,
+          "p95": 433.76317143556656
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 10478.578167002792,
+          "p95": 20843.228186065226
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 22,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T052611-robustness-32f0e2",
+        "experiment": "robustness",
+        "created": "2026-09-20T05:26:11.662687+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:40:01.280467+00:00"
+      },
+      "transport": {
+        "attempts": 407,
+        "status_counts": {
+          "429": 226,
+          "200": 177,
+          "504": 3,
+          "503": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 315.9322920255363,
+          "p95": 481.67260863119725
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 10468.381499508934,
+          "p95": 21193.171956550203
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 230,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T053217-language-a92b8c",
+        "experiment": "language",
+        "created": "2026-09-20T05:32:17.655625+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:43:58.566604+00:00"
+      },
+      "transport": {
+        "attempts": 156,
+        "status_counts": {
+          "429": 25,
+          "403": 60,
+          "200": 69,
+          "504": 2
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 291.47275001741946,
+          "p95": 402.074858394917
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 303.3644999959506,
+          "p95": 13145.10897539673
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 87,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T053838-access-fa0b43",
+        "experiment": "access",
+        "created": "2026-09-20T05:38:38.006399+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:38:38.666375+00:00"
+      },
+      "transport": {
+        "attempts": 1,
+        "status_counts": {
+          "200": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 601.7924579791725,
+          "p95": 601.7924579791725
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 601.7924579791725,
+          "p95": 601.7924579791725
+        },
+        "reported_usd": 8e-07,
+        "attempts_without_cost_metadata": 0,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T054001-latency-3a9397",
+        "experiment": "latency",
+        "created": "2026-09-20T05:40:01.339729+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:46:01.591954+00:00"
+      },
+      "transport": {
+        "attempts": 169,
+        "status_counts": {
+          "200": 118,
+          "429": 32,
+          "503": 19
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 338.7148960318882,
+          "p95": 543.9929018495604
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 412.0733334857505,
+          "p95": 10680.870401758397
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 51,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T054201-adapters-2c65f1",
+        "experiment": "adapters",
+        "created": "2026-09-20T05:42:01.265126+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:42:12.613097+00:00"
+      },
+      "transport": {
+        "attempts": 2,
+        "status_counts": {
+          "429": 1,
+          "200": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 279.2524590040557,
+          "p95": 279.2524590040557
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 10428.747459004057,
+          "p95": 10428.747459004057
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 1,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T054201-vision-41ff88",
+        "experiment": "vision",
+        "created": "2026-09-20T05:42:01.079605+00:00",
+        "config": {
+          "quick": true,
+          "fixture": "original gallery screenshot",
+          "inference": "browser WASM"
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:42:01.108599+00:00"
+      },
+      "transport": null
+    },
+    {
+      "manifest": {
+        "id": "20260920T054448-language_reference-666205",
+        "experiment": "language_reference",
+        "created": "2026-09-20T05:44:48.263746+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:49:00.729639+00:00"
+      },
+      "transport": {
+        "attempts": 120,
+        "status_counts": {
+          "200": 50,
+          "429": 70
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 2275.836333516054,
+          "p95": 4709.398606407921
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 11472.040770532629,
+          "p95": 23593.437054505634
+        },
+        "reported_usd": 0.007462,
+        "attempts_without_cost_metadata": 70,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T054601-optimize-8a730e",
+        "experiment": "optimize",
+        "created": "2026-09-20T05:46:01.632032+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "partial",
+        "finished": "2026-09-20T05:47:53.047875+00:00"
+      },
+      "transport": {
+        "attempts": 63,
+        "status_counts": {
+          "200": 50,
+          "429": 9,
+          "503": 3,
+          "403": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 335.3199579869397,
+          "p95": 599.3631104211089
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 380.3035829914734,
+          "p95": 10632.355979491651
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 13,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T054753-games-06bb27",
+        "experiment": "games",
+        "created": "2026-09-20T05:47:53.096142+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "partial",
+        "finished": "2026-09-20T06:01:13.243193+00:00"
+      },
+      "transport": {
+        "attempts": 373,
+        "status_counts": {
+          "200": 268,
+          "429": 104,
+          "504": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 275.09585401276127,
+          "p95": 391.06684997968836
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 297.18479202711023,
+          "p95": 10509.643537644582
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 105,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T054909-optimize-e576f0",
+        "experiment": "optimize",
+        "created": "2026-09-20T05:49:09.238601+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T05:59:23.511388+00:00"
+      },
+      "transport": {
+        "attempts": 170,
+        "status_counts": {
+          "200": 105,
+          "429": 62,
+          "503": 3
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 329.0965419728309,
+          "p95": 808.1003917963244
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 836.078437481774,
+          "p95": 16902.06483079559
+        },
+        "reported_usd": 0.000981,
+        "attempts_without_cost_metadata": 65,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T060113-optimize-fe1728",
+        "experiment": "optimize",
+        "created": "2026-09-20T06:01:13.392299+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T06:16:03.869815+00:00"
+      },
+      "transport": {
+        "attempts": 90,
+        "status_counts": {
+          "200": 74,
+          "429": 16
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 317.9117079998832,
+          "p95": 1917.762321131885
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 321.9629790110048,
+          "p95": 65196.88054148879
+        },
+        "reported_usd": 0.0029576999999999997,
+        "attempts_without_cost_metadata": 16,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T060114-games-38862c",
+        "experiment": "games",
+        "created": "2026-09-20T06:01:14.576420+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "partial",
+        "finished": "2026-09-20T06:31:51.572424+00:00"
+      },
+      "transport": {
+        "attempts": 372,
+        "status_counts": {
+          "429": 36,
+          "200": 334,
+          "504": 1,
+          "503": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 283.37758299312554,
+          "p95": 453.3240038581421
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 287.322812480852,
+          "p95": 56715.321885237165
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 38,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T060138-language_reference-57aebb",
+        "experiment": "language_reference",
+        "created": "2026-09-20T06:01:38.668949+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T06:04:30.611106+00:00"
+      },
+      "transport": {
+        "attempts": 10,
+        "status_counts": {
+          "200": 10
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 2374.9929165060166,
+          "p95": 3430.3065623738803
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 2374.9929165060166,
+          "p95": 3430.3065623738803
+        },
+        "reported_usd": 0.0015533,
+        "attempts_without_cost_metadata": 0,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T060248-search-8fd45d",
+        "experiment": "search",
+        "created": "2026-09-20T06:02:48.980019+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T06:04:01.720954+00:00"
+      },
+      "transport": {
+        "attempts": 13,
+        "status_counts": {
+          "429": 8,
+          "200": 5
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 287.2791669797152,
+          "p95": 323.69530057767406
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 71567.19416697684,
+          "p95": 71929.24829215778
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 8,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T060401-verify-595e6f",
+        "experiment": "verify",
+        "created": "2026-09-20T06:04:01.874151+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T06:06:03.039469+00:00"
+      },
+      "transport": {
+        "attempts": 24,
+        "status_counts": {
+          "200": 20,
+          "429": 4
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 319.4877505011391,
+          "p95": 368.55989826435695
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 319.4877505011391,
+          "p95": 117595.51709586216
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 4,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T060603-routing-007b3b",
+        "experiment": "routing",
+        "created": "2026-09-20T06:06:03.188826+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T06:10:00.598269+00:00"
+      },
+      "transport": {
+        "attempts": 31,
+        "status_counts": {
+          "200": 19,
+          "429": 11,
+          "504": 1
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 288.38820895180106,
+          "p95": 372.3600708472072
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 294.05024999869056,
+          "p95": 88140.7299354485
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 12,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T061000-beverage-56b928",
+        "experiment": "beverage",
+        "created": "2026-09-20T06:10:00.746063+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T06:12:02.631146+00:00"
+      },
+      "transport": {
+        "attempts": 34,
+        "status_counts": {
+          "200": 25,
+          "429": 9
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 282.16104197781533,
+          "p95": 379.0877082035877
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 291.4581460063346,
+          "p95": 116503.2378017466
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 9,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    },
+    {
+      "manifest": {
+        "id": "20260920T063151-games-49aa3f",
+        "experiment": "games",
+        "created": "2026-09-20T06:31:51.675159+00:00",
+        "config": {
+          "quick": false,
+          "seed": 42
+        },
+        "python": "3.13.11",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "status": "complete",
+        "finished": "2026-09-20T06:37:02.392722+00:00"
+      },
+      "transport": {
+        "attempts": 117,
+        "status_counts": {
+          "200": 98,
+          "429": 19
+        },
+        "successful_attempt_latency_ms": {
+          "p50": 322.4198750103824,
+          "p95": 655.7847580814265
+        },
+        "logical_request_latency_ms_including_retries_excluding_queue": {
+          "p50": 353.939396009082,
+          "p95": 59466.08428311951
+        },
+        "reported_usd": 0,
+        "attempts_without_cost_metadata": 19,
+        "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+      }
+    }
+  ],
+  "note": "Includes failed and superseded runs. The gallery selects the latest completed or partial run for each experiment; raw request logs remain local."
+}

@@ -1,0 +1,466 @@
+{
+  "manifest": {
+    "id": "20260920T060603-routing-007b3b",
+    "experiment": "routing",
+    "created": "2026-09-20T06:06:03.188826+00:00",
+    "config": {
+      "quick": false,
+      "seed": 42
+    },
+    "python": "3.13.11",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "status": "complete",
+    "finished": "2026-09-20T06:10:00.598269+00:00"
+  },
+  "result": {
+    "rows": [
+      {
+        "id": "0",
+        "text": "What is 143 times 29?",
+        "target": "calculator",
+        "prediction": "calculator",
+        "probabilities": {
+          "jev": 0,
+          "calculator": 1,
+          "search": 0,
+          "navigation": 0,
+          "reasoning_model": 0,
+          "local_writer": 0,
+          "beverage": 0
+        },
+        "confidence": 1,
+        "latency_ms": 293.68062503635883
+      },
+      {
+        "id": "1",
+        "text": "Find the passage about refunds in these documents",
+        "target": "search",
+        "prediction": "search",
+        "probabilities": {
+          "jev": 0,
+          "reasoning_model": 0,
+          "local_writer": 0,
+          "beverage": 0,
+          "search": 1,
+          "calculator": 0,
+          "navigation": 0
+        },
+        "confidence": 1,
+        "latency_ms": 295.0112920370884
+      },
+      {
+        "id": "2",
+        "text": "Write a warm invitation to our picnic",
+        "target": "local_writer",
+        "prediction": "local_writer",
+        "probabilities": {
+          "beverage": 0,
+          "reasoning_model": 0,
+          "search": 0,
+          "jev": 0,
+          "local_writer": 1,
+          "calculator": 0,
+          "navigation": 0
+        },
+        "confidence": 1,
+        "latency_ms": 750.3509169910103
+      },
+      {
+        "id": "3",
+        "text": "Classify this ticket as billing or support",
+        "target": "jev",
+        "prediction": "jev",
+        "probabilities": {
+          "jev": 1,
+          "navigation": 0,
+          "local_writer": 0,
+          "calculator": 0,
+          "beverage": 0,
+          "search": 0,
+          "reasoning_model": 0
+        },
+        "confidence": 1,
+        "latency_ms": 664.4591249641962
+      },
+      {
+        "id": "4",
+        "text": "Prove this mathematical conjecture with a careful argument",
+        "target": "reasoning_model",
+        "prediction": "reasoning_model",
+        "probabilities": {
+          "local_writer": 0,
+          "navigation": 0,
+          "jev": 0,
+          "search": 0,
+          "beverage": 0,
+          "reasoning_model": 1,
+          "calculator": 0
+        },
+        "confidence": 1,
+        "latency_ms": 298.76704199705273
+      },
+      {
+        "id": "5",
+        "text": "Click the account settings link on this page",
+        "target": "navigation",
+        "prediction": "navigation",
+        "probabilities": {
+          "reasoning_model": 0,
+          "navigation": 1,
+          "calculator": 0,
+          "local_writer": 0,
+          "jev": 0,
+          "beverage": 0,
+          "search": 0
+        },
+        "confidence": 1,
+        "latency_ms": 232.61458397610113
+      },
+      {
+        "id": "6",
+        "text": "A latte please, decaf and without dairy",
+        "target": "beverage",
+        "prediction": "beverage",
+        "probabilities": {
+          "jev": 0,
+          "reasoning_model": 0,
+          "local_writer": 0,
+          "navigation": 0,
+          "calculator": 0,
+          "beverage": 1,
+          "search": 0
+        },
+        "confidence": 1,
+        "latency_ms": 56482.84070799127
+      },
+      {
+        "id": "7",
+        "text": "Explain the tradeoffs in migrating this distributed system",
+        "target": "reasoning_model",
+        "prediction": "reasoning_model",
+        "probabilities": {
+          "local_writer": 0,
+          "jev": 0.02,
+          "calculator": 0,
+          "search": 0,
+          "reasoning_model": 0.98,
+          "beverage": 0,
+          "navigation": 0
+        },
+        "confidence": 0.96,
+        "latency_ms": 117093.74891605694
+      },
+      {
+        "id": "8",
+        "text": "Is this excerpt relevant to the question?",
+        "target": "jev",
+        "prediction": "jev",
+        "probabilities": {
+          "local_writer": 0,
+          "search": 0,
+          "calculator": 0,
+          "beverage": 0,
+          "jev": 1,
+          "navigation": 0,
+          "reasoning_model": 0
+        },
+        "confidence": 0.99,
+        "latency_ms": 229.19225000077859
+      },
+      {
+        "id": "9",
+        "text": "Summarize these three sentences in a friendly tone",
+        "target": "local_writer",
+        "prediction": "local_writer",
+        "probabilities": {
+          "navigation": 0,
+          "reasoning_model": 0,
+          "jev": 0,
+          "calculator": 0,
+          "search": 0,
+          "beverage": 0,
+          "local_writer": 1
+        },
+        "confidence": 1,
+        "latency_ms": 652.9194160248153
+      },
+      {
+        "id": "10",
+        "text": "Convert 72 Fahrenheit to Celsius",
+        "target": "calculator",
+        "prediction": "calculator",
+        "probabilities": {
+          "jev": 0,
+          "navigation": 0,
+          "local_writer": 0,
+          "search": 0,
+          "calculator": 1,
+          "reasoning_model": 0,
+          "beverage": 0
+        },
+        "confidence": 1,
+        "latency_ms": 691.4007079903968
+      },
+      {
+        "id": "11",
+        "text": "Locate the warranty section",
+        "target": "search",
+        "prediction": "search",
+        "probabilities": {
+          "beverage": 0,
+          "local_writer": 0,
+          "reasoning_model": 0,
+          "search": 0.83,
+          "jev": 0,
+          "calculator": 0,
+          "navigation": 0.17
+        },
+        "confidence": 0.79,
+        "latency_ms": 1096.8214169843122
+      },
+      {
+        "id": "12",
+        "text": "Open the next results page",
+        "target": "navigation",
+        "prediction": "navigation",
+        "probabilities": {
+          "jev": 0,
+          "search": 0,
+          "calculator": 0,
+          "beverage": 0,
+          "local_writer": 0,
+          "reasoning_model": 0,
+          "navigation": 1
+        },
+        "confidence": 1,
+        "latency_ms": 248.59608296537772
+      },
+      {
+        "id": "13",
+        "text": "I'd like an iced espresso",
+        "target": "beverage",
+        "prediction": "beverage",
+        "probabilities": {
+          "local_writer": 0,
+          "reasoning_model": 0,
+          "jev": 0.01,
+          "search": 0,
+          "calculator": 0,
+          "beverage": 0.99,
+          "navigation": 0
+        },
+        "confidence": 0.99,
+        "latency_ms": 225.70054203970358
+      },
+      {
+        "id": "14",
+        "text": "Design an experiment to distinguish these causal explanations",
+        "target": "reasoning_model",
+        "prediction": "reasoning_model",
+        "probabilities": {
+          "local_writer": 0,
+          "calculator": 0,
+          "jev": 0,
+          "beverage": 0,
+          "reasoning_model": 1,
+          "search": 0,
+          "navigation": 0
+        },
+        "confidence": 0.99,
+        "latency_ms": 31806.1939170002
+      },
+      {
+        "id": "15",
+        "text": "Which of these colors sounds most calming?",
+        "target": "jev",
+        "prediction": "jev",
+        "probabilities": {
+          "jev": 1,
+          "search": 0,
+          "local_writer": 0,
+          "navigation": 0,
+          "calculator": 0,
+          "beverage": 0,
+          "reasoning_model": 0
+        },
+        "confidence": 1,
+        "latency_ms": 740.016374969855
+      },
+      {
+        "id": "16",
+        "text": "Draft a one-line caption for this event",
+        "target": "local_writer",
+        "prediction": "local_writer",
+        "probabilities": {
+          "jev": 0.01,
+          "navigation": 0,
+          "local_writer": 0.99,
+          "search": 0,
+          "beverage": 0,
+          "reasoning_model": 0,
+          "calculator": 0
+        },
+        "confidence": 0.99,
+        "latency_ms": 86629.67975001084
+      },
+      {
+        "id": "17",
+        "text": "Search the help center for password reset",
+        "target": "search",
+        "prediction": "search",
+        "probabilities": {
+          "search": 0.93,
+          "jev": 0,
+          "calculator": 0,
+          "navigation": 0.07,
+          "reasoning_model": 0,
+          "beverage": 0,
+          "local_writer": 0
+        },
+        "confidence": 0.91,
+        "latency_ms": 86629.3347919709
+      },
+      {
+        "id": "18",
+        "target": "navigation",
+        "error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr"
+      },
+      {
+        "id": "19",
+        "text": "Could I get something hot with no caffeine?",
+        "target": "beverage",
+        "prediction": "beverage",
+        "probabilities": {
+          "search": 0,
+          "calculator": 0,
+          "navigation": 0,
+          "reasoning_model": 0,
+          "beverage": 0.99,
+          "jev": 0.01,
+          "local_writer": 0
+        },
+        "confidence": 0.98,
+        "latency_ms": 26403.53041596245
+      }
+    ],
+    "metrics": {
+      "attempted": 20,
+      "answered": 19,
+      "failed": 1,
+      "accuracy_all_attempted": 0.95,
+      "accuracy_answered": 1.0,
+      "macro_f1": 1.0,
+      "brier_multiclass": 0.003631578947368422,
+      "reliability_bins": [
+        {
+          "count": 1,
+          "mean_probability": 0.83,
+          "accuracy": 1.0
+        },
+        {
+          "count": 18,
+          "mean_probability": 0.9933333333333333,
+          "accuracy": 1.0
+        }
+      ],
+      "ece_10_bins": 0.015263157894736885,
+      "risk_coverage": [
+        {
+          "threshold": 0,
+          "accepted": 19,
+          "coverage_all_attempted": 0.95,
+          "error_rate": 0.0
+        },
+        {
+          "threshold": 0.5,
+          "accepted": 19,
+          "coverage_all_attempted": 0.95,
+          "error_rate": 0.0
+        },
+        {
+          "threshold": 0.7,
+          "accepted": 19,
+          "coverage_all_attempted": 0.95,
+          "error_rate": 0.0
+        },
+        {
+          "threshold": 0.8,
+          "accepted": 19,
+          "coverage_all_attempted": 0.95,
+          "error_rate": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "accepted": 18,
+          "coverage_all_attempted": 0.9,
+          "error_rate": 0.0
+        },
+        {
+          "threshold": 0.95,
+          "accepted": 17,
+          "coverage_all_attempted": 0.85,
+          "error_rate": 0.0
+        },
+        {
+          "threshold": 0.99,
+          "accepted": 16,
+          "coverage_all_attempted": 0.8,
+          "error_rate": 0.0
+        }
+      ],
+      "latency_ms": {
+        "p50": 691.4007079903968,
+        "p95": 89676.08666661539
+      }
+    },
+    "note": "Authored task routing fixtures. Routing does not itself establish that a downstream model succeeds.",
+    "budget_at_finish": {
+      "limit_usd": 25,
+      "request_limit": 10000,
+      "attempts": 4371,
+      "accounted_usd": 8.768114596,
+      "models": [
+        {
+          "model": "anthropic/claude-sonnet-4.6",
+          "attempts": 61,
+          "accounted_usd": 2.036739,
+          "reported_usd": null,
+          "unknown_cost_attempts": 61
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "attempts": 152,
+          "accounted_usd": 2.3574238,
+          "reported_usd": 0.0126943,
+          "unknown_cost_attempts": 70
+        },
+        {
+          "model": "typesafe-ai/jev",
+          "attempts": 4158,
+          "accounted_usd": 4.373951796,
+          "reported_usd": 0.0,
+          "unknown_cost_attempts": 2174
+        }
+      ]
+    },
+    "transport": {
+      "attempts": 31,
+      "status_counts": {
+        "200": 19,
+        "429": 11,
+        "504": 1
+      },
+      "successful_attempt_latency_ms": {
+        "p50": 288.38820895180106,
+        "p95": 372.3600708472072
+      },
+      "logical_request_latency_ms_including_retries_excluding_queue": {
+        "p50": 294.05024999869056,
+        "p95": 88140.7299354485
+      },
+      "reported_usd": 0,
+      "attempts_without_cost_metadata": 12,
+      "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+    }
+  }
+}

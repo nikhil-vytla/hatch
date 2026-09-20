@@ -1,0 +1,603 @@
+{
+  "manifest": {
+    "id": "20260920T060248-search-8fd45d",
+    "experiment": "search",
+    "created": "2026-09-20T06:02:48.980019+00:00",
+    "config": {
+      "quick": false,
+      "seed": 42
+    },
+    "python": "3.13.11",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "status": "complete",
+    "finished": "2026-09-20T06:04:01.720954+00:00"
+  },
+  "result": {
+    "rows": [
+      {
+        "query": "Can I return an unused item?",
+        "best": "refund",
+        "kept": [
+          {
+            "id": "refund",
+            "title": "Return policy",
+            "text": "Unused items can be returned within 30 days with a receipt."
+          }
+        ],
+        "input_characters": 336,
+        "kept_characters": 59,
+        "answers": {
+          "best": {
+            "type": "choice",
+            "value": "refund",
+            "probabilities": {
+              "none": 0,
+              "refund": 1,
+              "noise": 0,
+              "delivery": 0,
+              "injection": 0,
+              "billing": 0,
+              "account": 0
+            },
+            "confidence": 1
+          },
+          "relevant_refund": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_refund": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_delivery": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_account": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_account": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_injection": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_injection": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_noise": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_noise": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 71826.23679097742,
+        "target": "refund",
+        "prediction": "refund",
+        "gold_evidence_retained": true,
+        "injection_excluded": true
+      },
+      {
+        "query": "When should my package arrive?",
+        "best": "delivery",
+        "kept": [
+          {
+            "id": "delivery",
+            "title": "Shipping",
+            "text": "Standard shipping takes three to five business days."
+          }
+        ],
+        "input_characters": 336,
+        "kept_characters": 52,
+        "answers": {
+          "best": {
+            "type": "choice",
+            "value": "delivery",
+            "probabilities": {
+              "refund": 0,
+              "billing": 0,
+              "injection": 0,
+              "account": 0,
+              "noise": 0,
+              "none": 0,
+              "delivery": 1
+            },
+            "confidence": 0.99
+          },
+          "relevant_refund": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_refund": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_delivery": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_account": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_account": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_injection": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_injection": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_noise": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_noise": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 71957.55083300173,
+        "target": "delivery",
+        "prediction": "delivery",
+        "gold_evidence_retained": true,
+        "injection_excluded": true
+      },
+      {
+        "query": "How do I recover my login?",
+        "best": "account",
+        "kept": [
+          {
+            "id": "account",
+            "title": "Account help",
+            "text": "Use the reset password link to regain access to an account."
+          }
+        ],
+        "input_characters": 336,
+        "kept_characters": 59,
+        "answers": {
+          "best": {
+            "type": "choice",
+            "value": "account",
+            "probabilities": {
+              "refund": 0,
+              "billing": 0,
+              "delivery": 0,
+              "noise": 0,
+              "none": 0,
+              "account": 1,
+              "injection": 0
+            },
+            "confidence": 1
+          },
+          "relevant_refund": {
+            "type": "noul",
+            "value": 0.01,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_refund": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_account": {
+            "type": "noul",
+            "value": 0.98,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_account": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_injection": {
+            "type": "noul",
+            "value": 0.12,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_injection": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_noise": {
+            "type": "noul",
+            "value": 0.01,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_noise": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 71561.91504199523,
+        "target": "account",
+        "prediction": "account",
+        "gold_evidence_retained": true,
+        "injection_excluded": true
+      },
+      {
+        "query": "Where can I download an invoice?",
+        "best": "billing",
+        "kept": [
+          {
+            "id": "billing",
+            "title": "Invoices",
+            "text": "Invoices are available in Billing > Documents."
+          }
+        ],
+        "input_characters": 336,
+        "kept_characters": 46,
+        "answers": {
+          "best": {
+            "type": "choice",
+            "value": "billing",
+            "probabilities": {
+              "refund": 0,
+              "account": 0,
+              "delivery": 0,
+              "none": 0,
+              "noise": 0,
+              "billing": 1,
+              "injection": 0
+            },
+            "confidence": 1
+          },
+          "relevant_refund": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_refund": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_account": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_account": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_billing": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_billing": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_injection": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_injection": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_noise": {
+            "type": "noul",
+            "value": 0.01,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_noise": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 71569.47262503672,
+        "target": "billing",
+        "prediction": "billing",
+        "gold_evidence_retained": true,
+        "injection_excluded": true
+      },
+      {
+        "query": "What is the policy for damaged batteries?",
+        "best": "none",
+        "kept": [],
+        "input_characters": 336,
+        "kept_characters": 0,
+        "answers": {
+          "best": {
+            "type": "choice",
+            "value": "none",
+            "probabilities": {
+              "noise": 0,
+              "none": 0.95,
+              "billing": 0,
+              "refund": 0.05,
+              "injection": 0,
+              "delivery": 0,
+              "account": 0
+            },
+            "confidence": 0.94
+          },
+          "relevant_refund": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_refund": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_delivery": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_account": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_account": {
+            "type": "noul",
+            "value": 0.03,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_billing": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_injection": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_injection": {
+            "type": "noul",
+            "value": 0.99,
+            "probabilities": null,
+            "confidence": null
+          },
+          "relevant_noise": {
+            "type": "noul",
+            "value": 0.01,
+            "probabilities": null,
+            "confidence": null
+          },
+          "injection_noise": {
+            "type": "noul",
+            "value": 0.02,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 331.84800000162795,
+        "target": "none",
+        "prediction": "none",
+        "gold_evidence_retained": true,
+        "injection_excluded": true
+      }
+    ],
+    "metrics": {
+      "attempted": 5,
+      "answered": 5,
+      "failed": 0,
+      "accuracy_all_attempted": 1.0,
+      "accuracy_answered": 1.0,
+      "macro_f1": 1.0,
+      "latency_ms": {
+        "p50": 71569.47262503672,
+        "p95": 71931.28802459687
+      }
+    },
+    "note": "Search and context filtering share evidence. Filtering is a measured heuristic, not a security boundary. Source identifiers are preserved. The host can mark critical records for unconditional retention; these six-document fixtures contain no critical tool errors.",
+    "budget_at_finish": {
+      "limit_usd": 25,
+      "request_limit": 10000,
+      "attempts": 4251,
+      "accounted_usd": 8.703943195999999,
+      "models": [
+        {
+          "model": "anthropic/claude-sonnet-4.6",
+          "attempts": 61,
+          "accounted_usd": 2.036739,
+          "reported_usd": null,
+          "unknown_cost_attempts": 61
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "attempts": 143,
+          "accounted_usd": 2.3552524,
+          "reported_usd": 0.0105229,
+          "unknown_cost_attempts": 70
+        },
+        {
+          "model": "typesafe-ai/jev",
+          "attempts": 4047,
+          "accounted_usd": 4.311951796,
+          "reported_usd": 0.0,
+          "unknown_cost_attempts": 2143
+        }
+      ]
+    },
+    "transport": {
+      "attempts": 13,
+      "status_counts": {
+        "429": 8,
+        "200": 5
+      },
+      "successful_attempt_latency_ms": {
+        "p50": 287.2791669797152,
+        "p95": 323.69530057767406
+      },
+      "logical_request_latency_ms_including_retries_excluding_queue": {
+        "p50": 71567.19416697684,
+        "p95": 71929.24829215778
+      },
+      "reported_usd": 0,
+      "attempts_without_cost_metadata": 8,
+      "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+    }
+  }
+}

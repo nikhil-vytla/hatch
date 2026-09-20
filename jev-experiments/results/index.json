@@ -1,0 +1,165 @@
+{
+  "experiments": {
+    "classify": {
+      "run_id": "20260920T045250-classify-6631e1",
+      "status": "complete",
+      "created": "2026-09-20T04:52:50.422276+00:00",
+      "file": "classify.json"
+    },
+    "judge": {
+      "run_id": "20260920T045514-judge-af6fa4",
+      "status": "complete",
+      "created": "2026-09-20T04:55:14.845281+00:00",
+      "file": "judge.json"
+    },
+    "replica": {
+      "run_id": "20260920T050432-replica-6d43d3",
+      "status": "complete",
+      "created": "2026-09-20T05:04:32.597531+00:00",
+      "file": "replica.json"
+    },
+    "routing": {
+      "run_id": "20260920T060603-routing-007b3b",
+      "status": "complete",
+      "created": "2026-09-20T06:06:03.188826+00:00",
+      "file": "routing.json"
+    },
+    "verify": {
+      "run_id": "20260920T060401-verify-595e6f",
+      "status": "complete",
+      "created": "2026-09-20T06:04:01.874151+00:00",
+      "file": "verify.json"
+    },
+    "search": {
+      "run_id": "20260920T060248-search-8fd45d",
+      "status": "complete",
+      "created": "2026-09-20T06:02:48.980019+00:00",
+      "file": "search.json"
+    },
+    "beverage": {
+      "run_id": "20260920T061000-beverage-56b928",
+      "status": "complete",
+      "created": "2026-09-20T06:10:00.746063+00:00",
+      "file": "beverage.json"
+    },
+    "music": {
+      "run_id": "20260920T051111-music-6b3682",
+      "status": "complete",
+      "created": "2026-09-20T05:11:11.380014+00:00",
+      "file": "music.json"
+    },
+    "micro": {
+      "run_id": "20260920T051144-micro-793426",
+      "status": "complete",
+      "created": "2026-09-20T05:11:44.652442+00:00",
+      "file": "micro.json"
+    },
+    "logos": {
+      "run_id": "20260920T051233-logos-2beda5",
+      "status": "complete",
+      "created": "2026-09-20T05:12:33.676475+00:00",
+      "file": "logos.json"
+    },
+    "visuals": {
+      "run_id": "20260920T051311-visuals-3d4e09",
+      "status": "complete",
+      "created": "2026-09-20T05:13:11.543716+00:00",
+      "file": "visuals.json"
+    },
+    "ui": {
+      "run_id": "20260920T051511-ui-aed7e5",
+      "status": "complete",
+      "created": "2026-09-20T05:15:11.082180+00:00",
+      "file": "ui.json"
+    },
+    "reward": {
+      "run_id": "20260920T051801-reward-a6bf90",
+      "status": "complete",
+      "created": "2026-09-20T05:18:01.055527+00:00",
+      "file": "reward.json"
+    },
+    "teach": {
+      "run_id": "20260920T051911-teach-24a85f",
+      "status": "complete",
+      "created": "2026-09-20T05:19:11.427027+00:00",
+      "file": "teach.json"
+    },
+    "decisions": {
+      "run_id": "20260920T052254-decisions-f1ce1d",
+      "status": "complete",
+      "created": "2026-09-20T05:22:54.966688+00:00",
+      "file": "decisions.json"
+    },
+    "robustness": {
+      "run_id": "20260920T052611-robustness-32f0e2",
+      "status": "complete",
+      "created": "2026-09-20T05:26:11.662687+00:00",
+      "file": "robustness.json"
+    },
+    "language": {
+      "run_id": "20260920T060138-language_reference-57aebb",
+      "status": "complete",
+      "created": "2026-09-20T06:01:38.668949+00:00",
+      "file": "language.json"
+    },
+    "latency": {
+      "run_id": "20260920T054001-latency-3a9397",
+      "status": "complete",
+      "created": "2026-09-20T05:40:01.339729+00:00",
+      "file": "latency.json"
+    },
+    "adapters": {
+      "run_id": "20260920T054201-adapters-2c65f1",
+      "status": "complete",
+      "created": "2026-09-20T05:42:01.265126+00:00",
+      "file": "adapters.json"
+    },
+    "vision": {
+      "run_id": "20260920T054201-vision-41ff88",
+      "status": "complete",
+      "created": "2026-09-20T05:42:01.079605+00:00",
+      "file": "vision.json"
+    },
+    "optimize": {
+      "run_id": "20260920T060113-optimize-fe1728",
+      "status": "complete",
+      "created": "2026-09-20T06:01:13.392299+00:00",
+      "file": "optimize.json"
+    },
+    "games": {
+      "run_id": "20260920T063151-games-49aa3f",
+      "status": "complete",
+      "created": "2026-09-20T06:31:51.675159+00:00",
+      "file": "games.json"
+    }
+  },
+  "budget": {
+    "limit_usd": 25,
+    "request_limit": 10000,
+    "attempts": 4868,
+    "accounted_usd": 8.884375096,
+    "models": [
+      {
+        "model": "anthropic/claude-sonnet-4.6",
+        "attempts": 61,
+        "accounted_usd": 2.036739,
+        "reported_usd": null,
+        "unknown_cost_attempts": 61
+      },
+      {
+        "model": "google/gemini-2.5-flash-lite",
+        "attempts": 153,
+        "accounted_usd": 2.3576843,
+        "reported_usd": 0.0129548,
+        "unknown_cost_attempts": 70
+      },
+      {
+        "model": "typesafe-ai/jev",
+        "attempts": 4654,
+        "accounted_usd": 4.489951796,
+        "reported_usd": 0.0,
+        "unknown_cost_attempts": 2232
+      }
+    ]
+  }
+}

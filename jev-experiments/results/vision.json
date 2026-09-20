@@ -1,0 +1,63 @@
+{
+  "manifest": {
+    "id": "20260920T054201-vision-41ff88",
+    "experiment": "vision",
+    "created": "2026-09-20T05:42:01.079605+00:00",
+    "config": {
+      "quick": true,
+      "fixture": "original gallery screenshot",
+      "inference": "browser WASM"
+    },
+    "python": "3.13.11",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "status": "complete",
+    "finished": "2026-09-20T05:42:01.108599+00:00"
+  },
+  "result": {
+    "rows": [
+      {
+        "brief": "What should I inspect next in this image?",
+        "text": "What should I inspect next in this image?",
+        "answers": {
+          "action": {
+            "type": "choice",
+            "value": "describe",
+            "probabilities": {
+              "navigate": 0,
+              "describe": 0.5,
+              "inspect": 0.4,
+              "ask": 0.1
+            },
+            "confidence": 0.33
+          },
+          "enough_evidence": {
+            "type": "noul",
+            "value": 0.25,
+            "probabilities": null,
+            "confidence": null
+          },
+          "scene": {
+            "type": "choice",
+            "value": "unclear",
+            "probabilities": {
+              "unclear": 0.54,
+              "outdoor": 0,
+              "abstract": 0.23,
+              "indoor": 0.23
+            },
+            "confidence": 0.39
+          }
+        },
+        "latency_ms": 237.29895800352097,
+        "cost_usd": 0,
+        "source": "recorded browser run",
+        "description": "a collage of different types of electronic devices",
+        "image": "/vision-input.png",
+        "local_model": "Xenova/vit-gpt2-image-captioning",
+        "device": "wasm"
+      }
+    ],
+    "note": "A real browser run through a local ViT-GPT2 captioner and Jev. The input is this gallery screenshot. The caption inaccurately suggests electronic devices; Jev reports limited evidence. This single example tests the composition, not vision accuracy.",
+    "transport": null
+  }
+}
