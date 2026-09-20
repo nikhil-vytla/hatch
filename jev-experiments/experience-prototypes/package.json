@@ -1,0 +1,38 @@
+{
+  "name": "jev-experience-prototypes",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun scripts/prepare.ts && vite --host 127.0.0.1 --port 5191",
+    "server": "bun server/dev.ts",
+    "build": "bun scripts/prepare.ts && tsc --noEmit && vite build",
+    "test": "bun test server",
+    "start": "bun scripts/start.ts",
+    "record": "bun scripts/record.ts",
+    "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py"
+  },
+  "dependencies": {
+    "@json-render/core": "0.21.0",
+    "@json-render/react": "0.21.0",
+    "@json-render/shadcn": "0.21.0",
+    "@tanstack/react-table": "^8.21.3",
+    "@tonejs/midi": "^2.0.28",
+    "@xyflow/react": "^12.10.0",
+    "lucide-react": "^0.577.0",
+    "motion": "^12.35.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tone": "^15.1.22",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "typescript": "~5.9.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/node": "^26.6.2",
+    "@tailwindcss/vite": "^4.2.1",
+    "tailwindcss": "^4.2.1"
+  }
+}

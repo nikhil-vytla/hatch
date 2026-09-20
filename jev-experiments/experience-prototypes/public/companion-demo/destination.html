@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Event desk · destination form</title
+  ><style>
+    body {
+      font: 15px/1.6 system-ui;
+      background: #f4f5ee;
+      color: #28372d;
+      max-width: 600px;
+      margin: 60px auto;
+      padding: 25px;
+    }
+    h1 {
+      font-size: 40px;
+      letter-spacing: -1px;
+    }
+    form {
+      padding: 28px;
+      background: #fffefa;
+      border: 1px solid #d6ddcf;
+      border-radius: 12px;
+    }
+    label {
+      display: block;
+      margin: 15px 0;
+    }
+    input {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      border: 1px solid #cbd4c6;
+      border-radius: 6px;
+      font: inherit;
+    }
+    button {
+      padding: 12px 18px;
+      background: #527963;
+      color: white;
+      border: 0;
+      border-radius: 6px;
+      font: inherit;
+    }
+    a {
+      color: #557763;
+    }
+  </style>
+  <p>JEV PASTE / SAMPLE DESTINATION</p>
+  <h1>Create an event</h1>
+  <p>
+    Focus a field, then ask the companion to suggest values from your captured
+    selection. This demonstration never sends the form.
+  </p>
+  <form id="event-form">
+    <label>Event title<input name="event" autocomplete="off" /></label
+    ><label>Venue address<input name="address" autocomplete="off" /></label
+    ><label>Event date<input name="date" type="date" /></label
+    ><label>Start time<input name="time" type="time" /></label
+    ><label>Contact email<input name="email" type="email" /></label
+    ><button type="submit">Review event</button>
+    <p id="status" role="status"></p>
+  </form>
+  <p><a href="source.html">← Source page</a></p>
+  <script>
+    document.querySelector("form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      document.querySelector("#status").textContent =
+        "Preview reviewed. No data was sent.";
+    });
+  </script>
+</html>

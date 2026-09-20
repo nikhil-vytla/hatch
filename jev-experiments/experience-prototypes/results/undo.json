@@ -1,0 +1,54 @@
+{
+  "manifest": {
+    "experiment": "undo",
+    "created": "2026-09-20T07:34:19.270Z",
+    "status": "complete"
+  },
+  "result": {
+    "answers": {
+      "e1": {
+        "type": "noul",
+        "value": 0.97,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e2": {
+        "type": "noul",
+        "value": 0.04,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e3": {
+        "type": "noul",
+        "value": 0.94,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e4": {
+        "type": "noul",
+        "value": 0.04,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e5": {
+        "type": "noul",
+        "value": 0.31,
+        "probabilities": null,
+        "confidence": null
+      }
+    },
+    "latency_ms": 292,
+    "service_latency_ms": 292,
+    "retries": 0,
+    "attempts": [
+      {
+        "attempt": 1,
+        "status": 200,
+        "latency_ms": 272
+      }
+    ],
+    "cost_usd": "0",
+    "model": "typesafe-ai/jev",
+    "source": "live"
+  }
+}

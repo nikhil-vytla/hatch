@@ -1,0 +1,6060 @@
+{
+  "manifest": {
+    "id": "20260920T051311-visuals-3d4e09",
+    "experiment": "visuals",
+    "created": "2026-09-20T05:13:11.543716+00:00",
+    "config": {
+      "quick": false,
+      "seed": 42
+    },
+    "python": "3.13.11",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "status": "complete",
+    "finished": "2026-09-20T05:15:11.070426+00:00"
+  },
+  "result": {
+    "scenes": [
+      {
+        "brief": "A quiet moonlit garden with drifting fireflies and a small pond",
+        "scene": {
+          "palette": "night",
+          "terrain": "stars",
+          "density": "sparse",
+          "motion": "drift",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "palette": [
+          "#11172f",
+          "#504e9c",
+          "#94b6dc",
+          "#ffeab0"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "night",
+            "probabilities": {
+              "neon": 0,
+              "warm": 0,
+              "ocean": 0,
+              "night": 1,
+              "monochrome": 0,
+              "garden": 0
+            },
+            "confidence": 1
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "stars",
+            "probabilities": {
+              "flat": 0.06,
+              "hills": 0.18,
+              "waves": 0,
+              "buildings": 0,
+              "stars": 0.76
+            },
+            "confidence": 0.69
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "dense": 0,
+              "balanced": 0.03,
+              "sparse": 0.97
+            },
+            "confidence": 0.96
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "pulse": 0,
+              "grow": 0,
+              "drift": 1,
+              "bounce": 0,
+              "orbit": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.01,
+              "star": 0.13,
+              "triangle": 0,
+              "leaf": 0.11,
+              "circle": 0.75
+            },
+            "confidence": 0.68
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.01,
+              "circle": 0.66,
+              "triangle": 0,
+              "leaf": 0.18,
+              "star": 0.15
+            },
+            "confidence": 0.57
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.01,
+              "circle": 0.52,
+              "triangle": 0,
+              "leaf": 0.21,
+              "star": 0.26
+            },
+            "confidence": 0.4
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.01,
+              "circle": 0.54,
+              "triangle": 0,
+              "leaf": 0.14,
+              "star": 0.31
+            },
+            "confidence": 0.42
+          }
+        },
+        "latency_ms": 20845.16858396819
+      },
+      {
+        "brief": "A busy coral reef with curious fish and waving plants",
+        "scene": {
+          "palette": "ocean",
+          "terrain": "waves",
+          "density": "dense",
+          "motion": "drift",
+          "shape0": "leaf",
+          "shape1": "leaf",
+          "shape2": "leaf",
+          "shape3": "leaf"
+        },
+        "palette": [
+          "#102f43",
+          "#247d8c",
+          "#70cbb9",
+          "#dcf4d6"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "ocean",
+            "probabilities": {
+              "night": 0,
+              "ocean": 1,
+              "warm": 0,
+              "garden": 0,
+              "monochrome": 0,
+              "neon": 0
+            },
+            "confidence": 1
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "waves",
+            "probabilities": {
+              "stars": 0,
+              "flat": 0.01,
+              "hills": 0,
+              "waves": 0.99,
+              "buildings": 0
+            },
+            "confidence": 0.99
+          },
+          "density": {
+            "type": "choice",
+            "value": "dense",
+            "probabilities": {
+              "balanced": 0.01,
+              "sparse": 0,
+              "dense": 0.99
+            },
+            "confidence": 0.99
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "orbit": 0.01,
+              "bounce": 0.01,
+              "grow": 0,
+              "pulse": 0.11,
+              "drift": 0.87
+            },
+            "confidence": 0.84
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "star": 0.01,
+              "triangle": 0,
+              "leaf": 0.86,
+              "line": 0.05,
+              "circle": 0.08
+            },
+            "confidence": 0.82
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "star": 0.01,
+              "triangle": 0,
+              "leaf": 0.86,
+              "line": 0.06,
+              "circle": 0.07
+            },
+            "confidence": 0.81
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "triangle": 0,
+              "star": 0.01,
+              "leaf": 0.88,
+              "line": 0.06,
+              "circle": 0.05
+            },
+            "confidence": 0.84
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "star": 0.01,
+              "triangle": 0.01,
+              "leaf": 0.85,
+              "line": 0.07,
+              "circle": 0.06
+            },
+            "confidence": 0.82
+          }
+        },
+        "latency_ms": 20771.126292005647
+      },
+      {
+        "brief": "An orange desert at sunset with windblown dunes",
+        "scene": {
+          "palette": "warm",
+          "terrain": "hills",
+          "density": "sparse",
+          "motion": "drift",
+          "shape0": "line",
+          "shape1": "line",
+          "shape2": "line",
+          "shape3": "line"
+        },
+        "palette": [
+          "#241722",
+          "#ad4f41",
+          "#f39b53",
+          "#ffe3a1"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "warm",
+            "probabilities": {
+              "neon": 0,
+              "night": 0,
+              "warm": 1,
+              "ocean": 0,
+              "monochrome": 0,
+              "garden": 0
+            },
+            "confidence": 1
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "hills",
+            "probabilities": {
+              "stars": 0.01,
+              "waves": 0.02,
+              "buildings": 0,
+              "flat": 0.04,
+              "hills": 0.93
+            },
+            "confidence": 0.92
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "dense": 0,
+              "sparse": 0.99,
+              "balanced": 0.01
+            },
+            "confidence": 0.99
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "orbit": 0,
+              "pulse": 0,
+              "drift": 1,
+              "bounce": 0,
+              "grow": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "circle": 0.12,
+              "triangle": 0.19,
+              "line": 0.69,
+              "star": 0,
+              "leaf": 0
+            },
+            "confidence": 0.61
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "circle": 0.09,
+              "triangle": 0.17,
+              "line": 0.74,
+              "star": 0,
+              "leaf": 0
+            },
+            "confidence": 0.66
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "circle": 0.03,
+              "triangle": 0.16,
+              "line": 0.81,
+              "star": 0,
+              "leaf": 0
+            },
+            "confidence": 0.77
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "circle": 0.06,
+              "triangle": 0.24,
+              "line": 0.7,
+              "star": 0,
+              "leaf": 0
+            },
+            "confidence": 0.63
+          }
+        },
+        "latency_ms": 10536.737916991115
+      },
+      {
+        "id": "3",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A rainy city at night, full of reflections and umbrellas",
+        "scene": {
+          "palette": "night",
+          "terrain": "buildings",
+          "density": "dense",
+          "motion": "drift",
+          "shape0": "line",
+          "shape1": "line",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "night",
+            "probabilities": {
+              "garden": 0,
+              "neon": 0.16,
+              "warm": 0,
+              "monochrome": 0.01,
+              "night": 0.83,
+              "ocean": 0
+            },
+            "confidence": 0.79
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "buildings",
+            "probabilities": {
+              "hills": 0,
+              "buildings": 1,
+              "stars": 0,
+              "flat": 0,
+              "waves": 0
+            },
+            "confidence": 1
+          },
+          "density": {
+            "type": "choice",
+            "value": "dense",
+            "probabilities": {
+              "balanced": 0.15,
+              "sparse": 0,
+              "dense": 0.85
+            },
+            "confidence": 0.77
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "drift": 0.8,
+              "grow": 0,
+              "orbit": 0.01,
+              "bounce": 0,
+              "pulse": 0.19
+            },
+            "confidence": 0.75
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "star": 0,
+              "triangle": 0.02,
+              "line": 0.49,
+              "leaf": 0,
+              "circle": 0.49
+            },
+            "confidence": 0.36
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "star": 0,
+              "triangle": 0.03,
+              "line": 0.5,
+              "leaf": 0,
+              "circle": 0.47
+            },
+            "confidence": 0.37
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0,
+              "triangle": 0.02,
+              "line": 0.43,
+              "leaf": 0,
+              "circle": 0.55
+            },
+            "confidence": 0.43
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0,
+              "triangle": 0.02,
+              "line": 0.38,
+              "leaf": 0,
+              "circle": 0.6
+            },
+            "confidence": 0.49
+          }
+        },
+        "latency_ms": 262,
+        "recovery": {
+          "at": "2026-09-20T07:56:02.765Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 262,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "226456eae4f9b855d5ee09b8da04e168f3c892712f9714052f08c4fa25ccc909"
+        }
+      },
+      {
+        "id": "4",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A bright geometric playground with bouncing shapes",
+        "scene": {
+          "palette": "neon",
+          "terrain": "flat",
+          "density": "balanced",
+          "motion": "bounce",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "neon",
+            "probabilities": {
+              "neon": 0.99,
+              "garden": 0,
+              "monochrome": 0,
+              "night": 0,
+              "warm": 0.01,
+              "ocean": 0
+            },
+            "confidence": 0.98
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "flat",
+            "probabilities": {
+              "buildings": 0,
+              "hills": 0,
+              "stars": 0,
+              "waves": 0,
+              "flat": 1
+            },
+            "confidence": 0.99
+          },
+          "density": {
+            "type": "choice",
+            "value": "balanced",
+            "probabilities": {
+              "dense": 0.18,
+              "balanced": 0.78,
+              "sparse": 0.04
+            },
+            "confidence": 0.66
+          },
+          "motion": {
+            "type": "choice",
+            "value": "bounce",
+            "probabilities": {
+              "bounce": 1,
+              "orbit": 0,
+              "drift": 0,
+              "grow": 0,
+              "pulse": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.1,
+              "line": 0.09,
+              "star": 0,
+              "leaf": 0,
+              "circle": 0.81
+            },
+            "confidence": 0.75
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.12,
+              "line": 0.05,
+              "star": 0,
+              "leaf": 0,
+              "circle": 0.83
+            },
+            "confidence": 0.78
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.21,
+              "line": 0.04,
+              "star": 0.01,
+              "circle": 0.74,
+              "leaf": 0
+            },
+            "confidence": 0.68
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0.01,
+              "line": 0.03,
+              "triangle": 0.21,
+              "leaf": 0,
+              "circle": 0.75
+            },
+            "confidence": 0.68
+          }
+        },
+        "latency_ms": 281,
+        "recovery": {
+          "at": "2026-09-20T07:56:03.047Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 281,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "f18a50704890a2663c44863f28eef7de1ae7604e39c469c3e69498c087496fc8"
+        }
+      },
+      {
+        "id": "5",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A snowy forest with slow falling snowflakes",
+        "scene": {
+          "palette": "monochrome",
+          "terrain": "hills",
+          "density": "sparse",
+          "motion": "drift",
+          "shape0": "star",
+          "shape1": "star",
+          "shape2": "star",
+          "shape3": "star"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "monochrome",
+            "probabilities": {
+              "garden": 0.09,
+              "neon": 0,
+              "warm": 0,
+              "night": 0.16,
+              "ocean": 0,
+              "monochrome": 0.75
+            },
+            "confidence": 0.7
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "hills",
+            "probabilities": {
+              "waves": 0,
+              "flat": 0.03,
+              "stars": 0,
+              "hills": 0.97,
+              "buildings": 0
+            },
+            "confidence": 0.96
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "balanced": 0.36,
+              "dense": 0.05,
+              "sparse": 0.59
+            },
+            "confidence": 0.39
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "grow": 0,
+              "drift": 1,
+              "bounce": 0,
+              "orbit": 0,
+              "pulse": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "triangle": 0.32,
+              "circle": 0.02,
+              "leaf": 0.04,
+              "line": 0.08,
+              "star": 0.54
+            },
+            "confidence": 0.42
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "triangle": 0.37,
+              "circle": 0.02,
+              "leaf": 0.04,
+              "star": 0.5,
+              "line": 0.07
+            },
+            "confidence": 0.38
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "triangle": 0.24,
+              "circle": 0.02,
+              "leaf": 0.05,
+              "star": 0.6,
+              "line": 0.09
+            },
+            "confidence": 0.51
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "triangle": 0.2,
+              "circle": 0.03,
+              "leaf": 0.04,
+              "line": 0.08,
+              "star": 0.65
+            },
+            "confidence": 0.56
+          }
+        },
+        "latency_ms": 270,
+        "recovery": {
+          "at": "2026-09-20T07:56:03.318Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 270,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "28e9b301a21d14689a733f11db4b44dee2d932ff41db12441bfbe11666b81f18"
+        }
+      },
+      {
+        "id": "6",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A tiny alien planet with orbiting moons and purple grass",
+        "scene": {
+          "palette": "neon",
+          "terrain": "stars",
+          "density": "sparse",
+          "motion": "orbit",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "neon",
+            "probabilities": {
+              "warm": 0,
+              "neon": 0.98,
+              "garden": 0,
+              "monochrome": 0,
+              "night": 0.02,
+              "ocean": 0
+            },
+            "confidence": 0.97
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "stars",
+            "probabilities": {
+              "hills": 0.02,
+              "buildings": 0,
+              "stars": 0.98,
+              "waves": 0,
+              "flat": 0
+            },
+            "confidence": 0.98
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "balanced": 0.27,
+              "sparse": 0.72,
+              "dense": 0.01
+            },
+            "confidence": 0.59
+          },
+          "motion": {
+            "type": "choice",
+            "value": "orbit",
+            "probabilities": {
+              "drift": 0,
+              "grow": 0,
+              "orbit": 1,
+              "bounce": 0,
+              "pulse": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0.01,
+              "triangle": 0,
+              "line": 0,
+              "leaf": 0.04,
+              "circle": 0.95
+            },
+            "confidence": 0.93
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0.01,
+              "triangle": 0,
+              "line": 0,
+              "leaf": 0.06,
+              "circle": 0.93
+            },
+            "confidence": 0.91
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0.01,
+              "triangle": 0,
+              "line": 0.01,
+              "leaf": 0.1,
+              "circle": 0.88
+            },
+            "confidence": 0.84
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0.03,
+              "triangle": 0,
+              "line": 0.01,
+              "leaf": 0.16,
+              "circle": 0.8
+            },
+            "confidence": 0.75
+          }
+        },
+        "latency_ms": 353,
+        "recovery": {
+          "at": "2026-09-20T07:56:03.672Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 353,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "1dadfff13f15256d14d3b5b99c62e3d90b5401be6d144e083591f727d84e03ba"
+        }
+      },
+      {
+        "brief": "An underwater library where glowing books drift past",
+        "scene": {
+          "palette": "ocean",
+          "terrain": "waves",
+          "density": "balanced",
+          "motion": "drift",
+          "shape0": "circle",
+          "shape1": "line",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "palette": [
+          "#102f43",
+          "#247d8c",
+          "#70cbb9",
+          "#dcf4d6"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "ocean",
+            "probabilities": {
+              "neon": 0,
+              "warm": 0,
+              "ocean": 0.97,
+              "night": 0.03,
+              "garden": 0,
+              "monochrome": 0
+            },
+            "confidence": 0.96
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "waves",
+            "probabilities": {
+              "hills": 0,
+              "flat": 0.01,
+              "waves": 0.95,
+              "buildings": 0.03,
+              "stars": 0.01
+            },
+            "confidence": 0.93
+          },
+          "density": {
+            "type": "choice",
+            "value": "balanced",
+            "probabilities": {
+              "dense": 0.27,
+              "sparse": 0.04,
+              "balanced": 0.69
+            },
+            "confidence": 0.53
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "pulse": 0,
+              "grow": 0,
+              "drift": 1,
+              "orbit": 0,
+              "bounce": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.35,
+              "star": 0.16,
+              "triangle": 0.03,
+              "leaf": 0.05,
+              "circle": 0.41
+            },
+            "confidence": 0.28
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "line": 0.39,
+              "star": 0.15,
+              "triangle": 0.02,
+              "leaf": 0.07,
+              "circle": 0.37
+            },
+            "confidence": 0.24
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.28,
+              "circle": 0.39,
+              "triangle": 0.03,
+              "leaf": 0.07,
+              "star": 0.23
+            },
+            "confidence": 0.24
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.25,
+              "star": 0.24,
+              "triangle": 0.04,
+              "leaf": 0.08,
+              "circle": 0.39
+            },
+            "confidence": 0.22
+          }
+        },
+        "latency_ms": 10413.939042016864
+      },
+      {
+        "id": "8",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A clockwork greenhouse with rotating flowers",
+        "scene": {
+          "palette": "garden",
+          "terrain": "flat",
+          "density": "balanced",
+          "motion": "orbit",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "garden",
+            "probabilities": {
+              "garden": 0.94,
+              "monochrome": 0.01,
+              "neon": 0.05,
+              "ocean": 0,
+              "night": 0,
+              "warm": 0
+            },
+            "confidence": 0.93
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "flat",
+            "probabilities": {
+              "flat": 0.43,
+              "stars": 0.2,
+              "waves": 0,
+              "buildings": 0.34,
+              "hills": 0.03
+            },
+            "confidence": 0.28
+          },
+          "density": {
+            "type": "choice",
+            "value": "balanced",
+            "probabilities": {
+              "sparse": 0.02,
+              "balanced": 0.68,
+              "dense": 0.3
+            },
+            "confidence": 0.52
+          },
+          "motion": {
+            "type": "choice",
+            "value": "orbit",
+            "probabilities": {
+              "bounce": 0,
+              "drift": 0,
+              "grow": 0,
+              "orbit": 1,
+              "pulse": 0
+            },
+            "confidence": 0.99
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "circle": 0.71,
+              "triangle": 0,
+              "leaf": 0.29,
+              "star": 0,
+              "line": 0
+            },
+            "confidence": 0.63
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "circle": 0.66,
+              "triangle": 0,
+              "leaf": 0.34,
+              "star": 0,
+              "line": 0
+            },
+            "confidence": 0.57
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "circle": 0.65,
+              "line": 0.01,
+              "leaf": 0.33,
+              "star": 0.01,
+              "triangle": 0
+            },
+            "confidence": 0.56
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "circle": 0.6,
+              "line": 0.01,
+              "leaf": 0.38,
+              "star": 0.01,
+              "triangle": 0
+            },
+            "confidence": 0.5
+          }
+        },
+        "latency_ms": 294,
+        "recovery": {
+          "at": "2026-09-20T07:56:03.967Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 294,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "89b6d702770c162ac4a734c1e4049e5631443ee2cf005755827498f87f503d8c"
+        }
+      },
+      {
+        "brief": "A cheerful farm at dawn with birds circling",
+        "scene": {
+          "palette": "garden",
+          "terrain": "hills",
+          "density": "balanced",
+          "motion": "orbit",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "palette": [
+          "#172b23",
+          "#527c46",
+          "#a5c06d",
+          "#f1d9a6"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "garden",
+            "probabilities": {
+              "ocean": 0,
+              "garden": 0.6,
+              "warm": 0.4,
+              "monochrome": 0,
+              "neon": 0,
+              "night": 0
+            },
+            "confidence": 0.52
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "hills",
+            "probabilities": {
+              "buildings": 0.06,
+              "waves": 0,
+              "hills": 0.81,
+              "flat": 0.13,
+              "stars": 0
+            },
+            "confidence": 0.76
+          },
+          "density": {
+            "type": "choice",
+            "value": "balanced",
+            "probabilities": {
+              "sparse": 0.19,
+              "dense": 0,
+              "balanced": 0.81
+            },
+            "confidence": 0.72
+          },
+          "motion": {
+            "type": "choice",
+            "value": "orbit",
+            "probabilities": {
+              "grow": 0,
+              "orbit": 0.95,
+              "bounce": 0,
+              "drift": 0.05,
+              "pulse": 0
+            },
+            "confidence": 0.93
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0.01,
+              "circle": 0.96,
+              "leaf": 0.01,
+              "triangle": 0.01,
+              "line": 0.01
+            },
+            "confidence": 0.97
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0.01,
+              "circle": 0.96,
+              "leaf": 0.01,
+              "triangle": 0.01,
+              "line": 0.01
+            },
+            "confidence": 0.96
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0,
+              "circle": 0.96,
+              "leaf": 0.02,
+              "triangle": 0.01,
+              "line": 0.01
+            },
+            "confidence": 0.95
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "star": 0,
+              "circle": 0.97,
+              "leaf": 0.01,
+              "triangle": 0.01,
+              "line": 0.01
+            },
+            "confidence": 0.96
+          }
+        },
+        "latency_ms": 17566.325500025414
+      },
+      {
+        "id": "10",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "An abandoned space station with blinking lights",
+        "scene": {
+          "palette": "night",
+          "terrain": "stars",
+          "density": "sparse",
+          "motion": "pulse",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "star"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "night",
+            "probabilities": {
+              "neon": 0.11,
+              "warm": 0,
+              "ocean": 0,
+              "night": 0.85,
+              "monochrome": 0.04,
+              "garden": 0
+            },
+            "confidence": 0.82
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "stars",
+            "probabilities": {
+              "flat": 0,
+              "hills": 0,
+              "waves": 0,
+              "buildings": 0,
+              "stars": 1
+            },
+            "confidence": 1
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "dense": 0.03,
+              "sparse": 0.77,
+              "balanced": 0.2
+            },
+            "confidence": 0.65
+          },
+          "motion": {
+            "type": "choice",
+            "value": "pulse",
+            "probabilities": {
+              "pulse": 0.55,
+              "grow": 0,
+              "drift": 0.07,
+              "orbit": 0.38,
+              "bounce": 0
+            },
+            "confidence": 0.43
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.05,
+              "star": 0.36,
+              "triangle": 0,
+              "leaf": 0,
+              "circle": 0.59
+            },
+            "confidence": 0.48
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.04,
+              "star": 0.32,
+              "triangle": 0,
+              "leaf": 0,
+              "circle": 0.64
+            },
+            "confidence": 0.54
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.06,
+              "circle": 0.55,
+              "triangle": 0,
+              "leaf": 0,
+              "star": 0.39
+            },
+            "confidence": 0.43
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "line": 0.04,
+              "circle": 0.45,
+              "triangle": 0,
+              "leaf": 0,
+              "star": 0.51
+            },
+            "confidence": 0.38
+          }
+        },
+        "latency_ms": 263,
+        "recovery": {
+          "at": "2026-09-20T07:56:04.230Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 263,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "7a466b513ff72aac85dd78795ebbbc3650cc75ef6ca2a8dfe4a21bb5fd28f315"
+        }
+      },
+      {
+        "id": "11",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A paper ocean with sailing boats and curling waves",
+        "scene": {
+          "palette": "ocean",
+          "terrain": "waves",
+          "density": "balanced",
+          "motion": "drift",
+          "shape0": "line",
+          "shape1": "line",
+          "shape2": "line",
+          "shape3": "line"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "ocean",
+            "probabilities": {
+              "ocean": 0.99,
+              "monochrome": 0.01,
+              "night": 0,
+              "warm": 0,
+              "neon": 0,
+              "garden": 0
+            },
+            "confidence": 0.99
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "waves",
+            "probabilities": {
+              "buildings": 0,
+              "flat": 0.02,
+              "stars": 0,
+              "waves": 0.98,
+              "hills": 0
+            },
+            "confidence": 0.97
+          },
+          "density": {
+            "type": "choice",
+            "value": "balanced",
+            "probabilities": {
+              "dense": 0.01,
+              "sparse": 0.19,
+              "balanced": 0.8
+            },
+            "confidence": 0.7
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "bounce": 0,
+              "grow": 0,
+              "drift": 0.99,
+              "orbit": 0,
+              "pulse": 0.01
+            },
+            "confidence": 0.98
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0.01,
+              "line": 0.81,
+              "circle": 0.04,
+              "triangle": 0.13,
+              "star": 0
+            },
+            "confidence": 0.76
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0.02,
+              "line": 0.77,
+              "circle": 0.03,
+              "triangle": 0.18,
+              "star": 0
+            },
+            "confidence": 0.72
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0.01,
+              "line": 0.68,
+              "circle": 0.04,
+              "triangle": 0.26,
+              "star": 0
+            },
+            "confidence": 0.6
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0.02,
+              "line": 0.61,
+              "circle": 0.08,
+              "triangle": 0.29,
+              "star": 0
+            },
+            "confidence": 0.51
+          }
+        },
+        "latency_ms": 246,
+        "recovery": {
+          "at": "2026-09-20T07:58:53.967Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 245,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "89178baef382a65a4bbdf0335f63304a599d3e6c7bc53453afafe026d3537246"
+        }
+      },
+      {
+        "id": "12",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A cozy campsite with flickering flames and floating sparks",
+        "scene": {
+          "palette": "warm",
+          "terrain": "stars",
+          "density": "sparse",
+          "motion": "drift",
+          "shape0": "star",
+          "shape1": "star",
+          "shape2": "star",
+          "shape3": "star"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "warm",
+            "probabilities": {
+              "ocean": 0,
+              "night": 0.22,
+              "warm": 0.78,
+              "monochrome": 0,
+              "garden": 0,
+              "neon": 0
+            },
+            "confidence": 0.73
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "stars",
+            "probabilities": {
+              "hills": 0.38,
+              "stars": 0.61,
+              "buildings": 0,
+              "waves": 0,
+              "flat": 0.01
+            },
+            "confidence": 0.51
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "balanced": 0.49,
+              "sparse": 0.5,
+              "dense": 0.01
+            },
+            "confidence": 0.25
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "bounce": 0,
+              "orbit": 0,
+              "pulse": 0.23,
+              "grow": 0,
+              "drift": 0.77
+            },
+            "confidence": 0.7
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "line": 0.04,
+              "leaf": 0.01,
+              "star": 0.46,
+              "circle": 0.31,
+              "triangle": 0.18
+            },
+            "confidence": 0.33
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "line": 0.06,
+              "leaf": 0.01,
+              "star": 0.43,
+              "circle": 0.3,
+              "triangle": 0.2
+            },
+            "confidence": 0.3
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "line": 0.07,
+              "leaf": 0,
+              "star": 0.6900000000000001,
+              "circle": 0.12,
+              "triangle": 0.12
+            },
+            "confidence": 0.61
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "line": 0.07,
+              "leaf": 0,
+              "star": 0.75,
+              "circle": 0.09,
+              "triangle": 0.09
+            },
+            "confidence": 0.69
+          }
+        },
+        "latency_ms": 246,
+        "recovery": {
+          "at": "2026-09-20T07:57:00.569Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 245,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "7621a69b9739c57d0729cca28c95f3b9e971708ce8488a6d7fd1a4663f864463"
+        }
+      },
+      {
+        "id": "13",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A neon jungle with climbing vines and hidden creatures",
+        "scene": {
+          "palette": "neon",
+          "terrain": "hills",
+          "density": "dense",
+          "motion": "grow",
+          "shape0": "leaf",
+          "shape1": "leaf",
+          "shape2": "leaf",
+          "shape3": "leaf"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "neon",
+            "probabilities": {
+              "garden": 0,
+              "monochrome": 0,
+              "neon": 1,
+              "ocean": 0,
+              "warm": 0,
+              "night": 0
+            },
+            "confidence": 1
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "hills",
+            "probabilities": {
+              "flat": 0.32,
+              "stars": 0.23,
+              "waves": 0.01,
+              "buildings": 0.06,
+              "hills": 0.38
+            },
+            "confidence": 0.22
+          },
+          "density": {
+            "type": "choice",
+            "value": "dense",
+            "probabilities": {
+              "sparse": 0,
+              "balanced": 0.01,
+              "dense": 0.99
+            },
+            "confidence": 0.99
+          },
+          "motion": {
+            "type": "choice",
+            "value": "grow",
+            "probabilities": {
+              "bounce": 0,
+              "drift": 0.02,
+              "orbit": 0,
+              "grow": 0.85,
+              "pulse": 0.13
+            },
+            "confidence": 0.8
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "circle": 0,
+              "triangle": 0,
+              "leaf": 0.89,
+              "star": 0,
+              "line": 0.11
+            },
+            "confidence": 0.85
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "circle": 0,
+              "line": 0.1,
+              "triangle": 0,
+              "star": 0,
+              "leaf": 0.9
+            },
+            "confidence": 0.86
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "circle": 0,
+              "triangle": 0,
+              "leaf": 0.77,
+              "star": 0,
+              "line": 0.23
+            },
+            "confidence": 0.71
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "circle": 0,
+              "line": 0.17,
+              "triangle": 0,
+              "star": 0,
+              "leaf": 0.83
+            },
+            "confidence": 0.78
+          }
+        },
+        "latency_ms": 228,
+        "recovery": {
+          "at": "2026-09-20T07:57:00.797Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 228,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "4f70af00d75e495df28e4456c8d98cf65fe4468fe625fef4af2e5a8738d2685c"
+        }
+      },
+      {
+        "id": "14",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A peaceful mountain lake with clouds moving slowly",
+        "scene": {
+          "palette": "ocean",
+          "terrain": "hills",
+          "density": "sparse",
+          "motion": "drift",
+          "shape0": "line",
+          "shape1": "line",
+          "shape2": "line",
+          "shape3": "line"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "ocean",
+            "probabilities": {
+              "garden": 0.02,
+              "neon": 0,
+              "monochrome": 0,
+              "ocean": 0.97,
+              "night": 0.01,
+              "warm": 0
+            },
+            "confidence": 0.96
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "hills",
+            "probabilities": {
+              "flat": 0.01,
+              "stars": 0,
+              "hills": 0.98,
+              "waves": 0.01,
+              "buildings": 0
+            },
+            "confidence": 0.97
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "dense": 0,
+              "sparse": 1,
+              "balanced": 0
+            },
+            "confidence": 1
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "drift": 1,
+              "bounce": 0,
+              "grow": 0,
+              "orbit": 0,
+              "pulse": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0,
+              "triangle": 0.19,
+              "star": 0,
+              "circle": 0.13,
+              "line": 0.68
+            },
+            "confidence": 0.59
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0,
+              "star": 0,
+              "circle": 0.14,
+              "triangle": 0.22,
+              "line": 0.64
+            },
+            "confidence": 0.54
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0.01,
+              "star": 0,
+              "circle": 0.2,
+              "triangle": 0.18,
+              "line": 0.61
+            },
+            "confidence": 0.52
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "line",
+            "probabilities": {
+              "leaf": 0.01,
+              "circle": 0.2,
+              "triangle": 0.24,
+              "star": 0,
+              "line": 0.55
+            },
+            "confidence": 0.43
+          }
+        },
+        "latency_ms": 287,
+        "recovery": {
+          "at": "2026-09-20T07:57:01.085Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 287,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "8d76dc874affe912968cbfca5a48275552110d8ca25f4b0e70c7aaa5ae818e58"
+        }
+      },
+      {
+        "brief": "A carnival of colorful kites moving in a breeze",
+        "scene": {
+          "palette": "neon",
+          "terrain": "flat",
+          "density": "dense",
+          "motion": "drift",
+          "shape0": "triangle",
+          "shape1": "triangle",
+          "shape2": "triangle",
+          "shape3": "triangle"
+        },
+        "palette": [
+          "#191529",
+          "#924cdb",
+          "#e06dad",
+          "#87ecce"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "neon",
+            "probabilities": {
+              "warm": 0.35,
+              "garden": 0.08,
+              "ocean": 0.07,
+              "monochrome": 0,
+              "night": 0,
+              "neon": 0.5
+            },
+            "confidence": 0.4
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "flat",
+            "probabilities": {
+              "stars": 0.01,
+              "hills": 0.28,
+              "buildings": 0.01,
+              "waves": 0.02,
+              "flat": 0.68
+            },
+            "confidence": 0.6
+          },
+          "density": {
+            "type": "choice",
+            "value": "dense",
+            "probabilities": {
+              "balanced": 0.24,
+              "dense": 0.76,
+              "sparse": 0
+            },
+            "confidence": 0.64
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "orbit": 0,
+              "bounce": 0,
+              "drift": 1,
+              "grow": 0,
+              "pulse": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "triangle",
+            "probabilities": {
+              "triangle": 0.75,
+              "leaf": 0,
+              "line": 0.23,
+              "circle": 0.01,
+              "star": 0.01
+            },
+            "confidence": 0.69
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "triangle",
+            "probabilities": {
+              "triangle": 0.78,
+              "leaf": 0,
+              "line": 0.2,
+              "circle": 0.01,
+              "star": 0.01
+            },
+            "confidence": 0.73
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "triangle",
+            "probabilities": {
+              "leaf": 0,
+              "triangle": 0.67,
+              "line": 0.31,
+              "circle": 0.01,
+              "star": 0.01
+            },
+            "confidence": 0.59
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "triangle",
+            "probabilities": {
+              "leaf": 0.01,
+              "triangle": 0.73,
+              "circle": 0.01,
+              "line": 0.24,
+              "star": 0.01
+            },
+            "confidence": 0.67
+          }
+        },
+        "latency_ms": 10374.019249982666
+      },
+      {
+        "brief": "A microscopic world of swimming cells",
+        "scene": {
+          "palette": "ocean",
+          "terrain": "waves",
+          "density": "dense",
+          "motion": "drift",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "palette": [
+          "#102f43",
+          "#247d8c",
+          "#70cbb9",
+          "#dcf4d6"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "ocean",
+            "probabilities": {
+              "night": 0,
+              "ocean": 0.85,
+              "warm": 0,
+              "garden": 0,
+              "monochrome": 0.04,
+              "neon": 0.11
+            },
+            "confidence": 0.81
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "waves",
+            "probabilities": {
+              "stars": 0.02,
+              "flat": 0.38,
+              "hills": 0,
+              "waves": 0.6,
+              "buildings": 0
+            },
+            "confidence": 0.51
+          },
+          "density": {
+            "type": "choice",
+            "value": "dense",
+            "probabilities": {
+              "balanced": 0.32,
+              "sparse": 0.03,
+              "dense": 0.65
+            },
+            "confidence": 0.48
+          },
+          "motion": {
+            "type": "choice",
+            "value": "drift",
+            "probabilities": {
+              "orbit": 0.07,
+              "pulse": 0.27,
+              "grow": 0,
+              "bounce": 0.01,
+              "drift": 0.65
+            },
+            "confidence": 0.57
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.01,
+              "star": 0.01,
+              "leaf": 0.05,
+              "line": 0.13,
+              "circle": 0.8
+            },
+            "confidence": 0.75
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0,
+              "star": 0.01,
+              "leaf": 0.05,
+              "line": 0.2,
+              "circle": 0.74
+            },
+            "confidence": 0.67
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.01,
+              "star": 0.02,
+              "leaf": 0.08,
+              "line": 0.2,
+              "circle": 0.69
+            },
+            "confidence": 0.61
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.01,
+              "star": 0.02,
+              "leaf": 0.08,
+              "line": 0.22,
+              "circle": 0.67
+            },
+            "confidence": 0.58
+          }
+        },
+        "latency_ms": 20802.7864160249
+      },
+      {
+        "brief": "A cave of crystals that pulse with light",
+        "scene": {
+          "palette": "neon",
+          "terrain": "stars",
+          "density": "dense",
+          "motion": "pulse",
+          "shape0": "star",
+          "shape1": "star",
+          "shape2": "star",
+          "shape3": "star"
+        },
+        "palette": [
+          "#191529",
+          "#924cdb",
+          "#e06dad",
+          "#87ecce"
+        ],
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "neon",
+            "probabilities": {
+              "ocean": 0,
+              "warm": 0,
+              "garden": 0,
+              "neon": 0.84,
+              "monochrome": 0,
+              "night": 0.16
+            },
+            "confidence": 0.8
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "stars",
+            "probabilities": {
+              "flat": 0.38,
+              "stars": 0.55,
+              "hills": 0.06,
+              "buildings": 0,
+              "waves": 0.01
+            },
+            "confidence": 0.44
+          },
+          "density": {
+            "type": "choice",
+            "value": "dense",
+            "probabilities": {
+              "sparse": 0.02,
+              "dense": 0.82,
+              "balanced": 0.16
+            },
+            "confidence": 0.73
+          },
+          "motion": {
+            "type": "choice",
+            "value": "pulse",
+            "probabilities": {
+              "grow": 0,
+              "bounce": 0,
+              "orbit": 0,
+              "pulse": 1,
+              "drift": 0
+            },
+            "confidence": 1
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "circle": 0.22,
+              "leaf": 0,
+              "star": 0.59,
+              "triangle": 0.09,
+              "line": 0.1
+            },
+            "confidence": 0.47
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "leaf": 0,
+              "triangle": 0.11,
+              "star": 0.57,
+              "circle": 0.2,
+              "line": 0.12
+            },
+            "confidence": 0.47
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "leaf": 0,
+              "triangle": 0.06,
+              "star": 0.63,
+              "circle": 0.18,
+              "line": 0.13
+            },
+            "confidence": 0.53
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "star",
+            "probabilities": {
+              "star": 0.64,
+              "leaf": 0,
+              "circle": 0.17,
+              "triangle": 0.07,
+              "line": 0.12
+            },
+            "confidence": 0.54
+          }
+        },
+        "latency_ms": 20803.264209011104
+      },
+      {
+        "id": "18",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A field of flowers growing toward the sun",
+        "scene": {
+          "palette": "garden",
+          "terrain": "flat",
+          "density": "dense",
+          "motion": "grow",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "leaf",
+          "shape3": "circle"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "garden",
+            "probabilities": {
+              "ocean": 0,
+              "night": 0,
+              "monochrome": 0,
+              "warm": 0.04,
+              "garden": 0.96,
+              "neon": 0
+            },
+            "confidence": 0.95
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "flat",
+            "probabilities": {
+              "flat": 0.7,
+              "hills": 0.3,
+              "waves": 0,
+              "stars": 0,
+              "buildings": 0
+            },
+            "confidence": 0.62
+          },
+          "density": {
+            "type": "choice",
+            "value": "dense",
+            "probabilities": {
+              "balanced": 0.22,
+              "dense": 0.77,
+              "sparse": 0.01
+            },
+            "confidence": 0.65
+          },
+          "motion": {
+            "type": "choice",
+            "value": "grow",
+            "probabilities": {
+              "grow": 0.98,
+              "pulse": 0,
+              "orbit": 0.02,
+              "drift": 0,
+              "bounce": 0
+            },
+            "confidence": 0.98
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.02,
+              "circle": 0.34,
+              "line": 0.2,
+              "star": 0.11,
+              "leaf": 0.33
+            },
+            "confidence": 0.18
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.02,
+              "circle": 0.36,
+              "line": 0.23,
+              "star": 0.08,
+              "leaf": 0.31
+            },
+            "confidence": 0.22
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "leaf",
+            "probabilities": {
+              "triangle": 0.02,
+              "circle": 0.29,
+              "line": 0.22,
+              "star": 0.11,
+              "leaf": 0.36
+            },
+            "confidence": 0.2
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "triangle": 0.03,
+              "circle": 0.28,
+              "line": 0.23,
+              "star": 0.2,
+              "leaf": 0.26
+            },
+            "confidence": 0.1
+          }
+        },
+        "latency_ms": 19122,
+        "recovery": {
+          "at": "2026-09-20T07:57:20.208Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": "network",
+              "latency_ms": 18001
+            },
+            {
+              "attempt": 2,
+              "status": 200,
+              "latency_ms": 418,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "6264a8a551f928910c642da14be7a34cebf9d087160995c02d6cb5b47ec83852"
+        }
+      },
+      {
+        "id": "19",
+        "original_error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr",
+        "brief": "A minimalist black and white dance of circles",
+        "scene": {
+          "palette": "monochrome",
+          "terrain": "flat",
+          "density": "sparse",
+          "motion": "orbit",
+          "shape0": "circle",
+          "shape1": "circle",
+          "shape2": "circle",
+          "shape3": "circle"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "monochrome",
+            "probabilities": {
+              "ocean": 0,
+              "monochrome": 1,
+              "night": 0,
+              "warm": 0,
+              "garden": 0,
+              "neon": 0
+            },
+            "confidence": 1
+          },
+          "terrain": {
+            "type": "choice",
+            "value": "flat",
+            "probabilities": {
+              "waves": 0,
+              "buildings": 0,
+              "flat": 1,
+              "stars": 0,
+              "hills": 0
+            },
+            "confidence": 1
+          },
+          "density": {
+            "type": "choice",
+            "value": "sparse",
+            "probabilities": {
+              "balanced": 0,
+              "sparse": 1,
+              "dense": 0
+            },
+            "confidence": 0.99
+          },
+          "motion": {
+            "type": "choice",
+            "value": "orbit",
+            "probabilities": {
+              "grow": 0,
+              "pulse": 0.05,
+              "orbit": 0.93,
+              "bounce": 0.01,
+              "drift": 0.01
+            },
+            "confidence": 0.91
+          },
+          "shape0": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0,
+              "circle": 1,
+              "star": 0,
+              "leaf": 0,
+              "triangle": 0
+            },
+            "confidence": 1
+          },
+          "shape1": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0,
+              "circle": 1,
+              "star": 0,
+              "leaf": 0,
+              "triangle": 0
+            },
+            "confidence": 1
+          },
+          "shape2": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.02,
+              "circle": 0.98,
+              "star": 0,
+              "leaf": 0,
+              "triangle": 0
+            },
+            "confidence": 0.97
+          },
+          "shape3": {
+            "type": "choice",
+            "value": "circle",
+            "probabilities": {
+              "line": 0.01,
+              "circle": 0.99,
+              "star": 0,
+              "leaf": 0,
+              "triangle": 0
+            },
+            "confidence": 0.99
+          }
+        },
+        "latency_ms": 228,
+        "recovery": {
+          "at": "2026-09-20T07:57:20.437Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 227,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "8dbb4cefd7e024d363a4b2ff046c3a8ed36a84ac338fa86035f0f97d94d9ebcc"
+        }
+      }
+    ],
+    "pixels": [
+      {
+        "brief": "A quiet moonlit garden with drifting fireflies and a small pond",
+        "size": 8,
+        "answers": {
+          "p0_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.95,
+              "teal": 0.03
+            },
+            "confidence": 0.94
+          },
+          "p1_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.93,
+              "teal": 0.05
+            },
+            "confidence": 0.89
+          },
+          "p2_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.89,
+              "teal": 0.09
+            },
+            "confidence": 0.85
+          },
+          "p3_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.1,
+              "ink": 0.84,
+              "teal": 0.06
+            },
+            "confidence": 0.78
+          },
+          "p4_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.11,
+              "ink": 0.85,
+              "teal": 0.04
+            },
+            "confidence": 0.8
+          },
+          "p5_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.12,
+              "teal": 0.08,
+              "ink": 0.8
+            },
+            "confidence": 0.73
+          },
+          "p6_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.07,
+              "ink": 0.87,
+              "teal": 0.06
+            },
+            "confidence": 0.82
+          },
+          "p7_0": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.06,
+              "ink": 0.91,
+              "teal": 0.03
+            },
+            "confidence": 0.87
+          },
+          "p0_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.89,
+              "teal": 0.1
+            },
+            "confidence": 0.85
+          },
+          "p1_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "teal": 0.13,
+              "ink": 0.86
+            },
+            "confidence": 0.81
+          },
+          "p2_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.74,
+              "teal": 0.23
+            },
+            "confidence": 0.65
+          },
+          "p3_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.06,
+              "ink": 0.79,
+              "teal": 0.15
+            },
+            "confidence": 0.71
+          },
+          "p4_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.07,
+              "teal": 0.13,
+              "ink": 0.8
+            },
+            "confidence": 0.74
+          },
+          "p5_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.08,
+              "ink": 0.75,
+              "teal": 0.17
+            },
+            "confidence": 0.66
+          },
+          "p6_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.06,
+              "teal": 0.15,
+              "ink": 0.79
+            },
+            "confidence": 0.72
+          },
+          "p7_1": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.06,
+              "ink": 0.87,
+              "teal": 0.07
+            },
+            "confidence": 0.83
+          },
+          "p0_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.84,
+              "teal": 0.15
+            },
+            "confidence": 0.78
+          },
+          "p1_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.74,
+              "teal": 0.24
+            },
+            "confidence": 0.65
+          },
+          "p2_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "teal": 0.32,
+              "ink": 0.65
+            },
+            "confidence": 0.53
+          },
+          "p3_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.08,
+              "ink": 0.74,
+              "teal": 0.18
+            },
+            "confidence": 0.65
+          },
+          "p4_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.08,
+              "ink": 0.71,
+              "teal": 0.21
+            },
+            "confidence": 0.61
+          },
+          "p5_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.09,
+              "ink": 0.72,
+              "teal": 0.19
+            },
+            "confidence": 0.63
+          },
+          "p6_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.06,
+              "teal": 0.2,
+              "ink": 0.74
+            },
+            "confidence": 0.65
+          },
+          "p7_2": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.06,
+              "teal": 0.14,
+              "ink": 0.8
+            },
+            "confidence": 0.73
+          },
+          "p0_3": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.67,
+              "teal": 0.32
+            },
+            "confidence": 0.56
+          },
+          "p1_3": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "teal": 0.43,
+              "ink": 0.56
+            },
+            "confidence": 0.41
+          },
+          "p2_3": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.5,
+              "teal": 0.49
+            },
+            "confidence": 0.34
+          },
+          "p3_3": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.44,
+              "teal": 0.53
+            },
+            "confidence": 0.38
+          },
+          "p4_3": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.41,
+              "teal": 0.56
+            },
+            "confidence": 0.4
+          },
+          "p5_3": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "teal": 0.47,
+              "ink": 0.5
+            },
+            "confidence": 0.32
+          },
+          "p6_3": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.5,
+              "teal": 0.47
+            },
+            "confidence": 0.33
+          },
+          "p7_3": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.59,
+              "teal": 0.38
+            },
+            "confidence": 0.44
+          },
+          "p0_4": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.57,
+              "teal": 0.42
+            },
+            "confidence": 0.42
+          },
+          "p1_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.46,
+              "teal": 0.53
+            },
+            "confidence": 0.37
+          },
+          "p2_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.43,
+              "teal": 0.56
+            },
+            "confidence": 0.41
+          },
+          "p3_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.34,
+              "teal": 0.64
+            },
+            "confidence": 0.52
+          },
+          "p4_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.42,
+              "teal": 0.56
+            },
+            "confidence": 0.42
+          },
+          "p5_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.44,
+              "teal": 0.53
+            },
+            "confidence": 0.37
+          },
+          "p6_4": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.49,
+              "teal": 0.48
+            },
+            "confidence": 0.32
+          },
+          "p7_4": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.57,
+              "teal": 0.4
+            },
+            "confidence": 0.43
+          },
+          "p0_5": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.57,
+              "teal": 0.42
+            },
+            "confidence": 0.43
+          },
+          "p1_5": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.51,
+              "teal": 0.48
+            },
+            "confidence": 0.35
+          },
+          "p2_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.47,
+              "teal": 0.52
+            },
+            "confidence": 0.36
+          },
+          "p3_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.41,
+              "teal": 0.57
+            },
+            "confidence": 0.43
+          },
+          "p4_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.39,
+              "teal": 0.59
+            },
+            "confidence": 0.45
+          },
+          "p5_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.43,
+              "teal": 0.54
+            },
+            "confidence": 0.38
+          },
+          "p6_5": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "teal": 0.42,
+              "ink": 0.55
+            },
+            "confidence": 0.39
+          },
+          "p7_5": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.03,
+              "ink": 0.55,
+              "teal": 0.42
+            },
+            "confidence": 0.39
+          },
+          "p0_6": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.63,
+              "teal": 0.36
+            },
+            "confidence": 0.51
+          },
+          "p1_6": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.6,
+              "teal": 0.39
+            },
+            "confidence": 0.47
+          },
+          "p2_6": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "teal": 0.42,
+              "ink": 0.57
+            },
+            "confidence": 0.42
+          },
+          "p3_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.48,
+              "teal": 0.51
+            },
+            "confidence": 0.34
+          },
+          "p4_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "teal": 0.54,
+              "ink": 0.45
+            },
+            "confidence": 0.38
+          },
+          "p5_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "teal": 0.51,
+              "ink": 0.47
+            },
+            "confidence": 0.35
+          },
+          "p6_6": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "teal": 0.39,
+              "ink": 0.59
+            },
+            "confidence": 0.46
+          },
+          "p7_6": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.67,
+              "teal": 0.31
+            },
+            "confidence": 0.56
+          },
+          "p0_7": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.72,
+              "teal": 0.27
+            },
+            "confidence": 0.63
+          },
+          "p1_7": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.66,
+              "teal": 0.33
+            },
+            "confidence": 0.54
+          },
+          "p2_7": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "teal": 0.34,
+              "ink": 0.65
+            },
+            "confidence": 0.53
+          },
+          "p3_7": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "teal": 0.48,
+              "ink": 0.51
+            },
+            "confidence": 0.35
+          },
+          "p4_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.48,
+              "teal": 0.51
+            },
+            "confidence": 0.34
+          },
+          "p5_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.02,
+              "ink": 0.49,
+              "teal": 0.49
+            },
+            "confidence": 0.32
+          },
+          "p6_7": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.72,
+              "teal": 0.27
+            },
+            "confidence": 0.62
+          },
+          "p7_7": {
+            "type": "choice",
+            "value": "ink",
+            "probabilities": {
+              "coral": 0,
+              "cream": 0.01,
+              "ink": 0.8,
+              "teal": 0.19
+            },
+            "confidence": 0.73
+          }
+        },
+        "latency_ms": 6510.287166980561,
+        "note": "Independent pixel distributions, not a joint image distribution."
+      },
+      {
+        "brief": "A busy coral reef with curious fish and waving plants",
+        "size": 8,
+        "answers": {
+          "p0_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.35,
+              "ink": 0.09,
+              "teal": 0.54
+            },
+            "confidence": 0.38
+          },
+          "p1_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "coral": 0.33,
+              "ink": 0.11,
+              "teal": 0.53
+            },
+            "confidence": 0.38
+          },
+          "p2_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "coral": 0.41,
+              "ink": 0.11,
+              "teal": 0.45
+            },
+            "confidence": 0.26
+          },
+          "p3_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "coral": 0.38,
+              "ink": 0.06,
+              "teal": 0.52
+            },
+            "confidence": 0.35
+          },
+          "p4_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "coral": 0.33,
+              "ink": 0.07,
+              "teal": 0.55
+            },
+            "confidence": 0.41
+          },
+          "p5_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "coral": 0.39,
+              "ink": 0.07,
+              "teal": 0.51
+            },
+            "confidence": 0.34
+          },
+          "p6_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "ink": 0.09,
+              "coral": 0.37,
+              "teal": 0.5
+            },
+            "confidence": 0.33
+          },
+          "p7_0": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.05,
+              "coral": 0.28,
+              "ink": 0.1,
+              "teal": 0.56
+            },
+            "confidence": 0.41
+          },
+          "p0_1": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.35,
+              "ink": 0.11,
+              "teal": 0.52
+            },
+            "confidence": 0.36
+          },
+          "p1_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.47000000000000003,
+              "ink": 0.07,
+              "teal": 0.44
+            },
+            "confidence": 0.28
+          },
+          "p2_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.55,
+              "ink": 0.09,
+              "teal": 0.34
+            },
+            "confidence": 0.4
+          },
+          "p3_1": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.46,
+              "ink": 0.04,
+              "teal": 0.48
+            },
+            "confidence": 0.3
+          },
+          "p4_1": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.44,
+              "ink": 0.05,
+              "teal": 0.49
+            },
+            "confidence": 0.33
+          },
+          "p5_1": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.46,
+              "ink": 0.03,
+              "teal": 0.49
+            },
+            "confidence": 0.32
+          },
+          "p6_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.46,
+              "ink": 0.07,
+              "teal": 0.45
+            },
+            "confidence": 0.28
+          },
+          "p7_1": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "coral": 0.38,
+              "ink": 0.1,
+              "teal": 0.49
+            },
+            "confidence": 0.32
+          },
+          "p0_2": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.41,
+              "ink": 0.12,
+              "teal": 0.45
+            },
+            "confidence": 0.26
+          },
+          "p1_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.51,
+              "ink": 0.05,
+              "teal": 0.42
+            },
+            "confidence": 0.35
+          },
+          "p2_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.66,
+              "ink": 0.03,
+              "teal": 0.29
+            },
+            "confidence": 0.55
+          },
+          "p3_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.51,
+              "ink": 0.03,
+              "teal": 0.44
+            },
+            "confidence": 0.34
+          },
+          "p4_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.54,
+              "ink": 0.03,
+              "teal": 0.41
+            },
+            "confidence": 0.37
+          },
+          "p5_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "ink": 0.04,
+              "coral": 0.48,
+              "teal": 0.46
+            },
+            "confidence": 0.31
+          },
+          "p6_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "ink": 0.05,
+              "coral": 0.51,
+              "teal": 0.42
+            },
+            "confidence": 0.35
+          },
+          "p7_2": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.39,
+              "ink": 0.08,
+              "teal": 0.51
+            },
+            "confidence": 0.34
+          },
+          "p0_3": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.35,
+              "ink": 0.08,
+              "teal": 0.56
+            },
+            "confidence": 0.41
+          },
+          "p1_3": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.43,
+              "ink": 0.04,
+              "teal": 0.52
+            },
+            "confidence": 0.35
+          },
+          "p2_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "ink": 0.04,
+              "coral": 0.49,
+              "teal": 0.46
+            },
+            "confidence": 0.32
+          },
+          "p3_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "ink": 0.01,
+              "coral": 0.65,
+              "teal": 0.32
+            },
+            "confidence": 0.53
+          },
+          "p4_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.58,
+              "ink": 0.02,
+              "teal": 0.39
+            },
+            "confidence": 0.45
+          },
+          "p5_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.54,
+              "ink": 0.02,
+              "teal": 0.43
+            },
+            "confidence": 0.39
+          },
+          "p6_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.55,
+              "ink": 0.02,
+              "teal": 0.42
+            },
+            "confidence": 0.39
+          },
+          "p7_3": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.46,
+              "ink": 0.04,
+              "teal": 0.48
+            },
+            "confidence": 0.32
+          },
+          "p0_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "ink": 0.06,
+              "coral": 0.38,
+              "teal": 0.55
+            },
+            "confidence": 0.4
+          },
+          "p1_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "ink": 0.06,
+              "coral": 0.35,
+              "teal": 0.58
+            },
+            "confidence": 0.45
+          },
+          "p2_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.43,
+              "ink": 0.04,
+              "teal": 0.52
+            },
+            "confidence": 0.36
+          },
+          "p3_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "ink": 0.02,
+              "coral": 0.59,
+              "teal": 0.37
+            },
+            "confidence": 0.46
+          },
+          "p4_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.66,
+              "ink": 0.01,
+              "teal": 0.32
+            },
+            "confidence": 0.55
+          },
+          "p5_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.54,
+              "ink": 0.02,
+              "teal": 0.43
+            },
+            "confidence": 0.38
+          },
+          "p6_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "ink": 0.02,
+              "coral": 0.53,
+              "teal": 0.44
+            },
+            "confidence": 0.37
+          },
+          "p7_4": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.45,
+              "ink": 0.04,
+              "teal": 0.5
+            },
+            "confidence": 0.33
+          },
+          "p0_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.3,
+              "ink": 0.14,
+              "teal": 0.55
+            },
+            "confidence": 0.39
+          },
+          "p1_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.31,
+              "ink": 0.08,
+              "teal": 0.6
+            },
+            "confidence": 0.46
+          },
+          "p2_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.38,
+              "ink": 0.07,
+              "teal": 0.54
+            },
+            "confidence": 0.39
+          },
+          "p3_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.01,
+              "ink": 0.03,
+              "coral": 0.45,
+              "teal": 0.51
+            },
+            "confidence": 0.34
+          },
+          "p4_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "ink": 0.03,
+              "coral": 0.53,
+              "teal": 0.43
+            },
+            "confidence": 0.37
+          },
+          "p5_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "ink": 0.02,
+              "coral": 0.56,
+              "teal": 0.4
+            },
+            "confidence": 0.42
+          },
+          "p6_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.01,
+              "coral": 0.51,
+              "ink": 0.04,
+              "teal": 0.44
+            },
+            "confidence": 0.34
+          },
+          "p7_5": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.39,
+              "ink": 0.05,
+              "teal": 0.54
+            },
+            "confidence": 0.39
+          },
+          "p0_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "coral": 0.28,
+              "ink": 0.23,
+              "teal": 0.46
+            },
+            "confidence": 0.28
+          },
+          "p1_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "ink": 0.15,
+              "coral": 0.33,
+              "teal": 0.49
+            },
+            "confidence": 0.33
+          },
+          "p2_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "coral": 0.37,
+              "ink": 0.16,
+              "teal": 0.44
+            },
+            "confidence": 0.26
+          },
+          "p3_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "ink": 0.09,
+              "coral": 0.4,
+              "teal": 0.48
+            },
+            "confidence": 0.31
+          },
+          "p4_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.46,
+              "ink": 0.06,
+              "teal": 0.46
+            },
+            "confidence": 0.28
+          },
+          "p5_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "ink": 0.14,
+              "coral": 0.4,
+              "teal": 0.43
+            },
+            "confidence": 0.25
+          },
+          "p6_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "cream": 0.02,
+              "coral": 0.5,
+              "ink": 0.08,
+              "teal": 0.4
+            },
+            "confidence": 0.32
+          },
+          "p7_6": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "ink": 0.14,
+              "coral": 0.37,
+              "teal": 0.46
+            },
+            "confidence": 0.28
+          },
+          "p0_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "coral": 0.26,
+              "ink": 0.25,
+              "teal": 0.45
+            },
+            "confidence": 0.25
+          },
+          "p1_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "coral": 0.25,
+              "ink": 0.18,
+              "teal": 0.53
+            },
+            "confidence": 0.38
+          },
+          "p2_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "ink": 0.12,
+              "coral": 0.29,
+              "teal": 0.55
+            },
+            "confidence": 0.39
+          },
+          "p3_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "coral": 0.35,
+              "ink": 0.08,
+              "teal": 0.53
+            },
+            "confidence": 0.38
+          },
+          "p4_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.05,
+              "ink": 0.09,
+              "coral": 0.38,
+              "teal": 0.48
+            },
+            "confidence": 0.31
+          },
+          "p5_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "ink": 0.09,
+              "coral": 0.36,
+              "teal": 0.51
+            },
+            "confidence": 0.34
+          },
+          "p6_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.04,
+              "coral": 0.39,
+              "ink": 0.11,
+              "teal": 0.45999999999999996
+            },
+            "confidence": 0.29
+          },
+          "p7_7": {
+            "type": "choice",
+            "value": "teal",
+            "probabilities": {
+              "cream": 0.03,
+              "coral": 0.33,
+              "ink": 0.15,
+              "teal": 0.49
+            },
+            "confidence": 0.32
+          }
+        },
+        "latency_ms": 5793.996167019941,
+        "note": "Independent pixel distributions, not a joint image distribution."
+      },
+      {
+        "brief": "An orange desert at sunset with windblown dunes",
+        "size": 8,
+        "answers": {
+          "p0_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.07,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.03
+            },
+            "confidence": 0.86
+          },
+          "p1_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.06,
+              "cream": 0.05,
+              "coral": 0.89,
+              "teal": 0
+            },
+            "confidence": 0.85
+          },
+          "p2_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.04,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.06
+            },
+            "confidence": 0.86
+          },
+          "p3_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.03,
+              "teal": 0,
+              "coral": 0.92,
+              "cream": 0.05
+            },
+            "confidence": 0.89
+          },
+          "p4_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.03,
+              "cream": 0.05,
+              "coral": 0.92,
+              "teal": 0
+            },
+            "confidence": 0.89
+          },
+          "p5_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.04,
+              "cream": 0.05,
+              "coral": 0.91,
+              "teal": 0
+            },
+            "confidence": 0.87
+          },
+          "p6_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.09,
+              "cream": 0.04,
+              "coral": 0.87,
+              "teal": 0
+            },
+            "confidence": 0.82
+          },
+          "p7_0": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.1,
+              "cream": 0.04,
+              "coral": 0.86,
+              "teal": 0
+            },
+            "confidence": 0.81
+          },
+          "p0_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.05,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.05
+            },
+            "confidence": 0.87
+          },
+          "p1_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.05,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.05
+            },
+            "confidence": 0.87
+          },
+          "p2_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.05,
+              "cream": 0.07,
+              "coral": 0.88,
+              "teal": 0
+            },
+            "confidence": 0.84
+          },
+          "p3_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.04,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.06
+            },
+            "confidence": 0.87
+          },
+          "p4_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.03,
+              "cream": 0.05,
+              "coral": 0.92,
+              "teal": 0
+            },
+            "confidence": 0.89
+          },
+          "p5_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.04,
+              "cream": 0.05,
+              "coral": 0.91,
+              "teal": 0
+            },
+            "confidence": 0.88
+          },
+          "p6_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.08,
+              "cream": 0.04,
+              "coral": 0.88,
+              "teal": 0
+            },
+            "confidence": 0.84
+          },
+          "p7_1": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.13,
+              "cream": 0.04,
+              "coral": 0.83,
+              "teal": 0
+            },
+            "confidence": 0.78
+          },
+          "p0_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.03,
+              "teal": 0,
+              "coral": 0.91,
+              "cream": 0.06
+            },
+            "confidence": 0.88
+          },
+          "p1_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.02,
+              "cream": 0.06,
+              "coral": 0.92,
+              "teal": 0
+            },
+            "confidence": 0.9
+          },
+          "p2_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "cream": 0.06,
+              "coral": 0.93,
+              "teal": 0
+            },
+            "confidence": 0.9
+          },
+          "p3_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.05,
+              "teal": 0,
+              "coral": 0.88,
+              "cream": 0.07
+            },
+            "confidence": 0.84
+          },
+          "p4_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.05,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.05
+            },
+            "confidence": 0.86
+          },
+          "p5_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.04,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.06
+            },
+            "confidence": 0.86
+          },
+          "p6_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.07,
+              "cream": 0.05,
+              "coral": 0.88,
+              "teal": 0
+            },
+            "confidence": 0.83
+          },
+          "p7_2": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.13,
+              "teal": 0,
+              "coral": 0.81,
+              "cream": 0.06
+            },
+            "confidence": 0.75
+          },
+          "p0_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.02,
+              "teal": 0,
+              "coral": 0.87,
+              "cream": 0.11
+            },
+            "confidence": 0.83
+          },
+          "p1_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "teal": 0,
+              "coral": 0.89,
+              "cream": 0.1
+            },
+            "confidence": 0.85
+          },
+          "p2_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "cream": 0.11,
+              "coral": 0.88,
+              "teal": 0
+            },
+            "confidence": 0.84
+          },
+          "p3_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "cream": 0.06,
+              "coral": 0.93,
+              "teal": 0
+            },
+            "confidence": 0.9
+          },
+          "p4_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "cream": 0.07,
+              "coral": 0.92,
+              "teal": 0
+            },
+            "confidence": 0.89
+          },
+          "p5_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "teal": 0,
+              "coral": 0.9,
+              "cream": 0.09
+            },
+            "confidence": 0.86
+          },
+          "p6_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "cream": 0.08,
+              "coral": 0.91,
+              "teal": 0
+            },
+            "confidence": 0.88
+          },
+          "p7_3": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.05,
+              "cream": 0.08,
+              "coral": 0.87,
+              "teal": 0
+            },
+            "confidence": 0.82
+          },
+          "p0_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.03,
+              "cream": 0.14,
+              "coral": 0.83,
+              "teal": 0
+            },
+            "confidence": 0.77
+          },
+          "p1_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.02,
+              "cream": 0.13,
+              "coral": 0.85,
+              "teal": 0
+            },
+            "confidence": 0.8
+          },
+          "p2_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.02,
+              "teal": 0,
+              "coral": 0.84,
+              "cream": 0.14
+            },
+            "confidence": 0.79
+          },
+          "p3_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "teal": 0,
+              "coral": 0.88,
+              "cream": 0.11
+            },
+            "confidence": 0.85
+          },
+          "p4_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0,
+              "cream": 0.08,
+              "coral": 0.92,
+              "teal": 0
+            },
+            "confidence": 0.89
+          },
+          "p5_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.02,
+              "teal": 0,
+              "coral": 0.88,
+              "cream": 0.1
+            },
+            "confidence": 0.84
+          },
+          "p6_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.02,
+              "cream": 0.09,
+              "coral": 0.89,
+              "teal": 0
+            },
+            "confidence": 0.85
+          },
+          "p7_4": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.04,
+              "cream": 0.09,
+              "coral": 0.87,
+              "teal": 0
+            },
+            "confidence": 0.82
+          },
+          "p0_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.1,
+              "teal": 0.01,
+              "coral": 0.72,
+              "cream": 0.17
+            },
+            "confidence": 0.62
+          },
+          "p1_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.08,
+              "cream": 0.13,
+              "coral": 0.79,
+              "teal": 0
+            },
+            "confidence": 0.71
+          },
+          "p2_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.06,
+              "teal": 0,
+              "coral": 0.77,
+              "cream": 0.17
+            },
+            "confidence": 0.69
+          },
+          "p3_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.02,
+              "cream": 0.14,
+              "coral": 0.84,
+              "teal": 0
+            },
+            "confidence": 0.78
+          },
+          "p4_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.03,
+              "cream": 0.13,
+              "coral": 0.84,
+              "teal": 0
+            },
+            "confidence": 0.78
+          },
+          "p5_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.01,
+              "cream": 0.12,
+              "coral": 0.87,
+              "teal": 0
+            },
+            "confidence": 0.81
+          },
+          "p6_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.06,
+              "cream": 0.11,
+              "coral": 0.83,
+              "teal": 0
+            },
+            "confidence": 0.77
+          },
+          "p7_5": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.08,
+              "cream": 0.12,
+              "coral": 0.79,
+              "teal": 0.01
+            },
+            "confidence": 0.73
+          },
+          "p0_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.19,
+              "cream": 0.15,
+              "coral": 0.65,
+              "teal": 0.01
+            },
+            "confidence": 0.55
+          },
+          "p1_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.15,
+              "cream": 0.16,
+              "coral": 0.68,
+              "teal": 0.01
+            },
+            "confidence": 0.58
+          },
+          "p2_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.15,
+              "cream": 0.18,
+              "coral": 0.66,
+              "teal": 0.01
+            },
+            "confidence": 0.55
+          },
+          "p3_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.09,
+              "cream": 0.18,
+              "coral": 0.73,
+              "teal": 0
+            },
+            "confidence": 0.63
+          },
+          "p4_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.11,
+              "teal": 0.01,
+              "coral": 0.71,
+              "cream": 0.17
+            },
+            "confidence": 0.61
+          },
+          "p5_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.09,
+              "cream": 0.18,
+              "coral": 0.72,
+              "teal": 0.01
+            },
+            "confidence": 0.63
+          },
+          "p6_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.13,
+              "cream": 0.11,
+              "coral": 0.76,
+              "teal": 0
+            },
+            "confidence": 0.68
+          },
+          "p7_6": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.22,
+              "teal": 0.01,
+              "coral": 0.64,
+              "cream": 0.13
+            },
+            "confidence": 0.53
+          },
+          "p0_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.26,
+              "cream": 0.11,
+              "coral": 0.62,
+              "teal": 0.01
+            },
+            "confidence": 0.49
+          },
+          "p1_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.2,
+              "teal": 0,
+              "coral": 0.65,
+              "cream": 0.15
+            },
+            "confidence": 0.53
+          },
+          "p2_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.16,
+              "cream": 0.14,
+              "coral": 0.7,
+              "teal": 0
+            },
+            "confidence": 0.58
+          },
+          "p3_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.09,
+              "teal": 0,
+              "coral": 0.77,
+              "cream": 0.14
+            },
+            "confidence": 0.68
+          },
+          "p4_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.1,
+              "cream": 0.15,
+              "coral": 0.75,
+              "teal": 0
+            },
+            "confidence": 0.66
+          },
+          "p5_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.08,
+              "teal": 0,
+              "coral": 0.77,
+              "cream": 0.15
+            },
+            "confidence": 0.68
+          },
+          "p6_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.21,
+              "cream": 0.13,
+              "coral": 0.65,
+              "teal": 0.01
+            },
+            "confidence": 0.54
+          },
+          "p7_7": {
+            "type": "choice",
+            "value": "coral",
+            "probabilities": {
+              "ink": 0.22,
+              "teal": 0,
+              "coral": 0.65,
+              "cream": 0.13
+            },
+            "confidence": 0.54
+          }
+        },
+        "latency_ms": 16760.294750041794,
+        "note": "Independent pixel distributions, not a joint image distribution."
+      },
+      {
+        "id": "3",
+        "error": "HTTP 503: {\"error\":{\"message\":\"Service temporarily unavailable. Please try again shortly.\",\"type\":\"service_unavailable_error\",\"param\":{\"error\":\"Service temporarily unavailable. Please try again shortly.\",\"type\":\"service_unavailable_error\",\"statusCode\":503}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedProvider\":\"typesafe-ai\",\"fallbacksAvailable\":[],\"canonicalSlug\":\"typesafe-ai/jev\",\"modelAttemptCount\":1,\"modelAttempts\":[{\"canonicalSlug\":\"typesafe-ai/jev\",\"success\""
+      }
+    ],
+    "checks": {
+      "expected_scenes": 20,
+      "valid_scenes": 20
+    },
+    "human_preference": null,
+    "note": "Renderable choices are verified; visual quality awaits optional blinded ratings.",
+    "budget_at_finish": {
+      "limit_usd": 25,
+      "request_limit": 10000,
+      "attempts": 1745,
+      "accounted_usd": 2.266,
+      "models": [
+        {
+          "model": "typesafe-ai/jev",
+          "attempts": 1745,
+          "accounted_usd": 2.266,
+          "reported_usd": 0,
+          "unknown_cost_attempts": 1133
+        }
+      ]
+    },
+    "transport": {
+      "attempts": 66,
+      "status_counts": {
+        "200": 11,
+        "429": 53,
+        "503": 2
+      },
+      "successful_attempt_latency_ms": {
+        "p50": 329.1313340305351,
+        "p95": 3102.134062501136
+      },
+      "logical_request_latency_ms_including_retries_excluding_queue": {
+        "p50": 20782.947604481342,
+        "p95": 21194.321118704327
+      },
+      "reported_usd": 0,
+      "attempts_without_cost_metadata": 55,
+      "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+    },
+    "availability": {
+      "planned": 20,
+      "completed": 20,
+      "unavailable": 0
+    },
+    "recovery": {
+      "started": "2026-09-20T07:49:08.881Z",
+      "original_run": "20260920T051311-visuals-3d4e09",
+      "policy": "Only transport failures retried. All completed predictions retained, including incorrect predictions.",
+      "attempts": [
+        {
+          "id": "4",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 140
+            }
+          ]
+        },
+        {
+          "id": "3",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 141
+            }
+          ]
+        },
+        {
+          "id": "6",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 89
+            }
+          ]
+        },
+        {
+          "id": "5",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 95
+            }
+          ]
+        },
+        {
+          "id": "8",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 89
+            }
+          ]
+        },
+        {
+          "id": "10",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 86
+            }
+          ]
+        },
+        {
+          "id": "12",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 85
+            }
+          ]
+        },
+        {
+          "id": "11",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 94
+            }
+          ]
+        },
+        {
+          "id": "13",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 87
+            }
+          ]
+        },
+        {
+          "id": "14",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 86
+            }
+          ]
+        },
+        {
+          "id": "18",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 102
+            }
+          ]
+        },
+        {
+          "id": "19",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 96
+            }
+          ]
+        },
+        {
+          "id": "3",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:56:02.765Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 262,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "226456eae4f9b855d5ee09b8da04e168f3c892712f9714052f08c4fa25ccc909"
+        },
+        {
+          "id": "4",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:56:03.047Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 281,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "f18a50704890a2663c44863f28eef7de1ae7604e39c469c3e69498c087496fc8"
+        },
+        {
+          "id": "5",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:56:03.318Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 270,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "28e9b301a21d14689a733f11db4b44dee2d932ff41db12441bfbe11666b81f18"
+        },
+        {
+          "id": "6",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:56:03.672Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 353,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "1dadfff13f15256d14d3b5b99c62e3d90b5401be6d144e083591f727d84e03ba"
+        },
+        {
+          "id": "8",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:56:03.967Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 294,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "89b6d702770c162ac4a734c1e4049e5631443ee2cf005755827498f87f503d8c"
+        },
+        {
+          "id": "10",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:56:04.230Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 263,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "7a466b513ff72aac85dd78795ebbbc3650cc75ef6ca2a8dfe4a21bb5fd28f315"
+        },
+        {
+          "id": "11",
+          "group": "visuals",
+          "status": "unavailable",
+          "message": "Error: Jev is busy. Your input is preserved; retry shortly.",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 429,
+              "latency_ms": 88,
+              "retry_after_ms": 56000
+            }
+          ]
+        },
+        {
+          "id": "12",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:57:00.569Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 245,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "7621a69b9739c57d0729cca28c95f3b9e971708ce8488a6d7fd1a4663f864463"
+        },
+        {
+          "id": "13",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:57:00.797Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 228,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "4f70af00d75e495df28e4456c8d98cf65fe4468fe625fef4af2e5a8738d2685c"
+        },
+        {
+          "id": "14",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:57:01.085Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 287,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "8d76dc874affe912968cbfca5a48275552110d8ca25f4b0e70c7aaa5ae818e58"
+        },
+        {
+          "id": "18",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:57:20.208Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": "network",
+              "latency_ms": 18001
+            },
+            {
+              "attempt": 2,
+              "status": 200,
+              "latency_ms": 418,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "6264a8a551f928910c642da14be7a34cebf9d087160995c02d6cb5b47ec83852"
+        },
+        {
+          "id": "19",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:57:20.437Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 227,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "8dbb4cefd7e024d363a4b2ff046c3a8ed36a84ac338fa86035f0f97d94d9ebcc"
+        },
+        {
+          "id": "11",
+          "group": "visuals",
+          "status": "completed",
+          "at": "2026-09-20T07:58:53.967Z",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": 200,
+              "latency_ms": 245,
+              "retry_after_ms": 0
+            }
+          ],
+          "cost_usd": "0",
+          "original_request_hash": "89178baef382a65a4bbdf0335f63304a599d3e6c7bc53453afafe026d3537246"
+        }
+      ],
+      "recovered_cases": 12,
+      "reported_usd": 0
+    },
+    "compositions": [
+      {
+        "mode": "scenes",
+        "brief": "A tiny noodle shop on a rainy street at midnight, with one warm window and a cat under the awning.",
+        "plan": {
+          "palette": "night",
+          "weather": "rain",
+          "house": false,
+          "house_x": "32",
+          "house_y": "44",
+          "tree": false,
+          "tree_x": "32",
+          "tree_y": "52",
+          "cat": true,
+          "cat_x": "52",
+          "cat_y": "52",
+          "robot": false,
+          "robot_x": "32",
+          "robot_y": "52",
+          "flower": false,
+          "flower_x": "32",
+          "flower_y": "36",
+          "pond": false,
+          "pond_x": "32",
+          "pond_y": "52",
+          "mountain": false,
+          "mountain_x": "32",
+          "mountain_y": "52",
+          "moon": false,
+          "moon_x": "32",
+          "moon_y": "12",
+          "cloud": true,
+          "cloud_x": "32",
+          "cloud_y": "12"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "night",
+            "probabilities": {
+              "neon": 0,
+              "garden": 0,
+              "warm": 0.07,
+              "night": 0.93
+            },
+            "confidence": 0.9
+          },
+          "weather": {
+            "type": "choice",
+            "value": "rain",
+            "probabilities": {
+              "clear": 0,
+              "rain": 1
+            },
+            "confidence": 1
+          },
+          "house": {
+            "type": "noul",
+            "value": 0.17,
+            "probabilities": null,
+            "confidence": null
+          },
+          "house_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.04,
+              "24": 0.08,
+              "32": 0.79,
+              "44": 0.04,
+              "52": 0.05
+            },
+            "confidence": 0.74
+          },
+          "house_y": {
+            "type": "choice",
+            "value": "44",
+            "probabilities": {
+              "12": 0.06,
+              "24": 0.19,
+              "36": 0.24,
+              "44": 0.28,
+              "52": 0.23
+            },
+            "confidence": 0.1
+          },
+          "tree": {
+            "type": "noul",
+            "value": 0.18,
+            "probabilities": null,
+            "confidence": null
+          },
+          "tree_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0.01,
+              "32": 0.95,
+              "44": 0.01,
+              "52": 0.02
+            },
+            "confidence": 0.94
+          },
+          "tree_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.14,
+              "24": 0.17,
+              "36": 0.25,
+              "44": 0.16,
+              "52": 0.27999999999999997
+            },
+            "confidence": 0.11
+          },
+          "cat": {
+            "type": "noul",
+            "value": 0.96,
+            "probabilities": null,
+            "confidence": null
+          },
+          "cat_x": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.04,
+              "24": 0.06,
+              "32": 0.34,
+              "44": 0.2,
+              "52": 0.36
+            },
+            "confidence": 0.2
+          },
+          "cat_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0.01,
+              "36": 0.07,
+              "44": 0.3,
+              "52": 0.61
+            },
+            "confidence": 0.51
+          },
+          "robot": {
+            "type": "noul",
+            "value": 0.09,
+            "probabilities": null,
+            "confidence": null
+          },
+          "robot_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.03,
+              "24": 0.02,
+              "32": 0.89,
+              "44": 0.02,
+              "52": 0.04
+            },
+            "confidence": 0.86
+          },
+          "robot_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.06,
+              "24": 0.1,
+              "36": 0.21,
+              "44": 0.23,
+              "52": 0.4
+            },
+            "confidence": 0.25
+          },
+          "flower": {
+            "type": "noul",
+            "value": 0.15,
+            "probabilities": null,
+            "confidence": null
+          },
+          "flower_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0,
+              "32": 0.98,
+              "44": 0,
+              "52": 0.01
+            },
+            "confidence": 0.97
+          },
+          "flower_y": {
+            "type": "choice",
+            "value": "36",
+            "probabilities": {
+              "12": 0.08,
+              "24": 0.12,
+              "36": 0.33,
+              "44": 0.17,
+              "52": 0.3
+            },
+            "confidence": 0.16
+          },
+          "pond": {
+            "type": "noul",
+            "value": 0.05,
+            "probabilities": null,
+            "confidence": null
+          },
+          "pond_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0,
+              "32": 0.99,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.98
+          },
+          "pond_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.03,
+              "24": 0.04,
+              "36": 0.22,
+              "44": 0.19,
+              "52": 0.52
+            },
+            "confidence": 0.41
+          },
+          "mountain": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "mountain_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0,
+              "32": 0.99,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.98
+          },
+          "mountain_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.1,
+              "24": 0.1,
+              "36": 0.23,
+              "44": 0.2,
+              "52": 0.37
+            },
+            "confidence": 0.2
+          },
+          "moon": {
+            "type": "noul",
+            "value": 0.42,
+            "probabilities": null,
+            "confidence": null
+          },
+          "moon_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.06,
+              "24": 0.03,
+              "32": 0.64,
+              "44": 0.1,
+              "52": 0.17
+            },
+            "confidence": 0.56
+          },
+          "moon_y": {
+            "type": "choice",
+            "value": "12",
+            "probabilities": {
+              "12": 0.65,
+              "24": 0.17,
+              "36": 0.04,
+              "44": 0.05,
+              "52": 0.09
+            },
+            "confidence": 0.56
+          },
+          "cloud": {
+            "type": "noul",
+            "value": 0.57,
+            "probabilities": null,
+            "confidence": null
+          },
+          "cloud_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.07,
+              "24": 0.04,
+              "32": 0.8,
+              "44": 0.04,
+              "52": 0.05
+            },
+            "confidence": 0.76
+          },
+          "cloud_y": {
+            "type": "choice",
+            "value": "12",
+            "probabilities": {
+              "12": 0.58,
+              "24": 0.22,
+              "36": 0.07,
+              "44": 0.06,
+              "52": 0.07
+            },
+            "confidence": 0.47
+          }
+        },
+        "latency_ms": 564,
+        "service_latency_ms": 564,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 563,
+            "retry_after_ms": 0
+          }
+        ],
+        "cost_usd": 0,
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      {
+        "mode": "sprites",
+        "brief": "A friendly gardening robot with warm eyes, as a game sprite.",
+        "plan": {
+          "palette": "garden",
+          "weather": "clear",
+          "house": false,
+          "house_x": "32",
+          "house_y": "52",
+          "tree": false,
+          "tree_x": "32",
+          "tree_y": "52",
+          "cat": false,
+          "cat_x": "32",
+          "cat_y": "24",
+          "robot": true,
+          "robot_x": "32",
+          "robot_y": "24",
+          "flower": false,
+          "flower_x": "32",
+          "flower_y": "24",
+          "pond": false,
+          "pond_x": "32",
+          "pond_y": "52",
+          "mountain": false,
+          "mountain_x": "32",
+          "mountain_y": "52",
+          "moon": false,
+          "moon_x": "32",
+          "moon_y": "12",
+          "cloud": false,
+          "cloud_x": "32",
+          "cloud_y": "12"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "garden",
+            "probabilities": {
+              "neon": 0,
+              "night": 0,
+              "warm": 0.1,
+              "garden": 0.9
+            },
+            "confidence": 0.87
+          },
+          "weather": {
+            "type": "choice",
+            "value": "clear",
+            "probabilities": {
+              "clear": 0.96,
+              "rain": 0.04
+            },
+            "confidence": 0.93
+          },
+          "house": {
+            "type": "noul",
+            "value": 0.14,
+            "probabilities": null,
+            "confidence": null
+          },
+          "house_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0,
+              "32": 0.99,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "house_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.08,
+              "24": 0.16,
+              "36": 0.19,
+              "44": 0.25,
+              "52": 0.32
+            },
+            "confidence": 0.15
+          },
+          "tree": {
+            "type": "noul",
+            "value": 0.19,
+            "probabilities": null,
+            "confidence": null
+          },
+          "tree_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "tree_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.16,
+              "24": 0.2,
+              "36": 0.14,
+              "44": 0.17,
+              "52": 0.33
+            },
+            "confidence": 0.16
+          },
+          "cat": {
+            "type": "noul",
+            "value": 0.06,
+            "probabilities": null,
+            "confidence": null
+          },
+          "cat_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "cat_y": {
+            "type": "choice",
+            "value": "24",
+            "probabilities": {
+              "12": 0.07,
+              "24": 0.49,
+              "36": 0.22,
+              "44": 0.11,
+              "52": 0.11
+            },
+            "confidence": 0.36
+          },
+          "robot": {
+            "type": "noul",
+            "value": 0.98,
+            "probabilities": null,
+            "confidence": null
+          },
+          "robot_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 1
+          },
+          "robot_y": {
+            "type": "choice",
+            "value": "24",
+            "probabilities": {
+              "12": 0.07,
+              "24": 0.33999999999999997,
+              "36": 0.24,
+              "44": 0.2,
+              "52": 0.15
+            },
+            "confidence": 0.18
+          },
+          "flower": {
+            "type": "noul",
+            "value": 0.39,
+            "probabilities": null,
+            "confidence": null
+          },
+          "flower_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "flower_y": {
+            "type": "choice",
+            "value": "24",
+            "probabilities": {
+              "12": 0.19,
+              "24": 0.29000000000000004,
+              "36": 0.19,
+              "44": 0.14,
+              "52": 0.19
+            },
+            "confidence": 0.1
+          },
+          "pond": {
+            "type": "noul",
+            "value": 0.12,
+            "probabilities": null,
+            "confidence": null
+          },
+          "pond_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "pond_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.02,
+              "24": 0.06,
+              "36": 0.12,
+              "44": 0.24,
+              "52": 0.5599999999999999
+            },
+            "confidence": 0.46
+          },
+          "mountain": {
+            "type": "noul",
+            "value": 0.06,
+            "probabilities": null,
+            "confidence": null
+          },
+          "mountain_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "mountain_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.11,
+              "24": 0.17,
+              "36": 0.18,
+              "44": 0.21,
+              "52": 0.33
+            },
+            "confidence": 0.17
+          },
+          "moon": {
+            "type": "noul",
+            "value": 0.09,
+            "probabilities": null,
+            "confidence": null
+          },
+          "moon_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0,
+              "32": 0.96,
+              "44": 0.01,
+              "52": 0.02
+            },
+            "confidence": 0.96
+          },
+          "moon_y": {
+            "type": "choice",
+            "value": "12",
+            "probabilities": {
+              "12": 0.36,
+              "24": 0.16,
+              "36": 0.09,
+              "44": 0.14,
+              "52": 0.25
+            },
+            "confidence": 0.21
+          },
+          "cloud": {
+            "type": "noul",
+            "value": 0.12,
+            "probabilities": null,
+            "confidence": null
+          },
+          "cloud_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0,
+              "32": 0.99,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "cloud_y": {
+            "type": "choice",
+            "value": "12",
+            "probabilities": {
+              "12": 0.55,
+              "24": 0.2,
+              "36": 0.07,
+              "44": 0.08,
+              "52": 0.1
+            },
+            "confidence": 0.44
+          }
+        },
+        "latency_ms": 313,
+        "service_latency_ms": 313,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 313,
+            "retry_after_ms": 0
+          }
+        ],
+        "cost_usd": 0,
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      },
+      {
+        "mode": "patterns",
+        "brief": "An ocean-like field of slowly changing colors.",
+        "plan": {
+          "palette": "night",
+          "weather": "clear",
+          "house": false,
+          "house_x": "32",
+          "house_y": "52",
+          "tree": false,
+          "tree_x": "32",
+          "tree_y": "52",
+          "cat": false,
+          "cat_x": "32",
+          "cat_y": "36",
+          "robot": false,
+          "robot_x": "32",
+          "robot_y": "36",
+          "flower": false,
+          "flower_x": "32",
+          "flower_y": "36",
+          "pond": false,
+          "pond_x": "32",
+          "pond_y": "36",
+          "mountain": false,
+          "mountain_x": "32",
+          "mountain_y": "52",
+          "moon": false,
+          "moon_x": "32",
+          "moon_y": "36",
+          "cloud": false,
+          "cloud_x": "32",
+          "cloud_y": "24"
+        },
+        "answers": {
+          "palette": {
+            "type": "choice",
+            "value": "night",
+            "probabilities": {
+              "neon": 0.01,
+              "garden": 0.16,
+              "night": 0.73,
+              "warm": 0.1
+            },
+            "confidence": 0.64
+          },
+          "weather": {
+            "type": "choice",
+            "value": "clear",
+            "probabilities": {
+              "clear": 0.85,
+              "rain": 0.15
+            },
+            "confidence": 0.71
+          },
+          "house": {
+            "type": "noul",
+            "value": 0.07,
+            "probabilities": null,
+            "confidence": null
+          },
+          "house_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0.01,
+              "32": 0.98,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.98
+          },
+          "house_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.03,
+              "24": 0.1,
+              "36": 0.31,
+              "44": 0.25,
+              "52": 0.31
+            },
+            "confidence": 0.15
+          },
+          "tree": {
+            "type": "noul",
+            "value": 0.07,
+            "probabilities": null,
+            "confidence": null
+          },
+          "tree_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "tree_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.04,
+              "24": 0.08,
+              "36": 0.28,
+              "44": 0.19,
+              "52": 0.4
+            },
+            "confidence": 0.25
+          },
+          "cat": {
+            "type": "noul",
+            "value": 0.06,
+            "probabilities": null,
+            "confidence": null
+          },
+          "cat_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "cat_y": {
+            "type": "choice",
+            "value": "36",
+            "probabilities": {
+              "12": 0.03,
+              "24": 0.15,
+              "36": 0.58,
+              "44": 0.1,
+              "52": 0.14
+            },
+            "confidence": 0.49
+          },
+          "robot": {
+            "type": "noul",
+            "value": 0.08,
+            "probabilities": null,
+            "confidence": null
+          },
+          "robot_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 1
+          },
+          "robot_y": {
+            "type": "choice",
+            "value": "36",
+            "probabilities": {
+              "12": 0.03,
+              "24": 0.09,
+              "36": 0.64,
+              "44": 0.07,
+              "52": 0.17
+            },
+            "confidence": 0.54
+          },
+          "flower": {
+            "type": "noul",
+            "value": 0.12,
+            "probabilities": null,
+            "confidence": null
+          },
+          "flower_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "flower_y": {
+            "type": "choice",
+            "value": "36",
+            "probabilities": {
+              "12": 0.03,
+              "24": 0.1,
+              "36": 0.65,
+              "44": 0.08,
+              "52": 0.14
+            },
+            "confidence": 0.56
+          },
+          "pond": {
+            "type": "noul",
+            "value": 0.19,
+            "probabilities": null,
+            "confidence": null
+          },
+          "pond_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "pond_y": {
+            "type": "choice",
+            "value": "36",
+            "probabilities": {
+              "12": 0.06,
+              "24": 0.2,
+              "36": 0.38,
+              "44": 0.14,
+              "52": 0.22
+            },
+            "confidence": 0.23
+          },
+          "mountain": {
+            "type": "noul",
+            "value": 0.07,
+            "probabilities": null,
+            "confidence": null
+          },
+          "mountain_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "mountain_y": {
+            "type": "choice",
+            "value": "52",
+            "probabilities": {
+              "12": 0.03,
+              "24": 0.08,
+              "36": 0.24,
+              "44": 0.24,
+              "52": 0.41
+            },
+            "confidence": 0.26
+          },
+          "moon": {
+            "type": "noul",
+            "value": 0.11,
+            "probabilities": null,
+            "confidence": null
+          },
+          "moon_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0.01,
+              "24": 0.01,
+              "32": 0.98,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.98
+          },
+          "moon_y": {
+            "type": "choice",
+            "value": "36",
+            "probabilities": {
+              "12": 0.14,
+              "24": 0.27,
+              "36": 0.3,
+              "44": 0.12,
+              "52": 0.17
+            },
+            "confidence": 0.12
+          },
+          "cloud": {
+            "type": "noul",
+            "value": 0.18,
+            "probabilities": null,
+            "confidence": null
+          },
+          "cloud_x": {
+            "type": "choice",
+            "value": "32",
+            "probabilities": {
+              "12": 0,
+              "24": 0,
+              "32": 1,
+              "44": 0,
+              "52": 0
+            },
+            "confidence": 0.99
+          },
+          "cloud_y": {
+            "type": "choice",
+            "value": "24",
+            "probabilities": {
+              "12": 0.2,
+              "24": 0.38,
+              "36": 0.22,
+              "44": 0.09,
+              "52": 0.11
+            },
+            "confidence": 0.22
+          }
+        },
+        "latency_ms": 613,
+        "service_latency_ms": 613,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 613,
+            "retry_after_ms": 0
+          }
+        ],
+        "cost_usd": 0,
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    ]
+  }
+}
