@@ -1,0 +1,21 @@
+{
+  "model": "Laya MLX fine-tune, Core ML export",
+  "cases": 400,
+  "metrics": {
+    "decisions": 2000,
+    "accuracy": 0.469,
+    "soft_accuracy": 0.4417807898396909,
+    "brier": 0.05646127275650097,
+    "kl": 0.35540843035233477,
+    "ece": 0.040189567163380874,
+    "score_mae": 0.622628335725413
+  },
+  "case_latency_ms": {
+    "median": 551.315604505362,
+    "p95": 582.6800829963759
+  },
+  "method": "Core ML ALL, float16, five sequential batch-1 calls per case; each padded to 768 tokens and eight option slots. Loading, warm-up, and input collation excluded.",
+  "mlx_argmax_differences": 60,
+  "max_probability_error": 0.14228208597338587,
+  "mean_max_probability_error": 0.006945014249695837
+}

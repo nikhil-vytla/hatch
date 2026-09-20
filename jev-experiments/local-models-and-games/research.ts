@@ -1,0 +1,290 @@
+import { writeRecord } from "../experience-prototypes/scripts/records";
+const benchmarks = [
+  {
+    name: "BoolQ",
+    category: "Reading",
+    url: "https://github.com/google-research-datasets/boolean-questions",
+    question: "Can a tiny local model make a grounded yes/no decision?",
+    protocol:
+      "Use all 3,270 validation questions, with the passage visible beside each answer. Compare Jev, first-token models, and the trained scorer without adapting on validation.",
+    measure:
+      "Accuracy, calibration, abstention curves, and warm latency at matched passage lengths.",
+    demo: "A passage reader with the question above it, probability bars below, and a toggle for cases where models disagree.",
+    caveat:
+      "A binary result can conceal class imbalance. Show always-yes and majority baselines. Public model training may contain these examples.",
+  },
+  {
+    name: "ANLI",
+    category: "Reasoning",
+    url: "https://github.com/facebookresearch/anli",
+    question: "Does the model understand what follows from evidence?",
+    protocol:
+      "Keep all three adversarial rounds separate. Classify premise/hypothesis pairs as entailment, contradiction, or neutral with the original labels.",
+    measure: "Per-round accuracy, macro recall, and confusion matrices.",
+    demo: "Read the complete premise and hypothesis. Inspect each model’s three-way distribution and the human label.",
+    caveat:
+      "Difficult NLI is a useful stress test, but does not establish reliability as an agent verifier.",
+  },
+  {
+    name: "PAWS",
+    category: "Language",
+    url: "https://github.com/google-research-datasets/paws",
+    question:
+      "Can it notice that almost identical words describe different things?",
+    protocol:
+      "Evaluate the human-labeled PAWS-Wiki test partition. Preserve source pairs and compare against a lexical-similarity baseline.",
+    measure: "Accuracy, false-positive paraphrases, and calibration.",
+    demo: "Aligned sentence pairs with changed word order highlighted. Let visitors predict the answer before revealing it.",
+    caveat:
+      "Source variants have different release restrictions; pin the exact authorized split before redistributing text.",
+  },
+  {
+    name: "SciFact",
+    category: "Evidence",
+    url: "https://github.com/allenai/scifact",
+    question: "Can Jev separate supported claims from plausible ones?",
+    protocol:
+      "Start with claim verification using supplied evidence. Run retrieval separately so missing evidence is not counted as a classifier error.",
+    measure:
+      "Label F1 plus evidence selection precision/recall. Report retrieval and verification independently.",
+    demo: "A claim, the complete candidate abstracts, selected evidence sentences, and support/refute/insufficient probabilities.",
+    caveat:
+      "Scientific claim verification is a research benchmark. It is not medical advice or proof that a paper is correct.",
+  },
+  {
+    name: "MASSIVE",
+    category: "Intent",
+    url: "https://github.com/alexa/massive",
+    question: "Does a fast intent router work beyond English?",
+    protocol:
+      "Use fixed held-out utterances across the 51-language collection, stratified by language and intent. Add an explicit out-of-scope set.",
+    measure:
+      "Macro intent F1 by language, worst-language performance, and rejection quality.",
+    demo: "An intent inbox with translations, original utterances, and routing mistakes that remain visible.",
+    caveat:
+      "Intent and slot annotation are separate tasks. A choice-only router cannot claim slot-filling performance.",
+  },
+  {
+    name: "WildGuardMix",
+    category: "Safety",
+    url: "https://github.com/allenai/wildguard",
+    question:
+      "Can a local classifier distinguish harmful requests from harmless mentions?",
+    protocol:
+      "Use released evaluation splits and their original prompt-harm, response-harm, and refusal labels. Review licenses and sensitive text before publishing cases.",
+    measure:
+      "Precision and recall for each label at explicit thresholds. Show false positives as prominently as misses.",
+    demo: "An opt-in content review screen with source labels and complete text available after disclosure.",
+    caveat:
+      "Contains deliberately harmful and offensive material. Do not auto-play or hide its provenance.",
+  },
+  {
+    name: "AgentDojo",
+    category: "Agents",
+    url: "https://github.com/ethz-spylab/agentdojo",
+    question:
+      "Can Jev filter hostile tool results without breaking useful work?",
+    protocol:
+      "Insert Jev before a tool result enters the acting model’s context. Run paired attacked and clean tasks with identical acting models and budgets.",
+    measure:
+      "Attack success rate, clean task utility, added latency, and false-positive filtering.",
+    demo: "A timeline showing the untrusted tool result, the filtering decision, what the agent saw, and the actual final task outcome.",
+    caveat:
+      "Deterministic outcome checks are appropriate here: the semantic task is deciding which content is safe to pass through.",
+  },
+  {
+    name: "Typed Decisions",
+    category: "Calibration",
+    url: "https://huggingface.co/datasets/LocalLLaMA/typed-decisions",
+    question: "How much does specialization help a local decision model?",
+    protocol:
+      "Implemented in Decision models on a Mac: 960 training cases, 240 validation cases, all 400 held-out test cases. Five questions per case.",
+    measure:
+      "Agreement with the synthetic teacher, KL divergence, normalized Brier score, and per-workflow results.",
+    demo: "The complete state, question, option definitions, soft teacher labels, and every tested model’s probabilities.",
+    caveat:
+      "The references are synthetic teacher judgments, not independent human truth. This is a specialist benchmark.",
+    status: "Implemented",
+    experiment: "local-models",
+  },
+];
+const ideas = [
+  {
+    name: "Paste lens",
+    category: "Privacy",
+    question:
+      "Can the clipboard suggest a field value without sending the clipboard anywhere?",
+    demo: "Copy a messy itinerary. Focus the booking form and watch local-only suggestions appear with evidence highlights. The user accepts each field.",
+    protocol:
+      "Compare a small local scorer, a browser model, and hosted Jev on the same authorized synthetic forms. A network inspector should prove local mode makes no model-provider requests.",
+    measure:
+      "Field match precision, abstention, time to first suggestion, download size, and injected-instruction rejection.",
+    caveat:
+      "Inference location and data retention need separate controls. Never silently fall back to the cloud.",
+  },
+  {
+    name: "Confidence handoff",
+    category: "Agents",
+    question: "When should a cheap decision model ask a stronger model?",
+    demo: "A moving task stream splits into answer, ask, and escalate lanes. Drag the error budget and see which tasks move.",
+    protocol:
+      "Fit thresholds on validation only, then compare a Jev-first router with always-small and always-large policies.",
+    measure:
+      "Total cost, latency, quality, escalation rate, and selective risk.",
+    caveat:
+      "Raw maximum probability is not automatically calibrated confidence.",
+  },
+  {
+    name: "Counterfactual desk",
+    category: "Language",
+    question: "What is the smallest meaningful edit that changes a decision?",
+    demo: "Edit one fact in an invoice or policy case. Animate the probability shift and show the exact words changed.",
+    protocol:
+      "Author minimal contrast pairs with independent expected direction. Include irrelevant edits as controls.",
+    measure:
+      "Directional consistency, sensitivity to irrelevant facts, and option-order stability.",
+    caveat:
+      "A probability change explains behavior under that edit; it is not a causal account of the model’s internals.",
+  },
+  {
+    name: "Agent checkpoint",
+    category: "Agents",
+    question:
+      "Can a verifier catch an irreversible mistake before an agent acts?",
+    demo: "An agent rehearses a file operation in a sandbox. A checkpoint shows allow, request clarification, or block with the relevant evidence.",
+    protocol:
+      "Pair clean and adversarial tool traces. Evaluate actual task completion with the same acting model and tool permissions.",
+    measure:
+      "Prevented mistakes, unnecessary blocks, latency, and user interventions.",
+    caveat:
+      "A model score must not replace deterministic permissions or sandbox boundaries.",
+  },
+  {
+    name: "Adaptive soundtrack",
+    category: "Creative",
+    question: "Can a decision model conduct a musical scene?",
+    demo: "Move a character through a quiet garden, a storm, and a chase. Jev selects rhythm, harmony, and instrument layers on musical boundaries.",
+    protocol:
+      "Use licensed or generated note patterns and a deterministic audio scheduler. Compare Jev’s context choices with a fixed rule table.",
+    measure:
+      "Transition timing, unwanted changes, preference votes, and model calls per minute.",
+    caveat:
+      "Jev chooses musical structure; it does not synthesize the audio waveform. Sound starts only after a click.",
+  },
+  {
+    name: "Living interface",
+    category: "Creative",
+    question:
+      "Can an interface reorganize itself without losing the user’s place?",
+    demo: "A dashboard responds to a changing task by choosing among typed components. Animate moves while preserving focus, entered values, and undo.",
+    protocol:
+      "Use a fixed safe component catalog. Compare task-specific layouts to one static layout on timed user journeys.",
+    measure:
+      "Task completion, layout churn, focus loss, and number of corrections.",
+    caveat:
+      "Model-generated layout choices must remain keyboard accessible and cannot execute arbitrary code.",
+  },
+  {
+    name: "Annotation relay",
+    category: "Data",
+    question: "Where does one human correction teach the most?",
+    demo: "A labeling queue shows uncertainty and model disagreement. Each accepted correction updates a small local head and redraws the remaining queue.",
+    protocol:
+      "Reserve a fixed untouched test set. Compare active sampling, random sampling, and uncertainty-only sampling at equal label budgets.",
+    measure:
+      "Test quality per human label, calibration drift, and annotator disagreement.",
+    caveat:
+      "Reusing the same test set for every product choice creates hidden overfitting.",
+  },
+  {
+    name: "Vision to intent",
+    category: "Multimodal",
+    question: "Which visual details are enough to choose the next action?",
+    demo: "A vision model describes a cluttered desktop scene once. Jev answers several questions about what to select, group, or ask next.",
+    protocol:
+      "Hold the vision description fixed while comparing Jev’s actions. Repeat with missing or mistaken visual facts.",
+    measure:
+      "Action correctness, sensitivity to perception errors, and total two-model latency.",
+    caveat:
+      "Report the vision model, its prompt, and its cost. Jev should not receive credit for unseen pixels.",
+  },
+  {
+    name: "Memory budget",
+    category: "Agents",
+    question: "Can a filter retain the one detail an agent will need later?",
+    demo: "Tool results flow toward a bounded context window. Selected passages stay visible; discarded passages remain inspectable in a side panel.",
+    protocol:
+      "Create delayed-use tasks, including decoy instructions and rare critical facts. Compare to truncation, retrieval, and summarization.",
+    measure:
+      "End-task completion, critical-fact recall, token savings, and injection success.",
+    caveat:
+      "A shorter context is only an improvement if the agent still completes the task.",
+  },
+  {
+    name: "Instruction-driven arcade",
+    category: "Games",
+    question: "Can the same game policy follow different goals?",
+    demo: "Tell the drone to prioritize speed, avoid a color, or collect a specific core first. Replay the same world side by side.",
+    protocol:
+      "Extend the current Snake and Orbital games with held-out instruction/seed combinations and a rule-based policy for each objective.",
+    measure:
+      "Instruction adherence, completion, damage, and turns. Separate rule failures from API failures.",
+    caveat:
+      "Structured-state control with action previews is easier than playing from pixels.",
+  },
+  {
+    name: "Reward disagreement",
+    category: "Training",
+    question: "What happens when two reward models prefer different answers?",
+    demo: "Move a slider between helpfulness and restraint. Show the candidate text, each reward signal, and the answer a tiny policy would select.",
+    protocol:
+      "Use held-out preference pairs and optimize only on training pairs. Include a frozen reference policy to detect reward hacking.",
+    measure:
+      "Independent test preferences, diversity, and reward-model disagreement.",
+    caveat:
+      "Optimizing a proxy can make the proxy happy without making the answer better.",
+  },
+  {
+    name: "Option scoring lab",
+    category: "Local models",
+    question:
+      "How much of the result comes from the model versus the scoring method?",
+    demo: "Switch between label logits, full-option likelihood, and a learned head. Inspect option-order changes and the full probability distribution.",
+    protocol:
+      "Use matched models and inputs. Measure sum versus mean token likelihood separately and test cached versus fresh evaluation.",
+    measure:
+      "Agreement, KL divergence, option-length bias, cache parity, and end-to-end latency.",
+    caveat:
+      "Renormalized option probabilities are conditional on the supplied choices; they do not establish real-world certainty.",
+  },
+];
+writeRecord(new URL("./research-map.jsonl", import.meta.url).pathname, {
+  manifest: { created: new Date().toISOString(), experiment: "research-map" },
+  result: {
+    status: "Research proposals; only explicitly marked entries have been run.",
+    benchmarks: benchmarks.map((b) => ({ status: "Proposed", ...b })),
+    ideas: ideas.map((i) => ({ ...i, status: "Proposed" })),
+    sources: [
+      {
+        name: "sgnt.ai: You could have built Jev",
+        url: "https://sgnt.ai/p/jev/",
+      },
+      {
+        name: "Eric Zhang: openjev-sglang",
+        url: "https://github.com/ekzhang/openjev-sglang",
+      },
+      {
+        name: "SemIf, formerly TheoLeeCJ/openjev",
+        url: "https://github.com/TheoLeeCJ/SemIf",
+      },
+      {
+        name: "daseinlabs: full-option MLX scoring",
+        url: "https://github.com/daseinlabs/open-jev",
+      },
+      {
+        name: "TypeSafe: Jev and structured-state Doom",
+        url: "https://typesafe.ai/blog/introducing-system-one-models-and-jev",
+      },
+    ],
+  },
+});

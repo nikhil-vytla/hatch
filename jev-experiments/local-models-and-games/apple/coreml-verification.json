@@ -1,0 +1,103 @@
+{
+  "package": "jev-experiments/.cache/apple-decisions/LayaDecisions.mlpackage",
+  "package_bytes": 843498870,
+  "precision": "float16",
+  "rotary_tables": "Precomputed in float32 before tracing at the fixed 768-token shape.",
+  "trained_head_sha256": "1be276c3f8cca651031c928b9a3d44f6a20a25b0a374dd6d2cbb1e5de94371f5",
+  "input_tokens": 768,
+  "max_options": 8,
+  "conversion_bridge": "PyTorch; training was native MLX",
+  "checks": [
+    {
+      "compute_units": "CPU_ONLY",
+      "question_index": 0,
+      "max_probability_error": 0.009751975536346436,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "CPU_ONLY",
+      "question_index": 1,
+      "max_probability_error": 0.0013186931610107422,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "CPU_ONLY",
+      "question_index": 2,
+      "max_probability_error": 0.002376079559326172,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "CPU_ONLY",
+      "question_index": 500,
+      "max_probability_error": 0.005006961524486542,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "CPU_ONLY",
+      "question_index": 1000,
+      "max_probability_error": 0.0050140321254730225,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "CPU_ONLY",
+      "question_index": 1500,
+      "max_probability_error": 0.003679215908050537,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "ALL",
+      "question_index": 0,
+      "max_probability_error": 0.0021836161613464355,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "ALL",
+      "question_index": 1,
+      "max_probability_error": 0.0010745525360107422,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "ALL",
+      "question_index": 2,
+      "max_probability_error": 0.0014824271202087402,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "ALL",
+      "question_index": 500,
+      "max_probability_error": 0.017087765038013458,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "ALL",
+      "question_index": 1000,
+      "max_probability_error": 0.004475235939025879,
+      "same_argmax": true
+    },
+    {
+      "compute_units": "ALL",
+      "question_index": 1500,
+      "max_probability_error": 0.0002612471580505371,
+      "same_argmax": true
+    }
+  ],
+  "latency": {
+    "CPU_ONLY": {
+      "cold_first_ms": 272.66087499447167,
+      "warm_median_ms": 167.54356247838587,
+      "warm_p95_ms": 170.29245902085677,
+      "samples": 10,
+      "padded_tokens": 768
+    },
+    "ALL": {
+      "cold_first_ms": 282.99204201903194,
+      "warm_median_ms": 91.70012452523224,
+      "warm_p95_ms": 120.91141700511798,
+      "samples": 10,
+      "padded_tokens": 768
+    }
+  },
+  "probability_tolerance": 0.02,
+  "passed": true,
+  "neural_engine_placement": "Not measured; ALL allows Core ML to select compute units."
+}
