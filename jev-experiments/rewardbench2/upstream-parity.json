@@ -1,0 +1,15 @@
+{
+  "ties_cases": 102,
+  "upstream_ties_score": 0.9182221647033324,
+  "typescript_ties_score": 0.9182221647033324,
+  "ties_absolute_difference": 0.0,
+  "regular_cases": 1763,
+  "regular_absolute_differences": {
+    "Precise IF": 0.0,
+    "Factuality": 0.0,
+    "Safety": 0.0,
+    "Focus": 0.0,
+    "Math": 0.0
+  },
+  "passed": true
+}

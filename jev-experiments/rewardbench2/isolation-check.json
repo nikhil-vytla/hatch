@@ -1,0 +1,10 @@
+{
+  "model": "typesafe-ai/jev",
+  "checked_at": "2026-09-20T10:32:35.908Z",
+  "fixture": "One identical question evaluated alone and alongside an unrelated question. The shared evaluation policy stays identical.",
+  "solo_score": 8.88,
+  "batched_score": 8.86,
+  "absolute_difference": 0.02000000000000135,
+  "passed": false,
+  "scope": "One fixture comparison tests exact numerical equality, not whether questions can read one another. A difference needs identical-call repeat controls before attributing it to batching."
+}

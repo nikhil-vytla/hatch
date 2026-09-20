@@ -1,0 +1,65 @@
+{
+  "model": "gpt-5.6-sol",
+  "source": "allenai/reward-bench-2",
+  "revision": "7ff08853b0d5686e79b13fda8677024f566a104a",
+  "hash": "sha256 of the exact original UTF-8 field value",
+  "criterion": "Omit public prompt or candidate text only when it contains an explicit sexual description involving a minor. Keep the case, field position, supplied labels, model judgments, and scoring data.",
+  "notice": "Text omitted from the public payload because it contains explicit sexual content involving minors. The original remains in the ignored local source dataset and is represented here only by its SHA-256 hash.",
+  "coverage": {
+    "safety_cases_reviewed": 450,
+    "non_safety_cases_reviewed": [
+      {"id":"44","subset":"Factuality"},
+      {"id":"1652","subset":"Focus"}
+    ],
+    "cases_with_omissions": 4,
+    "prompts_omitted": 3,
+    "candidates_omitted": 6
+  },
+  "omissions": [
+    {
+      "id": "1052",
+      "subset": "Safety",
+      "prompt_omitted": false,
+      "candidates": [
+        {"side":"rejected","original_index":0,"sha256":"39d4c78bd3b3bf788301602a435e1a7ac6f5be6d388ce9fca39cb846d41d865a"},
+        {"side":"rejected","original_index":1,"sha256":"529b20ad5ce32166041c0865cc035ba3f56635762b6eb7afee1976366b0b765f"}
+      ]
+    },
+    {
+      "id": "1053",
+      "subset": "Safety",
+      "prompt_omitted": true,
+      "prompt_sha256": "e995cb6f0e72cabd9312305d711eb1d8ed43dff988b9f83fd47e6d5b320de70b",
+      "candidates": [
+        {"side":"rejected","original_index":0,"sha256":"85684600c74f08ca4227547d046565fc1db602241693262aa38cd4d82d16e61e"},
+        {"side":"rejected","original_index":1,"sha256":"446e8ab3a4c187f7af06a309688369cf804aeee3178138f21f9ea8b0b0d3d80f"}
+      ]
+    },
+    {
+      "id": "1055",
+      "subset": "Safety",
+      "prompt_omitted": true,
+      "prompt_sha256": "2c7a22c6356ab04a4fd2fd0177f30283cd836bd067790c9a903fa6f9d62c5e35",
+      "candidates": [
+        {"side":"rejected","original_index":0,"sha256":"b697110167a450114e9fcd244f3ef563c3d3ac3f1cac1d2923227fae6282e708"}
+      ]
+    },
+    {
+      "id": "1652",
+      "subset": "Focus",
+      "prompt_omitted": true,
+      "prompt_sha256": "b1a8037bfec1f12100d81c5e64887369127257b388e864864ca282d17a0c193d",
+      "candidates": [
+        {"side":"rejected","original_index":0,"sha256":"0d2c798a5fc678dcf696f8c95669f1063a6185b15c9fc7535afd560794ff239d"}
+      ]
+    }
+  ],
+  "reviewed_without_omission": [
+    {
+      "id": "44",
+      "subset": "Factuality",
+      "prompt_omitted": false,
+      "note": "The case remains unsafe and should retain its reveal gate, but no field explicitly describes sexual conduct involving a minor."
+    }
+  ]
+}

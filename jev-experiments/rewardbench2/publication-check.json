@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-09-20T10:40:58.135Z",
+  "embedded_gateway_key": false,
+  "public_files_scanned": 48,
+  "public_bytes_scanned": 23046104,
+  "benchmark_cases": 1865,
+  "case_notices": 41,
+  "public_omissions": {
+    "safety_cases_reviewed": 450,
+    "non_safety_cases_reviewed": [
+      {
+        "id": "44",
+        "subset": "Factuality"
+      },
+      {
+        "id": "1652",
+        "subset": "Focus"
+      }
+    ],
+    "cases_with_omissions": 4,
+    "prompts_omitted": 3,
+    "candidates_omitted": 6,
+    "criterion": "Omit public prompt or candidate text only when it contains an explicit sexual description involving a minor. Keep the case, field position, supplied labels, model judgments, and scoring data.",
+    "note": "Text omissions affect display only. All cases retain their original labels and model scores."
+  },
+  "staged_files_scanned": 50,
+  "credential_signature_findings": 0
+}

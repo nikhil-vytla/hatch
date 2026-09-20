@@ -14,6 +14,7 @@ import {
   Fold,
 } from "./shared";
 import { pretty, percent } from "./api";
+import { ContentReview } from "./provenance";
 export function Benchmarks({ id, result }: { id: string; result: any }) {
   const [dataset, setDataset] = useState("banking77"),
     [index, setIndex] = useState(0),
@@ -115,7 +116,10 @@ export function Benchmarks({ id, result }: { id: string; result: any }) {
             </button>
           </div>
           {row ? (
-            <>
+            <ContentReview
+              key={`${id}:${dataset}:${all.indexOf(row)}`}
+              notice={row.content_notice}
+            >
               <div className="question-card">
                 <span className="eyebrow">
                   {id === "judge" ? "THE QUESTION" : "THE REQUEST"}
@@ -252,7 +256,7 @@ export function Benchmarks({ id, result }: { id: string; result: any }) {
                 )}
                 <State title="Full case record" value={row} />
               </Fold>
-            </>
+            </ContentReview>
           ) : (
             <Notice>No completed examples match this filter.</Notice>
           )}
