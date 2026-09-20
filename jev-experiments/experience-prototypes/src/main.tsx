@@ -111,6 +111,7 @@ function Header() {
           </div>
           <button
             className={"key-button " + (connected ? "connected" : "")}
+            aria-label={connected ? "API key added" : "Connect live"}
             onClick={() => setOpen(true)}
           >
             <KeyRound size={14} />
