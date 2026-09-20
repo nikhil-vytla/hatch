@@ -32,7 +32,7 @@ The original audited application added 284,666 lines, including 260,219 lines of
 
 The automated audit requests triggered Vercel's ten-minute system challenge for the auditing client. Firewall status showed no custom configuration or pending changes. Owner-authenticated CLI access was used to inspect the immutable production deployment without changing firewall settings. This distinguishes the hosting challenge from application authentication. The final scan records its access mode and exact deployment URL.
 
-The credential scan checks the owner's exact gateway key and former lab token, known secret signatures, committed history, staged changes, built files, deployed assets, all 33 published JSON files, and the extracted companion ZIP. See `secret-scan.json`, `public-check.json`, `live-check.jsonl`, and `evidence-verification.json` for results. The [original audit](../security-audit/README.md) preserves the pre-fix findings.
+The credential scan found no exposed credentials across five commits and 293 unique blobs, 48 built files, four deployed assets, all 33 public JSON files, and the companion ZIP. It checks the owner's exact gateway key and former lab token, known secret signatures, committed history, staged changes, built files, deployed assets, all 33 published JSON files, and the extracted companion ZIP. See `secret-scan.json`, `public-check.json`, `live-check.jsonl`, and `evidence-verification.json` for results. The [original audit](../security-audit/README.md) preserves the pre-fix findings.
 
 ## Reproduce
 
