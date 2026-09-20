@@ -18,5 +18,16 @@
     "error": null
   },
   "overflow": false,
-  "providerCalls": 0
+  "providerCalls": 0,
+  "playbackToolbarVerification": {
+    "checkedAt": "2026-09-20T22:15:52.863406+00:00",
+    "deployment": "05844284684eef0bb4510b9feffedb800f37bc97",
+    "bottom": "76px",
+    "gapToStageBottom": 76,
+    "duration": 29.954,
+    "time": 4,
+    "readyState": 4,
+    "error": null,
+    "overflow": false
+  }
 }
