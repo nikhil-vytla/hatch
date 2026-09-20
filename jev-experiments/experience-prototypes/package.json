@@ -7,7 +7,7 @@
     "server": "bun server/dev.ts",
     "build": "bun scripts/prepare.ts && tsc --noEmit && vite build",
     "deploy": "bun scripts/deploy.ts",
-    "test": "bun test server",
+    "test": "bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts",
     "start": "bun scripts/start.ts",
     "record": "bun scripts/record.ts",
     "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py"
@@ -23,17 +23,19 @@
     "motion": "^12.35.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "three": "^0.186.0",
     "tone": "^15.1.22",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "vite": "^7.3.0",
-    "@vitejs/plugin-react": "^5.1.4",
-    "typescript": "~5.9.3",
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/node": "^26.6.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/node": "^26.6.2",
-    "@tailwindcss/vite": "^4.2.1",
-    "tailwindcss": "^4.2.1"
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.0"
   }
 }

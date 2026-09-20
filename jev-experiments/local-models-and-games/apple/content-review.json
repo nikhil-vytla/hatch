@@ -1,0 +1,6 @@
+{
+  "cases": 400,
+  "review": "Lexical triage for common profanity, explicit sexual/self-harm terms, and violence/identity abuse; manual reading of representative full states from all four workflows. This is a limited content review, not a guarantee against every offensive interpretation.",
+  "flags": [],
+  "content": "Synthetic business/service/security/agent-trace records. Security cases discuss incidents, access, and exfiltration without graphic detail."
+}

@@ -1,0 +1,33 @@
+{
+  "checks": [
+    {
+      "indices": [
+        0
+      ],
+      "max_abs_logit_error": 7.271766662597656e-06,
+      "same_argmax": true,
+      "seconds": 1.1299897079588845
+    },
+    {
+      "indices": [
+        1,
+        2
+      ],
+      "max_abs_logit_error": 1.7523765563964844e-05,
+      "same_argmax": true,
+      "seconds": 0.2104795000050217
+    },
+    {
+      "indices": [
+        1500,
+        3000,
+        4500
+      ],
+      "max_abs_logit_error": 1.1980533599853516e-05,
+      "same_argmax": true,
+      "seconds": 0.591376541997306
+    }
+  ],
+  "tolerance": 0.005,
+  "passed": true
+}
