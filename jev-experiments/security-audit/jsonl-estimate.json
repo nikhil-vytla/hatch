@@ -1,0 +1,26 @@
+[
+  {
+    "file": "jev-experiments/results/classify.json",
+    "json_lines": 95473,
+    "jsonl_lines": 788,
+    "json_bytes": 3418696,
+    "jsonl_bytes": 1961719,
+    "round_trip_equal": true
+  },
+  {
+    "file": "jev-experiments/results/games.json",
+    "json_lines": 84041,
+    "jsonl_lines": 370,
+    "json_bytes": 2102824,
+    "jsonl_bytes": 1017092,
+    "round_trip_equal": true
+  },
+  {
+    "file": "jev-experiments/results/robustness.json",
+    "json_lines": 16202,
+    "jsonl_lines": 201,
+    "json_bytes": 598700,
+    "jsonl_bytes": 414744,
+    "round_trip_equal": true
+  }
+]
