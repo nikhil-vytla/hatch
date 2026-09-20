@@ -12,3 +12,5 @@
 
 - Pushed the small ignore correction to `main` as `90e8e94`. The GitHub integration automatically created production deployment `dpl_o2fEfjgweCTyRsbFJdKzAKx1fCj4`, proving the new integration and root work together without a local upload.
 - Deployment reached READY and received `jev-experiments.vercel.app`. Public checks passed for the homepage, all 200 full JudgeBench cases, the companion ZIP, and missing-key API rejection.
+
+- Added the deployment root, Bun settings, outside-root data dependency, and clean Git build check to the repository's `AGENTS.md` so future code reorganizations also update Vercel's project setting.
