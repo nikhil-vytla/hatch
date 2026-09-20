@@ -4,3 +4,5 @@ preview-data/
 
 .vite/
 .playwright-cli/
+.finalization.json
+finalization.log
