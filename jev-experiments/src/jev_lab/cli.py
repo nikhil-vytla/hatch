@@ -100,16 +100,16 @@ def report():
                 result["latency_note"] = (
                     "This early run's row latency measures its successful final attempt only. See transport.logical_request_latency_ms_including_retries_excluding_queue for retry-aware durations."
                 )
-            save(ROOT / "results" / f"{name}.json", {"manifest": manifest, "result": result})
+            save(ROOT / "results" / f"{name}.jsonl", {"manifest": manifest, "result": result})
             index[name] = {
                 "run_id": manifest["id"],
                 "status": manifest["status"],
                 "created": manifest["created"],
                 "file": f"{name}.json",
             }
-    save(ROOT / "results" / "index.json", {"experiments": index, "budget": Ledger().summary()})
+    save(ROOT / "results" / "index.jsonl", {"experiments": index, "budget": Ledger().summary()})
     save(
-        ROOT / "results" / "history.json",
+        ROOT / "results" / "history.jsonl",
         {
             "runs": history,
             "note": "Includes failed and superseded runs. The gallery selects the latest completed or partial run for each experiment; raw request logs remain local.",
@@ -142,10 +142,7 @@ def main():
     replay.add_argument("path", type=Path)
     serve = sub.add_parser("serve")
     serve.add_argument("--port", type=int, default=8792)
-    deploy_parser = sub.add_parser("deploy")
-    deploy_parser.add_argument(
-        "--configure", action="store_true", help="Configure production secrets through stdin"
-    )
+    sub.add_parser("deploy")
     sub.add_parser("cloudcheck")
     args = parser.parse_args()
     if args.command in ("run", "batch"):
@@ -174,7 +171,12 @@ def main():
         print("\n".join(EXPERIMENTS))
     elif args.command == "replay":
         path = args.path / "result.json" if args.path.is_dir() else args.path
-        print(path.read_text())
+        if path.suffix == ".jsonl":
+            from .records import read_record
+
+            print(json.dumps(read_record(path), indent=2))
+        else:
+            print(path.read_text())
     elif args.command == "serve":
         import uvicorn
 
@@ -184,7 +186,7 @@ def main():
         from .deployment import deploy
 
         report()
-        deploy(configure=args.configure)
+        deploy()
     elif args.command == "cloudcheck":
         from .deployment import cloudcheck
 

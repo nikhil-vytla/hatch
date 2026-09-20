@@ -12,7 +12,7 @@ import {
 } from "@json-render/react";
 import { Sparkles, Check, GitBranch, RotateCcw } from "lucide-react";
 import { uiCatalog, uiInitial, exampleSpec } from "./ui-catalog";
-import { token, download } from "./api";
+import { getApiKey, download, readResponse } from "./api";
 import {
   Pane,
   Field,
@@ -243,7 +243,7 @@ export function GeneratedUI({ record }: { record: any }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token()}`,
+          Authorization: `Bearer ${getApiKey()}`,
         },
         body: JSON.stringify({
           prompt,
@@ -254,7 +254,7 @@ export function GeneratedUI({ record }: { record: any }) {
         signal: controller.current.signal,
       });
       if (!response.ok) {
-        const b = await response.json();
+        const b = await readResponse(response);
         throw new Error(b.error);
       }
       const reader = response.body!.getReader(),

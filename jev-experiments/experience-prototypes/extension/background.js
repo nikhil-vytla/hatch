@@ -1,3 +1,21 @@
+const sourceOrigin = (value) => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+};
+const storageReady = (async () => {
+  await chrome.storage.local.setAccessLevel({
+    accessLevel: "TRUSTED_CONTEXTS",
+  });
+  await chrome.storage.local.remove("token");
+  const saved = await chrome.storage.local.get("sourceUrl");
+  if (saved.sourceUrl)
+    await chrome.storage.local.set({
+      sourceUrl: sourceOrigin(saved.sourceUrl),
+    });
+})();
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "remember-selection",
@@ -7,9 +25,10 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "remember-selection") {
+    await storageReady;
     await chrome.storage.local.set({
       source: info.selectionText.slice(0, 30000),
-      sourceUrl: tab.url,
+      sourceUrl: sourceOrigin(tab.url),
     });
     chrome.action.setBadgeText({ text: "✓" });
   }
@@ -17,16 +36,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message.type !== "suggest") return;
   (async () => {
-    const { endpoint, token, source, memory, useMemory, sourceUrl } =
+    await storageReady;
+    if (
+      sender.id !== chrome.runtime.id ||
+      !sender.tab ||
+      !Array.isArray(message.fields) ||
+      message.fields.length > 24
+    )
+      throw new Error("Invalid suggestion request.");
+    const { endpoint, apiKey, source, memory, useMemory, sourceUrl } =
       await chrome.storage.local.get([
         "endpoint",
-        "token",
+        "apiKey",
         "source",
         "memory",
         "useMemory",
         "sourceUrl",
       ]);
-    if (!endpoint || !token)
+    if (!endpoint || !apiKey)
       throw new Error("Connect the companion in its popup first.");
     const text = useMemory ? memory : source;
     if (!text?.trim())
@@ -45,7 +72,28 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           value: colon > 0 && colon < 60 ? line.slice(colon + 1).trim() : line,
         };
       });
-    const fields = message.fields.slice(0, 24);
+    const fields = message.fields.map((field) => {
+      if (
+        !field ||
+        !/^field\d+$/.test(field.id) ||
+        typeof field.label !== "string" ||
+        field.label.length > 1000 ||
+        typeof field.type !== "string"
+      )
+        throw new Error("Invalid field description.");
+      return {
+        id: field.id,
+        label: field.label,
+        type: field.type.slice(0, 30),
+        ...(Array.isArray(field.options)
+          ? {
+              options: field.options
+                .slice(0, 100)
+                .map((o) => String(o).slice(0, 200)),
+            }
+          : {}),
+      };
+    });
     const questions = Object.fromEntries(
       fields.map((field) => [
         field.id,
@@ -65,10 +113,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        state: { source: facts, destination: sender.tab?.url, fields },
+        state: { source: facts, fields },
         questions,
       }),
     });
@@ -82,7 +130,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       })),
       sourceUrl: useMemory
         ? "Personal notes stored on this browser"
-        : sourceUrl,
+        : sourceOrigin(sourceUrl),
       retries: result.retries,
     };
   })()

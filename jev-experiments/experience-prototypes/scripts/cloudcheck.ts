@@ -1,9 +1,9 @@
+import { readRecord, writeRecord } from "./records";
 import "./credentials";
-import { readFileSync, writeFileSync } from "node:fs";
 const origin = process.argv[2] ?? "https://jev-experiments.vercel.app";
 const headers = {
   "Content-Type": "application/json",
-  Authorization: `Bearer ${process.env.LAB_ACCESS_TOKEN}`,
+  Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
 };
 const payload = {
   state: "Hello, it is good to meet you.",
@@ -27,9 +27,9 @@ const live = await fetch(origin + "/api/evaluate", {
   body: JSON.stringify(payload),
 });
 const value = await live.json();
-const spec = JSON.parse(
-  readFileSync("results/composed-ui.json", "utf8"),
-).result.rows.find((r: any) => r.domain === "settings").spec;
+const spec = readRecord("results/composed-ui.jsonl").result.rows.find(
+  (r: any) => r.domain === "settings",
+).spec;
 const state = { ...spec.state, name: "Preserve this edited name" };
 const started = Date.now();
 const response = await fetch(origin + "/api/compose", {
@@ -62,6 +62,7 @@ const events = body
 const report = {
   at: new Date().toISOString(),
   origin,
+  transport: process.env.JEV_CHECK_BUFFERED ? "owner-authenticated Vercel CLI; buffered response" : "direct HTTPS streaming",
   anonymous: anonymous.status,
   invalid: invalid.status,
   live_status: live.status,
@@ -71,7 +72,7 @@ const report = {
   composition: {
     http_status: response.status,
     event_count: events.length,
-    first_chunk_ms: firstChunkMs,
+    first_chunk_ms: process.env.JEV_CHECK_BUFFERED ? null : firstChunkMs,
     total_ms: Date.now() - started,
     stopReason: last?.stopReason,
     error: last?.error,
@@ -82,7 +83,7 @@ const report = {
   },
   events,
 };
-writeFileSync("results/cloudcheck.json", JSON.stringify(report, null, 2));
+writeRecord(process.argv[3] ?? "results/cloudcheck.jsonl", report);
 console.log(JSON.stringify({ ...report, events: undefined }, null, 2));
 if (
   report.anonymous !== 401 ||

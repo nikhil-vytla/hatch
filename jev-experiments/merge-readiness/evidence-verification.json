@@ -1,0 +1,9 @@
+{
+  "jsonl_files": 38,
+  "exact_original_documents": 37,
+  "classification_preserves_predictions_and_adds_published_text": true,
+  "all_typescript_python_roundtrips_equal": true,
+  "public_json_files": 33,
+  "pre_migration_snapshot_matches": 33,
+  "publication_allowlist_rejects_unlisted_files": true
+}

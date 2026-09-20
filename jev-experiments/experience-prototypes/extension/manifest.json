@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jev paste companion · prototype",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Capture selected information, then review field suggestions on another page.",
   "permissions": ["storage", "activeTab", "scripting", "contextMenus"],
   "optional_host_permissions": [

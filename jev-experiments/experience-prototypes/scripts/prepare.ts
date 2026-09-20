@@ -8,24 +8,52 @@ import {
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
+import { readRecord } from "./records";
 const lab = resolve(".."),
   dest = resolve("public/data");
+const publication: Record<string, string> = JSON.parse(
+  readFileSync("publication.json", "utf8"),
+);
 mkdirSync(dest, { recursive: true });
-if (existsSync(resolve(lab, "results"))) {
-  for (const f of readdirSync(resolve(lab, "results")))
-    if (f.endsWith(".json") && !["access.json", "smoke.json"].includes(f))
-      copyFileSync(resolve(lab, "results", f), resolve(dest, f));
+const hasSources = existsSync("results") || existsSync(resolve(lab, "results"));
+for (const name of readdirSync(dest)) {
+  if (!name.endsWith(".json") || !Object.hasOwn(publication, name.slice(0, -5)))
+    throw new Error(
+      `Unlisted public result: ${name}. Remove it or review the publication manifest.`,
+    );
 }
-if (existsSync("results"))
-  for (const f of readdirSync("results"))
-    if (f.endsWith(".json"))
-      copyFileSync(resolve("results", f), resolve(dest, f));
-if (existsSync(resolve(lab, ".cache/sources.json"))) {
-  const py = existsSync(resolve(lab, ".venv/bin/python"))
-    ? resolve(lab, ".venv/bin/python")
-    : "python3";
-  const p = spawnSync(py, ["scripts/enrich.py"], { stdio: "inherit" });
-  if (p.status) process.exit(p.status);
+for (const [name, source] of Object.entries(publication)) {
+  const target = resolve(dest, `${name}.json`);
+  if (hasSources) {
+    if (!existsSync(source))
+      throw new Error(`Missing recorded evidence: ${source}`);
+    const document = readRecord(source);
+    if (
+      [
+        "routing",
+        "verify",
+        "search",
+        "ui",
+        "visuals",
+        "music",
+        "logos",
+        "language",
+      ].includes(name)
+    ) {
+      const result = document.result,
+        rows = result.rows ?? result.scenes ?? [];
+      result.availability = {
+        planned: rows.length,
+        completed: rows.filter((row: any) => !row.error).length,
+        unavailable: rows.filter((row: any) => !!row.error).length,
+      };
+    }
+    writeFileSync(target, JSON.stringify(document) + "\n");
+  } else if (!existsSync(target)) {
+    throw new Error(
+      `Missing prepared evidence: ${name}. Run bun run build before deployment.`,
+    );
+  }
 }
 mkdirSync("public/research", { recursive: true });
 for (const name of ["README.md", "SOURCES.md", "IDEA_GARDEN.md"])
