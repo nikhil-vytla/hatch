@@ -1,0 +1,876 @@
+{
+  "method": "Bun executes the frozen 4c0c40d Undo component through mocked React hooks/elements and deferred model results. Decoded the original published record with shared readRecord. No browser, provider calls, app changes, or claim of general model accuracy. Synthetic overlapping-field cases test an extension limit absent from the current UI.",
+  "baselineCommit": "4c0c40d",
+  "currentUndoBlockUnchanged": true,
+  "sourceHashes": {
+    "originalUndoBlock": "811157102984fd2eae067b1545fc61efa35452d5ccb0da67dba1ad6b8bad9500",
+    "publishedEvidence": "62d3ae3e89bc8ed5410a422c94f0127a6ecbbf5a3a82b47d4a46abdf89e165c4"
+  },
+  "evidence": {
+    "manifest": {
+      "experiment": "undo",
+      "created": "2026-09-20T07:34:19.270Z",
+      "status": "complete"
+    },
+    "requests": 1,
+    "decisions": 5,
+    "answers": {
+      "e1": {
+        "type": "noul",
+        "value": 0.97,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e2": {
+        "type": "noul",
+        "value": 0.04,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e3": {
+        "type": "noul",
+        "value": 0.94,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e4": {
+        "type": "noul",
+        "value": 0.04,
+        "probabilities": null,
+        "confidence": null
+      },
+      "e5": {
+        "type": "noul",
+        "value": 0.31,
+        "probabilities": null,
+        "confidence": null
+      }
+    },
+    "selected": [
+      "e1",
+      "e3"
+    ],
+    "fieldBaseline": [
+      "e1",
+      "e3"
+    ],
+    "baselineMatches": true,
+    "latencyMs": 292,
+    "serviceLatencyMs": 292,
+    "attempts": [
+      {
+        "attempt": 1,
+        "status": 200,
+        "latency_ms": 272
+      }
+    ],
+    "retries": 0,
+    "costUsd": "0",
+    "source": "live",
+    "independentLabelsRetained": false,
+    "requestRetained": false
+  },
+  "fixedFixture": {
+    "fields": [
+      "accent",
+      "layout",
+      "background",
+      "title",
+      "rounded"
+    ],
+    "distinctFields": 5,
+    "actorsRetained": false,
+    "initial": {
+      "request": "Undo the color changes, but keep the new layout and title.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": false,
+      "design": {
+        "accent": "#607fa0",
+        "layout": "list",
+        "background": "#e5eee7",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    },
+    "applied": {
+      "request": "Undo the color changes, but keep the new layout and title.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": true,
+      "design": {
+        "accent": "#d97b5c",
+        "layout": "list",
+        "background": "#f8efe1",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    },
+    "restored": {
+      "request": "Undo the color changes, but keep the new layout and title.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": false,
+      "design": {
+        "accent": "#607fa0",
+        "layout": "list",
+        "background": "#e5eee7",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    },
+    "subsetMatches": 32,
+    "restoreMatches": 32,
+    "totalSubsets": 32,
+    "designEditControlCount": 0,
+    "previewActionButtonsWithHandlers": 0
+  },
+  "selectionAfterApply": {
+    "before": {
+      "request": "Undo the color changes, but keep the new layout and title.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": true,
+      "design": {
+        "accent": "#d97b5c",
+        "layout": "list",
+        "background": "#f8efe1",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    },
+    "after": {
+      "request": "Undo the color changes, but keep the new layout and title.",
+      "selected": [
+        "e1",
+        "e3",
+        "e4"
+      ],
+      "applied": false,
+      "design": {
+        "accent": "#607fa0",
+        "layout": "list",
+        "background": "#e5eee7",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    }
+  },
+  "rerunAfterApply": {
+    "before": {
+      "request": "Undo the color changes, but keep the new layout and title.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": true,
+      "design": {
+        "accent": "#d97b5c",
+        "layout": "list",
+        "background": "#f8efe1",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    },
+    "after": {
+      "request": "Undo the color changes, but keep the new layout and title.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": false,
+      "design": {
+        "accent": "#607fa0",
+        "layout": "list",
+        "background": "#e5eee7",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    }
+  },
+  "queryEditWithoutRerun": {
+    "oldSelectionStillApplicable": [
+      "e1",
+      "e3"
+    ],
+    "after": {
+      "request": "Undo only the title change. Keep every other change.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": true,
+      "design": {
+        "accent": "#d97b5c",
+        "layout": "list",
+        "background": "#f8efe1",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    }
+  },
+  "staleReply": {
+    "request": {
+      "state": {
+        "request": "Undo the color changes, but keep the new layout and title.",
+        "edits": [
+          {
+            "id": "e1",
+            "field": "accent",
+            "before": "#d97b5c",
+            "after": "#607fa0",
+            "description": "Changed the accent color from terracotta to blue"
+          },
+          {
+            "id": "e2",
+            "field": "layout",
+            "before": "cards",
+            "after": "list",
+            "description": "Changed the apartment layout from cards to a compact list"
+          },
+          {
+            "id": "e3",
+            "field": "background",
+            "before": "#f8efe1",
+            "after": "#e5eee7",
+            "description": "Changed the preview background from warm cream to sage"
+          },
+          {
+            "id": "e4",
+            "field": "title",
+            "before": "A few good places",
+            "after": "Your next chapter",
+            "description": "Changed the title text to Your next chapter"
+          },
+          {
+            "id": "e5",
+            "field": "rounded",
+            "before": true,
+            "after": false,
+            "description": "Changed the corners from rounded to square"
+          }
+        ]
+      },
+      "questions": {
+        "e1": {
+          "type": "noul",
+          "instructions": "Should edit e1 be undone to satisfy the user's request? Preserve unrelated edits."
+        },
+        "e2": {
+          "type": "noul",
+          "instructions": "Should edit e2 be undone to satisfy the user's request? Preserve unrelated edits."
+        },
+        "e3": {
+          "type": "noul",
+          "instructions": "Should edit e3 be undone to satisfy the user's request? Preserve unrelated edits."
+        },
+        "e4": {
+          "type": "noul",
+          "instructions": "Should edit e4 be undone to satisfy the user's request? Preserve unrelated edits."
+        },
+        "e5": {
+          "type": "noul",
+          "instructions": "Should edit e5 be undone to satisfy the user's request? Preserve unrelated edits."
+        }
+      }
+    },
+    "manualBeforeReply": {
+      "request": "Undo only the title change. Keep every other change.",
+      "selected": [
+        "e4"
+      ],
+      "applied": false,
+      "design": {
+        "accent": "#607fa0",
+        "layout": "list",
+        "background": "#e5eee7",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    },
+    "afterReply": {
+      "request": "Undo only the title change. Keep every other change.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": false,
+      "design": {
+        "accent": "#607fa0",
+        "layout": "list",
+        "background": "#e5eee7",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    },
+    "afterApply": {
+      "request": "Undo only the title change. Keep every other change.",
+      "selected": [
+        "e1",
+        "e3"
+      ],
+      "applied": true,
+      "design": {
+        "accent": "#d97b5c",
+        "layout": "list",
+        "background": "#f8efe1",
+        "title": "Your next chapter",
+        "rounded": false
+      },
+      "run": {
+        "answers": {
+          "e1": {
+            "type": "noul",
+            "value": 0.97,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e2": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e3": {
+            "type": "noul",
+            "value": 0.94,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e4": {
+            "type": "noul",
+            "value": 0.04,
+            "probabilities": null,
+            "confidence": null
+          },
+          "e5": {
+            "type": "noul",
+            "value": 0.31,
+            "probabilities": null,
+            "confidence": null
+          }
+        },
+        "latency_ms": 292,
+        "service_latency_ms": 292,
+        "retries": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "status": 200,
+            "latency_ms": 272
+          }
+        ],
+        "cost_usd": "0",
+        "model": "typesafe-ai/jev",
+        "source": "live"
+      }
+    }
+  },
+  "syntheticOverlappingFields": {
+    "history": [
+      {
+        "id": "agent-a",
+        "field": "accent",
+        "before": "red",
+        "after": "blue",
+        "description": "Agent changed accent to blue",
+        "actor": "agent"
+      },
+      {
+        "id": "user-b",
+        "field": "accent",
+        "before": "blue",
+        "after": "green",
+        "description": "User changed accent to green",
+        "actor": "user"
+      }
+    ],
+    "scope": "Extension fixture, not reachable through current noneditable UI",
+    "undoEarlierOnly": {
+      "expectedUnderPreserveLaterAssignmentPolicy": "green",
+      "actual": "red"
+    },
+    "undoBoth": {
+      "expected": "red",
+      "actual": "blue"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "catalogExperiments": 33,
+  "reviewed": 33,
+  "missing": [],
+  "jsonAndMarkdownPresent": 33,
+  "findings": 160,
+  "verdicts": {
+    "keep": 0,
+    "repair": 19,
+    "redesign": 13,
+    "research-map": 1
+  }
+}

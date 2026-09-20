@@ -1,0 +1,9 @@
+# Local home previews
+
+`src/live-world-preview.tsx` exports `LiveWorldPreview` for the existing hero-window link and `MiniExperimentPreview({ kind })` for seven experiment cards. The hero reuses this project's original courtyard engine and renderer, runs the deterministic keyword policy locally, and visibly says "Local world preview". It imports no API helper, credentials, model outputs or external images.
+
+The hero fills the existing responsive window. IntersectionObserver stops animation offscreen, document visibility stops it in hidden tabs, and the reduced-motion preference leaves a static painted courtyard. Each pause cancels the animation frame; resuming preserves the world while excluding paused wall time. Resize and theme observers repaint without starting the clock. Cleanup removes all observers and event listeners.
+
+The seven original decorative SVG compositions cover `tetris`, `crowd`, `ghost-brush`, `visual-search`, `wardrobe`, `icon-studio` and `drawing-framing`; unknown IDs return null. They are illustrations rather than model outputs or museum collection images. All use `aria-hidden` and contain no controls. The hero also contains no nested interaction, so its parent remains one accessible link.
+
+Root owns the lazy imports, hero link, catalog kind and card hook. No package or data preparation change is required. The app TypeScript check passes. Ten browser checks passed, including actual offscreen/reduced-motion pause, decorative semantics, unknown-kind fallback and 390 px layout. The hidden-document event path used an explicit visibility fixture because the headed runner did not reliably background the first tab. No model request occurred. Results are in `browser-qa.json`, the original Playwright CLI check is in `browser-qa.js`, and visually inspected light/dark/mobile/card captures are in `screenshots/`.

@@ -1,0 +1,818 @@
+{
+  "provenance": {
+    "source": "jev-experiments/results/reward.jsonl",
+    "manifest": {
+      "id": "20260920T051801-reward-a6bf90",
+      "experiment": "reward",
+      "created": "2026-09-20T05:18:01.055527+00:00",
+      "config": {
+        "quick": false,
+        "seed": 42
+      },
+      "python": "3.13.11",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "status": "complete",
+      "finished": "2026-09-20T05:19:11.410509+00:00"
+    },
+    "no_network_calls": true
+  },
+  "coverage": {
+    "planned_train": 48,
+    "usable_train": 44,
+    "test": 80,
+    "missing_ids": [
+      "drink/train/40",
+      "drink/train/41",
+      "drink/train/42",
+      "drink/train/43"
+    ],
+    "train_classes": {
+      "espresso": 5,
+      "latte": 5,
+      "iced_coffee": 5,
+      "iced_latte": 5,
+      "herbal_tea": 6,
+      "hot_chocolate": 6,
+      "lemonade": 6,
+      "milkshake": 6
+    },
+    "failures": [
+      {
+        "start": 40,
+        "error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr"
+      }
+    ]
+  },
+  "reproduction": {
+    "weight_max_abs_difference": 0.0,
+    "curve_max_abs_difference": 0,
+    "shape": [
+      72,
+      8
+    ],
+    "nonzero_parameters": 576,
+    "l2": 20.297328146033408
+  },
+  "teacher_reward_quality": {
+    "argmax_correct": 44,
+    "total": 44,
+    "target_reward_min": 0.97,
+    "target_reward_max": 0.99,
+    "off_target_reward_max": 0.03,
+    "mean_absolute_error_from_oracle": 0.013750000000000002
+  },
+  "final_metrics": {
+    "train_expected_teacher_reward": 0.7973929085284638,
+    "train_expected_oracle_success": 0.8110765469729728,
+    "train_greedy_oracle_accuracy": 1.0,
+    "test_expected_oracle_success": 0.4783279337507051,
+    "test_greedy_oracle_correct": 51,
+    "test_greedy_oracle_accuracy": 0.6375,
+    "test_wilson95_iid_only": [
+      0.5281079450222215,
+      0.7342920693555084
+    ],
+    "untrained_greedy_accuracy": 0.125,
+    "normalized_temperature_accuracy": 0.925
+  },
+  "baselines": {
+    "fixed_class_accuracy": 0.125,
+    "uniform_random_expected_accuracy": 0.125,
+    "declared_grammar_rule_accuracy": 1.0,
+    "teacher_argmax_supervised_accuracy": 0.6375,
+    "teacher_argmax_supervised_normalized_temperature_accuracy": 0.95,
+    "exact_oracle_rewards_accuracy": 0.625
+  },
+  "generator_audit": {
+    "temperature_tokens_in_vocabulary": {
+      "hot": true,
+      "cold": true,
+      "warm": false,
+      "chilled": false
+    },
+    "opposite_temperature_pairs": 60,
+    "opposite_temperature_identical_features": 60,
+    "semantic_groups_without_temperature": 5,
+    "class_count": 8,
+    "twenty_test_template_seeds_same_trained_policy": [
+      {
+        "seed": 0,
+        "accuracy": 0.5125
+      },
+      {
+        "seed": 1,
+        "accuracy": 0.5
+      },
+      {
+        "seed": 2,
+        "accuracy": 0.6125
+      },
+      {
+        "seed": 3,
+        "accuracy": 0.5375
+      },
+      {
+        "seed": 4,
+        "accuracy": 0.6375
+      },
+      {
+        "seed": 5,
+        "accuracy": 0.525
+      },
+      {
+        "seed": 6,
+        "accuracy": 0.525
+      },
+      {
+        "seed": 7,
+        "accuracy": 0.5875
+      },
+      {
+        "seed": 8,
+        "accuracy": 0.6375
+      },
+      {
+        "seed": 9,
+        "accuracy": 0.65
+      },
+      {
+        "seed": 10,
+        "accuracy": 0.55
+      },
+      {
+        "seed": 11,
+        "accuracy": 0.5375
+      },
+      {
+        "seed": 12,
+        "accuracy": 0.575
+      },
+      {
+        "seed": 13,
+        "accuracy": 0.5
+      },
+      {
+        "seed": 14,
+        "accuracy": 0.55
+      },
+      {
+        "seed": 15,
+        "accuracy": 0.5875
+      },
+      {
+        "seed": 16,
+        "accuracy": 0.525
+      },
+      {
+        "seed": 17,
+        "accuracy": 0.7
+      },
+      {
+        "seed": 18,
+        "accuracy": 0.575
+      },
+      {
+        "seed": 19,
+        "accuracy": 0.6
+      }
+    ],
+    "seed_accuracy_mean": 0.5712499999999998,
+    "seed_accuracy_min": 0.5,
+    "seed_accuracy_max": 0.7
+  },
+  "curve": [
+    {
+      "step": 0,
+      "mean_teacher_reward": 0.13369318181818182,
+      "oracle_test_accuracy": 0.125
+    },
+    {
+      "step": 20,
+      "mean_teacher_reward": 0.16771911453652721,
+      "oracle_test_accuracy": 0.65
+    },
+    {
+      "step": 40,
+      "mean_teacher_reward": 0.2184643870730966,
+      "oracle_test_accuracy": 0.625
+    },
+    {
+      "step": 60,
+      "mean_teacher_reward": 0.292202567762397,
+      "oracle_test_accuracy": 0.6
+    },
+    {
+      "step": 80,
+      "mean_teacher_reward": 0.38408778328537435,
+      "oracle_test_accuracy": 0.6
+    },
+    {
+      "step": 100,
+      "mean_teacher_reward": 0.47567808125591315,
+      "oracle_test_accuracy": 0.625
+    },
+    {
+      "step": 120,
+      "mean_teacher_reward": 0.5533282572169222,
+      "oracle_test_accuracy": 0.6125
+    },
+    {
+      "step": 140,
+      "mean_teacher_reward": 0.6149391846367608,
+      "oracle_test_accuracy": 0.625
+    },
+    {
+      "step": 160,
+      "mean_teacher_reward": 0.6644715710571071,
+      "oracle_test_accuracy": 0.625
+    },
+    {
+      "step": 180,
+      "mean_teacher_reward": 0.7065973204438819,
+      "oracle_test_accuracy": 0.6375
+    },
+    {
+      "step": 200,
+      "mean_teacher_reward": 0.7428054947082163,
+      "oracle_test_accuracy": 0.625
+    },
+    {
+      "step": 220,
+      "mean_teacher_reward": 0.7727731283892788,
+      "oracle_test_accuracy": 0.65
+    },
+    {
+      "step": 240,
+      "mean_teacher_reward": 0.7973929085284638,
+      "oracle_test_accuracy": 0.6375
+    }
+  ],
+  "test_predictions": [
+    {
+      "id": "drink/test/0",
+      "text": "I'm in the mood for a drink that is warm, without dairy, not sweet, with caffeine.",
+      "target": "espresso",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/1",
+      "text": "I'm in the mood for a drink that is warm, not sweet, with dairy milk, with caffeine.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/2",
+      "text": "Could you find me a drink that is not sweet, without dairy, with caffeine, chilled.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/3",
+      "text": "Could you find me a drink that is with dairy milk, chilled, not sweet, with caffeine.",
+      "target": "iced_latte",
+      "prediction": "latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/4",
+      "text": "Please recommend a drink that is without dairy, without caffeine, warm, not sweet.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/5",
+      "text": "I'm in the mood for a drink that is with dairy milk, without caffeine, warm, sweet.",
+      "target": "hot_chocolate",
+      "prediction": "milkshake",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/6",
+      "text": "Please recommend a drink that is without dairy, without caffeine, sweet, chilled.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/7",
+      "text": "I'd enjoy a drink that is sweet, without caffeine, with dairy milk, chilled.",
+      "target": "milkshake",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/8",
+      "text": "I'd enjoy a drink that is warm, without dairy, with caffeine, not sweet.",
+      "target": "espresso",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/9",
+      "text": "Please recommend a drink that is not sweet, with caffeine, warm, with dairy milk.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/10",
+      "text": "Please recommend a drink that is with caffeine, not sweet, without dairy, chilled.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/11",
+      "text": "Please recommend a drink that is with caffeine, with dairy milk, not sweet, chilled.",
+      "target": "iced_latte",
+      "prediction": "iced_latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/12",
+      "text": "Please recommend a drink that is without caffeine, not sweet, without dairy, warm.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/13",
+      "text": "Could you find me a drink that is sweet, with dairy milk, without caffeine, warm.",
+      "target": "hot_chocolate",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/14",
+      "text": "Could you find me a drink that is sweet, chilled, without caffeine, without dairy.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/15",
+      "text": "Could you find me a drink that is with dairy milk, chilled, without caffeine, sweet.",
+      "target": "milkshake",
+      "prediction": "milkshake",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/16",
+      "text": "I'd enjoy a drink that is warm, with caffeine, without dairy, not sweet.",
+      "target": "espresso",
+      "prediction": "espresso",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/17",
+      "text": "I'd enjoy a drink that is with dairy milk, not sweet, with caffeine, warm.",
+      "target": "latte",
+      "prediction": "iced_latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/18",
+      "text": "Please recommend a drink that is chilled, without dairy, with caffeine, not sweet.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/19",
+      "text": "Please recommend a drink that is not sweet, with caffeine, with dairy milk, chilled.",
+      "target": "iced_latte",
+      "prediction": "latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/20",
+      "text": "Could you find me a drink that is not sweet, warm, without dairy, without caffeine.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/21",
+      "text": "I'm in the mood for a drink that is warm, with dairy milk, without caffeine, sweet.",
+      "target": "hot_chocolate",
+      "prediction": "milkshake",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/22",
+      "text": "I'm in the mood for a drink that is chilled, without dairy, sweet, without caffeine.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/23",
+      "text": "I'm in the mood for a drink that is sweet, chilled, without caffeine, with dairy milk.",
+      "target": "milkshake",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/24",
+      "text": "I'd enjoy a drink that is not sweet, warm, with caffeine, without dairy.",
+      "target": "espresso",
+      "prediction": "espresso",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/25",
+      "text": "Could you find me a drink that is not sweet, with dairy milk, warm, with caffeine.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/26",
+      "text": "Please recommend a drink that is chilled, with caffeine, not sweet, without dairy.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/27",
+      "text": "I'm in the mood for a drink that is chilled, not sweet, with dairy milk, with caffeine.",
+      "target": "iced_latte",
+      "prediction": "latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/28",
+      "text": "Please recommend a drink that is warm, without dairy, without caffeine, not sweet.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/29",
+      "text": "I'm in the mood for a drink that is sweet, with dairy milk, warm, without caffeine.",
+      "target": "hot_chocolate",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/30",
+      "text": "I'm in the mood for a drink that is sweet, chilled, without caffeine, without dairy.",
+      "target": "lemonade",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/31",
+      "text": "Please recommend a drink that is with dairy milk, chilled, sweet, without caffeine.",
+      "target": "milkshake",
+      "prediction": "milkshake",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/32",
+      "text": "I'd enjoy a drink that is warm, not sweet, with caffeine, without dairy.",
+      "target": "espresso",
+      "prediction": "espresso",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/33",
+      "text": "Could you find me a drink that is with dairy milk, with caffeine, warm, not sweet.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/34",
+      "text": "I'd enjoy a drink that is with caffeine, without dairy, not sweet, chilled.",
+      "target": "iced_coffee",
+      "prediction": "espresso",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/35",
+      "text": "Please recommend a drink that is not sweet, with dairy milk, chilled, with caffeine.",
+      "target": "iced_latte",
+      "prediction": "latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/36",
+      "text": "I'd enjoy a drink that is without caffeine, not sweet, without dairy, warm.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/37",
+      "text": "I'm in the mood for a drink that is without caffeine, sweet, warm, with dairy milk.",
+      "target": "hot_chocolate",
+      "prediction": "lemonade",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/38",
+      "text": "Could you find me a drink that is sweet, without caffeine, chilled, without dairy.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/39",
+      "text": "I'm in the mood for a drink that is with dairy milk, chilled, without caffeine, sweet.",
+      "target": "milkshake",
+      "prediction": "milkshake",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/40",
+      "text": "Please recommend a drink that is not sweet, with caffeine, without dairy, warm.",
+      "target": "espresso",
+      "prediction": "espresso",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/41",
+      "text": "Could you find me a drink that is not sweet, with dairy milk, warm, with caffeine.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/42",
+      "text": "I'm in the mood for a drink that is chilled, with caffeine, not sweet, without dairy.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/43",
+      "text": "Please recommend a drink that is with caffeine, with dairy milk, not sweet, chilled.",
+      "target": "iced_latte",
+      "prediction": "iced_latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/44",
+      "text": "Could you find me a drink that is without dairy, without caffeine, warm, not sweet.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/45",
+      "text": "I'd enjoy a drink that is warm, sweet, with dairy milk, without caffeine.",
+      "target": "hot_chocolate",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/46",
+      "text": "Could you find me a drink that is without caffeine, chilled, without dairy, sweet.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/47",
+      "text": "I'd enjoy a drink that is with dairy milk, sweet, without caffeine, chilled.",
+      "target": "milkshake",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/48",
+      "text": "Could you find me a drink that is warm, without dairy, not sweet, with caffeine.",
+      "target": "espresso",
+      "prediction": "espresso",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/49",
+      "text": "Please recommend a drink that is not sweet, with caffeine, warm, with dairy milk.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/50",
+      "text": "Could you find me a drink that is not sweet, without dairy, with caffeine, chilled.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/51",
+      "text": "I'd enjoy a drink that is with dairy milk, not sweet, chilled, with caffeine.",
+      "target": "iced_latte",
+      "prediction": "iced_latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/52",
+      "text": "Could you find me a drink that is without caffeine, warm, not sweet, without dairy.",
+      "target": "herbal_tea",
+      "prediction": "lemonade",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/53",
+      "text": "I'd enjoy a drink that is sweet, warm, with dairy milk, without caffeine.",
+      "target": "hot_chocolate",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/54",
+      "text": "Please recommend a drink that is chilled, without caffeine, sweet, without dairy.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/55",
+      "text": "Could you find me a drink that is sweet, with dairy milk, chilled, without caffeine.",
+      "target": "milkshake",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/56",
+      "text": "I'd enjoy a drink that is without dairy, with caffeine, warm, not sweet.",
+      "target": "espresso",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/57",
+      "text": "Could you find me a drink that is with dairy milk, not sweet, warm, with caffeine.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/58",
+      "text": "Could you find me a drink that is without dairy, with caffeine, not sweet, chilled.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/59",
+      "text": "I'd enjoy a drink that is chilled, with dairy milk, with caffeine, not sweet.",
+      "target": "iced_latte",
+      "prediction": "latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/60",
+      "text": "I'd enjoy a drink that is warm, without dairy, not sweet, without caffeine.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/61",
+      "text": "I'm in the mood for a drink that is warm, sweet, with dairy milk, without caffeine.",
+      "target": "hot_chocolate",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "hot_chocolate"
+    },
+    {
+      "id": "drink/test/62",
+      "text": "I'm in the mood for a drink that is without dairy, chilled, without caffeine, sweet.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/63",
+      "text": "Please recommend a drink that is chilled, sweet, without caffeine, with dairy milk.",
+      "target": "milkshake",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/64",
+      "text": "Please recommend a drink that is with caffeine, not sweet, warm, without dairy.",
+      "target": "espresso",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "espresso"
+    },
+    {
+      "id": "drink/test/65",
+      "text": "Could you find me a drink that is warm, with dairy milk, with caffeine, not sweet.",
+      "target": "latte",
+      "prediction": "latte",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/66",
+      "text": "I'm in the mood for a drink that is chilled, not sweet, without dairy, with caffeine.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/67",
+      "text": "I'd enjoy a drink that is chilled, with dairy milk, with caffeine, not sweet.",
+      "target": "iced_latte",
+      "prediction": "latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/68",
+      "text": "Could you find me a drink that is without dairy, without caffeine, not sweet, warm.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/69",
+      "text": "Could you find me a drink that is with dairy milk, without caffeine, sweet, warm.",
+      "target": "hot_chocolate",
+      "prediction": "milkshake",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/70",
+      "text": "I'm in the mood for a drink that is without caffeine, chilled, without dairy, sweet.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/71",
+      "text": "Could you find me a drink that is without caffeine, with dairy milk, sweet, chilled.",
+      "target": "milkshake",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "milkshake"
+    },
+    {
+      "id": "drink/test/72",
+      "text": "Could you find me a drink that is without dairy, with caffeine, not sweet, warm.",
+      "target": "espresso",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/73",
+      "text": "I'm in the mood for a drink that is warm, with caffeine, with dairy milk, not sweet.",
+      "target": "latte",
+      "prediction": "iced_latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/74",
+      "text": "I'm in the mood for a drink that is without dairy, not sweet, chilled, with caffeine.",
+      "target": "iced_coffee",
+      "prediction": "iced_coffee",
+      "normalized_prediction": "iced_coffee"
+    },
+    {
+      "id": "drink/test/75",
+      "text": "I'd enjoy a drink that is chilled, with caffeine, not sweet, with dairy milk.",
+      "target": "iced_latte",
+      "prediction": "latte",
+      "normalized_prediction": "iced_latte"
+    },
+    {
+      "id": "drink/test/76",
+      "text": "I'd enjoy a drink that is without caffeine, warm, without dairy, not sweet.",
+      "target": "herbal_tea",
+      "prediction": "herbal_tea",
+      "normalized_prediction": "herbal_tea"
+    },
+    {
+      "id": "drink/test/77",
+      "text": "Please recommend a drink that is without caffeine, sweet, with dairy milk, warm.",
+      "target": "hot_chocolate",
+      "prediction": "lemonade",
+      "normalized_prediction": "latte"
+    },
+    {
+      "id": "drink/test/78",
+      "text": "I'm in the mood for a drink that is without caffeine, without dairy, chilled, sweet.",
+      "target": "lemonade",
+      "prediction": "lemonade",
+      "normalized_prediction": "lemonade"
+    },
+    {
+      "id": "drink/test/79",
+      "text": "I'm in the mood for a drink that is without caffeine, chilled, sweet, with dairy milk.",
+      "target": "milkshake",
+      "prediction": "hot_chocolate",
+      "normalized_prediction": "milkshake"
+    }
+  ],
+  "limits": [
+    "This probe is post hoc and does not tune an evaluated checkpoint.",
+    "The grammar baseline is tailored to this public authored fixture grammar, not a general language solver.",
+    "Twenty test seeds vary wording order and introductions; they are not twenty independent training runs.",
+    "The Wilson interval assumes independent Bernoulli cases and is descriptive only for these repeated authored templates."
+  ]
+}

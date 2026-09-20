@@ -1,0 +1,124 @@
+{
+  "id": "rewardbench2",
+  "title": "RewardBench 2",
+  "evidenceStatus": "Full pinned test split: 1,865/1,865 cases, 8,977/8,977 answers; source text/labels/order and official scorer parity independently verified; one scoring pass",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The 80.9002% macro score reproduces exactly, and full benchmark coverage is already complete. The Ties mistakes filter hides seven margin-only failures; single-pass close scores and weak baseline comparisons are the main remaining evaluation limitations. A paired case inspector and repeated full comparisons would add more value than another sample.",
+  "strengths": [
+    "Every original case and answer was evaluated; the six subset counts match Ai2's pinned official release.",
+    "Independent probe verified all published text, labels, candidate order, attribution and omission hashes against pinned source; all six metrics reproduce from unmodified upstream scoring functions.",
+    "255 successful batches contain exactly 8,977 judgments; three unavailable batches recovered, and 279 attempts remain inspectable.",
+    "Gold labels and response-model identities are excluded from model inputs, and questions carry isolated candidate text.",
+    "Content gates cover every Safety case plus 41 flagged cases; reviewed omissions retain hashes and count toward metrics; ten Bun tests passed."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Small ranking gaps lack representative repeatability evidence",
+      "evidence": "rewardbench2/check-repeats.ts:6,24 repeats one France/Paris fixture; probes/rewardbench2.json finds three identical-question pairs differing by 0.05–0.07, and 106/1,763 ordinary cases with top-two gaps <=0.10, including 33 <=0.02",
+      "impact": "A single recorded winner does not establish stable preference on close cases or justify small model comparisons; the existing control cannot characterize real-case variability.",
+      "fix": "Run three full shuffled scheduling passes, preserve all repeats, report winner stability and clustered comparison intervals, and add matched real-question solo/batched controls. Keep official exact-tie scoring unchanged. Add RewardBench tests to the standard app test script and preserve model/run fingerprints."
+    },
+    {
+      "priority": "P1",
+      "title": "Ties mistake filtering excludes seven failures in the actual metric",
+      "evidence": "experience-prototypes/src/rewardbench.tsx:23,91 checks ranking only; paired margin fails for ten pairs, but IDs 12,24,27,30,42,44,50 pass both rankings and vanish from that filter",
+      "impact": "Visitors cannot inspect most paired margin failures through the mistakes view, and reference/tied prompts are disconnected even though the score depends on both.",
+      "fix": "Navigate 51 linked pairs; render both prompts, matching answer identities, correct-answer spread and rejected-answer gaps. Filter each metric component separately and display the exact composite contribution."
+    },
+    {
+      "priority": "P2",
+      "title": "Upstream diagnostic metadata is dropped",
+      "evidence": "rewardbench2/protocol.ts:64 omits additional_metadata; source contains Safety categories for all 450 cases, Factuality method labels for 209 natural and 266 induced cases, and Precise IF instruction IDs",
+      "impact": "Aggregate category scores hide which source methods and request types cause errors; the viewer cannot explain meaningful benchmark label distinctions.",
+      "fix": "Preserve metadata for provenance and slice analysis while excluding it from model inputs. Add counts and slice scores plus an annotation/dispute layer that never changes official labels. Carry existing content gates and omission hashes through every new view."
+    },
+    {
+      "priority": "P2",
+      "title": "Random-only comparison does not show reward-model usefulness",
+      "evidence": "experience-prototypes/src/rewardbench.tsx:339 shows only 25% uniform selection; shortest-answer baseline earns 52.73% Focus and 37.70% Math from original text; no policy training or independent downstream outcome is recorded",
+      "impact": "The score establishes static preference recognition, but does not measure gains over simple dataset heuristics, an open reward model, or actual improvement under optimization.",
+      "fix": "Add deterministic length baselines, a pinned open reward model, and a pre-registered four-dimension Jev ablation on the full split. Create a separate disjoint best-of-N study before attempting reward-driven training; measure quality independently of Jev reward."
+    },
+    {
+      "priority": "P2",
+      "title": "The full evidence archive blocks initial loading and remains difficult to read",
+      "evidence": "experience-prototypes/src/main.tsx:47 fetches/parses one 15,844,662-byte JSON; local gzip is 4,669,806 bytes. rewardbench.tsx:284 renders raw Markdown/math; style.css:3623 limits cards to 460px; cases contain up to 38 candidates; raw case disclosure at rewardbench.tsx:319 can reveal labels before voting",
+      "impact": "Complete evidence exists, but initial loading is unnecessarily large, mathematical answers are harder to compare, and the current interaction cannot produce clean blind votes.",
+      "fix": "Ship a small index and hashed case/pair chunks plus full archive download. Add expanded safe Markdown/math and raw views, stable deep links, a pair comparison chart, and a separate blind mode that freezes the first vote before exposing gold-bearing diagnostics."
+    }
+  ],
+  "simulation": {
+    "title": "The reward selection desk",
+    "description": "Read and choose among anonymous candidates, reveal the dataset and scorer choices, then inspect score gaps and repeat-run winner stability. Ties switches between paired prompts while matching candidate identities stay fixed and score bars animate, exposing the four ranking/margin components. Live BYOK reruns remain exploratory records.",
+    "jevsRole": "Score anonymous prompt-and-answer combinations under a frozen rubric; optional comparison protocols score separate quality dimensions.",
+    "codeRole": "Preserve candidate identity and pair linkage, compute official metrics and uncertainty, gate sensitive text, render complete safe evidence, manage immutable first votes, and distinguish provider failures from model judgments.",
+    "acceptanceCriteria": [
+      "All 1,763 ordinary cases and 51 linked Ties pairs have stable deep links and complete text or explicit hashed omissions.",
+      "All seven margin-only failures are reachable by a component-specific filter and reproduce their exact composite contribution.",
+      "Blind mode hides gold, scores, raw records and diagnostic filters until the first vote is fixed.",
+      "Duplicate answer positions and differing recorded scores remain visible; charts never invent predictions.",
+      "The summary and first case load independently of the full archive; missing chunks show recoverable errors.",
+      "Provider outages or cancellation never overwrite completed results or change benchmark metrics.",
+      "Every displayed score identifies its run/protocol and is distinguished from calibrated correctness probability."
+    ]
+  },
+  "evaluation": {
+    "design": "Keep pinned official scoring and freeze protocols before comparing. Three fresh full passes with scheduling seeds 42/43/44 require 26,931 candidate judgments, about 765 successful batches at observed packing, before retries. Add 20 preselected real questions repeated ten times in each solo/batched condition, 400 judgments. Use 10,000 stratified paired cluster bootstrap resamples, retaining each Ties pair and repeated source-prompt cluster; report run variation separately. Develop rubric weights and abstention thresholds on disjoint data. A four-dimension ablation requires 35,908 judgments per full pass. A separate downstream study can use 200 disjoint tasks, eight candidates and three generation seeds, 4,800 candidate judgments per scorer, with verifier or blinded human outcomes.",
+    "baselines": [
+      "Uniform random selection, 25% for ordinary categories",
+      "Shortest and longest original answers with split credit for equal length",
+      "Current fixed one-score Jev protocol",
+      "Pinned open reward model using its documented scoring contract",
+      "Pre-registered correctness/instruction/relevance/appropriateness Jev scores, weights fixed on separate development data",
+      "For downstream selection: generator first answer, random selection and independent verifier/human outcome"
+    ],
+    "metrics": [
+      "Official six-category macro and all subset scores",
+      "Paired 95% cluster-bootstrap differences and run-to-run variation",
+      "Winner flip rate, exact ties and close score gaps",
+      "Ties reference/tied accuracy, margin tests and smooth bonus",
+      "Safety and source-method slice scores with counts",
+      "Availability, attempts and retry-inclusive latency",
+      "Risk versus coverage and held-out calibration for escalation policies",
+      "Downstream independently measured quality versus Jev reward"
+    ],
+    "coverage": {
+      "kind": "external",
+      "current": "1,865/1,865 unique test cases and 8,977/8,977 candidate answers. Three prompts and six answers are omitted from public display only; all remain scored.",
+      "full": "The official pinned release has one 1,865-case test split: Focus 495, Factuality 475, Math 183, Safety 450, Precise IF 160, Ties 102 as 51 linked pairs.",
+      "feasibility": "Already complete. One further pass needs 8,977 candidate judgments, approximately 255 successful batches with current packing. Two additional passes need 17,954 judgments; three fresh passes need 26,931. No generation calls or new dataset download are required. Provider scheduling/retry handling is the remaining operational concern; no case-size blocker was found. Recorded cost values are zero and cannot alone establish actual billing."
+    }
+  },
+  "libraries": [
+    {
+      "name": "react-markdown",
+      "url": "https://github.com/remarkjs/react-markdown",
+      "use": "Render full candidate Markdown and math through documented plugins, with raw HTML disabled, constrained links, and exact raw-text access."
+    },
+    {
+      "name": "SciPy bootstrap",
+      "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html",
+      "use": "Compute reproducible paired uncertainty after explicitly grouping source-prompt and Ties-pair dependencies."
+    },
+    {
+      "name": "TRL GRPOTrainer",
+      "url": "https://huggingface.co/docs/trl/main/en/grpo_trainer",
+      "use": "Reuse Jev as a custom reward function in a future disjoint training study, with independent quality measurement and retained request evidence. Validate offline best-of-N behavior first."
+    }
+  ],
+  "nextSteps": [
+    {"priority":"P1","size":"S","action":"Build pair-level Ties diagnostics and margin failure filters; include RewardBench tests in the app's standard test command."},
+    {"priority":"P1","size":"M","action":"Record full repeated comparisons, immutable request mappings, representative batching controls, ranking stability and clustered intervals."},
+    {"priority":"P2","size":"S","action":"Preserve upstream diagnostic metadata and add shortest/longest baselines and slice reports."},
+    {"priority":"P2","size":"M","action":"Chunk case loading and build expanded safe reading, stable links, and separate blind-vote behavior."},
+    {"priority":"P2","size":"L","action":"Compare a pinned open reward model and decomposed Jev on the full split; reuse the scorer in an independent best-of-N and reward-hacking study."}
+  ],
+  "sources": [
+    {"label":"Pinned official dataset card and complete split counts","url":"https://huggingface.co/datasets/allenai/reward-bench-2/raw/7ff08853b0d5686e79b13fda8677024f566a104a/README.md"},
+    {"label":"Pinned official scoring implementation","url":"https://github.com/allenai/reward-bench/blob/05a9005efb607249822c193590c8ecab87c77052/rewardbench/utils.py#L1033"},
+    {"label":"RewardBench 2 paper and downstream evaluations","url":"https://arxiv.org/html/2506.01937v1"},
+    {"label":"TypeSafe independent question and score contract","url":"https://docs.typesafe.ai/primitives"}
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "id": "orbital",
+  "title": "Orbital rescue",
+  "evidenceStatus": "Frozen main 4c0c40d5; six decoded episodes on three seeds; 192 transitions replayed; independent route oracle and 1,000 code-only seeds; no browser or model calls",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "Both controllers win all three published seeds, but none of the six trajectories offers an immediate hazardous or out-of-bounds choice. Jev matches the code greedy rule on 95 of 96 moves with code-selected objectives and supplied distances. Live mission state waits for model answers, and controller switching restarts the mission, so real-time shared play needs a separate clock and ownership design.",
+  "strengths": [
+    "All 192 published transitions and final states replay exactly in the deterministic engine; a genuine win requires all cores and return to the beacon.",
+    "Matched-seed Jev/greedy records, explicit fixed-clock replay labeling, visible observations and probabilities make the decision boundary inspectable.",
+    "Manual keyboard/button controls, WebGL fallback, reduced-motion rendering, resource disposal and reset/unmount request invalidation already exist."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "The recorded trajectories never test immediate hazard avoidance",
+      "evidence": "probes/orbital.json: six episodes, zero unsafe alternatives, 95/96 Jev-greedy agreement; seed 42 takes 30 moves versus exact no-damage optimum 26. engine.ts:153 supplies a selected goal and :168 supplies action distances. Code-only seeds 0..999 all win with greedy; 26 have duplicate hazards from engine.ts:86.",
+      "impact": "The evidence supports easy assisted geometric action selection, not robust rescue planning. A crafted state makes greedy time out despite a verified 10-move safe route; Jev was not called on that state.",
+      "fix": "Enforce distinct hazards, freeze solvable detour and route-order cases, compare an independent route oracle, and separate geometry-only observations from objective/preview assistance."
+    },
+    {
+      "priority": "P1",
+      "title": "Model response time controls the world clock and modes cannot hand off",
+      "evidence": "experience-prototypes/src/arcade.tsx:261 RAF only renders; :379 awaits a response before :414 advances state; :424 schedules the next request afterward. :446 resets on mode switch. :548 Pause leaves the pending generation valid.",
+      "impact": "Latency freezes mission progress, switching controllers loses the current run, and one pending move can apply after Pause. These are source-level lifecycle findings.",
+      "fix": "Add an independent simulation clock, explicit controller ownership, deadline/revision guards, bounded goal execution, visible fallback, same-state takeover and checkpoint branch generations. Define game pause separately from suspending model control."
+    },
+    {
+      "priority": "P2",
+      "title": "Docking and navigation need visible coordinates that match the rules",
+      "evidence": "arcade.tsx:168 places the beacon ring at y=0.05; engine.ts:228 requires y=2. Probe verifies y=0 remains playing and y=2 wins. Camera orbit at :127 does not change absolute keyboard axes at :492; the main HUD lacks compass/altitude. Collision uses center distance below 0.8, while the renderer draws separate rotor geometry.",
+      "impact": "Humans must infer decisive altitude and world directions that the model receives explicitly. Visible flight geometry does not define the grid collision rule.",
+      "fix": "Place a target marker at the actual dock, show compass and current/target altitude, offer a top-down inset and display the grid collision proxy. Version any future continuous collider rules."
+    },
+    {
+      "priority": "P2",
+      "title": "Action budget, oxygen and full-game progression need separate definitions",
+      "evidence": "engine.ts:164 and :231 give 70 actions and an oxygen timeout; idle time costs nothing. arcade.tsx:507 shows moves but no remaining resource; only three seed choices and restart exist.",
+      "impact": "The finite mission is winnable, but its resource wording implies time pressure it does not implement. The experience ends after one mission without progression or recovery choices.",
+      "fix": "Keep the legacy 70-action task versioned, show its remaining maneuver budget, and define actual oxygen/fuel separately in play. Add a complete short campaign and report evaluation truncation independently from game loss."
+    },
+    {
+      "priority": "P2",
+      "title": "Recorded request time is copied batch service latency",
+      "evidence": "record.ts:71 copies one response.service_latency_ms and :73 total batch cost into every pending game's action; arcade.tsx:623 labels it Request time. Orbital median/p95/max are 318/428/1011 ms across 96 decisions, with physical requests not identifiable.",
+      "impact": "These rows cannot establish independent request latency, retry availability or total cost by summation, and they differ from live wall timing.",
+      "fix": "Label legacy service timing accurately and add a physical-request ledger with IDs, retries, wall/service time and cost, plus decision application tick and deadline outcomes."
+    }
+  ],
+  "simulation": {
+    "title": "A rescue sortie with shared controls",
+    "description": "A versioned three-mission real-time game teaches flight and docking, adds a forced detour, then introduces moving hazards and rescue urgency. The player switches between manual and Jev control at the current state and can restore a checkpoint into a separate branch.",
+    "jevsRole": "Choose a typed recovery, return or hold goal from legal mission targets using user instructions and priorities. Preserve the original six-direction task as a separate benchmark.",
+    "codeRole": "Own fixed simulation ticks, movement/velocity, path execution, collision, oxygen, cargo, docking, mission progression, controller authority, checkpoint state and deadline fallback.",
+    "acceptanceCriteria": [
+      "An injected five-second provider delay does not stop world ticks, hazards or oxygen; expired and wrong-branch responses never apply.",
+      "Controller transfer preserves world state and manual input takes effect by the next simulation tick.",
+      "Every campaign mission has an independently verified reachable win; evaluation truncation differs from hull or oxygen loss.",
+      "Checkpoint replay reproduces state hashes and branch histories remain independent without replayed network side effects.",
+      "Dock target, collision proxy, compass and altitude match canonical coordinates; keyboard/touch navigation works without the inspector.",
+      "All three missions can be completed manually; model assistance is evaluated on mission priorities separately from code route planning."
+    ]
+  },
+  "evaluation": {
+    "design": "Freeze 20 development worlds and 150 test worlds, 50 each for easy collection, forced detours and competing core orders. Verify distinct hazards and solvability independently. Run three repeats in geometry-only and assisted-observation conditions, 900 Jev episodes and at most 63,000 logical decisions. Report paired seed-clustered uncertainty, fixed versions and option-order effects. For new real-time play, first test 1,000 local delayed-response/handoff/restore schedules, then 30 held-out three-mission campaigns with three Jev repeats and at most 20 goals per mission, 5,400 logical decisions. Keep game versions and provider failures separate.",
+    "baselines": [
+      "Random safe action",
+      "Existing distance-plus-collision greedy",
+      "Shortest safe path to nearest core",
+      "Independent exact no-damage collect-all-and-return search over position and core mask",
+      "For real-time play: manual control and code-only autopilot"
+    ],
+    "metrics": [
+      "Independent completion, cores returned, remaining hull, collision/boundary count and action count",
+      "Excess moves over the constrained oracle and repeated-state loops",
+      "Win numerator/denominator, difficulty strata and paired seed-clustered intervals",
+      "Physical request wall/service latency, retry/failure count, actual cost and decision deadline misses",
+      "For real-time play: campaign completion, rescue-priority adherence, mission time, fallback time, stale applications and takeover latency"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "Six published episodes on seeds 7,19,42, three Jev and three greedy; 96 Jev actions; both win 3/3; no unsafe immediate alternatives encountered. Audit-only code probes add 1,000 greedy seeds and a crafted detour/docking check, not Jev evidence.",
+      "full": "No external split exists. Proposed full declared grid set is 150 held-out worlds across three challenge strata, tested with two observation conditions and three repeats.",
+      "feasibility": "Exact no-damage search has at most 1,014 positions times eight core masks for current rules. Local baseline and lifecycle checks are cheap. New Jev runs require an explicit request budget and a physical-request ledger; no new model calls were made."
+    }
+  },
+  "libraries": [
+    {"name":"Three.js OrbitControls","url":"https://threejs.org/docs/pages/OrbitControls.html","use":"Use existing camera angles and reset/save controls for a compass and repeatable training view; Jev remains responsible for mission goals."},
+    {"name":"Rapier scene queries","url":"https://rapier.rs/docs/user_guides/javascript/scene_queries/","use":"Optional future continuous-flight shape casts and collision proxies; unnecessary for the preserved integer-grid benchmark."},
+    {"name":"XState persistence","url":"https://stately.ai/docs/persistence","use":"Persist mission/control phases alongside world snapshots; restore with a new request generation and explicit ownership."}
+  ],
+  "nextSteps": [
+    {"priority":"P1","size":"S","action":"Publish exact current coverage and observation assistance without altering legacy records."},
+    {"priority":"P1","size":"M","action":"Add route oracle, unique hazards, detour worlds and the frozen two-condition evaluation."},
+    {"priority":"P1","size":"L","action":"Build a versioned independent world clock, same-state takeover, deadline fallback and checkpoint branches."},
+    {"priority":"P2","size":"S","action":"Fix docking/altitude/compass/budget displays and distinguish batch service latency from request time."},
+    {"priority":"P2","size":"M","action":"Add three-mission progression and complete manual navigation/collision/docking checks."}
+  ],
+  "sources": [
+    {"label":"Three.js OrbitControls documentation","url":"https://threejs.org/docs/pages/OrbitControls.html"},
+    {"label":"Rapier scene queries documentation","url":"https://rapier.rs/docs/user_guides/javascript/scene_queries/"},
+    {"label":"XState persistence documentation","url":"https://stately.ai/docs/persistence"}
+  ]
+}

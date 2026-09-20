@@ -1,0 +1,260 @@
+{
+  "method": "Actual paintPixels and Pixels functions executed offline. Integer fillRect/clearRect software rasterizer mirrors the operations used by this renderer; React callbacks use mocked hooks/elements and deferred responses. Contact sheet is not a browser screenshot. No endpoint/model calls.",
+  "sourceHashes": {
+    "src/creative.tsx": "b9da4b93d6ac50841508af6534171943219b829b0c263f0b482bbfaceea54040",
+    "results/visuals.jsonl": "49c70e644f5113941b434664e8d20a5ccb22ee271e5883c9e1faf34bdee14b50"
+  },
+  "evidence": {
+    "compositions": 3,
+    "compositionAnswers": 87,
+    "oldPixelRows": 4,
+    "oldPixelSuccesses": 3,
+    "oldPixelAnswers": 192,
+    "legacyRenderedByCurrentComponent": false,
+    "humanPreference": null,
+    "enclosingChecks": {
+      "expected_scenes": 20,
+      "valid_scenes": 20
+    }
+  },
+  "readings": [
+    {
+      "mode": "scenes",
+      "questionCount": 29,
+      "answers": 29,
+      "usedFields": [
+        "palette",
+        "weather",
+        "house",
+        "tree",
+        "cat",
+        "cat_x",
+        "cat_y",
+        "robot",
+        "flower",
+        "pond",
+        "mountain",
+        "moon",
+        "cloud",
+        "cloud_x",
+        "cloud_y"
+      ],
+      "unreadAnswers": [
+        "house_x",
+        "house_y",
+        "tree_x",
+        "tree_y",
+        "robot_x",
+        "robot_y",
+        "flower_x",
+        "flower_y",
+        "pond_x",
+        "pond_y",
+        "mountain_x",
+        "mountain_y",
+        "moon_x",
+        "moon_y"
+      ],
+      "selectedObjects": [
+        "cat",
+        "cloud"
+      ],
+      "frameHash": "7f864769f72611e4d8c4a2b9cd8ff4de51c0650713f518c22696fd025f8fb846",
+      "fillRectCalls": 100,
+      "changesAtOneSecond": true,
+      "latencyMs": 564
+    },
+    {
+      "mode": "sprites",
+      "questionCount": 29,
+      "answers": 29,
+      "usedFields": [
+        "palette",
+        "house",
+        "tree",
+        "cat",
+        "robot",
+        "robot_x",
+        "robot_y",
+        "flower",
+        "pond",
+        "mountain",
+        "moon",
+        "cloud"
+      ],
+      "unreadAnswers": [
+        "weather",
+        "house_x",
+        "house_y",
+        "tree_x",
+        "tree_y",
+        "cat_x",
+        "cat_y",
+        "flower_x",
+        "flower_y",
+        "pond_x",
+        "pond_y",
+        "mountain_x",
+        "mountain_y",
+        "moon_x",
+        "moon_y",
+        "cloud_x",
+        "cloud_y"
+      ],
+      "selectedObjects": [
+        "robot"
+      ],
+      "frameHash": "e849e0a1ef1e3e5dd9b626f80fa3487bb94f2040af66996b3ebf8ae77408eef5",
+      "fillRectCalls": 10,
+      "changesAtOneSecond": false,
+      "latencyMs": 313
+    },
+    {
+      "mode": "patterns",
+      "questionCount": 29,
+      "answers": 29,
+      "usedFields": [
+        "palette"
+      ],
+      "unreadAnswers": [
+        "weather",
+        "house",
+        "house_x",
+        "house_y",
+        "tree",
+        "tree_x",
+        "tree_y",
+        "cat",
+        "cat_x",
+        "cat_y",
+        "robot",
+        "robot_x",
+        "robot_y",
+        "flower",
+        "flower_x",
+        "flower_y",
+        "pond",
+        "pond_x",
+        "pond_y",
+        "mountain",
+        "mountain_x",
+        "mountain_y",
+        "moon",
+        "moon_x",
+        "moon_y",
+        "cloud",
+        "cloud_x",
+        "cloud_y"
+      ],
+      "selectedObjects": [],
+      "frameHash": "18791c7f8c4e62ad4a9c6bc560c8d0e1579796031929d92e17e45342cd89ec09",
+      "fillRectCalls": 4097,
+      "changesAtOneSecond": true,
+      "latencyMs": 613
+    }
+  ],
+  "unusedAnswers": 59,
+  "patternInvariant": {
+    "allOtherFieldsChanged": true,
+    "samePixels": true
+  },
+  "geometry": {
+    "testedPlacements": 225,
+    "clippedPlacements": 49,
+    "clippedByObject": {
+      "house": 16,
+      "tree": 10,
+      "cat": 0,
+      "robot": 10,
+      "flower": 0,
+      "pond": 0,
+      "mountain": 13,
+      "moon": 0,
+      "cloud": 0
+    },
+    "examples": [
+      {
+        "kind": "house",
+        "x": 12,
+        "y": 12,
+        "clippedRectangles": 1
+      },
+      {
+        "kind": "house",
+        "x": 12,
+        "y": 24,
+        "clippedRectangles": 1
+      },
+      {
+        "kind": "house",
+        "x": 12,
+        "y": 36,
+        "clippedRectangles": 1
+      },
+      {
+        "kind": "house",
+        "x": 12,
+        "y": 44,
+        "clippedRectangles": 2
+      },
+      {
+        "kind": "house",
+        "x": 12,
+        "y": 52,
+        "clippedRectangles": 4
+      },
+      {
+        "kind": "house",
+        "x": 24,
+        "y": 44,
+        "clippedRectangles": 1
+      }
+    ],
+    "moonCutoutPixelAt36_20": [
+      20,
+      32,
+      50,
+      255
+    ]
+  },
+  "staleResponse": {
+    "submittedMode": "scenes",
+    "currentMode": "sprites",
+    "currentBrief": "A friendly gardening robot with warm eyes, as a game sprite.",
+    "displayedObjects": [
+      "cat",
+      "cloud"
+    ]
+  },
+  "lockDuringRequest": {
+    "checked": true,
+    "paletteAtRequest": "night",
+    "paletteAfterResponse": "warm",
+    "lockIncludedInRequest": false
+  },
+  "versionSelection": {
+    "selectedPlanPalette": "night",
+    "inspectorRunPalette": "warm",
+    "visibleBrief": "Make a warm scene."
+  },
+  "reducedMotion": {
+    "paintCallsFromSixCallbacks": 6,
+    "stillHasQueuedFrames": true
+  },
+  "contactSheet": {
+    "path": "probes/pixels.png",
+    "dimensions": [
+      768,
+      512
+    ],
+    "order": "Left to right, top row then bottom row",
+    "panels": [
+      "Recorded scenes, time 0",
+      "Recorded sprites, time 0",
+      "Recorded patterns, time 0",
+      "Prepared initial scene, time 0",
+      "Legal robot_y=12 placement clips top",
+      "Moon sprite cutout paints opaque background"
+    ]
+  }
+}

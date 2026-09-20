@@ -1,0 +1,8 @@
+{
+  "changed_or_new_source_files": 416,
+  "built_files": 734,
+  "literal_credentials_checked": 16,
+  "credential_match_files": [],
+  "new_binary_files_at_least_2MB": [],
+  "note": "Exact local literal credential scan plus binary-size policy. Not a comprehensive security audit."
+}

@@ -1,0 +1,21 @@
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { readRecord, writeRecord } from "../experience-prototypes/scripts/records";
+import { PRESETS, PROTOCOL, type SearchMode, type SearchScores } from "./protocol";
+import { rankWorks, lexicalScores, compareRankings, captionQuality } from "./ranking";
+const here = import.meta.dir, collection = readRecord(resolve(here, "collection.jsonl")), works = collection.result.works;
+const imageRecord = existsSync(resolve(here, "image-mirrors.jsonl")) ? readRecord(resolve(here, "image-mirrors.jsonl")) : null;
+if (imageRecord && imageRecord.manifest.collection_sha256 !== createHash("sha256").update(readFileSync(resolve(here, "collection.jsonl"))).digest("hex")) throw new Error("Image delivery sidecar belongs to a different collection");
+const imageMirrors = imageRecord?.result;
+const events: any[] = existsSync(resolve(here, "events.jsonl")) ? readFileSync(resolve(here, "events.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(s => JSON.parse(s)) : [];
+const successful = events.filter(e => e.event === "completed"), ids = new Set(successful.map(e => e.id)); if (ids.size !== successful.length) throw new Error("Duplicate successful ranking score");
+const queries = PRESETS.map(preset => {
+  const scores = Object.fromEntries(["metadata", "caption"].map(mode => [mode, Object.fromEntries(successful.filter(e => e.query_id === preset.id && e.mode === mode).map(e => [e.artwork_id, e.score]))])) as Record<SearchMode, SearchScores>;
+  const ranked = { metadata: rankWorks(works, scores.metadata), caption: rankWorks(works, scores.caption), lexical: rankWorks(works, lexicalScores(works, preset.query)) };
+  const records = successful.filter(e => e.query_id === preset.id), batches = events.filter(e => e.query_id === preset.id && e.event === "batch_completed");
+  return { ...preset, scores, source: "recorded", availability: { planned: works.length * 2, completed: records.length }, comparison: compareRankings(ranked.metadata, ranked.caption), recorded_at: batches.at(-1)?.finished_at ?? null, latency_ms: batches.reduce((n, b) => n + b.response.latency_ms, 0), returned_models: [...new Set(records.map(e => e.model))] };
+});
+const result = { ...collection.result, works: works.map((work: any) => ({ ...work, ...(imageMirrors?.mirrors.find((image: any) => image.artwork_id === work.id) ? { imageMirror: imageMirrors.mirrors.find((image: any) => image.artwork_id === work.id) } : {}) })), image_delivery: imageMirrors ? { matched: imageMirrors.matched, total: imageMirrors.total, method: imageMirrors.method, museum_image_issue: imageMirrors.museum_image_issue } : null, version: PROTOCOL.version, protocol: PROTOCOL, manifest: existsSync(resolve(here, "manifest.json")) ? JSON.parse(readFileSync(resolve(here, "manifest.json"), "utf8")) : null, queries, availability: { planned: works.length * PRESETS.length * 2, completed: successful.length, batches: events.filter(e => e.event === "batch_completed").length, attempts: events.filter(e => e.event === "attempt").length, failures: events.filter(e => e.event === "failed").length }, caption_counts: { descriptive: works.filter((w: any) => captionQuality(w) === "Descriptive museum caption").length, material_only: works.filter((w: any) => captionQuality(w) === "Material description").length }, archive: "/visual-search/evidence.jsonl", collection_archive: "/visual-search/collection.jsonl" };
+writeRecord(resolve(here, "results.jsonl"), { manifest: { experiment: "visual-search", prepared_at: new Date().toISOString() }, result });
+console.log(JSON.stringify({ artworks: works.length, queries: queries.length, availability: result.availability }));
