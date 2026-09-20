@@ -142,6 +142,9 @@
   justify-content: center;
   gap: 8px;
 }
+.wardrobe-stage-actions.with-playback-controls {
+  bottom: 76px;
+}
 .wardrobe-stage-actions button {
   font-size: 11px;
   color: #363c33;

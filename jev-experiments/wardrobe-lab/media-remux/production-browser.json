@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-09-20T22:12:03.171670+00:00",
+  "deployment": "8c208b52beb71e6f9126a64da4f50f93dc29faf9",
+  "origin": "https://jev-experiments.vercel.app/#experiment/wardrobe",
+  "forward": {
+    "duration": 29.954,
+    "time": 20.402632,
+    "readyState": 4,
+    "error": null,
+    "width": 720,
+    "height": 1280,
+    "paused": false,
+    "seekableEnd": 29.954
+  },
+  "backward": {
+    "time": 4,
+    "readyState": 4,
+    "error": null
+  },
+  "overflow": false,
+  "providerCalls": 0
+}

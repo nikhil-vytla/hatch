@@ -636,7 +636,7 @@ export function Wardrobe({ result }: { result: any }) {
               </AnimatePresence>
             </div>
           )}
-          <div className="wardrobe-stage-actions">
+          <div className={`wardrobe-stage-actions ${preview ? "with-playback-controls" : ""}`}>
             {videoStatus === "off" ? (
               <button
                 onClick={() => {

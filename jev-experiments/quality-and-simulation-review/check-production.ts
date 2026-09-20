@@ -1,5 +1,6 @@
 /** Exercise published assets and unauthenticated boundaries. No provider calls or real keys. */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 const origin = "https://jev-experiments.vercel.app";
 const checks = [
   { path: "/", status: 200 },
@@ -26,7 +27,15 @@ for (const check of checks) {
   const cacheControl = response.headers.get("cache-control");
   results.push({ path: check.path, method: check.body ? "POST" : "GET", expectedStatus: check.status, status: response.status, bytes: Buffer.byteLength(body), ...(check.path.startsWith("/api/") ? { cacheControl, error: data?.error } : {}), ...(check.path === "/data/live-worlds.json" ? { result } : {}), ...(check.path === "/data/judgment-reliability.json" ? { availability: result?.availability } : {}), passed: response.status === check.status && (!check.path.startsWith("/api/") || cacheControl === "no-store") });
 }
-const report = { at: new Date().toISOString(), origin, passed: results.every(result => result.passed), results };
+const media = [];
+for (const [filename, manifest] of [["try-on-demo.webm", "recording.json"], ["spoken-try-on-demo.webm", "spoken-recording.json"]]) {
+  const expected = JSON.parse(readFileSync(new URL(`../wardrobe-lab/${manifest}`, import.meta.url), "utf8"));
+  const response = await fetch(`${origin}/wardrobe/${filename}`, { cache: "no-store", signal: AbortSignal.timeout(30000) });
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  media.push({ path: `/wardrobe/${filename}`, status: response.status, bytes: bytes.length, sha256, expectedDurationSeconds: expected.containerDurationSeconds, passed: response.ok && bytes.length === expected.videoBytes && sha256 === expected.videoSha256 });
+}
+const report = { at: new Date().toISOString(), origin, passed: results.every(result => result.passed) && media.every(result => result.passed), results, media };
 writeFileSync(new URL("./production-check.json", import.meta.url), JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify(report, null, 2));
 if (!report.passed) process.exitCode = 1;
