@@ -1,0 +1,10 @@
+{
+  "cases": 400,
+  "questions_per_case": 5,
+  "case_latency_ms": {
+    "median": 186.79343751864508,
+    "p95": 547.1734579768963
+  },
+  "peak_mlx_gib": 3.7031917199492455,
+  "method": "Batch of five full state/question rows, dynamic padding; float32. Model loading and first warm-up excluded. Head weights are the selected fine-tune."
+}
