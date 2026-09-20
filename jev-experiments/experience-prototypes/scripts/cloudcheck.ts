@@ -1,6 +1,6 @@
 import "./credentials";
 import { readFileSync, writeFileSync } from "node:fs";
-const origin = process.argv[2] ?? "https://jev-experiences.vercel.app";
+const origin = process.argv[2] ?? "https://jev-experiments.vercel.app";
 const headers = {
   "Content-Type": "application/json",
   Authorization: `Bearer ${process.env.LAB_ACCESS_TOKEN}`,

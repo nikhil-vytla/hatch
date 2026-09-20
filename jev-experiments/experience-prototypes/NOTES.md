@@ -26,3 +26,8 @@
 - Browser verification of the deployed UI preserved the edited name across a real Jev revision, removed the requested switch, and added a second version. All three layout switches also preserved the edited field value. The adaptive journey followed hot → dairy-free → caffeine-free to herbal tea, stopping with one matching option.
 - Final deployment: https://jev-experiences.vercel.app (Vercel deployment dpl_9P2G1DSp21d93sr1YcPXkAn8oi9j). Public HTML, complete composition records, 200 full JudgeBench candidate pairs, the research report, the companion ZIP, and the companion sample form all return HTTP 200.
 - The comparison variant now puts controls above a full-width comparison, while studio retains its sidebar and notebook puts the question and artifact before its controls. This makes the choices about information order rather than just column widths.
+
+## Canonical application follow-up
+
+- The user requested one application at https://jev-experiments.vercel.app. The source now links to the original Vercel project; documentation, companion defaults, and smoke checks use that origin.
+- Added `bun run deploy`, which pins the existing project and prepares local evidence before deploying. Follow-up deployment verification is recorded in `canonical-deployment/NOTES.md`.
