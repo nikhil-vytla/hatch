@@ -1,0 +1,19 @@
+{
+  "name": "jev-experiment-gallery",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "bun scripts/copy-results.ts && tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "3.8.1",
+    "p5": "1.11.11"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/p5": "^1.7.7",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.0"
+  }
+}
