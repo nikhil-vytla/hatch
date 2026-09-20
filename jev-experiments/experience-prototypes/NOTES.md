@@ -1,0 +1,33 @@
+# Experience prototype notes
+
+## 2026-09-20
+
+- Starting the implementation pass after the research and design conversation. The user prioritizes creative, animated, understandable experiences and explicitly permits breaking compatibility.
+- Prototype questions: which page layout makes experimentation inviting; how should users inspect evidence, compare candidates, and revise artifacts; how should temporary provider failures stay out of the primary experience without biasing results?
+- Use three structurally different layouts on the same experiment route: studio, comparison desk, evidence notebook. Add light/dark/system themes.
+- Reuse React, json-render, TanStack Table, React Flow, and Tone where they solve a concrete need. Dependencies and upstream checkouts are excluded from commits.
+- Busy API responses are operational attempts, not model judgments. Retry transient errors with backoff, preserve all attempts, and publish completed records with availability reported separately.
+
+- Implemented a new Bun/React app on `jev-experience-prototypes`, preserving the original experiment routes and data identifiers while replacing their presentation. Warm light and charcoal dark themes share the same controls and evidence.
+- Published `@json-render/core` 0.21.0 includes the experimental Jev composer even though its documentation describes unreleased support. Batched composition produced an unreachable tree. Sequential composition completed settings and event forms; apartment composition hit a provider cooldown. Partial compositions remain explicitly labeled, separate from finished examples.
+- Added real recorded Jev decisions for paste mapping, semantic table review, selective undo, and changed-fact impact. Added full pinned JudgeBench questions and both candidate answers to all 200 cases.
+- Recovery passes reuse exact original request bodies and only select rows with transient transport failures. The first pass recovered 22 cases. Provider Retry-After sometimes exceeds the 48-second function deadline, so the server now returns the cooldown and the offline resume worker waits before continuing. Completed incorrect answers are never retried.
+- Six Bun tests pass for retry timing, deadline handoff, cancellation, permanent rejection, answer validation, and payload bounds. Browser interaction review is ongoing.
+- Built a Manifest V3 paste companion with explicit capture, local personal notes, per-field review, native input events, and undo. No gateway key enters the extension. Website-specific custom controls and cross-origin frames are outside this prototype.
+- Vercel project `jev-experiences` created. Automatic GitHub connection failed; direct CLI deployment remains available and does not require that integration.
+
+- Final recovery audit: 119 transport failures recovered across classification (69), JudgeBench (14), robustness (23), routing (1), and scenes (12). All original completed predictions are byte-equivalent in their prediction/answer fields. Returned-answer accuracy after recovery is 81.56% BANKING77, 88.5% CLINC, and 77% JudgeBench; order disagreement is 28%.
+- Added an adaptive café journey with all 81 preference states evaluated in one Jev request. The independent finite-menu audit found valid terminal or unanswered-question decisions in all 81 states. This is not an information-gain optimality claim.
+- Compositional quality improved with a second catalog: one reusable row and column, shallow-layout guidance, and complete apartment-card candidates. The apartment comparison then finished. Account and event examples retain their earlier completed records; earlier partial attempts remain inspectable.
+- Recorded three new pixel composition plans. Added MIDI export using @tonejs/midi. Browser playback advanced and stopped correctly; the downloaded MIDI decoded into Melody 32 notes, Harmony 24, Bass 8, and Rhythm 16 at approximately 70 BPM.
+- All 29 pages loaded without browser JavaScript exceptions at desktop width. No horizontal overflow appeared at 1440px or 390px. Dark-theme visual inspection caught a hardcoded root foreground/background pair; replacing it with theme variables fixed the contrast.
+- The extension content script filled five synthetic fields, dispatched native events, and undid accepted values while keeping a later manual edit. Extension messaging was stubbed for this browser check; actual Chrome installation and permission prompts remain manual compatibility checks.
+- Vercel cloud checks: anonymous calls 401, invalid authenticated requests 400, live Jev 200. A real streamed revision removed the notifications switch and preserved the edited name. Two events arrived, the first after 508ms and completion after 832ms. These timings are a single smoke check.
+- Browser verification of the deployed UI preserved the edited name across a real Jev revision, removed the requested switch, and added a second version. All three layout switches also preserved the edited field value. The adaptive journey followed hot → dairy-free → caffeine-free to herbal tea, stopping with one matching option.
+- Final deployment: https://jev-experiences.vercel.app (Vercel deployment dpl_9P2G1DSp21d93sr1YcPXkAn8oi9j). Public HTML, complete composition records, 200 full JudgeBench candidate pairs, the research report, the companion ZIP, and the companion sample form all return HTTP 200.
+- The comparison variant now puts controls above a full-width comparison, while studio retains its sidebar and notebook puts the question and artifact before its controls. This makes the choices about information order rather than just column widths.
+
+## Canonical application follow-up
+
+- The user requested one application at https://jev-experiments.vercel.app. The source now links to the original Vercel project; documentation, companion defaults, and smoke checks use that origin.
+- Added `bun run deploy`, which pins the existing project and prepares local evidence before deploying. Follow-up deployment verification is recorded in `canonical-deployment/NOTES.md`.

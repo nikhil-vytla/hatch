@@ -1,0 +1,1 @@
+[Jev experiments](https://jev-experiments.vercel.app) now uses one canonical application address on its existing Vercel project. The interactive experience work is deployed there, and the companion defaults and current documentation point to the same site. A Bun deployment script pins the original project so subsequent updates continue building on that application.

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><title>Jev paste</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      width: 330px;
+      margin: 20px;
+      font: 13px/1.5 system-ui;
+      background: light-dark(#f8f8f3, #202722);
+      color: light-dark(#27342a, #ecede5);
+    }
+    h1 {
+      font-size: 23px;
+      margin: 0;
+    }
+    p {
+      opacity: 0.75;
+    }
+    label {
+      display: block;
+      margin: 10px 0;
+    }
+    input,
+    textarea {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 8px;
+      font: inherit;
+      border: 1px solid #82928366;
+      border-radius: 6px;
+    }
+    button {
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 6px;
+      font: inherit;
+      cursor: pointer;
+      background: #547763;
+      color: white;
+      margin: 4px 3px 4px 0;
+    }
+    #status {
+      min-height: 22px;
+    }
+    details {
+      margin-top: 14px;
+    }
+    input[type="checkbox"] {
+      width: auto;
+    }
+    small {
+      opacity: 0.75;
+    }
+    #clear {
+      background: transparent;
+      color: inherit;
+      text-decoration: underline;
+    }
+  </style>
+  <h1>Paste what belongs.</h1>
+  <p>
+    Capture a selection on one page. Open this popup on another page to review
+    suggestions.
+  </p>
+  <button id="capture">Capture selection</button
+  ><button id="field">Suggest focused field</button
+  ><button id="form">Suggest this form</button>
+  <div id="status" role="status"></div>
+  <details open>
+    <summary>Source and memory</summary>
+    <label
+      >Captured information<textarea
+        id="source"
+        rows="5"
+        placeholder="Name: Alex Morgan&#10;Email: alex@example.com"
+      ></textarea></label
+    ><small id="sourceUrl"></small
+    ><label
+      ><input id="useMemory" type="checkbox" /> Use my personal notes
+      instead</label
+    ><label
+      >Personal notes<textarea
+        id="memory"
+        rows="3"
+        placeholder="Dietary preference: Vegetarian"
+      ></textarea></label
+    ><button id="saveNotes">Save notes</button>
+  </details>
+  <details>
+    <summary>Connection</summary>
+    <label
+      >Playground URL<input
+        id="endpoint"
+        type="url"
+        value="https://jev-experiments.vercel.app" /></label
+    ><label
+      >Vercel AI Gateway API key<input
+        id="apiKey"
+        type="password"
+        autocomplete="off" /></label
+    ><button id="connect">Connect</button><button id="disconnect">Disconnect</button
+    ><small
+      >Your API key is saved in this browser’s extension storage. Requests
+      pass through the selected playground to Vercel AI Gateway. Disconnect
+      removes the saved key.</small
+    >
+  </details>
+  <button id="clear">Clear captured information and notes</button>
+  <p>
+    <small
+      >Fields change only after you accept a suggestion. This companion never
+      submits a form. Notes remain in this browser until you clear them;
+      relevant notes are sent to Jev when you ask for suggestions.</small
+    >
+  </p>
+  <script type="module" src="popup.js"></script>
+</html>

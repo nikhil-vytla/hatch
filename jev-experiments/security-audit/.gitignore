@@ -1,0 +1,4 @@
+# Regenerable advisory dumps; keep the concise triage in README.md.
+osv-lockfile-results.json
+go-symbol-check.json
+production-headers.txt

@@ -1,0 +1,44 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "bytes": 963,
+    "assets_ok": true
+  },
+  {
+    "path": "/data/journeys.json",
+    "status": 200,
+    "bytes": 40288
+  },
+  {
+    "path": "/data/composed-ui.json",
+    "status": 200,
+    "bytes": 41309
+  },
+  {
+    "path": "/data/judge.json",
+    "status": 200,
+    "bytes": 1001338
+  },
+  {
+    "path": "/research/EXPERIENCE_PROTOTYPES.md",
+    "status": 200,
+    "bytes": 13148
+  },
+  {
+    "path": "/research/COMPANION.md",
+    "status": 200,
+    "bytes": 1752
+  },
+  {
+    "path": "/companion.zip",
+    "status": 200,
+    "bytes": 8143,
+    "canonical_companion_origin": true
+  },
+  {
+    "path": "/companion-demo/destination.html",
+    "status": 200,
+    "bytes": 1997
+  }
+]

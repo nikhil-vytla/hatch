@@ -1,0 +1,36 @@
+[project]
+name = "jev-experiments"
+version = "0.1.0"
+description = "Measured experiments with typed decisions, local models, and procedural worlds"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.28", "fastapi>=0.115", "uvicorn>=0.34", "pydantic>=2.11",
+  "numpy>=2", "scikit-learn>=1.6", "minigrid>=3", "gepa>=0.0.17",
+  "nltk>=3.9", "langdetect>=1.0.9", "absl-py>=2", "immutabledict>=4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.25", "ruff>=0.11"]
+train = ["torch>=2.6,<2.9", "transformers>=4.51,<4.58", "peft>=0.15", "accelerate>=1.0"]
+
+[project.scripts]
+jev-lab = "jev_lab.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jev_lab"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# Batch experiments record arbitrary per-case failures; malformed provider values
+# consistently raise ValueError, including malformed JSON types.
+ignore = ["BLE001", "TRY004"]

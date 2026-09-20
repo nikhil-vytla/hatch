@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vercel/
+.env*
+public/data/
+public/research/
+public/companion.zip
+.cache/
+.vercel
+
+.playwright-cli/
+output/

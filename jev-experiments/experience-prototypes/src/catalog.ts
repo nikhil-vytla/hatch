@@ -1,0 +1,281 @@
+export type Experiment = {
+  id: string;
+  data: string;
+  title: string;
+  category: string;
+  description: string;
+  question: string;
+  accent: string;
+  kind: string;
+};
+const e = (
+  id: string,
+  data: string,
+  title: string,
+  category: string,
+  description: string,
+  question: string,
+  kind = id,
+): Experiment => ({
+  id,
+  data,
+  title,
+  category,
+  description,
+  question,
+  kind,
+  accent:
+    category === "Create"
+      ? "coral"
+      : category === "Agents"
+        ? "sage"
+        : category === "Learn"
+          ? "blue"
+          : "gold",
+});
+export const experiments = [
+  e(
+    "paste",
+    "paste",
+    "Paste what belongs",
+    "New",
+    "A whole page copied. Exactly the right thing pasted.",
+    "Can a decision model match facts to fields and recognize when it needs help?",
+  ),
+  e(
+    "ui",
+    "ui",
+    "Interfaces that listen",
+    "Create",
+    "Build it. Use it. Change your mind.",
+    "Can Jev assemble and revise a working interface without losing your edits?",
+  ),
+  e(
+    "worlds",
+    "visuals",
+    "A world in motion",
+    "Create",
+    "A little place, alive with small decisions.",
+    "Can a handful of semantic choices coordinate a living scene?",
+  ),
+  e(
+    "games",
+    "games",
+    "Find a way through",
+    "Agents",
+    "Watch an agent find the key, the door, and the way out.",
+    "Does remembering what happened help an agent navigate?",
+  ),
+  e(
+    "music",
+    "music",
+    "A small orchestra",
+    "Create",
+    "One motif, many ways to make it move.",
+    "Can typed musical decisions become a coherent arrangement?",
+  ),
+  e(
+    "pixels",
+    "visuals",
+    "Picture by picture",
+    "Create",
+    "Scenes, sprites, and patterns that evolve.",
+    "How does staged composition compare with independent pixel choices?",
+  ),
+  e(
+    "semantic-table",
+    "semantic-table",
+    "A table that understands",
+    "New",
+    "Ask a question of every row. Inspect every answer.",
+    "Can semantic columns reduce the work of reviewing messy records?",
+  ),
+  e(
+    "undo",
+    "undo",
+    "Undo what you meant",
+    "New",
+    "Keep the layout. Rewind just the colors.",
+    "Can Jev select the intended edits without undoing unrelated work?",
+  ),
+  e(
+    "changes",
+    "changes",
+    "What changed that matters?",
+    "New",
+    "One changed fact. See what needs a second look.",
+    "Can we detect which conclusions a source edit invalidates?",
+  ),
+  e(
+    "logos",
+    "logos",
+    "Marks with character",
+    "Create",
+    "Explore a family of symbols, then make one yours.",
+    "Which design decisions make a mark fit its brief?",
+  ),
+  e(
+    "beverage",
+    "beverage",
+    "Find my drink",
+    "Decide",
+    "A craving becomes a choice, one useful question at a time.",
+    "Can we match preferences without inventing menu facts?",
+  ),
+  e(
+    "journeys",
+    "journeys",
+    "The next useful question",
+    "Decide",
+    "A form that asks only what changes the answer.",
+    "Can clarification reduce uncertainty with less effort?",
+  ),
+  e(
+    "decisions",
+    "decisions",
+    "What matters to you",
+    "Decide",
+    "Move your priorities. Watch the recommendation change.",
+    "How sensitive is a recommendation to what you value?",
+  ),
+  e(
+    "routing",
+    "routing",
+    "The right mind for the job",
+    "Agents",
+    "A task arrives. Jev chooses where it goes.",
+    "Can Jev identify the appropriate handler for a request?",
+  ),
+  e(
+    "verify",
+    "verify",
+    "Show your evidence",
+    "Agents",
+    "A completion claim, put under the microscope.",
+    "Does the trace actually support what the agent says it did?",
+  ),
+  e(
+    "search",
+    "search",
+    "Find the useful passage",
+    "Agents",
+    "Read the evidence behind the search result.",
+    "Which source actually answers the question?",
+  ),
+  e(
+    "context",
+    "search",
+    "Make room for what matters",
+    "Agents",
+    "Trim context while keeping the facts that count.",
+    "What evidence disappears as the context gets smaller?",
+  ),
+  e(
+    "micro",
+    "micro",
+    "Small agents, one task",
+    "Agents",
+    "Follow the handoffs from request to answer.",
+    "Can bounded decisions compose into useful behavior?",
+  ),
+  e(
+    "vision",
+    "vision",
+    "Look a little closer",
+    "Agents",
+    "An image becomes evidence for the next action.",
+    "What does Jev lose when a vision model reduces an image to words?",
+  ),
+  e(
+    "classify",
+    "classify",
+    "Read between the labels",
+    "Measure",
+    "Actual requests, predicted intents, and the mistakes between.",
+    "When does Jev beat a simple classifier, and where does it miss?",
+  ),
+  e(
+    "judge",
+    "judge",
+    "Which answer holds up?",
+    "Measure",
+    "Read both answers. Make your own call.",
+    "Does Jev choose the correct answer, regardless of its position?",
+  ),
+  e(
+    "robustness",
+    "robustness",
+    "Same meaning, new disguise",
+    "Measure",
+    "Change the wrapping. See whether the judgment survives.",
+    "Which changes to a question alter the answer?",
+  ),
+  e(
+    "latency",
+    "latency",
+    "Many questions, one moment",
+    "Measure",
+    "Explore the relationship between batching and waiting.",
+    "How much work can one request carry?",
+  ),
+  e(
+    "optimize",
+    "optimize",
+    "Teach the question to improve",
+    "Learn",
+    "Follow the search for a better way to ask.",
+    "Does optimizing a prompt improve unseen cases?",
+  ),
+  e(
+    "teach",
+    "teach",
+    "A teacher in the loop",
+    "Learn",
+    "Cheap labels become a local model.",
+    "Which examples are worth labeling next?",
+  ),
+  e(
+    "reward",
+    "reward",
+    "Reward is not the result",
+    "Learn",
+    "Watch learning and independent success side by side.",
+    "Does optimizing Jev’s feedback improve the task itself?",
+  ),
+  e(
+    "replica",
+    "replica",
+    "A little model learns decisions",
+    "Learn",
+    "Inspect what the replica learned, and what it did not.",
+    "Can a small local model learn choices, probabilities, and scores?",
+  ),
+  e(
+    "language",
+    "language",
+    "A writer and an editor",
+    "Create",
+    "Read the alternatives a small writer considered.",
+    "Can Jev select a better answer from a local model’s candidates?",
+  ),
+  e(
+    "adapters",
+    "adapters",
+    "Types become questions",
+    "Build",
+    "One semantic contract, four programming languages.",
+    "Can typed schemas preserve the meaning of a decision?",
+  ),
+];
+export const categories = [
+  "All",
+  "New",
+  "Create",
+  "Agents",
+  "Decide",
+  "Measure",
+  "Learn",
+  "Build",
+];
+export const lookup = (id: string) =>
+  experiments.find((e) => e.id === id) ?? experiments[0];

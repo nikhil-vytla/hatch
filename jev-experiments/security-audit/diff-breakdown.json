@@ -1,0 +1,101 @@
+{
+  "head": "f6926cc548682df8ac5921b09c02d5ad0f0aed13",
+  "base": "7a63c9cbe5971718f8b26a7382e99098ae18a152",
+  "files": 177,
+  "lines": 284666,
+  "bytes": 14946528,
+  "groups": {
+    "Reports, configuration, and artifacts": {
+      "files": 37,
+      "lines": 780,
+      "bytes": 1423310
+    },
+    "Research runners and adapters": {
+      "files": 37,
+      "lines": 5288,
+      "bytes": 196578
+    },
+    "Lockfiles": {
+      "files": 6,
+      "lines": 3018,
+      "bytes": 485126
+    },
+    "Current web application": {
+      "files": 39,
+      "lines": 11532,
+      "bytes": 313093
+    },
+    "Recorded results": {
+      "files": 40,
+      "lines": 260219,
+      "bytes": 12306097
+    },
+    "Earlier web application": {
+      "files": 18,
+      "lines": 3829,
+      "bytes": 222324
+    }
+  },
+  "largest_files": [
+    {
+      "path": "jev-experiments/results/classify.json",
+      "lines": 95473,
+      "bytes": 3418696,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/results/games.json",
+      "lines": 84041,
+      "bytes": 2102824,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/results/robustness.json",
+      "lines": 16202,
+      "bytes": 598700,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/results/decisions.json",
+      "lines": 10411,
+      "bytes": 345288,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/results/language.json",
+      "lines": 7515,
+      "bytes": 529623,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/results/judge.json",
+      "lines": 7299,
+      "bytes": 198950,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/results/visuals.json",
+      "lines": 6060,
+      "bytes": 163582,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/results/optimize.json",
+      "lines": 5663,
+      "bytes": 218226,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/results/replica.json",
+      "lines": 4661,
+      "bytes": 129018,
+      "category": "Recorded results"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/style.css",
+      "lines": 3433,
+      "bytes": 60037,
+      "category": "Current web application"
+    }
+  ]
+}
