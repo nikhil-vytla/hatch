@@ -1,0 +1,175 @@
+{
+  "audit_version": 1,
+  "audited_at": "2026-09-20",
+  "publication_manifest": "jev-experiments/experience-prototypes/publication.json",
+  "scope": {
+    "dataset_count": 33,
+    "string_field_count": 37630,
+    "character_count": 1925540,
+    "language": {
+      "rows": 60,
+      "prompts": 60,
+      "candidates": 240,
+      "references": 60
+    },
+    "judge": {
+      "rows": 200,
+      "unique_questions": 98,
+      "candidate_answers": 400
+    },
+    "classify": {
+      "rows": 785,
+      "banking77_rows": 385,
+      "clinc150_rows": 400
+    }
+  },
+  "reviewed_datasets": [
+    {"name":"adapters","strings":47,"characters":1082},
+    {"name":"beverage","strings":344,"characters":5392},
+    {"name":"changes","strings":10,"characters":75},
+    {"name":"classify","strings":8085,"characters":236470},
+    {"name":"cloudcheck","strings":92,"characters":1029},
+    {"name":"composed-ui","strings":548,"characters":6534},
+    {"name":"decisions","strings":1524,"characters":59826},
+    {"name":"deployment-check","strings":2,"characters":5},
+    {"name":"evidence-audit","strings":1,"characters":110},
+    {"name":"games","strings":15671,"characters":147500},
+    {"name":"history","strings":309,"characters":12422},
+    {"name":"index","strings":91,"characters":1862},
+    {"name":"journeys","strings":295,"characters":2138},
+    {"name":"judge","strings":3014,"characters":865278},
+    {"name":"language","strings":1383,"characters":339126},
+    {"name":"latency","strings":14,"characters":1476},
+    {"name":"logos","strings":76,"characters":1281},
+    {"name":"micro","strings":32,"characters":1188},
+    {"name":"music","strings":220,"characters":3562},
+    {"name":"optimize","strings":945,"characters":40385},
+    {"name":"paste","strings":48,"characters":1138},
+    {"name":"replica","strings":344,"characters":29301},
+    {"name":"reward","strings":196,"characters":5634},
+    {"name":"robustness","strings":1792,"characters":120732},
+    {"name":"routing","strings":111,"characters":2655},
+    {"name":"search","strings":114,"characters":1501},
+    {"name":"semantic-table","strings":14,"characters":98},
+    {"name":"teach","strings":297,"characters":6860},
+    {"name":"ui","strings":504,"characters":8779},
+    {"name":"undo","strings":11,"characters":76},
+    {"name":"verify","strings":132,"characters":3559},
+    {"name":"vision","strings":22,"characters":672},
+    {"name":"visuals","strings":1342,"characters":17794}
+  ],
+  "finding_counts": {
+    "grouped_cases": 10,
+    "sensitive": 8,
+    "offensive": 1,
+    "unsafe": 1
+  },
+  "findings": [
+    {
+      "dataset": "classify",
+      "stable_path": "result.experiments.clinc150.rows[263]",
+      "row_id": 263,
+      "severity": "sensitive",
+      "categories": ["violence", "terrorism"],
+      "explanation": "A user utterance asks about fatalities from the Boston Marathon bombing. It is a neutral information request, but it names a real mass-casualty attack.",
+      "fields": ["text"]
+    },
+    {
+      "dataset": "language",
+      "stable_path": "result.rows[20]",
+      "row_id": "ifeval/3204",
+      "severity": "sensitive",
+      "categories": ["slavery", "historical violence"],
+      "explanation": "The prompt and generated prose discuss the abolition and harms of slavery in an educational context. The answers oppose slavery and do not contain hateful language.",
+      "fields": ["prompt", "candidates[0]", "candidates[1]", "candidates[2]", "candidates[3]", "reference.text"]
+    },
+    {
+      "dataset": "language",
+      "stable_path": "result.rows[22]",
+      "row_id": "ifeval/1834",
+      "severity": "unsafe",
+      "categories": ["unsafe maintenance advice", "chemical and burn hazard"],
+      "explanation": "All four candidates confidently endorse inaccurate rust-removal guidance for a safety-critical bicycle part. Candidate 3 additionally recommends diluted bleach and applying a hot iron to the chain, which could cause injury or damage.",
+      "fields": ["candidates[0]", "candidates[1]", "candidates[2]", "candidates[3]"]
+    },
+    {
+      "dataset": "language",
+      "stable_path": "result.rows[26]",
+      "row_id": "ifeval/1858",
+      "severity": "offensive",
+      "categories": ["harassment", "demeaning insults"],
+      "explanation": "The reference answer is a sustained second-person attack that calls the recipient ignorant, dishonest, and incapable of basic reasoning. The prompt asks for anger, but the reference escalates into personal degradation.",
+      "fields": ["reference.text"]
+    },
+    {
+      "dataset": "judge",
+      "stable_path": "result.rows[110:112]",
+      "row_ids": ["a22906b1-02f2-59da-ba1f-7a75487ba740/False", "a22906b1-02f2-59da-ba1f-7a75487ba740/True"],
+      "severity": "sensitive",
+      "categories": ["slavery", "racism", "colonialism"],
+      "explanation": "A historical source passage quotes a dehumanizing defense of enslavement and asks about the Spanish conquest. The candidate answers analyze and reject the underlying claim.",
+      "fields": ["question", "candidate_a", "candidate_b"]
+    },
+    {
+      "dataset": "judge",
+      "stable_path": "result.rows[112:114]",
+      "row_ids": ["bbdcd0e8-c9f8-5d3d-bf42-7bd74bd75273/False", "bbdcd0e8-c9f8-5d3d-bf42-7bd74bd75273/True"],
+      "severity": "sensitive",
+      "categories": ["murder", "mental illness"],
+      "explanation": "A legal hypothetical discusses a murder confession and hallucinations. The treatment is analytical and non-graphic.",
+      "fields": ["question", "candidate_a", "candidate_b"]
+    },
+    {
+      "dataset": "judge",
+      "stable_path": "result.rows[122:124]",
+      "row_ids": ["907c3d20-a0dc-5b21-b4ba-1e784d7cfaf6/False", "907c3d20-a0dc-5b21-b4ba-1e784d7cfaf6/True"],
+      "severity": "sensitive",
+      "categories": ["sexual behavior", "HIV and AIDS"],
+      "explanation": "A social-science question and its answers discuss multiple sexual partners and HIV/AIDS. The content is non-explicit and does not demean either gender.",
+      "fields": ["question", "candidate_a", "candidate_b"]
+    },
+    {
+      "dataset": "judge",
+      "stable_path": "result.rows[126:128]",
+      "row_ids": ["f1b17db1-5206-504d-a8b0-3213449e41f5/False", "f1b17db1-5206-504d-a8b0-3213449e41f5/True"],
+      "severity": "sensitive",
+      "categories": ["abortion", "pregnancy"],
+      "explanation": "An ethics question and its answers discuss abortion, fetal personhood, and bodily autonomy in neutral academic language.",
+      "fields": ["question", "candidate_a", "candidate_b"]
+    },
+    {
+      "dataset": "judge",
+      "stable_path": "result.rows[176:178]",
+      "row_ids": ["c2d66af7-e981-5b4f-849d-00876452ae3e/False", "c2d66af7-e981-5b4f-849d-00876452ae3e/True"],
+      "severity": "sensitive",
+      "categories": ["slavery", "sexual objectification", "degrading historical language", "colonialism"],
+      "explanation": "A conquistador memoir describes enslaved Indigenous women as property and grades them by appearance. The framing is historical, and the candidate answers describe exploitation without endorsing it.",
+      "fields": ["question", "candidate_a", "candidate_b"]
+    },
+    {
+      "dataset": "judge",
+      "stable_path": "result.rows[178:182]",
+      "row_ids": ["ff5f3ce7-1423-5df5-922d-644070dfaea0/False", "ff5f3ce7-1423-5df5-922d-644070dfaea0/True", "6071bc26-275c-5873-aa87-bca1593c1350/False", "6071bc26-275c-5873-aa87-bca1593c1350/True"],
+      "severity": "sensitive",
+      "categories": ["human sacrifice", "drug transaction", "crime"],
+      "explanation": "Two adjacent paired questions discuss human sacrifice in Aztec history and a marijuana-sale fraud hypothetical. Both are non-graphic academic material, but they may warrant a general sensitive-content notice.",
+      "fields": ["question", "candidate_a", "candidate_b"]
+    }
+  ],
+  "negative_findings": {
+    "hate_speech_or_slurs": 0,
+    "profanity": 0,
+    "explicit_sexual_content": 0,
+    "graphic_violence": 0,
+    "notes": "Political, religious, medical, disability, and historical references were not treated as offensive merely because they name a contested or sensitive subject. Historical dehumanizing quotations were marked sensitive because their benchmark context is analytical and the generated answers do not endorse them."
+  },
+  "method": {
+    "steps": [
+      "Decode every publication record using the repository's jev-records-v1 decoder.",
+      "Inventory every string field and run broad lexical screening for possible abuse, identity attacks, sexual content, violence, drugs, and unsafe instructions.",
+      "Read matches in context and inspect adjacent prompt, candidate, and reference fields.",
+      "Perform row-level topic review of all language prompts and all JudgeBench questions, with complete candidate/reference review for selected cases."
+    ],
+    "limitations": "This is a judgment-based review of the publication snapshot dated 2026-09-20. Automated screening supported, but did not replace, contextual reading. Non-language and non-JudgeBench prose received full inventory screening and contextual review of matches; it did not receive sentence-by-sentence independent annotation by multiple reviewers."
+  }
+}

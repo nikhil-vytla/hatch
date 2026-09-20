@@ -9,6 +9,7 @@ import {
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { readRecord } from "./records";
+import { enrichProvenance } from "./provenance";
 const lab = resolve(".."),
   dest = resolve("public/data");
 const publication: Record<string, string> = JSON.parse(
@@ -28,6 +29,7 @@ for (const [name, source] of Object.entries(publication)) {
     if (!existsSync(source))
       throw new Error(`Missing recorded evidence: ${source}`);
     const document = readRecord(source);
+    if (document.result) enrichProvenance(name, document.result, lab);
     if (
       [
         "routing",

@@ -37,7 +37,8 @@ The strongest lesson is to keep a simple baseline. On Banking77, trained TF-IDF 
 | CLINC in-scope only | 84.00% over 300 attempts | TF-IDF logistic 89.67% |
 | CLINC OOS only | 78.00% over 100 attempts | TF-IDF logistic 13.00% |
 | JudgeBench | 72.00% over 200 ordered attempts; 77.42% among 186 answered | 100 underlying pairs, each asked both ways; 27.78% order disagreement among pairs answered in both orders |
-| Local writing, official IFEval checks | Jev selection passed 23/40 | First Qwen candidate 21/40; best-of-four oracle 30/40; Gemini Flash-Lite reference 35/40 |
+| Archived writing pilot, IFEval checks | Jev selection passed 23/40 | First Qwen candidate 21/40; best-of-four oracle 30/40; Gemini Flash-Lite reference 35/40 |
+| RewardBench 2, current experiment 28 | 80.90% six-category mean; 1,865/1,865 cases complete | Supplied upstream labels; full scoring parity and content audit in the [report](rewardbench2/README.md) |
 | SmolLM2 decision model | Four-way choice 32.47% before, 66.23% after | 77 held-out records; yes/no stayed at 40.26%, score argmax rose from 33.77% to 45.45% |
 | Reward training | 63.75% independent menu accuracy after 240 updates | 44 successful training annotations; 80 held-out authored examples; a linear policy, not LLM RLHF |
 | Teacher labeling | Random acquisition 53.75%; uncertainty acquisition 52.50% | 32 attempted labels per method, shared initial eight, 80 held-out authored examples |
