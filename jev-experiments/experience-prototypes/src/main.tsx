@@ -33,12 +33,16 @@ import { Worlds, Pixels, Music } from "./creative";
 import { Games, GameGrid } from "./games";
 import { Benchmarks, Learning } from "./benchmarks";
 import { RewardBench } from "./rewardbench";
+import { LocalModels, ResearchMap } from "./local-models";
 import { Provenance } from "./provenance";
 import { AgentExperiment, Beverage } from "./agent-experiments";
 import { Logos, Decisions, Vision, Adapters } from "./misc";
 import { Journeys } from "./journeys";
 import { getApiKey, setApiKey } from "./api";
 import "./style.css";
+const Arcade = lazy(() =>
+  import("./arcade").then((m) => ({ default: m.Arcade })),
+);
 const cache = new Map<string, any>();
 async function load(name: string) {
   if (!cache.has(name)) {
@@ -273,6 +277,38 @@ function MiniPreview({ kind }: { kind: string }) {
         <i className="transfer-dot" />
       </div>
     );
+  if (kind === "snake")
+    return (
+      <svg className="mini-chart" viewBox="0 0 220 120" aria-hidden="true">
+        <path
+          d="M35 80H90V40H140V75H175"
+          fill="none"
+          stroke="var(--sage)"
+          strokeWidth="15"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <circle cx="175" cy="75" r="3" fill="var(--ink)" />
+        <circle cx="180" cy="30" r="7" fill="var(--coral)" />
+      </svg>
+    );
+  if (kind === "orbital")
+    return (
+      <svg className="mini-chart" viewBox="0 0 220 120" aria-hidden="true">
+        <path
+          d="M30 85 100 113 195 67 125 39ZM30 85V35L125 2 195 26V67M125 2V39M30 35 100 63 195 26M100 63V113"
+          fill="none"
+          stroke="var(--sage)"
+          strokeWidth="1"
+          opacity=".4"
+        />
+        <path d="m110 42 12 8-12 8-12-8Z" fill="var(--sage)" />
+        <path
+          d="m60 55 6 10-6 10-6-10Zm90 17 6 10-6 10-6-10Z"
+          fill="var(--coral)"
+        />
+      </svg>
+    );
   if (kind === "games")
     return (
       <div className="mini-game">
@@ -306,7 +342,16 @@ function MiniPreview({ kind }: { kind: string }) {
         </g>
       </svg>
     );
-  if (["reward", "teach", "replica", "optimize", "latency"].includes(kind))
+  if (
+    [
+      "reward",
+      "teach",
+      "replica",
+      "optimize",
+      "latency",
+      "local-models",
+    ].includes(kind)
+  )
     return (
       <svg className="mini-chart" viewBox="0 0 220 120">
         <path
@@ -328,7 +373,15 @@ function MiniPreview({ kind }: { kind: string }) {
         />
       </svg>
     );
-  if (["judge", "classify", "robustness", "rewardbench2"].includes(kind))
+  if (
+    [
+      "judge",
+      "classify",
+      "robustness",
+      "rewardbench2",
+      "benchmark-atlas",
+    ].includes(kind)
+  )
     return (
       <div className="mini-answers">
         <div>
@@ -408,7 +461,7 @@ function Home() {
       </section>
       <div className="editorial-strip">
         <span>
-          <strong>29</strong> directions to explore
+          <strong>{experiments.length}</strong> directions to explore
         </span>
         <span>
           <i className="live-dot" /> Motion, music, and meaningful decisions
@@ -417,6 +470,21 @@ function Home() {
           Read the evidence yourself <ArrowUpRight size={14} />
         </a>
       </div>
+      <nav className="latest-work" aria-label="Latest experiments">
+        <span>LATEST</span>
+        <a href="#experiment/local-models">
+          Decision models on a Mac <ArrowUpRight size={12} />
+        </a>
+        <a href="#experiment/snake">
+          Snake <ArrowUpRight size={12} />
+        </a>
+        <a href="#experiment/orbital">
+          Orbital rescue <ArrowUpRight size={12} />
+        </a>
+        <a href="#experiment/benchmark-atlas">
+          The next experiments <ArrowUpRight size={12} />
+        </a>
+      </nav>
       <section className="collection">
         <div className="collection-heading">
           <div>
@@ -515,6 +583,19 @@ function View({
   composition: any;
 }) {
   switch (exp.id) {
+    case "snake":
+    case "orbital":
+      return (
+        <Suspense
+          fallback={<div className="loading-stage">Opening the arena…</div>}
+        >
+          <Arcade key={exp.id} game={exp.id} result={result} />
+        </Suspense>
+      );
+    case "local-models":
+      return <LocalModels result={result} />;
+    case "benchmark-atlas":
+      return <ResearchMap result={result} />;
     case "paste":
       return <Paste record={result} />;
     case "semantic-table":
@@ -592,6 +673,12 @@ function Detail({ id }: { id: string }) {
       alive = false;
     };
   }, [id]);
+  const layoutStudy = ![
+    "snake",
+    "orbital",
+    "local-models",
+    "benchmark-atlas",
+  ].includes(id);
   const change = (v: string) => {
     setVariant(v);
     const u = new URL(location.href);
@@ -600,6 +687,7 @@ function Detail({ id }: { id: string }) {
   };
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
+      if (!layoutStudy) return;
       if (
         e.target instanceof Element &&
         e.target.closest("input,textarea,select,[contenteditable],.react-flow")
@@ -612,9 +700,14 @@ function Detail({ id }: { id: string }) {
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  }, [variant]);
+  }, [variant, layoutStudy]);
   return (
-    <main className={"detail variant-" + variant}>
+    <main
+      className={
+        "detail " +
+        (layoutStudy ? "variant-" + variant : "published-experiment")
+      }
+    >
       <div className="breadcrumbs">
         <a href="#">
           <ArrowLeft size={13} /> All experiments
@@ -686,38 +779,40 @@ function Detail({ id }: { id: string }) {
           </a>
         </p>
       )}
-      <div className="prototype-switcher">
-        <button
-          aria-label="Previous layout"
-          onClick={() =>
-            change(variantNames[(variantNames.indexOf(variant) + 2) % 3])
-          }
-        >
-          <ArrowLeft size={15} />
-        </button>
-        <span>LAYOUT STUDY</span>
-        {variantNames.map((v, i) => {
-          const Icon = [PanelLeft, Columns3, BookOpen][i];
-          return (
-            <button
-              className={v === variant ? "active" : ""}
-              key={v}
-              onClick={() => change(v)}
-            >
-              <Icon size={14} />
-              {v}
-            </button>
-          );
-        })}
-        <button
-          aria-label="Next layout"
-          onClick={() =>
-            change(variantNames[(variantNames.indexOf(variant) + 1) % 3])
-          }
-        >
-          <ArrowRight size={15} />
-        </button>
-      </div>
+      {layoutStudy && (
+        <div className="prototype-switcher">
+          <button
+            aria-label="Previous layout"
+            onClick={() =>
+              change(variantNames[(variantNames.indexOf(variant) + 2) % 3])
+            }
+          >
+            <ArrowLeft size={15} />
+          </button>
+          <span>LAYOUT STUDY</span>
+          {variantNames.map((v, i) => {
+            const Icon = [PanelLeft, Columns3, BookOpen][i];
+            return (
+              <button
+                className={v === variant ? "active" : ""}
+                key={v}
+                onClick={() => change(v)}
+              >
+                <Icon size={14} />
+                {v}
+              </button>
+            );
+          })}
+          <button
+            aria-label="Next layout"
+            onClick={() =>
+              change(variantNames[(variantNames.indexOf(variant) + 1) % 3])
+            }
+          >
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
     </main>
   );
 }

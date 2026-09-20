@@ -31,5 +31,8 @@
   "undo": "results/undo.jsonl",
   "verify": "../results/verify.jsonl",
   "vision": "../results/vision.jsonl",
-  "visuals": "results/visuals.jsonl"
+  "visuals": "results/visuals.jsonl",
+  "arcade": "../local-models-and-games/arcade/results.jsonl",
+  "research-map": "../local-models-and-games/research-map.jsonl",
+  "local-models": "../local-models-and-games/apple/results.jsonl"
 }
