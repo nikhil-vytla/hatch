@@ -24,3 +24,6 @@
 
 - Final scan after the implementation commit checked five commits, 293 unique blobs, 48 built files, four deployed assets, all 33 deployed JSON files, and companion ZIP contents. It found no actual credentials or matching secret signatures.
 - Mobile QA at 390×844 found that the existing header hid the key button's text without an accessible name. Added an explicit aria-label. The light-mode dialog fits within the viewport and its key controls are accessible; desktop dark-mode was also visually inspected.
+
+- Final production deployment `dpl_Gk3ivAMmtr1NJmn9L95wkyb4mPjL` is ready at the canonical URL. The automatic challenge expired without configuration changes. Ordinary public HTTPS returned homepage 200 at 09:02:09 UTC and live evaluation 200 at 09:02:25 UTC, using the caller's gateway key without an owner bypass.
+- Pushed the implementation and verification commits as `nikhil-vytla`. GitHub reports PR #54 as open, non-draft, and cleanly mergeable. No GitHub check runs are configured; verification results above come from the local and deployed checks.
