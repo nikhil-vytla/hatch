@@ -1,0 +1,18 @@
+{
+  "origin": "https://jev-experiments.vercel.app",
+  "deployment": "dpl_Gk3ivAMmtr1NJmn9L95wkyb4mPjL",
+  "access_mode": "ordinary public HTTPS, no owner bypass",
+  "homepage": {
+    "at": "2026-09-20T09:02:09.680Z",
+    "status": 200,
+    "challenge": null
+  },
+  "evaluation": {
+    "at": "2026-09-20T09:02:25.199Z",
+    "status": 200,
+    "answer": {
+      "type": "noul",
+      "value": 0.99
+    }
+  }
+}

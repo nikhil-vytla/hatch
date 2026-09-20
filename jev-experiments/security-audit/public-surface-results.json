@@ -1,0 +1,118 @@
+{
+  "at": "2026-09-20T08:31:32.923Z",
+  "origin": "https://jev-experiments.vercel.app",
+  "results": [
+    {
+      "path": "/.env",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/.env.local",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/.git/config",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/.vercel/project.json",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/server/gateway.ts",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/scripts/credentials.ts",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/data/access.json",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/data/smoke.json",
+      "method": "GET",
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 79,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "GET",
+      "status": 405,
+      "content_type": "application/json; charset=utf-8",
+      "bytes": 21,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/api/compose",
+      "method": "GET",
+      "status": 405,
+      "content_type": "application/json; charset=utf-8",
+      "bytes": 21,
+      "exposes_source_or_secret_file": false
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "POST",
+      "credentials": "absent",
+      "status": 401
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "POST",
+      "credentials": "incorrect",
+      "status": 401
+    },
+    {
+      "path": "/api/compose",
+      "method": "POST",
+      "credentials": "absent",
+      "status": 401
+    },
+    {
+      "path": "/api/compose",
+      "method": "POST",
+      "credentials": "incorrect",
+      "status": 401
+    }
+  ],
+  "headers": {
+    "csp": null,
+    "frame_options": null,
+    "content_type_options": "nosniff",
+    "referrer_policy": "strict-origin-when-cross-origin",
+    "strict_transport_security": "max-age=63072000; includeSubDomains; preload",
+    "access_control_allow_origin": "*"
+  }
+}
