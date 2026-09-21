@@ -1,0 +1,103 @@
+diff --git a/jev-experiments/adapters/typescript/index.ts b/jev-experiments/adapters/typescript/index.ts
+index 7651ed5..d2c8e87 100644
+--- a/jev-experiments/adapters/typescript/index.ts
++++ b/jev-experiments/adapters/typescript/index.ts
+@@ -109,7 +109,10 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
+     const a = answers[id];
+     if (!a || a.type !== q.type)
+       throw Error(`Missing or wrong answer type: ${id}`);
+-    if (q.type === "choice" && !(String(a.value) in q.criteria!))
++    if (
++      q.type === "choice" &&
++      (typeof a.value !== "string" || !Object.hasOwn(q.criteria!, a.value))
++    )
+       throw Error(`Unknown option: ${id}`);
+     if (
+       q.type !== "choice" &&
+@@ -119,7 +122,9 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
+         a.value > (q.type === "noul" ? 1 : (q.criteria as string[]).length - 1))
+     )
+       throw Error(`Out of range: ${id}`);
+-    if (a.probabilities) {
++    if (a.probabilities != null) {
++      if (typeof a.probabilities !== "object" || Array.isArray(a.probabilities))
++        throw Error(`Malformed probabilities: ${id}`);
+       const expected =
+         q.type === "choice"
+           ? Object.keys(q.criteria!)
+diff --git a/jev-experiments/experience-prototypes/server/gateway.ts b/jev-experiments/experience-prototypes/server/gateway.ts
+index 7d63f41..8033138 100644
+--- a/jev-experiments/experience-prototypes/server/gateway.ts
++++ b/jev-experiments/experience-prototypes/server/gateway.ts
+@@ -154,6 +154,7 @@ export async function evaluate(
+           signal,
+         },
+       );
++      options.signal?.throwIfAborted();
+       const a = {
+         attempt: i + 1,
+         status: response.status,
+@@ -185,6 +186,19 @@ export async function evaluate(
+             attempts,
+           );
+         }
++        if (
++          !raw ||
++          typeof raw !== "object" ||
++          Array.isArray(raw) ||
++          !raw.answers ||
++          typeof raw.answers !== "object" ||
++          Array.isArray(raw.answers)
++        )
++          throw new GatewayError(
++            "Provider returned an invalid answer envelope.",
++            502,
++            attempts,
++          );
+         const answers: Record<string, any> = Object.create(null);
+         for (const [id, q] of Object.entries(body.questions)) {
+           const a = raw.answers?.[id],
+@@ -199,7 +213,7 @@ export async function evaluate(
+             !a ||
+             a.type !== q.type ||
+             (q.type === "choice"
+-              ? !Object.hasOwn(q.criteria!, String(v))
++              ? typeof v !== "string" || !Object.hasOwn(q.criteria!, v)
+               : typeof v !== "number" ||
+                 !Number.isFinite(v) ||
+                 v < 0 ||
+@@ -223,8 +237,17 @@ export async function evaluate(
+               attempts,
+             );
+           if (a.probabilities != null) {
++            const expected =
++              q.type === "choice"
++                ? Object.keys(q.criteria!)
++                : q.type === "score"
++                  ? (q.criteria as string[]).map((_, i) => String(i))
++                  : [];
+             const ps = Object.entries(a.probabilities);
+             if (
++              typeof a.probabilities !== "object" ||
++              Array.isArray(a.probabilities) ||
++              ps.length !== expected.length ||
+               !ps.length ||
+               ps.some(
+                 ([key, p]) =>
+@@ -232,7 +255,7 @@ export async function evaluate(
+                   !Number.isFinite(p) ||
+                   p < 0 ||
+                   p > 1 ||
+-                  (q.type === "choice" && !Object.hasOwn(q.criteria!, key)),
++                  !expected.includes(key),
+               ) ||
+               Math.abs(ps.reduce((s, [, p]) => s + Number(p), 0) - 1) > 0.08
+             )
+@@ -249,6 +272,7 @@ export async function evaluate(
+             confidence: a.confidence ?? null,
+           };
+         }
++        options.signal?.throwIfAborted();
+         return {
+           answers,
+           latency_ms: Date.now() - started,

@@ -1,0 +1,53 @@
+{
+  "baseCommit": "eb3c18d6db2891f0dfeff87d6a760d5936be37f4",
+  "patchSha256": "a28112d8f5b4c763ac84caeb77db1e3928c3afd468c44a369a110458c5c7e4e4",
+  "providerCalls": false,
+  "checks": [
+    {
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "jev-experiments/roadmap/runtime/existing-contracts.patch"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.00671062502078712,
+      "output": ""
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "jev-experiments/roadmap/runtime/existing-contracts.patch"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.006658124970272183,
+      "output": ""
+    },
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/adapters/typescript",
+      "exitCode": 0,
+      "elapsedSeconds": 0.28516162501182407,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ typescript@5.9.3\n+ zod@4.6.5\n\n6 packages installed [20.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "test",
+        "jev-experiments/roadmap/runtime"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.28206183400470763,
+      "output": "bun test v1.3.14 (0d9b296a)\n\njev-experiments/roadmap/runtime/existing-contract.test.ts:\n(pass) gateway rejects undeclared score probabilities without rerolling [1.68ms]\n(pass) direct decoder rejects inherited option names [0.30ms]\n\njev-experiments/roadmap/runtime/contract.test.ts:\n(pass) preserves meaning for choice, boolean and fractional ordinal [0.40ms]\n(pass) rejects undeclared and inherited keys, missing mass and duplicate answers [0.04ms]\n(pass) rejects oversized requests without truncating [0.06ms]\n(pass) requires explicit error and identity, rejects non-JSON values [0.11ms]\n\njev-experiments/roadmap/runtime/execute.test.ts:\n(pass) cancels even a runtime that ignores the signal [0.42ms]\n(pass) native boolean response becomes a complete distribution [0.29ms]\n(pass) missing provider distributions fail explicitly [0.20ms]\n\njev-experiments/roadmap/runtime/edge-cases.test.ts:\n(pass) untyped invalid requests return an explicit unsupported response [0.06ms]\n(pass) configured revision cannot silently change [0.10ms]\n(pass) representable adjacent ordinal values retain identities [0.06ms]\n(pass) null provider JSON fails once instead of rerolling [0.08ms]\n(pass) gateway checks cancellation after a transport returns [0.07ms]\n(pass) native instruction limit is declared and rejected before calling provider [0.09ms]\n(pass) direct decoder preserves string enum identity [0.05ms]\n(pass) direct decoder rejects array probability containers [0.03ms]\n\n 17 pass\n 0 fail\n 50 expect() calls\nRan 17 tests across 4 files. [31.00ms]\n"
+    }
+  ],
+  "passed": true
+}
