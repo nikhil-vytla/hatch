@@ -1,0 +1,50 @@
+diff --git a/jev-experiments/roadmap/MAP.md b/jev-experiments/roadmap/MAP.md
+index 67c000e..e145761 100644
+--- a/jev-experiments/roadmap/MAP.md
++++ b/jev-experiments/roadmap/MAP.md
+@@ -29,13 +29,14 @@ The supplied release plan is the authority for this map. It explicitly includes
+ | --- | --- | --- | --- |
+ | Foundations | Contracts, CI, publication metadata, common runtime | Clean build and provider-free checks | Verified locally, including canonical-root build before sibling installs |
+ | Internal previews | Play-first home, Tetris/crowd/music, routing integration | Visual review and actual client calls | Implemented, visually checked and exercised through real clients |
+-| First public release | Playable core/materials, trained models/export, routing/CLI/MCP, Mac runtime | Research, usability, integrations and installation verified | Not released |
++| First public release | Playable core/materials, trained models/export, routing/CLI/MCP, Mac runtime, coherent UI/UX and authored notes | Research, design, usability, integrations and installation verified | Not released; sitewide design integration open |
+ | Next wave | Perception, private extension, source-linked annotations, icons/brushes | Named dependent decisions | Deferred |
+ | Further products | Creative apps, richer mail, games/GPU worlds | Investigate before implementation commitment | Deferred |
+ 
+ ## Decisions so far
+ 
+ - [Build an instrument notebook](design-research/README.md) records the design-engineering research and separates visual inspiration from copied implementation.
++- [Make the first release feel authored](../design-revamp-2026-09-21/ui-ux-release.md) includes art direction, interaction engineering and experiment writing in the first-release gate. [DESIGN.md](../DESIGN.md) records the philosophy, reference decisions and adoption status. Backward compatibility does not constrain the redesign.
+ 
+ - [Preserve the deployment and research boundaries](decisions/deployment-boundary.md) records the canonical source root and patch-only research delivery rule.
+ - [One typed-decision wire contract](decisions/decision-contract.md) fixes runtime identity, distribution and unsupported-result semantics.
+@@ -49,6 +50,7 @@ The supplied release plan is the authority for this map. It explicitly includes
+ | [Prove client delegation with real tasks](decisions/harness-evidence.md) | routing/integration | Routing policy | Real calls and independent tasks passed; see evidence index |
+ | [Make scene changes observable](decisions/playable-defaults.md) | playable/root | Deployment boundary | Resolved; local production-build captures, functional checks and active frame samples retained |
+ | [Select an installed local default](decisions/local-default.md) | training/runtime | Training criteria, export and mail evaluation | Resolved; validation-selected experimental Laya readout, fresh offline install passed |
++| [Make the first release feel authored](../design-revamp-2026-09-21/ui-ux-release.md) | root / scene owners | Playable defaults, execution disclosure, research evidence | Direction and working editorial study complete; coherent app integration and sitewide review open |
+ | [Release only supported claims](decisions/release-gate.md) | root | All first-release decisions | Local artifact acceptance recorded; public deployment open |
+ 
+ ## Later named decisions
+diff --git a/jev-experiments/roadmap/decisions/release-gate.md b/jev-experiments/roadmap/decisions/release-gate.md
+index 8695eff..4a7f7ca 100644
+--- a/jev-experiments/roadmap/decisions/release-gate.md
++++ b/jev-experiments/roadmap/decisions/release-gate.md
+@@ -2,7 +2,7 @@
+ 
+ - Owner: root
+ - Type: research
+-- Status: Local artifact acceptance complete after recorded corrections; public deployment open
++- Status: Local implementation artifact checks complete; coherent UI/UX adoption and public deployment open
+ - Depends on: All first-release decisions
+ 
+ ## Question and resolution
+@@ -11,6 +11,8 @@ The authored implementation can be delivered for review with its limits stated.
+ 
+ The completed study and installation checks support an experimental validation-selected local default, not a general-purpose quality claim. The small routing comparison does not establish savings or a classifier advantage. Material rule interpretation has frozen labels but no model accuracy result. Mobile browser emulation and short frame samples do not replace physical-device usability or long-running performance checks.
+ 
++The user clarified that the first release also requires coherent art direction, thoughtful interaction engineering and source-linked experiment writing. [DESIGN.md](../../DESIGN.md) and the [UI/UX release decision](../../design-revamp-2026-09-21/ui-ux-release.md) record that requirement. The working editorial study is review evidence for the direction; it does not close the app integration or sitewide usability gate.
++
+ ## Evidence
+ 
+ - [Clean checkout, patch hash and prepared-output comparisons](../verification/clean-checkout.json)

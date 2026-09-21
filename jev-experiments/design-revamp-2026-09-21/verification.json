@@ -1,0 +1,166 @@
+{
+  "date": "2026-09-21",
+  "scope": "Original editorial study and reference board; not the integrated public app.",
+  "engineSha256": "b325e84014c7370ceaa54f3f6a12ca646e2e678a9dfbc941ea8fcb3a937104b3",
+  "build": {
+    "command": "bun run jev-experiments/design-revamp-2026-09-21/build.ts",
+    "passed": true,
+    "newDependencies": 0
+  },
+  "typecheck": {
+    "cwd": "jev-experiments/experience-prototypes",
+    "command": "./node_modules/.bin/tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM ../design-revamp-2026-09-21/editorial-study.ts",
+    "passed": true
+  },
+  "browser": "Isolated Chromium via Playwright CLI",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1080,
+      "horizontalOverflow": false,
+      "firstActionVisible": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": false,
+      "firstActionVisible": true
+    }
+  ],
+  "keyboard": {
+    "home": 0,
+    "arrowRightAfterHome": 1,
+    "end": 96,
+    "visibleFocus": true
+  },
+  "playback": {
+    "advancedBothBranches": true,
+    "pauseHeldAtStep": 3,
+    "resetRestoredStep": 0,
+    "automaticPlayback": false
+  },
+  "mobileEnlargement": {
+    "beforeWidthCssPx": 169,
+    "afterWidthCssPx": 350,
+    "stepPreserved": true,
+    "ariaExpanded": true
+  },
+  "export": {
+    "filename": "jev-contact-comparison-step-96.json",
+    "format": "jev-material-comparison-1",
+    "step": 96,
+    "validSceneParserResults": 4,
+    "contacts": [
+      "none",
+      "water"
+    ],
+    "endCounts": [
+      "138 grains; no new wood",
+      "114 grains; 24 new wood cells"
+    ]
+  },
+  "explanation": {
+    "nativeDisclosureOpened": true,
+    "copyButtonCompleted": true,
+    "excerptMatchesEngineIgnoringWhitespace": true,
+    "sameStartingCellsAndSeed": true,
+    "firstWoodStep": 13,
+    "initialPowder": 138,
+    "initialWaterCells": 1188,
+    "finalWaterCells": [
+      1188,
+      1188
+    ]
+  },
+  "themes": {
+    "darkRendered": true,
+    "explicitLightOverride": true,
+    "reducedMotionTransitionDuration": "0s",
+    "reducedMotionStartsPausedAtStep": 24,
+    "deliveredMotionPreferenceChangePausedPlayback": true,
+    "javascriptDisabledSystemDark": {
+      "paper": "#171d19",
+      "colorScheme": "dark"
+    }
+  },
+  "recovery": {
+    "nullCanvasContextInjected": true,
+    "visibleFailureMessage": true,
+    "retryButton": true,
+    "noteRemainsReadable": true,
+    "uncaughtPageErrors": 0
+  },
+  "javascriptDisabled": {
+    "explicitFallback": true,
+    "noteReadable": true,
+    "replayDisabled": true,
+    "horizontalOverflowAt390": false
+  },
+  "textContrastRatios": {
+    "lightBody": 13.02,
+    "lightMetadata": 5.75,
+    "lightAccent": 6.43,
+    "darkBody": 14.63,
+    "darkMetadata": 8.41,
+    "darkAccent": 9.53
+  },
+  "consoleErrorsInNormalSession": 0,
+  "referenceBoard": {
+    "pairedSelectorsVerified": 4,
+    "originalImageLinks": 8,
+    "builderCount": 12,
+    "keyboardPassed": true,
+    "mobileAndDarkPassed": true,
+    "reducedMotionPassed": true,
+    "noJavascriptImageLinksAvailable": true,
+    "consoleErrors": 0,
+    "resourceLoads": "local origin only"
+  },
+  "captures": [
+    {
+      "file": "output/playwright/editorial-desktop.webp",
+      "bytes": 66156,
+      "sha256": "1f5bf8e5c3bcfe98309e043bb9a84d93bc426ef834985b94f545f478a32eea73"
+    },
+    {
+      "file": "output/playwright/editorial-mobile-dark.webp",
+      "bytes": 28976,
+      "sha256": "b2d83f540382a8b5a6f01d4bb56f42ba4fca63809d2feebda16d7eb6b441ac88"
+    },
+    {
+      "file": "output/playwright/editorial-mobile.webp",
+      "bytes": 28112,
+      "sha256": "fdce3cf27bb1b69f05d10efaedbb8a54a4403eeef002d8bf4026c44399c92a7c"
+    },
+    {
+      "file": "output/playwright/editorial-note.webp",
+      "bytes": 69748,
+      "sha256": "b017ab6ed1fb1aab478c2a32d04584ef9672cc2791e370214df3470cc4713302"
+    }
+  ],
+  "limits": [
+    "No physical phone or screen-reader operation.",
+    "No sustained frame-time or memory benchmark.",
+    "Hidden-document cancellation source-inspected, not browser-verified.",
+    "Reference-site captures do not establish those sites accessibility or performance.",
+    "Sitewide app adoption and canonical deployment remain open."
+  ],
+  "accessibilitySourceChecks": {
+    "timelineOutputLive": "off",
+    "timelineValueTextAt96": "96 of 96 steps",
+    "themeActionHasPressedAttribute": false,
+    "skipTarget": "#experiment",
+    "ruleLabelsVisibleAt390": true,
+    "actualScreenReaderOperation": false
+  },
+  "cleanCheckout": {
+    "base": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+    "studyBuildWithoutInstall": true,
+    "roadmapPatchApplies": true
+  },
+  "review": {
+    "model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+    "verifiedIdentity": true,
+    "dispositions": "review-dispositions.md"
+  }
+}
