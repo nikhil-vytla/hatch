@@ -1,0 +1,23 @@
+[
+  {
+    "case": "normal",
+    "exitCode": 0,
+    "fixtureAfter": "new",
+    "workflowExists": true,
+    "stderr": ""
+  },
+  {
+    "case": "missing-ci-source",
+    "exitCode": 1,
+    "fixtureAfter": "old",
+    "workflowExists": false,
+    "stderr": "Missing provider-free CI workflow source."
+  },
+  {
+    "case": "conflicting-ci",
+    "exitCode": 1,
+    "fixtureAfter": "old",
+    "workflowExists": true,
+    "stderr": "Existing Jev CI workflow differs. Review it before applying this patch."
+  }
+]

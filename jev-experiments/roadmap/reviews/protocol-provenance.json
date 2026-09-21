@@ -1,0 +1,311 @@
+{
+  "gate": "protocol",
+  "requested_model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+  "observed_models": [
+    {
+      "provider": "amazon-bedrock",
+      "model": "global.anthropic.claude-fable-5-1"
+    }
+  ],
+  "session_ids": [
+    "ses_f3dd066a7ffe0uWeqkQsh0QK4g"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 330.02265882492065,
+  "prompt_sha256": "38e5ae514d6f811a9e704112efdaa9728a37d02251cbafe03a902780376d299d",
+  "files": [
+    {
+      "path": "jev-experiments/roadmap/runtime/contract.ts",
+      "sha256": "8f9214cc93cd40ca7a0c1230de7570014c54665ee116aa35aac3feff1e3edd63"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/existing-contract.test.ts",
+      "sha256": "8fb99d5ca6cae510161fe2adabc7274e12701a3577d05827fb71b404b5bf48d4"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/execute.ts",
+      "sha256": "4b18578ab52e7f30ffc18a9fe3bd57a23282e3c601a4de0dfcb4bca283d3e421"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/contract.test.ts",
+      "sha256": "418f1088e3fb7744e4f751680a8b12cb0bc23556eaf152dc3ff63290d6399e03"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/execute.test.ts",
+      "sha256": "292150befed1c356c92dce0c3b4e32a9a8280f3f34a5d8970b9ecdcf4181b82e"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/jev.ts",
+      "sha256": "c3403bb21134872b2e3163660223b3cd512c88ae9a88a37a5b3c35f8f2964afd"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/sources.json",
+      "sha256": "998e1ee369ced03ff0a9746c1e58bf1c223c2ac0d79abcb7c98142520baec73a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/NOTES.md",
+      "sha256": "9991c994996196c6826a3ea05ef264509a1ec24779e5667581e7220efb5ae3ea"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/prepare.py",
+      "sha256": "30289149b8f37384ca8ecd986792c7f3a13a993413908c36347546c6c7a019b9"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/PROTOCOL.md",
+      "sha256": "1a6561b00c50bfeb85faddfad780dfdf26daba9f84c55c7442415992b98ac6bb"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/router.ts",
+      "sha256": "395217b7b407378de6dba242826d91bfc1c061b5e64e02c84e06594190e380a9"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/types.ts",
+      "sha256": "d5a55612c6a5beb7f23a3cd4ac4c03bc076b2e345d8369f6e8bf26e768e6e640"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/policy.ts",
+      "sha256": "2198065996e51a25407184b0c01d289b361e4b2edff7d99de4f5d756bc7b45f0"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/package.json",
+      "sha256": "2f8496cad81eeef3dd21dc3f931e1f9b64e07e1ba35725d288962bf31779d900"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/execute.ts",
+      "sha256": "f3d4a2c6063b76c953d6319bf55a3b15b850a5b558b386a15ed6c8ab890c3949"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/NOTES.md",
+      "sha256": "b6a13237ede63576b7093c5e000d260a8fe82d009edf1ff866688c97d90c8363"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/PROTOCOL.md",
+      "sha256": "04678978c55185ad0439b2199f57188d6a901a9a8e3ed31c547b9e1b8499548a"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/MaterialsSandbox.tsx",
+      "sha256": "ffbe7861ba1ed79bcaeaa7873f542db12b59dd3615043e00e2e00b4b6624469d"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.test.ts",
+      "sha256": "47d2c2710598369f119fb61e2e905548813bf4d060c591dcbf87cb424ac7d988"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.ts",
+      "sha256": "abbb2f79817f7df8f03c4e81ccfa99b13d951203c947ebe723c01a216d5548ac"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/materials.css",
+      "sha256": "38f0b36003184a0b79dfaa18639382b35ce61f9aa6f4d75cbca58303bcc91d20"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/labels.v1.json",
+      "sha256": "668acad097533b58d5227e6ef02fe778b86a52c39059616a130663e3fd6ac8d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/NOTES.md",
+      "sha256": "ddca9a6c19e1f01e20dc65ff9e4e217f3212846d46d6c633d01f2c9ab4ad054f"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/PROTOCOL.md",
+      "sha256": "710eb01a3c54547fb0d1f85f5a04cdfc22142948f2e9d0ef56b847b25a10a0d2"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/NOTES.md",
+      "sha256": "a265448c3e3f132c978f393817a6eb54554e7a69ee9221afb2d1f81f82922215"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/NOTES.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/NOTES.md",
+      "sha256": "51c5d1177708f1301153d7740093db9934e281cff80db1f1b339a45f9f070c08"
+    },
+    {
+      "path": "jev-experiments/roadmap/MAP.md",
+      "sha256": "4843112135d0333048ef148019bf768da75321aecd2f385907b700c2d0d6e0ca"
+    },
+    {
+      "path": "jev-experiments/roadmap/IMPLEMENTATION.md",
+      "sha256": "077a8016bfb9b6ba80cbe25150eb4b58a8439c77584f98021f4120adfb5f996d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/icon-studio.tsx",
+      "sha256": "420d4f8f6df8d95625efc35eb38e1cd29567ec49d34bcd71091c38b67152d362"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-world-preview.tsx",
+      "sha256": "1300e5f248acf16c234d299eb882c5481e03267137ec66ace464cdec98afa15e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/music-arranger.tsx",
+      "sha256": "baaa1b177a5e1a0f3b3a0dc38e53e8cc1c1a130ed1cba0fa4e7f92b2986a3a55"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/local-models.tsx",
+      "sha256": "6a88efcaac65739c5dbe7c52ad39259044f9b441f7dbbf692f25d9c161172049"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/main.tsx",
+      "sha256": "d522733bdfba1df271105bad6a684ce82ce288e2f1f202656c6b8dd917165699"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/agent-experiments.tsx",
+      "sha256": "8690f1584533c64796dd2ce0b6c02518d692cb0955a5c1d18cd6788c994fbd4f"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/tetris-experience.tsx",
+      "sha256": "df82bd1fb824c4ad89323fcd27fffbfe574de76e60ed74c0b013afde2dfb70da"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/arcade.tsx",
+      "sha256": "3e4e64b4cd8a4f68db0c7ddfc35331b56317fcc3e8e47f7608efcd8265bd3198"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-crowd.tsx",
+      "sha256": "77d41ad91efdfbd38291f6329a2b180bfa5b97ab0dced69a60e5c167896ae49d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.tsx",
+      "sha256": "1497a48865a67511de408991b348d1188bf2ac707aa2d9bdf57baa232f9ba41f"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/judgment-reliability.css",
+      "sha256": "293b039c0e4c6639a0cec1cb8a93ecb9428eff680ad5e6cae6c9333326e9657b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/shared.tsx",
+      "sha256": "2d614a74286a1b23287c0f0c5f6c268ed9ee549a251c0bf58b9e35e724df8150"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ui-catalog.ts",
+      "sha256": "93d9e40650734f6a476c429c0277659b999113e8e86e2fd1f1cf8fb71e4b423e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/cafe-jev.tsx",
+      "sha256": "7f9be4ef9ac1d666b8c3a2a9fe3898926ef780aec2aa7c87c8c5b718e07c7744"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/generated-ui.tsx",
+      "sha256": "6c8b7f6e353cdcf3ae6ec0996cc60d9da4227f1c5dc8a611ea466fd238ba74b7"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/rewardbench.tsx",
+      "sha256": "b3aa442f08b5968f940633adaeb755029bb8a3a3307dfa0f8e9f0ced9987d5c8"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-tetris.css",
+      "sha256": "79b32d93b0faad543ef93556af585e13f383503b3bc2c45bf3dcc43b9e272a67"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/judgment-reliability.tsx",
+      "sha256": "6537494abd606466d9933267e73bb740766e64ed5cf37861e9e2f8a6ab814982"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.css",
+      "sha256": "4a4568fbad342bd6b5f6282f0ab129e57729fe4b517a5160a6070c3c5e06ab40"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-tetris.tsx",
+      "sha256": "fd3a56a2216ef5c2b29803541bbddc2b0a4416429323ba5549bbe4b964a22c67"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/cafe-jev.css",
+      "sha256": "cece4f6c9c3d49f1a7f9e64b085c6741d3691d5d5aaeae6ac79a33bf7e24bccc"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx",
+      "sha256": "300f6dd9fb92206e5285540c0c51ab8a9f157955d719f52adc4e4330ea245b54"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-world-preview.css",
+      "sha256": "d16d0c08863b6c7990f66fe5cddeee6093b0b7ee9fe97b8f59e8c1a9e4456a6d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/music-arranger.css",
+      "sha256": "63d763aaedd5d1512d3198a564b8b3abcd278f8638abfec5975381deb730ff2b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/games.tsx",
+      "sha256": "27ae9be8ac4898e59a989ab7d85e80a0bdcda1ee8f95bc915817f10103247483"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/icon-studio.css",
+      "sha256": "70b8b6fb7e57b55764265d1a5f12f00b5dedac78cd210808d0edcc8842d759be"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/api.ts",
+      "sha256": "7da4ee18e73b180b81a35cb2c95714722a081fccaa54142bf94207e4a17f1342"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-crowd.css",
+      "sha256": "52e01b2c8c84f6c003cd82b3113ffceb28d1f1d7e97d3ad97f39c886f7bf6404"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/outcome-framing.tsx",
+      "sha256": "872587e5bfc4cc46efe1ad7156b4da1e1fde5d27115bfafeabb51ff06c7dfe6e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/creative.tsx",
+      "sha256": "b9da4b93d6ac50841508af6534171943219b829b0c263f0b482bbfaceea54040"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/wardrobe.css",
+      "sha256": "80dc7873e7ab518c09157eee070cbd36ed008652290e3a672b53d9e15ecacbd7"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/journeys.tsx",
+      "sha256": "a49d9a68dc124ffda510ee31688d9e8c980acd27fe430cc77cc819b08f1af719"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/style.css",
+      "sha256": "fedc49cb1b045eeb77ce774dae093e4abce8b386c76c52aa13cb76bd04a43c36"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ghost-brush.tsx",
+      "sha256": "584637a347c74c70920424515d53cb9bf59677a1dfceba5afdcdb624dbd30e0b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/motion-art.tsx",
+      "sha256": "f490b6656fbe9ad4e5b63099b6c19cb590e688267ed885e42c616838cdb4417e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/misc.tsx",
+      "sha256": "a232e3a8514ec55f32b8cbe261e019bcbb28c36cb2f5e741281ad967c753bdd4"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ghost-brush.css",
+      "sha256": "0ae6477c506a594482fa5cfeb73336752298cfeec9c0d1caaa9bcdf4d3951153"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/provenance.tsx",
+      "sha256": "3d6b3ae408ae1f795273a4bf8cf410257737dd3955ac2051ad6c749d48f731d1"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/wardrobe.tsx",
+      "sha256": "8df7d8aedba89f0fcb091f2b5c6e556a7130fd28b7b55d78e6ca7e721b2fdb07"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/new-experiments.tsx",
+      "sha256": "8cdcdba29a13d2d7712615376ac5ab56f24feebf216766640b728f3b8bbd509d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/catalog.ts",
+      "sha256": "f2990493f207c3da70b9e5afc997f9450e3be36571e540abd2db9c4f02654883"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/outcome-framing.css",
+      "sha256": "e2362b86594fb4ac88e00b77d5fe6b361939283ba718252fecbff6085cf4af9b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "sha256": "de65877f1595a9168eade9acdfc25b475c7c77c596f5704891f014de6a51ea7e"
+    }
+  ],
+  "answer_sha256": "e33dc71ce6cb5138e30cc4cc19fe645cf65391ce94ddbe35d84cc510c3a43a75",
+  "opencode_reported_cost_usd": 1.18049125,
+  "billing_verified": false,
+  "raw_output_local": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-release-review-enuy0_zz",
+  "verification": "Exact provider/model verified in session export; initial immediate export did not parse, repeated export succeeded."
+}

@@ -1,0 +1,53 @@
+{
+  "conditions": "Initial functional pass in desktop Chromium and 390 px emulation, with dark theme and reduced motion. Not physical-phone testing. Its timing sample is paused materials only; final active measurements and production captures are separate reports.",
+  "checks": {
+    "materials-canvas": {
+      "canvasVisible": true,
+      "overflow": false,
+      "theme": "dark",
+      "paused": 1
+    },
+    "materials-frame": {
+      "page": "/materials",
+      "width": 390,
+      "overflow": false,
+      "theme": "dark",
+      "frameMedianMs": 8.299999999999272,
+      "frameP95Ms": 9.299999999999272,
+      "sampleCount": 120,
+      "savedSceneCount": 1
+    },
+    "crowd-interaction": {
+      "overflow": false,
+      "comparison": "Compare two ways of saying it\n\nBoth courtyards start with the same people, needs, weather and policy. Compare the noticeboard draft below with this second wording.\n\nSecond wording\nShared policy \nLocal keyword rules\nLive Jev \u00b7 no fallback\nStart matched comparison\n\n6 of 12 current destinations differ. Matched start; later visits may create further differences.\n\nMina\nReading Room \u2192 Tiny Stage\nOtis\nReading Room \u2192 Reading Room\nLuz\nReading Room \u2192 Reading Room\nEli\nReading Room \u2192 Tiny Stage\nJune\nCorner Caf\u00e9 \u2192 Tiny Stage\nIvo\nReading Room \u2192 Tiny Stage\nNia\nTiny Stage \u2192 Tiny Stage\nRemy\nLittle Bakery \u2192 Little Bakery\nAda\nTiny Stage \u2192 Tiny Stage\nSol\nReading Room \u2192 Reading Room\nBea\nReading Room \u2192 Tiny Stage\nKit\nCorner Caf\u00e9 \u2192 Tiny Stage\n\nKeyword rules can miss paraphrases. A live Jev comparison makes two requests with your key. These fictional paths are an inspection aid, not a controlled claim about human behavior.",
+      "inlineNotice": "A quiet tea-and-book afternoon in the reading room. Come if you need a break from conversation."
+    },
+    "music-playback": {
+      "preferenceEnabledAfterBothStarted": true,
+      "preferenceSubmitted": false,
+      "overflow": false
+    },
+    "routing-desktop": {
+      "title": "Jev / A living laboratory",
+      "overflow": false,
+      "recordedExample": true
+    },
+    "home-mobile-first-action": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "reducedMotion": true,
+      "fullCanvasVisible": true,
+      "canvasBounds": {
+        "top": 587.890625,
+        "bottom": 802.5546875,
+        "width": 322,
+        "height": 214.6640625
+      },
+      "horizontalOverflow": false,
+      "condition": "Current Vite dev app; whole material canvas visible without scrolling. Other scenes remain in the catalog below."
+    }
+  }
+}

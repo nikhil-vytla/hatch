@@ -1,0 +1,711 @@
+{
+  "gate": "prototype",
+  "requested_model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+  "observed_models": [
+    {
+      "provider": "amazon-bedrock",
+      "model": "global.anthropic.claude-fable-5-1"
+    }
+  ],
+  "session_ids": [
+    "ses_f3dc431aaffes4BKVHVQ93Jnag"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 712.542051076889,
+  "prompt_sha256": "a5526a825aca573e2098f611cba80cec8796dc1c88d3e70e13a6783c95b4106a",
+  "files": [
+    {
+      "path": "jev-experiments/roadmap/runtime/contract.ts",
+      "sha256": "8f9214cc93cd40ca7a0c1230de7570014c54665ee116aa35aac3feff1e3edd63"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/existing-contract.test.ts",
+      "sha256": "663821881a6c66e031d811f3cc1a7851137dd72bd5f221eb8d3f771467506e38"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/execute.ts",
+      "sha256": "4b18578ab52e7f30ffc18a9fe3bd57a23282e3c601a4de0dfcb4bca283d3e421"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/contract.test.ts",
+      "sha256": "418f1088e3fb7744e4f751680a8b12cb0bc23556eaf152dc3ff63290d6399e03"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/execute.test.ts",
+      "sha256": "8ed160db7e2e774ab6dbd820a0eabd36eb1ded21b55d2ab97ad64b91d3ee2a44"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/jev.ts",
+      "sha256": "c3403bb21134872b2e3163660223b3cd512c88ae9a88a37a5b3c35f8f2964afd"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/sources.json",
+      "sha256": "998e1ee369ced03ff0a9746c1e58bf1c223c2ac0d79abcb7c98142520baec73a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/corpus-manifest.json",
+      "sha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/models-manifest.json",
+      "sha256": "e7ffb1c8ec89de0ef00f2356af205c7577bd06d5da39f3d513c4a3a44401f3d7"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/PROVENANCE.md",
+      "sha256": "a79fa457bc92d1aaaed59f6f882fac8e9af810fb0985d701b54cca30b5d43bd0"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/test_study.py",
+      "sha256": "304ac159e5211175ad76168344090ddb4dc29193d8c4525c1bf884153a3739c0"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/REVIEW-DISPOSITION.md",
+      "sha256": "5cccbf54d475a4d7b606fab2f0f4d809e36a80f7369abc7d026fee691f466226"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/README.md",
+      "sha256": "ce000d7b7395e8c35277a8f6f34f24d02400c5ae314992b5adf9da871a974eb4"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export_coreml.py",
+      "sha256": "28b138ddb8a55acc5e5fcaa292e5b681e95a04b541e559758a7160e89a264a04"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/robustness.py",
+      "sha256": "37bb73c472f957a5d71a6ce0c606e5fc6caf54b0e63bffd1f2175ac18f2b312d"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/baseline-results.json",
+      "sha256": "aad43adad116417cb971fff8f4132b09cc9f05f01b4d441718cb0fdfebc0bd1d"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/results-laya.json",
+      "sha256": "fd42147b676bdf69f1f5df80d90d3fd8900bab42413b8102e68127305d5788b3"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/NOTES.md",
+      "sha256": "7efca37472b489ca1dde847da704d44d9f98c06179ef8b96e548dbe84e14a2a5"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/prepare.py",
+      "sha256": "293d43b12d1a585570936dec1811c6db58850eaee16b815bd45eb572b46e18ee"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/study.py",
+      "sha256": "1784efe71ca74e1874b76c0d9187ecf7f06233dd4e6a34c7ec3481161ee0e3e1"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/PROTOCOL.md",
+      "sha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/mcp.test.ts",
+      "sha256": "d60d41dba62546da963fc9e402a56f7fdacd89456e1f7220e4ef9d38abc76c19"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/ModelRoutingLab.tsx",
+      "sha256": "b8f7c554ac10632fb553e3f02b39aa04d9e7e099d60316161a8bd4fac861746a"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/web-registry.ts",
+      "sha256": "f842880f029b0eab6220b5625b3df9b21451ef9c63e7cf0c6c023bf0b87cfb1a"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/policy.test.ts",
+      "sha256": "6b549f8ce4d3373854e90536fd677b9b9e7ffb341e1eb9f45cfedc00ba4f03f6"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/router.ts",
+      "sha256": "72615f775d66c2406f58a7a01c2964a20efe177adc332c22da0e4d9803477b81"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/ATTRIBUTION.md",
+      "sha256": "c42bc62ae9f23d6d96b77a5c08b4010fd2df3726baacd031d7158ef882e653e2"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/artifacts.ts",
+      "sha256": "eb6c24b77de0e2c8cbe0dacebe46a3ce92008de4c88d09bb1bc26ec45dd0cb21"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/artifacts.test.ts",
+      "sha256": "c67d9b930c0fc41dce6ffc6032245facaa36b9a3c7bca300e779013157c2cc9c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/email.ts",
+      "sha256": "1f598ca8d3a77b33e3c7cd6bbffafb25e3d154bf451514b490c39316c93379f2"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/mcp.ts",
+      "sha256": "abac83066845ab688a0076b7c381a8a8375a88b0fa5c0776d4004470222cdd82"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/cli.ts",
+      "sha256": "295530111739603f6a7169621dac3cfa77ca299ea3c9179c27cfae85f94a0413"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/decide.ts",
+      "sha256": "c2c1639382fc406faab44e36e47214f27bd098025b2547f1ef940db6551f17d8"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/types.ts",
+      "sha256": "f5b3fcaaee197db21b19137b9c12b1fbea3894bf4af62eed0ca4cdcef1dea4d7"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/recorded-example.json",
+      "sha256": "7b7c184a1ee6ad71e65f1cc59d0c2232de67fd8da48a61647800ca3936f87641"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/policy.ts",
+      "sha256": "58fea40a0d207d4d28c437e1608c017f59697f38b5715680d0afc21676539457"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/package.json",
+      "sha256": "2f8496cad81eeef3dd21dc3f931e1f9b64e07e1ba35725d288962bf31779d900"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/execute.ts",
+      "sha256": "642f84f5209c477ec0eff009b670c0a080ef99d1285980c20dcbc2da680b03e1"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/index.ts",
+      "sha256": "9a77509e88972271e92845bb90b38e35173dbbc3fb299ac801fcf70a31751e3c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/NOTES.md",
+      "sha256": "b6a13237ede63576b7093c5e000d260a8fe82d009edf1ff866688c97d90c8363"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/config.ts",
+      "sha256": "f1eed9e0428dce587753ca9d9395593b326d1c868db47a5f9663a1d7c11d297b"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/classifier.ts",
+      "sha256": "0d35306e188ceb4cd0aa79f2cb4ed565f80a89942404bad8e803a692aba5eaad"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/web-handler.ts",
+      "sha256": "4fce9400a3ab02ad1eb746a1cce9f11622d32bc0ac210d09f2b7567833b4f521"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/PROTOCOL.md",
+      "sha256": "ce052807137bb1b40149650a0307cbcf8984116a471a4ea69f67d67b20720ca0"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/grade.ts",
+      "sha256": "0e83c3a80e247fc08ccb2f595704a6be46323e2803d26c6a9c2c51030dd0cca0"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/host-classifications.json",
+      "sha256": "28f9604c1b79fbea39f3bc987ffaf8add5a28b202d0a281c404d5c1250701738"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/local_classify.py",
+      "sha256": "5cc1721b27f07ec4a63a357da134a0623506a2cea67335cb7fb4ffd06dc3ed3c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/tasks.json",
+      "sha256": "48e71af1486a2000b7fe5c748788c44bb7125c20d372b918df73166ab32bc911"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/PROTOCOL.md",
+      "sha256": "50a4c05fcacd62ef842d4c114984be225e92496672bf86de9d824a1499616f6b"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/MaterialsSandbox.tsx",
+      "sha256": "88121b472fdcd9bbb556b5fe420197d3f1ee6fbdb12060845f0f63c88c76b9f8"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/_summary.md",
+      "sha256": "43b91c370f22327f91c3abd6ad3bc6e44be90e63303ae395870e992c1e856368"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.test.ts",
+      "sha256": "47d2c2710598369f119fb61e2e905548813bf4d060c591dcbf87cb424ac7d988"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.ts",
+      "sha256": "abbb2f79817f7df8f03c4e81ccfa99b13d951203c947ebe723c01a216d5548ac"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/materials.css",
+      "sha256": "f0e52d4d3bf921e61cf03c2dcc00d27b161b143e327233c574d645276dca9dee"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/labels.v1.json",
+      "sha256": "668acad097533b58d5227e6ef02fe778b86a52c39059616a130663e3fd6ac8d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/README.md",
+      "sha256": "9dbae62f559b0656d8266ab39a6e76f283a2e59b3ed49dec4de8d50d421c6a31"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/NOTES.md",
+      "sha256": "bd19bea239d31f8e85eb0082ab2cf0f38e7165503a21d2eedace1a99b6fa0cc6"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/PROTOCOL.md",
+      "sha256": "710eb01a3c54547fb0d1f85f5a04cdfc22142948f2e9d0ef56b847b25a10a0d2"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/models.json",
+      "sha256": "2342eed4890362be8a514beb12b8d66a0ae3a2e29031d59876770e2c822fd98a"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/_summary.md",
+      "sha256": "9078f0f7664d74d93697c23a52f5ce94052cbc07dda665f188910dc32da84a35"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/evaluate_email.py",
+      "sha256": "f045ae87814cc5557673cdb6c3a6c6b72d5290c733b7dbd8abd2b293b49e178e"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/email-fixtures.json",
+      "sha256": "0e2de8e7bcf673f1f0ad0711f09d2be86cded09fef3bd98316e7478f3fbcaba6"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/README.md",
+      "sha256": "d5d82a8c1f2c8c587626729efc6747db75abfed1653684a18c3142b99ff70879"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/uninstall.py",
+      "sha256": "6d55c9a64fb172e7caddcd6cffc40a83c56adef05bff676f56738c708f37c20a"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/test_local.py",
+      "sha256": "905674f3e12812dea512bef2c6a92b12854b4680ab8c2c0be91f961443c0aa0b"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/jev_local.py",
+      "sha256": "db7129c14a34bc762a01d0bd2394141fd573f4d70dfdc399495e8470f674448a"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/NOTES.md",
+      "sha256": "db38d829ef94b0c006bbf0cb86a4e696cacda38d64d1e1f3e2fa713d5fd70436"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/email-evaluation.json",
+      "sha256": "99277556d22e1e498e62c1be1ac4822b0e42e7b39701922a87849167fd677e11"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/examples/decision.json",
+      "sha256": "ebabff0b65b863e926914b2d723a031bfd479dbe0313507c3b51906eb7f469a2"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/run_harness.py",
+      "sha256": "57f6f173e173645e3f0138ba87987328b48fba87a4da884489ab780d0b799994"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/NOTES.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/task.json",
+      "sha256": "cc7258db132ac7ec2a1330de579a72365cde4d3ca54c7af688cff4376c717cef"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/claude.mcp.json",
+      "sha256": "7c8d57c83e212b6005db0ee0fc2caba258ecb30d344ab701c10eb70b3dddfd6f"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/opencode.json",
+      "sha256": "d474187a30a3cbdeaa81277944aaf49cd0019a942f1f39319a2da9f7757bee1d"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/router.json",
+      "sha256": "3b08c90ea762f5dd33611a5aec8fed9ad490065e8b4ce558dd8c6f5b0c450ca3"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/summary.json",
+      "sha256": "5ee38385f4064fd1dd5a2b81e85165a97e32076d163038619ac3e34a1964c45f"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/summary.json",
+      "sha256": "751e0041cd8f183c7375ebca8951b11ffaea5fcb6e25ed706f08e0f3a2f991fd"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/summary.json",
+      "sha256": "d4889e459b25f723d80e26926a79108a4722e77a6e606cf40a17a682bc3d031c"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/final-sum.test.ts",
+      "sha256": "98e98e82a47d1a26bd18398ab0c870a91561a9aa8cd15018e1a7f217c1fb0c42"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/final-ANALYSIS.md",
+      "sha256": "0c4bb22a361b1b4b5ecfb66a2d1ccb1a81812e3a457c656686a7e1b7fd75f6f7"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/summary.json",
+      "sha256": "72acd428463b0aebe69832f46ddfef7219bf09b433898bedb6218a7da0bb2a34"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/final-sum.test.ts",
+      "sha256": "d05a104aeeda1471d874ab463b05c5a6eda9d31d13ba4b89da1bc7843af09c39"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/final-ANALYSIS.md",
+      "sha256": "ab61d4bed8b8af732ecb9b2d4c034e3d52b174b47f1ce0a4310ebf0789512e22"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/summary.json",
+      "sha256": "ca4c9395ce476275ccde1bddb8e5d70040b77aade674d0bf52d8993e6efb1dbc"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/final-sum.test.ts",
+      "sha256": "42e193961e85c354a4a2a24d828f286423b710983d66317ffd442263ddbf7df4"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/final-ANALYSIS.md",
+      "sha256": "b77568c839ad5340f766321ef46f116d30635ae234a97f9db0a66792d37d09ed"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/summary.json",
+      "sha256": "d81634c1e16a6b8f4c64491af75e61f728bf6973490d172556a18555eae6deaf"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/final-ANALYSIS.md",
+      "sha256": "97849c7367aa1ac0cfbb94eb80ea08986a6f6bbe913493470624f34ad40ff0f6"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/final-sum.boundary.test.ts",
+      "sha256": "b16d0f0999fa8fd13b9bb9bafae4b8dcf2bf8344ae3749735a1602a31bc37822"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/generated-fixture/sum.ts",
+      "sha256": "7599ca4d26c0834e5487afe85d79c4901305b1c33caa7890f290bbfba93c9e35"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/generated-fixture/sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/generated-fixture/NOTES.md",
+      "sha256": "02bf92f5bd714bff8db71bcabe6acfa1d58d2bbffbcaf3a9cf1627c41b90a1c1"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/skills/jev-route-task/SKILL.md",
+      "sha256": "8582b0aaa60fc9f4ce2b6d3a1552f237bd34b498c986553a5f0fbc32e5c5181d"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/_summary.md",
+      "sha256": "36c2f0d836b7e7857fff2d5c985473d1d7395e60135f2c8863e3e7de5014229d"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/music.ts",
+      "sha256": "b12b12b25e67eb9d28fa26f19d7f1ff19d325ecc4fc0de04c3ab1c33d3535f40"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/crowd.test.ts",
+      "sha256": "2e58f3d142ed98ed4b3252b069d139fa6bfd5e8a03d6f365c6eedd101d94b578"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/README.md",
+      "sha256": "4c7544c5c4cecfdb92513aa51480e5505586fb5e72cd9138ccb9579068ee276b"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/crowd.ts",
+      "sha256": "13f7cacd01aa92bce8b1a99dff0e9ad8b01e858497d25b867f0012573cb6be25"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/NOTES.md",
+      "sha256": "77ab7f418a2f00072bcbd9d0fabcd304b0cac714eb66103ccd1db749440525fb"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/music.test.ts",
+      "sha256": "8516d05ab6a0ebfb72bc7f342bab4b614a274be815ba6e22f47eeb352095b2e1"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/routing-post-fix.json",
+      "sha256": "18f92c0649691ebd2549b14f7bc464308d49d53483ede371363f4dedc5ff9c1b"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/routing-review.ts",
+      "sha256": "cc40136bd9cfcd7904cb2b8b25d3261b09d653c1521a6b1dbbe72fe4fbe89735"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/README.md",
+      "sha256": "6d6ca9d00e9fade0faa44476dcbc81750dd004ecd7e7f70d029d9fc198cc7071"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/publication-index.json",
+      "sha256": "44842a3b817c363c2872fd0a10bd9c5cb9114ed6d25e8a0f48d3d9c035437684"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/clean-checkout.py",
+      "sha256": "a9b6fcf06ac7f2aca97d97bce33f50afbe903c2f39d5484a7a6fea7e16702ae3"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/publication.ts",
+      "sha256": "31aaab92a74beb9508951c72c51ac2948b88ad464f14ed3f6c45e4a9e568ec54"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/checks.json",
+      "sha256": "603f1af3247fbbf2e04f85c2b4c3b3f12c119786e84f71f3da88ea631482259d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/clean-checkout.json",
+      "sha256": "d9589bf44c35f479191d919c4b5700472aec9564b216fc9c88aeb5b331525683"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/package-patch.py",
+      "sha256": "578af2293fb36f781f806326461438e6b6c01f4d23462d0938d61e7d10955b78"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/check.ts",
+      "sha256": "fed5a6be579c2139cb83853a3ccc398ac750550e488a01c16b25fdf6ea511df7"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route-first-malformed.json",
+      "sha256": "19ec290cf19b64744f25371b00c0c9ac319094ac03ab29e22aec1eda38c3f0ca"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route.json",
+      "sha256": "ebf0d85c7e36b47ea8d1fac95251b8a60628c46304243de4d7cd66b96b3e0a99"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route.ts",
+      "sha256": "ad73ef3ee5b9253786457fb9846518f8da40a8d6a1294caaab2f9b1c1b6d2c3b"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-materials-canvas-mobile.png",
+      "sha256": "008008199a674dc799263518fef0da09d3a4ea185d9c783788683caaba1d5d60"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-music-desktop.png",
+      "sha256": "224674e376e46d439327c37ea6556e9b9ceeceaf6f8f5d931ce387dc2d35ce63"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-routing.png",
+      "sha256": "164197709b3ed608f92e300f58c84045dac51c77c6239589e4641e1c4c7f669d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-materials-mobile.png",
+      "sha256": "49ebfa899ba7cb787e56618a98a985e7c8fd36010f4fb87a047eb292a2f4ad45"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-music-mobile.png",
+      "sha256": "ff3498b79bdc01af33cad269a19421916392bb9874a473de42a50cebb34593e1"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-crowd-mobile.png",
+      "sha256": "bb4e1e330e1f2797402741c7d7932f780aad7548eeb21b05f11f72839345c2f6"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-home.png",
+      "sha256": "39d76ff2aaacbd3d5d271e27f7ceb7f5143b617fc0cb23768aa0832b038d5406"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-crowd-desktop.png",
+      "sha256": "86ed376afdec4f75136abebcb0a58528aea42c1d69f452a6551c57654eaf051d"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/_summary.md",
+      "sha256": "ee9314bcf992b13e65960438c4a71a27307e01e8d2e70218faf44005eb46572e"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/README.md",
+      "sha256": "7eb065c523b8e998b7ca661fb54d2af1b02ea4115880e1ccb92e707644799b2d"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/NOTES.md",
+      "sha256": "7a4ad6f3d25b941da593d061973ef434386994de64796423e6fb07d724445920"
+    },
+    {
+      "path": "jev-experiments/roadmap/MAP.md",
+      "sha256": "4843112135d0333048ef148019bf768da75321aecd2f385907b700c2d0d6e0ca"
+    },
+    {
+      "path": "jev-experiments/roadmap/IMPLEMENTATION.md",
+      "sha256": "077a8016bfb9b6ba80cbe25150eb4b58a8439c77584f98021f4120adfb5f996d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/icon-studio.tsx",
+      "sha256": "420d4f8f6df8d95625efc35eb38e1cd29567ec49d34bcd71091c38b67152d362"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-world-preview.tsx",
+      "sha256": "1300e5f248acf16c234d299eb882c5481e03267137ec66ace464cdec98afa15e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/music-arranger.tsx",
+      "sha256": "047f3a5d45788a146f575ac83f0b5afdde807631505d5935fca6e85bb6dcfbdb"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/local-models.tsx",
+      "sha256": "7386c6d7d34e128cbb71f467a32af9ca3455b26e04bea831b5e74c672954df78"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/main.tsx",
+      "sha256": "64410e8ebc85edfb5c966a87d959a8788e646097a4c4cfb79ab81dbe7edf0d55"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/agent-experiments.tsx",
+      "sha256": "8690f1584533c64796dd2ce0b6c02518d692cb0955a5c1d18cd6788c994fbd4f"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/tetris-experience.tsx",
+      "sha256": "df82bd1fb824c4ad89323fcd27fffbfe574de76e60ed74c0b013afde2dfb70da"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/arcade.tsx",
+      "sha256": "3e4e64b4cd8a4f68db0c7ddfc35331b56317fcc3e8e47f7608efcd8265bd3198"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-crowd.tsx",
+      "sha256": "fb257933c9cb1774b493a286a86140d2e4a6f8172116414a023c11d4e1563958"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.tsx",
+      "sha256": "1497a48865a67511de408991b348d1188bf2ac707aa2d9bdf57baa232f9ba41f"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/judgment-reliability.css",
+      "sha256": "293b039c0e4c6639a0cec1cb8a93ecb9428eff680ad5e6cae6c9333326e9657b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/shared.tsx",
+      "sha256": "2d614a74286a1b23287c0f0c5f6c268ed9ee549a251c0bf58b9e35e724df8150"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ui-catalog.ts",
+      "sha256": "93d9e40650734f6a476c429c0277659b999113e8e86e2fd1f1cf8fb71e4b423e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/cafe-jev.tsx",
+      "sha256": "7f9be4ef9ac1d666b8c3a2a9fe3898926ef780aec2aa7c87c8c5b718e07c7744"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/generated-ui.tsx",
+      "sha256": "6c8b7f6e353cdcf3ae6ec0996cc60d9da4227f1c5dc8a611ea466fd238ba74b7"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/rewardbench.tsx",
+      "sha256": "b3aa442f08b5968f940633adaeb755029bb8a3a3307dfa0f8e9f0ced9987d5c8"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-tetris.css",
+      "sha256": "79b32d93b0faad543ef93556af585e13f383503b3bc2c45bf3dcc43b9e272a67"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/judgment-reliability.tsx",
+      "sha256": "6537494abd606466d9933267e73bb740766e64ed5cf37861e9e2f8a6ab814982"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.css",
+      "sha256": "4a4568fbad342bd6b5f6282f0ab129e57729fe4b517a5160a6070c3c5e06ab40"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-tetris.tsx",
+      "sha256": "fd3a56a2216ef5c2b29803541bbddc2b0a4416429323ba5549bbe4b964a22c67"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/cafe-jev.css",
+      "sha256": "cece4f6c9c3d49f1a7f9e64b085c6741d3691d5d5aaeae6ac79a33bf7e24bccc"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx",
+      "sha256": "300f6dd9fb92206e5285540c0c51ab8a9f157955d719f52adc4e4330ea245b54"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-world-preview.css",
+      "sha256": "d16d0c08863b6c7990f66fe5cddeee6093b0b7ee9fe97b8f59e8c1a9e4456a6d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/music-arranger.css",
+      "sha256": "96571a0715fca8b4adba13441a914aa12af65f0dcfc322612a82066e26f0bff1"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/games.tsx",
+      "sha256": "27ae9be8ac4898e59a989ab7d85e80a0bdcda1ee8f95bc915817f10103247483"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/icon-studio.css",
+      "sha256": "70b8b6fb7e57b55764265d1a5f12f00b5dedac78cd210808d0edcc8842d759be"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/api.ts",
+      "sha256": "7da4ee18e73b180b81a35cb2c95714722a081fccaa54142bf94207e4a17f1342"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-crowd.css",
+      "sha256": "18b7525a2ef995ec01c771e4575b8edd0075f399dd9350773d971bd261d6436b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/outcome-framing.tsx",
+      "sha256": "872587e5bfc4cc46efe1ad7156b4da1e1fde5d27115bfafeabb51ff06c7dfe6e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/creative.tsx",
+      "sha256": "b9da4b93d6ac50841508af6534171943219b829b0c263f0b482bbfaceea54040"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/wardrobe.css",
+      "sha256": "80dc7873e7ab518c09157eee070cbd36ed008652290e3a672b53d9e15ecacbd7"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/journeys.tsx",
+      "sha256": "a49d9a68dc124ffda510ee31688d9e8c980acd27fe430cc77cc819b08f1af719"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/style.css",
+      "sha256": "0f25ff70be991cddef74d8661793598741280416bccbb5e05f1652b487705e6e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ghost-brush.tsx",
+      "sha256": "584637a347c74c70920424515d53cb9bf59677a1dfceba5afdcdb624dbd30e0b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/motion-art.tsx",
+      "sha256": "f490b6656fbe9ad4e5b63099b6c19cb590e688267ed885e42c616838cdb4417e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/misc.tsx",
+      "sha256": "a232e3a8514ec55f32b8cbe261e019bcbb28c36cb2f5e741281ad967c753bdd4"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ghost-brush.css",
+      "sha256": "0ae6477c506a594482fa5cfeb73336752298cfeec9c0d1caaa9bcdf4d3951153"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/provenance.tsx",
+      "sha256": "3d6b3ae408ae1f795273a4bf8cf410257737dd3955ac2051ad6c749d48f731d1"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/wardrobe.tsx",
+      "sha256": "8df7d8aedba89f0fcb091f2b5c6e556a7130fd28b7b55d78e6ca7e721b2fdb07"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/new-experiments.tsx",
+      "sha256": "8cdcdba29a13d2d7712615376ac5ab56f24feebf216766640b728f3b8bbd509d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/catalog.ts",
+      "sha256": "2f6e5c61aeb9ef39a8c3a31addc3bd940073c74a7e5e04d412c752454ffddc5c"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/outcome-framing.css",
+      "sha256": "e2362b86594fb4ac88e00b77d5fe6b361939283ba718252fecbff6085cf4af9b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "sha256": "de65877f1595a9168eade9acdfc25b475c7c77c596f5704891f014de6a51ea7e"
+    }
+  ],
+  "answer_sha256": "3976e97e02ed767eff4d296447fec421e84594d6b2b8a980540f712a72f33433",
+  "opencode_reported_cost_usd": 3.10938975,
+  "billing_verified": false,
+  "raw_output_local": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-release-review-f6gaas03",
+  "provenance_recovery": "Immediate export contained no readable assistant metadata. Repeated the export without another model call and verified all28 assistant message identities."
+}
