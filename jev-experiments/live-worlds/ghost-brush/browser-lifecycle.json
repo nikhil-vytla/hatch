@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "pointer ink renders while network request is pending",
+    "resolved result waits while pointer stroke remains active",
+    "queued result applies at pointer-up boundary",
+    "editing cancels an obsolete request without changing the brush",
+    "late failure does not overwrite the newer edit notice"
+  ],
+  "count": 5,
+  "requestsIntercepted": 2,
+  "realModelCalls": 0,
+  "note": "Explicit mocked HTTP responses test lifecycle only; these are not model evidence.",
+  "checkedAt": "2026-09-20T21:33:53.708Z",
+  "page": "http://127.0.0.1:5193/#experiment/ghost-brush"
+}

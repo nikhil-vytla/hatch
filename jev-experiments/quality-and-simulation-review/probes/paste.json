@@ -1,0 +1,478 @@
+{
+  "method": "Offline Bun execution of actual React component source with a minimal hook/element harness and actual extension background source with a mocked Chrome API and fetch. This is not a browser run or a model evaluation.",
+  "published": {
+    "status": "complete",
+    "rows": 3,
+    "decisions": 15,
+    "abstentions": 0,
+    "minimumConfidence": 0.45,
+    "initialSuggestions": {
+      "f0": "fact0",
+      "f1": "fact4",
+      "f2": "fact5",
+      "f3": "fact8",
+      "f4": "fact7"
+    },
+    "mappings": [
+      {
+        "preset": "Conference",
+        "latencyMs": 632,
+        "retries": 0,
+        "fields": [
+          {
+            "field": "Event title",
+            "selected": "fact0",
+            "fact": {
+              "id": "fact0",
+              "label": "Event",
+              "value": "Small Worlds Conference",
+              "source": "Event: Small Worlds Conference"
+            },
+            "confidence": 0.98,
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact0": 0.98,
+              "none": 0.02,
+              "fact5": 0,
+              "fact4": 0,
+              "fact1": 0,
+              "fact7": 0,
+              "fact2": 0
+            }
+          },
+          {
+            "field": "Location",
+            "selected": "fact4",
+            "fact": {
+              "id": "fact4",
+              "label": "Venue address",
+              "value": "240 Oak Avenue, Seattle",
+              "source": "Venue address: 240 Oak Avenue, Seattle"
+            },
+            "confidence": 0.96,
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0.02,
+              "fact6": 0,
+              "fact0": 0,
+              "none": 0.01,
+              "fact4": 0.97,
+              "fact5": 0,
+              "fact2": 0,
+              "fact7": 0,
+              "fact1": 0
+            }
+          },
+          {
+            "field": "Event date",
+            "selected": "fact5",
+            "fact": {
+              "id": "fact5",
+              "label": "Event date",
+              "value": "October 12, 2026",
+              "source": "Event date: October 12, 2026"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0,
+              "fact4": 0,
+              "fact0": 0,
+              "fact6": 0,
+              "fact5": 1,
+              "none": 0,
+              "fact1": 0,
+              "fact7": 0,
+              "fact2": 0
+            }
+          },
+          {
+            "field": "Start time",
+            "selected": "fact8",
+            "fact": {
+              "id": "fact8",
+              "label": "Start time",
+              "value": "9:30 AM",
+              "source": "Start time: 9:30 AM"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact8": 1,
+              "fact5": 0,
+              "fact4": 0,
+              "fact0": 0,
+              "fact6": 0,
+              "none": 0,
+              "fact3": 0,
+              "fact2": 0,
+              "fact7": 0,
+              "fact1": 0
+            }
+          },
+          {
+            "field": "Contact email",
+            "selected": "fact7",
+            "fact": {
+              "id": "fact7",
+              "label": "Contact email",
+              "value": "hello@smallworlds.example",
+              "source": "Contact email: hello@smallworlds.example"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact8": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact0": 0,
+              "fact5": 0,
+              "none": 0,
+              "fact4": 0,
+              "fact2": 0,
+              "fact7": 1,
+              "fact1": 0
+            }
+          }
+        ]
+      },
+      {
+        "preset": "Contact",
+        "latencyMs": 301,
+        "retries": 0,
+        "fields": [
+          {
+            "field": "Full name",
+            "selected": "fact0",
+            "fact": {
+              "id": "fact0",
+              "label": "Person",
+              "value": "Maya Chen",
+              "source": "Person: Maya Chen"
+            },
+            "confidence": 0.99,
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact2": 0,
+              "none": 0,
+              "fact0": 1,
+              "fact4": 0
+            }
+          },
+          {
+            "field": "Job title",
+            "selected": "fact1",
+            "fact": {
+              "id": "fact1",
+              "label": "Role",
+              "value": "Design director",
+              "source": "Role: Design director"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 1,
+              "fact3": 0,
+              "fact6": 0,
+              "fact2": 0,
+              "none": 0,
+              "fact0": 0,
+              "fact4": 0
+            }
+          },
+          {
+            "field": "Company",
+            "selected": "fact2",
+            "fact": {
+              "id": "fact2",
+              "label": "Company",
+              "value": "Northstar Studio",
+              "source": "Company: Northstar Studio"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact5": 0,
+              "fact4": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "fact2": 1,
+              "none": 0,
+              "fact0": 0,
+              "fact1": 0
+            }
+          },
+          {
+            "field": "Work email",
+            "selected": "fact3",
+            "fact": {
+              "id": "fact3",
+              "label": "Work email",
+              "value": "maya@northstar.example",
+              "source": "Work email: maya@northstar.example"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 0,
+              "fact3": 1,
+              "fact6": 0,
+              "fact4": 0,
+              "none": 0,
+              "fact0": 0,
+              "fact2": 0
+            }
+          },
+          {
+            "field": "Company website",
+            "selected": "fact6",
+            "fact": {
+              "id": "fact6",
+              "label": "Company website",
+              "value": "https://northstar.example",
+              "source": "Company website: https://northstar.example"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact5": 0,
+              "fact1": 0,
+              "fact3": 0,
+              "fact6": 1,
+              "fact2": 0,
+              "none": 0,
+              "fact0": 0,
+              "fact4": 0
+            }
+          }
+        ]
+      },
+      {
+        "preset": "Memory",
+        "latencyMs": 432,
+        "retries": 0,
+        "fields": [
+          {
+            "field": "Full name",
+            "selected": "fact0",
+            "fact": {
+              "id": "fact0",
+              "label": "Full name",
+              "value": "Alex Morgan",
+              "source": "Full name: Alex Morgan"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact0": 1,
+              "fact3": 0,
+              "fact6": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 0,
+              "fact5": 0,
+              "fact4": 0
+            }
+          },
+          {
+            "field": "Shipping address",
+            "selected": "fact5",
+            "fact": {
+              "id": "fact5",
+              "label": "Preferred shipping address",
+              "value": "17 Cedar Lane, Oakland",
+              "source": "Preferred shipping address: 17 Cedar Lane, Oakland"
+            },
+            "confidence": 0.99,
+            "probabilities": {
+              "fact6": 0,
+              "fact3": 0,
+              "fact0": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 0,
+              "fact5": 1,
+              "fact4": 0
+            }
+          },
+          {
+            "field": "Previous residence",
+            "selected": "fact2",
+            "fact": {
+              "id": "fact2",
+              "label": "Previous home address",
+              "value": "80 Lake Road, Berkeley (until June 2025)",
+              "source": "Previous home address: 80 Lake Road, Berkeley (until June 2025)"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact0": 0,
+              "fact3": 0,
+              "fact6": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 1,
+              "fact5": 0,
+              "fact4": 0
+            }
+          },
+          {
+            "field": "Company headquarters",
+            "selected": "fact4",
+            "fact": {
+              "id": "fact4",
+              "label": "Office address",
+              "value": "210 Mission Street, San Francisco",
+              "source": "Office address: 210 Mission Street, San Francisco"
+            },
+            "confidence": 0.45,
+            "probabilities": {
+              "fact0": 0,
+              "fact3": 0.01,
+              "fact6": 0,
+              "none": 0.48,
+              "fact7": 0,
+              "fact1": 0,
+              "fact2": 0,
+              "fact5": 0,
+              "fact4": 0.51
+            }
+          },
+          {
+            "field": "Personal email",
+            "selected": "fact6",
+            "fact": {
+              "id": "fact6",
+              "label": "Personal email",
+              "value": "alex@example.com",
+              "source": "Personal email: alex@example.com"
+            },
+            "confidence": 1,
+            "probabilities": {
+              "fact6": 1,
+              "fact3": 0,
+              "fact0": 0,
+              "none": 0,
+              "fact7": 0,
+              "fact2": 0,
+              "fact1": 0,
+              "fact5": 0,
+              "fact4": 0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "authoredPresets": [
+    {
+      "name": "Conference",
+      "facts": 9,
+      "fields": 5
+    },
+    {
+      "name": "Contact",
+      "facts": 7,
+      "fields": 5
+    },
+    {
+      "name": "Memory",
+      "facts": 8,
+      "fields": 5
+    }
+  ],
+  "appParsing": [
+    {
+      "id": "fact0",
+      "label": "https",
+      "value": "//northstar.example",
+      "source": "https://northstar.example"
+    },
+    {
+      "id": "fact1",
+      "label": "9",
+      "value": "30 AM",
+      "source": "9:30 AM"
+    },
+    {
+      "id": "fact2",
+      "label": "Source 3",
+      "value": "Maya Chen works at Northstar Studio. Her email is maya@example.com.",
+      "source": "Maya Chen works at Northstar Studio. Her email is maya@example.com."
+    }
+  ],
+  "overwrite": {
+    "manualValueBefore": "Manual title",
+    "afterFillAll": "Small Worlds Conference"
+  },
+  "undo": {
+    "manualValueAfterAccept": "Manual edit after accept",
+    "valueAfterUndo": "Manual title"
+  },
+  "crossPresetUndo": {
+    "fields": [
+      "Full name",
+      "Job title",
+      "Company",
+      "Work email",
+      "Company website"
+    ],
+    "filled": {
+      "f0": "Unrelated conference title"
+    }
+  },
+  "staleResponse": {
+    "sourceSent": "Event: Small Worlds Conference\nOrganizer: Fieldwork Collective\nOrganizer address: 18 Pine Street, Portland\nVenue: Glasshouse Hall\nVenue address: 240 Oak Avenue, Seattle\nEvent date: October 12, 2026\nRegistration deadline: September 28, 2026\nContact email: hello@smallworlds.example\nStart time: 9:30 AM",
+    "currentFacts": [
+      {
+        "id": "fact0",
+        "label": "Event",
+        "value": "Changed while request was running",
+        "source": "Event: Changed while request was running"
+      }
+    ],
+    "suggestions": {
+      "f0": "fact0"
+    },
+    "accepted": {
+      "f0": "Changed while request was running"
+    }
+  },
+  "extensionPayloadLimit": {
+    "sourceBytes": 7189,
+    "fields": 24,
+    "facts": 80,
+    "payloadBytes": 205107,
+    "validation": "Provide state and 1–128 questions under 100 KB."
+  },
+  "extensionTruncation": {
+    "suppliedLines": 81,
+    "retained": 80,
+    "finalRetained": {
+      "id": "f79",
+      "label": "Fact 79",
+      "value": "Value 79"
+    },
+    "explicitTruncationField": false
+  },
+  "extensionParsing": [
+    {
+      "id": "f0",
+      "label": "https",
+      "value": "//northstar.example"
+    },
+    {
+      "id": "f1",
+      "label": "9",
+      "value": "30 AM"
+    },
+    {
+      "id": "f2",
+      "label": "Line 3",
+      "value": "Maya Chen works at Northstar Studio. Her email is maya@example.com."
+    }
+  ]
+}

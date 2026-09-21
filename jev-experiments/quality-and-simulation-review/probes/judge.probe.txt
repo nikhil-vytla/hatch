@@ -1,0 +1,17 @@
+{
+  "pairs": 100,
+  "ordered_rows": 200,
+  "both_correct": 63,
+  "inconsistent": 28,
+  "both_wrong": 9,
+  "ordered_accuracy": 0.77,
+  "official_two_order_score_complete_pairs": 0.63,
+  "atomic_ordered_accuracy": 0.715,
+  "atomic_ties": 5,
+  "full_inputs": 200,
+  "recovered": 14
+}
+dataset=judgebench,response_model=gpt-4o-2024-05-13.jsonl 350
+dataset=judgebench,response_model=claude-3-5-sonnet-20240620.jsonl 270
+all embedded candidate strings match pinned source
+distinct source questions: sample 83 full 268

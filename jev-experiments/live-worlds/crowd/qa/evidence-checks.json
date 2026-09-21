@@ -1,0 +1,15 @@
+{
+  "canonicalEqualsDerived": true,
+  "requestHashMatches": true,
+  "snapshotObservationMatches": true,
+  "questionsMatch": true,
+  "wireBodyMatches": true,
+  "allNativeAnswersRetained": true,
+  "answerCount": 24,
+  "attemptCount": 1,
+  "statuses": [
+    200
+  ],
+  "suspiciousCredentialFields": [],
+  "providerCalls": 0
+}

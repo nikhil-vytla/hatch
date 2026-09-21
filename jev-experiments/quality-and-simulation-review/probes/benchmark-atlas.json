@@ -1,0 +1,65 @@
+{
+  "sha256": "656cdde73fcabee3ea7d70e58dc4a520d5750c0729f01aed142742c904d02894",
+  "benchmarks": 8,
+  "ideas": 12,
+  "statusCounts": {
+    "Proposed": 19,
+    "Implemented": 1
+  },
+  "implemented": [
+    {
+      "name": "Typed Decisions",
+      "experiment": "local-models"
+    }
+  ],
+  "declaredStructuredFields": {
+    "id": 0,
+    "revision": 0,
+    "split": 0,
+    "expected_cases": 0,
+    "completed_cases": 0,
+    "scorer": 0,
+    "request_budget": 0,
+    "seed": 0,
+    "evidence_path": 0
+  },
+  "benchmarkUrls": [
+    {
+      "name": "BoolQ",
+      "url": "https://github.com/google-research-datasets/boolean-questions"
+    },
+    {
+      "name": "ANLI",
+      "url": "https://github.com/facebookresearch/anli"
+    },
+    {
+      "name": "PAWS",
+      "url": "https://github.com/google-research-datasets/paws"
+    },
+    {
+      "name": "SciFact",
+      "url": "https://github.com/allenai/scifact"
+    },
+    {
+      "name": "MASSIVE",
+      "url": "https://github.com/alexa/massive"
+    },
+    {
+      "name": "WildGuardMix",
+      "url": "https://github.com/allenai/wildguard"
+    },
+    {
+      "name": "AgentDojo",
+      "url": "https://github.com/ethz-spylab/agentdojo"
+    },
+    {
+      "name": "Typed Decisions",
+      "url": "https://huggingface.co/datasets/LocalLLaMA/typed-decisions"
+    }
+  ],
+  "explicitCountProtocols": [
+    "BoolQ",
+    "Typed Decisions"
+  ],
+  "modelCalls": 0
+}

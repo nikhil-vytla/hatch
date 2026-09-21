@@ -1,0 +1,209 @@
+{
+  "method": "Offline actual-component callback/hook harness, published-record decoding, actual installed composer with a deterministic mocked evaluator, and actual wrapper invalid-strategy validation. No browser or model calls.",
+  "candidateCounts": [
+    {
+      "domain": "settings",
+      "candidates": 10
+    },
+    {
+      "domain": "apartments",
+      "candidates": 10
+    },
+    {
+      "domain": "event",
+      "candidates": 12
+    }
+  ],
+  "currentRows": [
+    {
+      "domain": "settings",
+      "catalogVersion": null,
+      "stopReason": "finish",
+      "nodes": 8,
+      "steps": 8,
+      "elapsedMs": 2753,
+      "hasTerminalStep": false,
+      "candidateUseOverCurrentLimit": [
+        {
+          "candidate": "column",
+          "count": 2,
+          "currentLimit": 1
+        }
+      ]
+    },
+    {
+      "domain": "apartments",
+      "catalogVersion": 2,
+      "stopReason": "finish",
+      "nodes": 5,
+      "steps": 5,
+      "elapsedMs": 1651,
+      "hasTerminalStep": false,
+      "candidateUseOverCurrentLimit": []
+    },
+    {
+      "domain": "event",
+      "catalogVersion": null,
+      "stopReason": "finish",
+      "nodes": 10,
+      "steps": 10,
+      "elapsedMs": 21607,
+      "hasTerminalStep": false,
+      "candidateUseOverCurrentLimit": [
+        {
+          "candidate": "column",
+          "count": 3,
+          "currentLimit": 1
+        }
+      ]
+    }
+  ],
+  "previousAttempts": [
+    {
+      "domain": "apartments",
+      "stopReason": "limit",
+      "steps": 10
+    },
+    {
+      "domain": "event",
+      "stopReason": "limit",
+      "steps": 10
+    },
+    {
+      "domain": "apartments",
+      "stopReason": "unavailable",
+      "steps": 14
+    }
+  ],
+  "recordedCloudRevision": {
+    "http_status": 200,
+    "event_count": 2,
+    "first_chunk_ms": 508,
+    "total_ms": 832,
+    "stopReason": "finish",
+    "preserved_name": "Preserve this edited name",
+    "has_toggle": false
+  },
+  "versionReselection": {
+    "editedName": "User-edited draft",
+    "keyBefore": 1,
+    "keyAfter": 2,
+    "nextInitialName": "Alex Morgan",
+    "externalStore": false
+  },
+  "shortlist": {
+    "notice": [
+      "Sunlit studio added to your shortlist."
+    ],
+    "hasShortlistInState": false
+  },
+  "crossDomain": {
+    "requestedDomain": "settings",
+    "currentDomain": "apartments",
+    "abortedOnDomainSwitch": false,
+    "beforeSwitchResultTypes": [
+      "Stack",
+      "Apartment",
+      "Input",
+      "Apartment",
+      "Apartment"
+    ],
+    "afterLateResultTypes": [
+      "Stack",
+      "Card",
+      "Stack",
+      "Input",
+      "Input",
+      "Stack",
+      "Toggle",
+      "Button"
+    ],
+    "label": "Live Jev composition"
+  },
+  "prematureEnd": {
+    "label": "Jev is composing",
+    "versionLabels": [
+      [
+        {
+          "type": "GitBranch",
+          "props": {
+            "size": 13,
+            "children": []
+          }
+        },
+        {
+          "type": "strong",
+          "props": {
+            "children": [
+              "Version ",
+              1
+            ]
+          }
+        },
+        {
+          "type": "span",
+          "props": {
+            "children": [
+              "Create account settings with name, email, notifications, and a save button."
+            ]
+          }
+        }
+      ],
+      [
+        {
+          "type": "GitBranch",
+          "props": {
+            "size": 13,
+            "children": []
+          }
+        },
+        {
+          "type": "strong",
+          "props": {
+            "children": [
+              "Version ",
+              2
+            ]
+          }
+        },
+        {
+          "type": "span",
+          "props": {
+            "children": [
+              "Create account settings with name, email, notifications, and a save button."
+            ]
+          }
+        }
+      ]
+    ],
+    "notice": null
+  },
+  "strategies": [
+    {
+      "strategy": "batched",
+      "error": "Unknown composition strategy."
+    },
+    {
+      "strategy": "batch",
+      "error": "Invalid composition request."
+    }
+  ],
+  "composerStateBoundary": {
+    "preservedName": "Private edited marker",
+    "evaluatorReceivedMarker": false,
+    "inputStateKeys": [
+      "user_request",
+      "already_built",
+      "changes_made",
+      "context"
+    ]
+  },
+  "legacyEvidence": {
+    "planned": 20,
+    "completed": 12,
+    "layoutCorrect": 12,
+    "revisionPreserved": 9,
+    "storedLayoutAccuracy": 0.6,
+    "storedRevisionStability": 0.45
+  }
+}

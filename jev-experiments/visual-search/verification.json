@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-09-20T21:36:49.849Z",
+  "artworks": 204,
+  "queries": 6,
+  "modes": 2,
+  "expected_scores": 2448,
+  "completed_scores": 2448,
+  "complete": true,
+  "reconstructed_question_attempts": 2480,
+  "collection_sha256": "b2cbd8d3bbc160eddbcaba9b9d02f55f26fd4e2ba41df2224a0d14dac2dc844c",
+  "protocol_sha256": "42302a59358e2f93a35d788e19b3d06503fca297f60f37e3eb21fdcbd1d301a9"
+}

@@ -1,0 +1,157 @@
+{
+  "id": "teach",
+  "title": "Active labeling",
+  "evidenceStatus": "One authored beverage run, one seed, 80 test rows; audited exports on all 768 current held-out templates",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "Real Jev labels train exported TF-IDF logistic classifiers, but the fixed vocabulary cannot distinguish warm from chilled in any test case. Uncertainty acquisition also spends 32 labels on only 28 distinct texts. The current page replays saved curves and needs a correction-and-retraining interaction plus a replicated evaluation before claiming label savings.",
+  "strengths": [
+    "Actual sklearn parameter fitting and complete student weight export.",
+    "Shared initial labels and equal attempted budgets for random and uncertainty sampling.",
+    "Menu-derived targets are independent of Jev; teacher agreement is distinct from student test accuracy.",
+    "Current UI acknowledges authored fixtures and the absence of an uncertainty-sampling win.",
+    "Existing parity test covers export semantics; audit inference exactly reproduces both published final scores."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Held-out temperature words erase a required feature",
+      "evidence": "src/jev_lab/compositions.py:269; src/jev_lab/teach.py:13; probes/teach.results.json: warm/chilled absent from vocabulary, 0/80 probability changes when swapped, 62.5% ceiling on all 768 authored templates",
+      "impact": "The acquisition comparison is confounded by a representation failure that labeling more of the current pool cannot repair.",
+      "fix": "Separate an in-distribution acquisition study from wording-shift evaluation; freeze a representation or explicit toy normalizer that preserves temperature distinctions before comparing policies."
+    },
+    {
+      "priority": "P1",
+      "title": "Repeated text consumes the annotation budget",
+      "evidence": "src/jev_lab/teach.py:40 and :68; 140 distinct pool texts among 160 rows; uncertainty selects 28 distinct texts in 32 labels, random 32; 51 cached IDs cover 47 texts",
+      "impact": "Equal ID budgets hide redundant teacher work and different useful-label budgets.",
+      "fix": "Deduplicate acquisition by content and teacher configuration; retain prevalence as training weights; compare diversity-aware batches and report calls, annotations, distinct texts, and correction time separately."
+    },
+    {
+      "priority": "P1",
+      "title": "One small seed does not establish label efficiency",
+      "evidence": "src/jev_lab/teach.py:32 and :36; results/teach.jsonl:2-5 and :131-134; final 43/80 versus 42/80; complete authored-template audit gives 391/768 versus 344/768",
+      "impact": "Class discovery, template sampling, and seed variation can dominate the one-example published gap; there is no external benchmark coverage.",
+      "fix": "Score the full authored grammar, run 20 paired seeds, add oracle-label and full-pool controls, and report area under the label curve plus labels to a predeclared target with uncertainty."
+    },
+    {
+      "priority": "P1",
+      "title": "The visitor cannot label, correct, or retrain",
+      "evidence": "experience-prototypes/src/benchmarks.tsx:456 and :585 show saved curves and a More examples action; current Learning component does not call the exported local predictor",
+      "impact": "The central question about choosing useful examples remains a passive result page, and perfect saved teacher labels never demonstrate correction.",
+      "fix": "Add a fixed-budget annotation queue with selection, Jev suggestions, human correction, commit-and-retrain, practice feedback, and sealed final evaluation."
+    },
+    {
+      "priority": "P2",
+      "title": "Missing measurements become zero and acquisition decisions lack replay data",
+      "evidence": "src/jev_lab/teach.py:74 emits accuracy null; experience-prototypes/src/benchmarks.tsx:467 maps null to 0; src/jev_lab/teach.py:91 saves final model and selected IDs without per-round utilities",
+      "impact": "A future failed batch or one-class start would look like measured 0% accuracy, while visitors cannot inspect why a candidate was selected. The published successful run is unaffected by the null conversion.",
+      "fix": "Render unavailable scores as gaps and record round utilities, model versions, text hashes, per-case predictions, failures, and attempted versus successful label counts."
+    }
+  ],
+  "simulation": {
+    "title": "Spend 24 labels to train the drink desk",
+    "description": "Start from eight labels, choose requests under a 24-label budget, ask Jev or provide a human label, correct or abstain, commit a batch, and watch a real local student update. Use a practice stream for immediate feedback and reveal a separate sealed evaluation only at finish. Clearly labeled recorded mode and an injected-error teacher scenario make correction inspectable without live calls.",
+    "jevsRole": "Return a typed label and probability distribution for selected requests, with an ambiguity option in the richer task. Jev never sees hidden targets, selects the winning method, or supplies the independent score.",
+    "codeRole": "Manage deduplicated pool partitions, versioned annotation ledger, budgets, acquisition utilities and diversity, retraining, local inference, deterministic menu constraints, abstention checks, undo, and sealed scoring.",
+    "acceptanceCriteria": [
+      "Visitor selection, labeling, correction, retraining, and changed predictions work in one session.",
+      "An exact duplicate under the same menu and teacher configuration consumes no new annotation unless repeat judgment is explicitly requested and priced.",
+      "Compared methods share initial labels, acquisition seed, representation, and budgets without consulting hidden gold labels.",
+      "Failure or retry creates no label or weight update; fewer than two classes displays not trained.",
+      "Correction and undo reproduce the student from the annotation ledger; undo does not erase incurred provider cost.",
+      "No sealed targets reach Jev, acquisition, development choices, or the visitor before finish.",
+      "Scripted teacher errors and assumed error rates are clearly labeled as simulation, separate from measured Jev behavior."
+    ]
+  },
+  "evaluation": {
+    "design": "Retain the exhaustive 768-template regression set and temperature counterfactual. Run repaired beverage acquisition over 20 paired seeds at 8/16/24/32/48/64 unique labels with a frozen representation and separate in-distribution and wording-shift results. Run both menu-oracle and teacher-label arms. For BANKING77, reserve 1540 training rows for development, acquire from 8463 rows, and score all 3080 test cases under ten paired seeds, three acquisition policies, and budgets 77/154/308/616/1232. Begin with released labels as a perfect annotation simulator; teacher-quality conclusions require a separate Jev-label arm. Claim label savings only if paired area-under-curve improvement has a positive lower 95% seed-bootstrap bound, median labels to the fixed target fall at least 10%, and final macro-F1 drops no more than one point. Threshold is 90% of full-pool oracle validation accuracy, fixed before test evaluation; unreached thresholds are censored.",
+    "baselines": [
+      "Deduplicated uniform random acquisition with identical starting labels",
+      "Least-confidence acquisition",
+      "Uncertainty with diversity-aware batches",
+      "Majority label prior and deterministic menu parser for the authored task",
+      "Same student and acquisitions with oracle labels",
+      "Full-pool oracle-labeled student as a representation control"
+    ],
+    "metrics": [
+      "Official BANKING77 exact-match top-1 accuracy on all 3080 test cases",
+      "Normalized trapezoidal area under accuracy versus unique-label budget",
+      "Labels to a fixed validation-defined target, with unreached runs censored",
+      "Macro-F1, per-class recall, Brier score, and abstention risk/coverage",
+      "Teacher agreement, human corrections, annotation time, unique text count, provider requests, and retry-inclusive latency",
+      "Paired seed effects and 95% bootstrap intervals; template families and reused teacher labels are not independent replicates"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "160 pool rows with 140 distinct texts; one seed and 80 test rows with 77 distinct texts; zero external cases. Audit additionally scored all 768 current held-out templates with saved models.",
+      "full": "Current authored grammar has 768 held-out templates. Proposed BANKING77 evaluation uses all 3080 official test examples from a dataset with 10003 training examples and 77 intents.",
+      "feasibility": "Authored exhaustive inference completed with Bun and no provider calls. BANKING77 ten-seed, three-policy, five-checkpoint evaluation needs 462000 local predictions. Released training labels simulate a perfect annotator with zero Jev calls; a complete cache for the proposed 8463-row acquisition pool needs 1058 successful eight-label requests, plus 385 for optional full-test direct Jev inference, excluding retries and batch-consistency checks. Dataset retrieval, Python environment, option definitions, teacher cost, and ambiguous source labels remain; no external data or weights were downloaded in this audit."
+    }
+  },
+  "libraries": [
+    {
+      "name": "small-text",
+      "url": "https://small-text.readthedocs.io/en/latest/api/active_learner.html",
+      "use": "Reuse its pool learner, query/update lifecycle, retraining, ignored labels, and label corrections with the sklearn student. Its query strategies provide random, least-confidence, and coreset controls; Jev supplies reviewable annotations."
+    },
+    {
+      "name": "Label Studio",
+      "url": "https://labelstud.io/guide/predictions",
+      "use": "Export versioned Jev pre-annotations and prediction scores to a real human review workflow; keep accepted human labels separate from predictions and retain the public app's immediate student-update experience."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Publish the exhaustive inference diagnostic, temperature vocabulary failure, distinct-text counts, and per-class scores beside the pilot."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Repair representation controls and deduplicate acquisition; run 20 paired seeds with oracle-label and teacher-label arms."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Build the fixed-budget annotation session with corrections, reproducible student updates, and a labeled teacher-error simulation."
+    },
+    {
+      "priority": "P2",
+      "size": "S",
+      "action": "Preserve missing chart points and publish per-round utility, model, prediction, and request records."
+    },
+    {
+      "priority": "P2",
+      "size": "L",
+      "action": "Run the complete 3080-case BANKING77 protocol, starting with free perfect-annotator replay; reuse the annotation ledger in a future ticket-routing and review-time study."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Official BANKING77 split counts and intents",
+      "url": "https://github.com/PolyAI-LDN/task-specific-datasets#banking"
+    },
+    {
+      "label": "Original BANKING77 evaluation and accuracy metric",
+      "url": "https://arxiv.org/html/2003.04807v1"
+    },
+    {
+      "label": "BANKING77 dataset card",
+      "url": "https://huggingface.co/datasets/PolyAI/banking77/blob/main/README.md"
+    },
+    {
+      "label": "small-text active learner API",
+      "url": "https://small-text.readthedocs.io/en/latest/api/active_learner.html"
+    },
+    {
+      "label": "small-text query strategies",
+      "url": "https://small-text.readthedocs.io/en/stable/components/query_strategies.html"
+    },
+    {
+      "label": "Label Studio versioned predictions",
+      "url": "https://labelstud.io/guide/predictions"
+    }
+  ]
+}

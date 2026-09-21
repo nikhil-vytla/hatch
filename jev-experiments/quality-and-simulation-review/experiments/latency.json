@@ -1,0 +1,168 @@
+{
+  "id": "latency",
+  "title": "Batching & latency",
+  "evidenceStatus": "120 serial requests across 12 repeated-question payloads; 118 completed, with 169 transport attempts and one positive semantic fact.",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The sweep shows that a request can return many copies of one easy Noul judgment, but it does not measure useful decision throughput. Its successful-only p95 hides failed-request waiting: one group's displayed 3.38-second p95 becomes 9.09 seconds when all terminal durations are counted. A paired, independently labelled workload and a queue replay would make the batching tradeoff measurable.",
+  "strengths": [
+    "All 12 published percentile pairs reproduce from the recorded successful rows, and failure durations remain available.",
+    "The client validates every expected answer and records retry-aware evaluate duration separately from successful-attempt timing.",
+    "The published transport summary distinguishes attempts, logical requests, HTTP errors, and missing cost metadata.",
+    "Five relevant Python contract tests pass; raw local logs contain all 5,030 returned question slots."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Repeated copies of one positive question do not measure useful batching",
+      "evidence": "jev-experiments/src/jev_lab/benchmarks.py:220-239; probe found 12 payload hashes, one instruction, 5,030 returned slots, and actual state lengths of 109/1,009/4,009 words.",
+      "impact": "The current run measures repetitive payload timing and acceptance. It cannot establish independent decision quality, diverse-question scaling, or correctness when multiple records share a packed state.",
+      "fix": "Retain the current condition as a transport control. Add balanced distinct labels, predictions, stable question IDs, tokens and bytes, and separate same-state fan-out from multiple-record packing."
+    },
+    {
+      "priority": "P1",
+      "title": "Successful-only p95 hides failed waiting",
+      "evidence": "jev-experiments/src/jev_lab/benchmarks.py:256-268; results/latency.jsonl:11 shows 3,378ms p95 for nine successes; the omitted tenth request failed after 12,815ms, producing 9,085ms p95 across all terminal durations.",
+      "impact": "A condition can look faster because a slow request fails. Terminal duration also must not be confused with time to a valid decision.",
+      "fix": "Show success-conditional latency, all-request terminal duration, failure rate, and correct decisions delivered before the deadline as separate metrics, with all offered work retained in availability denominators."
+    },
+    {
+      "priority": "P1",
+      "title": "Serial fixed-order samples confound packing with service conditions",
+      "evidence": "jev-experiments/src/jev_lab/benchmarks.py:220-252 awaits each request; core.py:255-258 reuses one HTTP client; local log maximum in flight is one; 43 of 120 requests retry; each group has only ten samples.",
+      "impact": "The experiment cannot isolate request concurrency, cold-client effects, provider coldness, cache behavior, or sustainable capacity. Time-varying gateway pressure can explain group differences.",
+      "fix": "Use randomized paired blocks, explicit concurrency and arrival schedules, an isolated ledger, labelled warm-up and fresh-client diagnostics, and timing stages for local queue, attempts and backoff. Keep provider coldness unknown without evidence."
+    },
+    {
+      "priority": "P1",
+      "title": "The comparison lacks an equal-work baseline and useful throughput",
+      "evidence": "jev-experiments/experience-prototypes/src/benchmarks.tsx:553-564 shows request medians and request counts; results/latency.jsonl:9 represents ten requests carrying 1,280 answer slots.",
+      "impact": "A fast packed request does not establish a better time to useful decisions. Dividing duration by question count would omit shared response waiting and any batch-collection delay.",
+      "fix": "Compare identical labelled work through serial singleton calls, bounded concurrent singleton calls, and native multi-question calls. Measure job completion and correct on-time decisions per elapsed second."
+    },
+    {
+      "priority": "P2",
+      "title": "The chart clips slow medians and turns empty percentiles into zero",
+      "evidence": "jev-experiments/experience-prototypes/src/benchmarks.tsx:558 caps bars at 1,500ms; the 4,000/32 condition has a 1,670ms median. Lines 561-563 pass nullable percentiles to Math.round, which coerces null to zero.",
+      "impact": "The visual suppresses the latency tail and would imply instant success for a group with no successful requests.",
+      "fix": "Use a labelled shared scale, distributions or request dots with failure marks, explicit no-success states, and selectable request timelines."
+    },
+    {
+      "priority": "P2",
+      "title": "Cost and version metadata do not support a durable efficiency claim",
+      "evidence": "jev-experiments/results/latency.jsonl:1 reports $0 and 51 attempts without cost metadata; lines 134-136 contain cumulative 3,500-attempt ledger totals. Local successful responses identify only typesafe-ai/jev.",
+      "impact": "A promotional price and cross-run ledger totals cannot establish run-specific steady-state cost; the underlying model version remains unknown.",
+      "fix": "Record run-local tokens, billed cost, missing-cost counts, route, exposed model identity, and dated pricing sources. Separate promotional price, estimates and measured bills, and preserve unknown fields."
+    }
+  ],
+  "simulation": {
+    "title": "A support desk under load",
+    "description": "Replay one seeded ticket arrival stream through singleton dispatch, immediate packing, and 25/100ms collection windows. Let visitors vary question cap, request concurrency and a two-second target, then inspect each ticket's collection wait, queue, attempts, backoff and final disposition.",
+    "jevsRole": "Judge ticket intent and urgency against a frozen rubric, returning values tied to stable ticket/question IDs and state revisions.",
+    "codeRole": "Create shared states, enforce packing limits, schedule and retry requests, validate answers, handle deadlines, score independent outcomes, and generate a deterministic replay. Counterfactual scheduling uses labelled simulations, not invented model measurements.",
+    "acceptanceCriteria": [
+      "The same seed reproduces arrival timestamps and scheduler events.",
+      "Every result maps to its original ticket, question, state revision and request; stale or missing values cannot silently complete work.",
+      "Collection windows and capacity queues are displayed separately.",
+      "Every policy receives identical offered work, and failed, expired and dropped work remains in all service-target denominators.",
+      "Timeline stages reconcile to measured end-to-end duration and distinguish request latency from ticket waiting.",
+      "Recorded replay makes zero model requests; unsupported load conditions cannot borrow an optimistic serial timing estimate."
+    ]
+  },
+  "evaluation": {
+    "design": "Use 20 development and 100 held-out scene seeds, each with 128 distinct balanced statements and three token-length variants. Freeze labels and templates independently of Jev. Run every held-out bundle with pack sizes 1/8/32/128 and concurrency caps 1/4 in five randomized time blocks: 89,400 logical requests. Add 9,000 tail-extension requests and 100 labelled warm-ups for 98,500 total, with at most 295,500 attempts under the three-attempt rule. Use a dedicated reviewed ledger because the existing 10,000-attempt cap is insufficient. Report paired 95% intervals clustered by scene seed and block; lengths are correlated. Offline scheduler checks cover 30 arrival seeds x 3 profiles x 3 policies x 3 concurrency caps = 810 simulations. Packing succeeds only when the paired 95% goodput-ratio interval exceeds 1, the 95% upper correctness-loss bound is below one percentage point, and 99% of offered decisions are correct within two seconds. No such run was performed in this audit.",
+    "baselines": [
+      "Singleton requests with concurrency one for the same 128-question workset.",
+      "Singleton requests with concurrency four for the same workset.",
+      "Native packs of 8, 32 and 128 questions under the same arrival stream and concurrency budget.",
+      "A deterministic fact oracle for scorer and scheduler validation, plus always-true as a label-balance check."
+    ],
+    "metrics": [
+      "Request p50/p95 with sample counts and uncertainty, reported separately for successful and all terminal outcomes.",
+      "Batch collection wait, local admission wait, attempt duration, retry wait, full workset completion and retry count.",
+      "Request availability, decision availability, and semantic accuracy conditional on returned values.",
+      "Correct decisions delivered within two seconds / all offered decisions, and correct on-time decisions / elapsed wall-clock seconds.",
+      "Run-local input tokens and billed versus estimated cost per 1,000 correct on-time decisions, with unknown-cost coverage.",
+      "Achieved concurrency, actual versus offered arrival rate, dropped arrivals, payload bytes, version/route metadata and content-reuse status."
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "One positive semantic fact; 12 payload configurations x 10 serial requests = 120 requests, 118 completed. All 5,030 returned question slots repeat the same instruction.",
+      "full": "Proposed authored held-out coverage is 100 scene seeds x 3 token-length variants x 128 distinct questions = 38,400 instances in 300 state bundles. Full paired transport plan is 98,500 logical requests including tail extensions and 100 warm-ups. There is no external split or official leaderboard score for this systems benchmark.",
+      "feasibility": "No large dataset or weights are required. Current gateway promotional pricing favors complete coverage, but the run needs an isolated budget above the default cap, provider-respecting pacing, checkpointing and adequate time. Gateway errors, opaque model version, route-specific limits, and missing failed-attempt costs remain confounds. Run the scorer and scheduler offline first; a transport preflight cannot replace full evaluation."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Grafana k6",
+      "url": "https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/",
+      "use": "Drive the later live arrival-rate test independently of service completion; retain error and dropped-iteration metrics alongside custom correct-decision outcomes."
+    },
+    {
+      "name": "SimPy",
+      "url": "https://simpy.readthedocs.io/en/latest/",
+      "use": "Simulate collection windows, finite request capacity, deadlines, outages and backoff deterministically, then export replay events to React."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Correct count labels, expose failed waits and retries, handle empty percentiles, and fix axis clipping while retaining the existing transport-control evidence."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Retain distinct labelled answers, token lengths, IDs, timing stages and run-local cost/version metadata; add regression cases for failure-only and mixed-result groups."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Implement the randomized paired runner with explicit concurrency, a dedicated budget ledger, checkpoints and the published complete-coverage plan."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Build the support-desk replay and validate 810 offline scheduler simulations."
+    },
+    {
+      "priority": "P2",
+      "size": "L",
+      "action": "Extend to multiple-record packing and live arrival-rate measurement; reuse the scheduler for semantic-table scans, routing and deadline-aware fallback."
+    }
+  ],
+  "sources": [
+    {
+      "label": "TypeSafe introduction and independent shared-state questions",
+      "url": "https://docs.typesafe.ai/introduction"
+    },
+    {
+      "label": "TypeSafe native pricing, limits and model identity",
+      "url": "https://docs.typesafe.ai/models"
+    },
+    {
+      "label": "Vercel evaluation contract",
+      "url": "https://vercel.com/docs/ai-gateway/modalities/evaluation"
+    },
+    {
+      "label": "Vercel Jev model listing and September 25, 2026 promotion expiry",
+      "url": "https://vercel.com/ai-gateway/models/jev"
+    },
+    {
+      "label": "HTTPX client connection pooling",
+      "url": "https://www.python-httpx.org/advanced/clients/"
+    },
+    {
+      "label": "k6 open and closed load models",
+      "url": "https://grafana.com/docs/k6/latest/using-k6/scenarios/concepts/open-vs-closed/"
+    },
+    {
+      "label": "k6 constant arrival rate",
+      "url": "https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/"
+    },
+    {
+      "label": "SimPy overview",
+      "url": "https://simpy.readthedocs.io/en/latest/"
+    }
+  ]
+}

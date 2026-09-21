@@ -1,0 +1,154 @@
+{
+  "id": "beverage",
+  "title": "Drink finder",
+  "evidenceStatus": "24 authored fully specified requests; 23 completed correctly, 1 HTTP 429; 2 unscored ambiguity examples; live contract differs from recorded runner",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The completed examples cover eight supported attribute profiles and a four-substring baseline matches Jev on all 23. The live component uses a different response contract, does not enforce extracted requirements, and offers no actual clarification conversation. Build Cafe Jev around semantic preference extraction, deterministic recipe constraints, visible customization and seeded customer goals.",
+  "strengths": [
+    "Fixed fictional menu is passed to Jev and shown to visitors.",
+    "Live drink options include an explicit none answer.",
+    "Published data distinguish 23 correct completed calls from one provider overload.",
+    "The adjacent Adaptive forms experiment already provides exact matching and all 81 partial preference states.",
+    "Live requests use the visitor key from memory."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "The evaluation only tests supported complete profiles",
+      "evidence": "src/jev_lab/compositions.py:258 and :329; probes/beverage.py: 23/23 literal-phrase baseline matches, 22 unique completed strings, 8 of 16 complete attribute profiles unsupported but unscored",
+      "impact": "The reported perfect completed accuracy says little about ambiguity, impossible constraints, customization or discovering preferences.",
+      "fix": "Keep the current set as a smoke test; evaluate all 81 partial states, independent language realizations, no-match cases and multi-turn goals."
+    },
+    {
+      "priority": "P1",
+      "title": "The recorded and live contracts disagree",
+      "evidence": "src/jev_lab/compositions.py:294 has 8 drink options and 5 questions; experience-prototypes/src/agent-experiments.tsx:541 has 9 drink options and 2 questions; clarify changes from numeric to categorical",
+      "impact": "The published run does not validate the actual live workflow, and the initial answer belongs to a different request from the text area.",
+      "fix": "Use one versioned schema and store exact request text, menu/prompt revision and request ID; record that same contract."
+    },
+    {
+      "priority": "P1",
+      "title": "The component never checks constraints independently",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:559 directly applies the model drink; :564 can simultaneously show an unresolved clarification; no preference extraction or feasible-set validator in Beverage",
+      "impact": "An impossible or premature suggestion can appear as a valid result; none renders as a cup titled None.",
+      "fix": "Extract typed required/preferred/unknown/conflicting preferences, validate recipes in code, rank only feasible candidates, and render separate clarification/conflict/no-match states."
+    },
+    {
+      "priority": "P1",
+      "title": "Results can become stale or misleading after editing",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:512 changes only selected; :530 changes only input; :559 accepts all completions; shared.tsx:214 has no request revision guard",
+      "impact": "A displayed suggestion or inspected answer can refer to an older request or a different manual choice.",
+      "fix": "Separate draft and submitted state, label manual actions, cancel obsolete work and ignore responses from older request/session revisions."
+    },
+    {
+      "priority": "P2",
+      "title": "The cafe does not support a recipe or conversation",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:494 always renders steam; :515 omits sweetness; :567 clarification has no answer control; menu is duplicated at :473, journeys.tsx:6 and compositions.py:246",
+      "impact": "The visitor cannot discover a preference or customize a drink, and the visual barely reflects the model decision.",
+      "fix": "Use one recipe catalog with legal modifiers, prices and availability; add conversation controls, illustrated cup changes and a visible receipt."
+    }
+  ],
+  "simulation": {
+    "title": "Cafe Jev: from an uncertain craving to a custom drink",
+    "description": "A seeded customer arrives, browses an illustrated menu, states a craving, answers one useful question at a time, revises preferences, customizes legal ingredients and confirms a simulated receipt. A private customer goal independently scores the final recipe; complete turns and decisions are replayable.",
+    "jevsRole": "Interpret language as typed hard/soft preferences, rank feasible recipes, and choose the next question or supported action without access to the hidden goal.",
+    "codeRole": "Own menu/ingredient facts, prices, inventory, allowed modifiers, feasible recipes, request revisions, state transitions, visuals and independent terminal scoring.",
+    "acceptanceCriteria": [
+      "Arrival, clarification, customization, revision, undo and receipt replay work in one session.",
+      "Identical seeds and actions reproduce customer answers, inventory and outcomes.",
+      "Invalid ingredients, inventory and explicit budgets never pass confirmation; semantic extraction errors remain separately measurable.",
+      "Cup appearance reflects temperature, size and ingredients, with reduced-motion alternatives.",
+      "Recorded replay works without a key and live mode uses the visitor key; manual, recorded and live choices remain distinct.",
+      "Obsolete responses cannot alter a newer draft or session.",
+      "Full customer text, menu facts and model decisions remain inspectable."
+    ]
+  },
+  "evaluation": {
+    "design": "Enumerate all 81 partial states and 16 complete profiles. Create 4 independent language realizations per partial state and run 3 option-order seeds, 972 logical requests. Use 24 separate development situations and a locked 120-scenario multi-turn test, 3 option-order seeds, at most 6 turns, at most 2160 additional requests. Total main test at most 3132 calls per policy plus retries. Use independently annotated goals and deterministic scripted responses; evaluate raw decisions separately from guarded execution. Report scenario-cluster bootstrap intervals and per-condition counts. Proposed release targets: zero confirmed hard-constraint violations in the 120 scenarios, at least 95% feasible-goal completion within six turns, fewer questions than the fixed questionnaire without worse task success. Later run 24-person counterbalanced usability study with 3 tasks each.",
+    "baselines": [
+      "Literal phrase parser plus exact menu filter",
+      "Fixed questionnaire plus exact filter",
+      "Information-gain question policy with oracle structured preferences",
+      "Manual menu browsing",
+      "Uniform and simple weighted ranking among identical feasible recipes"
+    ],
+    "metrics": [
+      "Preference extraction exact match and per-field accuracy",
+      "Conflict/no-match precision and recall",
+      "Hard-constraint violations before and after guards",
+      "Valid confirmed recipe rate",
+      "Hidden customer-goal success within 6 turns",
+      "Utility regret over independently accepted recipes",
+      "Clarifications per successful order and redundant questions",
+      "Refusal on solvable cases",
+      "Revision preservation and stale-response failures",
+      "Completed-call latency, end-to-end latency, retries and provider availability",
+      "Held-out calibration and scenario-cluster uncertainty"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "24 requests repeating 8 complete supported profiles; 23 completed, 1 provider overload; 2 unscored ambiguous cases; 22 unique completed strings.",
+      "full": "No external official split. Current finite domain is 81 partial preference states: 16 no-match, 29 unique-match, 36 multi-match; 16 complete profiles, of which 8 have no supported drink.",
+      "feasibility": "Full finite state coverage is trivial in code. Proposed language plus multi-turn test is at most 3132 logical model calls per policy; exact text and accepted goals must be authored/reviewed first."
+    }
+  },
+  "libraries": [
+    {
+      "name": "XState",
+      "url": "https://stately.ai/docs/actors",
+      "use": "Optional customer-session machines, invoked asynchronous Jev requests and replayable snapshots; a reducer is sufficient for an initial single-customer version."
+    },
+    {
+      "name": "Motion",
+      "url": "https://motion.dev/docs/react-layout-animations",
+      "use": "Already installed; animate changes to menu candidates, cup ingredients and counter/receipt layout so decisions have visible consequences."
+    },
+    {
+      "name": "Zod",
+      "url": "https://zod.dev/api",
+      "use": "Already installed; validate recipe variants, modifiers, ranges and shared response contracts; semantic extraction still needs independent evaluation."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Unify menu/result contract, attach submitted-request provenance and add request/session revision guards."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Add hard/soft preference extraction, independent feasible-recipe validation and all 81 partial-state tests."
+    },
+    {
+      "priority": "P1",
+      "size": "L",
+      "action": "Build the Cafe Jev customer scene, clarification loop, editable recipe and receipt replay."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Run the locked 120-scenario evaluation and publish full decisions, traces and availability separately."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Reuse the engine for counterfactual menu changes, inventory outages and one-preference revisions."
+    }
+  ],
+  "sources": [
+    {
+      "label": "XState official actors documentation",
+      "url": "https://stately.ai/docs/actors"
+    },
+    {
+      "label": "Motion official layout animation documentation",
+      "url": "https://motion.dev/docs/react-layout-animations"
+    },
+    {
+      "label": "Zod official schema documentation",
+      "url": "https://zod.dev/api"
+    }
+  ]
+}

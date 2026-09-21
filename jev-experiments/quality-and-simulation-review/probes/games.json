@@ -1,0 +1,227 @@
+{
+  "method": "Decoded all published episodes. Actual GameGrid/Games functions executed with mocked React elements/hooks; no real browser, environment steps, or model calls. Counts and rendered element equality do not establish visual usability or general planning accuracy.",
+  "sourceHashes": {
+    "experience-prototypes/src/games.tsx": "27ae9be8ac4898e59a989ab7d85e80a0bdcda1ee8f95bc915817f10103247483",
+    "src/jev_lab/games.py": "f61493a9f11de6ef0ee6ad58d617ff06a7bd484270564cade96ea4ef202a6619",
+    "results/games.jsonl": "f15f9f60abd7623eb2737fdb2ef6a1ddc91f4c4baad695e1ce2b2820385a529b"
+  },
+  "counts": {
+    "episodes": 240,
+    "successes": 156,
+    "labCutoffs": 83,
+    "interruptions": 1,
+    "traceRows": 7933,
+    "observations": 129,
+    "jevActionRows": 4298,
+    "jevCacheHits": 3886,
+    "jevCacheShare": 0.9041414611447185,
+    "publishedMemoizedStates": 419
+  },
+  "groups": [
+    {
+      "env": "MiniGrid-DoorKey-5x5-v0",
+      "policy": "random",
+      "episodes": 30,
+      "wins": 2,
+      "labCutoffs": 28,
+      "interrupted": 0,
+      "actionRows": 1904,
+      "cacheHits": 0,
+      "distinctInitialObservations": 20,
+      "distinctActionTraces": 30,
+      "meanActionsCompletedEpisodes": 63.46666666666667
+    },
+    {
+      "env": "MiniGrid-DoorKey-5x5-v0",
+      "policy": "visible_bfs",
+      "episodes": 30,
+      "wins": 30,
+      "labCutoffs": 0,
+      "interrupted": 0,
+      "actionRows": 315,
+      "cacheHits": 0,
+      "distinctInitialObservations": 20,
+      "distinctActionTraces": 23,
+      "meanActionsCompletedEpisodes": 10.5
+    },
+    {
+      "env": "MiniGrid-DoorKey-5x5-v0",
+      "policy": "jev_reactive",
+      "episodes": 30,
+      "wins": 14,
+      "labCutoffs": 16,
+      "interrupted": 0,
+      "actionRows": 1142,
+      "cacheHits": 1095,
+      "distinctInitialObservations": 20,
+      "distinctActionTraces": 23,
+      "meanActionsCompletedEpisodes": 38.06666666666667
+    },
+    {
+      "env": "MiniGrid-DoorKey-5x5-v0",
+      "policy": "jev_memory",
+      "episodes": 30,
+      "wins": 29,
+      "labCutoffs": 0,
+      "interrupted": 1,
+      "actionRows": 876,
+      "cacheHits": 525,
+      "distinctInitialObservations": 20,
+      "distinctActionTraces": 23,
+      "meanActionsCompletedEpisodes": 29.448275862068964
+    },
+    {
+      "env": "MiniGrid-Empty-5x5-v0",
+      "policy": "random",
+      "episodes": 30,
+      "wins": 21,
+      "labCutoffs": 9,
+      "interrupted": 0,
+      "actionRows": 1265,
+      "cacheHits": 0,
+      "distinctInitialObservations": 1,
+      "distinctActionTraces": 30,
+      "meanActionsCompletedEpisodes": 42.166666666666664
+    },
+    {
+      "env": "MiniGrid-Empty-5x5-v0",
+      "policy": "visible_bfs",
+      "episodes": 30,
+      "wins": 30,
+      "labCutoffs": 0,
+      "interrupted": 0,
+      "actionRows": 150,
+      "cacheHits": 0,
+      "distinctInitialObservations": 1,
+      "distinctActionTraces": 1,
+      "meanActionsCompletedEpisodes": 5
+    },
+    {
+      "env": "MiniGrid-Empty-5x5-v0",
+      "policy": "jev_reactive",
+      "episodes": 30,
+      "wins": 0,
+      "labCutoffs": 30,
+      "interrupted": 0,
+      "actionRows": 1920,
+      "cacheHits": 1918,
+      "distinctInitialObservations": 1,
+      "distinctActionTraces": 1,
+      "meanActionsCompletedEpisodes": 64
+    },
+    {
+      "env": "MiniGrid-Empty-5x5-v0",
+      "policy": "jev_memory",
+      "episodes": 30,
+      "wins": 30,
+      "labCutoffs": 0,
+      "interrupted": 0,
+      "actionRows": 360,
+      "cacheHits": 348,
+      "distinctInitialObservations": 1,
+      "distinctActionTraces": 1,
+      "meanActionsCompletedEpisodes": 12
+    }
+  ],
+  "interrupted": [
+    {
+      "env": "MiniGrid-DoorKey-5x5-v0",
+      "policy": "jev_memory",
+      "seed": 0,
+      "declaredSteps": 23,
+      "actionsTaken": 22,
+      "errorRows": 1,
+      "lastError": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"param\":{\"error\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\",\"type\":\"rate_limit_exceeded\",\"statusCode\":429,\"name\":\"RateLimitExceededError\",\"message\":\"The upstream provider is currently experiencing high demand. Please retry shortly.\"}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"typesafe-ai/jev\",\"resolvedPr"
+    }
+  ],
+  "terminalEvidence": {
+    "successesEndingWithForwardIntoVisibleGoal": 156,
+    "episodesWithExplicitTerminationField": 0,
+    "framesWithPostActionObservation": 0,
+    "defaultReplayAtEnd": {
+      "policy": "jev_memory",
+      "seed": 1,
+      "success": true,
+      "action": "forward",
+      "reward": 0.8812,
+      "frontStillGoal": true,
+      "inspectorObservationKeys": [
+        "mission",
+        "visible_grid",
+        "coordinates",
+        "carrying",
+        "legal_actions"
+      ]
+    }
+  },
+  "doorDisplay": {
+    "lockedVsOpenElementTreesEqual": true,
+    "yellowVsRedElementTreesEqual": true
+  },
+  "actionSemantics": {
+    "openDoorOnAlreadyOpenCount": 10,
+    "openDoorWithoutKeyCount": 20,
+    "examples": [
+      {
+        "env": "MiniGrid-DoorKey-5x5-v0",
+        "policy": "random",
+        "seed": 1,
+        "step": 1,
+        "front": "yellow door locked",
+        "carrying": null
+      },
+      {
+        "env": "MiniGrid-DoorKey-5x5-v0",
+        "policy": "random",
+        "seed": 2,
+        "step": 58,
+        "front": "yellow door open",
+        "carrying": "yellow key"
+      },
+      {
+        "env": "MiniGrid-DoorKey-5x5-v0",
+        "policy": "random",
+        "seed": 3,
+        "step": 5,
+        "front": "yellow door locked",
+        "carrying": null
+      },
+      {
+        "env": "MiniGrid-DoorKey-5x5-v0",
+        "policy": "random",
+        "seed": 3,
+        "step": 6,
+        "front": "yellow door locked",
+        "carrying": null
+      }
+    ]
+  },
+  "labLimits": {
+    "recorded": [
+      64
+    ],
+    "nativeMinigrid310": {
+      "MiniGrid-Empty-5x5-v0": 100,
+      "MiniGrid-DoorKey-5x5-v0": 250
+    },
+    "source": "Installed MiniGrid 3.1.0 env constructors and matching official v3.1.0 source; no new environment execution."
+  },
+  "transport": {
+    "attempts": 117,
+    "status_counts": {
+      "200": 98,
+      "429": 19
+    },
+    "successful_attempt_latency_ms": {
+      "p50": 322.4198750103824,
+      "p95": 655.7847580814265
+    },
+    "logical_request_latency_ms_including_retries_excluding_queue": {
+      "p50": 353.939396009082,
+      "p95": 59466.08428311951
+    },
+    "reported_usd": 0,
+    "attempts_without_cost_metadata": 19,
+    "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+  }
+}

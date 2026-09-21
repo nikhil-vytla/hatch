@@ -1,0 +1,119 @@
+{
+  "method": "All streams copied without decoding or encoding; original packet payload/order and timestamps compared before replacing each file.",
+  "command": "ffmpeg -copyts -i INPUT -map 0 -c copy -map_metadata 0 -avoid_negative_ts disabled -cues_to_front 1 OUTPUT.webm",
+  "ffmpeg": "ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers",
+  "artifacts": [
+    {
+      "file": "assets/try-on-demo.webm",
+      "before": {
+        "bytes": 904639,
+        "sha256": "267b89b4c1e77980a9ca19544f1689e0535dc3c77573bdea1d68ab864fd4c069",
+        "durationSeconds": null,
+        "cuePoints": 0,
+        "cuesOffset": null,
+        "firstClusterOffset": 126,
+        "cuePositionsValid": false
+      },
+      "after": {
+        "bytes": 905077,
+        "sha256": "beb3e7b1ea086e86821fe691189438e61a8e72602cf3843297373c3ac532f3a9",
+        "durationSeconds": 29.905,
+        "cuePoints": 6,
+        "cuesOffset": 446,
+        "firstClusterOffset": 564,
+        "cuePositionsValid": true
+      },
+      "encodedPackets": {
+        "count": 578,
+        "payloadSequenceSha256": "0fb5794ea61a619b6ec62d0c46b26bd8138915e139a654b593d22c7f9e1522e3",
+        "unchanged": true,
+        "timestampsAndTimeBasesUnchanged": true,
+        "timeBases": [
+          "#tb 0: 1/1000"
+        ],
+        "byStream": {
+          "0": {
+            "packets": 578,
+            "declaredPacketDurationsBefore": [
+              0,
+              1
+            ],
+            "declaredPacketDurationsAfter": [
+              1
+            ],
+            "payloadSequenceSha256": "0fb5794ea61a619b6ec62d0c46b26bd8138915e139a654b593d22c7f9e1522e3"
+          }
+        }
+      },
+      "decodedStreams": {
+        "method": "ffmpeg -i INPUT -map 0 -vsync 0 -f streamhash -hash sha256 -; default raw video and PCM audio",
+        "beforeAndAfterEqual": true,
+        "hashes": [
+          "0,v,SHA256=c13d17d9a5f818249b209501d68731e36097c7009fe00a6496d18882f0afc001"
+        ]
+      }
+    },
+    {
+      "file": "assets/spoken-try-on-demo.webm",
+      "before": {
+        "bytes": 994156,
+        "sha256": "464599f202aa23301fcc7962c33395fdbea720823046dad6f530f8d52c637471",
+        "durationSeconds": null,
+        "cuePoints": 0,
+        "cuesOffset": null,
+        "firstClusterOffset": 189,
+        "cuePositionsValid": false
+      },
+      "after": {
+        "bytes": 994578,
+        "sha256": "1e0f9b6c2b1f847208267835c835b1dad6b5d8875593040ba0d201e2a3456d26",
+        "durationSeconds": 29.954,
+        "cuePoints": 6,
+        "cuesOffset": 593,
+        "firstClusterOffset": 713,
+        "cuePositionsValid": true
+      },
+      "encodedPackets": {
+        "count": 688,
+        "payloadSequenceSha256": "00f0b3e8dbe1f4181a2281f056f588b4638e480a90edec2a822bb67fd6bc4f22",
+        "unchanged": true,
+        "timestampsAndTimeBasesUnchanged": true,
+        "timeBases": [
+          "#tb 0: 1/1000",
+          "#tb 1: 1/1000"
+        ],
+        "byStream": {
+          "0": {
+            "packets": 111,
+            "declaredPacketDurationsBefore": [
+              60
+            ],
+            "declaredPacketDurationsAfter": [
+              60
+            ],
+            "payloadSequenceSha256": "c929a7214efa3598550dc7a57b2df17e9ce951329b86bec91f061794d729ad14"
+          },
+          "1": {
+            "packets": 577,
+            "declaredPacketDurationsBefore": [
+              0,
+              1
+            ],
+            "declaredPacketDurationsAfter": [
+              1
+            ],
+            "payloadSequenceSha256": "a352e95621176329470f2cc124251eb05907d63253469c330d73b22efbf6cdf2"
+          }
+        }
+      },
+      "decodedStreams": {
+        "method": "ffmpeg -i INPUT -map 0 -vsync 0 -f streamhash -hash sha256 -; default raw video and PCM audio",
+        "beforeAndAfterEqual": true,
+        "hashes": [
+          "0,a,SHA256=6f48dd9114ded341d588285f60cd1d84b4c1b8e313e271895a52bf9460a3e5c4",
+          "1,v,SHA256=26a632d3ee51126a57f9600f5b0056707230e52184a340877c080d222c827283"
+        ]
+      }
+    }
+  ]
+}

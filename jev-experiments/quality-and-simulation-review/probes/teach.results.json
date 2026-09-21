@@ -1,0 +1,190 @@
+{
+  "published_run": {
+    "id": "20260920T051911-teach-24a85f",
+    "experiment": "teach",
+    "created": "2026-09-20T05:19:11.427027+00:00",
+    "config": {
+      "quick": false,
+      "seed": 42
+    },
+    "python": "3.13.11",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "status": "complete",
+    "finished": "2026-09-20T05:20:22.784779+00:00"
+  },
+  "pool_count": 160,
+  "pool_unique_texts": 140,
+  "test_count": 80,
+  "test_unique_texts": 77,
+  "train_test_exact_overlap": 0,
+  "test_class_counts": {
+    "espresso": 10,
+    "latte": 10,
+    "iced_coffee": 10,
+    "iced_latte": 10,
+    "herbal_tea": 10,
+    "hot_chocolate": 10,
+    "lemonade": 10,
+    "milkshake": 10
+  },
+  "semantic_requirement_combinations": 8,
+  "full_authored_heldout_template_space": 768,
+  "unique_teacher_labels": 51,
+  "distinct_teacher_texts": 47,
+  "teacher_errors": 0,
+  "failures": [],
+  "methods": {
+    "random": {
+      "curve": [
+        {
+          "attempted_labels": 8,
+          "available_labels": 8,
+          "accuracy": 0.25,
+          "teacher_agreement_with_oracle": 1.0
+        },
+        {
+          "attempted_labels": 16,
+          "available_labels": 16,
+          "accuracy": 0.4875,
+          "teacher_agreement_with_oracle": 1.0
+        },
+        {
+          "attempted_labels": 24,
+          "available_labels": 24,
+          "accuracy": 0.525,
+          "teacher_agreement_with_oracle": 1.0
+        },
+        {
+          "attempted_labels": 32,
+          "available_labels": 32,
+          "accuracy": 0.5375,
+          "teacher_agreement_with_oracle": 1.0
+        }
+      ],
+      "selected_count": 32,
+      "selected_unique_texts": 32,
+      "distinct_texts_by_round": [
+        8,
+        16,
+        24,
+        32
+      ],
+      "selected_class_counts": {
+        "herbal_tea": 3,
+        "lemonade": 6,
+        "latte": 6,
+        "iced_latte": 4,
+        "iced_coffee": 2,
+        "milkshake": 6,
+        "espresso": 5
+      },
+      "initial_class_counts": {
+        "herbal_tea": 1,
+        "lemonade": 3,
+        "latte": 1,
+        "iced_latte": 2,
+        "iced_coffee": 1
+      },
+      "vocabulary_size": 72,
+      "temperature_words_in_vocabulary": {
+        "hot": true,
+        "cold": true,
+        "warm": false,
+        "chilled": false
+      },
+      "reproduced_test_accuracy": 0.5375,
+      "all_768_authored_test_templates_accuracy": 0.5091145833333334,
+      "same_feature_group_accuracy_upper_bound": 0.625,
+      "diagnostic_temperature_restored_accuracy": 0.7125,
+      "temperature_swap_probability_changes": 0,
+      "temperature_swap_prediction_changes": 0,
+      "test_class_accuracy": {
+        "espresso": 0.9,
+        "latte": 0.8,
+        "iced_coffee": 0.0,
+        "iced_latte": 0.2,
+        "herbal_tea": 0.4,
+        "hot_chocolate": 0.0,
+        "lemonade": 1.0,
+        "milkshake": 1.0
+      }
+    },
+    "uncertainty": {
+      "curve": [
+        {
+          "attempted_labels": 8,
+          "available_labels": 8,
+          "accuracy": 0.25,
+          "teacher_agreement_with_oracle": 1.0
+        },
+        {
+          "attempted_labels": 16,
+          "available_labels": 16,
+          "accuracy": 0.375,
+          "teacher_agreement_with_oracle": 1.0
+        },
+        {
+          "attempted_labels": 24,
+          "available_labels": 24,
+          "accuracy": 0.55,
+          "teacher_agreement_with_oracle": 1.0
+        },
+        {
+          "attempted_labels": 32,
+          "available_labels": 32,
+          "accuracy": 0.525,
+          "teacher_agreement_with_oracle": 1.0
+        }
+      ],
+      "selected_count": 32,
+      "selected_unique_texts": 28,
+      "distinct_texts_by_round": [
+        8,
+        15,
+        23,
+        28
+      ],
+      "selected_class_counts": {
+        "herbal_tea": 1,
+        "lemonade": 3,
+        "latte": 3,
+        "iced_latte": 3,
+        "iced_coffee": 4,
+        "espresso": 5,
+        "hot_chocolate": 9,
+        "milkshake": 4
+      },
+      "initial_class_counts": {
+        "herbal_tea": 1,
+        "lemonade": 3,
+        "latte": 1,
+        "iced_latte": 2,
+        "iced_coffee": 1
+      },
+      "vocabulary_size": 72,
+      "temperature_words_in_vocabulary": {
+        "hot": true,
+        "cold": true,
+        "warm": false,
+        "chilled": false
+      },
+      "reproduced_test_accuracy": 0.525,
+      "all_768_authored_test_templates_accuracy": 0.4479166666666667,
+      "same_feature_group_accuracy_upper_bound": 0.625,
+      "diagnostic_temperature_restored_accuracy": 0.725,
+      "temperature_swap_probability_changes": 0,
+      "temperature_swap_prediction_changes": 0,
+      "test_class_accuracy": {
+        "espresso": 1.0,
+        "latte": 0.5,
+        "iced_coffee": 0.1,
+        "iced_latte": 0.6,
+        "herbal_tea": 0.0,
+        "hot_chocolate": 1.0,
+        "lemonade": 1.0,
+        "milkshake": 0.0
+      }
+    }
+  },
+  "shared_selected_ids": 13
+}

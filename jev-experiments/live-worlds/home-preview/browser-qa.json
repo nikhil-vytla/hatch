@@ -1,0 +1,17 @@
+{
+  "checks": [
+    "visible local preview advances",
+    "offscreen preview stops its world clock",
+    "reduced motion leaves a static courtyard",
+    "hidden-document listener stops its world clock, explicit visibility fixture",
+    "all seven new card previews render",
+    "card SVGs are decorative",
+    "hero preview has no nested interactive controls",
+    "unknown preview kinds return null",
+    "390px homepage has no horizontal overflow",
+    "preview lifecycle makes no model requests"
+  ],
+  "count": 10,
+  "modelRequests": 0,
+  "checkedAt": "2026-09-20T21:44:33.355Z"
+}

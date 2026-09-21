@@ -53,6 +53,7 @@ function fixture() {
   vm.runInNewContext(readFileSync(new URL("background.js", base), "utf8"), {
     chrome,
     URL,
+    TextEncoder,
     fetch: async (url: any, init: any) => {
       requests.push({
         url: String(url),

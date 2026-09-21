@@ -34,5 +34,14 @@
   "visuals": "results/visuals.jsonl",
   "arcade": "../local-models-and-games/arcade/results.jsonl",
   "research-map": "../local-models-and-games/research-map.jsonl",
-  "local-models": "../local-models-and-games/apple/results.jsonl"
+  "local-models": "../local-models-and-games/apple/results.jsonl",
+  "music-v2": "../music-arranger-v2/music-v2.jsonl",
+  "cafe": "../cafe-jev/cafe.jsonl",
+  "judgment-reliability": "../judgment-reliability/results.jsonl",
+  "tetris-framing": "../outcome-framing/tetris.jsonl",
+  "drawing-framing": "../outcome-framing/drawing.jsonl",
+  "visual-search": "../visual-search/results.jsonl",
+  "wardrobe": "../wardrobe-lab/wardrobe.jsonl",
+  "icon-studio": "../icon-studio/results.jsonl",
+  "live-worlds": "../live-worlds/manifest.jsonl"
 }

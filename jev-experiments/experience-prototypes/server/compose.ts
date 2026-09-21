@@ -13,7 +13,7 @@ export async function* compose(body: any, signal: AbortSignal, apiKey: string) {
     (body.domain !== undefined &&
       !["settings", "apartments", "event"].includes(body.domain)) ||
     (body.strategy !== undefined &&
-      !["sequential", "batched"].includes(body.strategy))
+      !["sequential", "batch"].includes(body.strategy))
   )
     throw new GatewayError("Invalid composition request.", 400);
   if (
