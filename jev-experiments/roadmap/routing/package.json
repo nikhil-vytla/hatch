@@ -1,0 +1,9 @@
+{
+  "name": "@jev/model-routing-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./index.ts",
+  "bin": { "jev": "./cli.ts" },
+  "scripts": { "test": "bun test", "mcp": "bun mcp.ts" }
+}

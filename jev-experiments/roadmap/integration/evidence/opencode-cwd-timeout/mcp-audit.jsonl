@@ -1,0 +1,13 @@
+{"time":"2026-09-21T04:20:39.112Z","event":"initialize","client":{"name":"opencode","version":"1.18.31"}}
+{"time":"2026-09-21T04:20:39.119Z","event":"tools/list"}
+{"time":"2026-09-21T04:22:58.784Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":458}
+{"time":"2026-09-21T04:23:07.898Z","event":"tools/result","tool":"route_task","requestId":2,"status":"ok","artifactKind":"patch"}
+{"time":"2026-09-21T04:23:07.908Z","event":"cancelled","requestId":2}
+{"time":"2026-09-21T04:23:17.476Z","event":"tools/call","tool":"route_task","requestId":3,"contextBytes":505}
+{"time":"2026-09-21T04:23:28.600Z","event":"tools/result","tool":"route_task","requestId":3,"status":"ok","artifactKind":"patch"}
+{"time":"2026-09-21T04:23:28.607Z","event":"cancelled","requestId":3}
+{"time":"2026-09-21T04:23:38.782Z","event":"tools/call","tool":"route_task","requestId":4,"contextBytes":580}
+{"time":"2026-09-21T04:24:10.346Z","event":"tools/result","tool":"route_task","requestId":4,"status":"error"}
+{"time":"2026-09-21T04:24:10.390Z","event":"cancelled","requestId":4}
+{"time":"2026-09-21T04:24:23.991Z","event":"tools/call","tool":"route_task","requestId":5,"contextBytes":580}
+{"time":"2026-09-21T04:24:40.378Z","event":"tools/result","tool":"route_task","requestId":5,"status":"ok","artifactKind":"structured"}

@@ -1,0 +1,14 @@
+{"time":"2026-09-21T04:23:23.486Z","event":"initialize","client":{"name":"codex-mcp-client","title":"Codex","version":"0.154.0"}}
+{"time":"2026-09-21T04:23:23.487Z","event":"tools/list"}
+{"time":"2026-09-21T04:23:42.060Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":1177}
+{"time":"2026-09-21T04:23:48.626Z","event":"tools/result","tool":"route_task","requestId":2,"status":"ok","artifactKind":"patch"}
+{"time":"2026-09-21T04:23:48.627Z","event":"tools/call","tool":"route_task","requestId":3,"contextBytes":1177}
+{"time":"2026-09-21T04:24:08.905Z","event":"tools/result","tool":"route_task","requestId":3,"status":"ok","artifactKind":"patch"}
+{"time":"2026-09-21T04:24:08.907Z","event":"tools/call","tool":"route_task","requestId":4,"contextBytes":1177}
+{"time":"2026-09-21T04:24:20.693Z","event":"tools/call","tool":"route_task","requestId":5,"contextBytes":null}
+{"time":"2026-09-21T04:24:20.694Z","event":"tools/result","tool":"route_task","requestId":5,"status":"unsupported"}
+{"time":"2026-09-21T04:24:29.951Z","event":"tools/call","tool":"route_task","requestId":6,"contextBytes":533}
+{"time":"2026-09-21T04:24:29.951Z","event":"tools/result","tool":"route_task","requestId":6,"status":"unavailable"}
+{"time":"2026-09-21T04:24:29.952Z","event":"tools/call","tool":"decide","requestId":7,"contextBytes":null}
+{"time":"2026-09-21T04:24:29.953Z","event":"tools/result","tool":"decide","requestId":7,"status":"unsupported"}
+{"time":"2026-09-21T04:24:33.713Z","event":"tools/result","tool":"route_task","requestId":4,"status":"ok","artifactKind":"structured"}

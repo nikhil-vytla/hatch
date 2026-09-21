@@ -1,0 +1,17 @@
+{
+  "protocol": "Host classified the task prompts and context before viewing destination answers or independent grader outputs. Confidence concerns task-category classification, not task success.",
+  "execution": {"source":"host","adapter":"Codex root integrator","model":"host-model-not-reported","local":false},
+  "classifications": {
+    "cal-loop": {"category":"bug-fix","difficulty":0.1,"confidence":0.99},
+    "cal-tests": {"category":"test-writing","difficulty":0.15,"confidence":0.99},
+    "cal-dag": {"category":"repository-analysis","difficulty":0.15,"confidence":0.99},
+    "cal-overlap": {"category":"bug-fix","difficulty":0.2,"confidence":0.95},
+    "test-search": {"category":"bug-fix","difficulty":0.25,"confidence":0.99},
+    "test-median": {"category":"test-writing","difficulty":0.2,"confidence":0.99},
+    "test-cycle": {"category":"repository-analysis","difficulty":0.2,"confidence":0.99},
+    "test-concurrency": {"category":"bug-fix","difficulty":0.3,"confidence":0.95}
+  },
+  "costUsd": null,
+  "latencyMs": null,
+  "limits": "Manual host judgments in the current agent session. Incremental token cost and classification-only time cannot be isolated, so end-to-end totals including this condition remain unknown."
+}

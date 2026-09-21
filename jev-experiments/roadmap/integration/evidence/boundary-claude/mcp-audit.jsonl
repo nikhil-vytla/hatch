@@ -1,0 +1,6 @@
+{"time":"2026-09-21T05:19:20.370Z","event":"initialize","client":{"name":"claude-code","title":"Claude Code","version":"2.1.278","description":"Anthropic's agentic coding tool","websiteUrl":"https://claude.com/claude-code"}}
+{"time":"2026-09-21T05:19:20.382Z","event":"tools/list"}
+{"time":"2026-09-21T05:19:30.041Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":367}
+{"time":"2026-09-21T05:19:30.042Z","event":"tools/result","tool":"route_task","requestId":2,"status":"unsupported"}
+{"time":"2026-09-21T05:19:31.683Z","event":"tools/call","tool":"route_task","requestId":3,"contextBytes":367}
+{"time":"2026-09-21T05:19:31.684Z","event":"tools/result","tool":"route_task","requestId":3,"status":"unavailable"}

@@ -1,0 +1,6 @@
+{"time":"2026-09-21T05:20:28.541Z","event":"initialize","client":{"name":"codex-mcp-client","title":"Codex","version":"0.154.0"}}
+{"time":"2026-09-21T05:20:28.542Z","event":"tools/list"}
+{"time":"2026-09-21T05:20:37.748Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":382}
+{"time":"2026-09-21T05:20:37.750Z","event":"tools/result","tool":"route_task","requestId":2,"status":"unsupported"}
+{"time":"2026-09-21T05:20:39.375Z","event":"tools/call","tool":"route_task","requestId":3,"contextBytes":382}
+{"time":"2026-09-21T05:20:39.375Z","event":"tools/result","tool":"route_task","requestId":3,"status":"unavailable"}

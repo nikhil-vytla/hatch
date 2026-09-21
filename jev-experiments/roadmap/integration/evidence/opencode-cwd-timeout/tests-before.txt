@@ -1,0 +1,19 @@
+bun test v1.3.14 (0d9b296a)
+
+sum.test.ts:
+1 | import { expect, test } from "bun:test";
+2 | import { totalThrough } from "./sum";
+3 | test("inclusive total", () => { expect(totalThrough(0)).toBe(0); expect(totalThrough(1)).toBe(1); expect(totalThrough(4)).toBe(10); });
+                                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-opencode-cnxms9_2/sum.test.ts:3:90)
+(fail) inclusive total [0.15ms]
+
+ 0 pass
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [6.00ms]

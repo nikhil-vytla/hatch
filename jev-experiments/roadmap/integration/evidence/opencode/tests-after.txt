@@ -1,0 +1,20 @@
+bun test v1.3.14 (0d9b296a)
+
+sum.boundary.test.ts:
+(pass) totalThrough boundary cases > n = 0 returns 0 [0.05ms]
+(pass) totalThrough boundary cases > n = 1 returns 1
+(pass) totalThrough boundary cases > n = 2 returns 3
+(pass) totalThrough boundary cases > negative n returns 0 because the loop never runs [0.01ms]
+(pass) totalThrough boundary cases > n = 100 returns 5050
+(pass) totalThrough boundary cases > n = 1000 returns 500500 [0.04ms]
+(pass) totalThrough boundary cases > matches closed form n*(n+1)/2 for a handful of values [0.08ms]
+(pass) totalThrough boundary cases > each step adds exactly n to the previous total [0.03ms]
+(pass) totalThrough boundary cases > result is always a non-negative integer [0.03ms]
+
+sum.test.ts:
+(pass) inclusive total [0.03ms]
+
+ 10 pass
+ 0 fail
+ 55 expect() calls
+Ran 10 tests across 2 files. [15.00ms]

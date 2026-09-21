@@ -1,0 +1,49 @@
+{
+  "harness": "codex",
+  "directory": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-codex-3v6g2vps",
+  "command": [
+    "codex",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--json",
+    "--sandbox",
+    "workspace-write",
+    "-c",
+    "approval_policy=\"never\"",
+    "-c",
+    "mcp_servers.jev.command=\"bun\"",
+    "-c",
+    "mcp_servers.jev.args=[\"/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/roadmap/routing/mcp.ts\"]",
+    "-c",
+    "mcp_servers.jev.env={\"JEV_ROUTER_CONFIG\" = \"/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/roadmap/integration/examples/router.json\", \"JEV_MCP_AUDIT\" = \"/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/roadmap/integration/evidence/codex/mcp-audit.jsonl\"}",
+    "-"
+  ],
+  "elapsedSeconds": 73.82,
+  "exitCode": 0,
+  "timedOut": false,
+  "baselineTestsExitCode": 1,
+  "independentTestsExitCode": 0,
+  "mcpDiscovered": true,
+  "toolCalls": [],
+  "toolResults": [],
+  "patchedBug": true,
+  "analysisFileWritten": true,
+  "additionalTestsWritten": true,
+  "delegationOccurred": false,
+  "usableDelegatedArtifacts": 0,
+  "cliVersion": "0.154.0",
+  "hostModel": {
+    "configured": null,
+    "identityBasis": "not reported; configured default"
+  },
+  "firstAuditTime": "2026-09-21T04:20:41.109Z",
+  "evidenceGate": {
+    "condition": "bounded-delegation",
+    "passed": false,
+    "reason": "Client approval rejected all MCP calls before server invocation; the host fixed the task itself.",
+    "historicalFailure": true
+  },
+  "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+  "auditChronologyOrder": 3
+}

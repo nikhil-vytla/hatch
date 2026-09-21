@@ -1,0 +1,5 @@
+{"time":"2026-09-21T04:41:18.825Z","event":"initialize","client":{"name":"opencode","version":"1.18.31"}}
+{"time":"2026-09-21T04:41:18.831Z","event":"tools/list"}
+{"time":"2026-09-21T04:41:29.301Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":45}
+{"time":"2026-09-21T04:41:29.567Z","event":"client-disconnected","requestId":2}
+{"time":"2026-09-21T04:41:29.568Z","event":"tools/result","tool":"route_task","requestId":2,"status":"cancelled"}

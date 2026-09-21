@@ -1,0 +1,153 @@
+{
+  "registry": [
+    {
+      "id": "gpt-4.1-mini",
+      "model": "openai/gpt-4.1-mini",
+      "taskQuality": {
+        "bug-fix": {
+          "easy": 0.6666666666666666,
+          "hard": 0.6666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "test-writing": {
+          "easy": 0.6666666666666666,
+          "hard": 0.6666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "repository-analysis": {
+          "easy": 0.6666666666666666,
+          "hard": 0.6666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "writing": {
+          "easy": 0.6666666666666666,
+          "hard": 0.6666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "other": {
+          "easy": 0.6666666666666666,
+          "hard": 0.6666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        }
+      },
+      "available": true,
+      "local": false,
+      "capabilities": [
+        "text",
+        "coding"
+      ],
+      "tools": [],
+      "contextTokens": 1047576,
+      "maxOutputTokens": 32768,
+      "quality": {
+        "value": 0.6666666666666666,
+        "basis": "measured",
+        "evidence": "4 calibration synthetic fixtures, Laplace smoothed."
+      },
+      "latencyMs": {
+        "value": 988.0237080000002,
+        "basis": "measured",
+        "evidence": "Median over4 calibration fixture calls."
+      },
+      "pricing": {
+        "inputPerMillion": 0.4,
+        "outputPerMillion": 1.6,
+        "cachedInputPerMillion": 0.1,
+        "basis": "configured",
+        "evidence": "Vercel AI Gateway /v1/models retrieved 2026-09-20; list-price arithmetic, not invoice charges."
+      },
+      "destination": {
+        "kind": "openai-compatible",
+        "endpoint": "https://ai-gateway.vercel.sh/v1/chat/completions"
+      }
+    },
+    {
+      "id": "claude-haiku-4.5",
+      "model": "anthropic/claude-haiku-4.5",
+      "taskQuality": {
+        "bug-fix": {
+          "easy": 0.16666666666666666,
+          "hard": 0.16666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "test-writing": {
+          "easy": 0.16666666666666666,
+          "hard": 0.16666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "repository-analysis": {
+          "easy": 0.16666666666666666,
+          "hard": 0.16666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "writing": {
+          "easy": 0.16666666666666666,
+          "hard": 0.16666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        },
+        "other": {
+          "easy": 0.16666666666666666,
+          "hard": 0.16666666666666666,
+          "basis": "measured",
+          "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+        }
+      },
+      "available": true,
+      "local": false,
+      "capabilities": [
+        "text",
+        "coding"
+      ],
+      "tools": [],
+      "contextTokens": 200000,
+      "maxOutputTokens": 64000,
+      "quality": {
+        "value": 0.16666666666666666,
+        "basis": "measured",
+        "evidence": "4 calibration synthetic fixtures, Laplace smoothed."
+      },
+      "latencyMs": {
+        "value": 331.143375,
+        "basis": "measured",
+        "evidence": "Median over4 calibration fixture calls."
+      },
+      "pricing": {
+        "inputPerMillion": 1,
+        "outputPerMillion": 5,
+        "cachedInputPerMillion": 0.1,
+        "basis": "configured",
+        "evidence": "Vercel AI Gateway /v1/models retrieved 2026-09-20; list-price arithmetic, not invoice charges."
+      },
+      "destination": {
+        "kind": "openai-compatible",
+        "endpoint": "https://ai-gateway.vercel.sh/v1/chat/completions"
+      }
+    }
+  ],
+  "policy": {
+    "weights": {
+      "quality": 0.6,
+      "cost": 0.25,
+      "latency": 0.15
+    },
+    "allowedTools": [],
+    "allowAvailabilityFallback": false,
+    "allowQualityEscalation": false,
+    "maxAttempts": 1
+  },
+  "calibrationIds": [
+    "cal-loop",
+    "cal-tests",
+    "cal-dag",
+    "cal-overlap"
+  ]
+}
