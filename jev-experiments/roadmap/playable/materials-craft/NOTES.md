@@ -1,0 +1,11 @@
+# Materials craft notes
+
+- Root requested a bounded critique and implementation of the three highest-value first-play, readability and touch improvements in the current home/materials scene.
+- Ownership is MaterialsSandbox.tsx and materials.css only. Preserve the existing engine, tests, import/export, branches and async invalidation. Use the separate jev-design-research browser session.
+- Inspected the current full materials screen and home. The palette was below the fold; canvas height constraints could distort the grid; most material types were solid blocks with no direct cell inspection or pointer footprint.
+- Agreed top three changes with root: first-action placement, material-specific notebook rendering, and precise pointer/touch inspection. Root removed its home canvas max-height overrides; this work retained the 3:2 scene ratio and used container queries for embedded width.
+- Reworked only MaterialsSandbox.tsx and materials.css. No engine or dependency changes. Existing reset/import/branch and async revision invalidation paths remain in use.
+- One CSS-writing attempt ran from the app directory with repository-relative paths and wrote nothing. Corrected the working directory, reran, then passed the app TypeScript check. The first Playwright run-code touch command omitted its async function wrapper; retried in the documented wrapper form.
+- Visual checks prompted smaller mobile palette padding so Bloom dust stays readable. Added a polite cursor readout and named inspection region for keyboard/assistive use.
+- Passed eight engine tests and TypeScript. Browser checks covered 1440×1080 and 390×844, 3:2 aspect, no overflow, keyboard painting, cell inspection, mirrored custom-rule controls, reduced-motion pause/zero transitions, dark mode, fullscreen and save/export/reset/branch recovery. Chromium CDP touch events exercised the above-finger magnifier. No physical-device or frame-time claim follows.
+- Final narrow-screen review still clipped the custom name after the padding change. Allowed that palette label to wrap to two lines; ordinary material names remain one line. A stale browser ref after root hot reload required a fresh snapshot, then the zero-error console check passed.
