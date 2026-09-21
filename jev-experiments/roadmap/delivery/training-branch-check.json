@@ -1,0 +1,66 @@
+{
+  "recordedAt": "2026-09-21T07:10:12.323776+00:00",
+  "commit": "d627e243769eabd975647ea0f0f6c399809b4314",
+  "conditions": "Assembled GitHub-main-based study branch; fresh project environment from locked dependencies. No model downloads, inference, training or private corpus cache. One corpus-integration unit test skips without the cache; full corpus evidence is retained separately.",
+  "checks": [
+    {
+      "command": [
+        "uv",
+        "sync",
+        "--extra",
+        "dev",
+        "--frozen"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 1.015440542018041,
+      "output": "Using CPython 3.13.11\nCreating virtual environment at: .venv\n   Building jev-experiments @ file:///private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-delivery-qgdc3r2x/hatch/jev-experiments\n      Built jev-experiments @ file:///private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-delivery-qgdc3r2x/hatch/jev-experiments\nPrepared 1 package in 520ms\nInstalled 44 packages in 157ms\n + absl-py==2.5.0\n + annotated-doc==0.0.5\n + annotated-types==0.8.0\n + anyio==4.15.1\n + certifi==2026.7.22\n + click==8.5.0\n + cloudpickle==3.1.2\n + defusedxml==0.7.1\n + farama-notifications==0.0.6\n + fastapi==0.141.1\n + gepa==0.1.4\n + gymnasium==1.3.0\n + h11==0.16.0\n + httpcore==1.0.9\n + httpx==0.28.1\n + idna==3.20\n + immutabledict==4.3.1\n + iniconfig==2.3.0\n + jev-experiments==0.1.0 (from file:///private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-delivery-qgdc3r2x/hatch/jev-experiments)\n + joblib==1.6.0\n + langdetect==1.0.9\n + minigrid==3.1.0\n + narwhals==2.26.0\n + nltk==3.10.3\n + numpy==2.5.3\n + packaging==26.3\n + pluggy==1.6.0\n + pydantic==2.13.5\n + pydantic-core==2.46.5\n + pygame-ce==2.5.8\n + pygments==2.21.0\n + pytest==9.1.1\n + pytest-asyncio==1.4.0\n + regex==2026.9.10\n + ruff==0.16.8\n + scikit-learn==1.9.1\n + scipy==1.18.1\n + six==1.17.0\n + starlette==1.6.0\n + threadpoolctl==3.7.0\n + tqdm==4.70.1\n + typing-extensions==4.16.0\n + typing-inspection==0.4.4\n + uvicorn==0.53.0\n"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "roadmap/training",
+        "-p",
+        "test_*.py"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 0.3848744999850169,
+      "output": "......s...\n----------------------------------------------------------------------\nRan 10 tests in 0.005s\n\nOK (skipped=1)\n"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "roadmap/mac",
+        "-p",
+        "test_*.py"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 0.12405250000301749,
+      "output": "...........\n----------------------------------------------------------------------\nRan 11 tests in 0.048s\n\nOK\n"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-c",
+        "import sys,json;sys.path.insert(0,'roadmap/training');from audit_release import audit;r=audit();print(json.dumps(r));assert r['releaseReady'] and r['installedDefault']=='laya-readout-experimental'"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 0.06093725003302097,
+      "output": "{\"schemaVersion\": \"1\", \"protocolSha256\": \"118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9\", \"corpusSha256\": \"e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b\", \"models\": {\"laya\": {\"trainedSeeds\": [17, 29, 43], \"coremlStatus\": \"complete\", \"trainingComplete\": true, \"coremlCompleteComparison\": true, \"coremlAgreementPassed\": true, \"robustnessComplete\": true, \"frozenBaselinesComplete\": true}, \"smol\": {\"trainedSeeds\": [17, 29, 43], \"coremlStatus\": \"complete\", \"trainingComplete\": true, \"coremlCompleteComparison\": true, \"coremlAgreementPassed\": true, \"robustnessComplete\": true, \"frozenBaselinesComplete\": true}, \"qwen\": {\"trainedSeeds\": [17, 29, 43], \"coremlStatus\": \"complete\", \"trainingComplete\": true, \"coremlCompleteComparison\": true, \"coremlAgreementPassed\": true, \"robustnessComplete\": true, \"frozenBaselinesComplete\": true}}, \"researchEvidenceComplete\": true, \"installedDefault\": \"laya-readout-experimental\", \"defaultSelection\": \"Predefined seed17 validation macro NLL and validation export parity; ALL warm median breaks 0.01 NLL ties. Promotion requires a fresh matching package check.\", \"releaseReady\": true, \"blockers\": []}\n"
+    }
+  ],
+  "passed": true
+}

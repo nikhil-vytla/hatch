@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-09-21T07:16:42.738772+00:00",
+  "mainSha": "eb3c18d6db2891f0dfeff87d6a760d5936be37f4",
+  "deployment": {
+    "id": 6560688604,
+    "sha": "eb3c18d6db2891f0dfeff87d6a760d5936be37f4",
+    "environment": "Production",
+    "status": "success",
+    "environmentUrl": "https://jev-experiments-rnnl9f7yu-nikhil-vytla.vercel.app"
+  },
+  "canonical": {
+    "url": "https://jev-experiments.vercel.app",
+    "status": 200,
+    "htmlSha256": "d2affb014eacdff4e431059a1dccd3c4e9bfecb5e05a4f2efa9d94e31a8211ad"
+  },
+  "applicationPatchDeployed": false,
+  "scope": "Confirms the existing GitHub-main production deployment and canonical URL. This research folder/application patch is not in that deployment; this does not satisfy the new release deployment gate.",
+  "rootDirectory": "jev-experiments/experience-prototypes",
+  "rootDirectoryEvidence": "Previously verified vercel-git-root/after.json; remote settings not re-read in this check."
+}

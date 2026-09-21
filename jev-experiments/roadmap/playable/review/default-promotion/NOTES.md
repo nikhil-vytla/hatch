@@ -1,0 +1,9 @@
+# Default promotion independent review notes
+
+- Root prioritized the newly added validation/default promotion boundary while the existing scene review was in progress.
+- Scope: select_default.py, promote_default.py, audit_release.py, verify_default_package.py and registry-default CLI handling. Read-only owner files; CPU fixtures only; no GPU, model execution or actual promotion.
+- Found a fresh-install regression once registry.default becomes non-null: the installer's final doctor call automatically requires missing model files. The package verifier installed under the old null registry, then swapped the proposed registry, so it did not exercise the eventual published path. Owner added doctor --runtime-only and --model-registry; proposed registry is now installed from the start.
+- Found that promotion bound jev_local.py but not the copied MLX helper, installer, inference requirements or bundled checkpoint. Owner added package_sources.py and a shipped-source manifest, including the authored first-action fixture, plus copied-file comparisons.
+- Owner also made verification, promotion and final audit derive validation selection afresh instead of trusting a selectedCandidate flag. No test/transfer scores enter ranking.
+- An initial fixture raced these owner edits and hit setup errors for the new derivation/module guards. The final fixture explicitly stubs research readiness and validation derivation to isolate source integrity, copies the required source files and includes an unchanged control. No incomplete setup result is retained as a defect reproduction.
+- Final CPU probe: original default doctor path returns2 on a missing model; new runtime-only path returns0 with dependencies stubbed. Unchanged synthetic package promotes inside its temporary folder; mutating its MLX helper produces a source-integrity error and leaves its default null. Production defaults remain null.

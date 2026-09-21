@@ -1,0 +1,106 @@
+{
+  "status": 200,
+  "task": {
+    "id": "routing-demo",
+    "prompt": "Fix the bug. totalThrough(n) must sum every integer from 1 through n inclusive. Return a proposed unified diff for sum.ts.",
+    "context": "sum.ts:\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n",
+    "requiredCapabilities": [
+      "text",
+      "coding"
+    ],
+    "outputTokens": 2048
+  },
+  "result": {
+    "schemaVersion": "1",
+    "taskId": "routing-demo",
+    "status": "error",
+    "classification": {
+      "source": "heuristic",
+      "category": "bug-fix",
+      "difficulty": 0.5,
+      "confidence": 0.5,
+      "latencyMs": 0,
+      "costUsd": 0,
+      "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+    },
+    "selection": {
+      "status": "selected",
+      "routeId": "gpt-4.1-mini",
+      "candidates": [
+        {
+          "routeId": "gpt-4.1-mini",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.20617949123084214,
+          "estimatedCostUsd": 0.004244,
+          "maximumCostUsd": 0.004244,
+          "quality": {
+            "value": 0.65,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 1600,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        },
+        {
+          "routeId": "claude-haiku-4.5",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.07999999999999999,
+          "estimatedCostUsd": 0.012658,
+          "maximumCostUsd": 0.012658,
+          "quality": {
+            "value": 0.8,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 2400,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        }
+      ],
+      "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+      "inputTokenUpperBound": 2418,
+      "outputTokens": 2048
+    },
+    "attempts": [
+      {
+        "actualModel": "openai/gpt-4.1-mini",
+        "identityBasis": "provider-reported",
+        "usage": {
+          "inputTokens": 203,
+          "outputTokens": 119,
+          "cachedInputTokens": 0
+        },
+        "costUsd": null,
+        "status": "malformed",
+        "error": "Destination returned an invalid typed artifact.",
+        "routeId": "gpt-4.1-mini",
+        "latencyMs": 1532.1979170000002,
+        "trigger": "initial",
+        "reservedCostUsd": 0.004244
+      }
+    ],
+    "outcome": {
+      "actualRouteId": "gpt-4.1-mini",
+      "actualModel": "openai/gpt-4.1-mini",
+      "totalLatencyMs": 1532.7565829999999,
+      "totalCostUsd": null,
+      "failure": "Destination returned an invalid typed artifact."
+    }
+  },
+  "independentCheck": {
+    "baselineExit": 1,
+    "patchApplied": false,
+    "testsExit": 1,
+    "tests": "bun test v1.3.14 (0d9b296a)\n\nsum.test.ts:\n1 | import {test,expect} from 'bun:test'; import {totalThrough} from './sum'; test('inclusive totals',()=>{for(const n of [0,1,2,10,42])expect(totalThrough(n)).toBe(n*(n+1)/2)});\n                                                                                                                                                                ^\nerror: expect(received).toBe(expected)\n\nExpected: 1\nReceived: 0\n\n      at <anonymous> (/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-web-route-nWFc3Y/sum.test.ts:1:157)\n(fail) inclusive totals [0.24ms]\n\n 0 pass\n 1 fail\n 2 expect() calls\nRan 1 test across 1 file. [7.00ms]\n"
+  },
+  "billingVerified": false
+}

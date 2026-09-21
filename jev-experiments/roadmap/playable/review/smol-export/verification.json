@@ -1,0 +1,197 @@
+{
+  "recordedAt": "2026-09-21T06:13:36.376294+00:00",
+  "passed": true,
+  "scope": "Smol seed17 saved evidence only. Python standard library; no model/library loading, prediction, browser or performance measurement.",
+  "exportReportSha256": "3afae95a2aa42544fa175f71f2974ede7f8e5f4bb33f0787046e53c94202d940",
+  "comparisons": {
+    "CPU_ONLY": {
+      "overall": {
+        "rows": 2960,
+        "supported": 2960,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 5.692243576049805e-06
+      },
+      "validation": {
+        "rows": 192,
+        "supported": 192,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 5.0067901611328125e-06
+      },
+      "test": {
+        "rows": 384,
+        "supported": 384,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 4.32133674621582e-06
+      },
+      "transfer": {
+        "rows": 2384,
+        "supported": 2384,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 5.692243576049805e-06
+      },
+      "datasets": {
+        "banking77": 192,
+        "boolq": 192,
+        "stsb": 192,
+        "clinc": 128,
+        "multirc": 128,
+        "summeval": 128,
+        "typed_decisions": 2000
+      },
+      "typedDecisionsCases": 400,
+      "typedDecisionsQuestionsPerCase": [
+        5
+      ],
+      "retainedFields": [
+        "argmaxAgreement",
+        "coremlProbabilities",
+        "id",
+        "maxProbabilityDelta",
+        "mlxProbabilities",
+        "split",
+        "status",
+        "values"
+      ],
+      "maximumSemanticOptionIdLength": 48
+    },
+    "ALL": {
+      "overall": {
+        "rows": 2960,
+        "supported": 2960,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 4.082918167114258e-06
+      },
+      "validation": {
+        "rows": 192,
+        "supported": 192,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 2.950429916381836e-06
+      },
+      "test": {
+        "rows": 384,
+        "supported": 384,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 2.771615982055664e-06
+      },
+      "transfer": {
+        "rows": 2384,
+        "supported": 2384,
+        "coverage": 1.0,
+        "argmaxAgreement": 1.0,
+        "maxProbabilityDelta": 4.082918167114258e-06
+      },
+      "datasets": {
+        "banking77": 192,
+        "boolq": 192,
+        "stsb": 192,
+        "clinc": 128,
+        "multirc": 128,
+        "summeval": 128,
+        "typed_decisions": 2000
+      },
+      "typedDecisionsCases": 400,
+      "typedDecisionsQuestionsPerCase": [
+        5
+      ],
+      "retainedFields": [
+        "argmaxAgreement",
+        "coremlProbabilities",
+        "id",
+        "maxProbabilityDelta",
+        "mlxProbabilities",
+        "split",
+        "status",
+        "values"
+      ],
+      "maximumSemanticOptionIdLength": 48
+    }
+  },
+  "publicComparisonSha256": {
+    "CPU_ONLY": "516841d234e1eff0357dbd6f1f2666866d3c207a819cdb4a430b7f29d396d8c1",
+    "ALL": "e5c6cab9a44765d48ae422386dc5c2a6e9093a06c3bb2ece432097758c79a3b2"
+  },
+  "rawCoremlPredictionSha256": {
+    "CPU_ONLY": "8aaa6ffd004013ef8059f36026ac8548c1fc95815c7c831ee942a108cf6e939d",
+    "ALL": "2b9e18a92dd0e3d89e0445e69d2023d6153ee82a589091eb258959c61ccecff5"
+  },
+  "sourceHashes": {
+    "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+    "corpusSha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b",
+    "modelFilesSha256": "e7ffb1c8ec89de0ef00f2356af205c7577bd06d5da39f3d513c4a3a44401f3d7",
+    "featureManifestSha256": "8d22cad7de4a13730b3e2dd690fca89c70c9f8d3e62a007aaee89fe818778c6d"
+  },
+  "corpusSplitSha256": {
+    "validation": "cb1edcd38c928e8642a99d7176fbdf70338e1d77d986de751ed541c192055e1c",
+    "test": "08cf5405afd847877a2ecc1a6fe43523d0a3ff54d204844849a9ed1322a4da63",
+    "transfer": "7569f17c5d2b664e38f75a5cc8dea4dcd72c95b5d754819e87d0c45b2001c520"
+  },
+  "featureFileSha256": {
+    "train.json": "00435b59b44e4283737213bd17bd01dd97ce42efa09b504c957ca8381e68eaa1",
+    "train.npz": "7b2cb971e5dcca56285b2eca57a23c1872d365a33c3e7cc83c46b64dcc0de848",
+    "validation.json": "3d14ac96a89e06bf769a143f9668c576b11fee39eb441c12b850326230c03d32",
+    "validation.npz": "866887d141c2c37f773a54c9f1ab568b964adfec4172e320474d4418d20d96a4",
+    "test.json": "1a40e8ba247de8f82113893f0eafa1bb05cc0acfe68e6e7db324241a90f63b95",
+    "test.npz": "e24874d45e13b1bbd5d9a360bfdba7e9b11ac9f8f36955036475a1b4a6a3d48f",
+    "transfer.json": "09005da9c8c576a8b4c996ccc6a98788600331f30d554931d68e464a50102fee",
+    "transfer.npz": "30392c70def5af41813b876ceba3b6fb00a091e7af260cad72aecf7ecb9d4d8e"
+  },
+  "readoutSha256": {
+    "17": "ed6c891535da8585326cffd95ffe87c3ac820b22b119a1decd32942176b59d3b",
+    "29": "1947cccdba8f8a8016fe043b47ea8dfa52983e5ce86a5df16fefa9919f4cd06c",
+    "43": "aec1901f23a7b9240dc6b2e8775f47ecd370dd6827f595f06e724f2e57f663ff"
+  },
+  "originalMlxPredictionSha256": {
+    "predictions-17-validation.jsonl": "750642dd620e9142c12e027f7c906113c4b69e6122a7ae05eb722dcbfa791fbe",
+    "predictions-17-test.jsonl": "8c3baacb38eeeca70049f8d2eda66e120928d528526849fa6bad7a004f5f79de",
+    "predictions-17-transfer.jsonl": "fa5f47d24a3ea0eccd2213c8d3a2f8e4674b0e67e82b0801425d04111583be5b",
+    "predictions-29-validation.jsonl": "31354b6b77f7e19285e9c295533ae817aa4e3416013c7219147b8d983e246d9c",
+    "predictions-29-test.jsonl": "eedd53066f269a56dcc93ba6f2aa1dd222fd6e7efc545fe2c1376c132fd7cf02",
+    "predictions-29-transfer.jsonl": "a0f365363dbb1a937b5271d8bc4d5f9990a0cd514be12965c13cbf963c5cea4c",
+    "predictions-43-validation.jsonl": "ca103ae2bb22d9da931767c7c07b2615bbd4707d1e8e54c8c8774a818e903d15",
+    "predictions-43-test.jsonl": "dc7f9e9071822a1f4051e62cb792e4376cb6cc04cc7d4a94f28448b742953d95",
+    "predictions-43-transfer.jsonl": "783a06aab68a6c474de93e9295f4d636e0d4c4185fb5ba7fe03b381970bb07d4"
+  },
+  "packageFileSha256": {
+    "Data/com.apple.CoreML/model.mlmodel": "114ed2d74a4e5038c7541966e05ea927c7f151c361865768226b21e992047969",
+    "Data/com.apple.CoreML/weights/weight.bin": "9c01e561d57c9932a407e132ba0d91f737dd399eb2303bd9ba8c85adccef3fc0",
+    "Manifest.json": "52eb40038cf199d56018e10285142442bc90e089dc759a24a1aa420a2d62a184"
+  },
+  "packageBytes": 1453684439,
+  "pinnedBackboneFileSha256": {
+    "model.safetensors": "e6bffe7435d7ddc10fd3b9a9efd429dafbacb1cb17015fb5562664e7532bf86e",
+    "tokenizer_config.json": "4ec77d44f62efeb38d7e044a1db318f6a939438425312dfa333b8382dbad98df",
+    "special_tokens_map.json": "2b7379f3ae813529281a5c602bc5a11c1d4e0a99107aaa597fe936c1e813ca52",
+    "config.json": "224f72354f10d617a359cc82ad15a3c96e866b9b2ffadb81997eeea9e88e22ee",
+    "tokenizer.json": "9ca9acddb6525a194ec8ac7a87f24fbba7232a9a15ffa1af0c1224fcd888e47c",
+    "train_results.json": "fceae2634b0a268a8adbda73fd0b2192922b496054011f588d2c6e888db1cea1",
+    "generation_config.json": "87b916edaaab66b3899b9d0dd0752727dff6666686da0504d89ae0a6e055a013",
+    "eval_results.json": "db9bcb5c4f2a3be0d7e88f86af26f375c22c240954af86942d1554d87a488ce8",
+    "vocab.json": "82b84012e3add4d01d12ba14442026e49b8cbbaead1f79ecf3d919784f82dc79",
+    "all_results.json": "71face5e244d784819f937a25206865c295c8889fe4359eec28bbec85d02da0d",
+    "trainer_state.json": "2263f580ae0d7890acc11253b83138b3fc1250dc6728688a3387ce813b92eed1"
+  },
+  "preparedTimingInputSha256": "a6b83aaa4e035a1f99587a362ea58cec31d263f9383735358999dd557c7f9462",
+  "publicationSmolExportMatches": true,
+  "publicationLinksBothStreams": true,
+  "timingBoundary": "Core ML model.predict with prepared token-ID/mask tensors. Tokenization and input compilation are excluded. MLX robustness timings include both, so the timings are not directly interchangeable.",
+  "isolatedTimingBoundaries": {
+    "CPU_ONLY": "Prepared token-ID/mask tensors, complete Core ML inference. File reading, tokenization and input preparation are outside timing. Fresh Python process per compute condition; OS file and Core ML compilation caches are not flushed.",
+    "ALL": "Prepared token-ID/mask tensors, complete Core ML inference. File reading, tokenization and input preparation are outside timing. Fresh Python process per compute condition; OS file and Core ML compilation caches are not flushed."
+  },
+  "mlxTimingBoundary": "Fresh process, complete seed17 decision including tokenization, backbone, residual readout and calibrated softmax. OS file cache is not flushed.",
+  "sourceReviewHashes": {
+    "TypedDecisionStudy.tsx": "0adc30a81acdb39282dd5e6c6617a20ab54816390082dafb30fe778b7acc781b",
+    "export_coreml.py": "39268b723004295de84fb505ef2cf56116d73c2735c596c41088a5aaf0239f18",
+    "export_decision_rows.py": "60121ec7b41c3d6dae977532002944a1e9c9a6f4ffd929a407bc7ca14c1870d8",
+    "benchmark_coreml.py": "f83eabbb6215e330e013644d68f5c634d3f343e1d3dc0b3c6415689685dd0b2c",
+    "publish.py": "ac466b94a0054614e5ef06873898e778dfb224cc11e78f726780b27f3a6a9619"
+  },
+  "limits": "Confirms saved-row arithmetic, identity/coverage and preserved byte provenance. Does not regenerate outputs, independently establish execution timestamps/hardware placement, verify original source licenses or evaluate quality superiority. Package description bytes are hash-verified, not independently parsed as protobuf."
+}

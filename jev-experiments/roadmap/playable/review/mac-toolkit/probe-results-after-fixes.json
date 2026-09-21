@@ -1,0 +1,49 @@
+{
+  "modelInstallSymlink": {
+    "unrelatedFilePreserved": true,
+    "targetIsSymlink": false,
+    "error": null
+  },
+  "missingModelResponse": {
+    "exitCode": 2,
+    "response": {
+      "schemaVersion": "1",
+      "requestId": "fixture-request",
+      "status": "error",
+      "decisions": [],
+      "execution": {
+        "adapter": "jev-local-mlx",
+        "model": "convaiinnovations/laya",
+        "local": true,
+        "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
+      },
+      "timing": {
+        "totalMs": 1.0620829998515546
+      },
+      "issues": [
+        {
+          "code": "local_runtime_error",
+          "message": "Missing model file: model.safetensors; Missing model file: encoder/config.json; Missing model file: tokenizer/tokenizer.json"
+        }
+      ]
+    },
+    "missingContractFields": []
+  },
+  "ordinalIdentity": {
+    "requested": [
+      1e-11,
+      2e-11
+    ],
+    "values": [
+      1e-11,
+      2e-11
+    ],
+    "preserved": true
+  },
+  "staleFeatureCache": {
+    "oldFeatureBytesUnchanged": true,
+    "manifestCorpusAfter": "stale-corpus",
+    "staleCacheRejected": true,
+    "error": "Stale feature cache: model or corpus manifest differs; refusing to relabel existing arrays"
+  }
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "case": "normal",
+    "exitCode": 0,
+    "fixtureAfter": "new",
+    "workflowExists": true,
+    "stderr": ""
+  },
+  {
+    "case": "missing-ci-source",
+    "exitCode": 1,
+    "fixtureAfter": "new",
+    "workflowExists": false,
+    "stderr": "cp: /var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-patch-review-vda7w9dk/jev-experiments/roadmap/ci/jev-checks.yml: No such file or directory"
+  },
+  {
+    "case": "conflicting-ci",
+    "exitCode": 1,
+    "fixtureAfter": "old",
+    "workflowExists": true,
+    "stderr": "Existing Jev CI workflow differs. Review it before applying this patch."
+  }
+]
