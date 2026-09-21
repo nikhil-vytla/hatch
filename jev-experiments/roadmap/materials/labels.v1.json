@@ -1,0 +1,19 @@
+{
+  "version": "materials-labels-1",
+  "frozen_before_model_results": true,
+  "model_results_recorded": 0,
+  "cases": [
+    {"id":"powder-water-wood","instruction":"A powder that turns into wood when it touches water.","support":"supported","motion":"powder","contact":"water","becomes":"wood"},
+    {"id":"gas-fire-sand","instruction":"It floats upward. Touching fire makes it sand.","support":"supported","motion":"gas","contact":"fire","becomes":"sand"},
+    {"id":"liquid-inert","instruction":"It falls and spreads like a liquid, without reacting.","support":"supported","motion":"liquid","contact":"none","becomes":"stone"},
+    {"id":"solid-water-steam","instruction":"Keep it still. If water is next to it, turn this particle into steam.","support":"supported","motion":"solid","contact":"water","becomes":"steam"},
+    {"id":"solid-inert","instruction":"A solid wall that stays exactly where I paint it.","support":"supported","motion":"solid","contact":"none","becomes":"stone"},
+    {"id":"powder-fire-water","instruction":"Make falling dust that becomes water beside a flame.","support":"supported","motion":"powder","contact":"fire","becomes":"water"},
+    {"id":"unsupported-temperature","instruction":"Melt only above 80 degrees Celsius.","support":"unsupported"},
+    {"id":"unsupported-clone","instruction":"Clone every particle it touches.","support":"unsupported"},
+    {"id":"unsupported-multiple","instruction":"Turn into wood beside water, and into steam beside fire.","support":"unsupported"},
+    {"id":"unsupported-neighbor","instruction":"Remain still and turn nearby water into sand.","support":"unsupported"},
+    {"id":"unsupported-time","instruction":"Fall for three seconds, then float upward.","support":"unsupported"},
+    {"id":"gas-wood-water","instruction":"A gas that becomes water when it touches wood.","support":"supported","motion":"gas","contact":"wood","becomes":"water"}
+  ]
+}
