@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hash, rng, type Pair } from "./protocol";
 import { canonical, rank, official, transitions, range, compareVotes, type Vote } from "./scoring";
+import { sourceClusterKey, analysisMetadata, BOOTSTRAP } from "./clustering";
 const here = dirname(fileURLToPath(import.meta.url));
 export function loadEvidence() {
   const manifest = JSON.parse(readFileSync(resolve(here, "manifest.json"), "utf8"));
@@ -76,7 +77,7 @@ function distributions(cases: any[]) {
 }
 function bootstrap(cases: any[]) {
   const grouped = new Map<string, any[]>();
-  for (const c of cases) { const key = `${c.source}/${c.original_id}`; grouped.set(key, [...(grouped.get(key) ?? []), c]); }
+  for (const c of cases) { const key = sourceClusterKey(c); grouped.set(key, [...(grouped.get(key) ?? []), c]); }
   const measures: Record<string, (c: any) => number | null> = {
     pairwise_official: c => c.runs.every((r: any) => !r.pairwise_official.nulls) ? mean(c.runs.map((r: any) => r.pairwise_official.correct)) : null,
     shared_official: c => c.runs.every((r: any) => !r.shared_official.nulls) ? mean(c.runs.map((r: any) => r.shared_official.correct)) : null,
@@ -87,16 +88,31 @@ function bootstrap(cases: any[]) {
   return Object.entries(measures).map(([name, measure]) => {
     const clusters = [...grouped.values()].map(cs => cs.map(measure).filter((v): v is number => v != null)).filter(cs => cs.length);
     if (!clusters.length) return { name, clusters: 0, cases: 0, estimate: null, low: null, high: null };
-    const sums = clusters.map(cs => cs.reduce((s, v) => s + v, 0)), sizes = clusters.map(cs => cs.length), random = rng(73421), draws: number[] = [];
-    for (let b = 0; b < 10000; b++) { let total = 0, size = 0; for (let n = 0; n < clusters.length; n++) { const i = Math.floor(random() * clusters.length); total += sums[i]; size += sizes[i]; } draws.push(total / size); }
+    const sums = clusters.map(cs => cs.reduce((s, v) => s + v, 0)), sizes = clusters.map(cs => cs.length), random = rng(BOOTSTRAP.seed), draws: number[] = [];
+    for (let b = 0; b < BOOTSTRAP.draws; b++) { let total = 0, size = 0; for (let n = 0; n < clusters.length; n++) { const i = Math.floor(random() * clusters.length); total += sums[i]; size += sizes[i]; } draws.push(total / size); }
     draws.sort((a, b) => a - b); return { name, clusters: clusters.length, cases: sizes.reduce((a, b) => a + b, 0), estimate: sums.reduce((a, b) => a + b, 0) / sizes.reduce((a, b) => a + b, 0), low: draws[249], high: draws[9749] };
   });
+}
+function evidenceCoverage(events: any[], records: Map<string, any>) {
+  const requests = new Map(events.filter(e => e.event === "batch_request").map(e => [e.batch_id, e]));
+  const batches = new Map(events.filter(e => e.event === "batch_completed" && e.answers).map(e => [e.batch_id, e]));
+  const normalizedOnlyBatches = new Set<string>();
+  let normalizedQuestions = 0, rawMatchedQuestions = 0;
+  for (const record of records.values()) for (const [name, answer] of Object.entries(record.answers)) {
+    normalizedQuestions++;
+    const batch = batches.get(record.batch_id);
+    if (!batch) { normalizedOnlyBatches.add(record.batch_id); continue; }
+    const mapping = requests.get(record.batch_id)?.mapping.find((m: any) => m.task.id === record.id && m.name === name);
+    if (!mapping || JSON.stringify(batch.answers[mapping.wire_id]) !== JSON.stringify(answer)) throw new Error(`Raw outcome changed ${record.id}/${name}`);
+    rawMatchedQuestions++;
+  }
+  return { normalized_questions: normalizedQuestions, raw_matched_questions: rawMatchedQuestions, normalized_only_questions: normalizedQuestions - rawMatchedQuestions, normalized_only_batches: normalizedOnlyBatches.size };
 }
 export function summarize(evidence = loadEvidence()) {
   const { manifest, pairs, events, records } = evidence, cases = buildCases(pairs, records);
   const attempts = events.filter(e => e.event === "attempt"), completed = [...records.values()], batchResults = events.filter(e => e.event === "batch_completed"), latencies = batchResults.map(r => r.latency_ms).sort((a, b) => a - b);
   const bases = ["longer", "shorter"].map(method => ({ method, accuracy: mean(pairs.map(p => { const v = method === "longer" ? rank(p.response_A.length, p.response_B.length) : rank(p.response_B.length, p.response_A.length); return v === p.label[0] ? 1 : 0; })), ties: pairs.filter(p => p.response_A.length === p.response_B.length).length }));
-  const result = { version: "judgment-reliability-v2", manifest, chunk_base: "/judgment-reliability/cases", archive: "/judgment-reliability/evidence.jsonl", source_archive: "/judgment-reliability/cases.jsonl", availability: { planned: 7440, completed: records.size, unavailable: 7440 - records.size, planned_decisions: 14880, completed_decisions: completed.reduce((n, r) => n + Object.keys(r.answers).length, 0), completed_batches: batchResults.length, transient_failed_invocations: events.filter(e => e.status === "failed" && e.transient).length, blocked_invocations: events.filter(e => e.status === "failed" && !e.transient).length, attempts: attempts.length, unsuccessful_attempts: attempts.filter(e => e.status !== 200).length, median_latency_ms: latencies[Math.floor(latencies.length / 2)] ?? null, p95_latency_ms: latencies[Math.floor(latencies.length * .95)] ?? null, returned_models: [...new Set(completed.map(r => r.model))], reported_cost_usd: batchResults.every(r => r.cost_usd != null) ? batchResults.reduce((n, r) => n + r.cost_usd, 0) : null, first_at: completed.map(r => r.started_at).sort()[0], last_at: completed.map(r => r.finished_at).sort().at(-1) }, metrics: { primary: methodMetrics(cases, 0), per_repeat: [0, 1, 2].map(r => ({ repeat: r, ...methodMetrics(cases, r) })), pooled: methodMetrics(cases), by_response_model: [...new Set(pairs.map(p => p.response_model))].map(model => ({ model, pairs: cases.filter(c => c.response_model === model).length, ...methodMetrics(cases.filter(c => c.response_model === model)) })), by_source: [...new Set(pairs.map(p => p.source.split("-")[0]))].map(source => ({ source, pairs: cases.filter(c => c.source.split("-")[0] === source).length, ...methodMetrics(cases.filter(c => c.source.split("-")[0] === source)) })), stability: stability(cases), comparisons: methodComparisons(cases), distributions: distributions(cases), confidence_intervals: bootstrap(cases), baselines: [{ method: "fixed displayed A", official_accuracy: 0, ordered_accuracy: .5 }, { method: "independent fair votes, expectation", official_accuracy: .25, ordered_accuracy: .5 }, { method: "canonical fair vote held across swaps, expectation", official_accuracy: .5, ordered_accuracy: .5 }, ...bases.map(b => ({ ...b, official_accuracy: b.accuracy, ordered_accuracy: b.accuracy }))] }, case_index: cases.map(c => ({ pair_id: c.pair_id, source: c.source, response_model: c.response_model, original_id: c.original_id, gate: c.gate.required, diagnostics: c.diagnostics, content_hash: c.content_hash })) };
+  const result = { version: "judgment-reliability-v2", manifest, analysis: { ...analysisMetadata(pairs, manifest.source_questions), evidence_coverage: evidenceCoverage(events, records) }, chunk_base: "/judgment-reliability/cases", archive: "/judgment-reliability/evidence.jsonl", source_archive: "/judgment-reliability/cases.jsonl", availability: { planned: 7440, completed: records.size, unavailable: 7440 - records.size, planned_decisions: 14880, completed_decisions: completed.reduce((n, r) => n + Object.keys(r.answers).length, 0), completed_batches: batchResults.length, transient_failed_invocations: events.filter(e => e.status === "failed" && e.transient).length, blocked_invocations: events.filter(e => e.status === "failed" && !e.transient).length, attempts: attempts.length, unsuccessful_attempts: attempts.filter(e => e.status !== 200).length, median_latency_ms: latencies[Math.floor(latencies.length / 2)] ?? null, p95_latency_ms: latencies[Math.floor(latencies.length * .95)] ?? null, returned_models: [...new Set(completed.map(r => r.model))], reported_cost_usd: batchResults.every(r => r.cost_usd != null) ? batchResults.reduce((n, r) => n + r.cost_usd, 0) : null, first_at: completed.map(r => r.started_at).sort()[0], last_at: completed.map(r => r.finished_at).sort().at(-1) }, metrics: { primary: methodMetrics(cases, 0), per_repeat: [0, 1, 2].map(r => ({ repeat: r, ...methodMetrics(cases, r) })), pooled: methodMetrics(cases), by_response_model: [...new Set(pairs.map(p => p.response_model))].map(model => ({ model, pairs: cases.filter(c => c.response_model === model).length, ...methodMetrics(cases.filter(c => c.response_model === model)) })), by_source: [...new Set(pairs.map(p => p.source.split("-")[0]))].map(source => ({ source, pairs: cases.filter(c => c.source.split("-")[0] === source).length, ...methodMetrics(cases.filter(c => c.source.split("-")[0] === source)) })), stability: stability(cases), comparisons: methodComparisons(cases), distributions: distributions(cases), confidence_intervals: bootstrap(cases), baselines: [{ method: "fixed displayed A", official_accuracy: 0, ordered_accuracy: .5 }, { method: "independent fair votes, expectation", official_accuracy: .25, ordered_accuracy: .5 }, { method: "canonical fair vote held across swaps, expectation", official_accuracy: .5, ordered_accuracy: .5 }, ...bases.map(b => ({ ...b, official_accuracy: b.accuracy, ordered_accuracy: b.accuracy }))] }, case_index: cases.map(c => ({ pair_id: c.pair_id, source: c.source, response_model: c.response_model, original_id: c.original_id, gate: c.gate.required, diagnostics: c.diagnostics, content_hash: c.content_hash })) };
   return { result, cases };
 }
 if (import.meta.main) { const { result } = summarize(); writeRecord(resolve(here, "results.jsonl"), { name: "judgment-reliability", result }); console.log(JSON.stringify({ completion: result.availability, primary: result.metrics.primary, stability: result.metrics.stability }, null, 2)); }

@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SOURCE_COMMIT, MODELS, PROTOCOL, hash, payload, tasks, encodedQuestions, POLICY_STATE, type Pair } from "./protocol";
+import { analysisMetadata } from "./clustering";
 const here = dirname(fileURLToPath(import.meta.url));
 const prior = JSON.parse(readFileSync(resolve(here, "../ifeval-review/content-audit/audit.json"), "utf8"));
 const findings: any[] = Object.values(prior).flatMap((v: any) => Array.isArray(v) ? v : []).filter((v: any) => v?.dataset === "judge");
@@ -32,4 +33,4 @@ const manifest = { ...PROTOCOL, frozen_at: "2026-09-20", source_commit: SOURCE_C
 for (const [name, content] of [["cases.jsonl", cases], ["manifest.json", JSON.stringify(manifest, null, 2) + "\n"]]) {
   const file = resolve(here, name); if (existsSync(file) && readFileSync(file, "utf8") !== content) throw new Error(`Immutable source changed: ${name}`); writeFileSync(file, content);
 }
-console.log(JSON.stringify({ pairs: pairs.length, questions: 268, gates: manifest.gate_counts, max_request_bytes: manifest.max_request_bytes, protocol_sha256: manifest.protocol_sha256 }));
+console.log(JSON.stringify({ pairs: pairs.length, frozen_protocol_source_questions: PROTOCOL.source_questions, analysis_source_clusters: analysisMetadata(pairs, PROTOCOL.source_questions).source_clusters, gates: manifest.gate_counts, max_request_bytes: manifest.max_request_bytes, protocol_sha256: manifest.protocol_sha256 }));
