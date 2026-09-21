@@ -117,3 +117,5 @@ Read current React UI, historical browser upload/worker/recipe, Python compositi
 - Final playback-toolbar spacing check: native video controls remain visible at390px; computed gap from toolbar to stage bottom is76px, no horizontal overflow. Root inspected the focused screenshot. Fresh TypeScript/Vite build passed; the earlier168-test suite covers behavior, while this final change only adds a playback class and its CSS spacing.
 
 - Final application revision0584428isREADYon canonical deploymentdpl_DXxfv26m3gKSJy2C8pAhaR5Pzz69. Rechecked all9routes/API boundaries and2exact media hashes, all passed. Canonical mobile player now has76pxclearance above native controls and finite29.954sduration; screenshot/evidence updated. The following commit changes verification documents and screenshots only. Ongoing JudgeBench event collection remains outside this release snapshot.
+
+- At the user's request, closed all14Chrome automation sessions opened for this work and verified Playwright reports no browsers. Future QA should close its task sessions on completion.
