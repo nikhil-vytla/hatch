@@ -1,0 +1,4 @@
+{"type": "thread.started", "thread_id": "01a0c244-fd22-7e63-8118-8403b3d87d0c"}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "item_0", "type": "agent_message", "text": "I\u2019ll call the Jev route_task tool once and wait for its result.\n"}}
+{"type": "item.started", "item": {"id": "item_1", "type": "mcp_tool_call", "server": "jev", "tool": "route_task", "arguments": {"task": {"id": "cancel-fixture", "prompt": "Return an answer about cancellation", "context": "Synthetic delayed fixture, no private content", "outputTokens": 128}}, "result": null, "error": null, "status": "in_progress"}}

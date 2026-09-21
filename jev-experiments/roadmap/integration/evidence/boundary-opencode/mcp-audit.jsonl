@@ -1,0 +1,8 @@
+{"time":"2026-09-21T05:16:51.318Z","event":"initialize","client":{"name":"opencode","version":"1.18.31"}}
+{"time":"2026-09-21T05:16:51.341Z","event":"tools/list"}
+{"time":"2026-09-21T05:17:32.689Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":368}
+{"time":"2026-09-21T05:17:32.692Z","event":"tools/result","tool":"route_task","requestId":2,"status":"unsupported"}
+{"time":"2026-09-21T05:17:32.699Z","event":"cancelled","requestId":2}
+{"time":"2026-09-21T05:17:38.949Z","event":"tools/call","tool":"route_task","requestId":3,"contextBytes":368}
+{"time":"2026-09-21T05:17:38.949Z","event":"tools/result","tool":"route_task","requestId":3,"status":"unavailable"}
+{"time":"2026-09-21T05:17:38.954Z","event":"cancelled","requestId":3}

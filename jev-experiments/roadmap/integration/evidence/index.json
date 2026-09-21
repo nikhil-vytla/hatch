@@ -1,0 +1,341 @@
+{
+  "orderBasis": "First retained MCP audit event, not elapsed-time ranking. Failure variants were renamed before their corrected runs; original command paths preserve the names at invocation.",
+  "runs": [
+    {
+      "order": 1,
+      "run": "opencode-cwd-timeout",
+      "firstAuditTime": "2026-09-21T04:20:39.112Z",
+      "harness": "opencode",
+      "version": "1.18.31",
+      "hostModel": {
+        "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": true,
+      "gate": {
+        "condition": "bounded-delegation",
+        "passed": false,
+        "reason": "Effective project cwd differed from subprocess cwd; timed out without completing host application.",
+        "historicalFailure": true
+      },
+      "summary": "opencode-cwd-timeout/summary.json",
+      "transcript": "opencode-cwd-timeout/stdout.jsonl",
+      "audit": "opencode-cwd-timeout/mcp-audit.jsonl"
+    },
+    {
+      "order": 2,
+      "run": "claude-fable-unavailable",
+      "firstAuditTime": "2026-09-21T04:20:40.276Z",
+      "harness": "claude",
+      "version": "2.1.278",
+      "hostModel": {
+        "configured": "claude-fable-5-1",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "bounded-delegation",
+        "passed": false,
+        "reason": "The host provider rejected the configured Fable request before any delegation.",
+        "historicalFailure": true
+      },
+      "summary": "claude-fable-unavailable/summary.json",
+      "transcript": "claude-fable-unavailable/stdout.jsonl",
+      "audit": "claude-fable-unavailable/mcp-audit.jsonl"
+    },
+    {
+      "order": 3,
+      "run": "codex-approval-default",
+      "firstAuditTime": "2026-09-21T04:20:41.109Z",
+      "harness": "codex",
+      "version": "0.154.0",
+      "hostModel": {
+        "configured": null,
+        "identityBasis": "not reported; configured default"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "bounded-delegation",
+        "passed": false,
+        "reason": "Client approval rejected all MCP calls before server invocation; the host fixed the task itself.",
+        "historicalFailure": true
+      },
+      "summary": "codex-approval-default/summary.json",
+      "transcript": "codex-approval-default/stdout.jsonl",
+      "audit": "codex-approval-default/mcp-audit.jsonl"
+    },
+    {
+      "order": 4,
+      "run": "claude",
+      "firstAuditTime": "2026-09-21T04:21:43.509Z",
+      "harness": "claude",
+      "version": "2.1.278",
+      "hostModel": {
+        "configured": "claude-sonnet-4-6",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": true,
+      "gate": {
+        "condition": "bounded-delegation",
+        "passed": true,
+        "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
+        "historicalFailure": false
+      },
+      "summary": "claude/summary.json",
+      "transcript": "claude/stdout.jsonl",
+      "audit": "claude/mcp-audit.jsonl"
+    },
+    {
+      "order": 5,
+      "run": "codex",
+      "firstAuditTime": "2026-09-21T04:23:23.486Z",
+      "harness": "codex",
+      "version": "0.154.0",
+      "hostModel": {
+        "configured": null,
+        "identityBasis": "not reported; configured default"
+      },
+      "delegationOccurred": true,
+      "gate": {
+        "condition": "bounded-delegation",
+        "passed": true,
+        "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
+        "historicalFailure": false
+      },
+      "summary": "codex/summary.json",
+      "transcript": "codex/stdout.jsonl",
+      "audit": "codex/mcp-audit.jsonl"
+    },
+    {
+      "order": 6,
+      "run": "opencode",
+      "firstAuditTime": "2026-09-21T04:26:03.113Z",
+      "harness": "opencode",
+      "version": "1.18.31",
+      "hostModel": {
+        "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": true,
+      "gate": {
+        "condition": "bounded-delegation",
+        "passed": true,
+        "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
+        "historicalFailure": false
+      },
+      "summary": "opencode/summary.json",
+      "transcript": "opencode/stdout.jsonl",
+      "audit": "opencode/mcp-audit.jsonl"
+    },
+    {
+      "order": 7,
+      "run": "cancel-opencode",
+      "firstAuditTime": "2026-09-21T04:41:18.825Z",
+      "harness": "opencode",
+      "version": "1.18.31",
+      "hostModel": {
+        "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "active-interruption",
+        "passed": true,
+        "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
+        "historicalFailure": false
+      },
+      "summary": "cancel-opencode/summary.json",
+      "transcript": "cancel-opencode/stdout.jsonl",
+      "audit": "cancel-opencode/mcp-audit.jsonl"
+    },
+    {
+      "order": 8,
+      "run": "cancel-claude",
+      "firstAuditTime": "2026-09-21T04:41:31.643Z",
+      "harness": "claude",
+      "version": "2.1.278",
+      "hostModel": {
+        "configured": "claude-sonnet-4-6",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "active-interruption",
+        "passed": true,
+        "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
+        "historicalFailure": false
+      },
+      "summary": "cancel-claude/summary.json",
+      "transcript": "cancel-claude/stdout.jsonl",
+      "audit": "cancel-claude/mcp-audit.jsonl"
+    },
+    {
+      "order": 9,
+      "run": "cancel-codex",
+      "firstAuditTime": "2026-09-21T04:41:36.412Z",
+      "harness": "codex",
+      "version": "0.154.0",
+      "hostModel": {
+        "configured": null,
+        "identityBasis": "not reported; configured default"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "active-interruption",
+        "passed": true,
+        "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
+        "historicalFailure": false
+      },
+      "summary": "cancel-codex/summary.json",
+      "transcript": "cancel-codex/stdout.jsonl",
+      "audit": "cancel-codex/mcp-audit.jsonl"
+    },
+    {
+      "order": 10,
+      "run": "malformed-opencode",
+      "firstAuditTime": "2026-09-21T04:43:27.744Z",
+      "harness": "opencode",
+      "version": "1.18.31",
+      "hostModel": {
+        "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "malformed-response",
+        "passed": true,
+        "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
+        "historicalFailure": false
+      },
+      "summary": "malformed-opencode/summary.json",
+      "transcript": "malformed-opencode/stdout.jsonl",
+      "audit": "malformed-opencode/mcp-audit.jsonl"
+    },
+    {
+      "order": 11,
+      "run": "malformed-claude",
+      "firstAuditTime": "2026-09-21T04:44:31.334Z",
+      "harness": "claude",
+      "version": "2.1.278",
+      "hostModel": {
+        "configured": "claude-sonnet-4-6",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "malformed-response",
+        "passed": true,
+        "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
+        "historicalFailure": false
+      },
+      "summary": "malformed-claude/summary.json",
+      "transcript": "malformed-claude/stdout.jsonl",
+      "audit": "malformed-claude/mcp-audit.jsonl"
+    },
+    {
+      "order": 12,
+      "run": "malformed-codex",
+      "firstAuditTime": "2026-09-21T04:45:25.917Z",
+      "harness": "codex",
+      "version": "0.154.0",
+      "hostModel": {
+        "configured": null,
+        "identityBasis": "not reported; configured default"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "malformed-response",
+        "passed": true,
+        "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
+        "historicalFailure": false
+      },
+      "summary": "malformed-codex/summary.json",
+      "transcript": "malformed-codex/stdout.jsonl",
+      "audit": "malformed-codex/mcp-audit.jsonl"
+    },
+    {
+      "order": 13,
+      "run": "boundary-opencode",
+      "firstAuditTime": "2026-09-21T05:16:51.318Z",
+      "harness": "opencode",
+      "version": "1.18.31",
+      "hostModel": {
+        "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "unsupported-task-and-unavailable-route",
+        "passed": false,
+        "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
+        "historicalFailure": true
+      },
+      "summary": "boundary-opencode/summary.json",
+      "transcript": "boundary-opencode/stdout.jsonl",
+      "audit": "boundary-opencode/mcp-audit.jsonl"
+    },
+    {
+      "order": 14,
+      "run": "boundary-claude",
+      "firstAuditTime": "2026-09-21T05:19:20.370Z",
+      "harness": "claude",
+      "version": "2.1.278",
+      "hostModel": {
+        "configured": "claude-sonnet-4-6",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "unsupported-task-and-unavailable-route",
+        "passed": true,
+        "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
+        "historicalFailure": false
+      },
+      "summary": "boundary-claude/summary.json",
+      "transcript": "boundary-claude/stdout.jsonl",
+      "audit": "boundary-claude/mcp-audit.jsonl"
+    },
+    {
+      "order": 15,
+      "run": "boundary-codex",
+      "firstAuditTime": "2026-09-21T05:20:28.541Z",
+      "harness": "codex",
+      "version": "0.154.0",
+      "hostModel": {
+        "configured": null,
+        "identityBasis": "not reported; configured default"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "unsupported-task-and-unavailable-route",
+        "passed": true,
+        "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
+        "historicalFailure": false
+      },
+      "summary": "boundary-codex/summary.json",
+      "transcript": "boundary-codex/stdout.jsonl",
+      "audit": "boundary-codex/mcp-audit.jsonl"
+    },
+    {
+      "order": 16,
+      "run": "boundary-opencode-relative-paths",
+      "firstAuditTime": "2026-09-21T05:20:43.867Z",
+      "harness": "opencode",
+      "version": "1.18.31",
+      "hostModel": {
+        "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+        "identityBasis": "command configuration"
+      },
+      "delegationOccurred": false,
+      "gate": {
+        "condition": "unsupported-task-and-unavailable-route",
+        "passed": true,
+        "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
+        "historicalFailure": false
+      },
+      "summary": "boundary-opencode-relative-paths/summary.json",
+      "transcript": "boundary-opencode-relative-paths/stdout.jsonl",
+      "audit": "boundary-opencode-relative-paths/mcp-audit.jsonl"
+    }
+  ]
+}

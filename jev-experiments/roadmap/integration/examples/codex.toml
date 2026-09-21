@@ -1,0 +1,14 @@
+[mcp_servers.jev]
+command = "bun"
+args = ["/ABSOLUTE/PATH/jev-experiments/roadmap/routing/mcp.ts"]
+startup_timeout_sec = 10
+tool_timeout_sec = 120
+enabled_tools = ["decide", "route_task", "classify_eml"]
+
+[mcp_servers.jev.env]
+JEV_ROUTER_CONFIG = "/ABSOLUTE/PATH/router.json"
+
+# Keep the client's normal interactive approval flow. The isolated automated
+# fixture explicitly approves only its two required Jev tools per invocation.
+[mcp_servers.jev.tools.route_task]
+approval_mode = "prompt"

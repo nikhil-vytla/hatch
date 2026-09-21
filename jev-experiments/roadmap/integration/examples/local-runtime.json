@@ -1,0 +1,16 @@
+{
+  "routes": [],
+  "policy": {
+    "weights": { "quality": 0.6, "cost": 0.25, "latency": 0.15 },
+    "allowedTools": [],
+    "localOnly": true,
+    "allowAvailabilityFallback": false,
+    "allowQualityEscalation": false,
+    "maxAttempts": 1
+  },
+  "localRuntime": {
+    "executable": "/absolute/path/to/jev-local/bin/jev-local",
+    "model": "laya-base-experimental",
+    "dataDirectory": "/absolute/path/to/installed/models"
+  }
+}

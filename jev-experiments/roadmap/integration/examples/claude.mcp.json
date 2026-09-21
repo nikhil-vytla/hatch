@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "jev": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["/ABSOLUTE/PATH/jev-experiments/roadmap/routing/mcp.ts"],
+      "env": { "JEV_ROUTER_CONFIG": "/ABSOLUTE/PATH/router.json" }
+    }
+  }
+}

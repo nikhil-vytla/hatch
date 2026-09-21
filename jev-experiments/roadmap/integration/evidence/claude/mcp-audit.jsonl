@@ -1,0 +1,12 @@
+{"time":"2026-09-21T04:21:43.509Z","event":"initialize","client":{"name":"claude-code","title":"Claude Code","version":"2.1.278","description":"Anthropic's agentic coding tool","websiteUrl":"https://claude.com/claude-code"}}
+{"time":"2026-09-21T04:21:43.522Z","event":"tools/list"}
+{"time":"2026-09-21T04:22:07.748Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":287}
+{"time":"2026-09-21T04:22:15.667Z","event":"tools/result","tool":"route_task","requestId":2,"status":"ok","artifactKind":"patch"}
+{"time":"2026-09-21T04:22:15.670Z","event":"tools/call","tool":"route_task","requestId":3,"contextBytes":674}
+{"time":"2026-09-21T04:22:24.471Z","event":"tools/result","tool":"route_task","requestId":3,"status":"ok","artifactKind":"patch"}
+{"time":"2026-09-21T04:22:24.474Z","event":"tools/call","tool":"route_task","requestId":4,"contextBytes":536}
+{"time":"2026-09-21T04:22:48.802Z","event":"tools/result","tool":"route_task","requestId":4,"status":"ok","artifactKind":"structured"}
+{"time":"2026-09-21T04:22:48.806Z","event":"tools/call","tool":"route_task","requestId":5,"contextBytes":142}
+{"time":"2026-09-21T04:22:48.806Z","event":"tools/result","tool":"route_task","requestId":5,"status":"unavailable"}
+{"time":"2026-09-21T04:22:48.809Z","event":"tools/call","tool":"decide","requestId":6,"contextBytes":null}
+{"time":"2026-09-21T04:22:48.810Z","event":"tools/result","tool":"decide","requestId":6,"status":"unsupported"}

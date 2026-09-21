@@ -1,0 +1,49 @@
+{
+  "harness": "claude",
+  "directory": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-claude-c1tphmi1",
+  "command": [
+    "claude",
+    "--bare",
+    "--strict-mcp-config",
+    "--mcp-config",
+    "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-claude-c1tphmi1/mcp.json",
+    "--model",
+    "claude-fable-5-1",
+    "--permission-mode",
+    "acceptEdits",
+    "--allowedTools",
+    "Read,Write,Edit,Glob,Grep,Bash(bun test*),Bash(git diff*),Bash(git apply*),mcp__jev__route_task,mcp__jev__decide",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--no-session-persistence",
+    "-p"
+  ],
+  "elapsedSeconds": 2.18,
+  "exitCode": 1,
+  "timedOut": false,
+  "baselineTestsExitCode": 1,
+  "independentTestsExitCode": 1,
+  "mcpDiscovered": true,
+  "toolCalls": [],
+  "toolResults": [],
+  "patchedBug": false,
+  "analysisFileWritten": false,
+  "additionalTestsWritten": false,
+  "delegationOccurred": false,
+  "usableDelegatedArtifacts": 0,
+  "cliVersion": "2.1.278",
+  "hostModel": {
+    "configured": "claude-fable-5-1",
+    "identityBasis": "command configuration"
+  },
+  "firstAuditTime": "2026-09-21T04:20:40.276Z",
+  "evidenceGate": {
+    "condition": "bounded-delegation",
+    "passed": false,
+    "reason": "The host provider rejected the configured Fable request before any delegation.",
+    "historicalFailure": true
+  },
+  "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+  "auditChronologyOrder": 2
+}
