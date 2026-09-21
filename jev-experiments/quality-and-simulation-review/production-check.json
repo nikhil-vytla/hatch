@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-20T22:15:25.323Z",
+  "at": "2026-09-21T01:04:51.794Z",
   "origin": "https://jev-experiments.vercel.app",
   "passed": true,
   "results": [
@@ -42,26 +42,64 @@
       "method": "GET",
       "expectedStatus": 200,
       "status": 200,
-      "bytes": 306029,
+      "bytes": 307887,
       "availability": {
         "planned": 7440,
-        "completed": 4430,
-        "unavailable": 3010,
+        "completed": 7440,
+        "unavailable": 0,
         "planned_decisions": 14880,
-        "completed_decisions": 8844,
-        "completed_batches": 696,
-        "transient_failed_invocations": 2,
+        "completed_decisions": 14880,
+        "completed_batches": 1177,
+        "transient_failed_invocations": 5,
         "blocked_invocations": 0,
-        "attempts": 1088,
-        "unsuccessful_attempts": 392,
-        "median_latency_ms": 492,
-        "p95_latency_ms": 44587,
+        "attempts": 1779,
+        "unsuccessful_attempts": 602,
+        "median_latency_ms": 487,
+        "p95_latency_ms": 36546,
         "returned_models": [
           "typesafe-ai/jev"
         ],
         "reported_cost_usd": 0,
         "first_at": "2026-09-20T20:05:27.680Z",
-        "last_at": "2026-09-20T21:53:54.183Z"
+        "last_at": "2026-09-20T22:46:50.077Z"
+      },
+      "completeStudy": true,
+      "passed": true
+    },
+    {
+      "path": "/judgment-reliability/analysis.json",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 1554,
+      "analysis": {
+        "version": "judge-reliability-analysis-v2.1",
+        "amendment": {
+          "id": "missing-source-id-clusters",
+          "date": "2026-09-20",
+          "reason": "The frozen source+original_id analysis grouped 312 pairs with missing IDs into three source-wide clusters. Exact-question grouping separates those questions and merges one identical-text group with different valid source IDs, without changing any recorded judgment or accuracy denominator.",
+          "preserved": "Frozen protocol.ts, manifest.json, cases.jsonl and append-only events.jsonl remain byte-identical. Only analysis grouping, confidence intervals and descriptive cluster counts are amended."
+        },
+        "cluster_rule": "Group every pair by source plus SHA-256 of its exact question string. This keeps repeated questions together when original_id is missing or when identical text has different source IDs. The archive is checked to contain no non-null source+ID spanning multiple question texts; such variants would require connected-component grouping.",
+        "source_clusters": 528,
+        "frozen_protocol_source_questions": 268,
+        "pairs_with_source_id": 308,
+        "pairs_without_source_id": 312,
+        "nonnull_source_id_groups": 265,
+        "null_id_question_groups": 264,
+        "distinct_question_texts": 528,
+        "same_text_distinct_id_groups": 1,
+        "source_id_multiple_text_groups": 0,
+        "bootstrap": {
+          "draws": 10000,
+          "seed": 73421
+        },
+        "evidence_coverage": {
+          "normalized_questions": 14880,
+          "raw_matched_questions": 14614,
+          "normalized_only_questions": 266,
+          "normalized_only_batches": 21
+        }
       },
       "passed": true
     },
