@@ -1,0 +1,8 @@
+{
+  "name": "jev-release-lab",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "bun test runtime routing materials playable", "check": "tsc --noEmit", "verify": "bun verification/check.ts" },
+  "dependencies": { "react": "19.2.4", "react-dom": "19.2.4" },
+  "devDependencies": { "@types/react": "^19.2.14", "@types/react-dom": "^19.2.3", "@types/bun": "^1.3.0", "typescript": "~5.9.3" }
+}
