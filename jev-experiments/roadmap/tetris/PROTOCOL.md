@@ -1,0 +1,7 @@
+# Live matched-queue Tetris comparison
+
+Freeze before recording: seeds 7, 19 and 42; a pair of full games per seed on the same deterministic seven-bag queue; lane A short buttons and lane B reachable outcomes. Both use Jev, no fallback assistance, a 900 ms request interval, the preserved 700 ms grace setting, the existing validity windows, and the same gravity clock. These conditions change the information and authority supplied by code, not only wording. No human interventions occur.
+
+Advance simulation by actual elapsed monotonic time while requests execute asynchronously. Retain all requests, actual replies, failures, accepted/stale/cancelled decisions and controller-time contributions. Keep seeds sequential and at most two requests in flight. Report pieces, lines, score, game-over status, coverage and unknown costs, with no superiority test on three seeds. End a recording after four wall-clock minutes if either game still runs, label it censored, and retain the uncapped playable game unchanged. Do not describe censored recordings as completed games. This is a behavior comparison, not a hardware/provider latency benchmark. Other development processes may be active.
+
+The assisted 700 ms default remains covered by engine tests and historical local-only smoke evidence. This new condition isolates model contribution by disabling fallback. A separate larger assisted cohort remains necessary to estimate end-user controller effectiveness.
