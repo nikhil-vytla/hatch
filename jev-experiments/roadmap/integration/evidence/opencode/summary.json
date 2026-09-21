@@ -1,0 +1,161 @@
+{
+  "harness": "opencode",
+  "directory": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-opencode-p1nda30r",
+  "command": [
+    "opencode",
+    "run",
+    "--dir",
+    "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-opencode-p1nda30r",
+    "--pure",
+    "--format",
+    "json",
+    "--agent",
+    "jev-fixture",
+    "--model",
+    "amazon-bedrock/global.anthropic.claude-fable-5-1"
+  ],
+  "elapsedSeconds": 221.4,
+  "exitCode": 0,
+  "timedOut": false,
+  "baselineTestsExitCode": 1,
+  "independentTestsExitCode": 0,
+  "mcpDiscovered": true,
+  "toolCalls": [
+    {
+      "time": "2026-09-21T04:26:43.949Z",
+      "event": "tools/call",
+      "tool": "route_task",
+      "requestId": 2,
+      "contextBytes": 584
+    },
+    {
+      "time": "2026-09-21T04:26:51.853Z",
+      "event": "tools/call",
+      "tool": "route_task",
+      "requestId": 3,
+      "contextBytes": 583
+    },
+    {
+      "time": "2026-09-21T04:26:54.500Z",
+      "event": "tools/call",
+      "tool": "route_task",
+      "requestId": 4,
+      "contextBytes": 925
+    },
+    {
+      "time": "2026-09-21T04:26:56.241Z",
+      "event": "tools/call",
+      "tool": "route_task",
+      "requestId": 5,
+      "contextBytes": 377
+    },
+    {
+      "time": "2026-09-21T04:26:56.267Z",
+      "event": "tools/call",
+      "tool": "decide",
+      "requestId": 6,
+      "contextBytes": null
+    },
+    {
+      "time": "2026-09-21T04:27:47.692Z",
+      "event": "tools/call",
+      "tool": "route_task",
+      "requestId": 7,
+      "contextBytes": 901
+    },
+    {
+      "time": "2026-09-21T04:27:47.708Z",
+      "event": "tools/call",
+      "tool": "decide",
+      "requestId": 8,
+      "contextBytes": null
+    },
+    {
+      "time": "2026-09-21T04:28:12.966Z",
+      "event": "tools/call",
+      "tool": "decide",
+      "requestId": 9,
+      "contextBytes": null
+    }
+  ],
+  "toolResults": [
+    {
+      "time": "2026-09-21T04:26:50.326Z",
+      "event": "tools/result",
+      "tool": "route_task",
+      "requestId": 2,
+      "status": "ok",
+      "artifactKind": "patch"
+    },
+    {
+      "time": "2026-09-21T04:26:56.241Z",
+      "event": "tools/result",
+      "tool": "route_task",
+      "requestId": 5,
+      "status": "unavailable"
+    },
+    {
+      "time": "2026-09-21T04:26:56.267Z",
+      "event": "tools/result",
+      "tool": "decide",
+      "requestId": 6,
+      "status": "unsupported"
+    },
+    {
+      "time": "2026-09-21T04:27:05.891Z",
+      "event": "tools/result",
+      "tool": "route_task",
+      "requestId": 3,
+      "status": "ok",
+      "artifactKind": "patch"
+    },
+    {
+      "time": "2026-09-21T04:27:25.761Z",
+      "event": "tools/result",
+      "tool": "route_task",
+      "requestId": 4,
+      "status": "error"
+    },
+    {
+      "time": "2026-09-21T04:27:47.709Z",
+      "event": "tools/result",
+      "tool": "decide",
+      "requestId": 8,
+      "status": "ok"
+    },
+    {
+      "time": "2026-09-21T04:28:04.549Z",
+      "event": "tools/result",
+      "tool": "route_task",
+      "requestId": 7,
+      "status": "ok",
+      "artifactKind": "structured"
+    },
+    {
+      "time": "2026-09-21T04:28:12.966Z",
+      "event": "tools/result",
+      "tool": "decide",
+      "requestId": 9,
+      "status": "unsupported"
+    }
+  ],
+  "patchedBug": true,
+  "analysisFileWritten": true,
+  "additionalTestsWritten": true,
+  "delegationOccurred": true,
+  "usableDelegatedArtifacts": 3,
+  "cliVersion": "1.18.31",
+  "hostModel": {
+    "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+    "identityBasis": "command configuration"
+  },
+  "firstAuditTime": "2026-09-21T04:26:03.113Z",
+  "evidenceGate": {
+    "condition": "bounded-delegation",
+    "passed": true,
+    "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
+    "historicalFailure": false
+  },
+  "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+  "auditChronologyOrder": 6
+}

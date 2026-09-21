@@ -1,0 +1,15 @@
+# Actual-client unsupported request and unavailable route protocol
+
+Frozen2026-09-21 before these boundary-only client sessions. Existing complete-workflow sessions already observed unavailable required-shell routes and unsupported typed image questions. This additional condition isolates two route_task outcomes in each actual OpenCode, Claude Code and Codex client.
+
+The registry contains no destinations, localOnly:true, no allowed tools, no fallback or escalation, and one allowed attempt. Each host reads the same authored sum.ts and sum.test.ts fixture and supplies their complete contents in both calls. No GPU or delegated model can execute; only the coding client's own authenticated host model runs.
+
+1. Unsupported task request: a deliberately empty task id with a meaningful prompt, complete context and outputTokens128. The published MCP schema accepts a string id, while the shared runtime contract requires a nonempty id. The server must return unsupported with an understandable required-id explanation. This is unsupported contract input, not a measurement of model capability.
+2. Unavailable route: the same meaningful task and complete context with id boundary-no-route. The task is valid but the registry is empty. The server must return unavailable and explain that no eligible destination exists, with no destination attempts.
+
+The host must make exactly these two calls, preserve the deliberate invalid id, and neither retry nor loosen restrictions. It must leave source, tests and configuration unchanged, and write ANALYSIS.md explaining both outcomes. Existing failing fixture tests must remain failing. A client refusal before the call reaches MCP does not satisfy this gate.
+
+Acceptance is derived from actual MCP audits and sanitized client transcripts: two route_task calls with complete source context, one unsupported and one unavailable result, readable selection explanations, empty attempt lists and no artifacts, unchanged tracked source/tests and configuration, successful host termination and an explanation file. Tool discovery is not success. Failures are retained; an implementation change needs a distinct evidence name before another condition. Original transcripts, test outputs and summaries remain under evidence/boundary-CLIENT. No private source or mailbox content is used.
+
+
+Permission amendment after the first OpenCode condition: the absolute read/edit allow patterns did not match OpenCode's worktree-relative permission checks. The host made both expected calls and explained the outcomes, but could not write ANALYSIS.md; that run fails the frozen full gate and is retained. The corrected condition keeps --dir pinned to the canonical generated Git worktree, denies external_directory, and allows only sum.ts, *.test.ts and ANALYSIS.md through relative read/edit patterns. It changes fixture permissions, not router eligibility or task requests. The rerun uses a separate boundary-opencode-relative-paths evidence folder. Upstream [edit-tool implementation](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/edit.ts) identifies the relative permission path; no upstream code is copied.
