@@ -1,0 +1,29 @@
+{
+  "model": "smol",
+  "originalCorpusAndRevisionMatched": true,
+  "allBackboneFileHashesMatched": true,
+  "allTargetAndMetadataRowsMatched": true,
+  "featureManifestSha256": "8d22cad7de4a13730b3e2dd690fca89c70c9f8d3e62a007aaee89fe818778c6d",
+  "splits": {
+    "train": {
+      "rows": 2304,
+      "arraysSha256": "7b2cb971e5dcca56285b2eca57a23c1872d365a33c3e7cc83c46b64dcc0de848",
+      "metadataSha256": "00435b59b44e4283737213bd17bd01dd97ce42efa09b504c957ca8381e68eaa1"
+    },
+    "validation": {
+      "rows": 192,
+      "arraysSha256": "866887d141c2c37f773a54c9f1ab568b964adfec4172e320474d4418d20d96a4",
+      "metadataSha256": "3d14ac96a89e06bf769a143f9668c576b11fee39eb441c12b850326230c03d32"
+    },
+    "test": {
+      "rows": 384,
+      "arraysSha256": "e24874d45e13b1bbd5d9a360bfdba7e9b11ac9f8f36955036475a1b4a6a3d48f",
+      "metadataSha256": "1a40e8ba247de8f82113893f0eafa1bb05cc0acfe68e6e7db324241a90f63b95"
+    },
+    "transfer": {
+      "rows": 2384,
+      "arraysSha256": "30392c70def5af41813b876ceba3b6fb00a091e7af260cad72aecf7ecb9d4d8e",
+      "metadataSha256": "09005da9c8c576a8b4c996ccc6a98788600331f30d554931d68e464a50102fee"
+    }
+  }
+}

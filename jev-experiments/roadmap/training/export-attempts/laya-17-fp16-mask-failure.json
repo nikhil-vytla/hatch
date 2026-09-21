@@ -1,0 +1,89 @@
+{
+  "model": "laya",
+  "seed": 17,
+  "completeGraph": true,
+  "pilotLimit": 0,
+  "status": "failed",
+  "defaultSelected": false,
+  "parameterElements": {
+    "backbone": 421029889,
+    "readout": 3075
+  },
+  "torchBridgeValidationIds": [
+    "banking77/train/9210",
+    "boolq/train/7710",
+    "stsb/validation/1300"
+  ],
+  "torchVsMlxValidationProbabilityDelta": [
+    1.1920928955078125e-07,
+    1.4901161193847656e-07,
+    7.450580596923828e-08
+  ],
+  "inputSpecification": {
+    "input_ids": {
+      "shape": [
+        1,
+        768
+      ],
+      "dtype": "int32"
+    },
+    "attention_mask": {
+      "shape": [
+        1,
+        768
+      ],
+      "dtype": "int32"
+    },
+    "marker_pos": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "option_mask": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "kind": {
+      "shape": [
+        1
+      ],
+      "dtype": "int32"
+    },
+    "last_index": {
+      "shape": [
+        1
+      ],
+      "dtype": "int32"
+    }
+  },
+  "outputSpecification": {
+    "probabilities": {
+      "shape": [
+        1,
+        8
+      ],
+      "meaning": "final calibrated masked decision probabilities"
+    }
+  },
+  "artifact": {
+    "bytes": 845263363,
+    "files": {
+      "Manifest.json": "17c0461750f03619855a8d8e04fd11c52c5eb29df980931005f84b035205177b",
+      "Data/com.apple.CoreML/model.mlmodel": "73310c2020e3fe1534a8852168cb30b076276007640fe6c537c3eaafd9a7203d",
+      "Data/com.apple.CoreML/weights/weight.bin": "4d835178cd7b976d96ffa99866551c357b037927e3787b968b4d5a6367e7ca50"
+    }
+  },
+  "error": {
+    "type": "ValueError",
+    "message": "Core ML returned invalid probabilities"
+  },
+  "passed": false,
+  "elapsedSeconds": 18.778834583004937,
+  "peakProcessRssBytes": 6554845184,
+  "peakMlxBytes": 2648739346
+}

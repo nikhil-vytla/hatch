@@ -1,0 +1,30 @@
+{
+  "model": "laya",
+  "seed": 17,
+  "completeGraph": true,
+  "pilotLimit": 0,
+  "status": "failed",
+  "defaultSelected": false,
+  "parameterElements": {
+    "backbone": 421029889,
+    "readout": 3075
+  },
+  "torchBridgeValidationIds": [
+    "banking77/train/9210",
+    "boolq/train/7710",
+    "stsb/validation/1300"
+  ],
+  "torchVsMlxValidationProbabilityDelta": [
+    1.1920928955078125e-07,
+    1.4901161193847656e-07,
+    7.450580596923828e-08
+  ],
+  "error": {
+    "type": "TypeError",
+    "message": "only 0-dimensional arrays can be converted to Python scalars"
+  },
+  "passed": false,
+  "elapsedSeconds": 3.4420673749991693,
+  "peakProcessRssBytes": 3435282432,
+  "peakMlxBytes": 2648739346
+}
