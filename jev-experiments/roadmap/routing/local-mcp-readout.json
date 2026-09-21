@@ -1,0 +1,194 @@
+{
+  "condition": "Actual local MCP-to-MLX invocation, explicit experimental model; synthetic typed question and supplied email. Smoke only, not calibration or benchmark evidence.",
+  "model": "laya-readout-experimental",
+  "runtime": "/tmp/jev-local-readout-test/bin/jev-local",
+  "dataDirectory": "/tmp/jev-local-remote-model-test",
+  "exitCode": 0,
+  "stderr": "",
+  "calls": [
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-06-18",
+          "clientInfo": {
+            "name": "local-mcp-smoke",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {
+            "tools": {
+              "listChanged": false
+            }
+          },
+          "serverInfo": {
+            "name": "jev-model-routing-lab",
+            "version": "0.1.0"
+          },
+          "instructions": "Use route_task for bounded delegation with complete context. It returns proposed artifacts; you retain control of tools and applying changes. Default decide and classify_eml are explicitly labeled baselines."
+        }
+      },
+      "wallMs": 18.490749993361533
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+          "name": "decide",
+          "arguments": {
+            "request": {
+              "schemaVersion": "1",
+              "requestId": "synthetic-local-smoke",
+              "state": "The parcel arrived today.",
+              "questions": [
+                {
+                  "id": "arrived",
+                  "kind": "boolean",
+                  "prompt": "Has the parcel arrived?"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"schemaVersion\":\"1\",\"requestId\":\"synthetic-local-smoke\",\"status\":\"ok\",\"decisions\":[{\"questionId\":\"arrived\",\"distribution\":[{\"value\":false,\"probability\":0.1732647567987442},{\"value\":true,\"probability\":0.826735258102417}],\"selected\":true}],\"execution\":{\"adapter\":\"jev-local-mlx\",\"model\":\"jev/laya-typed-readout-v1-seed17\",\"revision\":\"9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29\",\"local\":true},\"timing\":{\"loadMs\":396.57237502979115,\"inferenceMs\":25.41404200019315,\"totalMs\":504.624833},\"issues\":[]}"
+            }
+          ],
+          "structuredContent": {
+            "schemaVersion": "1",
+            "requestId": "synthetic-local-smoke",
+            "status": "ok",
+            "decisions": [
+              {
+                "questionId": "arrived",
+                "distribution": [
+                  {
+                    "value": false,
+                    "probability": 0.1732647567987442
+                  },
+                  {
+                    "value": true,
+                    "probability": 0.826735258102417
+                  }
+                ],
+                "selected": true
+              }
+            ],
+            "execution": {
+              "adapter": "jev-local-mlx",
+              "model": "jev/laya-typed-readout-v1-seed17",
+              "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+              "local": true
+            },
+            "timing": {
+              "loadMs": 396.57237502979115,
+              "inferenceMs": 25.41404200019315,
+              "totalMs": 504.624833
+            },
+            "issues": []
+          },
+          "isError": false
+        }
+      },
+      "wallMs": 505.43837499571964
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+          "name": "classify_eml",
+          "arguments": {
+            "eml": "Subject: Receipt for order123\nContent-Type: text/plain\n\nPayment received. Here is your receipt.\n"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"schemaVersion\":\"1\",\"requestId\":\"eml-49d82ff189a32522\",\"status\":\"ok\",\"decisions\":[{\"questionId\":\"category\",\"distribution\":[{\"value\":\"action_required\",\"probability\":0.024719564244151115},{\"value\":\"transactional\",\"probability\":0.8562276363372803},{\"value\":\"newsletter\",\"probability\":0.05026471987366676},{\"value\":\"personal\",\"probability\":0.03968328237533569},{\"value\":\"uncertain\",\"probability\":0.0291046854108572}],\"selected\":\"transactional\"}],\"execution\":{\"adapter\":\"jev-local-mlx\",\"model\":\"jev/laya-typed-readout-v1-seed17\",\"revision\":\"9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29\",\"local\":true},\"timing\":{\"loadMs\":387.7922920510173,\"inferenceMs\":31.000916962511837,\"totalMs\":52.496958000119776},\"issues\":[],\"artifact\":{\"sha256\":\"49d82ff189a32522b3d7e98af0ddb96bc49619add715a3cb272387f855ae578d\",\"modified\":false},\"uncertainty\":{\"maximumProbability\":0.8562276363372803,\"normalizedEntropy\":0.37632609271345685,\"calibration\":\"Uncalibrated for email; these scores are not verified correctness probabilities.\"}}"
+            }
+          ],
+          "structuredContent": {
+            "schemaVersion": "1",
+            "requestId": "eml-49d82ff189a32522",
+            "status": "ok",
+            "decisions": [
+              {
+                "questionId": "category",
+                "distribution": [
+                  {
+                    "value": "action_required",
+                    "probability": 0.024719564244151115
+                  },
+                  {
+                    "value": "transactional",
+                    "probability": 0.8562276363372803
+                  },
+                  {
+                    "value": "newsletter",
+                    "probability": 0.05026471987366676
+                  },
+                  {
+                    "value": "personal",
+                    "probability": 0.03968328237533569
+                  },
+                  {
+                    "value": "uncertain",
+                    "probability": 0.0291046854108572
+                  }
+                ],
+                "selected": "transactional"
+              }
+            ],
+            "execution": {
+              "adapter": "jev-local-mlx",
+              "model": "jev/laya-typed-readout-v1-seed17",
+              "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+              "local": true
+            },
+            "timing": {
+              "loadMs": 387.7922920510173,
+              "inferenceMs": 31.000916962511837,
+              "totalMs": 52.496958000119776
+            },
+            "issues": [],
+            "artifact": {
+              "sha256": "49d82ff189a32522b3d7e98af0ddb96bc49619add715a3cb272387f855ae578d",
+              "modified": false
+            },
+            "uncertainty": {
+              "maximumProbability": 0.8562276363372803,
+              "normalizedEntropy": 0.37632609271345685,
+              "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+            }
+          },
+          "isError": false
+        }
+      },
+      "wallMs": 499.5539999799803
+    }
+  ]
+}

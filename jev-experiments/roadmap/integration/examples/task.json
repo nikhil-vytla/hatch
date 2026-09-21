@@ -1,0 +1,7 @@
+{
+  "id": "off-by-one-demo",
+  "prompt": "Fix the bug. totalThrough(n) must sum all integers from 1 through n inclusive. Return a proposed unified diff for sum.ts.",
+  "context": "sum.ts:\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n",
+  "requiredCapabilities": ["text", "coding"],
+  "outputTokens": 2048
+}

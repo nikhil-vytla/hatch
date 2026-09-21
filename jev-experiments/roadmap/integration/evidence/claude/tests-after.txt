@@ -1,0 +1,13 @@
+bun test v1.3.14 (0d9b296a)
+
+sum.test.ts:
+(pass) inclusive total [0.07ms]
+(pass) small n values
+(pass) large n
+(pass) negative n returns 0
+(pass) zero returns 0
+
+ 5 pass
+ 0 fail
+ 9 expect() calls
+Ran 5 tests across 1 file. [7.00ms]

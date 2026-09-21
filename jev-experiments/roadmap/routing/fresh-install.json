@@ -1,0 +1,167 @@
+{
+  "condition": "Fresh source-built Bun CLI, no weights or training dependencies; default email is explicitly a lexical demonstration.",
+  "prefix": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-router-install-iw9ws87d/tool",
+  "bundleBytes": 84933,
+  "bundleSha256": "fadcab2dac09c7ee03368bd3f7df7316c9195f8920e5d297731c199165d56a9f",
+  "elapsedSeconds": 0.41193333407863975,
+  "doctor": {
+    "status": "ok",
+    "runtime": "bun",
+    "version": "1.3.14",
+    "configuredRoutes": [],
+    "defaultDecisionAdapter": "state-blind uniform prior; no model installed",
+    "operations": [
+      "decide",
+      "route_task",
+      "classify_eml"
+    ],
+    "localCloudFallback": false
+  },
+  "emailExitCode": 0,
+  "email": {
+    "status": "ok",
+    "execution": {
+      "adapter": "email-lexical-baseline",
+      "model": "rules-v1",
+      "local": true
+    },
+    "issues": [],
+    "labels": [
+      {
+        "label": "receipt",
+        "probability": 0.625
+      },
+      {
+        "label": "action",
+        "probability": 0.125
+      },
+      {
+        "label": "newsletter",
+        "probability": 0.125
+      },
+      {
+        "label": "other",
+        "probability": 0.125
+      }
+    ],
+    "selected": "receipt",
+    "uncertainty": 0.375,
+    "calibrated": false,
+    "explanation": "Local lexical demonstration. Probabilities are normalized rule weights, not calibrated model confidence. No mailbox was read or modified."
+  },
+  "mcpExitCode": 0,
+  "mcpReplies": [
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {
+          "tools": {
+            "listChanged": false
+          }
+        },
+        "serverInfo": {
+          "name": "jev-model-routing-lab",
+          "version": "0.1.0"
+        },
+        "instructions": "Use route_task for bounded delegation with complete context. It returns proposed artifacts; you retain control of tools and applying changes. Default decide and classify_eml are explicitly labeled baselines."
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": {
+        "tools": [
+          {
+            "name": "decide",
+            "description": "Answer typed choice, boolean or ordinal questions about explicitly supplied state. Default is a labeled state-blind uniform baseline, not a trained model. Returns distributions, execution identity, timing and unsupported/error states.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "request": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Version 1 decision request with requestId, state and questions."
+                }
+              },
+              "required": [
+                "request"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "route_task",
+            "description": "Delegate one bounded bug fix, test-writing, repository-analysis or writing task to an eligible configured model. Include the complete relevant source and requirements in context. Returns an answer, structured result or proposed unified diff; never applies edits or executes tools. Review the artifact, apply it using your own normal permissions and independently test it. No eligible route returns an explanation.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "context": {
+                      "type": "string"
+                    },
+                    "requiredCapabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "requiredTools": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "outputTokens": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "prompt",
+                    "context"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "task"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "classify_eml",
+            "description": "Classify an explicitly supplied raw .eml message locally. The default is an uncalibrated lexical baseline; an explicitly configured localRuntime uses its installed experimental model. Labels action, receipt, newsletter or other with uncertainty. Does not access or modify a mailbox. The baseline rejects MIME attachments and encoded messages; the configured Mac runtime declares its own coverage.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "eml": {
+                  "type": "string",
+                  "description": "The complete raw .eml content, read only from a file explicitly supplied by the user."
+                }
+              },
+              "required": [
+                "eml"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "mailUnchanged": true,
+  "uninstall": "Temporary install prefix removed after this smoke; no shell/client configuration changed.",
+  "uninstalled": true
+}
