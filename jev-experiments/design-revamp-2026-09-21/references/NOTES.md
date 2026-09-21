@@ -1,0 +1,11 @@
+# Additional primary visual references
+
+- 2026-09-21: Began a bounded visual study of four primary sites: Bartosz Ciechanowski’s Mechanical Watch, Bret Victor’s Explorable Explanations, Nicky Case’s Nutshell, and Matt Webb’s Yesterday app article. Root owns the Jev design direction and DESIGN.md; this folder contains reference observations and selected captures only.
+- Method: isolated Playwright browser session, page-only captures, original author/source links, explicit distinction between exercised interactions and static observations. Selected WebP files must be below 2 MB. No third-party source code is copied into this folder.
+- Opened an isolated browser session at a 1280 × 1000 viewport. All selected captures are browser page screenshots, with no desktop or browser chrome.
+- Ciechanowski: captured the opening watch assembled, then dragged the first slider right and captured its separated layers. The nearby instruction, pause control and restrained article frame are visible. No claim of keyboard or touch testing.
+- Victor: loaded the filter section, captured the initial response examples, then dragged the first graph control and captured the changing response with its extra annotations while the pointer was held. The numerical values are illustrative states, not measurements. The article's 2024 postscript distinguishes editable arguments from decorative interactive pictures.
+- Case: captured the question list, clicked the first explanation, captured its expanded form, then opened the recursive definition and confirmed that it remained nested in the containing explanation. Did not exercise arbitrary remote embeds.
+- Webb: inspected the opening and three-phone product figure. Both selected captures are static article observations. The page's displayed date is 28 August 2026, while its permalink says 26 August. No app download, purchase or app interaction.
+- Visually opened all eight selected WebPs. Each is 1280 × 1000; sizes range from 68,374 to 356,810 bytes. Authorship and exact source links accompany every manifest entry. Original artwork and screenshots are references, not proposed Jev assets.
+- Finished cited README and manifest. Recommended contextual explanations, a large scene with an immediate action, and comparisons drawn inside the scene. App implementation and DESIGN.md remain with the root integrator.

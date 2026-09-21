@@ -1,0 +1,54 @@
+{
+  "requested_model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+  "observed_models": [
+    {
+      "provider": "amazon-bedrock",
+      "model": "global.anthropic.claude-fable-5-1"
+    }
+  ],
+  "reviewed_on": "2026-09-21",
+  "input_files": [
+    {
+      "file": "DESIGN.md",
+      "sha256": "ad952c912f5a65070e09e40b859414dfd14a14fd4ca4a330ac5a36689785fa89"
+    },
+    {
+      "file": "editorial-study.html",
+      "sha256": "1660578c3432f065b6db423caa7011ed18e840e808e56b493283ad51743f5f2f"
+    },
+    {
+      "file": "editorial-study.css",
+      "sha256": "6dcd9b85fde007d336a64e1cb84d3ebf36bbccf214cf9acbf6dbd60d6ef9a72b"
+    },
+    {
+      "file": "editorial-study.ts",
+      "sha256": "03b54137d7b3aabc104f0951d5ea7e7954b043571dde7a564ca2dae477244a26"
+    },
+    {
+      "file": "engine.ts",
+      "sha256": "b325e84014c7370ceaa54f3f6a12ca646e2e678a9dfbc941ea8fcb3a937104b3"
+    },
+    {
+      "file": "additional-references.md",
+      "sha256": "7c955b80d6cd951283de72ed29afb9cfc7178f305297a635f758f73f536aa466"
+    },
+    {
+      "file": "reference-observations.md",
+      "sha256": "62a34a7c6daa595451b409be5754039cd361fd896c3926776fb1dd92f05eda88"
+    },
+    {
+      "file": "desktop.webp",
+      "sha256": "402e9816da16e3bd52b49db2bbe9b602c32de2d1d4accd97079045ee4c38f36e"
+    },
+    {
+      "file": "mobile.webp",
+      "sha256": "3308515662836a52f6cc905254a08f8a4c0c4eb3432f610ff629f9e1828fbacf"
+    }
+  ],
+  "prompt": "Review this original Jev design direction and working editorial study.\nRead DESIGN.md, the three editorial-study source files, engine.ts, the reference\nobservations and both screenshots. You may read files only. Evaluate the visual\ncomposition, taste, useful interaction, clear authorship, accuracy of the material\nexplanation, mobile/keyboard/reduced-motion behavior and unnecessary complexity.\nPrefer a few consequential findings to a generic checklist. Identify source/line\nor visible evidence. Separate a verified defect from a suggestion. You have no\nbrowser, so do not claim interactive or accessibility verification from screenshots.\nThe study is a proposed page, not a shipped application. Do not infer release or\nmodel-quality results. Recommend concrete changes and say what is already worth\nkeeping. Return concise Markdown, with no machine-specific absolute paths.\n",
+  "prompt_sha256": "872dde1bc3a6a282cce783f0cce5f56b20399adaa258b3a4c0b83d839fc2f235",
+  "answer_sha256": "31ed7ff76f5b4aadc220a28ec0f4aa7448fa70f8749c0734044558ddee320c10",
+  "exit_code": 0,
+  "elapsed_seconds": 600.1,
+  "scope": "Explicit design source, cited observations and two study screenshots. No browser interaction by reviewer."
+}

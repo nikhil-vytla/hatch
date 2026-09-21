@@ -1,0 +1,2 @@
+# Patch artifacts contain blank context lines prefixed by a space.
+*.patch -whitespace

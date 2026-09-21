@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:,">
+  <title>Jev / An experiment worth spending time with</title>
+  <style>
+    :root { --paper:#f4f2eb; --ink:#242b29; --muted:#58655f; --rule:#c8cec7; --accent:#8a4228; --control:#e8e9e0; --selected:#243b32; --selected-ink:#faf8ef; color-scheme:light; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    :root[data-theme="dark"] { --paper:#191d1b; --ink:#eeeede; --muted:#bbc7bd; --rule:#46504a; --accent:#efb28e; --control:#2c342f; --selected:#d8e5d7; --selected-ink:#19261f; color-scheme:dark; }
+    @media (prefers-color-scheme:dark) { :root:not([data-theme="light"]) { --paper:#191d1b; --ink:#eeeede; --muted:#bbc7bd; --rule:#46504a; --accent:#efb28e; --control:#2c342f; --selected:#d8e5d7; --selected-ink:#19261f; color-scheme:dark; } }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--paper); color:var(--ink); line-height:1.65; }
+    button,select { font:inherit; }
+    a { color:inherit; text-decoration-thickness:1px; text-underline-offset:.22em; }
+    a:hover { color:var(--accent); }
+    a:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+    button,select { min-height:44px; }
+    button { cursor:pointer; }
+    .skip { position:absolute; left:20px; top:-70px; padding:10px 16px; background:var(--ink); color:var(--paper); z-index:2; }
+    .skip:focus { top:12px; }
+    .wrap { width:min(1280px,100%); padding:0 48px; margin:auto; }
+    .masthead { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:24px 0 22px; border-bottom:1px solid var(--rule); }
+    .small,.number,.section-label { font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.07em; text-transform:uppercase; }
+    .masthead a { text-decoration:none; }
+    .theme { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px; }
+    .theme select { border:1px solid var(--rule); border-radius:3px; background:var(--paper); color:var(--ink); padding:0 28px 0 10px; }
+    .intro { padding:68px 0 36px; display:grid; grid-template-columns:1.25fr 1fr; column-gap:70px; align-items:end; }
+    .intro .section-label { color:var(--accent); display:block; margin-bottom:24px; }
+    h1,h2,h3,p { margin:0; }
+    h1,h2,.lens h3 { font-family:Georgia,"Times New Roman",serif; font-weight:400; }
+    h1 { font-size:clamp(45px,5vw,72px); line-height:1.03; letter-spacing:-.045em; text-wrap:balance; max-width:660px; }
+    .intro-copy { padding-bottom:3px; }
+    .intro-copy p { max-width:430px; font-size:17px; color:var(--muted); text-wrap:pretty; }
+    .intro-copy .meta { margin-top:24px; font-size:12px; color:var(--muted); }
+    .jump { display:flex; flex-wrap:wrap; gap:8px 26px; padding:23px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
+    .jump a { display:flex; align-items:center; gap:8px; min-height:36px; font-size:13px; text-decoration:none; }
+    .jump span { color:var(--accent); font:11px ui-monospace,monospace; }
+    .reference { display:grid; grid-template-columns:minmax(230px,.76fr) minmax(0,1.8fr); column-gap:58px; padding:68px 0; border-bottom:1px solid var(--rule); scroll-margin-top:24px; }
+    .number { display:block; color:var(--accent); margin-bottom:18px; }
+    h2 { font-size:clamp(30px,3vw,40px); line-height:1.13; letter-spacing:-.025em; text-wrap:balance; }
+    .credit { margin-top:18px; font-size:13px; }
+    .work { display:block; color:var(--muted); font-size:12px; margin-top:4px; }
+    .lesson { margin-top:34px; font-size:14px; text-wrap:pretty; }
+    .lesson h3 { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
+    .lesson p + p { margin-top:14px; color:var(--muted); }
+    figure { margin:0; min-width:0; }
+    .states { display:flex; align-items:center; gap:6px; margin:0 0 12px; padding:0; border:0; flex-wrap:wrap; }
+    .states legend { margin-bottom:8px; color:var(--muted); font-size:11px; }
+    .states button { border:1px solid var(--rule); border-radius:3px; padding:8px 15px; background:transparent; color:var(--ink); font-size:12px; transition:background-color 120ms,color 120ms; }
+    .states button:hover { background:var(--control); }
+    .states button:disabled { cursor:default; opacity:.55; }
+    .states button[aria-pressed="true"] { background:var(--selected); border-color:var(--selected); color:var(--selected-ink); }
+    .capture { background:#fff; border:1px solid var(--rule); }
+    .capture img { display:block; width:100%; height:auto; aspect-ratio:1280/1000; object-fit:contain; }
+    figcaption { padding-top:13px; font-size:12px; color:var(--muted); }
+    .caption-top { display:flex; align-items:baseline; justify-content:space-between; gap:20px; }
+    .caption-top p { max-width:520px; }
+    .full-image { flex-shrink:0; font-size:11px; }
+    .evidence { font-size:11px; margin-top:8px; }
+    .evidence::before { content:"↳ "; }
+    .all-images { margin-top:12px; font-size:11px; }
+    .all-images summary { cursor:pointer; min-height:28px; }
+    .all-images p { padding:8px 0 2px; }
+    .lens-section { padding:54px 0 58px; }
+    .lens-grid { display:grid; grid-template-columns:1fr 1fr; gap:58px; margin-top:26px; }
+    .lens .number { margin:0 0 10px; }
+    .lens h3 { font-size:29px; letter-spacing:-.025em; line-height:1.2; margin-bottom:12px; }
+    .lens p { font-size:14px; max-width:480px; color:var(--muted); }
+    .lens .credit { margin-top:16px; }
+    .index { padding:44px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); scroll-margin-top:24px; }
+    .index-head { display:flex; justify-content:space-between; align-items:baseline; gap:30px; margin-bottom:26px; }
+    .index h2 { font-size:30px; }
+    .index-head p { color:var(--muted); font-size:12px; }
+    .builders { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 40px; counter-reset:builder; }
+    .builders li { padding:13px 0; border-top:1px solid var(--rule); }
+    .builders a { display:block; font-size:13px; width:fit-content; }
+    .builders span { display:block; margin-top:3px; color:var(--muted); font-size:11px; }
+    .colophon { padding:30px 0 42px; display:grid; grid-template-columns:1fr 1fr; gap:50px; font-size:11px; color:var(--muted); }
+    .colophon p + p { margin-top:12px; }
+    .colophon nav { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:13px; }
+    @media (max-width:1000px) { .wrap { padding:0 30px; } .intro { column-gap:38px; } .reference { column-gap:35px; grid-template-columns:minmax(220px,.8fr) minmax(0,1.5fr); } .caption-top { display:block; } .full-image { display:inline-block; margin-top:8px; } }
+    @media (max-width:720px) { .wrap { padding:0 20px; } .masthead { gap:12px; padding:18px 0; } .masthead .small { font-size:10px; max-width:140px; } .theme { gap:5px; } .intro { display:block; padding:42px 0 28px; } .intro .section-label { margin-bottom:19px; } h1 { max-width:570px; } .intro-copy { margin-top:26px; } .intro-copy p { font-size:15px; } .intro-copy .meta { margin-top:15px; } .jump { gap:2px 20px; padding:15px 0; } .reference { display:block; padding:42px 0; } .number { margin-bottom:12px; } .credit { margin-top:14px; } .lesson { margin-top:24px; max-width:570px; } figure { margin-top:26px; } .lens-grid { grid-template-columns:1fr; gap:35px; } .lens-section { padding:42px 0; } .index-head { display:block; } .index-head p { margin-top:10px; } .builders { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; } .builders a { font-size:12px; } .colophon { display:block; } .colophon > div + div { margin-top:22px; } }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { transition:none!important; animation:none!important; } }
+    @media print { .wrap { padding:0; } .theme,.skip { display:none; } .intro { padding-top:20px; } .reference { break-inside:avoid; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#references">Skip to the references</a>
+  <div class="wrap">
+    <header class="masthead">
+      <a href="README.md" class="small">Jev / Design field notes · 02</a>
+      <label class="theme">Theme <select id="theme"><option value="auto">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="board-title">
+        <div><span class="section-label">A reference board · 21 September 2026</span><h1 id="board-title">An experiment worth spending time with.</h1></div>
+        <div class="intro-copy"><p>A working object, an idea you can question, a note that tells you what changed. These references help us give Jev both a point of view and something worth trying.</p><p class="meta">Four paired captures · six new references · twelve credited builders</p></div>
+      </section>
+      <nav class="jump" aria-label="Reference sections">
+        <a href="#object"><span>01</span> The object</a><a href="#argument"><span>02</span> The argument</a><a href="#explanation"><span>03</span> The explanation</a><a href="#note"><span>04</span> The note</a><a href="#builders"><span>12</span> Builders index</a>
+      </nav>
+      <div id="references">
+        <article class="reference" id="object">
+          <div><span class="number">01 / Make the mechanism visible</span><h2>The object carries the detail.</h2><p class="credit"><a href="https://ciechanow.ski/mechanical-watch/">Bartosz Ciechanowski</a><span class="work">Mechanical Watch</span></p><div class="lesson"><h3>For Jev</h3><p>Give the scene room. Put one useful control beside the consequence it produces, then explain the selected part in its own terms.</p><p>Keep the first action visible. A material's color, name and rule should stay connected as the reader moves between the scene and its note.</p></div></div>
+          <figure data-pair>
+            <fieldset class="states"><legend>Recorded states of the opening figure</legend>
+              <button type="button" disabled aria-pressed="true" aria-controls="watch-image watch-caption" data-src="references/ciechanowski-watch-assembly.webp" data-alt="Bartosz Ciechanowski's article with an assembled watch movement between short explanatory passages." data-caption="Before the slider was moved: the assembled watch movement.">Assembled</button>
+              <button type="button" disabled aria-pressed="false" aria-controls="watch-image watch-caption" data-src="references/ciechanowski-watch-exploded.webp" data-alt="The same Mechanical Watch figure after its slider separates the movement into visible layers." data-caption="After the slider was moved: the movement separates into layers.">Separated</button>
+            </fieldset>
+            <div class="capture"><img id="watch-image" src="references/ciechanowski-watch-assembly.webp" width="1280" height="1000" alt="Bartosz Ciechanowski's article with an assembled watch movement between short explanatory passages."></div>
+            <figcaption><div class="caption-top"><p id="watch-caption" data-caption-output aria-live="polite" aria-atomic="true">Before the slider was moved: the assembled watch movement.</p><a class="full-image" data-full href="references/ciechanowski-watch-assembly.webp" target="_blank" rel="noopener">Open full capture ↗</a></div><p class="evidence">Browser-observed slider interaction. These images do not simulate the mechanism.</p><details class="all-images"><summary>Both original captures</summary><p><a href="references/ciechanowski-watch-assembly.webp">Assembled</a> · <a href="references/ciechanowski-watch-exploded.webp">Separated</a></p></details></figcaption>
+          </figure>
+        </article>
+        <article class="reference" id="argument">
+          <div><span class="number">02 / Let the reader question it</span><h2>A figure inside the argument.</h2><p class="credit"><a href="https://worrydream.com/ExplorableExplanations/#filterExample">Bret Victor</a><span class="work">Explorable Explanations</span></p><div class="lesson"><h3>For Jev</h3><p>Show one changed assumption beside the original case. Keep the relevant value and its consequences close enough to read together.</p><p>A routing preference can change a hypothetical choice. The measured result it refers to should remain fixed and visibly labeled.</p></div></div>
+          <figure data-pair>
+            <fieldset class="states"><legend>Recorded states of the filter example</legend>
+              <button type="button" disabled aria-pressed="true" aria-controls="filter-image filter-caption" data-src="references/victor-filter-before.webp" data-alt="Bret Victor's filter explanation, with equations and frequency plots beside the article text." data-caption="Before manipulation: the filter example remains a readable part of the article.">Before</button>
+              <button type="button" disabled aria-pressed="false" aria-controls="filter-image filter-caption" data-src="references/victor-filter-dragging.webp" data-alt="The filter example during a control drag, showing additional coefficients, poles and time-response annotations." data-caption="During a drag: linked coefficient, pole and time-response annotations are visible.">During the drag</button>
+            </fieldset>
+            <div class="capture"><img id="filter-image" src="references/victor-filter-before.webp" width="1280" height="1000" loading="lazy" alt="Bret Victor's filter explanation, with equations and frequency plots beside the article text."></div>
+            <figcaption><div class="caption-top"><p id="filter-caption" data-caption-output aria-live="polite" aria-atomic="true">Before manipulation: the filter example remains a readable part of the article.</p><a class="full-image" data-full href="references/victor-filter-before.webp" target="_blank" rel="noopener">Open full capture ↗</a></div><p class="evidence">Browser-observed control drag. The second image was taken while the pointer was held.</p><details class="all-images"><summary>Both original captures</summary><p><a href="references/victor-filter-before.webp">Before</a> · <a href="references/victor-filter-dragging.webp">During the drag</a></p></details></figcaption>
+          </figure>
+        </article>
+        <article class="reference" id="explanation">
+          <div><span class="number">03 / Preserve the reading thread</span><h2>A little more, right here.</h2><p class="credit"><a href="https://ncase.me/nutshell/">Nicky Case</a><span class="work">Nutshell</span></p><div class="lesson"><h3>For Jev</h3><p>Let "Why did this happen?" reveal a short explanation beside the selected object: its observation, the rule and the resulting change.</p><p>Preserve the reader's place and offer a clear way to close the explanation. Keep the central finding and essential controls in the open.</p></div></div>
+          <figure data-pair>
+            <fieldset class="states"><legend>Recorded states of the first explanation</legend>
+              <button type="button" disabled aria-pressed="true" aria-controls="nutshell-image nutshell-caption" data-src="references/nutshell-before.webp" data-alt="Nicky Case's Nutshell page with a short question list and illustrated invitation." data-caption="Before opening: a small set of questions invites the next step.">Questions</button>
+              <button type="button" disabled aria-pressed="false" aria-controls="nutshell-image nutshell-caption" data-src="references/nutshell-expanded.webp" data-alt="The first Nutshell explanation expanded in place, with its source attribution and surrounding context still visible." data-caption="After opening the first question: its explanation and source stay in the page.">Explanation open</button>
+            </fieldset>
+            <div class="capture"><img id="nutshell-image" src="references/nutshell-before.webp" width="1280" height="1000" loading="lazy" alt="Nicky Case's Nutshell page with a short question list and illustrated invitation."></div>
+            <figcaption><div class="caption-top"><p id="nutshell-caption" data-caption-output aria-live="polite" aria-atomic="true">Before opening: a small set of questions invites the next step.</p><a class="full-image" data-full href="references/nutshell-before.webp" target="_blank" rel="noopener">Open full capture ↗</a></div><p class="evidence">Browser-observed expansion. A nested definition was also opened, but is not pictured.</p><details class="all-images"><summary>Both original captures</summary><p><a href="references/nutshell-before.webp">Questions</a> · <a href="references/nutshell-expanded.webp">Explanation open</a></p></details></figcaption>
+          </figure>
+        </article>
+        <article class="reference" id="note">
+          <div><span class="number">04 / Give the work a point of view</span><h2>A reason to make the thing.</h2><p class="credit"><a href="https://interconnected.org/home/2026/08/26/yesterday">Matt Webb</a><span class="work">Yesterday, on Interconnected</span></p><div class="lesson"><h3>For Jev</h3><p>Start the note with the question that led to the experiment. Give the figure room, then say what surprised us and what we would change next.</p><p>Make comparisons concrete: the original state, the changed state and a visible difference. Record an unfinished edge when it explains the next iteration.</p></div></div>
+          <figure data-pair>
+            <fieldset class="states"><legend>Two crops of the article, not app states</legend>
+              <button type="button" disabled aria-pressed="true" aria-controls="webb-image webb-caption" data-src="references/webb-yesterday-top.webp" data-alt="Matt Webb's Yesterday article opening, with its large title and narrow reading column." data-caption="Article opening: a specific everyday need introduces the project.">Opening</button>
+              <button type="button" disabled aria-pressed="false" aria-controls="webb-image webb-caption" data-src="references/webb-yesterday-figure.webp" data-alt="Three product screenshots in Matt Webb's article, followed by an explanation of the solid and dashed weather lines." data-caption="Further down: three author-provided product images and their explanation.">Product figure</button>
+            </fieldset>
+            <div class="capture"><img id="webb-image" src="references/webb-yesterday-top.webp" width="1280" height="1000" loading="lazy" alt="Matt Webb's Yesterday article opening, with its large title and narrow reading column."></div>
+            <figcaption><div class="caption-top"><p id="webb-caption" data-caption-output aria-live="polite" aria-atomic="true">Article opening: a specific everyday need introduces the project.</p><a class="full-image" data-full href="references/webb-yesterday-top.webp" target="_blank" rel="noopener">Open full capture ↗</a></div><p class="evidence">Static article observation. The Yesterday app was not installed or tested.</p><details class="all-images"><summary>Both original captures</summary><p><a href="references/webb-yesterday-top.webp">Opening</a> · <a href="references/webb-yesterday-figure.webp">Product figure</a></p></details></figcaption>
+          </figure>
+        </article>
+      </div>
+      <section class="lens-section" aria-labelledby="more-lenses"><p class="section-label" id="more-lenses">Two more lenses / primary-page research, without captures</p><div class="lens-grid">
+        <article class="lens"><span class="number">05 / Effect and implementation</span><h3>Show the detail. Explain the choice.</h3><p>Pair an adjustable example with the small part of the implementation that matters. Typography, hit areas and interrupted actions deserve the same care as the opening scene.</p><p class="credit"><a href="https://jakub.kr/writing/details-that-make-interfaces-feel-better">Jakub Krehel · interface details</a></p></article>
+        <article class="lens"><span class="number">06 / A useful counterexample</span><h3>Let the limit be visible.</h3><p>Explain what the algorithm sees, then show the case where the attractive first approach fails. Jev's experiment notes should connect that limit to a reproducible state and relevant code.</p><p class="credit"><a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html">Amit Patel · Red Blob Games</a></p></article>
+      </div></section>
+      <section class="index" id="builders" aria-labelledby="index-title"><div class="index-head"><h2 id="index-title">Twelve builders, twelve useful lessons.</h2><p>Six from the earlier study; six added here.</p></div><ul class="builders">
+        <li><a href="https://brainfunctioncollapse.com/projects/see-the-music">Wojciech Dobry</a><span>A live figure before configuration</span></li>
+        <li><a href="https://rauno.me/craft/interaction-design">Rauno Freiberg</a><span>Spatial continuity and direct control</span></li>
+        <li><a href="https://emilkowal.ski/ui/7-practical-animation-tips">Emil Kowalski</a><span>Feedback with a reason</span></li>
+        <li><a href="https://www.joshwcomeau.com/animation/linear-timing-function/">Josh W. Comeau</a><span>A parameter beside its consequence</span></li>
+        <li><a href="https://paco.me/craft/tabs">Paco Coursey</a><span>A stable selected state</span></li>
+        <li><a href="https://maggieappleton.com/garden">Maggie Appleton</a><span>Work at different stages of maturity</span></li>
+        <li><a href="https://ciechanow.ski/mechanical-watch/">Bartosz Ciechanowski</a><span>The whole object, then its parts</span></li>
+        <li><a href="https://worrydream.com/ExplorableExplanations/">Bret Victor</a><span>Assumptions the reader can question</span></li>
+        <li><a href="https://ncase.me/nutshell/">Nicky Case</a><span>Explanation within the reading flow</span></li>
+        <li><a href="https://interconnected.org/home/2026/08/26/yesterday">Matt Webb</a><span>The reason and the unfinished edge</span></li>
+        <li><a href="https://jakub.kr/writing/the-invisible-side-of-design-engineering">Jakub Krehel</a><span>Craft includes behavior and access</span></li>
+        <li><a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html">Amit Patel</a><span>Pictures connected to code and limits</span></li>
+      </ul></section>
+    </main>
+    <footer class="colophon"><div><p>Eight original-site captures, recorded at 1280 × 1000 on 21 September 2026. Credit belongs to the named creators. These are attributed research figures, not Jev branding assets or a license to reuse their artwork.</p><nav aria-label="Research documents"><a href="additional-references.md">Six-source research</a><a href="references/README.md">Capture observations</a><a href="references/manifest.json">Capture manifest</a><a href="../roadmap/design-research/README.md">Earlier study</a></nav></div><div><p>These recommendations describe what we want to learn from the work. Reference-site mobile, keyboard, screen-reader, reduced-motion and performance behavior were not audited. A still image establishes composition; it cannot establish animation quality.</p><p>This board uses original HTML, CSS and JavaScript with local images. It makes no external requests until you choose a source link. Its screenshot controls also work with the keyboard; the original capture links remain available without JavaScript.</p></div></footer>
+  </div>
+  <script>
+    const theme = document.getElementById('theme');
+    theme.addEventListener('change', () => { document.documentElement.dataset.theme = theme.value; });
+    document.querySelectorAll('[data-pair]').forEach((figure) => {
+      const image = figure.querySelector('img');
+      const caption = figure.querySelector('[data-caption-output]');
+      const full = figure.querySelector('[data-full]');
+      const buttons = figure.querySelectorAll('button[data-src]');
+      buttons.forEach((button) => {
+        button.disabled = false;
+        button.addEventListener('click', () => {
+        buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        image.alt = button.dataset.alt;
+        image.src = button.dataset.src;
+        full.href = button.dataset.src;
+        caption.textContent = button.dataset.caption;
+        });
+      });
+      image.addEventListener('error', () => { caption.textContent = 'This capture could not load. Use the original capture links below, or reload the page.'; });
+    });
+  </script>
+</body>
+</html>

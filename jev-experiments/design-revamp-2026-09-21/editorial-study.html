@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="editorial-study.css">
+  <title>A grain meets water · Jev notes</title>
+</head>
+<body>
+  <a class="skip" href="#experiment">Skip to the experiment</a>
+  <header class="masthead">
+    <a class="wordmark" href="#main" aria-label="Jev notes home">jev<span class="wordmark-dot" aria-hidden="true">.</span></a>
+    <nav aria-label="Study navigation"><a href="#experiment">Try the rule</a><a href="#note">Read the note</a><a href="reference-board.html">References</a></nav>
+    <button id="theme" class="quiet" type="button" disabled>Dark</button>
+  </header>
+  <main id="main">
+    <div class="article-meta"><span>Material study</span><span>21 Sep 2026 · Proposal</span></div>
+    <section class="opening" aria-labelledby="title">
+      <h1 id="title">A grain<br> meets <em>water.</em></h1>
+      <div class="opening-copy"><p>One extra rule turns a falling powder into a solid at the water's edge.</p><p class="instruction">Move through time. Compare the same starting scene with and without the rule.</p></div>
+    </section>
+
+    <section class="instrument" id="experiment" aria-labelledby="experiment-title">
+      <div class="instrument-heading"><h2 id="experiment-title">One change. Two branches.</h2><span class="execution">Local rules · no model call</span></div>
+      <div class="transport">
+        <button id="play" class="primary" type="button" disabled>Play from start</button>
+        <label class="timeline" for="tick"><span>Time <output id="tick-value" for="tick" aria-live="off">24 / 96 steps</output></span><input id="tick" type="range" min="0" max="96" value="24" step="1" disabled></label>
+        <button id="reset" class="quiet" type="button" disabled>Reset</button>
+      </div>
+      <div class="branch-grid" id="branches">
+        <figure class="branch">
+          <figcaption><span><b>A</b> Fall through</span><span class="rule-label">contact: none</span></figcaption>
+          <canvas id="before" width="768" height="512" role="img" aria-label="Branch A, powder falls through water without reacting"></canvas>
+          <p class="branch-count" id="before-count">Loading the starting scene…</p>
+        </figure>
+        <figure class="branch">
+          <figcaption><span><b>B</b> Turn solid</span><span class="rule-label">powder → wood</span></figcaption>
+          <canvas id="after" width="768" height="512" role="img" aria-label="Branch B, powder turns into wood beside water"></canvas>
+          <p class="branch-count" id="after-count">Loading the starting scene…</p>
+        </figure>
+      </div>
+      <div class="instrument-foot"><span class="legend"><span><i class="grain"></i>Powder</span><span><i class="water"></i>Water</span><span><i class="wood"></i>Wood</span><span><i class="stone"></i>Stone</span></span><button id="enlarge" class="text-button mobile-enlarge" type="button" aria-controls="branches" aria-expanded="false" disabled>Larger figures</button><button id="export" class="text-button" type="button" disabled>Save both scenes ↓</button></div>
+      <p id="status" class="status" role="status">Preparing a deterministic comparison.</p>
+      <noscript><p>This comparison needs JavaScript. The note and its source links remain readable below.</p></noscript>
+    </section>
+    <p class="figure-caption"><span>Figure 01</span> Both branches begin with the same cells and seed. Only the contact rule changes. Scrubbing replays cached states from the existing materials engine.</p>
+
+    <article class="note" id="note" aria-labelledby="note-title">
+      <aside class="margin-note"><span>Implementation note</span><p>A small cellular world<br>96 × 64 cells<br>One typed rule</p><a href="../roadmap/materials/engine.ts">Read the engine ↗</a></aside>
+      <div class="prose">
+        <h2 id="note-title">The interesting part is<br> where they touch.</h2>
+        <p>Play from the start and watch the purple grains reach the pool. In the left branch they keep falling. In the right branch, a grain touching water becomes wood. The solid cell leaves a visible trace of the contact and changes the path of the grains behind it.</p>
+        <p>The added rule is deliberately small. It checks the four neighboring cells, changes the current cell and finishes its turn. The rest of the simulation still handles falling and sideways movement.</p>
+        <div class="code-listing"><div class="code-heading"><span>engine.ts · TypeScript excerpt</span><button id="copy" class="text-button" type="button" disabled>Copy</button></div><pre tabindex="0" role="region" aria-label="Material contact rule, TypeScript"><code id="rule-code"><span class="keyword">if</span> (
+  cell === <span class="literal">7</span> &amp;&amp;
+  scene.rule.contact !== <span class="string">"none"</span> &amp;&amp;
+  adjacent.some((n) =&gt;
+    cells[n] === contacts[scene.rule.contact])
+) {
+  set(i, ids[scene.rule.becomes]);
+  <span class="keyword">continue</span>;
+}</code></pre></div>
+        <p class="code-caption">Actual contact branch, with line breaks adjusted. Material <code>7</code> is the configurable slot. The omitted <code>contacts</code> and <code>ids</code> maps resolve names to material numbers; <code>set</code> resets age and marks the cell as moved. Only the powder changes. The water remains.</p>
+        <details><summary>What does the model decide here?</summary><p>Nothing in this figure. Both rules are set explicitly and run locally. The full sandbox can ask Jev to interpret an instruction into a typed rule. That separate interpretation task has <a href="../roadmap/materials/PROTOCOL.md">frozen labels and a protocol</a>, but this example supplies no model accuracy result.</p></details>
+        <h3>A changed shape is a result. It is not a physics claim.</h3>
+        <p>These are grid rules, not a fluid solver. The engine alternates its horizontal scan direction, processes one cell at a time and checks immediate neighbors. The two branches can consume random numbers differently after they diverge. An equal starting seed does not guarantee that every later random choice remains paired.</p>
+        <p>This makes a useful place to explore rules and preserve a scene. It does not show that a model understands materials, or that the picture behaves like real powder and water.</p>
+        <div class="next-question"><span>Next question</span><p>Can a small local model recover this exact rule from different descriptions, and recognize when the available rules cannot express one?</p><a href="../roadmap/materials/PROTOCOL.md">Read the interpretation protocol ↗</a></div>
+      </div>
+    </article>
+
+    <section class="colophon" aria-labelledby="colophon-title"><h2 id="colophon-title">Behind this note</h2><div><p>An original study for the <a href="https://github.com/nikhil-vytla/hatch">Jev experiments project</a>, using its existing materials engine. Authored with Codex; design reviewed with Fable 5.1. This is a proposal for the site's notes, not a deployed article or a training result.</p><p>The figure-and-code sequence draws on <a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html">Amit Patel's Red Blob Games</a>; the generous working figure on <a href="https://ciechanow.ski/mechanical-watch/">Bartosz Ciechanowski</a>; the in-place explanation on <a href="https://ncase.me/nutshell/">Nicky Case</a>. See the <a href="reference-board.html">full reference study</a> and <a href="../DESIGN.md">design philosophy</a>.</p><p>Revised 21 September 2026 after review: clearer rule labels, an observable fall before contact, larger mobile figures and recoverable drawing failures.</p><p id="engine-version" class="revision">Engine revision appears after the study is built.</p></div></section>
+  </main>
+  <footer><span>jev / experiments &amp; notes</span><span>Not affiliated with or endorsed by TypeSafe AI</span></footer>
+  <script type="module" src="study.js"></script>
+</body>
+</html>

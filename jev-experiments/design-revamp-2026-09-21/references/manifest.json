@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "recordedOn": "2026-09-21",
+  "captureMethod": "Isolated Playwright browser; webpage viewport only; no full-page source copies.",
+  "viewport": {
+    "width": 1280,
+    "height": 1000
+  },
+  "rights": "Original site content and artwork credited to their named authors. Captures are retained for design analysis, not offered as Jev product assets or under an inferred reuse license. No third-party code copied.",
+  "sources": [
+    {
+      "id": "ciechanowski-watch",
+      "author": "Bartosz Ciechanowski",
+      "title": "Mechanical Watch",
+      "url": "https://ciechanow.ski/mechanical-watch/",
+      "interaction": "Dragged the opening cutaway slider from its left endpoint toward the right; visibly separated the assembled movement into layers.",
+      "observationType": "browser interaction and visual inspection",
+      "captures": [
+        {
+          "file": "ciechanowski-watch-assembly.webp",
+          "state": "Opening figure before slider manipulation; assembled watch.",
+          "capturedAt": "2026-09-21T09:46:35.632559+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 82934,
+          "sha256": "e7b1828c7f26d31c40d4cdb49d3db2bf49f9c565677b0b9e036e1d75ffd66f33",
+          "visuallyInspected": true
+        },
+        {
+          "file": "ciechanowski-watch-exploded.webp",
+          "state": "Opening figure after slider manipulation; separated layers and slider visible.",
+          "capturedAt": "2026-09-21T09:46:44.943465+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 101382,
+          "sha256": "8f1d19e137074685f12d531254a30872d342fc3c857c13a23ee73f18b61b53f3",
+          "visuallyInspected": true
+        }
+      ]
+    },
+    {
+      "id": "victor-filter",
+      "author": "Bret Victor",
+      "title": "Explorable Explanations",
+      "url": "https://worrydream.com/ExplorableExplanations/#filterExample",
+      "interaction": "Dragged the first frequency-response control. Captured linked diagram, coefficients and plots while the pointer was held; released afterward.",
+      "observationType": "browser interaction and visual inspection",
+      "captures": [
+        {
+          "file": "victor-filter-before.webp",
+          "state": "Filter example and article text before manipulation.",
+          "capturedAt": "2026-09-21T09:47:06.097308+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 98584,
+          "sha256": "0c72e423d213ebdd1220ad5dbc2f93a0cd7a6267d396fda13594b0ad99939aa9",
+          "visuallyInspected": true
+        },
+        {
+          "file": "victor-filter-dragging.webp",
+          "state": "During manipulation, with additional coefficient, pole and time-response annotations visible.",
+          "capturedAt": "2026-09-21T09:47:17.231613+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 97480,
+          "sha256": "fa5c559b5867d76ca4c9577d7010a334cc3614f6e397fc6fa47a766aa00686b9",
+          "visuallyInspected": true
+        }
+      ]
+    },
+    {
+      "id": "case-nutshell",
+      "author": "Nicky Case",
+      "title": "Nutshell",
+      "url": "https://ncase.me/nutshell/",
+      "interaction": "Clicked the first What is Nutshell? link and captured its explanation. Also opened the nested recursive definition, without retaining an additional capture.",
+      "observationType": "browser interaction and visual inspection",
+      "captures": [
+        {
+          "file": "nutshell-before.webp",
+          "state": "Initial question list and illustrated invitation.",
+          "capturedAt": "2026-09-21T09:47:46.691466+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 68374,
+          "sha256": "0db8dbb0db2747fd93ad562bf1563bd518d913ff37290b5a3e6d4d62cfd1a791",
+          "visuallyInspected": true
+        },
+        {
+          "file": "nutshell-expanded.webp",
+          "state": "First explanation expanded in place with source attribution.",
+          "capturedAt": "2026-09-21T09:47:48.434014+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 101510,
+          "sha256": "854b9c39696047bf4f64baa62f4989a3b35ba090a32d2a16a4d6aceeaea1c0ff",
+          "visuallyInspected": true
+        }
+      ]
+    },
+    {
+      "id": "webb-yesterday",
+      "author": "Matt Webb",
+      "title": "New app: Yesterday, an iPhone app for yesterday’s weather",
+      "url": "https://interconnected.org/home/2026/08/26/yesterday",
+      "interaction": "Scrolled the article and inspected its product figure. Did not install, purchase or operate Yesterday.",
+      "observationType": "static article and screenshot observation",
+      "displayedDate": "2026-08-28",
+      "permalinkDate": "2026-08-26",
+      "captures": [
+        {
+          "file": "webb-yesterday-top.webp",
+          "state": "Article title, reading column and introductory premise.",
+          "capturedAt": "2026-09-21T09:48:03.573367+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 211222,
+          "sha256": "eb670b50c42fc3484704cc7634450fe26234efa4824da69730160e4d76efabd2",
+          "visuallyInspected": true
+        },
+        {
+          "file": "webb-yesterday-figure.webp",
+          "state": "Three author-provided product screenshots and nearby explanation.",
+          "capturedAt": "2026-09-21T09:48:13.517982+00:00",
+          "width": 1280,
+          "height": 1000,
+          "bytes": 356810,
+          "sha256": "ce23240988bcf994569bec29bf70fbe3cab0b142549aace378bf557f0d6fb04c",
+          "visuallyInspected": true
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Desktop observations only.",
+    "Reference-site keyboard, touch, screen-reader, reduced-motion and performance behavior not audited.",
+    "Webb product behavior is described by the author and pictured in static screenshots; the app was not tested.",
+    "Proposed Jev adaptations are design recommendations, not implementation claims."
+  ]
+}
