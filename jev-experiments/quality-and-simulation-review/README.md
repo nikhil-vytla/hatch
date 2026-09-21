@@ -19,7 +19,7 @@ The strongest improvements connect model decisions to a complete, inspectable ar
 | Icon workbench | Six complete searches over all 1,703 Lucide icons, in-context previews and export | Candidate grouping can affect the winner; no independent preference labels |
 | Tetris framing | 35 complete episodes and exact trajectory verification | All 25 Jev runs cleared zero lines; code baselines completed the horizon |
 | Pixel framing | 33 complete maps, 8,448 reconstructed pixel values | Formula assistance is mixed; creative images include empty thresholded outputs |
-| JudgeBench reliability | Frozen full 620-pair study running, complete source text and provenance explorer | 14,880 planned question decisions; final statistics await completion |
+| JudgeBench reliability | All 620 pairs, three unchanged passes, all 14,880 decisions verified | Pass 1 official score 66.29%; 16.77% cross-order winner disagreement, including run-to-run variation |
 | Continuous worlds | Complete Tetris, twelve-resident courtyard and Ghost Brush, with preserved synchronized branches | Small genuine crowd/brush demonstrations; full live-game model performance remains unmeasured |
 
 These changes are published at [jev-experiments.vercel.app](https://jev-experiments.vercel.app) and proposed in [PR 57](https://github.com/nikhil-vytla/hatch/pull/57). [deployment.json](deployment.json) records the exact published commit and project root; [production-check.json](production-check.json) records deployed asset and API boundary checks. Subfolder reports give exact requests, counts and verification commands.
@@ -36,7 +36,7 @@ UI motion should explain a consequence: the exact bar adopting a new musical phr
 
 ## What remains
 
-The full JudgeBench reliability collection is still running. Full Tetris, a living courtyard and Ghost Brush implement the user's agreed direction under [live-worlds](../live-worlds/README.md). Their independent review defects have regression coverage; the older Snake, Orbital and Key & Door still need the same complete-game treatment. The remaining audit repairs are prioritized individually in [review.json](review.json); completing the review does not mean all 160 findings have been fixed. New recorded experiments also need replication and held-out evaluation before broad claims.
+The full JudgeBench reliability collection is complete and verified. All 7,440 evaluation records and 14,880 questions are present. [The study report](../judgment-reliability/README.md) separates the official two-order score, ordinary accuracy, repeatability and provider availability. Full Tetris, a living courtyard and Ghost Brush implement the user's agreed direction under [live-worlds](../live-worlds/README.md). Their independent review defects have regression coverage; the older Snake, Orbital and Key & Door still need the same complete-game treatment. The remaining audit repairs are prioritized individually in [review.json](review.json); completing the review does not mean all 160 findings have been fixed. New recorded experiments also need replication and held-out evaluation before broad claims.
 
 External benchmark coverage is explicit in each report. RewardBench 2 already covers all 1,865 released groups. The next full benchmark choices have different requirements: BoolQ's 3,270 validation cases are straightforward; SciFact needs a declared retrieval candidate set and official scorer; ScreenSpot-v2 needs grounded image outputs; RULER needs full downstream reader trials rather than retention alone. A full split is valuable only when the task and scoring match the intended claim.
 
@@ -51,10 +51,19 @@ bun run test
 bun run build
 ```
 
-Strict review validation passes for 33/33 original experiments. The integrated app passes 168 tests with 148,041 assertions across 28 files and a production build, including the live-world implementations. The eight recently integrated routes loaded at 390 px without overflow or page exceptions; a follow-up with the correct music selector confirmed all 14 arrangements loaded. Detailed interaction checks are recorded in each experiment folder. The independent timing-sketch review caught restoration bugs and is preserved with follow-up notes rather than removed.
+Strict review validation passes for 33/33 original experiments. The integrated app passes 171 tests with 148,066 assertions across 28 files and a production build, including the live-world implementations. The eight recently integrated routes loaded at 390 px without overflow or page exceptions; a follow-up with the correct music selector confirmed all 14 arrangements loaded. Detailed interaction checks are recorded in each experiment folder. The independent timing-sketch review caught restoration bugs and is preserved with follow-up notes rather than removed.
 
-The new components load on demand, reducing initial JavaScript from about 1,078 KB to 853 KB before compression. Sixteen literal credential values read privately from local configuration had no matches in 465 changed/new source files and 734 built files at the expanded scan point. [SECURITY.md](SECURITY.md) records the bounded key and attack-path review; [security-scan.json](security-scan.json) records the latest literal-scan result. BYOK isolation and missing-key behavior have dedicated tests; this is a bounded key-exposure check, not an assurance that all possible security issues are absent. Generated library copies, build output, caches and recording logs are excluded from the intended commit.
+The new components load on demand, reducing initial JavaScript from about 1,078 KB to 853 KB before compression. Sixteen literal credential values read privately from local configuration had no matches in 466 changed/new source files and 735 built files at the expanded scan point. [SECURITY.md](SECURITY.md) records the bounded key and attack-path review; [security-scan.json](security-scan.json) records the latest literal-scan result. BYOK isolation and missing-key behavior have dedicated tests; this is a bounded key-exposure check, not an assurance that all possible security issues are absent. Generated library copies, build output, caches and recording logs are excluded from the intended commit.
 
 ## Deployed interaction checks
 
 The [independent production browser review](../live-worlds/production-review/README.md) verified continuously falling Tetris pieces, identical paired clocks, human takeover, rewind and exact restoration of preserved games. Crowd checkpoints retained resident memory, RNG, disturbances and settings; all exported paired clocks matched. Root also played Ghost Brush on the canonical site, replayed its recorded Coral nerve choice and inspected the same-stroke comparison at desktop and 390 px dark mobile sizes. These checks used local policies or recorded decisions and made no live provider requests.
+
+## Next implementation pass
+
+1. Measure live Tetris with real Jev responses on matched piece queues. Compare buttons, reachable landings and planner intent, plus grace-period settings. Show lines cleared, survival, stale replies and the fraction of control supplied by Jev, fallback or a human. Preserve full games and their terminal reasons.
+2. Make individual crowd decisions readable. Selecting a resident should connect the notice they read, their needs, the typed choice and the resulting route. Compare contrasting notices from the same checkpoint with a local baseline.
+3. Build Café Jev into a running shift, with arriving customers, changed orders, queues and stock changes. Let the existing music arranger follow the shift with transitions at phrase boundaries and reversible musical decisions.
+4. Apply the complete-game and branch controls to Snake, then the 3D rescue game. Reuse the current timeline, evidence receipts and controller attribution.
+
+These are proposed next steps; the current release does not claim these extensions are implemented.

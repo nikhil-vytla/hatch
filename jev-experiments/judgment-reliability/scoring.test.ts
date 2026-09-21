@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { canonical, rank, official, transitions, compareVotes, range } from "./scoring";
 import { payload, tasks, hash, PROTOCOL, POLICY_STATE, encodedQuestions, type Pair } from "./protocol";
-import { buildCases } from "./analyze";
+import { buildCases, summarize } from "./analyze";
+import { sourceClusterKey, analysisMetadata } from "./clustering";
 const pairs: Pair[] = readFileSync(new URL("cases.jsonl", import.meta.url), "utf8").trim().split("\n").map(line => JSON.parse(line));
 test("official upstream signed two-order rule including null and tie votes", () => {
   expect(official("A", "B", "A").outcome).toBe("correct");
@@ -30,13 +31,57 @@ test("identity remapping, ties and score drift are distinct", () => {
   expect(compareVotes("A", null).complete).toBe(false);
   expect(range([.7, .8, .7])).toBeCloseTo(.1);
 });
-test("full released coverage, two splits and question clusters", () => {
+test("full released coverage, two splits and corrected source clusters", () => {
   expect(pairs.length).toBe(620); expect(new Set(pairs.map(p => p.pair_id)).size).toBe(620);
   expect(pairs.filter(p => p.response_model.startsWith("gpt")).length).toBe(350);
   expect(pairs.filter(p => p.response_model.startsWith("claude")).length).toBe(270);
-  expect(new Set(pairs.map(p => `${p.source}/${p.original_id}`)).size).toBe(268);
+  expect(new Set(pairs.map(sourceClusterKey)).size).toBe(528);
+  // The historical value is preserved in the immutable request protocol, not
+  // reused as the number of independent source questions in current analysis.
+  expect(PROTOCOL.source_questions).toBe(268);
   expect(tasks(pairs).length).toBe(7440);
   expect(new Set(tasks(pairs).map(t => t.id)).size).toBe(7440);
+});
+
+test("missing IDs group exact repeated questions without merging an entire source", () => {
+  const pair = { source: "livebench-math", original_id: null, question: "First question" };
+  expect(sourceClusterKey(pair)).toBe(sourceClusterKey({ ...pair }));
+  expect(sourceClusterKey(pair)).toBe(sourceClusterKey({ ...pair, original_id: undefined }));
+  expect(sourceClusterKey(pair)).not.toBe(sourceClusterKey({ ...pair, question: "Other question" }));
+  expect(sourceClusterKey(pair)).not.toBe(sourceClusterKey({ ...pair, question: "First question " }));
+  expect(sourceClusterKey(pair)).not.toBe(sourceClusterKey({ ...pair, source: "another-source" }));
+  expect(sourceClusterKey(pair)).toBe(sourceClusterKey({ ...pair, original_id: hash(pair.question) }));
+  expect(sourceClusterKey({ ...pair, original_id: 1 })).toBe(sourceClusterKey({ ...pair, original_id: 2 }));
+  expect(() => analysisMetadata([{ ...pair, original_id: 0 }, { ...pair, original_id: 0, question: "Different rendering" }], 1)).toThrow("connected-component");
+});
+
+test("analysis amendment reports fallback coverage and the identical-text source-ID exception", () => {
+  expect(analysisMetadata(pairs, PROTOCOL.source_questions)).toMatchObject({
+    version: "judge-reliability-analysis-v2.1", source_clusters: 528,
+    frozen_protocol_source_questions: 268,
+    pairs_with_source_id: 308, pairs_without_source_id: 312,
+    nonnull_source_id_groups: 265, null_id_question_groups: 264,
+    distinct_question_texts: 528, same_text_distinct_id_groups: 1,
+    source_id_multiple_text_groups: 0,
+    bootstrap: { draws: 10000, seed: 73421 },
+  });
+  const duplicateText = pairs.filter(p => p.source === "mmlu-pro-health" && [6274, 6275].includes(Number(p.original_id)));
+  expect(duplicateText).toHaveLength(2);
+  expect(new Set(duplicateText.map(sourceClusterKey)).size).toBe(1);
+});
+
+test("analysis correction preserves complete decisions and headline scores while updating intervals", () => {
+  const { result } = summarize();
+  expect(result.availability.completed).toBe(7440);
+  expect(result.availability.completed_decisions).toBe(14880);
+  expect(result.metrics.per_repeat.map(r => [r.pairwise.official_correct, r.pairwise.ordered_correct, r.pairwise.position_identity_flips])).toEqual([[411, 926, 104], [404, 922, 114], [409, 924, 106]]);
+  expect(result.metrics.stability.pairwise).toMatchObject({ complete_sets: 1240, identity_flips: 53, nonzero_score_drift: 1079 });
+  expect(result.analysis.evidence_coverage).toEqual({ normalized_questions: 14880, raw_matched_questions: 14614, normalized_only_questions: 266, normalized_only_batches: 21 });
+  for (const interval of result.metrics.confidence_intervals) expect(interval).toMatchObject({ cases: 620, clusters: 528 });
+  const officialInterval = result.metrics.confidence_intervals.find(x => x.name === "pairwise_official")!;
+  expect(officialInterval.estimate).toBeCloseTo(1224 / 1860, 14);
+  expect(officialInterval.low).toBeCloseTo(0.6211878009630817, 14);
+  expect(officialInterval.high).toBeCloseTo(0.6945786366076222, 14);
 });
 test("swap preserves byte-exact candidates, no label leakage, repeat bodies unchanged", () => {
   for (const pair of pairs) {
