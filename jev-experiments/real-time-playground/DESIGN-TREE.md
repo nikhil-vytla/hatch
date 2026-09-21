@@ -21,6 +21,6 @@ The first round is settled. A full Tetris game, a living courtyard crowd and an 
 
 ## Round 2, exposed by play
 
-4. Default assisted Tetris timing is open: an immediate code fallback can lock the observed piece before an asynchronous answer arrives. Both immediate fallback and a configurable grace period will be exposed. The optional user question recommends a short grace period as default, with gravity continuing throughout. This changes control scheduling, not the frozen framing benchmark.
+4. **Settled:** give Jev a short grace period, then use local fallback when needed. The user selected this as the assisted lane's default. Gravity continues throughout, and immediate fallback remains available for comparison. This changes control scheduling, not the frozen framing benchmark.
 
-The optional timing question had no reply during the implementation window. Root stated a provisional 700ms default, with 0ms immediate fallback available in the same control. This remains a reversible prototype assumption, not an answered user preference.
+The implementation uses an initial 700ms wait from each new piece's spawn, adjustable from 0 to 2400ms. The user confirmed the grace-period policy after deployment; the exact duration remains an adjustable prototype setting. Zero selects immediate fallback.

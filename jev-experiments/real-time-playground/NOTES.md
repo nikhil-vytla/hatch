@@ -19,3 +19,5 @@ The dedicated reviewer visually inspected 1440px desktop and 390px mobile screen
 - User settled Q2 fullgame+crowd and Q3 synchronized side-by-side branches. Three workers now implement full Tetris, living crowd and a separate Ghost Brush creative tool under live-worlds.
 
 - Follow-up browser regression passed restored scheduling, 32/64 population provenance, and historical evidence filtering. Automation initially destructured the Playwright page incorrectly, then tried to read a details panel before its render update; reran with the documented page argument and visible update. No application defect was hidden by those retries.
+
+- User confirmed a short grace period before local fallback as the assisted Tetris default. Existing deployed code already starts at700ms, adjustable0–2400ms, with gravity continuing. Marked the policy settled in the design record and reports; no runtime change or new model call was needed.
