@@ -1,0 +1,57 @@
+{
+  "id": "undo",
+  "title": "Intent-based undo",
+  "evidenceStatus": "One original authored request, five judgments; frozen component equals current Undo block; 32 offline subset and restoration checks plus reproduced state defects",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The saved run correctly selects the two color changes, but changing a selection or completing a rerun reverses an already applied undo. Old suggestions also apply after request edits and replace manual review. A real command history with separate proposals, actor identity and conflict checks is needed before claiming preservation of unrelated work.",
+  "strengths": [
+    "Jev chooses an edit subset while code owns all replacement values and rendering.",
+    "The visitor can inspect and adjust selections before explicitly applying them.",
+    "All 32 subsets and 32 restoration checks pass on the fixed five-unique-field fixture.",
+    "Original recorded answers and source were checked against frozen commit 4c0c40d; no provider calls were needed."
+  ],
+  "findings": [
+    {"priority":"P1","title":"Proposal edits reverse an applied undo","evidence":"src/new-experiments.tsx:641 rebuilds the document from fixed after values; lines 707 and 759 set applied false after selection edits and completed requests. Actual callbacks restore blue/sage immediately after accepting terracotta/cream.","impact":"Accepted changes are not durable transactions, so successive undo requests cannot compose.","fix":"Separate committed document and transaction history from draft proposals; selection and inference must not mutate committed work."},
+    {"priority":"P1","title":"Obsolete decisions apply to a new request and overwrite manual selection","evidence":"src/new-experiments.tsx:734 changes only query, and line 753 accepts every response. The probe changes to title-only, selects e4, receives an old color response and ends with e1/e3 under the title-only request.","impact":"The next apply and exported state associate the wrong semantic decision with the visitor's intent.","fix":"Bind proposals to document, history, request and selection revisions; invalidate old suggestions and retain late responses only for inspection."},
+    {"priority":"P1","title":"The fixed projection cannot establish preservation of user edits","evidence":"src/new-experiments.tsx:596 has five unique-field assignments without actors or dependencies; line 669 calls a preview editable despite zero design-edit controls. Synthetic red-to-blue agent and blue-to-green user events return red when undoing the earlier event and blue when undoing both.","impact":"The fixture excludes repeated writes, manual work and structural dependencies, which are the central selective-undo cases. Synthetic extension failures are not currently reachable UI actions.","fix":"Use stable-ID commands with actors, transaction groups, preconditions and a declared retained-event/dependency policy; provide real design-edit controls."},
+    {"priority":"P1","title":"One literal request does not measure semantic value or final outcomes","evidence":"scripts/record.ts:71 records one five-edit request, matched exactly by an accent/background field rule. The save helper at line 18 retains no request/history snapshot or independent outcomes; recorded and live instruction text differs.","impact":"Five sensible scores cannot establish general accuracy, calibrated confidence, preserved work or reduced review effort.","fix":"Retain immutable inputs and prompt versions, independently label varied histories and expected final documents, and compare deterministic filters and manual selection under matched controls."}
+  ],
+  "simulation": {
+    "title": "An editor with durable selective undo",
+    "description": "Let the visitor edit an apartment page alongside logged agent changes, request an actor- and meaning-specific reversal, inspect a separate preview, resolve conflicts, apply one transaction, then continue editing and undo or redo without losing newer work.",
+    "jevsRole": "Classify visible candidate operations as undo, keep or needs review using the request and versioned history; never invent replacement document values.",
+    "codeRole": "Store stable-ID commands, actors, revisions and dependencies; compute exact previews, preserve retained later assignments, detect structural conflicts, commit atomically and manage compensating transactions and redo branches.",
+    "acceptanceCriteria": [
+      "Request edits, selection edits and model responses leave the committed document unchanged.",
+      "Each accepted transaction applies once and matches an independently specified final snapshot.",
+      "Later retained assignments survive removal of earlier assignments; removing all assignments restores the base value.",
+      "Late results cannot replace manual selections or write across history revisions.",
+      "Structural dependencies produce an explicit safe result or a visible unresolved conflict.",
+      "Undo/redo respect preconditions and never discard a newer branch silently.",
+      "Export preserves history, request, raw decisions, manual adjustments, conflicts, transaction and final document hash."
+    ]
+  },
+  "evaluation": {
+    "design": "Independently annotate 48 development and 240 held-out twelve-operation histories across six equal strata. Two paraphrases and two seeded presentations per history compare current score/0.5 and proposed undo/keep/review protocols: 1920 logical requests and 23040 edit decisions before retries. Use independent expected snapshots and adjudicated ambiguity outcomes, paired 10000-resample bootstrap clustered by history, 1000 offline action schedules, and 12 reviewers completing 12 counterbalanced tasks each with frozen decisions.",
+    "baselines": ["Deterministic field, actor and temporal filters", "Frozen keyword/exclusion rule", "Manual history selection with the same preview", "Oracle selection through the same transaction engine", "Plain last-action undo, explicitly limited to chronological reversal"],
+    "metrics": ["Exact intended subset and exact final-state success", "Protected-operation mutations and clarification precision/recall", "Stale writes, duplicate commits and loss of retained edits", "Provider availability, retries, latency and cost", "Reviewed-operation count, correction effort and completion time", "Clustered 95% intervals; provisional lower bound at least 90% exact outcome success with no observed unrelated writes"],
+    "coverage": {"kind":"authored","current":"One request, one five-edit history and five scores. Thirty-two subset checks assess deterministic behavior only; no external benchmark or productivity study.","full":"48 development plus 240 held-out histories, six strata of 40 test histories and twelve operations each. Held-out protocols total 1920 requests/23040 decisions; 24-history pilot is a 192-request subset. Offline 1000-schedule tests and 144 reviewer sessions require no extra model calls.","feasibility":"Feasible without external datasets or weights. Needs a real transaction engine, two independent annotators plus adjudication, payload checks under 100 KB/128 questions, and a future evaluation budget. No planned model calls or participant study were performed during this audit."}
+  },
+  "libraries": [
+    {"name":"Immer patches","url":"https://immerjs.github.io/immer/patches/","use":"Capture forward/inverse document patches and apply checked transactions. Stable IDs, preconditions and selective-undo conflict policy remain application responsibilities."},
+    {"name":"fast-check command testing","url":"https://fast-check.dev/docs/advanced/model-based-testing/","use":"Generate, shrink and replay edit/response/apply/undo schedules against independent revision and protected-edit invariants."}
+  ],
+  "nextSteps": [
+    {"priority":"P1","size":"M","action":"Separate committed state, proposal state and compensating transactions; preserve reproduced callback failures as regressions."},
+    {"priority":"P1","size":"M","action":"Add request/history/selection revision checks and stale-result handling."},
+    {"priority":"P1","size":"L","action":"Implement stable-ID commands, actor attribution, repeated assignments, dependency conflicts and real editing controls."},
+    {"priority":"P1","size":"S","action":"Save exact source histories and prompts with evidence, and correct the editable-preview label until controls exist."},
+    {"priority":"P1","size":"M","action":"Annotate and run the full authored comparison after deterministic invariants pass."},
+    {"priority":"P2","size":"M","action":"Measure review time and final-state correctness in the counterbalanced user study."}
+  ],
+  "sources": [
+    {"label":"Immer official patch documentation","url":"https://immerjs.github.io/immer/patches/"},
+    {"label":"fast-check official command testing documentation","url":"https://fast-check.dev/docs/advanced/model-based-testing/"}
+  ]
+}

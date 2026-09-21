@@ -1,0 +1,59 @@
+{
+  "url": "http://127.0.0.1:5195/#experiment/tetris",
+  "protocol": "Rebuilt preview, local demo only, dark theme, reduced motion, desktop 1440x1050 and mobile 390x844. No provider calls.",
+  "worldMs": 4320,
+  "defaultFallbackWaitMs": 700,
+  "lanes": [
+    {
+      "assisted": true,
+      "accepted": 5,
+      "stale": 0,
+      "jevMs": 0,
+      "demoMs": 980,
+      "fallbackMs": 160,
+      "gravityMs": 3180
+    },
+    {
+      "assisted": false,
+      "accepted": 5,
+      "stale": 0,
+      "jevMs": 0,
+      "demoMs": 980,
+      "fallbackMs": 0,
+      "gravityMs": 3340
+    }
+  ],
+  "boardTopPixels": [
+    867.0859375,
+    867.0859375
+  ],
+  "keyboardRange": {
+    "Home": 0,
+    "End": 2400,
+    "restored": 700
+  },
+  "mobile": {
+    "viewportWidth": 390,
+    "scrollWidth": 390
+  },
+  "slowReplyPreset": {
+    "identicalGames": true,
+    "preservedRun": "Before branch 1 \u00b7 4.3s",
+    "source": [
+      "local",
+      "local"
+    ],
+    "assisted": [
+      true,
+      false
+    ],
+    "delayMs": [
+      1200,
+      1200
+    ],
+    "fallbackWaitMs": [
+      700,
+      700
+    ]
+  }
+}

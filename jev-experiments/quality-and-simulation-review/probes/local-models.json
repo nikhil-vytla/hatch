@@ -1,0 +1,292 @@
+{
+  "recordSha256": "085655edbb470d688ae3a25b40630bf574975d3b7737cba8904ba40348511331",
+  "cases": 400,
+  "decisions": 2000,
+  "uniqueIds": 400,
+  "workflows": {
+    "agent_trace_observability": 100,
+    "customer_service": 100,
+    "invoice_processing": 100,
+    "security_incidents": 100
+  },
+  "models": [
+    {
+      "id": "laya-base",
+      "correct": 727,
+      "decisions": 2000,
+      "accuracy": 0.3635,
+      "brier": 0.10139158207322736,
+      "kl": 0.5738223755365367,
+      "wholeCasesCorrect": 8,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [
+        "agent_trace_observability/action",
+        "agent_trace_observability/urgency",
+        "invoice_processing/duplicate",
+        "invoice_processing/urgency"
+      ],
+      "maxPublishedMetricDelta": 4.440892098500626e-16
+    },
+    {
+      "id": "laya-tuned",
+      "correct": 939,
+      "decisions": 2000,
+      "accuracy": 0.4695,
+      "brier": 0.05643792538376572,
+      "kl": 0.35530779152668446,
+      "wholeCasesCorrect": 10,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [],
+      "maxPublishedMetricDelta": 1.457167719820518e-16
+    },
+    {
+      "id": "laya-coreml",
+      "correct": 938,
+      "decisions": 2000,
+      "accuracy": 0.469,
+      "brier": 0.05646127275650092,
+      "kl": 0.3554084303523341,
+      "wholeCasesCorrect": 10,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [],
+      "maxPublishedMetricDelta": 6.661338147750939e-16
+    },
+    {
+      "id": "Qwen3-0.6B-4bit",
+      "correct": 707,
+      "decisions": 2000,
+      "accuracy": 0.3535,
+      "brier": 0.20223413673358012,
+      "kl": 2.58234740463387,
+      "wholeCasesCorrect": 1,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [
+        "agent_trace_observability/outcome",
+        "customer_service/needs_human",
+        "invoice_processing/discrepancy_severity",
+        "invoice_processing/disposition",
+        "invoice_processing/duplicate",
+        "invoice_processing/matches_order",
+        "invoice_processing/urgency",
+        "security_incidents/credential_compromise",
+        "security_incidents/disposition",
+        "security_incidents/true_positive"
+      ],
+      "maxPublishedMetricDelta": 2.4717383695360695e-10
+    },
+    {
+      "id": "Qwen3-4B-Instruct-2507-4bit",
+      "correct": 1081,
+      "decisions": 2000,
+      "accuracy": 0.5405,
+      "brier": 0.19059500943231708,
+      "kl": 5.316581826111031,
+      "wholeCasesCorrect": 27,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [
+        "agent_trace_observability/needs_review",
+        "customer_service/needs_human",
+        "invoice_processing/duplicate",
+        "invoice_processing/matches_order"
+      ],
+      "maxPublishedMetricDelta": 4.239301354402869e-9
+    },
+    {
+      "id": "SmolLM2-360M-Instruct",
+      "correct": 509,
+      "decisions": 2000,
+      "accuracy": 0.2545,
+      "brier": 0.08301603569848777,
+      "kl": 0.4826607621569386,
+      "wholeCasesCorrect": 0,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [
+        "agent_trace_observability/action",
+        "agent_trace_observability/outcome",
+        "agent_trace_observability/risk",
+        "customer_service/churn_risk",
+        "invoice_processing/duplicate",
+        "invoice_processing/matches_order"
+      ],
+      "maxPublishedMetricDelta": 1.1930436083495977e-9
+    },
+    {
+      "id": "Qwen3-0.6B-4bit-sequence",
+      "correct": 672,
+      "decisions": 2000,
+      "accuracy": 0.336,
+      "brier": 0.08883261120833268,
+      "kl": 0.5373633280586391,
+      "wholeCasesCorrect": 2,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [
+        "agent_trace_observability/action",
+        "agent_trace_observability/needs_review",
+        "agent_trace_observability/outcome",
+        "agent_trace_observability/risk",
+        "agent_trace_observability/urgency",
+        "customer_service/needs_human",
+        "customer_service/urgency",
+        "invoice_processing/discrepancy_severity",
+        "invoice_processing/duplicate",
+        "invoice_processing/matches_order",
+        "invoice_processing/urgency",
+        "security_incidents/credential_compromise"
+      ],
+      "maxPublishedMetricDelta": 1.1542917732754177e-9
+    },
+    {
+      "id": "jev",
+      "correct": 1455,
+      "decisions": 2000,
+      "accuracy": 0.7275,
+      "brier": 0.04316466223403952,
+      "kl": 1.287691206799414,
+      "wholeCasesCorrect": 89,
+      "zeroTeacherMassDecisions": 818,
+      "constantArgmaxGroups": [],
+      "maxPublishedMetricDelta": 2.7755575615628914e-17
+    },
+    {
+      "id": "uniform",
+      "correct": 553,
+      "decisions": 2000,
+      "accuracy": 0.2765,
+      "brier": 0.07191006034647592,
+      "kl": 0.4444631851871564,
+      "wholeCasesCorrect": 0,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [
+        "agent_trace_observability/action",
+        "agent_trace_observability/needs_review",
+        "agent_trace_observability/outcome",
+        "agent_trace_observability/risk",
+        "agent_trace_observability/urgency",
+        "customer_service/action",
+        "customer_service/category",
+        "customer_service/churn_risk",
+        "customer_service/needs_human",
+        "customer_service/urgency",
+        "invoice_processing/discrepancy_severity",
+        "invoice_processing/disposition",
+        "invoice_processing/duplicate",
+        "invoice_processing/matches_order",
+        "invoice_processing/urgency",
+        "security_incidents/credential_compromise",
+        "security_incidents/disposition",
+        "security_incidents/severity",
+        "security_incidents/true_positive",
+        "security_incidents/urgency"
+      ],
+      "maxPublishedMetricDelta": 1.8318679906315083e-15
+    },
+    {
+      "id": "train-prior",
+      "correct": 979,
+      "decisions": 2000,
+      "accuracy": 0.4895,
+      "brier": 0.05376660209104416,
+      "kl": 0.3274120691512021,
+      "wholeCasesCorrect": 30,
+      "zeroTeacherMassDecisions": 0,
+      "constantArgmaxGroups": [
+        "agent_trace_observability/action",
+        "agent_trace_observability/needs_review",
+        "agent_trace_observability/outcome",
+        "agent_trace_observability/risk",
+        "agent_trace_observability/urgency",
+        "customer_service/action",
+        "customer_service/category",
+        "customer_service/churn_risk",
+        "customer_service/needs_human",
+        "customer_service/urgency",
+        "invoice_processing/discrepancy_severity",
+        "invoice_processing/disposition",
+        "invoice_processing/duplicate",
+        "invoice_processing/matches_order",
+        "invoice_processing/urgency",
+        "security_incidents/credential_compromise",
+        "security_incidents/disposition",
+        "security_incidents/severity",
+        "security_incidents/true_positive",
+        "security_incidents/urgency"
+      ],
+      "maxPublishedMetricDelta": 3.885780586188048e-16
+    }
+  ],
+  "paired": [
+    {
+      "a": "laya-tuned",
+      "b": "laya-base",
+      "onlyACorrect": 507,
+      "onlyBCorrect": 295,
+      "argmaxAgreement": 926,
+      "difference": 0.106,
+      "caseBootstrap95": [
+        0.07499999999999997,
+        0.1375000000000001
+      ],
+      "bootstrapSeed": 42,
+      "bootstrapSamples": 5000
+    },
+    {
+      "a": "laya-tuned",
+      "b": "train-prior",
+      "onlyACorrect": 276,
+      "onlyBCorrect": 316,
+      "argmaxAgreement": 1238,
+      "difference": -0.02,
+      "caseBootstrap95": [
+        -0.048000000000000036,
+        0.008000000000000021
+      ],
+      "bootstrapSeed": 42,
+      "bootstrapSamples": 5000
+    },
+    {
+      "a": "jev",
+      "b": "train-prior",
+      "onlyACorrect": 655,
+      "onlyBCorrect": 179,
+      "argmaxAgreement": 1080,
+      "difference": 0.238,
+      "caseBootstrap95": [
+        0.20700000000000024,
+        0.27000000000000024
+      ],
+      "bootstrapSeed": 42,
+      "bootstrapSamples": 5000
+    }
+  ],
+  "exportChanges": {
+    "count": 60,
+    "maximumMargin": 0.1393851488828659,
+    "maximumProbabilityDelta": 0.14228208597338587
+  },
+  "splitCounts": {
+    "train": 960,
+    "validation": 240,
+    "test": 400
+  },
+  "overlap": [
+    {
+      "a": "train",
+      "b": "validation",
+      "idOverlap": 0,
+      "stateOverlap": 0
+    },
+    {
+      "a": "test",
+      "b": "train",
+      "idOverlap": 0,
+      "stateOverlap": 0
+    },
+    {
+      "a": "test",
+      "b": "validation",
+      "idOverlap": 0,
+      "stateOverlap": 0
+    }
+  ],
+  "modelCalls": 0
+}

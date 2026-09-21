@@ -1,0 +1,158 @@
+{
+  "id": "classify",
+  "title": "Intent recognition",
+  "evidenceStatus": "785 completed sampled official test cases, including 69 recovered transport failures; full distributions and request text preserved",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The experiment uses all 77 BANKING77 or 151 CLINC candidate labels, but the page hides its trained baseline and out-of-scope breakdown. Full official tests require only 8,580 intent decisions, compared with the current 785; label definitions and validation-only rejection thresholds would make the comparison more useful.",
+  "strengths": [
+    "Every recorded benchmark case is complete and includes full request text and all candidate probabilities.",
+    "The baseline trains on the official training split and predictions are paired by source ID.",
+    "Recovery preserves completed mistakes and separates provider outages from semantic errors.",
+    "Pinned sources, provenance links, content notices, calibration diagnostics, and paired bootstrap values already exist."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "The page hides its baseline and the source of the CLINC gain",
+      "evidence": "experience-prototypes/src/benchmarks.tsx:265 does not render tfidf_logistic, baseline_rows, or paired_difference. Current records show BANKING77 314/385 versus baseline 343/385; CLINC in scope 271/300 versus 269/300 and OOS 83/100 versus 13/100. README.md:31 still describes initial-run values.",
+      "impact": "Visitors cannot assess whether Jev is useful or distinguish OOS gains from known-intent accuracy.",
+      "fix": "Show both systems, baseline predictions, disagreement filters, paired intervals, and separate in-scope/OOS scores; generate narrative tables from current data."
+    },
+    {
+      "priority": "P1",
+      "title": "Sampled coverage leaves feasible official test cases unmeasured",
+      "evidence": "src/jev_lab/benchmarks.py:42 samples five BANKING77 and two CLINC cases per known intent. Pinned source counts are 3,080 BANKING77 and 5,500 CLINC/OOS test cases. Current 385 and 400 cases cover 12.50% and 7.27%.",
+      "impact": "Class-level results from two CLINC cases are unstable, and the sample changes OOS prevalence from 18.18% to 25%.",
+      "fix": "Run all official test IDs with frozen prompts, complete candidate sets, resumable recording, and dataset-specific completion counts. Preserve the sampled run as historical evidence."
+    },
+    {
+      "priority": "P1",
+      "title": "OOS comparison omits a validation-selected rejection baseline",
+      "evidence": "src/jev_lab/benchmarks.py:48 uses a plain 151-way logistic argmax; no validation threshold is fitted. Jev falsely rejects 8/300 supported requests and routes 17/100 unsupported requests. Ten wrong predictions across datasets carry probability exactly 1.",
+      "impact": "The current OOS advantage is against one weak operating point, and raw probability is easy to mistake for reliable confidence.",
+      "fix": "Fit thresholds only on validation; show OOS recall/precision, supported false rejection, accepted accuracy, and coverage. Preserve raw distributions and distinguish exploratory test sliders from frozen benchmark thresholds."
+    },
+    {
+      "priority": "P1",
+      "title": "Bare label names underspecify fine-grained intent distinctions",
+      "evidence": "src/jev_lab/data.py:68 and :82 replace underscores with spaces. experience-prototypes/results/classify.jsonl:1215 records transactions versus spending_history confusion at predicted probability 1.",
+      "impact": "The current condition measures matching against label names; visitors cannot understand the ontology boundary or all candidates.",
+      "fix": "Preserve the raw-label condition; add a frozen training-derived description condition and a searchable drawer of all definitions, instructions, and training-only examples. Do not tune descriptions on observed test errors."
+    },
+    {
+      "priority": "P2",
+      "title": "Per-case source links and recovery counts use the wrong dataset context",
+      "evidence": "experience-prototypes/scripts/enrich.py:45 sets a BANKING77-only source_url; src/benchmarks.tsx:252 renders it for CLINC. src/benchmarks.tsx:327 passes the combined recovery object, reporting 69 recoveries instead of per-dataset 43 or 26.",
+      "impact": "Provenance and availability details become misleading when the visitor switches datasets.",
+      "fix": "Store and render dataset-specific source URL, split size, sampling rule, recovery count, and run metadata. Bind future content notices to stable case IDs."
+    }
+  ],
+  "simulation": {
+    "title": "A support desk that knows when to ask",
+    "description": "An animated inbox shows the same request moving through Jev and baseline lanes into predefined support routes. Visitors inspect route definitions, compare disagreements, preview rejection thresholds, and try scripted clarifications.",
+    "jevsRole": "Classify the complete request and, in a separately evaluated interaction condition, choose a bounded clarification question when supported intents remain ambiguous.",
+    "codeRole": "Validate intent IDs, apply a frozen acceptance policy, version requests, cancel stale responses, animate the inbox, and render route outcomes.",
+    "acceptanceCriteria": [
+      "Expose the actual prompt and every candidate description.",
+      "Both lanes consume identical request text and show the corresponding downstream route.",
+      "A threshold preview shows coverage, mistakes, and unsupported false routes without changing the frozen benchmark result.",
+      "Transport failures remain waiting states; semantic mistakes remain visible.",
+      "Keyboard, reduced motion, cancellation, and request-version checks work."
+    ]
+  },
+  "evaluation": {
+    "design": "Freeze one canonical prompt and candidate set, then run all 8,580 official test cases with one request and one decision per case. CLINC reports official in-scope accuracy and OOS recall, with precision/false rejection as additional measures. Add 3,100 CLINC validation and 1,001 BANKING77 train-held-out calibration decisions for a total 12,681-decision calibrated protocol. Separate the full-training baseline from a calibrated baseline trained on the remaining 9,002 BANKING77 examples. A three-permutation order audit on the existing 785 sampled IDs adds 2,355 decisions. Bootstrap paired utterances, not retries or permutations. Separately evaluate 120 authored support-desk cases across three presentation seeds.",
+    "baselines": [
+      "Current full-training TF-IDF logistic regression, clearly labeled supervised.",
+      "TF-IDF logistic regression with validation-selected OOS rejection.",
+      "Nearest-training-example TF-IDF retrieval.",
+      "For the simulation: direct argmax and fixed-threshold routing versus clarification."
+    ],
+    "metrics": [
+      "BANKING77 exact label accuracy and macro-F1",
+      "CLINC in-scope accuracy and OOS recall",
+      "OOS precision and supported-request false rejection",
+      "Accepted accuracy at frozen coverage and risk-coverage curves",
+      "Paired bootstrap differences and Wilson intervals for binary rates",
+      "Calibration diagnostics retaining raw rounded distributions",
+      "Simulation final-route correctness, clarification count, unresolved rate, and elapsed interaction time"
+    ],
+    "coverage": {
+      "kind": "external",
+      "current": "385 BANKING77 cases plus 300 CLINC in-scope and 100 OOS cases, all completed. Five separate authored semantic requests are excluded from these benchmark counts.",
+      "full": "3,080 BANKING77 + 4,500 CLINC in-scope + 1,000 CLINC OOS = 8,580 cases and 1,067,660 candidate-option scores.",
+      "feasibility": "Feasible with the existing all-label runner: 8,580 fresh logical requests or 7,795 missing-case requests if the original request condition is retained. No large-model or dataset-size blocker; needs resumable transport, complete manifests, OOS calibration, and scalable exploration."
+    }
+  },
+  "libraries": [
+    {
+      "name": "scikit-learn calibration",
+      "url": "https://scikit-learn.org/stable/modules/calibration.html",
+      "use": "Fit held-out calibration and baseline rejection policies; compute reliability and OOS tradeoffs around Jev semantic predictions."
+    },
+    {
+      "name": "TanStack Virtual",
+      "url": "https://tanstack.com/virtual/latest/docs/introduction",
+      "use": "Keep the complete test explorer and 151-option drawer responsive, alongside the already installed TanStack Table."
+    },
+    {
+      "name": "XState",
+      "url": "https://stately.ai/docs/xstate",
+      "use": "Represent request lifecycle, clarification, cancellation, routing, and provider failure in the support-desk simulation."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Expose existing baseline and OOS metrics, full criteria, and dataset-specific provenance; update stale report values."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Add and run a resumable full-split canonical benchmark with metadata and aggregate-parity checks."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Compare validation-only OOS thresholds and a frozen training-derived description condition."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Build and independently evaluate the two-lane support-desk clarification simulation."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Reuse ontology and rejection work for an intent-aware application command palette with independent action-success labels."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Official BANKING77 counts and dataset",
+      "url": "https://github.com/PolyAI-LDN/task-specific-datasets#banking"
+    },
+    {
+      "label": "BANKING77 paper",
+      "url": "https://aclanthology.org/2020.nlp4convai-1.5.pdf"
+    },
+    {
+      "label": "Official CLINC150 splits",
+      "url": "https://github.com/clinc/oos-eval#1-what-are-the-relevant-files"
+    },
+    {
+      "label": "CLINC scoring and OOS methods",
+      "url": "https://aclanthology.org/D19-1131.pdf"
+    },
+    {
+      "label": "Pinned BANKING77 source",
+      "url": "https://github.com/PolyAI-LDN/task-specific-datasets/tree/57ec275d8078af65b7731c2a98be812d844a6d6b/banking_data"
+    },
+    {
+      "label": "Pinned CLINC source",
+      "url": "https://github.com/clinc/oos-eval/tree/828f8093932c8fe6ca7936c3d2e52903b1c523de/data"
+    }
+  ]
+}

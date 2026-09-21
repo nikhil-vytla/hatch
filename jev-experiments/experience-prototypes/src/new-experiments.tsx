@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Check,
@@ -29,6 +29,7 @@ import {
   useRun,
   ErrorText,
 } from "./shared";
+import { extractLineFacts, fillEmpty, undoFill, pasteBatches, type Patch } from "../../quality-and-simulation-review/paste-transactions";
 export const pasteSources = {
   Conference:
     "Event: Small Worlds Conference\nOrganizer: Fieldwork Collective\nOrganizer address: 18 Pine Street, Portland\nVenue: Glasshouse Hall\nVenue address: 240 Oak Avenue, Seattle\nEvent date: October 12, 2026\nRegistration deadline: September 28, 2026\nContact email: hello@smallworlds.example\nStart time: 9:30 AM",
@@ -60,21 +61,7 @@ export const pasteFields = {
     "Personal email",
   ],
 };
-export function extractFacts(source: string) {
-  return source
-    .split("\n")
-    .filter((s) => s.trim())
-    .map((line, i) => ({
-      id: "fact" + i,
-      label: line.includes(":")
-        ? line.slice(0, line.indexOf(":")).trim()
-        : "Source " + (i + 1),
-      value: line.includes(":")
-        ? line.slice(line.indexOf(":") + 1).trim()
-        : line.trim(),
-      source: line,
-    }));
-}
+export const extractFacts = extractLineFacts;
 export function pasteQuestions(
   fields: string[],
   facts: ReturnType<typeof extractFacts>,
@@ -86,7 +73,7 @@ export function pasteQuestions(
       choice(
         `For the ${destination} form, which fact belongs in the field "${field}"? Respect entity, purpose, and time. Choose none if missing or ambiguous.`,
         {
-          ...Object.fromEntries(facts.map((f) => [f.id, f.source])),
+          ...Object.fromEntries(facts.map((f) => [f.id, `Source line ${f.line}: ${f.label}`])),
           none: "No supported value, or ambiguous",
         },
       ),
@@ -99,16 +86,22 @@ export function Paste({ record }: { record: any }) {
     [fields, setFields] = useState(pasteFields.Conference),
     [suggestions, setSuggestions] = useState<Record<string, string>>({}),
     [values, setValues] = useState<Record<string, string>>({}),
-    [history, setHistory] = useState<Record<string, string>[]>([]),
+    [history, setHistory] = useState<Patch[][]>([]),
+    [reviewed, setReviewed] = useState<Record<string, boolean>>({}),
     [active, setActive] = useState<string | null>(null),
     [last, setLast] = useState<any>(null),
     [mode, setMode] = useState("Whole form"),
     [focused, setFocused] = useState("f0");
-  const { busy, error, execute } = useRun();
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const revision = useRef(0), controller = useRef<AbortController|null>(null);
+  const valuesRef = useRef(values); valuesRef.current = values;
+  const invalidate = () => { revision.current++; controller.current?.abort(); setBusy(false); setReviewed({}); setSuggestions({}); setLast(null); };
+  useEffect(() => () => { revision.current++; controller.current?.abort(); }, []);
   const facts = useMemo(() => extractFacts(source), [source]);
   useEffect(() => {
     const r = record?.rows?.find((r: any) => r.preset === preset && !r.error);
-    if (r) {
+    if (r && source === pasteSources[preset] && fields.join("\n") === pasteFields[preset].join("\n")) {
+      setReviewed({});
       setSuggestions(
         Object.fromEntries(
           Object.entries(r.answers).map(([k, a]: any) => [k, a.value]),
@@ -118,18 +111,29 @@ export function Paste({ record }: { record: any }) {
     }
   }, [record, preset]);
   const accept = (key?: string) => {
-    setHistory((h) => [...h, values]);
-    setValues((v) => ({
-      ...v,
-      ...Object.fromEntries(
-        fields.flatMap((f, i) => {
-          const id = "f" + i,
-            s = facts.find((x) => x.id === suggestions[id]);
-          return s && (!key || key === id) ? [[id, s.value]] : [];
-        }),
-      ),
+    const candidates = Object.fromEntries(fields.flatMap((_, i) => {
+      const id = "f" + i, fact = facts.find(f => f.id === suggestions[id]);
+      return fact && (key ? key === id : reviewed[id]) ? [[id, fact.value]] : [];
     }));
+    const next = fillEmpty(valuesRef.current, candidates);
+    if (!next.patch.length) return;
+    setHistory(h => [...h, next.patch]); valuesRef.current = next.values; setValues(next.values);
   };
+  const changePreset = (p: keyof typeof pasteSources) => {
+    invalidate(); setPreset(p); setSource(pasteSources[p]); setFields(pasteFields[p]); setValues({}); valuesRef.current={}; setHistory([]); setActive(null);
+  };
+  async function findSuggestions() {
+    invalidate(); const version=revision.current, abort=new AbortController(); controller.current=abort; setBusy(true); setError("");
+    const input={source,destination:preset}, questions=pasteQuestions(fields,facts,preset);
+    try {
+      const answers:Record<string,any>={}, batches=pasteBatches(input,questions), responses:any[]=[];
+      for(const batch of batches){const response=await run(input,batch,abort.signal);if(revision.current!==version)return;Object.assign(answers,response.answers);responses.push(response);}
+      if(revision.current!==version)return;
+      setSuggestions(Object.fromEntries(Object.entries(answers).map(([k,a])=>[k,a.value])));
+      setLast({source:"live",answers,request:{state:input,questions},responses,latency_ms:responses.reduce((n,r)=>n+r.latency_ms,0)});
+    } catch(e) {if(!abort.signal.aborted)setError(e instanceof Error?e.message:String(e));}
+    finally {if(revision.current===version)setBusy(false);}
+  }
   return (
     <div className="workbench">
       <div className="artifact-column">
@@ -140,12 +144,7 @@ export function Paste({ record }: { record: any }) {
             onChange={(v) => {
               setMode(v);
               if (v === "Personal memory") {
-                setPreset("Memory");
-                setSource(pasteSources.Memory);
-                setFields(pasteFields.Memory);
-                setSuggestions({});
-                setValues({});
-                setLast(null);
+                changePreset("Memory");
               }
             }}
           />
@@ -174,7 +173,7 @@ export function Paste({ record }: { record: any }) {
                   <strong>{f.value}</strong>
                   <small>
                     {preset === "Memory" ? "Personal knowledge" : "Source page"}{" "}
-                    · {f.id.replace("fact", "line ")}
+                    · {`line ${f.line}`}
                   </small>
                 </motion.button>
               ))}
@@ -228,9 +227,8 @@ export function Paste({ record }: { record: any }) {
                           >
                             <Plus size={12} /> Use {fact.value}
                           </button>
-                          <small onMouseEnter={() => setActive(fact.id)}>
-                            {fact.label}
-                          </small>
+                          <small onMouseEnter={() => setActive(fact.id)}>{fact.label} · confidence {Number(last?.answers?.[key]?.confidence ?? 0).toFixed(2)}, uncalibrated</small>
+                          <label><input type="checkbox" checked={!!reviewed[key]} onChange={e=>setReviewed(r=>({...r,[key]:e.target.checked}))}/> I reviewed this source for this field</label>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -247,18 +245,18 @@ export function Paste({ record }: { record: any }) {
                   onClick={() =>
                     accept(mode === "Smart paste" ? focused : undefined)
                   }
-                  disabled={!Object.keys(suggestions).length}
+                  disabled={mode === "Smart paste" ? !suggestions[focused] || suggestions[focused] === "none" : !Object.values(reviewed).some(Boolean)}
                 >
                   <Check size={15} />{" "}
                   {mode === "Smart paste"
                     ? "Paste into focused field"
-                    : "Fill suggestions"}
+                    : "Fill reviewed suggestions"}
                 </Button>
                 <Button
                   secondary
                   disabled={!history.length}
                   onClick={() => {
-                    setValues(history.at(-1)!);
+                    const next = undoFill(valuesRef.current, history.at(-1)!); valuesRef.current=next; setValues(next);
                     setHistory((h) => h.slice(0, -1));
                   }}
                 >
@@ -281,20 +279,14 @@ export function Paste({ record }: { record: any }) {
             </a>
           </p>
           <p>
-            Jev chooses source facts for each field. The source stays visible so
-            you can inspect and correct every suggestion.
+            Jev chooses source facts for each field. Review each source before filling. Existing values and later manual edits are preserved. The three authored examples include mistakes, including an office address suggested as company headquarters.
           </p>
           <Field label="Example">
             <select
               value={preset}
               onChange={(e) => {
                 const p = e.target.value as keyof typeof pasteSources;
-                setPreset(p);
-                setSource(pasteSources[p]);
-                setFields(pasteFields[p]);
-                setSuggestions({});
-                setValues({});
-                setLast(null);
+                changePreset(p);
               }}
             >
               {Object.keys(pasteSources).map((p) => (
@@ -307,9 +299,7 @@ export function Paste({ record }: { record: any }) {
               rows={10}
               value={source}
               onChange={(e) => {
-                setSource(e.target.value);
-                setSuggestions({});
-                setLast(null);
+                invalidate(); setSource(e.target.value);
               }}
             />
           </Field>
@@ -318,31 +308,14 @@ export function Paste({ record }: { record: any }) {
               rows={5}
               value={fields.join("\n")}
               onChange={(e) => {
-                setFields(e.target.value.split("\n"));
-                setSuggestions({});
+                invalidate(); setFields(e.target.value.split("\n")); setValues({}); valuesRef.current={}; setHistory([]);
               }}
             />
           </Field>
           <RunButton
             busy={busy}
             label="Find what belongs"
-            onClick={() =>
-              execute(async () => {
-                const r = await run(
-                  { source, destination: preset },
-                  pasteQuestions(fields, facts, preset),
-                );
-                setSuggestions(
-                  Object.fromEntries(
-                    Object.entries(r.answers).map(([k, a]: any) => [
-                      k,
-                      a.value,
-                    ]),
-                  ),
-                );
-                setLast(r);
-              })
-            }
+            onClick={() => void findSuggestions()}
           />
           <ErrorText error={error} />
           {last && (

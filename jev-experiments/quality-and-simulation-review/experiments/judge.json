@@ -1,0 +1,143 @@
+{
+  "id": "judge",
+  "title": "JudgeBench",
+  "evidenceStatus": "100 sampled pairs; 200/200 completed orientations; full candidate texts verified against pinned upstream; 14 transport failures recovered",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The current 77% headline measures ordered decisions, while official JudgeBench two-order scoring gives 63% on the same 100 pairs. Full candidate visibility and recovery are working; the next work is complete 620-pair coverage, comparable scoring, and an interaction that makes order-sensitive failures inspectable.",
+  "strengths": [
+    "All 200 published rows include full questions and candidate strings, with zero discrepancies against pinned upstream.",
+    "Recovered only transport failures; completed predictions were retained.",
+    "React separates returned-answer accuracy from availability and lets visitors vote before revealing judgments."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Ordered accuracy differs from official JudgeBench score",
+      "evidence": "src/jev_lab/benchmarks.py:153; experience-prototypes/scripts/metrics.py:18; probe: 63 both-correct, 28 inconsistent, 9 both-wrong pairs",
+      "impact": "77% ordered accuracy is not comparable to the official two-order score, which is 63%.",
+      "fix": "Lead with upstream-compatible two-order score; retain ordered accuracy, completion and tie counts as separate diagnostics; add official-rule test vectors."
+    },
+    {
+      "priority": "P1",
+      "title": "Sample changes benchmark composition and overstates independent units",
+      "evidence": "src/jev_lab/data.py:101; 100/620 pairs, 50 per response model; 82% MMLU versus 49.68% full; 83 distinct source questions",
+      "impact": "The sample does not estimate the official release distribution directly; repeated orientations and source questions inflate apparent sample size.",
+      "fix": "Evaluate all 350 GPT and 270 Claude pairs; report split/source scores and cluster intervals by source plus original question ID."
+    },
+    {
+      "priority": "P1",
+      "title": "Order sensitivity is a number rather than an inspectable intervention",
+      "evidence": "experience-prototypes/src/benchmarks.tsx:25,98; 200 orientation rows navigated separately; pair 88c03f19-2b85-5b04-b0f8-42e9a765098e selects displayed B both ways",
+      "impact": "Visitors cannot naturally compare the 28 pairs whose underlying winner changes after swapping.",
+      "fix": "Navigate unique pairs, add controlled swap, preserve canonical answer identity and show both judgments together with disagreement filters."
+    },
+    {
+      "priority": "P2",
+      "title": "Atomic scoring is whole-answer shared-context scoring with positional tie-breaking",
+      "evidence": "src/jev_lab/benchmarks.py:124; five equal-score cases assigned A; 71.5% ordered accuracy and 51% official two-order score",
+      "impact": "The label suggests finer or independent verification than performed, and ties acquire arbitrary positional winners.",
+      "fix": "Rename the method, preserve ties, show the negative ablation, and compare isolated-answer scoring before proposing claim-level checks."
+    },
+    {
+      "priority": "P2",
+      "title": "Difficult-case reading and blind voting remain limited",
+      "evidence": "experience-prototypes/src/benchmarks.tsx:29,158,163; src/style.css:2140; candidate markup is plain text in 420px scroll regions",
+      "impact": "Math/code is harder to read; mistakes filtering and target search leak information before voting; no durable first vote exists.",
+      "fix": "Separate blind practice and diagnostics; add safe Markdown/math, expanded/raw reading, explicit reveal, first-vote persistence and pair deep links."
+    }
+  ],
+  "simulation": {
+    "title": "The order-sensitivity courtroom",
+    "description": "Read and vote on a unique pair, reveal gold and both Jev orientations, then swap seats while answer identities stay fixed. Compare pairwise, whole-answer and consensus methods, filter disagreements and export exact evidence. Optional live votes are exploratory records and cannot overwrite the frozen benchmark.",
+    "jevsRole": "Return defined pairwise or answer-correctness judgments without access to dataset labels.",
+    "codeRole": "Keep labels hidden, map canonical candidates through swaps, score with the official rule, render safely, preserve human votes, expose unavailable requests and export provenance.",
+    "acceptanceCriteria": [
+      "All 620 pairs have complete byte-verified raw text in both orientations.",
+      "Swapping twice restores candidate identities; both recorded judgments are available after reveal.",
+      "Blind mode hides gold, model votes and diagnostic filters until the first vote is fixed.",
+      "All headline metrics exactly reproduce from exported evidence and distinguish pairs from orientations.",
+      "Cancelled or unavailable live votes never alter benchmark scores.",
+      "Keyboard and dark/light reading flows support expanded math/code and raw-text views."
+    ]
+  },
+  "evaluation": {
+    "design": "Freeze the protocol, evaluate all 620 pairs in both orders across three scheduling seeds 42/43/44: 3720 state requests and 11160 decision questions before retries. Reproduce official two-order scoring and use 10000 source-question-cluster bootstrap resamples for paired comparisons; report run variability separately. No benchmark labels enter prompts or tuning. Isolated-answer ablation costs 1240 additional requests per pass.",
+    "baselines": [
+      "Current pairwise Jev",
+      "Whole-answer shared-state scoring",
+      "Isolated-answer scoring",
+      "Always displayed A: 0% official / 50% ordered expected",
+      "Independent random votes: 25% official / 50% ordered expected",
+      "Canonical random answer across swaps: 50% expected",
+      "Longer-answer heuristic: 47% on current sample"
+    ],
+    "metrics": [
+      "Official two-order score per response-model split and source family",
+      "Ordered accuracy",
+      "Order disagreement and correct/tied/incorrect pair counts",
+      "Availability and retry-inclusive latency",
+      "Brier score",
+      "Paired source-question-cluster 95% intervals",
+      "Abstention risk versus coverage"
+    ],
+    "coverage": {
+      "kind": "external",
+      "current": "100/620 unique response pairs (16.13%), 50 GPT and 50 Claude; 200 completed orientations; 83 distinct source questions.",
+      "full": "Official gpt split 350 pairs and claude split 270 pairs; 620 total, 1240 orientations; 268 distinct (source, original_id) questions in pinned release.",
+      "feasibility": "Full pass needs 1240 API state requests, 3720 questions with existing contract. Cached source is available; maximum serialized state 9,172 bytes. No candidate-generation calls needed. Tokenizer preflight and provider rate-limit recovery remain practical checks; no evident data-size blocker."
+    }
+  },
+  "libraries": [
+    {
+      "name": "SciPy bootstrap",
+      "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html",
+      "use": "Compute reproducible uncertainty after grouping dependent records by original source question."
+    },
+    {
+      "name": "react-markdown",
+      "url": "https://github.com/remarkjs/react-markdown",
+      "use": "Safe candidate Markdown rendering with documented math-plugin integration and a raw-text toggle; no raw HTML or code execution."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Implement official-compatible scoring and tests; publish corrected historical score alongside ordered accuracy."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Run both complete splits with resumable immutable records and clustered analysis."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Create pair-level swap, disagreement and blind-vote interaction."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Add safe rich reading and isolated-answer/consensus ablations; reuse consistency tools for reward-label and verifier audits."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Official dataset card and split counts",
+      "url": "https://huggingface.co/datasets/ScalerLab/JudgeBench/raw/main/README.md"
+    },
+    {
+      "label": "Official scoring implementation",
+      "url": "https://github.com/ScalerLab/JudgeBench/blob/main/utils/metrics.py"
+    },
+    {
+      "label": "Official runner and two-order protocol",
+      "url": "https://github.com/ScalerLab/JudgeBench/blob/main/run_judge.py"
+    },
+    {
+      "label": "Pinned dataset revision",
+      "url": "https://github.com/ScalerLab/JudgeBench/tree/e2c52c284e735e139b3daa61c206ee208f36c461"
+    }
+  ]
+}

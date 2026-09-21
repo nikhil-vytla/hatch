@@ -1,0 +1,23 @@
+# Real-time design playground
+
+- User explicitly wants continuous running environments, abundant parallel Jev decisions and checkpoint/replay together. They requested grill-with-docs and show-me prototypes for joint review.
+- First design frontier asks about late responses, initial game/crowd emphasis, and rewind/branch behavior. These decisions are pending; the prototype exposes alternatives rather than settling them.
+- Using show-me for a focused playable HTML artifact. The simulation clock and decision clock are independent. Default decisions come from a declared local heuristic with an adjustable artificial delay; that is not a Jev performance result. Live mode uses the visitor's memory-only Gateway key.
+
+- Browser check passed: world reached2.1seconds while decisions were in flight;2of3returned decisions accepted; rewind+branch preserved oldrun. Defaultlocalcontroller/delay explicitly labeled, notJevmeasurement. Openedartifactforuserat5193/research/show-me-realtime.html.
+
+- Fixed cross-world branch restoration to recover mode controls, controller settings and inspected decision. Saved branches now cancel pending requests first; cancelled events are not counted as returned decisions. Switching decision source expires all crowd leases. Rewound checkpoints disable world edits and human takeover until a branch is created. Added a visible observation marker so a moving drone makes decision staleness concrete.
+- Tool friction: guessed a nonexistent server/evaluate.ts path; found actual handler with rg and confirmed prototype uses the same BYOK API contract as the app.
+- Browser review: at artificial 1,200 ms delay, flight advanced 1.8 seconds and rejected one button response as late; the saved flight branch restored its button framing and controls after a 64-visitor crowd run. At 390 px width no horizontal overflow was found, and the screenshot was visually inspected. Selecting an older run now saves the current trajectory before restoring it.
+- Delayed HTTP fixture check: world advanced 0.7 seconds before the reply, then switching worlds cancelled the old decision; its eventual response left the new crowd at 0.0 seconds and 0 returned answers. A subsequent local crowd run advanced 1.6 seconds with 3/3 accepted batches. This is transport-lifecycle validation with an intercepted response, not a live Jev measurement. Playwright sandbox lacks global setTimeout; used page.waitForTimeout for the fixture delay.
+- User settled round1/Q1: offer both late-response conditions as a comparison. Updated design tree and glossary. Asked remaining emphasis and checkpoint-layout questions; synchronized side-by-side remains a recommendation awaiting the user, while the current sketch offers preserved sequential branches.
+
+## Independent browser review, September 20
+
+The dedicated reviewer visually inspected 1440px desktop and 390px mobile screenshots and reproduced an older-branch scheduling stall: after restoring t=2.525s from a newer t=7.025s run, world time reached 4.783s while checkpoints and decisions stayed at 25 and 4/4. Also reproduced population selector 64 versus 32 restored people. ArrowRight takeover moved x=120 to 172.5 without a reset; mobile had no horizontal overflow. REVIEW.md records fixes and source-level history/clock concerns. No model calls or app changes. The CLI initially rejected a bare async script; rerunning its documented async page function succeeded.
+- Independent reviewer found scheduling clocks were not restored with an older world; fixed lastSend/lastSnap relative to the restored time. Population settings now derive from saved actor count. Historical counters and inspector filter out future replies. New-branch first snapshot now follows lease reset. Replaced frame-time clamping with120Hz fixed steps and retained catch-up backlog, maximum240steps per animation frame. Follow-up browser checks pending.
+- User settled Q2 fullgame+crowd and Q3 synchronized side-by-side branches. Three workers now implement full Tetris, living crowd and a separate Ghost Brush creative tool under live-worlds.
+
+- Follow-up browser regression passed restored scheduling, 32/64 population provenance, and historical evidence filtering. Automation initially destructured the Playwright page incorrectly, then tried to read a details panel before its render update; reran with the documented page argument and visible update. No application defect was hidden by those retries.
+
+- User confirmed a short grace period before local fallback as the assisted Tetris default. Existing deployed code already starts at700ms, adjustable0–2400ms, with gravity continuing. Marked the policy settled in the design record and reports; no runtime change or new model call was needed.

@@ -1,0 +1,805 @@
+{
+  "run": "20260920T060113-optimize-fe1728",
+  "source": {
+    "commit": "57ec275d8078af65b7731c2a98be812d844a6d6b",
+    "files": {
+      "banking_data/categories.json": "53261da888122daf2d120d925458631d9619e15d82e56052e7a42e535ce32b63",
+      "banking_data/test.csv": "d12d6e3bc4c3103966ae786dc435913c0c563dfa328f5a3646d0e62cfeeb474d",
+      "banking_data/train.csv": "b06e26ac675513959a63135f11b94ea7786ed02da65db93a5650d8838cbc664b"
+    }
+  },
+  "resumedFrom": "20260920T054909-optimize-e576f0",
+  "splits": {
+    "train": {
+      "count": 50,
+      "unique": 50
+    },
+    "validation": {
+      "count": 20,
+      "unique": 20
+    },
+    "test": {
+      "count": 50,
+      "unique": 50
+    }
+  },
+  "trainValidationOverlap": [],
+  "methods": {
+    "random": {
+      "validation": 0.85,
+      "metricCalls": 240,
+      "candidates": 12,
+      "uniquePrompts": 10,
+      "validationHistory": [
+        0.85,
+        0.85,
+        0.8,
+        0.8,
+        0.8,
+        0.8,
+        0.85,
+        0.8,
+        0.8,
+        0.8,
+        0.8,
+        0.85
+      ],
+      "changedPrompt": false,
+      "answered": 50,
+      "attempted": 50,
+      "correct": 43,
+      "wilson95": [
+        0.7381380628941446,
+        0.9304916657298371
+      ],
+      "targetCounts": {
+        "failed_transfer": 5,
+        "card_payment_not_recognised": 5,
+        "transaction_charged_twice": 5,
+        "declined_transfer": 5,
+        "pending_transfer": 5,
+        "Refund_not_showing_up": 5,
+        "request_refund": 5,
+        "card_delivery_estimate": 5,
+        "transfer_timing": 5,
+        "card_arrival": 5
+      },
+      "disagreementIds": [],
+      "errors": [
+        {
+          "id": "banking77/test/280",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/1796",
+          "target": "Refund_not_showing_up",
+          "prediction": "request_refund"
+        },
+        {
+          "id": "banking77/test/285",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/310",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/32",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/15",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/308",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        }
+      ]
+    },
+    "hill_climb": {
+      "validation": 0.9,
+      "metricCalls": 240,
+      "candidates": 12,
+      "uniquePrompts": 7,
+      "validationHistory": [
+        0.8,
+        0.85,
+        0.9,
+        0.85,
+        0.8,
+        0.8,
+        0.85,
+        0.9,
+        0.8,
+        0.85,
+        0.85,
+        0.85
+      ],
+      "changedPrompt": true,
+      "answered": 50,
+      "attempted": 50,
+      "correct": 43,
+      "wilson95": [
+        0.7381380628941446,
+        0.9304916657298371
+      ],
+      "targetCounts": {
+        "failed_transfer": 5,
+        "card_payment_not_recognised": 5,
+        "transaction_charged_twice": 5,
+        "declined_transfer": 5,
+        "pending_transfer": 5,
+        "Refund_not_showing_up": 5,
+        "request_refund": 5,
+        "card_delivery_estimate": 5,
+        "transfer_timing": 5,
+        "card_arrival": 5
+      },
+      "disagreementIds": [],
+      "errors": [
+        {
+          "id": "banking77/test/280",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/1796",
+          "target": "Refund_not_showing_up",
+          "prediction": "request_refund"
+        },
+        {
+          "id": "banking77/test/285",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/310",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/32",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/15",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/308",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        }
+      ]
+    },
+    "opro": {
+      "validation": 0.9,
+      "metricCalls": 240,
+      "candidates": 12,
+      "uniquePrompts": 9,
+      "validationHistory": [
+        0.8,
+        0.85,
+        0.9,
+        0.9,
+        0.45,
+        0.9,
+        0.45,
+        0.9,
+        0.85,
+        0.9,
+        0.9,
+        0.9
+      ],
+      "changedPrompt": true,
+      "answered": 50,
+      "attempted": 50,
+      "correct": 42,
+      "wilson95": [
+        0.7148578393696501,
+        0.916625793219666
+      ],
+      "targetCounts": {
+        "failed_transfer": 5,
+        "card_payment_not_recognised": 5,
+        "transaction_charged_twice": 5,
+        "declined_transfer": 5,
+        "pending_transfer": 5,
+        "Refund_not_showing_up": 5,
+        "request_refund": 5,
+        "card_delivery_estimate": 5,
+        "transfer_timing": 5,
+        "card_arrival": 5
+      },
+      "disagreementIds": [
+        "banking77/test/1874"
+      ],
+      "errors": [
+        {
+          "id": "banking77/test/1874",
+          "target": "pending_transfer",
+          "prediction": "transfer_timing"
+        },
+        {
+          "id": "banking77/test/280",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/1796",
+          "target": "Refund_not_showing_up",
+          "prediction": "request_refund"
+        },
+        {
+          "id": "banking77/test/285",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/310",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/32",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/15",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/308",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        }
+      ]
+    },
+    "gepa": {
+      "validation": 0.9,
+      "metricCalls": 250,
+      "candidates": 5,
+      "uniquePrompts": 5,
+      "validationHistory": [
+        0.9,
+        0.8,
+        0.85,
+        0.85,
+        0.8
+      ],
+      "changedPrompt": false,
+      "answered": 50,
+      "attempted": 50,
+      "correct": 43,
+      "wilson95": [
+        0.7381380628941446,
+        0.9304916657298371
+      ],
+      "targetCounts": {
+        "failed_transfer": 5,
+        "card_payment_not_recognised": 5,
+        "transaction_charged_twice": 5,
+        "declined_transfer": 5,
+        "pending_transfer": 5,
+        "Refund_not_showing_up": 5,
+        "request_refund": 5,
+        "card_delivery_estimate": 5,
+        "transfer_timing": 5,
+        "card_arrival": 5
+      },
+      "disagreementIds": [],
+      "errors": [
+        {
+          "id": "banking77/test/280",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/1796",
+          "target": "Refund_not_showing_up",
+          "prediction": "request_refund"
+        },
+        {
+          "id": "banking77/test/285",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/310",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/32",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/15",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/308",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        }
+      ]
+    },
+    "unchanged": {
+      "candidates": 0,
+      "uniquePrompts": 0,
+      "changedPrompt": false,
+      "answered": 50,
+      "attempted": 50,
+      "correct": 43,
+      "wilson95": [
+        0.7381380628941446,
+        0.9304916657298371
+      ],
+      "targetCounts": {
+        "failed_transfer": 5,
+        "card_payment_not_recognised": 5,
+        "transaction_charged_twice": 5,
+        "declined_transfer": 5,
+        "pending_transfer": 5,
+        "Refund_not_showing_up": 5,
+        "request_refund": 5,
+        "card_delivery_estimate": 5,
+        "transfer_timing": 5,
+        "card_arrival": 5
+      },
+      "disagreementIds": [],
+      "errors": [
+        {
+          "id": "banking77/test/280",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/1796",
+          "target": "Refund_not_showing_up",
+          "prediction": "request_refund"
+        },
+        {
+          "id": "banking77/test/285",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/310",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        },
+        {
+          "id": "banking77/test/32",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/15",
+          "target": "card_arrival",
+          "prediction": "card_delivery_estimate"
+        },
+        {
+          "id": "banking77/test/308",
+          "target": "card_delivery_estimate",
+          "prediction": "card_arrival"
+        }
+      ]
+    }
+  },
+  "runs": [
+    {
+      "name": "20260920T054601-optimize-8a730e",
+      "status": "partial",
+      "config": {
+        "quick": false,
+        "seed": 42
+      },
+      "statuses": {
+        "200": 50,
+        "403": 1,
+        "429": 9,
+        "503": 3
+      },
+      "attemptsByTag": {
+        "optimize/random": 30,
+        "optimize/hill_climb": 30,
+        "optimize/opro": 2,
+        "opro/propose": 1
+      },
+      "successesByTag": {
+        "optimize/random": 24,
+        "optimize/hill_climb": 24,
+        "optimize/opro": 2
+      },
+      "scoredRecordsByTag": {
+        "optimize/random": 240,
+        "optimize/hill_climb": 240,
+        "optimize/opro": 20
+      },
+      "reflectionFinishReasons": {},
+      "failedEvaluationBatches": [],
+      "methods": {
+        "random": {
+          "validation": 0.85,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.85,
+            0.85,
+            0.8,
+            0.8,
+            0.8,
+            0.8,
+            0.85,
+            0.8,
+            0.8,
+            0.8,
+            0.8,
+            0.85
+          ],
+          "sameFrozenPromptAsPublished": false
+        },
+        "hill_climb": {
+          "validation": 0.9,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.8,
+            0.85,
+            0.9,
+            0.85,
+            0.8,
+            0.8,
+            0.85,
+            0.9,
+            0.8,
+            0.85,
+            0.85,
+            0.85
+          ],
+          "sameFrozenPromptAsPublished": false
+        }
+      }
+    },
+    {
+      "name": "20260920T054909-optimize-e576f0",
+      "status": "complete",
+      "config": {
+        "quick": false,
+        "seed": 42
+      },
+      "resumedFrom": "20260920T054601-optimize-8a730e",
+      "statuses": {
+        "200": 105,
+        "429": 62,
+        "503": 3
+      },
+      "attemptsByTag": {
+        "optimize/opro": 49,
+        "opro/propose": 11,
+        "optimize/gepa": 74,
+        "optimize/unchanged/heldout": 7,
+        "optimize/random/heldout": 8,
+        "optimize/hill_climb/heldout": 7,
+        "optimize/opro/heldout": 8,
+        "optimize/gepa/heldout": 6
+      },
+      "successesByTag": {
+        "optimize/opro": 22,
+        "opro/propose": 11,
+        "optimize/gepa": 47,
+        "optimize/unchanged/heldout": 5,
+        "optimize/random/heldout": 5,
+        "optimize/hill_climb/heldout": 5,
+        "optimize/opro/heldout": 5,
+        "optimize/gepa/heldout": 5
+      },
+      "scoredRecordsByTag": {
+        "optimize/opro": 220,
+        "opro/propose": 0,
+        "optimize/gepa": 245,
+        "optimize/unchanged/heldout": 50,
+        "optimize/random/heldout": 50,
+        "optimize/hill_climb/heldout": 50,
+        "optimize/opro/heldout": 50,
+        "optimize/gepa/heldout": 50
+      },
+      "reflectionFinishReasons": {},
+      "failedEvaluationBatches": [
+        {
+          "tag": "optimize/opro",
+          "recordCount": 10,
+          "attemptCount": 3,
+          "statuses": [
+            429,
+            429,
+            429
+          ],
+          "requestHash": "9a1348228d8adaa4e043567d27211a8ea644588dab19f1597f0f16d8fb744b30",
+          "prompt": "For record banking77/train/7439 only: Classify the user's primary intent by selecting the most specific label that accurately reflects their core request or issue from the following options: \"card arrival\", \"card delivery estimate\", \"pending transfer\", \"transfer timing\", \"failed transfer\", \"declined transfer\", \"request refund\", \"Refund not showing up\", \"card payment not recognised\", \"transaction charged twice\"."
+        },
+        {
+          "tag": "optimize/opro",
+          "recordCount": 10,
+          "attemptCount": 3,
+          "statuses": [
+            429,
+            429,
+            429
+          ],
+          "requestHash": "a1a4d33031af434a8885a778dcaffcd10a736404d67ffb73e7218d7eaebccfec",
+          "prompt": "For record banking77/train/5635 only: Classify the user's primary intent by selecting the single most specific and accurate label from the following options: \"card arrival\", \"card delivery estimate\", \"pending transfer\", \"transfer timing\", \"failed transfer\", \"declined transfer\", \"request refund\", \"Refund not showing up\", \"card payment not recognised\", \"transaction charged twice\"."
+        },
+        {
+          "tag": "optimize/gepa",
+          "recordCount": 5,
+          "attemptCount": 3,
+          "statuses": [
+            429,
+            503,
+            429
+          ],
+          "requestHash": "e109f6acbfa183445b8ef1b87618a962d00af483fef19b68cbcfaca8b72b7a91",
+          "prompt": "For record banking77/train/5655 only: Select the primary intent expressed by this utterance. Match the meaning, not a shared keyword. Select the most specific supported intent. If out_of_scope is available, choose it only when none of the intents applies."
+        }
+      ],
+      "methods": {
+        "random": {
+          "validation": 0.85,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.85,
+            0.85,
+            0.8,
+            0.8,
+            0.8,
+            0.8,
+            0.85,
+            0.8,
+            0.8,
+            0.8,
+            0.8,
+            0.85
+          ],
+          "test": 0.86,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "hill_climb": {
+          "validation": 0.9,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.8,
+            0.85,
+            0.9,
+            0.85,
+            0.8,
+            0.8,
+            0.85,
+            0.9,
+            0.8,
+            0.85,
+            0.85,
+            0.85
+          ],
+          "test": 0.84,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "opro": {
+          "validation": 0.9,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.8,
+            0.85,
+            0.9,
+            0.9,
+            0.45,
+            0.9,
+            0.45,
+            0.9,
+            0.85,
+            0.9,
+            0.9,
+            0.9
+          ],
+          "test": 0.84,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "gepa": {
+          "validation": 0.8,
+          "metricCalls": 250,
+          "candidates": 1,
+          "validationHistory": [
+            0.8
+          ],
+          "test": 0.86,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "unchanged": {
+          "candidates": 0,
+          "test": 0.86,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        }
+      }
+    },
+    {
+      "name": "20260920T060113-optimize-fe1728",
+      "status": "complete",
+      "config": {
+        "quick": false,
+        "seed": 42
+      },
+      "resumedFrom": "20260920T054909-optimize-e576f0",
+      "statuses": {
+        "200": 74,
+        "429": 16
+      },
+      "attemptsByTag": {
+        "optimize/gepa": 50,
+        "gepa/reflect": 11,
+        "optimize/unchanged/heldout": 7,
+        "optimize/random/heldout": 5,
+        "optimize/hill_climb/heldout": 6,
+        "optimize/opro/heldout": 6,
+        "optimize/gepa/heldout": 5
+      },
+      "successesByTag": {
+        "optimize/gepa": 38,
+        "gepa/reflect": 11,
+        "optimize/unchanged/heldout": 5,
+        "optimize/random/heldout": 5,
+        "optimize/hill_climb/heldout": 5,
+        "optimize/opro/heldout": 5,
+        "optimize/gepa/heldout": 5
+      },
+      "scoredRecordsByTag": {
+        "optimize/gepa": 240,
+        "gepa/reflect": 0,
+        "optimize/unchanged/heldout": 50,
+        "optimize/random/heldout": 50,
+        "optimize/hill_climb/heldout": 50,
+        "optimize/opro/heldout": 50,
+        "optimize/gepa/heldout": 50
+      },
+      "reflectionFinishReasons": {
+        "stop": 11
+      },
+      "failedEvaluationBatches": [
+        {
+          "tag": "optimize/gepa",
+          "recordCount": 5,
+          "attemptCount": 3,
+          "statuses": [
+            429,
+            429,
+            429
+          ],
+          "requestHash": "7327ece18ad713db58ce0cd9ffd7e68ea0d61f7c0977f864a7817cfe9edcf164",
+          "prompt": "For record banking77/train/6456 only: Select the primary intent expressed by this utterance. Match the meaning, not a shared keyword. Select the most specific supported intent. If out_of_scope is available, choose it only when none of the intents applies.\n\nSupported intents:\n- Refund_not_showing_up: The user is inquiring about a refund that has not yet appeared in their account.\n- transfer_timing: The user is asking about the expected timing or duration of a transfer.\n- request_refund: The user is explicitly asking to initiate a refund process.\n- pending_transfer: The user is inquiring about a transfer that is currently in progress or pending.\n- card_arrival: The user is asking about the status or expected arrival of a physical card.\n- card_payment_not_recognised: The user is reporting that a card payment is not being recognized or processed correctly.\n- transaction_charged_twice: The user is reporting that a transaction has been charged to their account more than once.\n- failed_transfer: The user is reporting that a transfer has failed or was unsuccessful.\n- card_delivery_estimate: The user is inquiring about the estimated delivery time or date for a card, or if specific delivery dates can be accommodated.\n- declined_transfer: The user is reporting that a transfer has been declined."
+        },
+        {
+          "tag": "optimize/gepa",
+          "recordCount": 5,
+          "attemptCount": 3,
+          "statuses": [
+            429,
+            429,
+            429
+          ],
+          "requestHash": "97418e9d00862f9688bd782dd26478bdf9d797c166de71e62561992c641026c2",
+          "prompt": "For record banking77/train/6650 only: Select the primary intent expressed by this utterance. Match the meaning, not a shared keyword. Select the most specific supported intent. If out_of_scope is available, choose it only when none of the intents applies.\n\nThe available intents are:\n- `transfer_timing`: Inquiries about the duration of a transfer.\n- `request_refund`: Explicit requests for a refund.\n- `failed_transfer`: Issues related to a transfer that did not complete.\n- `card_payment_not_recognised`: Transactions on a statement that the user does not recognize.\n- `transaction_charged_twice`: Situations where a transaction has been charged multiple times.\n- `card_delivery_estimate`: Inquiries about when a card will be delivered.\n- `pending_transfer`: Transfers that are currently in progress and not yet completed.\n- `declined_transfer`: Transfers that have been rejected.\n- `Refund_not_showing_up`: Refunds that have been requested but are not yet reflected.\n- `card_arrival`: General inquiries about card arrival, which is less specific than `card_delivery_estimate`.\n\nPrioritize the most specific intent. For example, if the user is asking about card delivery, `card_delivery_estimate` is more specific than `card_arrival`."
+        }
+      ],
+      "methods": {
+        "random": {
+          "validation": 0.85,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.85,
+            0.85,
+            0.8,
+            0.8,
+            0.8,
+            0.8,
+            0.85,
+            0.8,
+            0.8,
+            0.8,
+            0.8,
+            0.85
+          ],
+          "test": 0.86,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "hill_climb": {
+          "validation": 0.9,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.8,
+            0.85,
+            0.9,
+            0.85,
+            0.8,
+            0.8,
+            0.85,
+            0.9,
+            0.8,
+            0.85,
+            0.85,
+            0.85
+          ],
+          "test": 0.86,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "opro": {
+          "validation": 0.9,
+          "metricCalls": 240,
+          "candidates": 12,
+          "validationHistory": [
+            0.8,
+            0.85,
+            0.9,
+            0.9,
+            0.45,
+            0.9,
+            0.45,
+            0.9,
+            0.85,
+            0.9,
+            0.9,
+            0.9
+          ],
+          "test": 0.84,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "gepa": {
+          "validation": 0.9,
+          "metricCalls": 250,
+          "candidates": 5,
+          "validationHistory": [
+            0.9,
+            0.8,
+            0.85,
+            0.85,
+            0.8
+          ],
+          "test": 0.86,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        },
+        "unchanged": {
+          "candidates": 0,
+          "test": 0.86,
+          "failed": 0,
+          "sameFrozenPromptAsPublished": true
+        }
+      }
+    }
+  ]
+}

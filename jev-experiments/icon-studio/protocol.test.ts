@@ -1,0 +1,4 @@
+import{test,expect}from'bun:test';import{shards,finalists}from'./protocol';
+const icons=Array.from({length:1831},(_,i)=>({id:'icon-'+i,label:'Icon '+i,node:[]}));
+test('every distinct icon receives exactly one first-round opportunity',()=>{const groups=shards(icons);expect(groups.flat().length).toBe(icons.length);expect(new Set(groups.flat().map(i=>i.id)).size).toBe(icons.length);expect(groups).toEqual(shards(icons));expect(groups).not.toEqual(shards(icons,32));expect(groups.every(g=>g.length<=64)).toBe(true);});
+test('unavailable groups cannot masquerade as abstention or completed ranking',()=>{const groups=shards(icons);expect(()=>finalists(groups,{})).toThrow('Missing shard');const answers=Object.fromEntries(groups.map((g,i)=>['shard_'+i,{value:i===0?'none':g[0].id}]));expect(finalists(groups,answers)).toHaveLength(groups.length-1);answers.shard_1.value='not-in-library';expect(()=>finalists(groups,answers)).toThrow('outside candidate');});

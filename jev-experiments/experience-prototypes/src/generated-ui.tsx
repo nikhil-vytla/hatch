@@ -1,3 +1,4 @@
+import { compositionEvents } from "../../quality-and-simulation-review/composition-stream";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -172,13 +173,15 @@ export function GeneratedUI({ record }: { record: any }) {
     [source, setSource] = useState("Prepared interface"),
     [epoch, setEpoch] = useState(0),
     [replaying, setReplaying] = useState(false);
+  const requestVersion = useRef(0);
+  const [shortlist, setShortlist] = useState<string[]>([]);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { busy, error, execute } = useRun();
   const state = useRef<any>(uiInitial),
     controller = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
-      controller.current?.abort();
+      requestVersion.current++; controller.current?.abort();
       if (replayTimer.current) clearInterval(replayTimer.current);
     },
     [],
@@ -236,9 +239,12 @@ export function GeneratedUI({ record }: { record: any }) {
   }
   async function generate(edit: boolean) {
     await execute(async () => {
-      controller.current = new AbortController();
+      const version=++requestVersion.current;
+      const requestController = new AbortController(); controller.current = requestController;
+      setVersions(v=>v.map((item,i)=>i===active?{...item,spec:{...item.spec,state:structuredClone(state.current)}}:item));
       setSteps([]);
       setNotice("");
+      try {
       const response = await fetch("/api/compose", {
         method: "POST",
         headers: {
@@ -251,26 +257,17 @@ export function GeneratedUI({ record }: { record: any }) {
           state: edit ? state.current : uiInitial,
           ...(edit ? { spec } : {}),
         }),
-        signal: controller.current.signal,
+        signal: requestController.signal,
       });
       if (!response.ok) {
         const b = await readResponse(response);
         throw new Error(b.error);
       }
-      const reader = response.body!.getReader(),
-        decoder = new TextDecoder();
-      let pending = "",
-        final: any = null;
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        pending += decoder.decode(value, { stream: true });
-        let cut;
-        while ((cut = pending.indexOf("\n")) >= 0) {
-          const raw = pending.slice(0, cut);
-          pending = pending.slice(cut + 1);
-          if (!raw) continue;
-          const event = JSON.parse(raw);
+      if(version!==requestVersion.current)return;
+      let final:any=null, complete=false;
+      for await(const event of compositionEvents(response.body!,requestController.signal)) {
+          if(version!==requestVersion.current)return;
+          if(event.type === "complete")complete=true;
           if (event.type === "error") {
             setSource("Interrupted composition");
             throw new Error(event.error);
@@ -293,8 +290,9 @@ export function GeneratedUI({ record }: { record: any }) {
                 event.stopReason +
                 ". The last valid version is preserved.",
             );
-        }
       }
+      if(version!==requestVersion.current)return;
+      if (!complete) { setSource("Partial composition"); setNotice("The stream ended before completion. The visible partial interface is preserved; it is not a completed run."); }
       if (final?.spec) {
         setVersions((v) => [
           ...v,
@@ -307,6 +305,7 @@ export function GeneratedUI({ record }: { record: any }) {
         setActive(versions.length);
         setEpoch((e) => e + 1);
       }
+      } catch(error) { if(requestController.signal.aborted || version!==requestVersion.current)return; setSource("Interrupted composition"); throw error; }
     });
   }
   return (
@@ -341,8 +340,10 @@ export function GeneratedUI({ record }: { record: any }) {
                         "Saved in this preview. Try editing the interface while keeping your values.",
                       ),
                     reset: () => setEpoch((e) => e + 1),
-                    shortlist: async (p: any) =>
-                      setNotice(`${p.name} added to your shortlist.`),
+                    shortlist: async (p: any) => {
+                      const name=String(p.name??"Apartment"); setShortlist(items=>items.includes(name)?items:[...items,name]);
+                      setNotice(`${name} added to your shortlist.`);
+                    },
                   }}
                 >
                   <Renderer spec={spec} registry={registry} />
@@ -357,12 +358,16 @@ export function GeneratedUI({ record }: { record: any }) {
           </div>
         </div>
         {notice && <Notice>{notice}</Notice>}
+        {shortlist.length>0&&<Pane title="Your shortlist">{shortlist.map(name=><Button key={name} secondary onClick={()=>setShortlist(items=>items.filter(item=>item!==name))}>{name} · Remove</Button>)}</Pane>}
         <div className="version-strip">
           {versions.map((v, i) => (
             <button
               className={active === i ? "active" : ""}
               key={i}
+              disabled={busy || replaying}
               onClick={() => {
+                if(i===active)return;
+                setVersions(items=>items.map((item,n)=>n===active?{...item,spec:{...item.spec,state:structuredClone(state.current)}}:item));
                 setSpec(v.spec);
                 setActive(i);
                 setEpoch((e) => e + 1);
@@ -390,6 +395,7 @@ export function GeneratedUI({ record }: { record: any }) {
             values={["settings", "apartments", "event"]}
             value={domain}
             onChange={(d) => {
+              requestVersion.current++; controller.current?.abort(); setShortlist([]); setNotice("");
               if (replayTimer.current) clearInterval(replayTimer.current);
               setReplaying(false);
               setDomain(d);
@@ -446,7 +452,7 @@ export function GeneratedUI({ record }: { record: any }) {
             Revise this version
           </Button>
           {busy && (
-            <Button secondary onClick={() => controller.current?.abort()}>
+            <Button secondary onClick={() => {requestVersion.current++;controller.current?.abort();setSource("Interrupted composition");setNotice("Stopped. The partial preview is preserved.");}}>
               Stop, keep the preview
             </Button>
           )}

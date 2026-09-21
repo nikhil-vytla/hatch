@@ -1,0 +1,215 @@
+{
+  "method": "Decoded published evidence, executed actual SemanticTable callbacks with mocked React hooks/elements, and used installed TanStack Table 8.21.3 core row models. No browser, model calls, or app edits; callback tests do not establish general semantic accuracy.",
+  "sourceHashes": {
+    "src/new-experiments.tsx": "8cdcdba29a13d2d7712615376ac5ab56f24feebf216766640b728f3b8bbd509d",
+    "scripts/record.ts": "ae77a3dd8cccb465867bc13f97c024aa58c070f972166ac7cff75dfc277b7953",
+    "results/semantic-table.jsonl": "83dcbd69665b7b1c790402fa1888a55bdb053d818538b92a310f5c96e8d9f307"
+  },
+  "evidence": {
+    "rows": 8,
+    "judgments": 8,
+    "derivedFixtureMatches": 8,
+    "confusion": {
+      "tp": 3,
+      "fp": 0,
+      "tn": 5,
+      "fn": 0
+    },
+    "latencyMs": 264,
+    "attempts": [
+      {
+        "attempt": 1,
+        "status": 200,
+        "latency_ms": 264
+      }
+    ],
+    "payloadRetainedInPublishedResult": false,
+    "evidenceRows": [
+      {
+        "id": "01",
+        "text": "Agent: I will refund your duplicate payment today. Customer: Thanks. No transaction ID is present.",
+        "promisedFixture": true,
+        "completedFixture": false,
+        "derivedFixtureTarget": true,
+        "score": 0.88,
+        "predictedMatch": true
+      },
+      {
+        "id": "02",
+        "text": "A refund of $24 was processed. Transaction RF-8921. Customer confirmed receipt.",
+        "promisedFixture": true,
+        "completedFixture": true,
+        "derivedFixtureTarget": false,
+        "score": 0.04,
+        "predictedMatch": false
+      },
+      {
+        "id": "03",
+        "text": "Customer asked how to change a delivery address. Agent updated the address.",
+        "promisedFixture": false,
+        "completedFixture": false,
+        "derivedFixtureTarget": false,
+        "score": 0.07,
+        "predictedMatch": false
+      },
+      {
+        "id": "04",
+        "text": "Your refund has been approved and should be sent tomorrow. No payment confirmation yet.",
+        "promisedFixture": true,
+        "completedFixture": false,
+        "derivedFixtureTarget": true,
+        "score": 0.92,
+        "predictedMatch": true
+      },
+      {
+        "id": "05",
+        "text": "The customer requested a refund. Agent declined because the item had been used.",
+        "promisedFixture": false,
+        "completedFixture": false,
+        "derivedFixtureTarget": false,
+        "score": 0.3,
+        "predictedMatch": false
+      },
+      {
+        "id": "06",
+        "text": "We promised a refund last week. Today payment RF-3201 was sent and confirmed.",
+        "promisedFixture": true,
+        "completedFixture": true,
+        "derivedFixtureTarget": false,
+        "score": 0.06,
+        "predictedMatch": false
+      },
+      {
+        "id": "07",
+        "text": "Agent: I can offer a store credit, not a cash refund. Customer accepted the credit.",
+        "promisedFixture": false,
+        "completedFixture": false,
+        "derivedFixtureTarget": false,
+        "score": 0.23,
+        "predictedMatch": false
+      },
+      {
+        "id": "08",
+        "text": "Agent: I will reverse the accidental charge. The payment tool then failed with a timeout.",
+        "promisedFixture": true,
+        "completedFixture": false,
+        "derivedFixtureTarget": true,
+        "score": 0.9,
+        "predictedMatch": true
+      }
+    ]
+  },
+  "actualRequest": {
+    "rowCount": 8,
+    "questionCount": 8,
+    "stateKeys": [
+      "conversations"
+    ],
+    "allRowsShareState": true,
+    "firstQuestion": "For conversation 01: Was a refund promised but no successful refund is evidenced? Use only that conversation as evidence.",
+    "goldAnnotationKeysSent": false,
+    "payloadBytes": 2054
+  },
+  "corrections": {
+    "changedRow": {
+      "id": "01",
+      "customer": "Maya",
+      "text": "Agent: I will refund your duplicate payment today. Customer: Thanks. No transaction ID is present.",
+      "promised": true,
+      "completed": false,
+      "score": 0.88,
+      "correction": "Already resolved"
+    },
+    "visibleAfterAlreadyResolved": [
+      "01",
+      "04",
+      "08"
+    ],
+    "exportRetainsRawScore": 0.88,
+    "correctionAfterQueryChange": null
+  },
+  "emptyFilteredQueryChange": {
+    "onlyMatchesStillChecked": true,
+    "visibleRows": 0,
+    "notEvaluatedUnderlyingRows": 8
+  },
+  "staleQuery": {
+    "requestedQuestion": "For conversation 01: Was a refund promised but no successful refund is evidenced? Use only that conversation as evidence.",
+    "visibleQuestion": "Is a successful refund evidenced?",
+    "oldQuestionScoreNowVisible": 0.88,
+    "exportQuestion": "Is a successful refund evidenced?",
+    "exportFirstScore": 0.88
+  },
+  "rowIdentity": {
+    "before": [
+      {
+        "tableId": "0",
+        "domainId": "01",
+        "score": 0.88
+      },
+      {
+        "tableId": "1",
+        "domainId": "02",
+        "score": 0.04
+      },
+      {
+        "tableId": "2",
+        "domainId": "03",
+        "score": 0.07
+      },
+      {
+        "tableId": "3",
+        "domainId": "04",
+        "score": 0.92
+      },
+      {
+        "tableId": "4",
+        "domainId": "05",
+        "score": 0.3
+      },
+      {
+        "tableId": "5",
+        "domainId": "06",
+        "score": 0.06
+      },
+      {
+        "tableId": "6",
+        "domainId": "07",
+        "score": 0.23
+      },
+      {
+        "tableId": "7",
+        "domainId": "08",
+        "score": 0.9
+      }
+    ],
+    "filtered": [
+      {
+        "tableId": "0",
+        "domainId": "01",
+        "score": 0.88,
+        "correction": "Already resolved"
+      },
+      {
+        "tableId": "1",
+        "domainId": "04",
+        "score": 0.92
+      },
+      {
+        "tableId": "2",
+        "domainId": "08",
+        "score": 0.9
+      }
+    ],
+    "explicitGetRowId": false,
+    "headerClickHandlers": 0,
+    "currentSelectionUsesDomainId": true
+  },
+  "incompleteRecordFixture": {
+    "total": 8,
+    "evaluated": 2,
+    "visibleMatched": 1,
+    "unknownHidden": 6,
+    "note": "Synthetic missing-answer record for a UI coverage check. Actual published record contains all eight answers; live gateway rejects incomplete responses."
+  }
+}
