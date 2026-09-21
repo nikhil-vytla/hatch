@@ -1,0 +1,340 @@
+{
+  "scope": "Read-only current source inventory; no browser/performance/GPU/model execution. Existence of a route or data file is not a complete usability test.",
+  "recordedAt": "2026-09-21T05:26:10.944Z",
+  "sourceHashes": {
+    "experience-prototypes/src/main.tsx": "24dccc4aaef56296213cc943461fc6fa05429c9393f41d5792f73bf63629d36e",
+    "experience-prototypes/src/catalog.ts": "7ccb033029359a32e6550a13cc5811901ba47a62b3f101c71e397fdde3bed2f1",
+    "experience-prototypes/src/live-tetris.tsx": "fd3a56a2216ef5c2b29803541bbddc2b0a4416429323ba5549bbe4b964a22c67",
+    "live-worlds/tetris/session.ts": "fb3dabd1c405331974daadb350ebc8c4e70b50f1f613b8574cbb27b43abf8ec2",
+    "experience-prototypes/src/live-crowd.tsx": "fb257933c9cb1774b493a286a86140d2e4a6f8172116414a023c11d4e1563958",
+    "live-worlds/crowd/engine.ts": "5bb9ae0c9ed0a7c7a4ec5395339748252e07ef82e9d6e3caac5621ce374ba276",
+    "experience-prototypes/src/music-arranger.tsx": "047f3a5d45788a146f575ac83f0b5afdde807631505d5935fca6e85bb6dcfbdb",
+    "music-arranger-v2/engine.ts": "daa1dbd1ec27d8ac1ff7e4c1eee1d4c8420053a0c92988554614f5529f1ddd25",
+    "roadmap/materials/MaterialsSandbox.tsx": "5a6865143cf4713e6096a28086b2932fa537123922d6df64baa5e64c4b15adef",
+    "roadmap/materials/engine.ts": "b325e84014c7370ceaa54f3f6a12ca646e2e678a9dfbc941ea8fcb3a937104b3",
+    "roadmap/credits.tsx": "f11a7f2e740dd246fbf98b8787d41dab4dc164159e9bec5d0ae101c4024c24f2",
+    "experience-prototypes/scripts/prepare.ts": "72d09922caafa6d8d0fc79ef1ee650af91b9e543035ef4b74907252cdfffa76b"
+  },
+  "catalog": [
+    {
+      "id": "materials",
+      "title": "Material sandbox",
+      "data": "",
+      "localSceneOrIndependentToolkit": true,
+      "preparedDataExists": false
+    },
+    {
+      "id": "paste",
+      "title": "Smart paste",
+      "data": "paste",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "ui",
+      "title": "Generative interfaces",
+      "data": "ui",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "worlds",
+      "title": "Living scenes",
+      "data": "visuals",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "games",
+      "title": "Key & door",
+      "data": "games",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "music",
+      "title": "Music arranger",
+      "data": "music-v2",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "pixels",
+      "title": "Pixel studio",
+      "data": "visuals",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "semantic-table",
+      "title": "Semantic spreadsheet",
+      "data": "semantic-table",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "undo",
+      "title": "Intent-based undo",
+      "data": "undo",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "changes",
+      "title": "Change impact",
+      "data": "changes",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "logos",
+      "title": "Logo studio",
+      "data": "logos",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "beverage",
+      "title": "Café Jev",
+      "data": "cafe",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "journeys",
+      "title": "Adaptive forms",
+      "data": "journeys",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "decisions",
+      "title": "Preference explorer",
+      "data": "decisions",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "routing",
+      "title": "Model Routing Lab",
+      "data": "routing",
+      "localSceneOrIndependentToolkit": true,
+      "preparedDataExists": true
+    },
+    {
+      "id": "verify",
+      "title": "Agent verifier",
+      "data": "verify",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "search",
+      "title": "Search reranker",
+      "data": "search",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "context",
+      "title": "Context filter",
+      "data": "search",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "micro",
+      "title": "Micro-agent team",
+      "data": "micro",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "vision",
+      "title": "Vision to action",
+      "data": "vision",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "classify",
+      "title": "Intent recognition",
+      "data": "classify",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "judge",
+      "title": "JudgeBench",
+      "data": "judgment-reliability",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "robustness",
+      "title": "Decision stability",
+      "data": "robustness",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "latency",
+      "title": "Batching & latency",
+      "data": "latency",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "optimize",
+      "title": "Prompt evolution",
+      "data": "optimize",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "teach",
+      "title": "Active labeling",
+      "data": "teach",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "reward",
+      "title": "Learning from rewards",
+      "data": "reward",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "replica",
+      "title": "SmolLM decision model",
+      "data": "replica",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "rewardbench2",
+      "title": "RewardBench 2",
+      "data": "rewardbench2",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "adapters",
+      "title": "Typed schema adapters",
+      "data": "adapters",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "snake",
+      "title": "Snake",
+      "data": "arcade",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "orbital",
+      "title": "Orbital rescue",
+      "data": "arcade",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "local-models",
+      "title": "Decision models on a Mac",
+      "data": "local-models",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "benchmark-atlas",
+      "title": "The next experiments",
+      "data": "research-map",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "tetris",
+      "title": "Tetris: play and branch",
+      "data": "tetris-framing",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "drawing-framing",
+      "title": "Pixel questions",
+      "data": "drawing-framing",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "visual-search",
+      "title": "The visual archive",
+      "data": "visual-search",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "wardrobe",
+      "title": "A change of clothes",
+      "data": "wardrobe",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "icon-studio",
+      "title": "A symbol for an idea",
+      "data": "icon-studio",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "crowd",
+      "title": "The square at five",
+      "data": "live-worlds",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    },
+    {
+      "id": "ghost-brush",
+      "title": "Ghost Brush",
+      "data": "live-worlds",
+      "localSceneOrIndependentToolkit": false,
+      "preparedDataExists": true
+    }
+  ],
+  "materialsEvidence": {
+    "frozenLabelClaim": true,
+    "evidencePanelHasLink": true,
+    "evidencePanelHasDownload": true,
+    "componentImportsProtocol": true,
+    "componentImportsLabels": true,
+    "protocolPublishedByPrepare": false,
+    "labelsPublishedByPrepare": false
+  },
+  "creditLinks": [
+    "https://docs.typesafe.ai/introduction",
+    "https://github.com/NandhaKishorM/laya",
+    "https://brainfunctioncollapse.com/laya",
+    "https://github.com/wdobry/laya-playground",
+    "https://github.com/ekzhang/openjev-sglang",
+    "https://github.com/daseinlabs/open-jev",
+    "https://github.com/fstandhartinger/auto-model-router",
+    "https://whichmodel.app.mintapis.com/",
+    "https://www.inkandswitch.com/patchwork/notebook/2024-version-control/",
+    "https://www.inkandswitch.com/potluck/",
+    "https://musiclab.chromeexperiments.com/",
+    "https://maxbittker.com/making-sandspiel/",
+    "https://brainfunctioncollapse.com/",
+    "https://rauno.me/craft/interaction-design",
+    "https://emilkowal.ski/ui/7-practical-animation-tips",
+    "https://www.joshwcomeau.com/animation/linear-timing-function/",
+    "https://paco.me/craft",
+    "https://maggieappleton.com/garden",
+    "https://tonejs.github.io/",
+    "https://threejs.org/",
+    "https://motion.dev/",
+    "https://reactflow.dev/"
+  ]
+}

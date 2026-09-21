@@ -1,0 +1,20 @@
+{
+  "condition": "Chromium real link clicks and downloads from current Vite dev app; source-byte comparison",
+  "passed": true,
+  "files": [
+    {
+      "source": "materials/PROTOCOL.md",
+      "download": ".playwright-cli/jev-materials-protocol.md",
+      "sha256": "710eb01a3c54547fb0d1f85f5a04cdfc22142948f2e9d0ef56b847b25a10a0d2",
+      "bytes": 1289,
+      "identical": true
+    },
+    {
+      "source": "materials/labels.v1.json",
+      "download": ".playwright-cli/jev-materials-labels-v1.json",
+      "sha256": "668acad097533b58d5227e6ef02fe778b86a52c39059616a130663e3fd6ac8d9",
+      "bytes": 1920,
+      "identical": true
+    }
+  ]
+}

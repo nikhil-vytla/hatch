@@ -1,0 +1,99 @@
+{
+  "conditions": "Eight serial active-scene samples after all local model/training work released the device. 2 s warmup and 10 s measurement per scene/viewport. API requests blocked, zero attempts observed. One Chromium host with desktop and mobile viewports, not physical-device performance or an audio-quality test.",
+  "host": {
+    "machine": "arm64",
+    "macOS": "26.6.2",
+    "cpu": "Apple M4 Max",
+    "memoryBytes": 51539607552
+  },
+  "allUsedSameProductionAssets": true,
+  "productionAssetCount": 102,
+  "rows": [
+    {
+      "scene": "materials",
+      "viewport": "desktop",
+      "frameP95Ms": 16.799999999999272,
+      "callbackP95Ms": 0.800000011920929,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-materials-desktop.json",
+      "sha256": "08b41584b857e144d37b2905f7664d47c4cb1621196932ed24a3c517bf723cd2"
+    },
+    {
+      "scene": "materials",
+      "viewport": "mobile",
+      "frameP95Ms": 16.799999999999272,
+      "callbackP95Ms": 0.8999999761581421,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-materials-mobile.json",
+      "sha256": "d70893b21707774803121d398f538176d18a70b3ecc0bf4d5a654b60d0cbed2d"
+    },
+    {
+      "scene": "crowd",
+      "viewport": "desktop",
+      "frameP95Ms": 16.700000000000728,
+      "callbackP95Ms": 1.199999988079071,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-crowd-desktop.json",
+      "sha256": "f89ea1bb2f27f8c1a031874f647fa1197fdb48fb86e9494174c59a581fc455d4"
+    },
+    {
+      "scene": "crowd",
+      "viewport": "mobile",
+      "frameP95Ms": 16.700000000000728,
+      "callbackP95Ms": 1.199999988079071,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-crowd-mobile.json",
+      "sha256": "9b30417274d3b20561b4d9508ba1bba020cf886c24fda2533439aba30e086b9e"
+    },
+    {
+      "scene": "tetris",
+      "viewport": "desktop",
+      "frameP95Ms": 16.70000000001164,
+      "callbackP95Ms": 7.099999964237213,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-tetris-desktop.json",
+      "sha256": "f9b005b5e5fe93bc8ccde502eb948e1632d8d0964037c154f30f7bb39e1d0a95"
+    },
+    {
+      "scene": "tetris",
+      "viewport": "mobile",
+      "frameP95Ms": 16.70000000001164,
+      "callbackP95Ms": 5.900000035762787,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-tetris-mobile.json",
+      "sha256": "9f98c424497fde2e4118cee6e5d99887154c1d064b75d7d11a688197ec611372"
+    },
+    {
+      "scene": "music",
+      "viewport": "desktop",
+      "frameP95Ms": 16.79999999998836,
+      "callbackP95Ms": 0.10000002384185791,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-music-desktop.json",
+      "sha256": "da2524c17d9987cea6d744f29e0326cac115624bcbeed3209e9e2c2897b16fc8"
+    },
+    {
+      "scene": "music",
+      "viewport": "mobile",
+      "frameP95Ms": 16.79999999998836,
+      "callbackP95Ms": 0.10000002384185791,
+      "intervalsOver33Ms": 0,
+      "longTasks": 0,
+      "report": "frames-music-mobile.json",
+      "sha256": "9454f79a33876f1f44073a803e8cda0aac941172f846c2eaaf69fc7c6085816c"
+    }
+  ],
+  "limitations": [
+    "Animation callback timings omit asynchronous React/layout/paint work.",
+    "Browser requestAnimationFrame cadence does not measure physical display presentation.",
+    "Default local scenes and short samples do not cover every saved scene, large history or model latency."
+  ],
+  "complete": true
+}

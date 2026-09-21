@@ -1,0 +1,220 @@
+{
+  "downloads": [
+    {
+      "text": "Routing protocol",
+      "filename": "jev-routing-protocol.md",
+      "url": "/assets/PROTOCOL-M7tlKPGn.md",
+      "failure": null,
+      "source": "routing/PROTOCOL.md",
+      "bytes": 8299,
+      "sha256": "5a21d795a7fd1bdfbed691e7ade17ae634f04d526b924025e14d4abd48388542",
+      "identical": true,
+      "refreshedAfterProtocolEdit": true
+    },
+    {
+      "text": "Comparison protocol",
+      "filename": "jev-comparison-protocol.md",
+      "url": "/assets/PROTOCOL-OAvEdSRl.md",
+      "failure": null,
+      "source": "routing/comparison/PROTOCOL.md",
+      "bytes": 4490,
+      "sha256": "6cdd6c722ae372086a9b464c1780bdcebe8e928f1f1bc559b4b48b9dd12bfd21",
+      "identical": true
+    },
+    {
+      "text": "Comparison report",
+      "filename": "jev-comparison-report.md",
+      "url": "/assets/README-Bi9cMOKF.md",
+      "failure": null,
+      "source": "routing/comparison/README.md",
+      "bytes": 5003,
+      "sha256": "3c2ddf6a439a511e14194936f04279b82a9deb35a7d063c5202aa7deeaa349dd",
+      "identical": true
+    },
+    {
+      "text": "Comparison results (JSON)",
+      "filename": "jev-comparison-results.json",
+      "url": "/assets/report-BlzAeuc1.json",
+      "failure": null,
+      "source": "routing/comparison/report.json",
+      "bytes": 49444,
+      "sha256": "823fcc08c329576c142f52d9352dbb3b474cc77fdd224bf05112b2d0164f5b93",
+      "identical": true
+    },
+    {
+      "text": "Client failure protocol",
+      "filename": "jev-client-failure-protocol.md",
+      "url": "/assets/FAILURE-PROTOCOL-CbXgaDiO.md",
+      "failure": null,
+      "source": "integration/FAILURE-PROTOCOL.md",
+      "bytes": 3165,
+      "sha256": "86749591957f0b90ef2ea7c2383708bbb1116c0385150f3b407951118af6253c",
+      "identical": true
+    },
+    {
+      "text": "Client evidence index",
+      "filename": "jev-client-evidence-index.json",
+      "url": "/assets/index-C5VpKSV-.json",
+      "failure": null,
+      "source": "integration/evidence/index.json",
+      "bytes": 13267,
+      "sha256": "47276c546f78b69d62a14045db82fe1c9e9b188039118309ca210654f7c03ee4",
+      "identical": true
+    },
+    {
+      "text": "Run summary",
+      "filename": "jev-opencode-summary.json",
+      "url": "/assets/summary-C-EmTh4-.json",
+      "failure": null,
+      "source": "integration/evidence/opencode/summary.json",
+      "bytes": 4123,
+      "sha256": "65cf0d1538b54c2ba847047b8142a50e706e3215879263673d72f843a0a13dc1",
+      "identical": true
+    },
+    {
+      "text": "MCP audit (JSONL)",
+      "filename": "jev-opencode-mcp-audit.jsonl",
+      "url": "/assets/mcp-audit-D6uvBDr0.jsonl",
+      "failure": null,
+      "source": "integration/evidence/opencode/mcp-audit.jsonl",
+      "bytes": 2542,
+      "sha256": "abf4759d6d57349e001774fbe3116268bb6d28024548c03348c56d0f4f2fced9",
+      "identical": true
+    },
+    {
+      "text": "Host transcript (JSONL)",
+      "filename": "jev-opencode-host-transcript.jsonl",
+      "url": "/assets/stdout--5TQ4psR.jsonl",
+      "failure": null,
+      "source": "integration/evidence/opencode/stdout.jsonl",
+      "bytes": 67528,
+      "sha256": "9375285e7cad5675612e8078fb6d682d35aa68c264dc84b7ae1e7ded520b40e9",
+      "identical": true
+    },
+    {
+      "text": "Host-applied diff",
+      "filename": "jev-opencode-host.diff",
+      "url": "/assets/host-B1NZmd_o.diff",
+      "failure": null,
+      "source": "integration/evidence/opencode/host.diff",
+      "bytes": 277,
+      "sha256": "c3ad4ff4eab1cb86fbe42c04345a59ae3c61c1c3d449efb852276a13fd19e4dd",
+      "identical": true
+    },
+    {
+      "text": "Independent test output",
+      "filename": "jev-opencode-tests.txt",
+      "url": "/assets/tests-after-B5V7V2Iv.txt",
+      "failure": null,
+      "source": "integration/evidence/opencode/tests-after.txt",
+      "bytes": 843,
+      "sha256": "dee2a51bcab3d306209506f889e22fb45c50d7dd160b6b5be7063f8482f9f823",
+      "identical": true
+    },
+    {
+      "text": "Run summary",
+      "filename": "jev-claude-summary.json",
+      "url": "/assets/summary-hDskSf1t.json",
+      "failure": null,
+      "source": "integration/evidence/claude/summary.json",
+      "bytes": 3362,
+      "sha256": "4bddb6db049d61cca4ade9b4d27cc61e9b2dfcd98b7abcd6f08c2feb37cfb7be",
+      "identical": true
+    },
+    {
+      "text": "MCP audit (JSONL)",
+      "filename": "jev-claude-mcp-audit.jsonl",
+      "url": "/assets/mcp-audit-BBqAchtl.jsonl",
+      "failure": null,
+      "source": "integration/evidence/claude/mcp-audit.jsonl",
+      "bytes": 1452,
+      "sha256": "7c09b926c22d242c509d858c9c2f1567322a0f8fef70ff674e29e950e380795a",
+      "identical": true
+    },
+    {
+      "text": "Host transcript (JSONL)",
+      "filename": "jev-claude-host-transcript.jsonl",
+      "url": "/assets/stdout-Dlg2Xwzs.jsonl",
+      "failure": null,
+      "source": "integration/evidence/claude/stdout.jsonl",
+      "bytes": 123243,
+      "sha256": "aa38d8461da8d3fc210ea7d9075ff8b41d25c373ea88d301b13e66c73ccbf15a",
+      "identical": true
+    },
+    {
+      "text": "Host-applied diff",
+      "filename": "jev-claude-host.diff",
+      "url": "/assets/host-U1NaUH8f.diff",
+      "failure": null,
+      "source": "integration/evidence/claude/host.diff",
+      "bytes": 998,
+      "sha256": "cf46cdcd72fe1bcf8531b14046bc181dd3e7c185a77a36bff442cd9973b7c702",
+      "identical": true
+    },
+    {
+      "text": "Independent test output",
+      "filename": "jev-claude-tests.txt",
+      "url": "/assets/tests-after-fGjxi0gj.txt",
+      "failure": null,
+      "source": "integration/evidence/claude/tests-after.txt",
+      "bytes": 232,
+      "sha256": "995260304c85d504156a5ca76780782ce2c8c24e90b897c0356e98a0d2134776",
+      "identical": true
+    },
+    {
+      "text": "Run summary",
+      "filename": "jev-codex-summary.json",
+      "url": "/assets/summary-Dz0k-0ns.json",
+      "failure": null,
+      "source": "integration/evidence/codex/summary.json",
+      "bytes": 3999,
+      "sha256": "2c6f161e318a02e2502b3edff7f883dcf5bdaad9e6de3d4c8c52bb5b7844de3e",
+      "identical": true
+    },
+    {
+      "text": "MCP audit (JSONL)",
+      "filename": "jev-codex-mcp-audit.jsonl",
+      "url": "/assets/mcp-audit-DTgVyc3G.jsonl",
+      "failure": null,
+      "source": "integration/evidence/codex/mcp-audit.jsonl",
+      "bytes": 1587,
+      "sha256": "86d69b3974f6976ce3c41746f25b004125f6f75d047cd78904c8c21b07b1d26f",
+      "identical": true
+    },
+    {
+      "text": "Host transcript (JSONL)",
+      "filename": "jev-codex-host-transcript.jsonl",
+      "url": "/assets/stdout-BEFqOLsU.jsonl",
+      "failure": null,
+      "source": "integration/evidence/codex/stdout.jsonl",
+      "bytes": 71579,
+      "sha256": "12b3261ae4e64ff9bd8026bcdc4d10e8ed273bd8a777ea5416620e284d095354",
+      "identical": true
+    },
+    {
+      "text": "Host-applied diff",
+      "filename": "jev-codex-host.diff",
+      "url": "/assets/host-DyWqMSrW.diff",
+      "failure": null,
+      "source": "integration/evidence/codex/host.diff",
+      "bytes": 1189,
+      "sha256": "0430c5e3ed51c426b33fe06166bcc1a292c815c8adfac8cea2fcdfd07c80b603",
+      "identical": true
+    },
+    {
+      "text": "Independent test output",
+      "filename": "jev-codex-tests.txt",
+      "url": "/assets/tests-after-BUGvXFka.txt",
+      "failure": null,
+      "source": "integration/evidence/codex/tests-after.txt",
+      "bytes": 339,
+      "sha256": "8a230f0e6aac9453d530e7c1bbc32676a17786c5ce2e0a583a8b4bf4f6d16302",
+      "identical": true
+    }
+  ],
+  "overflow": false,
+  "passed": true,
+  "condition": "Production Vite preview,390px Chromium, actual link clicks at500ms intervals; downloaded bytes compared to source.",
+  "initialAttempt": "A rapid21-click download burst timed out at file11 after10 completed downloads. Pacing clicks at500ms passed with unchanged product code and assets. This is consistent with download throttling; the browser cause was not separately diagnosed.",
+  "protocolRefresh": "Repeated the protocol download after final execution-identity boundary edits and production rebuild. All 21 downloaded-file hashes match current source; unchanged files retain their prior actual download evidence."
+}

@@ -1,0 +1,232 @@
+{
+  "commit": "eb633db88cf6f6a81816007d68eb710f4af4fe3a",
+  "files": 562,
+  "totalBytes": 17480111,
+  "binaryFiles": [
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-gradients.webp",
+      "bytes": 124270,
+      "sha256": "7c957fcf02f6f64480e396c6c7bf5c162f4ca6317649102b939616f05e397000"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-music-desktop.webp",
+      "bytes": 91104,
+      "sha256": "049893fa4401eb68ba99a0ddffd5b72489f68d403b26631f2266ac532d9abfe7"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-redraw.webp",
+      "bytes": 79688,
+      "sha256": "b91a2b6f50055b73aa51ba212bd0ce3162f6c3bc721d01416ad3b23b68462ab9"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/emil-animation-tips.webp",
+      "bytes": 159352,
+      "sha256": "2617d0fcd38d1de93b416032052e9c86098857c84f9c9cd4fa22f20c4e2f1866"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/josh-linear-timing.webp",
+      "bytes": 134280,
+      "sha256": "6a60f6998a074941554d9355e847b6bac2b8c982037b24df6a96ddd333f932b0"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-home.webp",
+      "bytes": 217054,
+      "sha256": "bc8750bb3f355ac5e5fe469f2cd3e259ca6ef9c09e2c07923ceed5cb8f1e23b7"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-mobile.webp",
+      "bytes": 70610,
+      "sha256": "c6b109c5bbd54cfc5375e977ee07b34a104001fa277c5a0fee52222c69fda1d3"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-playground-desktop.webp",
+      "bytes": 115786,
+      "sha256": "e33f9373e337f78b0b69c5852fdcc844918f8210cc839904ed36840e89d35758"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/maggie-garden.webp",
+      "bytes": 334018,
+      "sha256": "9fe337fd68e63a6156c36facb0300de30683261b89bae5f6edcfc26dfb265c73"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/paco-tabs-selected.webp",
+      "bytes": 62402,
+      "sha256": "697b9680662733c4928b4ba396e54a388f2f92bdd063dbb4996b771a1b86d3bd"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/rauno-fractional-slider.webp",
+      "bytes": 141580,
+      "sha256": "daf45bba394a94cafa09cb536e00064fcca6e95ab4b64e941dc822e786489d89"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-dark.webp",
+      "bytes": 196256,
+      "sha256": "d4fb09489bd3dab64eb24bcd130f93ca77cdfe78f38aaa7f17c3a466c0910f8c"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-desktop.webp",
+      "bytes": 188772,
+      "sha256": "0bb02498e170a3cee25c8f472840b0a2e51e3f3743d03e9e760e8c7dd34d70eb"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-mobile.webp",
+      "bytes": 58222,
+      "sha256": "5fb6cbe07e90e3dc6bb19976a290aeb2720b62f8c70aa0ff52ae1bf4c1db1de3"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/before-desktop.webp",
+      "bytes": 170552,
+      "sha256": "dd9879aa49410e5e90ec7f0266a738b67b6ad8916c9e7f7472062a94eb0bde09"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/home-desktop.webp",
+      "bytes": 189094,
+      "sha256": "30cdabfb29af8783935a44b50291ebd7d2f4a10eb16ca9ce7448739aff4ec6cc"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/inspect-desktop.webp",
+      "bytes": 187228,
+      "sha256": "12c4058f1f11049bea31ce72acaf8b2320fd932a37ebe6bfa2267cf4314ad4eb"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/materials-dark-mobile.webp",
+      "bytes": 31652,
+      "sha256": "ca4b08f7c02b5a609d6402f1d2a200b997a5b06892bf3d0ee4c0f8c13547d722"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/materials-mobile.webp",
+      "bytes": 27522,
+      "sha256": "d0e6a219ef15d21eae0cd6298c97ce4e1467afcf1dc86cac801e85a1def9f988"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/touch-preview-mobile.webp",
+      "bytes": 48302,
+      "sha256": "a0ad0d9ec6b2dd9a9a4611301ba27cd3df6e0b4011c0581f8a7aedd1c488c7cf"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/laya-17.safetensors",
+      "bytes": 12458,
+      "sha256": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/laya-29.safetensors",
+      "bytes": 12458,
+      "sha256": "67398be72053dfff08544c6f36c81c04e58281b35e4d7e82e3fee018717e1f7b"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/laya-43.safetensors",
+      "bytes": 12458,
+      "sha256": "a29f85012849a7c1be8ff3dcbfb87a09f28a37d1ad64495a9ae217ac848b3907"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/qwen-17.safetensors",
+      "bytes": 98558,
+      "sha256": "4fd59a8e4c7811b09f0ded36c0d87264e4c439a8a416304ccfab29d605f7ae9d"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/qwen-29.safetensors",
+      "bytes": 98558,
+      "sha256": "e0a64c63d50e20c92ae04a8c1024473d4cc2cc65b3e23a0254ef9568993eaee3"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/qwen-43.safetensors",
+      "bytes": 98558,
+      "sha256": "a3a7df67e1d72e3a2d50397dba35907401df7906c7a6a0a610939dd44ea99aa7"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/smol-17.safetensors",
+      "bytes": 92413,
+      "sha256": "ed6c891535da8585326cffd95ffe87c3ac820b22b119a1decd32942176b59d3b"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/smol-29.safetensors",
+      "bytes": 92413,
+      "sha256": "1947cccdba8f8a8016fe043b47ea8dfa52983e5ce86a5df16fefa9919f4cd06c"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/smol-43.safetensors",
+      "bytes": 92413,
+      "sha256": "aec1901f23a7b9240dc6b2e8775f47ecd370dd6827f595f06e724f2e57f663ff"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/home-desktop-final.png",
+      "bytes": 113312,
+      "sha256": "e9d9b69608c04854aa46e83f3bde3aa8fa452f47ca8a02fe059e7a634d9a3d59"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/home-mobile-final.png",
+      "bytes": 61652,
+      "sha256": "630730a3d17a5b36993faea9cd81ac98873e0404b37cd6591914e536d297dcfb"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-crowd-desktop.png",
+      "bytes": 127030,
+      "sha256": "86ed376afdec4f75136abebcb0a58528aea42c1d69f452a6551c57654eaf051d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-crowd-mobile.png",
+      "bytes": 89459,
+      "sha256": "bb4e1e330e1f2797402741c7d7932f780aad7548eeb21b05f11f72839345c2f6"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-home.png",
+      "bytes": 92877,
+      "sha256": "39d76ff2aaacbd3d5d271e27f7ceb7f5143b617fc0cb23768aa0832b038d5406"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-materials-canvas-mobile.png",
+      "bytes": 45291,
+      "sha256": "008008199a674dc799263518fef0da09d3a4ea185d9c783788683caaba1d5d60"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-materials-mobile.png",
+      "bytes": 54266,
+      "sha256": "49ebfa899ba7cb787e56618a98a985e7c8fd36010f4fb87a047eb292a2f4ad45"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-music-desktop.png",
+      "bytes": 120410,
+      "sha256": "224674e376e46d439327c37ea6556e9b9ceeceaf6f8f5d931ce387dc2d35ce63"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-music-mobile.png",
+      "bytes": 39422,
+      "sha256": "ff3498b79bdc01af33cad269a19421916392bb9874a473de42a50cebb34593e1"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-routing.png",
+      "bytes": 133729,
+      "sha256": "164197709b3ed608f92e300f58c84045dac51c77c6239589e4641e1c4c7f669d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/materials-dark-final.png",
+      "bytes": 109463,
+      "sha256": "ad576e113776a536b47a5a0275cf9c8926c94d0e35aeb3a637a6f6610b6584e8"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/routing-mobile-final.png",
+      "bytes": 63479,
+      "sha256": "e4c4c029031976e7a3f56aec41360866ed436faf59668efb444fbb03c135519f"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/study-desktop-final.png",
+      "bytes": 151810,
+      "sha256": "ebfe23616cea8a798fc1a59fa16645818848b7a62b6aa909a164d36c42353771"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/study-mobile-final.png",
+      "bytes": 62859,
+      "sha256": "2539a4fd307e1ac9cc250abf1b225bfafc8ce49f00e721c98f3d9d4910ea58af"
+    }
+  ],
+  "checkedImplementationCommits": [
+    "eb633db88cf6f6a81816007d68eb710f4af4fe3a",
+    "d5461b4cdc2ccb9849b5675fda09de4b9bdff4ff",
+    "e3f5d3e0cbb9e9289aab74c523c20f6680aae536",
+    "246bb5f823f8e0732f2f74e868d01c5cebd0d730",
+    "884074b321709bbb33afbd081d42ca06af636dea"
+  ],
+  "checks": "Tracked authored artifacts only; excludes known cache/dependency/local-state paths; each binary below 2 MB; selected credential patterns; all implementation commits folder-only. This is not an exhaustive secret detector.",
+  "problems": [],
+  "passed": true
+}

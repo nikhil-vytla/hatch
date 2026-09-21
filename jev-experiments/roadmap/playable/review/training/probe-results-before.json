@@ -1,0 +1,429 @@
+{
+  "scope": "CPU and provider free; no model loading, downloads or GPU",
+  "sourceHashes": {
+    "study.py": "25b12982ae1863bc56da71648b6feca4d930112323903cce2c7c1e2ea2c2207d",
+    "audit_release.py": "84ab4975fde7ab60a01d3838ccd9eecf8fd091773ccb3c121bdb37eacad3fe9c",
+    "publish.py": "2ff34c22115ae47e32cd4921285f21fa6e6d0a1a8b08b7d38ef2b81f9fcbb775",
+    "robustness.py": "c5ef7ebeace148c2b843effba118e80a7b649176778e080b977d52c44cfe3ad1",
+    "export_coreml.py": "748c86233181862d2e3d8fc6ab07fde3b2958e1e3f0cfa20e00ba9987cd69cc8"
+  },
+  "metrics": {
+    "predictionExactlyMatchesSoftGold": {
+      "total": 1,
+      "supported": 1,
+      "coverage": 1.0,
+      "unsupportedReasons": {},
+      "nll": 0.6931471805599453,
+      "brier": 0.0,
+      "accuracy": 1.0,
+      "ece": 0.5,
+      "ordinalMae": 0.0
+    },
+    "allUnsupported": {
+      "overall": {
+        "total": 1,
+        "supported": 0,
+        "coverage": 0.0,
+        "unsupportedReasons": {
+          "input limit": 1
+        }
+      },
+      "datasets": {
+        "fixture": {
+          "total": 1,
+          "supported": 0,
+          "coverage": 0.0,
+          "unsupportedReasons": {
+            "input limit": 1
+          }
+        }
+      },
+      "kinds": {
+        "ordinal": {
+          "total": 1,
+          "supported": 0,
+          "coverage": 0.0,
+          "unsupportedReasons": {
+            "input limit": 1
+          }
+        }
+      },
+      "macroNll": 0.0
+    }
+  },
+  "malformedEvidenceGate": {
+    "mutations": [
+      "stale result corpus hash",
+      "wrong backbone revision",
+      "wrong export identity and seed",
+      "empty export comparisons",
+      "empty baseline object",
+      "wrong robustness seeds and empty batch checks"
+    ],
+    "release": {
+      "schemaVersion": "1",
+      "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+      "models": {
+        "laya": {
+          "trainedSeeds": [
+            17,
+            29,
+            43
+          ],
+          "trainingComplete": true,
+          "coremlStatus": "complete",
+          "coremlCompleteComparison": true,
+          "coremlAgreementPassed": true,
+          "robustnessComplete": true,
+          "frozenBaselinesComplete": true
+        },
+        "smol": {
+          "trainedSeeds": [
+            17,
+            29,
+            43
+          ],
+          "trainingComplete": true,
+          "coremlStatus": "complete",
+          "coremlCompleteComparison": true,
+          "coremlAgreementPassed": true,
+          "robustnessComplete": true,
+          "frozenBaselinesComplete": true
+        },
+        "qwen": {
+          "trainedSeeds": [
+            17,
+            29,
+            43
+          ],
+          "trainingComplete": true,
+          "coremlStatus": "complete",
+          "coremlCompleteComparison": true,
+          "coremlAgreementPassed": true,
+          "robustnessComplete": true,
+          "frozenBaselinesComplete": true
+        }
+      },
+      "researchEvidenceComplete": true,
+      "installedDefault": null,
+      "defaultSelection": "None. An explicit validation-only default-selection artifact and matching distributable package are required even when agreement gates pass.",
+      "releaseReady": false,
+      "blockers": [
+        "No validation-selected distributable model has been installed and evaluated."
+      ]
+    },
+    "publication": {
+      "accepted": true,
+      "researchEvidenceComplete": true,
+      "revisions": [
+        "wrong-revision",
+        "wrong-revision",
+        "wrong-revision"
+      ]
+    }
+  },
+  "currentEvidence": {
+    "counts": {
+      "train": 768,
+      "validation": 192,
+      "test": 384,
+      "transfer": 2384
+    },
+    "datasetCounts": {
+      "train": {
+        "banking77": 256,
+        "boolq": 256,
+        "stsb": 256
+      },
+      "validation": {
+        "banking77": 64,
+        "boolq": 64,
+        "stsb": 64
+      },
+      "test": {
+        "banking77": 128,
+        "boolq": 128,
+        "stsb": 128
+      },
+      "transfer": {
+        "clinc": 128,
+        "multirc": 128,
+        "summeval": 128,
+        "typed_decisions": 2000
+      }
+    },
+    "typedDecisionsCases": 400,
+    "invalidTargets": 0,
+    "crossSplitExactTaskDuplicates": 0,
+    "sourcesManifestMatches": true,
+    "models": {
+      "laya": {
+        "protocolMatches": true,
+        "corpusMatches": true,
+        "revisionMatches": true,
+        "selectionMatchesValidationMinimum": true,
+        "comparisons": [
+          {
+            "seed": 17,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "2a144dae8991bc89c5dac99edb7bb78a7e2d01248d44ba01a94fa9c4232508f6",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 17,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "db754edaa02837df8c1a91ab95acfa2acf2df8f6d34b0f78cebc08e1542a3dda",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 17,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "b7a7c64e37e52d97296e6cfb4a97772e5f8be668db6bece2f893c1c926ede1d2",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "80f6ca95c310e7d293b858bec3b4fb2308629aceae3ca947ead546d4fde827ec",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "1d8a7176b264a79619acf435ec02c8c7bdd8ddfe388d44a607ee1b6deef3a87c",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "0fd0a19cadfcfbfdb1b901f4f5cd805e4d55b08f2c6a4288497d06a18c760b20",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "8ca734d7d762cc6c2fde9731af8e7e1d7648b9bc636759f7a3e92f82f267fee5",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "735d851ba7b8c6574f4c769ccb67ec759ce563e823bc928fd222a1bc7a32654d",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "963fd027430d8a9a577efef518c9301b2ce07d275057d0edbaabe0f5bcb1c050",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          }
+        ]
+      },
+      "smol": {
+        "protocolMatches": true,
+        "corpusMatches": true,
+        "revisionMatches": true,
+        "selectionMatchesValidationMinimum": true,
+        "comparisons": [
+          {
+            "seed": 17,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "750642dd620e9142c12e027f7c906113c4b69e6122a7ae05eb722dcbfa791fbe",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 17,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "8c3baacb38eeeca70049f8d2eda66e120928d528526849fa6bad7a004f5f79de",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 17,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "fa5f47d24a3ea0eccd2213c8d3a2f8e4674b0e67e82b0801425d04111583be5b",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "31354b6b77f7e19285e9c295533ae817aa4e3416013c7219147b8d983e246d9c",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "eedd53066f269a56dcc93ba6f2aa1dd222fd6e7efc545fe2c1376c132fd7cf02",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "a0f365363dbb1a937b5271d8bc4d5f9990a0cd514be12965c13cbf963c5cea4c",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "ca103ae2bb22d9da931767c7c07b2615bbd4707d1e8e54c8c8774a818e903d15",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "dc7f9e9071822a1f4051e62cb792e4376cb6cc04cc7d4a94f28448b742953d95",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "783a06aab68a6c474de93e9295f4d636e0d4c4185fb5ba7fe03b381970bb07d4",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          }
+        ]
+      },
+      "qwen": {
+        "protocolMatches": true,
+        "corpusMatches": true,
+        "revisionMatches": true,
+        "selectionMatchesValidationMinimum": true,
+        "comparisons": [
+          {
+            "seed": 17,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "818101201863cef62915a3c397810fb7eb39b4e0a8a9bd303b031932a595bfef",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 17,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "8a8a11d4e94b0fee61448fb9eebe4913ef7b274b5ec53dd93c691c1d9446e108",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 17,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "4b34e0401af1a440d243477e69186e9f16052cc4bb453a342b00083341b9b1c5",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "51b552dd8885b0bc0e430aa5ea274d12c05cfe7e6dd32e3a9c39ccf046df00c8",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "0682aebbd31df3fd65bfbc8ba291592cf5b1ce470e66a7351368946db4c8d117",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 29,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "8b6f9846c1fd9893f08e00d40ff08a5ca8bbcc900a34e727f3281ad8c26fe5b1",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "validation",
+            "rows": 192,
+            "predictionSha256": "95cdc2997999da70d6fcfb71fd122ef08e81718cc1238475fbcf342ac6524589",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "test",
+            "rows": 384,
+            "predictionSha256": "83878eb0085ef838e72ce40dd6254e1c2428b47839e99e1d4ee41909dd6bbe9a",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          },
+          {
+            "seed": 43,
+            "split": "transfer",
+            "rows": 2384,
+            "predictionSha256": "da92e6c2069767ec8fc83352aa0ad2274e66584eb88fa8f4442cd7d82714b020",
+            "alignedWithFrozenRows": true,
+            "maximumRecomputedMetricDelta": 0,
+            "calibrationMatchesValidationMinimum": true
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "status": 200,
+  "task": {
+    "id": "routing-demo",
+    "prompt": "Fix the bug. totalThrough(n) must sum every integer from 1 through n inclusive. Return a proposed unified diff for sum.ts.",
+    "context": "sum.ts:\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n",
+    "requiredCapabilities": [
+      "text",
+      "coding"
+    ],
+    "outputTokens": 2048
+  },
+  "result": {
+    "schemaVersion": "1",
+    "taskId": "routing-demo",
+    "status": "ok",
+    "classification": {
+      "source": "heuristic",
+      "category": "bug-fix",
+      "difficulty": 0.5,
+      "confidence": 0.5,
+      "latencyMs": 0,
+      "costUsd": 0,
+      "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+    },
+    "selection": {
+      "status": "selected",
+      "routeId": "gpt-4.1-mini",
+      "candidates": [
+        {
+          "routeId": "gpt-4.1-mini",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.20617949123084214,
+          "estimatedCostUsd": 0.004244,
+          "maximumCostUsd": 0.004244,
+          "quality": {
+            "value": 0.65,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 1600,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        },
+        {
+          "routeId": "claude-haiku-4.5",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.07999999999999999,
+          "estimatedCostUsd": 0.012658,
+          "maximumCostUsd": 0.012658,
+          "quality": {
+            "value": 0.8,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 2400,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        }
+      ],
+      "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+      "inputTokenUpperBound": 2418,
+      "outputTokens": 2048
+    },
+    "attempts": [
+      {
+        "actualModel": "openai/gpt-4.1-mini",
+        "identityBasis": "provider-reported",
+        "usage": {
+          "inputTokens": 307,
+          "outputTokens": 130,
+          "cachedInputTokens": 0
+        },
+        "costUsd": null,
+        "status": "ok",
+        "artifact": {
+          "kind": "patch",
+          "text": "--- sum.ts\n+++ sum.ts\n@@ -1,5 +1,6 @@\n-export function totalThrough(n: number): number {\n-  let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n-  return total;\n-}\n+export function totalThrough(n: number): number {\n+  let total = 0;\n+  for (let i = 1; i <= n; i++) total += i;\n+  return total;\n+}\n"
+        },
+        "routeId": "gpt-4.1-mini",
+        "latencyMs": 1413.5078339999998,
+        "trigger": "initial",
+        "reservedCostUsd": 0.004244
+      }
+    ],
+    "outcome": {
+      "actualRouteId": "gpt-4.1-mini",
+      "actualModel": "openai/gpt-4.1-mini",
+      "totalLatencyMs": 1414.047375,
+      "totalCostUsd": null,
+      "artifact": {
+        "kind": "patch",
+        "text": "--- sum.ts\n+++ sum.ts\n@@ -1,5 +1,6 @@\n-export function totalThrough(n: number): number {\n-  let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n-  return total;\n-}\n+export function totalThrough(n: number): number {\n+  let total = 0;\n+  for (let i = 1; i <= n; i++) total += i;\n+  return total;\n+}\n"
+      }
+    }
+  },
+  "independentCheck": {
+    "baselineExit": 1,
+    "patchApplied": true,
+    "testsExit": 0,
+    "tests": "bun test v1.3.14 (0d9b296a)\n\nsum.test.ts:\n(pass) inclusive totals [0.10ms]\n\n 1 pass\n 0 fail\n 5 expect() calls\nRan 1 test across 1 file. [8.00ms]\n",
+    "strictPatchApplied": false,
+    "hostRepair": "Trim duplicate terminal blank line introduced by recorder and use git apply --recount -p0 to repair model hunk counts. Patch content unchanged."
+  },
+  "billingVerified": false,
+  "historical": true,
+  "currentValidatorWouldAccept": false,
+  "annotation": "Original provider output retained. Host repair fields were appended after independent strict apply failed. This predates strict patch-hunk validation and is not evidence of the current accepted-result path."
+}

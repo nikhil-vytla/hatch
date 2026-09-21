@@ -1,0 +1,25 @@
+{
+  "capturedAt": "2026-09-21T04:23:01.045Z",
+  "cancelledVerification": {
+    "expected": "cancelled",
+    "actual": "cancelled",
+    "artifactRetained": false
+  },
+  "classifierUnderZeroCap": {
+    "expectedCalls": 0,
+    "actualCalls": 0,
+    "status": "unavailable"
+  },
+  "redirectGuard": {
+    "expectedReceiverCalls": 0,
+    "actualReceiverCalls": 0,
+    "status": "unavailable",
+    "actualModel": "fixture"
+  },
+  "malformedMcp": {
+    "expectedExitCode": 0,
+    "actualExitCode": 0,
+    "stdout": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Invalid request\"}}\n{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":{}}\n",
+    "stderr": ""
+  }
+}

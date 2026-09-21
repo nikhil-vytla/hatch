@@ -1,0 +1,936 @@
+{
+  "recordedAt": "2026-09-21T06:05:46.637326+00:00",
+  "scope": [
+    "jev-experiments/roadmap/design-research",
+    "jev-experiments/roadmap/materials",
+    "jev-experiments/roadmap/playable",
+    "jev-experiments/roadmap/tetris"
+  ],
+  "excluded": [
+    "jev-experiments/roadmap/playable/review/artifacts"
+  ],
+  "byteLimit": 2000000,
+  "fileCount": 90,
+  "binaryCount": 20,
+  "totalBinaryBytes": 2627744,
+  "filesAtOrOverLimit": [],
+  "dependencyOrRepositoryTrees": [],
+  "archiveOrModelCandidates": [],
+  "symlinks": [],
+  "privacyPatternFlags": [
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/README.md",
+      "line": 32,
+      "kind": "user_home"
+    }
+  ],
+  "referenceFigures": [
+    {
+      "images": [
+        {
+          "src": "output/playwright/laya-home.webp",
+          "alt": "Screenshot of Laya, explained through a scene by Wojciech Dobry \u00b7 brain function collapse"
+        }
+      ],
+      "sourceUrls": [
+        "https://brainfunctioncollapse.com/laya"
+      ],
+      "caption": "Laya, explained through a sceneWojciech Dobry \u00b7 brain function collapseA strong first action and a distinct model attribution. The large speed headline is an author claim, not a Jev result.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/laya-playground-desktop.webp",
+          "alt": "Screenshot of Execution source stays visible by Wojciech Dobry \u00b7 brain function collapse"
+        }
+      ],
+      "sourceUrls": [
+        "https://brainfunctioncollapse.com/laya/about"
+      ],
+      "caption": "Execution source stays visibleWojciech Dobry \u00b7 brain function collapseThe recorded-playback banner and visible distributions establish what the demonstration actually contains.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/bfc-music-desktop.webp",
+          "alt": "Screenshot of A live figure before the explanation by Wojciech Dobry \u00b7 brain function collapse"
+        }
+      ],
+      "sourceUrls": [
+        "https://brainfunctioncollapse.com/projects/see-the-music"
+      ],
+      "caption": "A live figure before the explanationWojciech Dobry \u00b7 brain function collapseA restrained page lets the musical figure carry the introduction. Smaller code-and-effect figures follow.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/bfc-gradients.webp",
+          "alt": "Screenshot of Edit the object in place by Wojciech Dobry \u00b7 brain function collapse"
+        }
+      ],
+      "sourceUrls": [
+        "https://brainfunctioncollapse.com/projects/gradients"
+      ],
+      "caption": "Edit the object in placeWojciech Dobry \u00b7 brain function collapseLarge handles on the artboard and a precise numerical inspector offer two ways to express the same change.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/bfc-redraw.webp",
+          "alt": "Screenshot of One drawing command at a time by Wojciech Dobry \u00b7 brain function collapse"
+        }
+      ],
+      "sourceUrls": [
+        "https://brainfunctioncollapse.com/projects/redraw-exploration"
+      ],
+      "caption": "One drawing command at a timeWojciech Dobry \u00b7 brain function collapseThe page separates the command to draw from pointer movement. It labels the renderer as a technical preview and credits William Candillon.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/rauno-fractional-slider.webp",
+          "alt": "Screenshot of A small control can explain itself by Rauno Freiberg"
+        }
+      ],
+      "sourceUrls": [
+        "https://rauno.me/craft/fractional-slider"
+      ],
+      "caption": "A small control can explain itselfRauno FreibergA ruler, one instruction and immediate feedback are enough for a focused experiment. No surrounding dashboard is needed.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/emil-animation-tips.webp",
+          "alt": "Screenshot of Feedback demonstrated side by side by Emil Kowalski"
+        }
+      ],
+      "sourceUrls": [
+        "https://emilkowal.ski/ui/7-practical-animation-tips"
+      ],
+      "caption": "Feedback demonstrated side by sideEmil KowalskiThe pressed-button examples make the recommendation inspectable. Repeated high-frequency actions call for restraint.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/josh-linear-timing.webp",
+          "alt": "Screenshot of Change a parameter, see the consequence by Josh W. Comeau"
+        }
+      ],
+      "sourceUrls": [
+        "https://www.joshwcomeau.com/animation/linear-timing-function/"
+      ],
+      "caption": "Change a parameter, see the consequenceJosh W. ComeauRunnable controls sit beside the explanation. A screenshot records layout, not the quality of the animation.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/paco-tabs-selected.webp",
+          "alt": "Screenshot of A stable place for the selected item by Paco Coursey"
+        }
+      ],
+      "sourceUrls": [
+        "https://paco.me/craft/tabs"
+      ],
+      "caption": "A stable place for the selected itemPaco CourseyCaptured after clicking Engineering. The original article also credits Stripe and explains its accessible duplicate presentation.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/maggie-garden.webp",
+          "alt": "Screenshot of Make the maturity of work visible by Maggie Appleton"
+        }
+      ],
+      "sourceUrls": [
+        "https://maggieappleton.com/garden"
+      ],
+      "caption": "Make the maturity of work visibleMaggie AppletonGrowth stages distinguish unfinished ideas from mature work. Jev can apply that distinction to research evidence and usable scenes.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    },
+    {
+      "images": [
+        {
+          "src": "output/playwright/laya-mobile.webp",
+          "alt": "Screenshot of Stack the first actions on a small screen by Wojciech Dobry \u00b7 brain function collapse"
+        }
+      ],
+      "sourceUrls": [
+        "https://brainfunctioncollapse.com/laya"
+      ],
+      "caption": "Stack the first actions on a small screenWojciech Dobry \u00b7 brain function collapseAt 390 px the primary choices remain explicit. The mobile capture is one page state, not a full accessibility audit.",
+      "allImagesExist": true,
+      "hasSourceAndDescription": true
+    }
+  ],
+  "files": [
+    {
+      "path": "jev-experiments/roadmap/design-research/NOTES.md",
+      "bytes": 2861,
+      "sha256": "574db6dc0816ebaec4e01f44024387a37d5fac48b8bb2c1588b69d4c033569a8",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/README.md",
+      "bytes": 14023,
+      "sha256": "7ea36ddb4dab3187d8d9089f32346d849897b8e49d1486995ef273431fc0e049",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/_summary.md",
+      "bytes": 786,
+      "sha256": "5d99d2e41b2d369d31f3ec52c4b5ebc0f5950d4ebde045ea138aa5e09b62af18",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-gradients.webp",
+      "bytes": 124270,
+      "sha256": "7c957fcf02f6f64480e396c6c7bf5c162f4ca6317649102b939616f05e397000",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-music-desktop.webp",
+      "bytes": 91104,
+      "sha256": "049893fa4401eb68ba99a0ddffd5b72489f68d403b26631f2266ac532d9abfe7",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-redraw.webp",
+      "bytes": 79688,
+      "sha256": "b91a2b6f50055b73aa51ba212bd0ce3162f6c3bc721d01416ad3b23b68462ab9",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/emil-animation-tips.webp",
+      "bytes": 159352,
+      "sha256": "2617d0fcd38d1de93b416032052e9c86098857c84f9c9cd4fa22f20c4e2f1866",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/josh-linear-timing.webp",
+      "bytes": 134280,
+      "sha256": "6a60f6998a074941554d9355e847b6bac2b8c982037b24df6a96ddd333f932b0",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-home.webp",
+      "bytes": 217054,
+      "sha256": "bc8750bb3f355ac5e5fe469f2cd3e259ca6ef9c09e2c07923ceed5cb8f1e23b7",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-mobile.webp",
+      "bytes": 70610,
+      "sha256": "c6b109c5bbd54cfc5375e977ee07b34a104001fa277c5a0fee52222c69fda1d3",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-playground-desktop.webp",
+      "bytes": 115786,
+      "sha256": "e33f9373e337f78b0b69c5852fdcc844918f8210cc839904ed36840e89d35758",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/maggie-garden.webp",
+      "bytes": 334018,
+      "sha256": "9fe337fd68e63a6156c36facb0300de30683261b89bae5f6edcfc26dfb265c73",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/paco-tabs-selected.webp",
+      "bytes": 62402,
+      "sha256": "697b9680662733c4928b4ba396e54a388f2f92bdd063dbb4996b771a1b86d3bd",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/rauno-fractional-slider.webp",
+      "bytes": 141580,
+      "sha256": "daf45bba394a94cafa09cb536e00064fcca6e95ab4b64e941dc822e786489d89",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-dark.webp",
+      "bytes": 196256,
+      "sha256": "d4fb09489bd3dab64eb24bcd130f93ca77cdfe78f38aaa7f17c3a466c0910f8c",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-desktop.webp",
+      "bytes": 188772,
+      "sha256": "0bb02498e170a3cee25c8f472840b0a2e51e3f3743d03e9e760e8c7dd34d70eb",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-mobile.webp",
+      "bytes": 58222,
+      "sha256": "5fb6cbe07e90e3dc6bb19976a290aeb2720b62f8c70aa0ff52ae1bf4c1db1de3",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/reference-board.html",
+      "bytes": 8066,
+      "sha256": "c1296146ff23c8997b0403b6a56140d85cadff79db0ea040449c729e7a308c17",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/style-study.html",
+      "bytes": 22772,
+      "sha256": "ff762001db98ad9b862bcd11bd018575b0648886567c0ac5a10980928eafb18e",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/MaterialsSandbox.tsx",
+      "bytes": 36847,
+      "sha256": "092d474c16b97d214844a8d7613b7cf47f38a7444fe0d54d537d2a2352870357",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/NOTES.md",
+      "bytes": 1342,
+      "sha256": "bd19bea239d31f8e85eb0082ab2cf0f38e7165503a21d2eedace1a99b6fa0cc6",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/PROTOCOL.md",
+      "bytes": 1289,
+      "sha256": "710eb01a3c54547fb0d1f85f5a04cdfc22142948f2e9d0ef56b847b25a10a0d2",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/README.md",
+      "bytes": 1600,
+      "sha256": "9dbae62f559b0656d8266ab39a6e76f283a2e59b3ed49dec4de8d50d421c6a31",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/_summary.md",
+      "bytes": 589,
+      "sha256": "43b91c370f22327f91c3abd6ad3bc6e44be90e63303ae395870e992c1e856368",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.test.ts",
+      "bytes": 2726,
+      "sha256": "6816b37a8a7fffb3ede4640e1933d692d7b4a9f20975374ea0e920ae5d25fefc",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.ts",
+      "bytes": 11147,
+      "sha256": "b325e84014c7370ceaa54f3f6a12ca646e2e678a9dfbc941ea8fcb3a937104b3",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/labels.v1.json",
+      "bytes": 1920,
+      "sha256": "668acad097533b58d5227e6ef02fe778b86a52c39059616a130663e3fd6ac8d9",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/materials.css",
+      "bytes": 16313,
+      "sha256": "dafb96a57c1d2aa8c5c9db56b7e0e7a3810425d88625af98711a472605d0fad9",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/NOTES.md",
+      "bytes": 2631,
+      "sha256": "77ab7f418a2f00072bcbd9d0fabcd304b0cac714eb66103ccd1db749440525fb",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/README.md",
+      "bytes": 1849,
+      "sha256": "4c7544c5c4cecfdb92513aa51480e5505586fb5e72cd9138ccb9579068ee276b",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/_summary.md",
+      "bytes": 533,
+      "sha256": "36c2f0d836b7e7857fff2d5c985473d1d7395e60135f2c8863e3e7de5014229d",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/crowd.test.ts",
+      "bytes": 1190,
+      "sha256": "2e58f3d142ed98ed4b3252b069d139fa6bfd5e8a03d6f365c6eedd101d94b578",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/crowd.ts",
+      "bytes": 1026,
+      "sha256": "13f7cacd01aa92bce8b1a99dff0e9ad8b01e858497d25b867f0012573cb6be25",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/NOTES.md",
+      "bytes": 2220,
+      "sha256": "1ea081ac6b220b397ce9c970ac22a158dc323602eebd51380dfa1da314860575",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/README.md",
+      "bytes": 3515,
+      "sha256": "5b2f249a0521ec802f49066ee5b6ca8da89735963932fcde2a6c788b42c5efaa",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/_summary.md",
+      "bytes": 607,
+      "sha256": "f708293d07b892afb685030813822e576c9dabda7c54c17f6d97221a343c24e0",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/before-desktop.webp",
+      "bytes": 170552,
+      "sha256": "dd9879aa49410e5e90ec7f0266a738b67b6ad8916c9e7f7472062a94eb0bde09",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/home-desktop.webp",
+      "bytes": 189094,
+      "sha256": "30cdabfb29af8783935a44b50291ebd7d2f4a10eb16ca9ce7448739aff4ec6cc",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/inspect-desktop.webp",
+      "bytes": 187228,
+      "sha256": "12c4058f1f11049bea31ce72acaf8b2320fd932a37ebe6bfa2267cf4314ad4eb",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/materials-dark-mobile.webp",
+      "bytes": 31652,
+      "sha256": "ca4b08f7c02b5a609d6402f1d2a200b997a5b06892bf3d0ee4c0f8c13547d722",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/materials-mobile.webp",
+      "bytes": 27522,
+      "sha256": "d0e6a219ef15d21eae0cd6298c97ce4e1467afcf1dc86cac801e85a1def9f988",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/touch-preview-mobile.webp",
+      "bytes": 48302,
+      "sha256": "a0ad0d9ec6b2dd9a9a4611301ba27cd3df6e0b4011c0581f8a7aedd1c488c7cf",
+      "ignored": true,
+      "kind": "binary",
+      "webpChunks": [
+        "VP8X",
+        "ICCP",
+        "VP8L"
+      ],
+      "hasExifOrXmp": false
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/music.test.ts",
+      "bytes": 1508,
+      "sha256": "8516d05ab6a0ebfb72bc7f342bab4b614a274be815ba6e22f47eeb352095b2e1",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/music.ts",
+      "bytes": 1879,
+      "sha256": "b12b12b25e67eb9d28fa26f19d7f1ff19d325ecc4fc0de04c3ab1c33d3535f40",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/README.md",
+      "bytes": 1774,
+      "sha256": "6d6ca9d00e9fade0faa44476dcbc81750dd004ecd7e7f70d029d9fc198cc7071",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/NOTES.md",
+      "bytes": 1902,
+      "sha256": "47c6cd4ed18edf011c56b4b2b241dcd55a6e296545b88e3031ff30eb0b49edf4",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/README.md",
+      "bytes": 2369,
+      "sha256": "7de86dedaf5d6b43f716dd308be17de395dd8dcd0e3dc5a0768b422e950f75e3",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/_summary.md",
+      "bytes": 636,
+      "sha256": "c6b9f467cea0cd21fd8ff0df331f657dc74d9581394cf810717cb9d1dec63658",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/probe-results-after.json",
+      "bytes": 3645,
+      "sha256": "faa6f527a05a56fce1d5d19143bd70d396c08259e04b5ca84b49f65ea603f710",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/probes.py",
+      "bytes": 6820,
+      "sha256": "263e448549a708cd8c01f01511ae3e5afe9857751d4c82ac5be4bf5e0d41cae1",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/NOTES.md",
+      "bytes": 1883,
+      "sha256": "92bf75cfba80122f99c02efca227dde2818c610d192feb8ec571dc118ee84020",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/README.md",
+      "bytes": 4030,
+      "sha256": "b09d03cfd9011199c1e0cd2bdcf47cc92b388ed5ddf60a7db6a4177d28f7c0d4",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/_summary.md",
+      "bytes": 531,
+      "sha256": "c56896626e0f829f925fd222e91f902b6e089cbb2b121ffb93b652caab15b3a5",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/foundations.test.ts",
+      "bytes": 1218,
+      "sha256": "9d9c687abc405da89421e674532541e5b3c9432f2c25fe5feb1f9711b64e8e58",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/patch-probe-results-after-fixes.json",
+      "bytes": 501,
+      "sha256": "465585fd3793bfae4b63e179cdf4a50f22bf6b5c8167f0e1f9b1ced33d1b1f33",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/patch-probe-results.json",
+      "bytes": 607,
+      "sha256": "385aaca48ce90006357209195ed821afadf6b7676c5cee9ec83d3e57154833ab",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/patch-probes.py",
+      "bytes": 1424,
+      "sha256": "d89a62f0f44b89e172b55c341508ea41d139a67fdef71b685e8b1905cd924e00",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/probe-results-after-fixes.json",
+      "bytes": 1855,
+      "sha256": "cbc13871cfee0cd81097bc0d16578ec283b308b64cfe9a6b8e77d57358c2072d",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/probe-results.json",
+      "bytes": 1570,
+      "sha256": "f3b5b4c0eb7c8793d08b1db339742fa73420103b846f10f88cac13a63ead7f11",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/probes.ts",
+      "bytes": 3127,
+      "sha256": "347bc469df500dfb5f4264dae4a242d36021ce11c9b1e5cb5878a250785f4961",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-current-check.json",
+      "bytes": 210,
+      "sha256": "bb933504c9482b8fca0042c39f2d097320d3e729695afeb960dddc531d4a31d9",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-probe-results-after-fixes.json",
+      "bytes": 421,
+      "sha256": "a2e660425f472a04cc23cca117a824fbbd9e9964807692ccdc85b769c7caafc0",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-probe-results.json",
+      "bytes": 295,
+      "sha256": "fb4152db029e5bc911102df9887673c38c95789ea6b6c999e2a85deff1c0992b",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-probe.ts",
+      "bytes": 808,
+      "sha256": "e53b4c5fd2161011d76db98a859bfd689cf9439f2f8777c932219eae75fd3c95",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/NOTES.md",
+      "bytes": 1653,
+      "sha256": "ea88907e92d75fe795e386f35dbd25591d1eda58379ca5c9a93058da39f96222",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/README.md",
+      "bytes": 5667,
+      "sha256": "96051488ac25e87791aed22d72c0fd1a529ef20b164fa8854845f6841d0dcd24",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/_summary.md",
+      "bytes": 546,
+      "sha256": "bf9f269cb9b43dfd8638daca492216ab3fca13c7d3c14c376a3639704f594970",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/probe-results-after-fixes.json",
+      "bytes": 1235,
+      "sha256": "85d518ce1320142324c9c6c6bce757cf86d5c61a062a73f050864f95ee629ae6",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/probe-results.json",
+      "bytes": 973,
+      "sha256": "42c57a5230f246160cd1b8743f1516edd68cfbc22e8f19a90d9accaf20472618",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/probes.py",
+      "bytes": 3581,
+      "sha256": "ce2eda43aabb4f90dca3515ec5e4a32b4a6b56c0bdee43b8c49d4f2d14200818",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/NOTES.md",
+      "bytes": 1906,
+      "sha256": "7fc984e745b45dd53216d1f1554aa478d63ed91b7cc4f1e49710b33e599e8358",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/README.md",
+      "bytes": 5355,
+      "sha256": "0960abe86f2027d82e4b7c1e60a68e31f627b5fa785a24c1ddede366eeb1e4af",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/_summary.md",
+      "bytes": 721,
+      "sha256": "a45fb260599b92d14ca3d768691eaba932e27de24b49dbdf65339077d1e13237",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/source-audit-after.json",
+      "bytes": 10162,
+      "sha256": "b4f36dfdd2d5b74dec09a4e0118657e641c781ae9a66040efa1a8d02fc78748e",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/source-audit.ts",
+      "bytes": 2934,
+      "sha256": "f84acd76a0662d799b0761d18524839710278051d0b0655d2dfbde42cc2078cd",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/routing-post-fix.json",
+      "bytes": 675,
+      "sha256": "18f92c0649691ebd2549b14f7bc464308d49d53483ede371363f4dedc5ff9c1b",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/routing-review.ts",
+      "bytes": 3642,
+      "sha256": "cc40136bd9cfcd7904cb2b8b25d3261b09d653c1521a6b1dbbe72fe4fbe89735",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/NOTES.md",
+      "bytes": 3199,
+      "sha256": "f2a2f81130443c517b5488b737b7cd4af8c308db50e0ae7ef00a1f8295a1330e",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/README.md",
+      "bytes": 5489,
+      "sha256": "17a5d9c19f435cea70a7968908ba8e23b12c62d88867a5ea4fd51cce083cb60c",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/_summary.md",
+      "bytes": 667,
+      "sha256": "2ec22963fda3da28fc12f0fea13975369ccb2fd60a86f347418a8a12a61f7065",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probe-results-after.json",
+      "bytes": 18222,
+      "sha256": "cf5588e6d250ca55f55ca7b93b2b86b116d0530a9afdd2e9b419abc29e7616ec",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probe-results-before.json",
+      "bytes": 14445,
+      "sha256": "856f5b008b40f2cf345f0e0c04ceddf3a1ebb6014b0846e35513e6e1b9537a61",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probe-results-partial-fix.json",
+      "bytes": 18041,
+      "sha256": "9d0c68a540ab0256356017413b134baaf0b906750afa514714222602ebdb2f9d",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probes.py",
+      "bytes": 11782,
+      "sha256": "e9cfd7d0b141c5afad09854896d7c09ac11aed47eb90eec5a5cc2233e5790caa",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/PROTOCOL.md",
+      "bytes": 1459,
+      "sha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/README.md",
+      "bytes": 1188,
+      "sha256": "12e8ff88b7113f8db37d753e4f642a1cd364981a2ac6458c8a22249dc3b2b7eb",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/games.jsonl",
+      "bytes": 1117210,
+      "sha256": "99e6861edc764a2c8fb7ef17d9dbe81d4eefe5a9dae1319a7fe52d99f3f37b6c",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/record.local.log",
+      "bytes": 3435,
+      "sha256": "307bc8908b804932b4cbccdaa645092b08344d4baa385ec5a98bb64b5106c1ff",
+      "ignored": true,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/record.ts",
+      "bytes": 3099,
+      "sha256": "9359f80d27f9a9c4181c33fc07912f11829bb4d2e207137d3de5423c4d0f652c",
+      "ignored": false,
+      "kind": "text"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/summary.json",
+      "bytes": 4779,
+      "sha256": "de4a110455ff7b4ac85677c3c6ae6833b69eab66ca84ece852a3fedd7fa826d8",
+      "ignored": false,
+      "kind": "text"
+    }
+  ],
+  "limits": "Inventory and pattern matches are not a forensic privacy or source-origin proof. Manual screenshot and prose review is recorded in README.md. No network, model, browser or performance work was run."
+}

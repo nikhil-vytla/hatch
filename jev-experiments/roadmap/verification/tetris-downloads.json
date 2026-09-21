@@ -1,0 +1,45 @@
+{
+  "condition": "Chromium390px actual link clicks, source-byte comparison",
+  "passed": true,
+  "horizontalOverflow": false,
+  "tableRows": [
+    [
+      7,
+      0,
+      0
+    ],
+    [
+      19,
+      0,
+      3
+    ],
+    [
+      42,
+      0,
+      1
+    ]
+  ],
+  "files": [
+    {
+      "source": "tetris/PROTOCOL.md",
+      "download": "jev-live-tetris-protocol.md",
+      "sha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca",
+      "bytes": 1459,
+      "identical": true
+    },
+    {
+      "source": "tetris/summary.json",
+      "download": "jev-live-tetris-summary.json",
+      "sha256": "de4a110455ff7b4ac85677c3c6ae6833b69eab66ca84ece852a3fedd7fa826d8",
+      "bytes": 4779,
+      "identical": true
+    },
+    {
+      "source": "tetris/games.jsonl",
+      "download": "jev-live-tetris-games.jsonl",
+      "sha256": "99e6861edc764a2c8fb7ef17d9dbe81d4eefe5a9dae1319a7fe52d99f3f37b6c",
+      "bytes": 1117210,
+      "identical": true
+    }
+  ]
+}

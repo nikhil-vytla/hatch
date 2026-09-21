@@ -1,0 +1,70 @@
+name: Jev provider-free checks
+on:
+  pull_request:
+    paths: ['jev-experiments/**', '.github/workflows/jev-checks.yml']
+  push:
+    branches: [main]
+    paths: ['jev-experiments/**', '.github/workflows/jev-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  web-and-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: '1.3.14' }
+      - run: bun install --frozen-lockfile
+        working-directory: jev-experiments/experience-prototypes
+      # Match Vercel before installing any sibling toolkit dependencies.
+      - run: bun run build
+        working-directory: jev-experiments/experience-prototypes
+      - run: bun install --frozen-lockfile
+        working-directory: jev-experiments/adapters/typescript
+      - run: bun install --frozen-lockfile
+        working-directory: jev-experiments/roadmap
+      - run: bun run check
+        working-directory: jev-experiments/roadmap
+      - run: bun test
+        working-directory: jev-experiments/adapters/typescript
+      - run: bun run test
+        working-directory: jev-experiments/experience-prototypes
+      - run: bun test runtime routing materials playable
+        working-directory: jev-experiments/roadmap
+      - run: bun verification/publication.ts
+        working-directory: jev-experiments/roadmap
+      - run: bun verification/evidence-assets.ts
+        working-directory: jev-experiments/roadmap
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publication-integrity
+          path: |
+            jev-experiments/roadmap/verification/publication-index.json
+            jev-experiments/roadmap/verification/evidence-assets.json
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --extra dev --frozen
+        working-directory: jev-experiments
+      - run: uv run pytest -q tests
+        working-directory: jev-experiments
+      - run: uv run python local-models-and-games/apple/test_metrics.py
+        working-directory: jev-experiments
+      - run: uv run python -m unittest discover -s roadmap/training -p 'test_*.py'
+        working-directory: jev-experiments
+      - run: uv run python -m unittest discover -s roadmap/mac -p 'test_*.py'
+        working-directory: jev-experiments
+  other-adapters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: jev-experiments/adapters/go/go.mod }
+      - run: go test ./...
+        working-directory: jev-experiments/adapters/go
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked
+        working-directory: jev-experiments/adapters/rust
