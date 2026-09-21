@@ -1,0 +1,4 @@
+# Inference only. No torch, coremltools, pyarrow, optimizer or training dataset stack.
+mlx==0.32.2
+numpy==2.5.3
+tokenizers==0.23.2

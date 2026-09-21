@@ -1,0 +1,177 @@
+{
+  "schemaVersion": "1",
+  "recordedAtUtc": "2026-09-21T06:32:55.606574+00:00",
+  "selectedModel": "laya-readout-experimental",
+  "selectionArtifactSha256": "ef3be9fb7b13ddf4d1c5b37ae95b80060294b4a6ac611bc79d3f7fa10b815c33",
+  "freshPrefix": "/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/.cache/typed-study-v1/default-installation-x5e9rq91/toolkit",
+  "freshModelDirectory": "/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/.cache/typed-study-v1/default-installation-x5e9rq91/models",
+  "dependencyInstallationPassed": true,
+  "proposedRegistryInstalledByInstaller": true,
+  "modelInstall": {
+    "status": "ok",
+    "model": "laya-readout-experimental",
+    "path": "/Users/nikhil/.codex/worktrees/a144/hatch/jev-experiments/.cache/typed-study-v1/default-installation-x5e9rq91/models/laya-readout-experimental",
+    "verified": true,
+    "experimental": true
+  },
+  "doctor": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.13.11",
+    "localOnly": true,
+    "limits": {
+      "maxStateBytes": 65536,
+      "maxInputBytes": 131072,
+      "maxQuestions": 32,
+      "maxOptions": 8,
+      "maxTokens": 768,
+      "supportedKinds": [
+        "choice",
+        "boolean",
+        "ordinal"
+      ]
+    },
+    "defaultModel": "laya-readout-experimental",
+    "issues": [],
+    "status": "ok"
+  },
+  "proposedRegistry": {
+    "schemaVersion": "1",
+    "default": "laya-readout-experimental",
+    "models": {
+      "laya-base-experimental": {
+        "model": "convaiinnovations/laya",
+        "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+        "license": "Apache-2.0",
+        "experimental": true,
+        "selection": "Explicit experimental choice of the pinned published base model.",
+        "files": [
+          {
+            "path": "model.safetensors",
+            "sha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+            "bytes": 842609210,
+            "url": "https://huggingface.co/convaiinnovations/laya/resolve/1c5edc17a7acd8701df6fc341c0d179f1c62c982/model.safetensors"
+          },
+          {
+            "path": "encoder/config.json",
+            "sha256": "bf3ab80598fdccf414855a2ce80f22859e4492d06ca8a62ddd1cfb63972f8979",
+            "bytes": 2083,
+            "url": "https://huggingface.co/convaiinnovations/laya/resolve/1c5edc17a7acd8701df6fc341c0d179f1c62c982/encoder/config.json"
+          },
+          {
+            "path": "tokenizer/tokenizer.json",
+            "sha256": "6c8aaa9a542084f2457eab775d4eeb51f92a70c0fd9de28d5edb0ddec3c08d30",
+            "bytes": 3583228,
+            "url": "https://huggingface.co/convaiinnovations/laya/resolve/1c5edc17a7acd8701df6fc341c0d179f1c62c982/tokenizer/tokenizer.json"
+          }
+        ]
+      },
+      "laya-readout-experimental": {
+        "model": "jev/laya-typed-readout-v1-seed17",
+        "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+        "license": "Apache-2.0",
+        "experimental": true,
+        "selection": "Predefined seed17, selected by validation macro NLL among eligible complete exports. Experimental readout adapted on three datasets; no test-based model selection.",
+        "files": [
+          {
+            "path": "model.safetensors",
+            "sha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+            "bytes": 842609210,
+            "url": "https://huggingface.co/convaiinnovations/laya/resolve/1c5edc17a7acd8701df6fc341c0d179f1c62c982/model.safetensors"
+          },
+          {
+            "path": "encoder/config.json",
+            "sha256": "bf3ab80598fdccf414855a2ce80f22859e4492d06ca8a62ddd1cfb63972f8979",
+            "bytes": 2083,
+            "url": "https://huggingface.co/convaiinnovations/laya/resolve/1c5edc17a7acd8701df6fc341c0d179f1c62c982/encoder/config.json"
+          },
+          {
+            "path": "tokenizer/tokenizer.json",
+            "sha256": "6c8aaa9a542084f2457eab775d4eeb51f92a70c0fd9de28d5edb0ddec3c08d30",
+            "bytes": 3583228,
+            "url": "https://huggingface.co/convaiinnovations/laya/resolve/1c5edc17a7acd8701df6fc341c0d179f1c62c982/tokenizer/tokenizer.json"
+          },
+          {
+            "path": "readout.safetensors",
+            "sha256": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+            "bytes": 12458,
+            "bundled": "checkpoints/laya-17.safetensors"
+          }
+        ],
+        "baseModel": "convaiinnovations/laya",
+        "baseRevision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+        "readout": {
+          "path": "readout.safetensors",
+          "temperature": 1.3,
+          "seed": 17,
+          "evidence": "../training/results-laya.json"
+        }
+      }
+    }
+  },
+  "proposedRegistrySha256": "4ca8388eaec5fa94ca573be4a46ff85435802c4a57234b0a050ed42344c1a4a4",
+  "runtimeSourceSha256": "5b2685ac4197796cb069b2533b186eeb04f7212a24c632d43ea188f7a4eb340f",
+  "shippedSourceSha256": {
+    "jev_local.py": "5b2685ac4197796cb069b2533b186eeb04f7212a24c632d43ea188f7a4eb340f",
+    "install.sh": "e7973b859d60748adc90f3cad722daaf0009dc50baba3239d787f360c0f88987",
+    "requirements-inference.txt": "0f00ad757ae46778735735925e6dc761bbe945e5d969c43b375f03d1148f6ca5",
+    "CREDITS.md": "909cc6e8fbacecc69aaa1aab18e4249d7dcacf2f7231d8b6067b8e082c29dcf5",
+    "../../local-models-and-games/apple/mlx_model.py": "013da9df8684f30cf5bc00d5608419ccee624d1f044f1b4155bba3ba8d289cc3",
+    "../training/checkpoints/laya-17.safetensors": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+    "examples/decision.json": "ebabff0b65b863e926914b2d723a031bfd479dbe0313507c3b51906eb7f469a2"
+  },
+  "installedSourcesMatched": true,
+  "networkBlockedDuringDecision": true,
+  "modelArgumentOmitted": true,
+  "firstUsefulResult": {
+    "schemaVersion": "1",
+    "requestId": "fruit-example",
+    "status": "ok",
+    "decisions": [
+      {
+        "questionId": "has-apples",
+        "distribution": [
+          {
+            "value": false,
+            "probability": 0.017991015687584877
+          },
+          {
+            "value": true,
+            "probability": 0.9820089340209961
+          }
+        ],
+        "selected": true
+      },
+      {
+        "questionId": "most-common",
+        "distribution": [
+          {
+            "value": "apple",
+            "probability": 0.8781045079231262
+          },
+          {
+            "value": "banana",
+            "probability": 0.12189552932977676
+          }
+        ],
+        "selected": "apple"
+      }
+    ],
+    "execution": {
+      "adapter": "jev-local-mlx",
+      "model": "jev/laya-typed-readout-v1-seed17",
+      "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+      "local": true
+    },
+    "timing": {
+      "loadMs": 526.2904170667753,
+      "inferenceMs": 385.55895804893225,
+      "totalMs": 934.8800830775872
+    },
+    "issues": []
+  },
+  "semanticTaskPassed": true,
+  "elapsedSeconds": 4.87425108300522,
+  "scope": "Fresh toolkit/model directories. Model bytes copied from the previously tested remote-download cache and rehashed. This authored first-action check does not select the model or establish general task quality.",
+  "passed": true
+}

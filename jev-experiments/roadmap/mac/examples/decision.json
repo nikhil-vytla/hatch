@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1",
+  "requestId": "fruit-example",
+  "state": "The bowl contains three apples and two bananas.",
+  "questions": [
+    {"id": "has-apples", "kind": "boolean", "prompt": "Does the bowl contain apples?"},
+    {"id": "most-common", "kind": "choice", "prompt": "Which fruit is more numerous?", "options": [{"id": "apple", "label": "Apples"}, {"id": "banana", "label": "Bananas"}]}
+  ]
+}

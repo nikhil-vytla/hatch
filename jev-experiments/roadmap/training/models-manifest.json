@@ -1,0 +1,116 @@
+{
+  "laya": {
+    "model": "convaiinnovations/laya",
+    "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+    "files": {
+      "model.safetensors": {
+        "sha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+        "bytes": 842609210
+      },
+      "rl_agent_config.json": {
+        "sha256": "ae287b56bbcf5f8c4f4541ae9dfd00c914c4c48b940b8398c3058af37ba92bbd",
+        "bytes": 745
+      },
+      "encoder/config.json": {
+        "sha256": "bf3ab80598fdccf414855a2ce80f22859e4492d06ca8a62ddd1cfb63972f8979",
+        "bytes": 2083
+      },
+      "tokenizer/tokenizer_config.json": {
+        "sha256": "50044de60daaa73df97d262e15a40d4faf0160e7d742df64b377877a1320dd12",
+        "bytes": 308
+      },
+      "tokenizer/tokenizer.json": {
+        "sha256": "6c8aaa9a542084f2457eab775d4eeb51f92a70c0fd9de28d5edb0ddec3c08d30",
+        "bytes": 3583228
+      }
+    }
+  },
+  "smol": {
+    "model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+    "revision": "a10cc1512eabd3dde888204e902eca88bddb4951",
+    "files": {
+      "model.safetensors": {
+        "sha256": "e6bffe7435d7ddc10fd3b9a9efd429dafbacb1cb17015fb5562664e7532bf86e",
+        "bytes": 723674912
+      },
+      "tokenizer_config.json": {
+        "sha256": "4ec77d44f62efeb38d7e044a1db318f6a939438425312dfa333b8382dbad98df",
+        "bytes": 3764
+      },
+      "special_tokens_map.json": {
+        "sha256": "2b7379f3ae813529281a5c602bc5a11c1d4e0a99107aaa597fe936c1e813ca52",
+        "bytes": 655
+      },
+      "config.json": {
+        "sha256": "224f72354f10d617a359cc82ad15a3c96e866b9b2ffadb81997eeea9e88e22ee",
+        "bytes": 846
+      },
+      "tokenizer.json": {
+        "sha256": "9ca9acddb6525a194ec8ac7a87f24fbba7232a9a15ffa1af0c1224fcd888e47c",
+        "bytes": 2104556
+      },
+      "train_results.json": {
+        "sha256": "fceae2634b0a268a8adbda73fd0b2192922b496054011f588d2c6e888db1cea1",
+        "bytes": 232
+      },
+      "generation_config.json": {
+        "sha256": "87b916edaaab66b3899b9d0dd0752727dff6666686da0504d89ae0a6e055a013",
+        "bytes": 132
+      },
+      "eval_results.json": {
+        "sha256": "db9bcb5c4f2a3be0d7e88f86af26f375c22c240954af86942d1554d87a488ce8",
+        "bytes": 589
+      },
+      "vocab.json": {
+        "sha256": "82b84012e3add4d01d12ba14442026e49b8cbbaead1f79ecf3d919784f82dc79",
+        "bytes": 800662
+      },
+      "all_results.json": {
+        "sha256": "71face5e244d784819f937a25206865c295c8889fe4359eec28bbec85d02da0d",
+        "bytes": 786
+      },
+      "trainer_state.json": {
+        "sha256": "2263f580ae0d7890acc11253b83138b3fc1250dc6728688a3387ce813b92eed1",
+        "bytes": 57621
+      }
+    }
+  },
+  "qwen": {
+    "model": "mlx-community/Qwen3-0.6B-4bit",
+    "revision": "73e3e38d981303bc594367cd910ea6eb48349da8",
+    "files": {
+      "model.safetensors": {
+        "sha256": "392e8d466d56100ada00eb82031fb854297fc9e389b7d303eba3af114e87bce2",
+        "bytes": 335450584
+      },
+      "added_tokens.json": {
+        "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680",
+        "bytes": 707
+      },
+      "tokenizer_config.json": {
+        "sha256": "253153d0738ceb4c668d2eff957714dd2bea0b56de772a9fdccd96cbf517e6a0",
+        "bytes": 9706
+      },
+      "special_tokens_map.json": {
+        "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+        "bytes": 613
+      },
+      "config.json": {
+        "sha256": "15d3ac26c043ae477273ed5802ee0f0b33bb14f18c9d3dd70910c02d906e3f1f",
+        "bytes": 937
+      },
+      "tokenizer.json": {
+        "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "bytes": 11422654
+      },
+      "vocab.json": {
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+        "bytes": 2776833
+      },
+      "model.safetensors.index.json": {
+        "sha256": "7b294141456f6904936db03c00bca50fb5f6198f652fe8483f9cd2a1018accfb",
+        "bytes": 49731
+      }
+    }
+  }
+}
