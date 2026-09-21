@@ -1,0 +1,734 @@
+{
+  "status": "completed_smoke_evaluation",
+  "fixtureSha256": "0e2de8e7bcf673f1f0ad0711f09d2be86cded09fef3bd98316e7478f3fbcaba6",
+  "model": "jev/laya-typed-readout-v1-seed17",
+  "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+  "cases": 12,
+  "accuracy": 0.5833333333333334,
+  "coverage": 1.0,
+  "networkBlockedDuringInference": true,
+  "filesUnchanged": true,
+  "limits": "Twelve authored synthetic messages, not a representative benchmark. Email uncertainty is uncalibrated. No product-quality claim or default-model selection follows.",
+  "rows": [
+    {
+      "id": "review",
+      "expected": "action_required",
+      "selected": "action_required",
+      "correct": true,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-9890596b3523ef62",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.615806519985199
+              },
+              {
+                "value": "transactional",
+                "probability": 0.09679208695888519
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.11110728234052658
+              },
+              {
+                "value": "personal",
+                "probability": 0.09352345019578934
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.08277071267366409
+              }
+            ],
+            "selected": "action_required"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 20.206790999509394,
+          "totalMs": 39.13958300836384
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "9890596b3523ef62eb90b484a1480d7717c6f934ffd086bfae29c3fddbf1435f",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.615806519985199,
+          "normalizedEntropy": 0.7434659465950407,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "approval",
+      "expected": "action_required",
+      "selected": "action_required",
+      "correct": true,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-3479a20cdbb96716",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.4500705599784851
+              },
+              {
+                "value": "transactional",
+                "probability": 0.14070145785808563
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.1025693416595459
+              },
+              {
+                "value": "personal",
+                "probability": 0.20723848044872284
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.09942016750574112
+              }
+            ],
+            "selected": "action_required"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.168583035934716,
+          "totalMs": 19.42775002680719
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "3479a20cdbb96716773a42fc20054775f4ac03ba33a8ded534eeb2ad8355ace3",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.4500705599784851,
+          "normalizedEntropy": 0.8850851738070981,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "availability",
+      "expected": "action_required",
+      "selected": "personal",
+      "correct": false,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-d0aff148679bcc19",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.23238563537597656
+              },
+              {
+                "value": "transactional",
+                "probability": 0.03929799050092697
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.075367771089077
+              },
+              {
+                "value": "personal",
+                "probability": 0.5403349995613098
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.11261361837387085
+              }
+            ],
+            "selected": "personal"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.010792020708323,
+          "totalMs": 19.28841701010242
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "d0aff148679bcc193887e18ca17a9e335a09968833ade6696ef04ac28fb87f12",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.5403349995613098,
+          "normalizedEntropy": 0.7702784858518102,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "receipt",
+      "expected": "transactional",
+      "selected": "transactional",
+      "correct": true,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-5fdf6204f4be740f",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.058785658329725266
+              },
+              {
+                "value": "transactional",
+                "probability": 0.8087805509567261
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.04904652014374733
+              },
+              {
+                "value": "personal",
+                "probability": 0.03521972522139549
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.048167549073696136
+              }
+            ],
+            "selected": "transactional"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.454959023278207,
+          "totalMs": 19.748874998185784
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "5fdf6204f4be740f62742bce358402505908887846ef45e4c2b4f0683ec72ffa",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.8087805509567261,
+          "normalizedEntropy": 0.46603620049364275,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "shipment",
+      "expected": "transactional",
+      "selected": "newsletter",
+      "correct": false,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-52faf75dc05d5151",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.09533685445785522
+              },
+              {
+                "value": "transactional",
+                "probability": 0.18215706944465637
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.3113745450973511
+              },
+              {
+                "value": "personal",
+                "probability": 0.1727362424135208
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.23839528858661652
+              }
+            ],
+            "selected": "newsletter"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.111125031486154,
+          "totalMs": 19.3714170018211
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "52faf75dc05d5151468eaad6a14a2ce9db555d2d633bd924e15799c2f3cb4549",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.3113745450973511,
+          "normalizedEntropy": 0.9585369914727906,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "reset",
+      "expected": "transactional",
+      "selected": "newsletter",
+      "correct": false,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-1c7406758e52dc59",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.08417967706918716
+              },
+              {
+                "value": "transactional",
+                "probability": 0.2799610197544098
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.39488014578819275
+              },
+              {
+                "value": "personal",
+                "probability": 0.1664714515209198
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.07450761646032333
+              }
+            ],
+            "selected": "newsletter"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.16095899650827,
+          "totalMs": 19.440542033407837
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "1c7406758e52dc59840e422c17aa75be6c616179731015f4e257907703ed7473",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.39488014578819275,
+          "normalizedEntropy": 0.884542988139842,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "sale",
+      "expected": "newsletter",
+      "selected": "newsletter",
+      "correct": true,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-d146b8ff5eb130c5",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.029755476862192154
+              },
+              {
+                "value": "transactional",
+                "probability": 0.08113788068294525
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.8096002340316772
+              },
+              {
+                "value": "personal",
+                "probability": 0.0463763028383255
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.03313012048602104
+              }
+            ],
+            "selected": "newsletter"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.31241701822728,
+          "totalMs": 19.586832961067557
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "d146b8ff5eb130c5245dce588c0eba087101acc623facb96d123e583bc5c0e0f",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.8096002340316772,
+          "normalizedEntropy": 0.4564782337327983,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "digest",
+      "expected": "newsletter",
+      "selected": "newsletter",
+      "correct": true,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-b6f6257584c3e318",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.010567494668066502
+              },
+              {
+                "value": "transactional",
+                "probability": 0.01647774502635002
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.9368837475776672
+              },
+              {
+                "value": "personal",
+                "probability": 0.01607339084148407
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.019997529685497284
+              }
+            ],
+            "selected": "newsletter"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.13287496427074,
+          "totalMs": 19.422292010858655
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "b6f6257584c3e31832f26d9d6533be6f4ef556018e5c72e642522f20fa1600d1",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.9368837475776672,
+          "normalizedEntropy": 0.19972328079691257,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "launch",
+      "expected": "newsletter",
+      "selected": "newsletter",
+      "correct": true,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-1946f6912b980059",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.019016452133655548
+              },
+              {
+                "value": "transactional",
+                "probability": 0.021078621968626976
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.8798433542251587
+              },
+              {
+                "value": "personal",
+                "probability": 0.04239519312977791
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.03766631707549095
+              }
+            ],
+            "selected": "newsletter"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 19.425707985647023,
+          "totalMs": 19.73854104289785
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "1946f6912b9800594e95b3204a3aa3094d40f552b86a5ea6bad2c5fe00f594f5",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.8798433542251587,
+          "normalizedEntropy": 0.3273449500585308,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "thanks",
+      "expected": "personal",
+      "selected": "personal",
+      "correct": true,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-9a34e498158b1b72",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.06529198586940765
+              },
+              {
+                "value": "transactional",
+                "probability": 0.03434564918279648
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.13934288918972015
+              },
+              {
+                "value": "personal",
+                "probability": 0.6500096321105957
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.11100976169109344
+              }
+            ],
+            "selected": "personal"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 18.80979200359434,
+          "totalMs": 19.09633300965652
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "9a34e498158b1b7213cbae046b19be4a256e12cbbb47faa15658fc0d3b11927e",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.6500096321105957,
+          "normalizedEntropy": 0.678870976452763,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "holiday",
+      "expected": "personal",
+      "selected": "newsletter",
+      "correct": false,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-b06c5b7ef8f3aae5",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.03502903878688812
+              },
+              {
+                "value": "transactional",
+                "probability": 0.03171733021736145
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.5353268980979919
+              },
+              {
+                "value": "personal",
+                "probability": 0.34398671984672546
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.053940027952194214
+              }
+            ],
+            "selected": "newsletter"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 18.774166994262487,
+          "totalMs": 19.061041995882988
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "b06c5b7ef8f3aae55cacb710c4222fa5b22937d24cfe41e4fd03f56ae6aa5cff",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.5353268980979919,
+          "normalizedEntropy": 0.674741286159989,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    },
+    {
+      "id": "ambiguous",
+      "expected": "uncertain",
+      "selected": "newsletter",
+      "correct": false,
+      "result": {
+        "schemaVersion": "1",
+        "requestId": "eml-65df45340e3cb33a",
+        "status": "ok",
+        "decisions": [
+          {
+            "questionId": "category",
+            "distribution": [
+              {
+                "value": "action_required",
+                "probability": 0.11265696585178375
+              },
+              {
+                "value": "transactional",
+                "probability": 0.24065206944942474
+              },
+              {
+                "value": "newsletter",
+                "probability": 0.4046854078769684
+              },
+              {
+                "value": "personal",
+                "probability": 0.1247386485338211
+              },
+              {
+                "value": "uncertain",
+                "probability": 0.11726690828800201
+              }
+            ],
+            "selected": "newsletter"
+          }
+        ],
+        "execution": {
+          "adapter": "jev-local-mlx",
+          "model": "jev/laya-typed-readout-v1-seed17",
+          "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+          "local": true
+        },
+        "timing": {
+          "loadMs": 386.25525002134964,
+          "inferenceMs": 18.512625014409423,
+          "totalMs": 18.762291001621634
+        },
+        "issues": [],
+        "artifact": {
+          "sha256": "65df45340e3cb33a10554da66d48690500b8fc981d095bb1f6f88bc99dff441f",
+          "modified": false
+        },
+        "uncertainty": {
+          "maximumProbability": 0.4046854078769684,
+          "normalizedEntropy": 0.9107805052796831,
+          "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+        }
+      }
+    }
+  ]
+}

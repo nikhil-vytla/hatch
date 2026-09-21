@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1",
+  "recordedAtUtc": "2026-09-21T06:32:43.499599+00:00",
+  "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+  "candidates": [
+    {
+      "model": "laya",
+      "seed": 17,
+      "eligible": true,
+      "reasons": [],
+      "validationMacroNll": 0.8842626375504512,
+      "allWarmMedianMs": 76.48989546578377
+    },
+    {
+      "model": "smol",
+      "seed": 17,
+      "eligible": true,
+      "reasons": [],
+      "validationMacroNll": 1.5149985498772731,
+      "allWarmMedianMs": 59.96954199508764
+    },
+    {
+      "model": "qwen",
+      "seed": 17,
+      "eligible": true,
+      "reasons": [],
+      "validationMacroNll": 1.097177361415482,
+      "allWarmMedianMs": 107.20058350125328
+    }
+  ],
+  "selectedCandidate": "laya",
+  "selectedSeed": 17,
+  "evidenceSha256": {
+    "results-laya.json": "14743eaa9c68c001d01ee4911421aa99e5b0d961aad45a9428a49dc86228eedd",
+    "export-laya-17.json": "72cf6c3508127b54449dbce5195d8bd4c1e737b7a130ab0de5d8ae7d91c0a116",
+    "results-smol.json": "b90bec090102108397ab9ed17c4f62ec080ea0ccf41129bd5341d88e47da2124",
+    "export-smol-17.json": "3afae95a2aa42544fa175f71f2974ede7f8e5f4bb33f0787046e53c94202d940",
+    "results-qwen.json": "78893b3a7c3f6bbb0b205cb062f8565234a29d8364f0ec96b309cc9d4b691d07",
+    "export-qwen-17.json": "75b65c899b43ff402b0b90fe0ec38721f7af6ad3a0bf3b7432d135b498ce1afd"
+  },
+  "selectionUses": "Predefined seed17 validation macro NLL; ALL warm median latency within 0.01 NLL of the best eligible model. Both compute conditions must pass validation-only parity.",
+  "forbiddenSelectionInputs": [
+    "test metrics",
+    "transfer metrics",
+    "global export passed flag",
+    "best repeated seed"
+  ],
+  "installedDefault": "laya-readout-experimental",
+  "packagePromotion": "Separate verified package promotion is required; this command does not change the model registry.",
+  "promotedAtUtc": "2026-09-21T06:33:04.735577+00:00",
+  "packageVerificationSha256": "d0ea0d1fdaac474da6a61c19c9c1403702568dd5259a21ebbedd70b547d9bda0",
+  "promotedRegistrySha256": "4ca8388eaec5fa94ca573be4a46ff85435802c4a57234b0a050ed42344c1a4a4"
+}

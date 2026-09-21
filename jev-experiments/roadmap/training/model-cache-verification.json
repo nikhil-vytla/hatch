@@ -1,0 +1,24 @@
+{
+  "mode": "verify-only",
+  "downloadAttempted": false,
+  "models": [
+    {
+      "model": "laya",
+      "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+      "filesVerified": 5,
+      "networkAllowed": false
+    },
+    {
+      "model": "smol",
+      "revision": "a10cc1512eabd3dde888204e902eca88bddb4951",
+      "filesVerified": 11,
+      "networkAllowed": false
+    },
+    {
+      "model": "qwen",
+      "revision": "73e3e38d981303bc594367cd910ea6eb48349da8",
+      "filesVerified": 8,
+      "networkAllowed": false
+    }
+  ]
+}

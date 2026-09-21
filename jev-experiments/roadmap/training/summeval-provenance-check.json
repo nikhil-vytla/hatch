@@ -1,0 +1,9 @@
+{
+  "source": "https://storage.googleapis.com/sfr-summarization-repo-research/model_annotations.aligned.jsonl",
+  "sha256": "f0d4166e0cdeb439b387c4449634b067b7e9f721b9ef4c2b722f6b7550d3d6ab",
+  "sourceRows": 1600,
+  "mirrorRowsCompared": 1600,
+  "summaryMatches": 1600,
+  "meanExpertFluencyMatches": 1600,
+  "failed": []
+}
