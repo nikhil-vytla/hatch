@@ -6,11 +6,11 @@ Existing application changes are delivered in `application.patch` under the repo
 
 <pr-train-toc>
 
-- Typed runtime: pending root links
-- Routing and client integration: pending root links
-- Local study and Mac toolkit: pending root links
-- Playable scenes and design research: pending root links
-- Application and release evidence: pending root links, current PR
+- [Typed runtime](https://github.com/nikhil-vytla/hatch/pull/58)
+- [Routing and client integration](https://github.com/nikhil-vytla/hatch/pull/59)
+- [Local study and Mac toolkit](https://github.com/nikhil-vytla/hatch/pull/60)
+- [Playable scenes and design research](https://github.com/nikhil-vytla/hatch/pull/61)
+- [Application and release evidence](https://github.com/nikhil-vytla/hatch/pull/62) (current PR)
 
 </pr-train-toc>
 
@@ -33,3 +33,5 @@ A scene that responds immediately, with nearby controls and inspectable decision
 - [x] Eight serialized active-scene samples cover materials, crowd, Tetris and music at desktop and 390 px sizes. Frame-interval p95 was 16.7–16.8 ms on this host, with no interval over 33 ms or browser Long Task in the ten-second samples. These are browser observations, not a guarantee of frame presentation on other hardware.
 - [x] Three Fable 5.1 Global review sessions have verified provider/model provenance, retained feedback and independent dispositions. The final review found two router edge cases and wording/provenance corrections; current regression results are retained.
 - [x] The existing canonical GitHub-main deployment is healthy. The new application patch has not been deployed; successful Vercel checks on these artifact-only PRs do not deploy the patch.
+
+- [x] Assembled branch `f2ee3347a60e` passed all eight clean-checkout commands. Its 45 prepared public files match the verified working build, all 61 evidence assets retain source bytes, and 98 runtime/router/scene tests pass. No prepared assets, model caches or sibling dependencies were copied into the canonical-root build.
