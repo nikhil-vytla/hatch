@@ -1,0 +1,119 @@
+{
+  "recordedAt": "2026-09-21T04:53:11.310Z",
+  "status": 200,
+  "sources": {
+    "live-route.ts": "7a1a5bd34fbdf5ece44dc1819f10c901fe76bcd66bb105a3154cf17d497f4f97",
+    "../routing/web-handler.ts": "1f4cc5ead4c3dbbc4c194b1e6466da8604a03c64210b731fa3142799fc69ea94",
+    "../routing/execute.ts": "2a4197e77ad7c80d57e939e9c53cac23bbd73a80d29627f2fb02e21eed91a8b6",
+    "../routing/http-executor.ts": "965e3093d81fc247b12aaeb3e25949c7c192946f18cd35236185a057b21cccde",
+    "../routing/artifacts.ts": "aa810065de5a06f79c968b72f1d0b3e735faee69f5c605ec8749ae287424d6e9"
+  },
+  "task": {
+    "id": "routing-demo",
+    "prompt": "Fix the bug. totalThrough(n) must sum every integer from 1 through n inclusive. Return a proposed unified diff for sum.ts.",
+    "context": "sum.ts:\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n",
+    "requiredCapabilities": [
+      "text",
+      "coding"
+    ],
+    "outputTokens": 2048
+  },
+  "result": {
+    "schemaVersion": "1",
+    "taskId": "routing-demo",
+    "status": "error",
+    "classification": {
+      "source": "heuristic",
+      "category": "bug-fix",
+      "difficulty": 0.5,
+      "confidence": 0.5,
+      "latencyMs": 0,
+      "costUsd": 0,
+      "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+    },
+    "selection": {
+      "status": "selected",
+      "routeId": "gpt-4.1-mini",
+      "candidates": [
+        {
+          "routeId": "gpt-4.1-mini",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.20617949123084214,
+          "estimatedCostUsd": 0.004244,
+          "maximumCostUsd": 0.004244,
+          "quality": {
+            "value": 0.65,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 1600,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        },
+        {
+          "routeId": "claude-haiku-4.5",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.07999999999999999,
+          "estimatedCostUsd": 0.012658,
+          "maximumCostUsd": 0.012658,
+          "quality": {
+            "value": 0.8,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 2400,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        }
+      ],
+      "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+      "inputTokenUpperBound": 2418,
+      "outputTokens": 2048
+    },
+    "attempts": [
+      {
+        "actualModel": "openai/gpt-4.1-mini",
+        "identityBasis": "provider-reported",
+        "usage": {
+          "inputTokens": 345,
+          "outputTokens": 134,
+          "cachedInputTokens": 0
+        },
+        "costUsd": null,
+        "status": "malformed",
+        "error": "Destination returned an invalid typed artifact.",
+        "rawOutput": "{\"kind\":\"patch\",\"text\":\"--- a/sum.ts\\n+++ b/sum.ts\\n@@ -1,5 +1,6 @@\\n-export function totalThrough(n: number): number {\\n-  let total = 0;\\n-  for (let i = 1; i < n; i++) total += i;\\n-  return total;\\n-}\\n+export function totalThrough(n: number): number {\\n+  let total = 0;\\n+  for (let i = 1; i <= n; i++) total += i;\\n+  return total;\\n+}\\n\"}",
+        "routeId": "gpt-4.1-mini",
+        "latencyMs": 2385.256125,
+        "trigger": "initial",
+        "reservedCostUsd": 0.004244
+      }
+    ],
+    "outcome": {
+      "actualRouteId": "gpt-4.1-mini",
+      "actualModel": "openai/gpt-4.1-mini",
+      "totalLatencyMs": 2385.768125,
+      "totalCostUsd": null,
+      "failure": "Destination returned an invalid typed artifact."
+    }
+  },
+  "independentCheck": {
+    "baselineExit": 1,
+    "baseline": "bun test v1.3.14 (0d9b296a)\n\nsum.test.ts:\n1 | import {test,expect} from 'bun:test'; import {totalThrough} from './sum'; test('inclusive totals',()=>{for(const n of [0,1,2,10,42])expect(totalThrough(n)).toBe(n*(n+1)/2)});\n                                                                                                                                                                ^\nerror: expect(received).toBe(expected)\n\nExpected: 1\nReceived: 0\n\n      at <anonymous> (/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-web-route-6EcjhG/sum.test.ts:1:157)\n(fail) inclusive totals [0.29ms]\n\n 0 pass\n 1 fail\n 2 expect() calls\nRan 1 test across 1 file. [11.00ms]\n",
+    "strictCheck": null,
+    "strictPatchApplied": false,
+    "patchApplied": false,
+    "testsExit": 1,
+    "tests": "bun test v1.3.14 (0d9b296a)\n\nsum.test.ts:\n1 | import {test,expect} from 'bun:test'; import {totalThrough} from './sum'; test('inclusive totals',()=>{for(const n of [0,1,2,10,42])expect(totalThrough(n)).toBe(n*(n+1)/2)});\n                                                                                                                                                                ^\nerror: expect(received).toBe(expected)\n\nExpected: 1\nReceived: 0\n\n      at <anonymous> (/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-web-route-6EcjhG/sum.test.ts:1:157)\n(fail) inclusive totals [0.21ms]\n\n 0 pass\n 1 fail\n 2 expect() calls\nRan 1 test across 1 file. [8.00ms]\n",
+    "repairApplied": false
+  },
+  "billingVerified": false
+}

@@ -1,0 +1,36 @@
+{
+  "checkout": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-vercel-root-59ijf0b8",
+  "conditions": "Only the canonical application root dependencies installed. No roadmap or adapter installs.",
+  "checks": [
+    {
+      "command": [
+        "sh",
+        "jev-experiments/roadmap/apply.sh"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "output": "Applied application changes and provider-free CI. Install Bun packages and run roadmap verification before release.\n"
+    },
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @tailwindcss/vite@4.3.3\n+ @types/node@26.6.2\n+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ @types/three@0.186.0\n+ @vitejs/plugin-react@5.2.0\n+ tailwindcss@4.3.3\n+ typescript@5.9.3\n+ vite@7.3.6\n+ @fal-ai/client@1.10.1\n+ @json-render/core@0.21.0\n+ @json-render/react@0.21.0\n+ @json-render/shadcn@0.21.0\n+ @msgpack/msgpack@3.1.3\n+ @tanstack/react-table@8.21.3\n+ @tonejs/midi@2.0.28\n+ @xyflow/react@12.11.6\n+ lucide-react@0.577.0\n+ motion@12.43.0\n+ react@19.2.4\n+ react-dom@19.2.4\n+ three@0.186.0\n+ tone@15.1.22\n+ zod@4.6.5\n\n216 packages installed [668.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 2,
+      "output": "{\"artworks\":204,\"queries\":6,\"availability\":{\"planned\":2448,\"completed\":2448,\"batches\":84,\"attempts\":136,\"failures\":1}}\n{\"icons\":1703,\"version\":\"0.577.0\",\"sha256\":\"15c8759d5563e4e624357a06b253fb16644bf031b1e779f88b74850e7839dc54\"}\nPrepared recorded evidence and companion.\n../roadmap/credits.tsx(4,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.\n../roadmap/materials/MaterialsSandbox.tsx(7,8): error TS2307: Cannot find module 'react' or its corresponding type declarations.\n../roadmap/materials/MaterialsSandbox.tsx(198,34): error TS7006: Parameter 'v' implicitly has an 'any' type.\n../roadmap/materials/MaterialsSandbox.tsx(230,18): error TS7006: Parameter 'all' implicitly has an 'any' type.\n../roadmap/materials/MaterialsSandbox.tsx(488,7): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.\n../roadmap/materials/MaterialsSandbox.tsx(741,30): error TS7006: Parameter 'c' implicitly has an 'any' type.\n../roadmap/materials/MaterialsSandbox.tsx(1034,28): error TS7006: Parameter 'b' implicitly has an 'any' type.\n../roadmap/materials/MaterialsSandbox.tsx(1047,25): error TS7006: Parameter 's' implicitly has an 'any' type.\n../roadmap/routing/ModelRoutingLab.tsx(1,54): error TS2307: Cannot find module 'react' or its corresponding type declarations.\n../roadmap/routing/ModelRoutingLab.tsx(115,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.\n../roadmap/training/TypedDecisionStudy.tsx(1,26): error TS2307: Cannot find module 'react' or its corresponding type declarations.\n../roadmap/training/TypedDecisionStudy.tsx(105,16): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'StudyModel'.\n../roadmap/training/TypedDecisionStudy.tsx(122,14): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ validation: { overall: { total: number; supported: number; coverage: number; unsupportedReasons: {}; nll: number; brier: number; accuracy: number; ece: number; ordinalMae: number; }; datasets: { banking77: { ...; }; boolq: { ...; }; stsb: { ...; }; }; kinds: { ...; }; macroNll: number; }; test: { ...; }; transfer:...'.\n../roadmap/training/TypedDecisionStudy.tsx(126,14): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ validation: { overall: { total: number; supported: number; coverage: number; unsupportedReasons: {}; nll: number; brier: number; accuracy: number; ece: number; ordinalMae: number; }; datasets: { banking77: { ...; }; boolq: { ...; }; stsb: { ...; }; }; kinds: { ...; }; macroNll: number; }; test: { ...; }; transfer:...'.\n../roadmap/training/TypedDecisionStudy.tsx(134,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.\n../roadmap/training/TypedDecisionStudy.tsx(311,24): error TS18046: 'm' is of type 'unknown'.\n../roadmap/training/TypedDecisionStudy.tsx(311,38): error TS18046: 'm' is of type 'unknown'.\n../roadmap/training/TypedDecisionStudy.tsx(313,30): error TS18046: 'm' is of type 'unknown'.\n../roadmap/training/TypedDecisionStudy.tsx(314,30): error TS18046: 'm' is of type 'unknown'.\n../roadmap/training/TypedDecisionStudy.tsx(315,30): error TS18046: 'm' is of type 'unknown'.\n../roadmap/training/TypedDecisionStudy.tsx(316,30): error TS18046: 'm' is of type 'unknown'.\n../roadmap/training/TypedDecisionStudy.tsx(317,30): error TS18046: 'm' is of type 'unknown'.\n$ bun scripts/prepare.ts && tsc --noEmit && vite build\n"
+    }
+  ],
+  "passed": false
+}

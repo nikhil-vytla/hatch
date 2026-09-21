@@ -1,0 +1,44 @@
+{
+  "modelInstallSymlink": {
+    "unrelatedFilePreserved": false,
+    "targetIsSymlink": true,
+    "error": null
+  },
+  "missingModelResponse": {
+    "exitCode": 2,
+    "response": {
+      "status": "error",
+      "issues": [
+        {
+          "code": "local_runtime_error",
+          "message": "Missing model file: model.safetensors; Missing model file: encoder/config.json; Missing model file: tokenizer/tokenizer.json"
+        }
+      ],
+      "localOnly": true
+    },
+    "missingContractFields": [
+      "decisions",
+      "execution",
+      "requestId",
+      "schemaVersion",
+      "timing"
+    ]
+  },
+  "ordinalIdentity": {
+    "requested": [
+      1e-11,
+      2e-11
+    ],
+    "values": [
+      0.0,
+      0.0
+    ],
+    "preserved": false
+  },
+  "staleFeatureCache": {
+    "oldFeatureBytesUnchanged": true,
+    "manifestCorpusAfter": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b",
+    "staleCacheRejected": false,
+    "error": null
+  }
+}

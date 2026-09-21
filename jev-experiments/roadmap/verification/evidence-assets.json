@@ -1,0 +1,555 @@
+{
+  "conditions": "Current production build; exact byte hashes of every explicit evidence URL import and complete decision-comparison file. This supplements actual browser download checks.",
+  "files": [
+    {
+      "source": "jev-experiments/roadmap/integration/FAILURE-PROTOCOL.md",
+      "bytes": 3165,
+      "sha256": "86749591957f0b90ef2ea7c2383708bbb1116c0385150f3b407951118af6253c",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/FAILURE-PROTOCOL-CbXgaDiO.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/README.md",
+      "bytes": 11834,
+      "sha256": "4b7375af47ecc1fccba80ead218e1120c6dbcfe1c8245f69795d3609d5af800d",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/README-Ce_1zTjc.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/claude/host.diff",
+      "bytes": 998,
+      "sha256": "cf46cdcd72fe1bcf8531b14046bc181dd3e7c185a77a36bff442cd9973b7c702",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/host-U1NaUH8f.diff"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/claude/mcp-audit.jsonl",
+      "bytes": 1452,
+      "sha256": "7c09b926c22d242c509d858c9c2f1567322a0f8fef70ff674e29e950e380795a",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/mcp-audit-BBqAchtl.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/claude/stdout.jsonl",
+      "bytes": 123243,
+      "sha256": "aa38d8461da8d3fc210ea7d9075ff8b41d25c373ea88d301b13e66c73ccbf15a",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/stdout-Dlg2Xwzs.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/claude/summary.json",
+      "bytes": 3362,
+      "sha256": "4bddb6db049d61cca4ade9b4d27cc61e9b2dfcd98b7abcd6f08c2feb37cfb7be",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/summary-hDskSf1t.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/claude/tests-after.txt",
+      "bytes": 232,
+      "sha256": "995260304c85d504156a5ca76780782ce2c8c24e90b897c0356e98a0d2134776",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/tests-after-fGjxi0gj.txt"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/codex/host.diff",
+      "bytes": 1189,
+      "sha256": "0430c5e3ed51c426b33fe06166bcc1a292c815c8adfac8cea2fcdfd07c80b603",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/host-DyWqMSrW.diff"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/codex/mcp-audit.jsonl",
+      "bytes": 1587,
+      "sha256": "86d69b3974f6976ce3c41746f25b004125f6f75d047cd78904c8c21b07b1d26f",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/mcp-audit-DTgVyc3G.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/codex/stdout.jsonl",
+      "bytes": 71579,
+      "sha256": "12b3261ae4e64ff9bd8026bcdc4d10e8ed273bd8a777ea5416620e284d095354",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/stdout-BEFqOLsU.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/codex/summary.json",
+      "bytes": 3999,
+      "sha256": "2c6f161e318a02e2502b3edff7f883dcf5bdaad9e6de3d4c8c52bb5b7844de3e",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/summary-Dz0k-0ns.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/codex/tests-after.txt",
+      "bytes": 339,
+      "sha256": "8a230f0e6aac9453d530e7c1bbc32676a17786c5ce2e0a583a8b4bf4f6d16302",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/tests-after-BUGvXFka.txt"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/index.json",
+      "bytes": 13267,
+      "sha256": "47276c546f78b69d62a14045db82fe1c9e9b188039118309ca210654f7c03ee4",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/index-C5VpKSV-.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/opencode/host.diff",
+      "bytes": 277,
+      "sha256": "c3ad4ff4eab1cb86fbe42c04345a59ae3c61c1c3d449efb852276a13fd19e4dd",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/host-B1NZmd_o.diff"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/opencode/mcp-audit.jsonl",
+      "bytes": 2542,
+      "sha256": "abf4759d6d57349e001774fbe3116268bb6d28024548c03348c56d0f4f2fced9",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/mcp-audit-D6uvBDr0.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/opencode/stdout.jsonl",
+      "bytes": 67528,
+      "sha256": "9375285e7cad5675612e8078fb6d682d35aa68c264dc84b7ae1e7ded520b40e9",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/stdout--5TQ4psR.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/opencode/summary.json",
+      "bytes": 4123,
+      "sha256": "65cf0d1538b54c2ba847047b8142a50e706e3215879263673d72f843a0a13dc1",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/summary-C-EmTh4-.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/evidence/opencode/tests-after.txt",
+      "bytes": 843,
+      "sha256": "dee2a51bcab3d306209506f889e22fb45c50d7dd160b6b5be7063f8482f9f823",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/tests-after-B5V7V2Iv.txt"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/examples/claude.mcp.json",
+      "bytes": 232,
+      "sha256": "7c8d57c83e212b6005db0ee0fc2caba258ecb30d344ab701c10eb70b3dddfd6f",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/claude.mcp-CsO7zdl8.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/examples/codex.toml",
+      "bytes": 492,
+      "sha256": "1978a614cd94a1823fe2a5176bb190c58d166a2cd7f610b58e4b57a541ff51d0",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/codex-CZaE_4gB.toml"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/examples/opencode.json",
+      "bytes": 315,
+      "sha256": "d474187a30a3cbdeaa81277944aaf49cd0019a942f1f39319a2da9f7757bee1d",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/opencode-Cy_Ze4sQ.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/examples/router.json",
+      "bytes": 860,
+      "sha256": "3b08c90ea762f5dd33611a5aec8fed9ad490065e8b4ce558dd8c6f5b0c450ca3",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/router-CWHQT1HS.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/integration/skills/jev-route-task/SKILL.md",
+      "bytes": 1719,
+      "sha256": "8582b0aaa60fc9f4ce2b6d3a1552f237bd34b498c986553a5f0fbc32e5c5181d",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/SKILL-3sPzyfUu.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/mac/README.md",
+      "bytes": 6255,
+      "sha256": "a8513aaa3623644fcd2ff228a7382abc39e7d2bbc08e319df048118a4bd0038f",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/README-CBZmO_Tg.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/mac/examples/decision.json",
+      "bytes": 405,
+      "sha256": "ebabff0b65b863e926914b2d723a031bfd479dbe0313507c3b51906eb7f469a2",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/decision-OC-QZH1i.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/mac/examples/meeting.eml",
+      "bytes": 282,
+      "sha256": "ac7b022a90ae82dadc3f0d3cfbaa97b2c276d7fa0964b55259adf5ddc280acb6",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/meeting-pCl35og9.eml"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/materials/PROTOCOL.md",
+      "bytes": 1289,
+      "sha256": "710eb01a3c54547fb0d1f85f5a04cdfc22142948f2e9d0ef56b847b25a10a0d2",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/PROTOCOL-B1DAOgPh.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/materials/labels.v1.json",
+      "bytes": 1920,
+      "sha256": "668acad097533b58d5227e6ef02fe778b86a52c39059616a130663e3fd6ac8d9",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/labels.v1-C3t32ENU.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/routing/PROTOCOL.md",
+      "bytes": 8299,
+      "sha256": "5a21d795a7fd1bdfbed691e7ade17ae634f04d526b924025e14d4abd48388542",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/PROTOCOL-M7tlKPGn.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/routing/README.md",
+      "bytes": 10921,
+      "sha256": "35a8489fad1a2f41cc3c94436cc04af8e56d15f728241bd7208221a0666ec2e9",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/README-FZfzvihc.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/routing/comparison/PROTOCOL.md",
+      "bytes": 4490,
+      "sha256": "6cdd6c722ae372086a9b464c1780bdcebe8e928f1f1bc559b4b48b9dd12bfd21",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/PROTOCOL-OAvEdSRl.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/routing/comparison/README.md",
+      "bytes": 5003,
+      "sha256": "3c2ddf6a439a511e14194936f04279b82a9deb35a7d063c5202aa7deeaa349dd",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/README-Bi9cMOKF.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/routing/comparison/report.json",
+      "bytes": 49444,
+      "sha256": "823fcc08c329576c142f52d9352dbb3b474cc77fdd224bf05112b2d0164f5b93",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/report-BlzAeuc1.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/tetris/PROTOCOL.md",
+      "bytes": 1459,
+      "sha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/PROTOCOL-BleJlNJe.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/tetris/games.jsonl",
+      "bytes": 1117210,
+      "sha256": "99e6861edc764a2c8fb7ef17d9dbe81d4eefe5a9dae1319a7fe52d99f3f37b6c",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/games-SJqP_myD.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/tetris/summary.json",
+      "bytes": 4779,
+      "sha256": "de4a110455ff7b4ac85677c3c6ae6833b69eab66ca84ece852a3fedd7fa826d8",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/summary-B5Ho4gaR.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/PROVENANCE.md",
+      "bytes": 1985,
+      "sha256": "a79fa457bc92d1aaaed59f6f882fac8e9af810fb0985d701b54cca30b5d43bd0",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/PROVENANCE-Bzp7ZOp1.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/REVIEW-DISPOSITION.md",
+      "bytes": 5463,
+      "sha256": "e6495afa53fb102fa8a48f5e7f3a050428a76386bf47847b16d7e4f84f902d0b",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/REVIEW-DISPOSITION-1YpK4tgu.md"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/corpus-manifest.json",
+      "bytes": 969858,
+      "sha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/corpus-manifest-DaS4v65C.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/default-selection.json",
+      "bytes": 2156,
+      "sha256": "08f771a3a6e333f759dde131fe01156a6eed73076d3bf9e30287c22494f65ae2",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/default-selection-B_6JBo85.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-decisions-laya-17-ALL.jsonl",
+      "bytes": 1198913,
+      "sha256": "2b8d4ef6a48e4ffd8d5fe136fe7e34432fc4bfa1f002fe6be9e527bc16aae1b7",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-decisions-laya-17-ALL-D5m0xG-Q.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-decisions-laya-17-CPU_ONLY.jsonl",
+      "bytes": 1199052,
+      "sha256": "e2269f40cdf328a985fd1e43bb8e6d8e399708e01ddfeecbeccf7b124d0a627a",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-decisions-laya-17-CPU_ONLY-ShE6Fxox.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-decisions-qwen-17-ALL.jsonl",
+      "bytes": 1197710,
+      "sha256": "eec4b226dd4d3329f136302841f4134efd9a1e8f644971a495e94e6d9bfce153",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-decisions-qwen-17-ALL-Djjii5zt.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-decisions-qwen-17-CPU_ONLY.jsonl",
+      "bytes": 1197893,
+      "sha256": "0fd357eed3184a04615821f47b6c349c7e584d916d376c9a691cd710d2fe7b93",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-decisions-qwen-17-CPU_ONLY-CIhup1lr.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-decisions-smol-17-ALL.jsonl",
+      "bytes": 1190541,
+      "sha256": "e5c6cab9a44765d48ae422386dc5c2a6e9093a06c3bb2ece432097758c79a3b2",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-decisions-smol-17-ALL-CIWKTNs0.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-decisions-smol-17-CPU_ONLY.jsonl",
+      "bytes": 1191491,
+      "sha256": "516841d234e1eff0357dbd6f1f2666866d3c207a819cdb4a430b7f29d396d8c1",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-decisions-smol-17-CPU_ONLY-CH7riPVv.jsonl"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-laya-17.json",
+      "bytes": 34972,
+      "sha256": "72cf6c3508127b54449dbce5195d8bd4c1e737b7a130ab0de5d8ae7d91c0a116",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-laya-17-CuHjtsVd.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-qwen-17.json",
+      "bytes": 34681,
+      "sha256": "75b65c899b43ff402b0b90fe0ec38721f7af6ad3a0bf3b7432d135b498ce1afd",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-qwen-17-05Ek23NG.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/export-smol-17.json",
+      "bytes": 34571,
+      "sha256": "3afae95a2aa42544fa175f71f2974ede7f8e5f4bb33f0787046e53c94202d940",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/export-smol-17-DqOGiSr4.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/frozen-baselines-laya.json",
+      "bytes": 15337,
+      "sha256": "25623166a053ad799716f29ddc46bc666e40f2b90869ad76501d94a4dd49d767",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/frozen-baselines-laya-BKY77CFr.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/frozen-baselines-qwen.json",
+      "bytes": 15326,
+      "sha256": "e5ea5c2ffbf933df4a062c0f7bcddeb9f09b7671132d9ebf20f1980ed0d37b5a",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/frozen-baselines-qwen-Dl-LFuuP.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/frozen-baselines-smol.json",
+      "bytes": 15328,
+      "sha256": "e632be73a493dea25572537ae3bcbfcab28debb62d0f7cfdd6b643f1811dabf8",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/frozen-baselines-smol-1GCZIEtQ.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/metric-correction.json",
+      "bytes": 4344,
+      "sha256": "5a27b2ea12c7efb18eee13628301d0f04fbf855b1b7e85019a344c955e6fe5da",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/metric-correction-DTTAM04u.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/release-status.json",
+      "bytes": 1443,
+      "sha256": "ed9ed57c06e083a8903af286175866983c674af867ccca02bc4b08cb2e2bfdea",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/release-status-DmAXhsyN.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/results-laya.json",
+      "bytes": 28328,
+      "sha256": "14743eaa9c68c001d01ee4911421aa99e5b0d961aad45a9428a49dc86228eedd",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/results-laya-BYCpqXNj.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/results-qwen.json",
+      "bytes": 27970,
+      "sha256": "78893b3a7c3f6bbb0b205cb062f8565234a29d8364f0ec96b309cc9d4b691d07",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/results-qwen-Bi7-z_zD.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/results-smol.json",
+      "bytes": 28017,
+      "sha256": "b90bec090102108397ab9ed17c4f62ec080ea0ccf41129bd5341d88e47da2124",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/results-smol-Qd3WxOgS.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/robustness-laya.json",
+      "bytes": 8293,
+      "sha256": "5d005becb925f33324f65ee666329ade2631d265ef10291d080dbc9a9f9c328d",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/robustness-laya-DagR8_4D.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/robustness-qwen.json",
+      "bytes": 8945,
+      "sha256": "6fccdab612e2a2e035bf27ea190512ceafb468cee6d7b8e92f25a7e54681c9c1",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/robustness-qwen-DPeG7H9I.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/robustness-smol.json",
+      "bytes": 8969,
+      "sha256": "c87850c1d9151cb78d4d6027ebaec2b36137425b7933d2ca8319a031119a3989",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/robustness-smol-BzTbjw2s.json"
+      ],
+      "preserved": true
+    },
+    {
+      "source": "jev-experiments/roadmap/training/sources.json",
+      "bytes": 4890,
+      "sha256": "998e1ee369ced03ff0a9746c1e58bf1c223c2ac0d79abcb7c98142520baec73a",
+      "builtAssets": [
+        "jev-experiments/experience-prototypes/dist/assets/sources-D7ewyCtf.json"
+      ],
+      "preserved": true
+    }
+  ],
+  "passed": true
+}

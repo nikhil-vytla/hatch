@@ -1,0 +1,155 @@
+{
+  "recordedAtUtc": "2026-09-21T06:38:32.321071+00:00",
+  "conditions": "Production preview in Chromium. Emulated viewports, reduced motion and explicit theme. Captures and overflow/footer assertions; physical-phone testing is not claimed.",
+  "scriptSha256": "2335058da7bf6f960179e0c27559ec522098f37f79ca65c83b79947b0f878c2a",
+  "cases": [
+    {
+      "name": "home-desktop-final",
+      "route": "/",
+      "theme": "light",
+      "title": "Jev / A living laboratory",
+      "heading": "Make a little world.See what changes.",
+      "footer": "jev\nfield notes / 002\n\nOriginal experiments. Real decisions. Plenty left to discover.\n\nNot affiliated with or endorsed by TypeSafe AI\n\nBuilders and sources\nTypeSafe \u2197",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "reducedMotion": true,
+      "canvasBounds": [
+        {
+          "top": 440.5,
+          "bottom": 816.171875,
+          "width": 563.515625,
+          "height": 375.671875
+        },
+        {
+          "top": 1739.4609375,
+          "bottom": 1947.4609375,
+          "width": 420.71875,
+          "height": 208
+        }
+      ],
+      "screenshot": "screenshots/home-desktop-final.png",
+      "bytes": 113312,
+      "sha256": "e9d9b69608c04854aa46e83f3bde3aa8fa452f47ca8a02fe059e7a634d9a3d59",
+      "passed": true
+    },
+    {
+      "name": "home-mobile-final",
+      "route": "/",
+      "theme": "light",
+      "title": "Jev / A living laboratory",
+      "heading": "Make a little world.See what changes.",
+      "footer": "jev\nfield notes / 002\n\nOriginal experiments. Real decisions. Plenty left to discover.\n\nNot affiliated with or endorsed by TypeSafe AI\n\nBuilders and sources\nTypeSafe \u2197",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "reducedMotion": true,
+      "canvasBounds": [
+        {
+          "top": 587.890625,
+          "bottom": 802.5546875,
+          "width": 322,
+          "height": 214.6640625
+        },
+        {
+          "top": 1804.5390625,
+          "bottom": 1954.5390625,
+          "width": 164.5,
+          "height": 150
+        }
+      ],
+      "screenshot": "screenshots/home-mobile-final.png",
+      "bytes": 61652,
+      "sha256": "630730a3d17a5b36993faea9cd81ac98873e0404b37cd6591914e536d297dcfb",
+      "passed": true
+    },
+    {
+      "name": "materials-dark-final",
+      "route": "/materials",
+      "theme": "dark",
+      "title": "Jev / A living laboratory",
+      "heading": "Material sandbox",
+      "footer": "jev\nfield notes / 002\n\nOriginal experiments. Real decisions. Plenty left to discover.\n\nNot affiliated with or endorsed by TypeSafe AI\n\nBuilders and sources\nTypeSafe \u2197",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "reducedMotion": true,
+      "canvasBounds": [
+        {
+          "top": 646.3828125,
+          "bottom": 1314.4921875,
+          "width": 1002.171875,
+          "height": 668.109375
+        }
+      ],
+      "screenshot": "screenshots/materials-dark-final.png",
+      "bytes": 109463,
+      "sha256": "ad576e113776a536b47a5a0275cf9c8926c94d0e35aeb3a637a6f6610b6584e8",
+      "passed": true
+    },
+    {
+      "name": "routing-mobile-final",
+      "route": "/routing",
+      "theme": "dark",
+      "title": "Jev / A living laboratory",
+      "heading": "Model Routing Lab",
+      "footer": "jev\nfield notes / 002\n\nOriginal experiments. Real decisions. Plenty left to discover.\n\nNot affiliated with or endorsed by TypeSafe AI\n\nBuilders and sources\nTypeSafe \u2197",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "reducedMotion": true,
+      "canvasBounds": [],
+      "screenshot": "screenshots/routing-mobile-final.png",
+      "bytes": 63479,
+      "sha256": "e4c4c029031976e7a3f56aec41360866ed436faf59668efb444fbb03c135519f",
+      "passed": true
+    },
+    {
+      "name": "study-desktop-final",
+      "route": "/#experiment/local-models",
+      "theme": "light",
+      "title": "Jev / A living laboratory",
+      "heading": "Decision models on a Mac",
+      "footer": "jev\nfield notes / 002\n\nOriginal experiments. Real decisions. Plenty left to discover.\n\nNot affiliated with or endorsed by TypeSafe AI\n\nBuilders and sources\nTypeSafe \u2197",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "reducedMotion": true,
+      "canvasBounds": [],
+      "screenshot": "screenshots/study-desktop-final.png",
+      "bytes": 151810,
+      "sha256": "ebfe23616cea8a798fc1a59fa16645818848b7a62b6aa909a164d36c42353771",
+      "passed": true
+    },
+    {
+      "name": "study-mobile-final",
+      "route": "/#experiment/local-models",
+      "theme": "dark",
+      "title": "Jev / A living laboratory",
+      "heading": "Decision models on a Mac",
+      "footer": "jev\nfield notes / 002\n\nOriginal experiments. Real decisions. Plenty left to discover.\n\nNot affiliated with or endorsed by TypeSafe AI\n\nBuilders and sources\nTypeSafe \u2197",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "reducedMotion": true,
+      "canvasBounds": [],
+      "screenshot": "screenshots/study-mobile-final.png",
+      "bytes": 62859,
+      "sha256": "2539a4fd307e1ac9cc250abf1b225bfafc8ce49f00e721c98f3d9d4910ea58af",
+      "passed": true
+    }
+  ],
+  "passed": true
+}

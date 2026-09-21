@@ -1,0 +1,371 @@
+{
+  "recordedAt": "2026-09-21T07:09:27.103499+00:00",
+  "baseCommit": "246bb5f823f8e0732f2f74e868d01c5cebd0d730",
+  "patchSha256": "58663d91310786d13c375119324d3ab74bf0eaccc9ba98b548f08780ce55ce74",
+  "preparedAssetsCopied": false,
+  "applicationBuiltBeforeSiblingInstalls": true,
+  "localCheckout": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-release-clean-wet1udix",
+  "checks": [
+    {
+      "command": [
+        "sh",
+        "jev-experiments/roadmap/apply.sh"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.10936236381530762,
+      "output": "Applied application changes and provider-free CI. Install Bun packages and run roadmap verification before release.\n"
+    },
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "elapsedSeconds": 0.8683619499206543,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @tailwindcss/vite@4.3.3\n+ @types/node@26.6.2\n+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ @types/three@0.186.0\n+ @vitejs/plugin-react@5.2.0\n+ tailwindcss@4.3.3\n+ typescript@5.9.3\n+ vite@7.3.6\n+ @fal-ai/client@1.10.1\n+ @json-render/core@0.21.0\n+ @json-render/react@0.21.0\n+ @json-render/shadcn@0.21.0\n+ @msgpack/msgpack@3.1.3\n+ @tanstack/react-table@8.21.3\n+ @tonejs/midi@2.0.28\n+ @xyflow/react@12.11.6\n+ lucide-react@0.577.0\n+ motion@12.43.0\n+ react@19.2.4\n+ react-dom@19.2.4\n+ three@0.186.0\n+ tone@15.1.22\n+ zod@4.6.5\n\n216 packages installed [603.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "elapsedSeconds": 8.966552972793579,
+      "output": "{\"artworks\":204,\"queries\":6,\"availability\":{\"planned\":2448,\"completed\":2448,\"batches\":84,\"attempts\":136,\"failures\":1}}\n{\"icons\":1703,\"version\":\"0.577.0\",\"sha256\":\"15c8759d5563e4e624357a06b253fb16644bf031b1e779f88b74850e7839dc54\"}\nPrepared recorded evidence and companion.\nvite v7.3.6 building client environment for production...\ntransforming...\n\u2713 3559 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/assets/claude.mcp-CsO7zdl8.json                              0.23 kB \u2502 gzip:   0.18 kB\ndist/assets/tests-after-fGjxi0gj.txt                              0.23 kB \u2502 gzip:   0.18 kB\ndist/assets/host-B1NZmd_o.diff                                    0.28 kB\ndist/assets/meeting-pCl35og9.eml                                  0.28 kB\ndist/assets/opencode-Cy_Ze4sQ.json                                0.32 kB \u2502 gzip:   0.24 kB\ndist/assets/tests-after-BUGvXFka.txt                              0.34 kB \u2502 gzip:   0.23 kB\ndist/assets/decision-OC-QZH1i.json                                0.41 kB \u2502 gzip:   0.24 kB\ndist/assets/codex-CZaE_4gB.toml                                   0.49 kB\ndist/assets/tests-after-B5V7V2Iv.txt                              0.84 kB \u2502 gzip:   0.34 kB\ndist/assets/router-CWHQT1HS.json                                  0.86 kB \u2502 gzip:   0.44 kB\ndist/index.html                                                   0.96 kB \u2502 gzip:   0.53 kB\ndist/assets/host-U1NaUH8f.diff                                    1.00 kB\ndist/assets/host-DyWqMSrW.diff                                    1.19 kB\ndist/assets/PROTOCOL-B1DAOgPh.md                                  1.29 kB\ndist/assets/release-status-DmAXhsyN.json                          1.44 kB \u2502 gzip:   0.50 kB\ndist/assets/mcp-audit-BBqAchtl.jsonl                              1.45 kB\ndist/assets/PROTOCOL-BleJlNJe.md                                  1.46 kB\ndist/assets/mcp-audit-DTgVyc3G.jsonl                              1.59 kB\ndist/assets/SKILL-3sPzyfUu.md                                     1.72 kB\ndist/assets/labels.v1-C3t32ENU.json                               1.92 kB \u2502 gzip:   0.64 kB\ndist/assets/PROVENANCE-Bzp7ZOp1.md                                1.99 kB\ndist/assets/default-selection-B_6JBo85.json                       2.16 kB \u2502 gzip:   1.06 kB\ndist/assets/mcp-audit-D6uvBDr0.jsonl                              2.54 kB\ndist/assets/FAILURE-PROTOCOL-CbXgaDiO.md                          3.17 kB\ndist/assets/summary-hDskSf1t.json                                 3.36 kB \u2502 gzip:   1.08 kB\ndist/assets/summary-Dz0k-0ns.json                                 4.00 kB \u2502 gzip:   1.19 kB\ndist/assets/summary-C-EmTh4-.json                                 4.12 kB \u2502 gzip:   1.07 kB\ndist/assets/metric-correction-DTTAM04u.json                       4.34 kB \u2502 gzip:   1.50 kB\ndist/assets/PROTOCOL-OAvEdSRl.md                                  4.49 kB\ndist/assets/summary-B5Ho4gaR.json                                 4.78 kB \u2502 gzip:   0.68 kB\ndist/assets/sources-D7ewyCtf.json                                 4.89 kB \u2502 gzip:   1.29 kB\ndist/assets/README-Bi9cMOKF.md                                    5.00 kB\ndist/assets/REVIEW-DISPOSITION-1YpK4tgu.md                        5.46 kB\ndist/assets/README-CBZmO_Tg.md                                    6.26 kB\ndist/assets/robustness-laya-DagR8_4D.json                         8.29 kB \u2502 gzip:   1.87 kB\ndist/assets/PROTOCOL-M7tlKPGn.md                                  8.30 kB\ndist/assets/robustness-qwen-DPeG7H9I.json                         8.95 kB \u2502 gzip:   2.28 kB\ndist/assets/robustness-smol-BzTbjw2s.json                         8.97 kB \u2502 gzip:   2.22 kB\ndist/assets/README-FZfzvihc.md                                   10.92 kB\ndist/assets/README-Ce_1zTjc.md                                   11.83 kB\ndist/assets/index-C5VpKSV-.json                                  13.27 kB \u2502 gzip:   1.65 kB\ndist/assets/frozen-baselines-qwen-Dl-LFuuP.json                  15.33 kB \u2502 gzip:   2.60 kB\ndist/assets/frozen-baselines-smol-1GCZIEtQ.json                  15.33 kB \u2502 gzip:   2.57 kB\ndist/assets/frozen-baselines-laya-BKY77CFr.json                  15.34 kB \u2502 gzip:   2.59 kB\ndist/assets/results-qwen-Bi7-z_zD.json                           27.97 kB \u2502 gzip:   3.59 kB\ndist/assets/results-smol-Qd3WxOgS.json                           28.02 kB \u2502 gzip:   3.58 kB\ndist/assets/results-laya-BYCpqXNj.json                           28.33 kB \u2502 gzip:   3.72 kB\ndist/assets/export-smol-17-DqOGiSr4.json                         34.57 kB \u2502 gzip:   6.18 kB\ndist/assets/export-qwen-17-05Ek23NG.json                         34.68 kB \u2502 gzip:   6.29 kB\ndist/assets/export-laya-17-CuHjtsVd.json                         34.97 kB \u2502 gzip:   6.36 kB\ndist/assets/report-BlzAeuc1.json                                 49.44 kB \u2502 gzip:   3.25 kB\ndist/assets/stdout--5TQ4psR.jsonl                                67.53 kB\ndist/assets/stdout-BEFqOLsU.jsonl                                71.58 kB\ndist/assets/stdout-Dlg2Xwzs.jsonl                               123.24 kB\ndist/assets/corpus-manifest-DaS4v65C.json                       969.86 kB \u2502 gzip: 290.21 kB\ndist/assets/games-SJqP_myD.jsonl                              1,117.21 kB\ndist/assets/export-decisions-smol-17-ALL-CIWKTNs0.jsonl       1,190.54 kB\ndist/assets/export-decisions-smol-17-CPU_ONLY-CH7riPVv.jsonl  1,191.49 kB\ndist/assets/export-decisions-qwen-17-ALL-Djjii5zt.jsonl       1,197.71 kB\ndist/assets/export-decisions-qwen-17-CPU_ONLY-CIhup1lr.jsonl  1,197.89 kB\ndist/assets/export-decisions-laya-17-ALL-D5m0xG-Q.jsonl       1,198.91 kB\ndist/assets/export-decisions-laya-17-CPU_ONLY-ShE6Fxox.jsonl  1,199.05 kB\ndist/assets/live-world-preview-DjoG64dx.css                       1.74 kB \u2502 gzip:   0.74 kB\ndist/assets/outcome-framing-Cfkl1Gty.css                          2.90 kB \u2502 gzip:   1.08 kB\ndist/assets/TypedDecisionStudy-B7gUbcG1.css                       4.32 kB \u2502 gzip:   1.24 kB\ndist/assets/icon-studio-Dh99QMg8.css                              5.66 kB \u2502 gzip:   1.57 kB\ndist/assets/live-tetris-Dtpjt4S_.css                              7.78 kB \u2502 gzip:   2.01 kB\ndist/assets/judgment-reliability-BthYXgu1.css                     8.62 kB \u2502 gzip:   2.12 kB\ndist/assets/wardrobe-DdPXRyKX.css                                12.23 kB \u2502 gzip:   3.06 kB\ndist/assets/ghost-brush-S9lKzTJW.css                             12.23 kB \u2502 gzip:   3.05 kB\ndist/assets/MaterialsSandbox-BuZbp0FU.css                        13.11 kB \u2502 gzip:   3.41 kB\ndist/assets/visual-search-DnyjRpGg.css                           14.92 kB \u2502 gzip:   3.41 kB\ndist/assets/live-crowd-D1bThj69.css                              15.05 kB \u2502 gzip:   3.59 kB\ndist/assets/music-arranger-CdxwB9MD.css                          16.79 kB \u2502 gzip:   3.90 kB\ndist/assets/cafe-jev-BIdKpWcI.css                                23.25 kB \u2502 gzip:   5.32 kB\ndist/assets/index-fn_jRMxj.css                                   87.21 kB \u2502 gzip:  17.28 kB\ndist/assets/chevron-right-Dlb49XLL.js                             0.13 kB \u2502 gzip:   0.14 kB\ndist/assets/use-reduced-motion-Dug8nojV.js                        0.14 kB \u2502 gzip:   0.14 kB\ndist/assets/arrow-down--HHEPd_v.js                                0.17 kB \u2502 gzip:   0.16 kB\ndist/assets/rotate-ccw-iZuQp0WJ.js                                0.20 kB \u2502 gzip:   0.19 kB\ndist/assets/rotate-cw-B9pFyTZ2.js                                 0.20 kB \u2502 gzip:   0.19 kB\ndist/assets/volume-2-htin7jTc.js                                  0.39 kB \u2502 gzip:   0.27 kB\ndist/assets/sliders-horizontal-BXPgCLby.js                        0.43 kB \u2502 gzip:   0.24 kB\ndist/assets/tetris-experience-CZvbBgX8.js                         1.44 kB \u2502 gzip:   0.71 kB\ndist/assets/live-world-preview-BZch3kKa.js                       10.35 kB \u2502 gzip:   3.90 kB\ndist/assets/icon-studio-BJpS-f_4.js                              14.60 kB \u2502 gzip:   5.98 kB\ndist/assets/render-tdVB2NW4.js                                   21.50 kB \u2502 gzip:   9.04 kB\ndist/assets/judgment-reliability-ZIqx_Kgw.js                     22.53 kB \u2502 gzip:   7.36 kB\ndist/assets/visual-search-CIoU6hRP.js                            23.78 kB \u2502 gzip:   9.07 kB\ndist/assets/MaterialsSandbox-D4LUfH4r.js                         26.08 kB \u2502 gzip:   9.67 kB\ndist/assets/ModelRoutingLab-CVGscltf.js                          26.98 kB \u2502 gzip:   8.88 kB\ndist/assets/outcome-framing-D3arrEOu.js                          29.58 kB \u2502 gzip:  10.94 kB\ndist/assets/Midi-D7G63JhL.js                                     32.74 kB \u2502 gzip:   9.94 kB\ndist/assets/live-tetris-Flzfc84M.js                              34.07 kB \u2502 gzip:  11.88 kB\ndist/assets/cafe-jev-BS_7TFnE.js                                 38.03 kB \u2502 gzip:  13.15 kB\ndist/assets/music-arranger-BQqVhpC_.js                           45.32 kB \u2502 gzip:  16.35 kB\ndist/assets/ghost-brush-gGx5Wc8a.js                              50.49 kB \u2502 gzip:  13.56 kB\ndist/assets/wardrobe-BnwqWoEA.js                                 62.59 kB \u2502 gzip:  21.44 kB\ndist/assets/live-crowd-BFFwmDqf.js                               90.06 kB \u2502 gzip:  16.28 kB\ndist/assets/TypedDecisionStudy-C0sOf5lZ.js                      159.17 kB \u2502 gzip:  38.58 kB\ndist/assets/index-B4_z7ZI7.js                                   340.35 kB \u2502 gzip:  81.17 kB\ndist/assets/arcade-BDEV7J1t.js                                  569.33 kB \u2502 gzip: 145.01 kB\ndist/assets/index-BNLHXT0a.js                                   858.22 kB \u2502 gzip: 273.22 kB\n\u2713 built in 2.70s\n$ bun scripts/prepare.ts && tsc --noEmit && vite build\nnode_modules/zod/v4/core/regexes.js (74:0): A comment\n\n\"/** Anchors a pattern source. The interpolation lives here rather than at the call site because\n * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it\n * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */\"\n\nin \"node_modules/zod/v4/core/regexes.js\" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.\nnode_modules/zod/v4/core/util.js (400:0): A comment\n\n\"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle.\"\n\nin \"node_modules/zod/v4/core/util.js\" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.\n"
+    },
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "elapsedSeconds": 0.01893901824951172,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ typescript@5.9.3\n+ react@19.2.4\n+ react-dom@19.2.4\n\n11 packages installed [13.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/adapters/typescript",
+      "exitCode": 0,
+      "elapsedSeconds": 0.022439002990722656,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ typescript@5.9.3\n+ zod@4.6.5\n\n6 packages installed [16.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "verification/publication.ts"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "elapsedSeconds": 0.45591020584106445,
+      "output": "{\"publicationCount\":45,\"roundTripPassed\":true,\"originalFieldsPreserved\":true,\"unlistedPublicFiles\":0}\n"
+    },
+    {
+      "command": [
+        "bun",
+        "verification/evidence-assets.ts"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "elapsedSeconds": 0.032514095306396484,
+      "output": "{\"files\":61,\"passed\":true,\"missing\":[]}\n"
+    },
+    {
+      "command": [
+        "bun",
+        "test",
+        "runtime",
+        "routing",
+        "materials",
+        "playable"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "elapsedSeconds": 0.8526129722595215,
+      "output": "bun test v1.3.14 (0d9b296a)\n\nplayable/crowd.test.ts:\n(pass) notice comparison copies one frozen world, preserving policy and physical conditions [2.01ms]\n(pass) a pre-comparison request cannot apply to either new lane [0.64ms]\n\nplayable/music.test.ts:\n(pass) continuity checks both adjacent phrase boundaries [1.63ms]\n(pass) blind order swaps independently and copied scores stay frozen [0.68ms]\n(pass) a preference requires both listens and cannot be overwritten after reveal [0.95ms]\n\nrouting/normalization.test.ts:\n(pass) normalization changes only the two count fields and retains the original malformed proposal [0.39ms]\n(pass) ambiguous or structurally invalid patches are never normalized [0.10ms]\n(pass) already valid patches have no repair claim [0.04ms]\n(pass) host strict application rejects original counts, accepts disclosed normalization, and independently tests source [114.94ms]\n(pass) syntax normalization cannot make a mismatched source patch applicable [19.90ms]\n(pass) SQL and Lua comment deletions strictly apply after count-only normalization [44.37ms]\n\nrouting/http-executor.test.ts:\n(pass) null and primitive HTTP bodies are malformed, never availability failures [0.47ms]\n(pass) shared HTTP path rejects negative usage and never calculates a negative charge [0.11ms]\n(pass) cached usage is capped by total input and web accounting stays explicitly unknown [0.08ms]\n(pass) shared transport prohibits redirect following and sends the same strict artifact schema [0.19ms]\n(pass) cancelled HTTP response cannot return a usable artifact [0.12ms]\n(pass) a different provider-reported model is rejected with observed usage and unknown charge [0.06ms]\n(pass) absent HTTP model metadata stays explicitly configured-unverified [0.04ms]\n\nrouting/mac-adapter.test.ts:\n(pass) explicit Mac bridge passes stdin and selected model without a cloud fallback [247.58ms]\n(pass) missing explicitly selected local executable returns an error, never a baseline [0.77ms]\n\nrouting/mcp.test.ts:\n(pass) MCP invalid request does not kill server; tools expose required operations [23.70ms]\n(pass) MCP unsupported task and question return explicit errors without a provider [23.00ms]\n(pass) an unwritable optional audit does not kill MCP discovery or ping [21.43ms]\n(pass) MCP cancellation reaches destination and suppresses late artifact [40.86ms]\n\nrouting/policy.test.ts:\n(pass) hard eligibility > never widens when no route meets permissions [0.40ms]\n(pass) hard eligibility > rejects local-only cloud destinations [0.04ms]\n(pass) hard eligibility > rejects excessive context without truncating [0.06ms]\n(pass) hard eligibility > requires configured known prices for hard caps [0.05ms]\n(pass) hard eligibility > does not spend cache savings against hard caps [0.04ms]\n(pass) hard eligibility > cache expiry changes estimate, never permissions [0.05ms]\n(pass) hard eligibility > weights cannot override spending limits [0.03ms]\n(pass) execution records > records actual destination and null for unknown charges [0.85ms]\n(pass) execution records > availability fallback stays eligible and explicit [0.14ms]\n(pass) execution records > unknown first charge reserves full maximum before retry [0.10ms]\n(pass) execution records > malformed response is not treated as availability failure [0.08ms]\n(pass) execution records > cancelled result discards late answer [0.09ms]\n(pass) execution records > quality escalation requires measured stronger route [0.25ms]\n(pass) prior declares identity and exact uniform distribution [0.15ms]\n(pass) email baseline rejects unsupported MIME and leaves input unchanged [0.20ms]\n(pass) invalid route limits cannot qualify through NaN comparisons [0.06ms]\n(pass) simulated quality cannot satisfy a hard minimum [0.03ms]\n(pass) local-only blocks a hosted classifier before sending input [0.07ms]\n(pass) an already cancelled task never calls its classifier [0.04ms]\n(pass) classification changes soft ranking under the same policy without changing eligibility [0.12ms]\n(pass) invalid SDK spending policy is rejected before a paid classifier can run [0.04ms]\n(pass) remaining reservation can tighten but never widen a configured spending cap [0.06ms]\n(pass) malformed registry entries stay ineligible without crashing valid candidate selection [0.07ms]\n(pass) contradictory OpenCode model configuration is ineligible before any executor call [0.04ms]\n(pass) direct OpenCode execution rejects a model conflict without resolving an executable [12.75ms]\n(pass) minimumQuality remains an aggregate measured floor despite a higher task-calibrated score [0.12ms]\n(pass) quality escalation requires improvement in both aggregate and calibrated measured quality [0.34ms]\n\nrouting/artifacts.test.ts:\n(pass) accepts a valid hunk while leaving application to caller [0.04ms]\n(pass) rejects valid JSON carrying mismatched patch line counts [0.05ms]\n(pass) rejects prose and incomplete diffs as patches [0.05ms]\n(pass) accepts a new-file diff with /dev/null old path [0.02ms]\n(pass) deleting a SQL comment is hunk content, not a new file header [0.02ms]\n(pass) multiple files require complete structural header pairs and correct hunk counts [0.09ms]\n\nrouting/hooks.test.ts:\n(pass) local-only never invokes an undeclared, remote or malformed-locality verifier [0.28ms]\n(pass) an explicitly local verifier runs and preserves unknown charge plus evidence [0.08ms]\n(pass) malformed verifier decisions cannot certify an answer, corrupt totals or cause either fallback [0.33ms]\n(pass) a thrown verifier records unknown charge and fails without escalation [0.21ms]\n(pass) valid rejection alone triggers quality escalation and includes all known verifier charges [0.10ms]\n(pass) cancellation during verification discards the proposal and leaves verifier charge unknown [0.08ms]\n(pass) invalid custom executor metadata cannot create negative budgets or a false usable result [0.19ms]\n(pass) classifier identity contradictions stop before destination execution [0.21ms]\n(pass) consistent declared classifier identity works, including host traits without repeated identity [0.12ms]\n(pass) hard budget skips unreserved verification and records an unverified proposal [0.07ms]\n(pass) a rejected first proposal is not returned when the stronger destination fails [0.10ms]\n(pass) finite reported charges cannot overflow the public total [0.06ms]\n(pass) reported hosted identity remains visible when it contradicts declared locality [0.06ms]\n(pass) a custom executor cannot substitute a different model or cause an identity fallback [0.07ms]\n\nmaterials/engine.test.ts:\n(pass) material simulation > same exported state produces the same next 100 ticks [33.67ms]\n(pass) material simulation > sand falls, stone stays, water spreads and gas rises [0.29ms]\n(pass) material simulation > one contact rule transforms only the custom particle [0.09ms]\n(pass) material simulation > paint strokes connect and clip at boundaries [0.67ms]\n(pass) material simulation > import rejects unsupported grids, corrupt rules and nonfinite cells [0.58ms]\n(pass) material simulation > branch copies do not share grid or rule state [0.31ms]\n(pass) interpretation safety > invalid and unsupported replies never become rules [0.05ms]\n(pass) interpretation safety > edits invalidate a delayed request token [0.07ms]\n\nruntime/existing-contract.test.ts:\n(pass) gateway rejects undeclared score probabilities without rerolling [0.85ms]\n(pass) direct decoder rejects inherited option names [0.21ms]\n\nruntime/contract.test.ts:\n(pass) preserves meaning for choice, boolean and fractional ordinal [0.24ms]\n(pass) rejects undeclared and inherited keys, missing mass and duplicate answers [0.05ms]\n(pass) rejects oversized requests without truncating [0.05ms]\n(pass) requires explicit error and identity, rejects non-JSON values [0.10ms]\n\nruntime/execute.test.ts:\n(pass) cancels even a runtime that ignores the signal [0.14ms]\n(pass) native boolean response becomes a complete distribution [0.23ms]\n(pass) missing provider distributions fail explicitly [0.09ms]\n\nruntime/edge-cases.test.ts:\n(pass) untyped invalid requests return an explicit unsupported response [0.03ms]\n(pass) configured revision cannot silently change [0.07ms]\n(pass) representable adjacent ordinal values retain identities [0.03ms]\n(pass) null provider JSON fails once instead of rerolling [0.06ms]\n(pass) gateway checks cancellation after a transport returns [0.05ms]\n(pass) native instruction limit is declared and rejected before calling provider [0.08ms]\n(pass) direct decoder preserves string enum identity [0.03ms]\n(pass) direct decoder rejects array probability containers [0.03ms]\n\nplayable/review/foundations/foundations.test.ts:\n(pass) publication preservation checks retain empty object shape [0.15ms]\n(pass) patch application preflights CI source and conflicts before edits [205.08ms]\n\n 98 pass\n 0 fail\n 495 expect() calls\nRan 98 tests across 15 files. [844.00ms]\n"
+    }
+  ],
+  "workingBuildComparison": [
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/adapters.json",
+      "workingSha256": "15ec160d6500807d2805ea4f36a3835cf578d666a53bdfca4fd6377832f55ac9",
+      "cleanSha256": "15ec160d6500807d2805ea4f36a3835cf578d666a53bdfca4fd6377832f55ac9",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/arcade.json",
+      "workingSha256": "b79f41ae952ffd1df1e16f434fd38a60599c8bed04c964a14e518d2ff1fe556a",
+      "cleanSha256": "b79f41ae952ffd1df1e16f434fd38a60599c8bed04c964a14e518d2ff1fe556a",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/beverage.json",
+      "workingSha256": "e4e53f4957f5015d3c5096a3b370889bf6fc5b5f01c3aa0238c6f35be15b2cbf",
+      "cleanSha256": "e4e53f4957f5015d3c5096a3b370889bf6fc5b5f01c3aa0238c6f35be15b2cbf",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/cafe.json",
+      "workingSha256": "9ad218efef019387adf2d536938bfe117f75e06cf711b3aff5629ea5a0b0d63f",
+      "cleanSha256": "9ad218efef019387adf2d536938bfe117f75e06cf711b3aff5629ea5a0b0d63f",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/changes.json",
+      "workingSha256": "9d71b8da0adf27383b61ab807606741c0240f9e63f82fbb74a8ee69c3ebc8453",
+      "cleanSha256": "9d71b8da0adf27383b61ab807606741c0240f9e63f82fbb74a8ee69c3ebc8453",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/classify.json",
+      "workingSha256": "ea0af5de6ed4119eb2218936346634404e7bcf4858d4f02adeaaa08a758d6308",
+      "cleanSha256": "ea0af5de6ed4119eb2218936346634404e7bcf4858d4f02adeaaa08a758d6308",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/cloudcheck.json",
+      "workingSha256": "db169b6a79299460acb512bd084a3da8413ff94cd051e95567b612f24626e92b",
+      "cleanSha256": "db169b6a79299460acb512bd084a3da8413ff94cd051e95567b612f24626e92b",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/composed-ui.json",
+      "workingSha256": "09a97cc991b22cb08ed3ef2fc4d25e29ec3397a3b087e1ec8e9658f59b611ab1",
+      "cleanSha256": "09a97cc991b22cb08ed3ef2fc4d25e29ec3397a3b087e1ec8e9658f59b611ab1",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/decisions.json",
+      "workingSha256": "7b9619bea3b0f4cc217df26d6d18967df8f2b97a5d562149e988ddbeddd9739a",
+      "cleanSha256": "7b9619bea3b0f4cc217df26d6d18967df8f2b97a5d562149e988ddbeddd9739a",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/deployment-check.json",
+      "workingSha256": "80cbb1d97ef11649ef0a666d6e1a39987d92b01e9bfb714a90b0525b1c69889e",
+      "cleanSha256": "80cbb1d97ef11649ef0a666d6e1a39987d92b01e9bfb714a90b0525b1c69889e",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/drawing-framing.json",
+      "workingSha256": "1f9314f1623768ffcd3cadefcd3d17ef7493a88f1dd4d31f8a2ee75d9d4b0707",
+      "cleanSha256": "1f9314f1623768ffcd3cadefcd3d17ef7493a88f1dd4d31f8a2ee75d9d4b0707",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/evidence-audit.json",
+      "workingSha256": "9e4d1c99b16af3314bc33f137e76aaf269d06c692ed12d9e5d0342a1b4e4b293",
+      "cleanSha256": "9e4d1c99b16af3314bc33f137e76aaf269d06c692ed12d9e5d0342a1b4e4b293",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/games.json",
+      "workingSha256": "6f6475c9a3d9c642ce737281a8dd3a34817c7cc4bcaf349057197a53a9d8e23a",
+      "cleanSha256": "6f6475c9a3d9c642ce737281a8dd3a34817c7cc4bcaf349057197a53a9d8e23a",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/history.json",
+      "workingSha256": "50121a6350e8753fce2690d388b7a496b1009fe7f41cb77720c1363aeca95433",
+      "cleanSha256": "50121a6350e8753fce2690d388b7a496b1009fe7f41cb77720c1363aeca95433",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/icon-studio.json",
+      "workingSha256": "c9be5a9dc2ddaeb0a93885440bd8188319f4d7653fbae5eed3b095a9d55fd3c7",
+      "cleanSha256": "c9be5a9dc2ddaeb0a93885440bd8188319f4d7653fbae5eed3b095a9d55fd3c7",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/index.json",
+      "workingSha256": "e423a3a6e1911b2dda6cdc41690bedd5e9606fe9ee72d7267ef30aaff4772b69",
+      "cleanSha256": "e423a3a6e1911b2dda6cdc41690bedd5e9606fe9ee72d7267ef30aaff4772b69",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/journeys.json",
+      "workingSha256": "5e40cae94a634f5deb0778ff885e6c403f0cfddc3fe04af1f47a89ab12ea9ce2",
+      "cleanSha256": "5e40cae94a634f5deb0778ff885e6c403f0cfddc3fe04af1f47a89ab12ea9ce2",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/judge.json",
+      "workingSha256": "bae13358777d1400fd8b78f63595bf182236ee595ce4b68d56318d7e19f10ce6",
+      "cleanSha256": "bae13358777d1400fd8b78f63595bf182236ee595ce4b68d56318d7e19f10ce6",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/judgment-reliability.json",
+      "workingSha256": "5af9d99604b4265bc998aba489a60bb3685e98c6d339310d95015ddb7efe7c02",
+      "cleanSha256": "5af9d99604b4265bc998aba489a60bb3685e98c6d339310d95015ddb7efe7c02",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/latency.json",
+      "workingSha256": "400ebfc821b7651e18f67a0dbc2b05138260041425e0d428a3be6c3018436253",
+      "cleanSha256": "400ebfc821b7651e18f67a0dbc2b05138260041425e0d428a3be6c3018436253",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/live-worlds.json",
+      "workingSha256": "c7406eeb857b739d5592dcdb42add398ba035ef148af0c84602e254e4a2fdc91",
+      "cleanSha256": "c7406eeb857b739d5592dcdb42add398ba035ef148af0c84602e254e4a2fdc91",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/local-models.json",
+      "workingSha256": "b4c27b914d678575dbb8fe574a58e77af74edc84a2eddc48360418799198d330",
+      "cleanSha256": "b4c27b914d678575dbb8fe574a58e77af74edc84a2eddc48360418799198d330",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/logos.json",
+      "workingSha256": "c1d76de17dc5ee6c7dbe19d5cd2065f06096086f030cdd97e3a9e69b4c67a455",
+      "cleanSha256": "c1d76de17dc5ee6c7dbe19d5cd2065f06096086f030cdd97e3a9e69b4c67a455",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/micro.json",
+      "workingSha256": "2593b12979279fab2473c7304bdc36a3c7aeac4b79b7489ad5b6d0d658f7ab74",
+      "cleanSha256": "2593b12979279fab2473c7304bdc36a3c7aeac4b79b7489ad5b6d0d658f7ab74",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/music.json",
+      "workingSha256": "1bbc35506020b20c05f7a971690a9d1f517964a967a33e8499624b743885d5f0",
+      "cleanSha256": "1bbc35506020b20c05f7a971690a9d1f517964a967a33e8499624b743885d5f0",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/music-v2.json",
+      "workingSha256": "42574478b0b836c2a91606056d5b95866d63c372e1bc30b4394ec4e82f80890c",
+      "cleanSha256": "42574478b0b836c2a91606056d5b95866d63c372e1bc30b4394ec4e82f80890c",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/optimize.json",
+      "workingSha256": "187627b814ea2dde7e4bec2c63a0392eb153b5b43d3e862930865e4b1d474084",
+      "cleanSha256": "187627b814ea2dde7e4bec2c63a0392eb153b5b43d3e862930865e4b1d474084",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/paste.json",
+      "workingSha256": "87395fe0b77e7a581992e71b05c5c79bca979d84de38e8ba3d9c49e85b4258c8",
+      "cleanSha256": "87395fe0b77e7a581992e71b05c5c79bca979d84de38e8ba3d9c49e85b4258c8",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/replica.json",
+      "workingSha256": "f96996302c8bf1425db488221f166c6f978d471dc55cc8a5b3258cf612a76fd0",
+      "cleanSha256": "f96996302c8bf1425db488221f166c6f978d471dc55cc8a5b3258cf612a76fd0",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/research-map.json",
+      "workingSha256": "a7e9aa27e37d01672552389a96a176123745bd7d9ec42e1848a7f95e372af6d1",
+      "cleanSha256": "a7e9aa27e37d01672552389a96a176123745bd7d9ec42e1848a7f95e372af6d1",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/reward.json",
+      "workingSha256": "811a6610b3b3e756ca1c1d28a623f2fb78f3507380bc7e77231c57674fe6aa69",
+      "cleanSha256": "811a6610b3b3e756ca1c1d28a623f2fb78f3507380bc7e77231c57674fe6aa69",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/rewardbench2.json",
+      "workingSha256": "6242395de913f5cc4a2bd1f57fc694dcbfd570fca8b4e16bdce47dfcb71c141e",
+      "cleanSha256": "6242395de913f5cc4a2bd1f57fc694dcbfd570fca8b4e16bdce47dfcb71c141e",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/robustness.json",
+      "workingSha256": "f97d770ad4460deaa8d166a3c13d29a68de1379bc15fd2a07b63436d431b7784",
+      "cleanSha256": "f97d770ad4460deaa8d166a3c13d29a68de1379bc15fd2a07b63436d431b7784",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/routing.json",
+      "workingSha256": "9a167d715ac8d57c440fa7983db992abfbd99ca8e2ced1d244108ee99fa4e295",
+      "cleanSha256": "9a167d715ac8d57c440fa7983db992abfbd99ca8e2ced1d244108ee99fa4e295",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/search.json",
+      "workingSha256": "a15fb35cfd0fcb8f7ae660c8d78323f633a0421b0146de1a6d9075e0814389b1",
+      "cleanSha256": "a15fb35cfd0fcb8f7ae660c8d78323f633a0421b0146de1a6d9075e0814389b1",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/semantic-table.json",
+      "workingSha256": "43f48172e715bdeea41fb3800b26209b3724849e94098b400e77c8fec802fb54",
+      "cleanSha256": "43f48172e715bdeea41fb3800b26209b3724849e94098b400e77c8fec802fb54",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/teach.json",
+      "workingSha256": "8888de5852541bfaddae87c33681fac78b05b9f42f35d48057637db50bea636f",
+      "cleanSha256": "8888de5852541bfaddae87c33681fac78b05b9f42f35d48057637db50bea636f",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/tetris-framing.json",
+      "workingSha256": "fe3391ab82cb2ecc9e64dcd90a2e37518404ff845c78b9abe36249111616db75",
+      "cleanSha256": "fe3391ab82cb2ecc9e64dcd90a2e37518404ff845c78b9abe36249111616db75",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/ui.json",
+      "workingSha256": "e22e0600389cf937b2e9ea2a5f6dd6f28c5f975dfcb46a0c7ca86eb8e8eabd84",
+      "cleanSha256": "e22e0600389cf937b2e9ea2a5f6dd6f28c5f975dfcb46a0c7ca86eb8e8eabd84",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/undo.json",
+      "workingSha256": "ec202be593663551aa42e4f9b578756898e113477deed61327679b7dbd4e7555",
+      "cleanSha256": "ec202be593663551aa42e4f9b578756898e113477deed61327679b7dbd4e7555",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/verify.json",
+      "workingSha256": "e40a48e97cfb7416dc599550e0f1d31688a0e7a53fce04c0284715431385bf58",
+      "cleanSha256": "e40a48e97cfb7416dc599550e0f1d31688a0e7a53fce04c0284715431385bf58",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/vision.json",
+      "workingSha256": "874ba8f02f2169bf44716ce75a9b7d416ebf81a743f4f4cb3b1075af8dc5ca82",
+      "cleanSha256": "874ba8f02f2169bf44716ce75a9b7d416ebf81a743f4f4cb3b1075af8dc5ca82",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/visual-search.json",
+      "workingSha256": "45c91efb05d66046a5e862888a469ed0faa96496ef66d1dedbd7e3f026caf089",
+      "cleanSha256": "45c91efb05d66046a5e862888a469ed0faa96496ef66d1dedbd7e3f026caf089",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/visuals.json",
+      "workingSha256": "9e6efacbd6fc7b6bd84e9fb9c8149a058875e5f6b8f4892a9431c5986e3ea4a7",
+      "cleanSha256": "9e6efacbd6fc7b6bd84e9fb9c8149a058875e5f6b8f4892a9431c5986e3ea4a7",
+      "equal": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/public/data/wardrobe.json",
+      "workingSha256": "d2dbe011b7e5fe0731e0ac45029903c5aa0a65713fbdabd66249bafde93af15e",
+      "cleanSha256": "d2dbe011b7e5fe0731e0ac45029903c5aa0a65713fbdabd66249bafde93af15e",
+      "equal": true
+    }
+  ],
+  "passed": true
+}

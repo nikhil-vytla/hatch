@@ -1,0 +1,51 @@
+{
+  "conditions": "Fresh current-source local API on 8794, production Vite preview on 5195 with explicit API proxy. No credentials or provider calls. Authentication/method boundaries only; the retained live destination fixture is separate evidence.",
+  "rows": [
+    {
+      "method": "GET",
+      "path": "/",
+      "status": 200,
+      "expected": 200,
+      "bytes": 963,
+      "sha256": "f44c22d0c4aaff1afac5f4e49bf9530a2041f02b515b520c4094ab987e995086",
+      "passed": true
+    },
+    {
+      "method": "GET",
+      "path": "/materials",
+      "status": 200,
+      "expected": 200,
+      "bytes": 963,
+      "sha256": "f44c22d0c4aaff1afac5f4e49bf9530a2041f02b515b520c4094ab987e995086",
+      "passed": true
+    },
+    {
+      "method": "GET",
+      "path": "/routing",
+      "status": 200,
+      "expected": 200,
+      "bytes": 963,
+      "sha256": "f44c22d0c4aaff1afac5f4e49bf9530a2041f02b515b520c4094ab987e995086",
+      "passed": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/route",
+      "status": 401,
+      "expected": 401,
+      "bytes": 68,
+      "sha256": "7b7aac7ce7b15626d58a1a9b86f65d852aa07ca51693686d77a599abc0586e24",
+      "passed": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/route",
+      "status": 405,
+      "expected": 405,
+      "bytes": 21,
+      "sha256": "4097fbde7bc543b7f711f010d9b5fa55a51a244fee4f943632683ddba1961a64",
+      "passed": true
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,84 @@
+{
+  "nullRequest": {
+    "response": {
+      "schemaVersion": "1",
+      "requestId": "invalid-request",
+      "status": "unsupported",
+      "decisions": [],
+      "execution": {
+        "adapter": "fixture",
+        "model": "fixture",
+        "revision": "pinned-one",
+        "local": true
+      },
+      "timing": {
+        "totalMs": 0.1064999999999987
+      },
+      "issues": [
+        {
+          "code": "invalid_request",
+          "message": "Supply version 1, requestId, JSON state and typed questions."
+        }
+      ]
+    },
+    "threw": false
+  },
+  "revisionIdentity": {
+    "status": "error",
+    "configuredRevision": "pinned-one",
+    "returnedRevision": "pinned-one"
+  },
+  "ordinalIdentity": {
+    "requested": [
+      100000000000000,
+      100000000000001
+    ],
+    "values": [
+      100000000000000,
+      100000000000001
+    ],
+    "requestIssues": []
+  },
+  "nullGatewayJson": {
+    "calls": 1,
+    "error": "Error: Provider returned an invalid answer envelope."
+  },
+  "gatewayCancellation": {
+    "returnedSuccess": false,
+    "error": "AbortError: The operation was aborted."
+  },
+  "instructionLimit": {
+    "advertisedLimits": {
+      "maxStateBytes": 100000,
+      "maxInputBytes": 90000,
+      "maxQuestions": 128,
+      "maxOptions": 255,
+      "supportedKinds": [
+        "choice",
+        "boolean",
+        "ordinal"
+      ],
+      "maxPromptChars": 12000
+    },
+    "requestIssues": [
+      {
+        "code": "prompt_limit",
+        "message": "Question prompts must be at most 12000 characters.",
+        "questionIds": [
+          "q"
+        ]
+      }
+    ],
+    "status": "unsupported",
+    "issues": [
+      {
+        "code": "prompt_limit",
+        "message": "Question prompts must be at most 12000 characters.",
+        "questionIds": [
+          "q"
+        ]
+      }
+    ],
+    "providerCalls": 0
+  }
+}
