@@ -1,0 +1,29 @@
+{
+  "recordedAt": "2026-09-21T07:12:05.291419+00:00",
+  "commit": "ce8b0243dae2813e58aca5aed2a8851f93606ba8",
+  "conditions": "Assembled playable branch, locked Bun dependencies; engine/helper tests only, no provider calls or GPU inference. Integrated browser evidence is retained in the final slice.",
+  "checks": [
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 0.28652545798104256,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ typescript@5.9.3\n+ react@19.2.4\n+ react-dom@19.2.4\n\n11 packages installed [15.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "test",
+        "materials",
+        "playable"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 0.3297090830747038,
+      "output": "bun test v1.3.14 (0d9b296a)\n\nplayable/crowd.test.ts:\n(pass) notice comparison copies one frozen world, preserving policy and physical conditions [1.99ms]\n(pass) a pre-comparison request cannot apply to either new lane [0.62ms]\n\nplayable/music.test.ts:\n(pass) continuity checks both adjacent phrase boundaries [1.74ms]\n(pass) blind order swaps independently and copied scores stay frozen [0.70ms]\n(pass) a preference requires both listens and cannot be overwritten after reveal [1.06ms]\n\nmaterials/engine.test.ts:\n(pass) material simulation > same exported state produces the same next 100 ticks [34.24ms]\n(pass) material simulation > sand falls, stone stays, water spreads and gas rises [0.31ms]\n(pass) material simulation > one contact rule transforms only the custom particle [0.09ms]\n(pass) material simulation > paint strokes connect and clip at boundaries [0.78ms]\n(pass) material simulation > import rejects unsupported grids, corrupt rules and nonfinite cells [0.63ms]\n(pass) material simulation > branch copies do not share grid or rule state [0.29ms]\n(pass) interpretation safety > invalid and unsupported replies never become rules [0.06ms]\n(pass) interpretation safety > edits invalidate a delayed request token [0.08ms]\n\n 13 pass\n 0 fail\n 38 expect() calls\nRan 13 tests across 3 files. [59.00ms]\n"
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "empty-object-replaced-with-null",
+    "accepted": false,
+    "error": "Error: Public object changed at root.metadata"
+  },
+  {
+    "name": "empty-object-replaced-with-number",
+    "accepted": false,
+    "error": "Error: Public object changed at root.metadata"
+  },
+  {
+    "name": "empty-array-replaced-with-object",
+    "accepted": false,
+    "error": "Error: Public array changed at root.rows"
+  }
+]
