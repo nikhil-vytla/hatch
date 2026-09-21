@@ -1,0 +1,9 @@
+# Crowd and music improvements
+
+Crowd now supports notice editing below each scene and a matched-start comparison of two phrasings. Both lanes use the same source residents, needs, weather, queues and policy. Destination differences appear as an inspectable resident list. Individual inspectors show the actual request observation and typed decisions when available; otherwise the interface identifies the current local observation. Model requests cancel when editing begins, and old branch replies cannot apply to a comparison.
+
+Music retains immediate local playback, phrase locks, note editing, bar-boundary score adoption and JSON/MIDI export. New controls impose a maximum melody leap at neighboring phrase boundaries before either a user or Jev chooses a candidate. No eligible candidate produces an explanation. Browser save/restore preserves a score. Source-hidden A/B auditions compare recorded Jev and rule arrangements when available, or two procedural candidates otherwise. Randomized order and preference records remain local until export; playback-start checks do not establish listening duration or musical quality.
+
+Run `bun test jev-experiments/roadmap/playable jev-experiments/music-arranger-v2/engine.test.ts`. The two crowd checks and twelve music checks passed on 2026-09-20. App TypeScript compilation passed. Root roadmap evidence tracks browser usability, integration and release acceptance separately.
+
+`crowd.ts` and `music.ts` contain bounded comparison and constraint helpers, not a universal experiment engine. Existing [Tone.js](https://tonejs.github.io/) playback remains the audio implementation. Files modified in the app are `src/live-crowd.tsx`, `src/live-crowd.css`, `src/music-arranger.tsx` and `src/music-arranger.css`; the root integration patch preserves those changes for the folder-only commit requirement.

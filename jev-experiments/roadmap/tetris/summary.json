@@ -1,0 +1,193 @@
+{
+  "protocolSha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca",
+  "completeSeeds": 3,
+  "plannedSeeds": 3,
+  "games": [
+    {
+      "seed": 7,
+      "protocolSha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca",
+      "wallMs": 32455.651917,
+      "worldMs": 32420,
+      "censored": false,
+      "lanes": [
+        {
+          "settings": {
+            "source": "jev",
+            "framing": "button",
+            "assisted": false,
+            "delayMs": 450,
+            "intervalMs": 900,
+            "fallbackWaitMs": 700
+          },
+          "status": "over",
+          "lines": 0,
+          "pieces": 11,
+          "score": 204,
+          "stats": {
+            "accepted": 11,
+            "stale": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "jevMs": 220,
+            "demoMs": 0,
+            "fallbackMs": 0,
+            "humanMs": 0,
+            "gravityMs": 12220
+          }
+        },
+        {
+          "settings": {
+            "source": "jev",
+            "framing": "landing",
+            "assisted": false,
+            "delayMs": 450,
+            "intervalMs": 900,
+            "fallbackWaitMs": 700
+          },
+          "status": "over",
+          "lines": 0,
+          "pieces": 18,
+          "score": 364,
+          "stats": {
+            "accepted": 15,
+            "stale": 1,
+            "failed": 0,
+            "cancelled": 1,
+            "jevMs": 3960,
+            "demoMs": 0,
+            "fallbackMs": 0,
+            "humanMs": 0,
+            "gravityMs": 28460
+          }
+        }
+      ],
+      "attempts": 31,
+      "knownCostUsd": 0,
+      "unknownCostRequests": 1
+    },
+    {
+      "seed": 19,
+      "protocolSha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca",
+      "wallMs": 98328.392209,
+      "worldMs": 98300,
+      "censored": false,
+      "lanes": [
+        {
+          "settings": {
+            "source": "jev",
+            "framing": "button",
+            "assisted": false,
+            "delayMs": 450,
+            "intervalMs": 900,
+            "fallbackWaitMs": 700
+          },
+          "status": "over",
+          "lines": 0,
+          "pieces": 10,
+          "score": 88,
+          "stats": {
+            "accepted": 6,
+            "stale": 1,
+            "failed": 23,
+            "cancelled": 0,
+            "jevMs": 120,
+            "demoMs": 0,
+            "fallbackMs": 0,
+            "humanMs": 0,
+            "gravityMs": 59420
+          }
+        },
+        {
+          "settings": {
+            "source": "jev",
+            "framing": "landing",
+            "assisted": false,
+            "delayMs": 450,
+            "intervalMs": 900,
+            "fallbackWaitMs": 700
+          },
+          "status": "over",
+          "lines": 3,
+          "pieces": 23,
+          "score": 752,
+          "stats": {
+            "accepted": 20,
+            "stale": 1,
+            "failed": 24,
+            "cancelled": 0,
+            "jevMs": 3200,
+            "demoMs": 0,
+            "fallbackMs": 0,
+            "humanMs": 0,
+            "gravityMs": 95100
+          }
+        }
+      ],
+      "attempts": 75,
+      "knownCostUsd": 0,
+      "unknownCostRequests": 47
+    },
+    {
+      "seed": 42,
+      "protocolSha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca",
+      "wallMs": 64677.59195900001,
+      "worldMs": 64640,
+      "censored": false,
+      "lanes": [
+        {
+          "settings": {
+            "source": "jev",
+            "framing": "button",
+            "assisted": false,
+            "delayMs": 450,
+            "intervalMs": 900,
+            "fallbackWaitMs": 700
+          },
+          "status": "over",
+          "lines": 0,
+          "pieces": 10,
+          "score": 110,
+          "stats": {
+            "accepted": 7,
+            "stale": 1,
+            "failed": 3,
+            "cancelled": 0,
+            "jevMs": 360,
+            "demoMs": 0,
+            "fallbackMs": 0,
+            "humanMs": 0,
+            "gravityMs": 48740
+          }
+        },
+        {
+          "settings": {
+            "source": "jev",
+            "framing": "landing",
+            "assisted": false,
+            "delayMs": 450,
+            "intervalMs": 900,
+            "fallbackWaitMs": 700
+          },
+          "status": "over",
+          "lines": 1,
+          "pieces": 16,
+          "score": 336,
+          "stats": {
+            "accepted": 11,
+            "stale": 1,
+            "failed": 6,
+            "cancelled": 1,
+            "jevMs": 3440,
+            "demoMs": 0,
+            "fallbackMs": 0,
+            "humanMs": 0,
+            "gravityMs": 61200
+          }
+        }
+      ],
+      "attempts": 30,
+      "knownCostUsd": 0,
+      "unknownCostRequests": 10
+    }
+  ]
+}
