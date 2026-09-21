@@ -1,0 +1,9 @@
+# Training/export dependencies, intentionally separate from Mac inference installation.
+-r ../mac/requirements-inference.txt
+mlx-lm==0.31.3
+coremltools==9.0
+torch==2.8.0
+transformers==5.17.0
+safetensors==0.8.0
+pyarrow==25.0.1
+huggingface-hub==1.32.0

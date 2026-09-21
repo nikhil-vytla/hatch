@@ -1,0 +1,296 @@
+{
+  "model": "laya",
+  "provenance": {
+    "recordedAtUtc": "2026-09-21T05:24:03.324691+00:00",
+    "recordedAfterRun": false,
+    "method": "Input hashes verified before this measurement run.",
+    "model": "laya",
+    "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+    "corpusSha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b",
+    "modelFilesSha256": "e7ffb1c8ec89de0ef00f2356af205c7577bd06d5da39f3d513c4a3a44401f3d7",
+    "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+    "featureManifestSha256": "44bccd7ec1dab7793b98154290bd41e5aee78d9dabc2bc5373a2186417de75e7",
+    "readoutSha256": {
+      "17": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+      "29": "67398be72053dfff08544c6f36c81c04e58281b35e4d7e82e3fee018717e1f7b",
+      "43": "a29f85012849a7c1be8ff3dcbfb87a09f28a37d1ad64495a9ae217ac848b3907"
+    },
+    "predictionSha256": {
+      "predictions-17-validation.jsonl": "2a144dae8991bc89c5dac99edb7bb78a7e2d01248d44ba01a94fa9c4232508f6",
+      "predictions-17-test.jsonl": "db754edaa02837df8c1a91ab95acfa2acf2df8f6d34b0f78cebc08e1542a3dda",
+      "predictions-17-transfer.jsonl": "b7a7c64e37e52d97296e6cfb4a97772e5f8be668db6bece2f893c1c926ede1d2",
+      "predictions-29-validation.jsonl": "80f6ca95c310e7d293b858bec3b4fb2308629aceae3ca947ead546d4fde827ec",
+      "predictions-29-test.jsonl": "1d8a7176b264a79619acf435ec02c8c7bdd8ddfe388d44a607ee1b6deef3a87c",
+      "predictions-29-transfer.jsonl": "0fd0a19cadfcfbfdb1b901f4f5cd805e4d55b08f2c6a4288497d06a18c760b20",
+      "predictions-43-validation.jsonl": "8ca734d7d762cc6c2fde9731af8e7e1d7648b9bc636759f7a3e92f82f267fee5",
+      "predictions-43-test.jsonl": "735d851ba7b8c6574f4c769ccb67ec759ce563e823bc928fd222a1bc7a32654d",
+      "predictions-43-transfer.jsonl": "963fd027430d8a9a577efef518c9301b2ce07d275057d0edbaabe0f5bcb1c050"
+    }
+  },
+  "optionOrder": {
+    "17": {
+      "cases": 384,
+      "compared": 384,
+      "coverage": 1.0,
+      "argmaxAgreement": 0.9270833333333334,
+      "meanTotalVariation": 0.04822589020244923,
+      "maxTotalVariation": 0.46620599809102714
+    },
+    "29": {
+      "cases": 384,
+      "compared": 384,
+      "coverage": 1.0,
+      "argmaxAgreement": 0.6770833333333334,
+      "meanTotalVariation": 0.04879947633280281,
+      "maxTotalVariation": 0.4840636174194515
+    },
+    "43": {
+      "cases": 384,
+      "compared": 384,
+      "coverage": 1.0,
+      "argmaxAgreement": 0.9453125,
+      "meanTotalVariation": 0.05129553067682458,
+      "maxTotalVariation": 0.45152470748871565
+    }
+  },
+  "batchIndependence": {
+    "condition": "Complete adapted probabilities, all three seeds. Batch of two equal-length sequences; second row has a changed content token.",
+    "checks": [
+      {
+        "id": "banking77/train/9210",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/9210",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/9210",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/7732",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/7732",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/7732",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/5010",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/5010",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/5010",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/5102",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/5102",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "banking77/train/5102",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/7710",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/7710",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/7710",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/2940",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/2940",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/2940",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/8834",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/8834",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/8834",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/4245",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/4245",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/4245",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/1300",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/1300",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/1300",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/95",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/95",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/95",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/695",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/695",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/695",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/840",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/840",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "stsb/validation/840",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 0.0
+      }
+    ],
+    "maxProbabilityDelta": 0.0,
+    "passed": true
+  },
+  "limits": {
+    "maxTokens": 768,
+    "maxOptions": 8,
+    "maxQuestions": 32
+  },
+  "mlxTiming": {
+    "loadMs": 403.945375001058,
+    "firstPredictionMs": 32.390792039223015,
+    "firstPredictionWasCold": true,
+    "note": "Fresh process, complete seed17 decision including tokenization, backbone, residual readout and calibrated softmax. OS file cache is not flushed.",
+    "warmMedianMs": 15.448999998625368,
+    "warmP95Ms": 15.61008399585262,
+    "repetitions": 30,
+    "inputId": "banking77/train/9210",
+    "peakProcessRssBytes": 997294080,
+    "peakMlxBytes": 2526179334
+  }
+}

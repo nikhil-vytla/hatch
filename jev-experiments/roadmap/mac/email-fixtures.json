@@ -1,0 +1,14 @@
+[
+  {"id":"review","subject":"Review requested","body":"Please review the draft and send corrections by Friday.","label":"action_required"},
+  {"id":"approval","subject":"Budget approval","body":"Can you approve the workshop budget today? We need your decision before booking.","label":"action_required"},
+  {"id":"availability","subject":"Meeting time","body":"Please reply with your availability for a meeting next Tuesday.","label":"action_required"},
+  {"id":"receipt","subject":"Your order receipt","body":"Payment received. Order 4832 has been confirmed. Total paid: 24.00. No response is needed.","label":"transactional"},
+  {"id":"shipment","subject":"Package delivered","body":"Your package was delivered today at 2:15 PM. This is an automated delivery notification.","label":"transactional"},
+  {"id":"reset","subject":"Password changed","body":"Your account password was successfully changed. This automated confirmation is for your records.","label":"transactional"},
+  {"id":"sale","subject":"Weekend sale","body":"Save 30 percent on all shoes this weekend. Browse our latest collection. Unsubscribe from marketing emails at any time.","label":"newsletter"},
+  {"id":"digest","subject":"Weekly industry digest","body":"Here are this week's top industry stories. You received this newsletter because you subscribed. Unsubscribe below.","label":"newsletter"},
+  {"id":"launch","subject":"New collection available","body":"Discover our new autumn collection, available now. Promotional mailing. Manage your subscription preferences below.","label":"newsletter"},
+  {"id":"thanks","subject":"Thank you","body":"It was lovely to see you yesterday. Thanks for dinner and for the great conversation! No need to reply.","label":"personal"},
+  {"id":"holiday","subject":"Greetings from the mountains","body":"We are having a wonderful holiday. The views are beautiful. Just sending you a hello!","label":"personal"},
+  {"id":"ambiguous","subject":"Update","body":"The thing we mentioned earlier is here.","label":"uncertain"}
+]

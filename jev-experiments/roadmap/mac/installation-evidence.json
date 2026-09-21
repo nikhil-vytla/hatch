@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1",
+  "platform": "Apple M4 Max, macOS 26.6.2, 48 GiB",
+  "freshPrefix": "/tmp/jev-local-fresh-test",
+  "python": "3.13.11",
+  "installation": "bash install.sh --prefix /tmp/jev-local-fresh-test --python jev-experiments/.venv/bin/python",
+  "newVirtualEnvironment": true,
+  "dependencyInstallationPassed": true,
+  "doctorPassed": true,
+  "modelInstall": {
+    "model": "laya-base-experimental",
+    "source": "existing pinned cache, copied into new model directory",
+    "verifiedBytesAndSha256": true,
+    "remoteDownloadPathTested": false
+  },
+  "firstUsefulResult": {
+    "command": "classify-eml on examples/meeting.eml",
+    "completed": true,
+    "expectedLabel": "action_required",
+    "actualLabel": "personal",
+    "semanticTaskPassed": false,
+    "note": "Successful local execution is separate from correct email classification. The example model is experimental."
+  },
+  "offlineEmailEvaluation": "email-evaluation.json",
+  "unitChecksPassed": 8,
+  "freshUninstallProbe": {
+    "prefix": "/tmp/jev-local-uninstall-probe",
+    "installationPassed": true,
+    "uninstallPassed": true,
+    "directoryRemoved": true,
+    "primaryFixtureInstallationRetained": true
+  },
+  "independentReview": "../playable/review/mac-toolkit/probe-results-after-fixes.json",
+  "remoteReadoutInstallation": {
+    "freshToolkitPrefix": "/tmp/jev-local-readout-test",
+    "emptyModelDirectory": "/tmp/jev-local-remote-model-test",
+    "model": "laya-readout-experimental",
+    "remoteBackboneDownloadPassed": true,
+    "bundledReadoutBytes": 12458,
+    "allFileHashesVerified": true,
+    "runtimeParity": "readout-runtime-verification.json",
+    "offlineEmailEvaluation": "email-readout-evaluation.json"
+  }
+}

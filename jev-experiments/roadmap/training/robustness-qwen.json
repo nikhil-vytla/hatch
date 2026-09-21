@@ -1,0 +1,296 @@
+{
+  "model": "qwen",
+  "provenance": {
+    "recordedAtUtc": "2026-09-21T06:12:44.421046+00:00",
+    "recordedAfterRun": false,
+    "method": "Input hashes verified before this measurement run.",
+    "model": "qwen",
+    "revision": "73e3e38d981303bc594367cd910ea6eb48349da8",
+    "corpusSha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b",
+    "modelFilesSha256": "e7ffb1c8ec89de0ef00f2356af205c7577bd06d5da39f3d513c4a3a44401f3d7",
+    "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+    "featureManifestSha256": "7b951baf2a91994f460fd729f0c5a91b9dbbb56090efc3de3050a6c787e164e9",
+    "readoutSha256": {
+      "17": "4fd59a8e4c7811b09f0ded36c0d87264e4c439a8a416304ccfab29d605f7ae9d",
+      "29": "e0a64c63d50e20c92ae04a8c1024473d4cc2cc65b3e23a0254ef9568993eaee3",
+      "43": "a3a7df67e1d72e3a2d50397dba35907401df7906c7a6a0a610939dd44ea99aa7"
+    },
+    "predictionSha256": {
+      "predictions-17-validation.jsonl": "818101201863cef62915a3c397810fb7eb39b4e0a8a9bd303b031932a595bfef",
+      "predictions-17-test.jsonl": "8a8a11d4e94b0fee61448fb9eebe4913ef7b274b5ec53dd93c691c1d9446e108",
+      "predictions-17-transfer.jsonl": "4b34e0401af1a440d243477e69186e9f16052cc4bb453a342b00083341b9b1c5",
+      "predictions-29-validation.jsonl": "51b552dd8885b0bc0e430aa5ea274d12c05cfe7e6dd32e3a9c39ccf046df00c8",
+      "predictions-29-test.jsonl": "0682aebbd31df3fd65bfbc8ba291592cf5b1ce470e66a7351368946db4c8d117",
+      "predictions-29-transfer.jsonl": "8b6f9846c1fd9893f08e00d40ff08a5ca8bbcc900a34e727f3281ad8c26fe5b1",
+      "predictions-43-validation.jsonl": "95cdc2997999da70d6fcfb71fd122ef08e81718cc1238475fbcf342ac6524589",
+      "predictions-43-test.jsonl": "83878eb0085ef838e72ce40dd6254e1c2428b47839e99e1d4ee41909dd6bbe9a",
+      "predictions-43-transfer.jsonl": "da92e6c2069767ec8fc83352aa0ad2274e66584eb88fa8f4442cd7d82714b020"
+    }
+  },
+  "optionOrder": {
+    "17": {
+      "cases": 384,
+      "compared": 384,
+      "coverage": 1.0,
+      "argmaxAgreement": 0.4557291666666667,
+      "meanTotalVariation": 0.34122451388007374,
+      "maxTotalVariation": 0.8901609745807946
+    },
+    "29": {
+      "cases": 384,
+      "compared": 384,
+      "coverage": 1.0,
+      "argmaxAgreement": 0.4583333333333333,
+      "meanTotalVariation": 0.42081034424524927,
+      "maxTotalVariation": 0.9466918858961435
+    },
+    "43": {
+      "cases": 384,
+      "compared": 384,
+      "coverage": 1.0,
+      "argmaxAgreement": 0.4609375,
+      "meanTotalVariation": 0.32666501118454033,
+      "maxTotalVariation": 0.8417413744173246
+    }
+  },
+  "batchIndependence": {
+    "condition": "Complete adapted probabilities, all three seeds. Batch of two equal-length sequences; second row has a changed content token.",
+    "checks": [
+      {
+        "id": "banking77/train/9210",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 5.185604095458984e-06
+      },
+      {
+        "id": "banking77/train/9210",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 3.5762786865234375e-07
+      },
+      {
+        "id": "banking77/train/9210",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 4.291534423828125e-06
+      },
+      {
+        "id": "banking77/train/7732",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 3.5762786865234375e-07
+      },
+      {
+        "id": "banking77/train/7732",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 6.616115570068359e-06
+      },
+      {
+        "id": "banking77/train/7732",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 2.086162567138672e-06
+      },
+      {
+        "id": "banking77/train/5010",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 8.58306884765625e-06
+      },
+      {
+        "id": "banking77/train/5010",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 1.1295080184936523e-05
+      },
+      {
+        "id": "banking77/train/5010",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 8.404254913330078e-06
+      },
+      {
+        "id": "banking77/train/5102",
+        "kind": "choice",
+        "seed": 17,
+        "maxProbabilityDelta": 2.2649765014648438e-06
+      },
+      {
+        "id": "banking77/train/5102",
+        "kind": "choice",
+        "seed": 29,
+        "maxProbabilityDelta": 2.0489096641540527e-07
+      },
+      {
+        "id": "banking77/train/5102",
+        "kind": "choice",
+        "seed": 43,
+        "maxProbabilityDelta": 8.940696716308594e-07
+      },
+      {
+        "id": "boolq/train/7710",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 3.3974647521972656e-06
+      },
+      {
+        "id": "boolq/train/7710",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 5.424022674560547e-06
+      },
+      {
+        "id": "boolq/train/7710",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 3.2186508178710938e-06
+      },
+      {
+        "id": "boolq/train/2940",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 4.172325134277344e-07
+      },
+      {
+        "id": "boolq/train/2940",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 1.2665987014770508e-07
+      },
+      {
+        "id": "boolq/train/2940",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 3.129243850708008e-07
+      },
+      {
+        "id": "boolq/train/8834",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 4.76837158203125e-07
+      },
+      {
+        "id": "boolq/train/8834",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 0.0
+      },
+      {
+        "id": "boolq/train/8834",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 1.1920928955078125e-06
+      },
+      {
+        "id": "boolq/train/4245",
+        "kind": "boolean",
+        "seed": 17,
+        "maxProbabilityDelta": 8.672475814819336e-06
+      },
+      {
+        "id": "boolq/train/4245",
+        "kind": "boolean",
+        "seed": 29,
+        "maxProbabilityDelta": 1.52587890625e-05
+      },
+      {
+        "id": "boolq/train/4245",
+        "kind": "boolean",
+        "seed": 43,
+        "maxProbabilityDelta": 1.0251998901367188e-05
+      },
+      {
+        "id": "stsb/validation/1300",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 3.889203071594238e-06
+      },
+      {
+        "id": "stsb/validation/1300",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 9.566545486450195e-06
+      },
+      {
+        "id": "stsb/validation/1300",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 6.943941116333008e-06
+      },
+      {
+        "id": "stsb/validation/95",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 3.844499588012695e-06
+      },
+      {
+        "id": "stsb/validation/95",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 6.0498714447021484e-06
+      },
+      {
+        "id": "stsb/validation/95",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 3.159046173095703e-06
+      },
+      {
+        "id": "stsb/validation/695",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 6.9141387939453125e-06
+      },
+      {
+        "id": "stsb/validation/695",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 6.079673767089844e-06
+      },
+      {
+        "id": "stsb/validation/695",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 6.67572021484375e-06
+      },
+      {
+        "id": "stsb/validation/840",
+        "kind": "ordinal",
+        "seed": 17,
+        "maxProbabilityDelta": 3.6656856536865234e-06
+      },
+      {
+        "id": "stsb/validation/840",
+        "kind": "ordinal",
+        "seed": 29,
+        "maxProbabilityDelta": 3.993511199951172e-06
+      },
+      {
+        "id": "stsb/validation/840",
+        "kind": "ordinal",
+        "seed": 43,
+        "maxProbabilityDelta": 3.3527612686157227e-06
+      }
+    ],
+    "maxProbabilityDelta": 1.52587890625e-05,
+    "passed": true
+  },
+  "limits": {
+    "maxTokens": 768,
+    "maxOptions": 8,
+    "maxQuestions": 32
+  },
+  "mlxTiming": {
+    "loadMs": 2305.489708960522,
+    "firstPredictionMs": 31.636917032301426,
+    "firstPredictionWasCold": true,
+    "note": "Fresh process, complete seed17 decision including tokenization, backbone, residual readout and calibrated softmax. OS file cache is not flushed.",
+    "warmMedianMs": 14.566771016689017,
+    "warmP95Ms": 14.832374989055097,
+    "repetitions": 30,
+    "inputId": "banking77/train/9210",
+    "peakProcessRssBytes": 1037828096,
+    "peakMlxBytes": 1451519808
+  }
+}
