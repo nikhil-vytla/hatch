@@ -30,5 +30,13 @@
     "url": "https://github.com/nikhil-vytla/hatch/pull/61",
     "commit": "ce8b0243dae2813e58aca5aed2a8851f93606ba8",
     "implementationCommit": "d5461b4cdc2ccb9849b5675fda09de4b9bdff4ff"
+  },
+  {
+    "slice": "integration",
+    "branch": "nikhil-20260920-jevReleaseIntegration",
+    "base": "nikhil-20260920-jevPlayableLab",
+    "url": "https://github.com/nikhil-vytla/hatch/pull/62",
+    "commit": "f2ee3347a60e09d7c1e48208c51769277dca4009",
+    "implementationCommit": "eb633db88cf6f6a81816007d68eb710f4af4fe3a"
   }
 ]

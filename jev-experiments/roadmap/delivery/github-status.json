@@ -1,0 +1,141 @@
+{
+  "recordedAt": "2026-09-21T07:16:42.136478+00:00",
+  "scope": "GitHub status snapshot of initial artifact PR heads. Vercel previews build the original application; local provider-free checks separately validate the applied patch. Later changes to review documents do not alter the tested source.",
+  "pullRequests": [
+    {
+      "baseRefName": "main",
+      "headRefName": "nikhil-20260920-jevTypedRuntime",
+      "headRefOid": "4adf8c1fb80f2a0c2f6344b41192291e70d1cd06",
+      "isDraft": true,
+      "number": 58,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "StatusContext",
+          "context": "Vercel",
+          "startedAt": "2026-09-21T06:59:52Z",
+          "state": "SUCCESS",
+          "targetUrl": "https://vercel.com/nikhil-vytla/jev-experiments/8dVPYHbTB4myV9vN4TCBAWrZ9xEN"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-21T06:59:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://vercel.com/github",
+          "name": "Vercel Preview Comments",
+          "startedAt": "2026-09-21T06:59:53Z",
+          "status": "COMPLETED",
+          "workflowName": ""
+        }
+      ]
+    },
+    {
+      "baseRefName": "nikhil-20260920-jevTypedRuntime",
+      "headRefName": "nikhil-20260920-jevRoutingToolkit",
+      "headRefOid": "afb7cbf129d8c98833cd7430924a7bf06c0a4bf9",
+      "isDraft": true,
+      "number": 59,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "StatusContext",
+          "context": "Vercel",
+          "startedAt": "2026-09-21T07:10:07Z",
+          "state": "SUCCESS",
+          "targetUrl": "https://vercel.com/nikhil-vytla/jev-experiments/8cVwv94i1kYNZKgtbySAzBExvL8c"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-21T07:10:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://vercel.com/github",
+          "name": "Vercel Preview Comments",
+          "startedAt": "2026-09-21T07:10:08Z",
+          "status": "COMPLETED",
+          "workflowName": ""
+        }
+      ]
+    },
+    {
+      "baseRefName": "nikhil-20260920-jevRoutingToolkit",
+      "headRefName": "nikhil-20260920-jevLocalStudy",
+      "headRefOid": "d627e243769eabd975647ea0f0f6c399809b4314",
+      "isDraft": true,
+      "number": 60,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "StatusContext",
+          "context": "Vercel",
+          "startedAt": "2026-09-21T07:12:01Z",
+          "state": "SUCCESS",
+          "targetUrl": "https://vercel.com/nikhil-vytla/jev-experiments/FTGhdSPNRjp3PPCdJdPi6gxZyJnu"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-21T07:12:02Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://vercel.com/github",
+          "name": "Vercel Preview Comments",
+          "startedAt": "2026-09-21T07:12:02Z",
+          "status": "COMPLETED",
+          "workflowName": ""
+        }
+      ]
+    },
+    {
+      "baseRefName": "nikhil-20260920-jevLocalStudy",
+      "headRefName": "nikhil-20260920-jevPlayableLab",
+      "headRefOid": "ce8b0243dae2813e58aca5aed2a8851f93606ba8",
+      "isDraft": true,
+      "number": 61,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "StatusContext",
+          "context": "Vercel",
+          "startedAt": "2026-09-21T07:13:08Z",
+          "state": "SUCCESS",
+          "targetUrl": "https://vercel.com/nikhil-vytla/jev-experiments/4Ah49A2xSRDiFzEUWZNdFN4KUfRc"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-21T07:13:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://vercel.com/github",
+          "name": "Vercel Preview Comments",
+          "startedAt": "2026-09-21T07:13:09Z",
+          "status": "COMPLETED",
+          "workflowName": ""
+        }
+      ]
+    },
+    {
+      "baseRefName": "nikhil-20260920-jevPlayableLab",
+      "headRefName": "nikhil-20260920-jevReleaseIntegration",
+      "headRefOid": "f2ee3347a60e09d7c1e48208c51769277dca4009",
+      "isDraft": true,
+      "number": 62,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "StatusContext",
+          "context": "Vercel",
+          "startedAt": "2026-09-21T07:16:26Z",
+          "state": "SUCCESS",
+          "targetUrl": "https://vercel.com/nikhil-vytla/jev-experiments/2ZP6TD3zCHv1r27DXaBHEG7yf8pk"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-21T07:16:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://vercel.com/github",
+          "name": "Vercel Preview Comments",
+          "startedAt": "2026-09-21T07:16:27Z",
+          "status": "COMPLETED",
+          "workflowName": ""
+        }
+      ]
+    }
+  ]
+}

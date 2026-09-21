@@ -6,11 +6,11 @@ This slice depends on the preceding typed-runtime PR. Web components, public cat
 
 <pr-train-toc>
 
-- Typed runtime: #58
-- Routing and client integration: current PR
-- Local study and Mac toolkit: pending link
-- Playable scenes and design research: pending link
-- Application and release evidence: pending link
+- [Typed runtime](https://github.com/nikhil-vytla/hatch/pull/58)
+- [Routing and client integration](https://github.com/nikhil-vytla/hatch/pull/59) (current PR)
+- [Local study and Mac toolkit](https://github.com/nikhil-vytla/hatch/pull/60)
+- [Playable scenes and design research](https://github.com/nikhil-vytla/hatch/pull/61)
+- [Application and release evidence](https://github.com/nikhil-vytla/hatch/pull/62)
 
 </pr-train-toc>
 
