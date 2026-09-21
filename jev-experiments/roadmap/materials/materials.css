@@ -1,0 +1,879 @@
+.materials-lab {
+  container: materials/inline-size;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+  --mat-paper: #f0ebdd;
+  --mat-focus: #58755f;
+  --mat-purple: #a487bd;
+}
+:root[data-theme="dark"] .materials-lab {
+  --mat-paper: #242d29;
+  --mat-focus: #b9c8a8;
+}
+.mat-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin: 4px 0 24px;
+}
+.mat-eyebrow {
+  font: 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.mat-intro h2 {
+  font:
+    32px/1.15 Georgia,
+    serif;
+  letter-spacing: -0.8px;
+  margin: 9px 0;
+}
+.mat-intro p,
+.mat-artifacts p {
+  color: var(--muted);
+  margin: 0;
+}
+.mat-local {
+  font: 10px var(--mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mat-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 22px;
+  align-items: start;
+}
+.mat-workbench,
+.mat-inspector {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.materials-lab button,
+.mat-import {
+  font: inherit;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 9px 11px;
+  cursor: pointer;
+  min-height: 40px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    transform 90ms ease;
+}
+.materials-lab button:hover,
+.mat-import:hover {
+  background: var(--soft);
+}
+.materials-lab button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.materials-lab button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.materials-lab
+  :is(button, input, select, textarea, canvas, summary):focus-visible {
+  outline: 2px solid var(--mat-focus);
+  outline-offset: 3px;
+}
+.materials-lab .mat-primary {
+  background: var(--ink);
+  color: var(--surface);
+  min-width: 60px;
+}
+.materials-lab .mat-primary:hover {
+  background: var(--sage);
+}
+.mat-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.mat-mode-switch {
+  display: flex;
+  padding: 3px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.mat-mode-switch button {
+  border-color: transparent;
+  min-height: 32px;
+  padding: 5px 12px;
+  background: transparent;
+}
+.mat-mode-switch button[aria-pressed="true"] {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: 0 1px 3px #00000008;
+}
+.mat-playback {
+  display: flex;
+  gap: 7px;
+}
+.mat-fullscreen {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mat-fullscreen > span:first-child {
+  font-size: 17px;
+  line-height: 1;
+}
+.mat-palette {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  padding: 12px 12px 0;
+}
+.mat-palette button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  text-align: left;
+  padding: 9px 10px;
+  min-width: 0;
+  position: relative;
+}
+.mat-palette button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mat-palette button:last-child > span {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.mat-palette button[aria-pressed="true"] {
+  border-color: var(--mat-focus);
+  background: var(--soft);
+  box-shadow: inset 0 0 0 1px var(--mat-focus);
+}
+.mat-palette kbd {
+  font: 8px var(--mono);
+  color: var(--muted);
+  margin-left: auto;
+  opacity: 0.6;
+}
+.mat-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
+}
+.mat-swatch-0 {
+  border: 1px dashed var(--muted);
+  background: transparent !important;
+}
+.mat-swatch-2 {
+  border-radius: 50% 50% 45% 45%;
+  transform: rotate(-10deg);
+}
+.mat-swatch-3,
+.mat-swatch-4 {
+  border-radius: 2px;
+}
+.mat-swatch-7 {
+  border-radius: 2px;
+  transform: rotate(45deg);
+  width: 10px;
+  height: 10px;
+  margin: 0 1px;
+}
+.mat-brush {
+  padding: 13px 15px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 65px;
+}
+.mat-selected {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mat-selected strong {
+  font:
+    17px/1.2 Georgia,
+    serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.mat-selected > span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.mat-brush label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.mat-brush input {
+  width: 75px;
+  accent-color: var(--mat-focus);
+}
+.mat-brush output {
+  font: 10px var(--mono);
+  min-width: 14px;
+}
+.mat-size-preview {
+  height: 22px;
+  width: 22px;
+  display: grid;
+  place-items: center;
+}
+.mat-size-preview:after {
+  content: "";
+  width: var(--brush-size);
+  height: var(--brush-size);
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: var(--soft);
+}
+.mat-stage {
+  position: relative;
+  background: var(--mat-paper);
+  border-block: 1px solid var(--line);
+  isolation: isolate;
+}
+.materials-lab .mat-workbench .mat-stage > canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 3/2;
+  touch-action: none;
+  cursor: crosshair;
+  image-rendering: auto;
+}
+.mat-stage.is-inspecting > canvas {
+  cursor: help;
+}
+.mat-canvas-invitation {
+  position: absolute;
+  left: 16%;
+  top: 20%;
+  width: 180px;
+  pointer-events: none;
+  color: var(--mat-focus);
+  transform: rotate(-5deg);
+  text-align: center;
+}
+.mat-canvas-invitation > span {
+  font:
+    italic 19px/1.2 Georgia,
+    serif;
+  display: block;
+  max-width: 170px;
+}
+.mat-canvas-invitation svg {
+  display: block;
+  margin: 9px 0 0 52px;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  fill: none;
+  opacity: 0.75;
+}
+.mat-stage-meta {
+  display: flex;
+  justify-content: space-between;
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 12px;
+  pointer-events: none;
+  font: 8px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mat-focus);
+  opacity: 0.7;
+}
+.mat-cell-card {
+  position: absolute;
+  right: 15px;
+  top: 42px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 13px;
+  width: 216px;
+  box-shadow: 0 6px 24px #0000000b;
+  animation: mat-reveal 120ms ease-out;
+}
+.mat-cell-card > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mat-cell-card i {
+  height: 10px;
+  width: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mat-cell-card strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.mat-cell-card > div > button {
+  margin-left: auto;
+  border: 0;
+  min-height: 26px;
+  padding: 1px 6px;
+  font-size: 18px;
+}
+.mat-cell-coordinate {
+  font: 9px var(--mono);
+  color: var(--muted);
+}
+.mat-cell-card p {
+  font-size: 11px;
+  margin: 10px 0 12px;
+  line-height: 1.6;
+}
+.mat-cell-card > button {
+  min-height: 34px;
+  font-size: 10px;
+}
+.mat-touch-preview {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  width: 92px;
+  pointer-events: none;
+  background: var(--surface);
+  border: 2px solid var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 4px 18px #0003;
+  overflow: hidden;
+  z-index: 4;
+}
+.mat-touch-preview canvas {
+  display: block;
+  width: 88px;
+  height: 88px;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+.mat-touch-preview span {
+  display: block;
+  font-size: 9px;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 2px 4px;
+}
+.mat-scene-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 15px;
+}
+.mat-hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.mat-scene-tools > .mat-hint {
+  margin: 0;
+  font-size: 10px;
+}
+.mat-scene-tools > .mat-hint span {
+  display: block;
+  font-size: 9px;
+  opacity: 0.85;
+}
+.mat-scene-tools details {
+  flex-shrink: 0;
+}
+.mat-scene-tools summary {
+  font-size: 10px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mat-scene-tools summary:after {
+  content: "+";
+  font-size: 14px;
+}
+.mat-scene-tools details[open] summary:after {
+  content: "−";
+}
+.mat-scene-tools details > div {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 210px;
+}
+.mat-scene-tools details > div > span {
+  flex-basis: 100%;
+  font: 9px var(--mono);
+  color: var(--muted);
+  text-align: right;
+}
+.materials-lab summary {
+  cursor: pointer;
+}
+.mat-inspector {
+  padding: 20px;
+}
+.mat-inspector h3 {
+  font:
+    24px/1.2 Georgia,
+    serif;
+  margin: 9px 0 20px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.mat-inspector h3 i {
+  display: block;
+  width: 11px;
+  height: 11px;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.mat-inspector label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  margin: 12px 0;
+}
+.mat-inspector input,
+.mat-inspector select,
+.mat-inspector textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--bg);
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 42px;
+}
+.mat-control-label {
+  display: block;
+  font-size: 11px;
+  margin: 16px 0 7px;
+}
+.mat-motions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.mat-motions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 3px;
+  min-height: 49px;
+  font-size: 10px;
+}
+.mat-motions button > span {
+  font:
+    20px/1 Georgia,
+    serif;
+}
+.mat-motions button[aria-pressed="true"] {
+  border-color: var(--mat-purple);
+  box-shadow: inset 0 0 0 1px var(--mat-purple);
+  background: var(--soft);
+}
+.mat-movement > p {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 6px 0 14px;
+}
+.mat-rule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mat-inspector details {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.mat-inspector summary {
+  font-size: 12px;
+}
+.mat-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 22px;
+}
+.mat-presets > span {
+  flex-basis: 100%;
+  margin-bottom: 6px;
+}
+.mat-presets button {
+  text-transform: capitalize;
+}
+.mat-proposal {
+  padding: 12px;
+  background: var(--soft);
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.mat-proposal pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 10px var(--mono);
+  max-height: 240px;
+  overflow: auto;
+}
+.mat-quick-rule {
+  padding: 13px 15px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.mat-quick-rule > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.mat-quick-rule .mat-eyebrow {
+  font-size: 8px;
+}
+.materials-lab .mat-text-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 26px;
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.mat-quick-rule .mat-motions button {
+  flex-direction: row;
+  gap: 7px;
+  min-height: 39px;
+}
+.mat-quick-rule p {
+  font-size: 10px;
+  margin: 8px 0 0;
+}
+.mat-quick-rule p span {
+  color: var(--muted);
+}
+.mat-status {
+  font-size: 12px;
+  padding: 10px 0;
+  color: var(--muted);
+}
+.mat-error {
+  border: 1px solid #bb7b70;
+  border-radius: 7px;
+  padding: 12px;
+  color: var(--ink);
+}
+.mat-artifacts {
+  border-top: 1px solid var(--line);
+  padding: 22px 0;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.mat-artifacts h3 {
+  font:
+    25px Georgia,
+    serif;
+  margin: 0 0 8px;
+}
+.mat-artifact-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.mat-import {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+}
+.mat-import:focus-within {
+  outline: 2px solid var(--mat-focus);
+  outline-offset: 3px;
+}
+.mat-import input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.mat-scene-list {
+  flex-basis: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.mat-scene-list strong {
+  font: 11px var(--mono);
+  min-width: 100px;
+}
+.mat-artifacts > .mat-hint {
+  flex-basis: 100%;
+}
+.mat-hint a {
+  margin-left: 9px;
+  color: var(--ink);
+  text-decoration: underline;
+}
+.mat-evidence {
+  border-top: 1px solid var(--line);
+  padding: 18px 0;
+}
+.mat-evidence p {
+  max-width: 800px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.materials-lab.is-compact:not(.show-details) .mat-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.materials-lab.is-compact:not(.show-details) .mat-inspector,
+.materials-lab.is-compact:not(.show-details) .mat-artifacts,
+.materials-lab.is-compact:not(.show-details) .mat-evidence {
+  display: none;
+}
+.materials-lab.is-compact .mat-intro {
+  margin-top: 0;
+}
+.materials-lab.is-compact .mat-expand {
+  margin-bottom: 12px;
+}
+.materials-lab.is-compact .mat-palette {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.mat-workbench:fullscreen {
+  overflow: auto;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 0;
+  border-radius: 0;
+}
+.mat-workbench:fullscreen .mat-stage {
+  width: min(100%, calc((100dvh - 315px) * 1.5));
+  margin: 0 auto;
+}
+.mat-workbench:fullscreen
+  :is(
+    .mat-palette,
+    .mat-toolbar,
+    .mat-brush,
+    .mat-scene-tools,
+    .mat-quick-rule
+  ) {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+@container materials (max-width:860px) {
+  .mat-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mat-local {
+    white-space: normal;
+    max-width: 140px;
+  }
+  .mat-inspector {
+    display: block;
+  }
+  .mat-intro h2 {
+    font-size: 29px;
+  }
+}
+@container materials (max-width:530px) {
+  .mat-toolbar {
+    gap: 8px;
+    padding: 9px;
+  }
+  .mat-mode-switch button {
+    padding: 5px 9px;
+  }
+  .mat-playback {
+    gap: 5px;
+  }
+  .mat-playback button {
+    padding: 8px 10px;
+  }
+  .mat-fullscreen > span:last-child {
+    display: none;
+  }
+  .mat-palette {
+    gap: 4px;
+    padding: 8px 8px 0;
+  }
+  .mat-palette button {
+    font-size: 10px;
+    padding: 8px 4px;
+    gap: 5px;
+    min-height: 42px;
+  }
+  .mat-palette kbd {
+    display: none;
+  }
+  .mat-swatch {
+    width: 10px;
+    height: 10px;
+  }
+  .mat-brush {
+    padding: 11px 12px;
+    gap: 10px;
+  }
+  .mat-selected strong {
+    font-size: 16px;
+    max-width: 145px;
+  }
+  .mat-selected > span {
+    font-size: 9px;
+    max-width: 175px;
+  }
+  .mat-brush input {
+    width: 64px;
+  }
+  .mat-brush-label {
+    display: none;
+  }
+  .mat-brush label {
+    gap: 4px;
+  }
+  .mat-size-preview {
+    width: 18px;
+  }
+  .mat-canvas-invitation {
+    left: 12%;
+    top: 18%;
+    width: 130px;
+  }
+  .mat-canvas-invitation > span {
+    font-size: 16px;
+  }
+  .mat-canvas-invitation svg {
+    height: 32px;
+    margin-top: 5px;
+  }
+  .mat-scene-tools {
+    padding: 10px 12px;
+  }
+  .mat-scene-tools > .mat-hint span {
+    max-width: 180px;
+  }
+  .mat-cell-card {
+    width: 175px;
+    right: 10px;
+    top: 32px;
+    padding: 10px;
+  }
+  .mat-cell-card p {
+    font-size: 10px;
+  }
+  .mat-intro {
+    display: block;
+  }
+  .mat-local {
+    display: block;
+    max-width: none;
+    margin-top: 12px;
+  }
+  .mat-intro h2 {
+    font-size: 29px;
+  }
+  .mat-artifact-actions {
+    width: 100%;
+  }
+  .mat-inspector {
+    padding: 17px;
+  }
+}
+@media (max-width: 520px) {
+  .materials-lab button,
+  .mat-import {
+    min-height: 42px;
+  }
+  .mat-cell-card > div > button {
+    min-height: 28px;
+  }
+  .mat-mode-switch button {
+    min-height: 34px;
+  }
+  .mat-workbench:fullscreen {
+    padding: 8px;
+  }
+}
+@keyframes mat-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .materials-lab * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .materials-lab button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+.mat-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

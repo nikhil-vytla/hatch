@@ -1,0 +1,14 @@
+# Design research notes
+
+- New assignment: inspect the original Laya writing and repositories, plus primary design-engineer sites with usable visual/code artifacts. Link authors directly and distinguish inspiration from shipped implementation.
+- Research artifacts must remain selective. No third-party source tree or full copied implementation enters this folder.
+- Used a separate named Playwright session, `jev-design-research`, at 1440×1080 and 390×844. Captured eleven selected WebP screenshots and inspected each. Removed two redundant captures, including partially loaded craft-gallery media.
+- Browser navigation read Laya and Redraw pages that the text web tool could not open. Used public links and rendered page text to identify Nandakishor M as model author and Wojciech Dobry as playground/benchmark/skill author.
+- Verified primary GitHub repositories and license pages: Laya Apache-2.0; Laya playground MIT; Sonner MIT; cmdk MIT. cmdk's original Paco link redirects to dip/cmdk, whose history still credits Paco, Rauno and Shu.
+- Verified Eric Zhang through github.com/ekzhang and openjev-sglang. Existing local-models-and-games already pins the original method inspiration and distinguishes the MLX adaptation from a CUDA runtime port.
+- Inspected source examples and visible interactions from Rauno, Emil, Josh, Paco and Maggie. Clicked Paco's Engineering tab and saved the selected result. No benchmark or animation-performance claim follows from screenshots.
+- Findings sent to root while it refined home and footer: playable figure first, restrained metadata, clear source labels, instant frequent actions, short optional explanatory motion, original builder credits.
+- Wrote original `reference-board.html` with eleven attributed screenshots and no copied implementation. Wrote standalone `style-study.html` using paper/ink/moss/ochre tokens, source disclosure, immediate direction controls, a selected-grain inspector, keyboard movement, fullscreen, PNG export, dark mode and reduced-motion behavior.
+- Verified the style study in the separate browser session at 1440×1080 and 390×844. Clicked Rise, paused, selected a grain, moved it with ArrowRight, entered/exited full screen and downloaded a PNG. Reduced-motion reload started paused and exposed a 0ms panel duration. Mobile overflow was false.
+- Visual review found grains behind the small-screen caption. Added a paper background to the caption and recaptured mobile. The initial favicon 404 was removed using an empty data icon; fresh navigations showed no console errors.
+- Saved three style-study screenshots in addition to the eleven source captures. All fourteen image files are below 2 MB individually. This is an original review artifact, not a claim that its styling shipped into the app. Physical touch testing and frame-time profiling remain outside this bounded pass.
