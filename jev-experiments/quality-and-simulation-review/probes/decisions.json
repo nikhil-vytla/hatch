@@ -1,0 +1,342 @@
+{
+  "method": "Shared decoded evidence plus frozen component executed with mocked React hooks/elements; exhaustive integer slider grid. No browser/provider calls. These are sensitivity and setup checks, not independent project-quality judgments.",
+  "baselineCommit": "4c0c40d",
+  "sourceUnchanged": true,
+  "sourceHash": "10e45c497614de5ee66c1dc5b2620eda0eababeb3ff0d11a38e2022ba9847d63",
+  "evidenceHash": "c313ef3a55789282bd035a08d6501a94c04a295b686a2e402749dc47253c29e2",
+  "evidence": {
+    "cases": 20,
+    "completed": 18,
+    "failed": [
+      {
+        "case": 5,
+        "error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand"
+      },
+      {
+        "case": 17,
+        "error": "HTTP 429: {\"error\":{\"message\":\"The upstream provider is currently experiencing high demand"
+      }
+    ],
+    "scoreJudgments": 216,
+    "missingJudgments": 54,
+    "uniqueOrderedInputs": 6,
+    "uniqueContentSets": 4,
+    "groups": [
+      {
+        "cases": [
+          0
+        ],
+        "order": [
+          "a",
+          "b",
+          "c"
+        ],
+        "prototypeAddedTo": []
+      },
+      {
+        "cases": [
+          1
+        ],
+        "order": [
+          "b",
+          "c",
+          "a"
+        ],
+        "prototypeAddedTo": []
+      },
+      {
+        "cases": [
+          2
+        ],
+        "order": [
+          "c",
+          "a",
+          "b"
+        ],
+        "prototypeAddedTo": []
+      },
+      {
+        "cases": [
+          3,
+          6,
+          9,
+          12,
+          15,
+          18
+        ],
+        "order": [
+          "a",
+          "b",
+          "c"
+        ],
+        "prototypeAddedTo": [
+          "a"
+        ]
+      },
+      {
+        "cases": [
+          4,
+          7,
+          10,
+          13,
+          16,
+          19
+        ],
+        "order": [
+          "b",
+          "c",
+          "a"
+        ],
+        "prototypeAddedTo": [
+          "b"
+        ]
+      },
+      {
+        "cases": [
+          8,
+          11,
+          14
+        ],
+        "order": [
+          "c",
+          "a",
+          "b"
+        ],
+        "prototypeAddedTo": [
+          "c"
+        ]
+      }
+    ],
+    "prototypeAddedAlwaysFirst": true,
+    "equalWeightWinners": {
+      "a": 18,
+      "b": 0,
+      "c": 0
+    },
+    "baselineScoreRanges": [
+      {
+        "id": "c",
+        "criterion": "ease",
+        "min": 1.13,
+        "max": 1.57,
+        "range": 0.44000000000000017
+      },
+      {
+        "id": "b",
+        "criterion": "ease",
+        "min": 0.28,
+        "max": 0.67,
+        "range": 0.39
+      },
+      {
+        "id": "b",
+        "criterion": "usefulness",
+        "min": 0.37,
+        "max": 0.63,
+        "range": 0.26
+      },
+      {
+        "id": "c",
+        "criterion": "shareability",
+        "min": 1.06,
+        "max": 1.28,
+        "range": 0.21999999999999997
+      },
+      {
+        "id": "a",
+        "criterion": "usefulness",
+        "min": 1.59,
+        "max": 1.75,
+        "range": 0.15999999999999992
+      },
+      {
+        "id": "b",
+        "criterion": "shareability",
+        "min": 1.78,
+        "max": 1.9,
+        "range": 0.11999999999999988
+      },
+      {
+        "id": "c",
+        "criterion": "usefulness",
+        "min": 1.71,
+        "max": 1.81,
+        "range": 0.10000000000000009
+      },
+      {
+        "id": "a",
+        "criterion": "shareability",
+        "min": 1.89,
+        "max": 1.97,
+        "range": 0.08000000000000007
+      },
+      {
+        "id": "a",
+        "criterion": "ease",
+        "min": 1.94,
+        "max": 1.99,
+        "range": 0.050000000000000044
+      },
+      {
+        "id": "b",
+        "criterion": "novelty",
+        "min": 1.94,
+        "max": 1.95,
+        "range": 0.010000000000000009
+      },
+      {
+        "id": "a",
+        "criterion": "novelty",
+        "min": 0.01,
+        "max": 0.02,
+        "range": 0.01
+      },
+      {
+        "id": "c",
+        "criterion": "novelty",
+        "min": 0,
+        "max": 0,
+        "range": 0
+      }
+    ],
+    "transport": {
+      "attempts": 40,
+      "status_counts": {
+        "200": 18,
+        "429": 22
+      },
+      "successful_attempt_latency_ms": {
+        "p50": 333.58235453488305,
+        "p95": 433.76317143556656
+      },
+      "logical_request_latency_ms_including_retries_excluding_queue": {
+        "p50": 10478.578167002792,
+        "p95": 20843.228186065226
+      },
+      "reported_usd": 0,
+      "attempts_without_cost_metadata": 22,
+      "note": "Logical request duration is reconstructed from recorded attempt timestamps. It includes failed requests and retry waits, but excludes time waiting for the shared concurrency slot."
+    }
+  },
+  "ui": {
+    "caseUsed": 0,
+    "initial": {
+      "weights": {
+        "usefulness": 3,
+        "novelty": 2,
+        "ease": 2,
+        "shareability": 1
+      },
+      "ranked": [
+        {
+          "id": "a",
+          "name": "Pocket tutor",
+          "evidence": "Two-day prototype. Local flashcards and adaptive hints. Useful to students. Similar apps exist. Can demo in a browser.",
+          "scores": {
+            "usefulness": 1.75,
+            "novelty": 0.01,
+            "ease": 1.98,
+            "shareability": 1.95
+          },
+          "confidence": {
+            "usefulness": 0.62,
+            "novelty": 0.99,
+            "ease": 0.97,
+            "shareability": 0.92
+          },
+          "missing_probability": 0.15,
+          "total": 0.69875
+        },
+        {
+          "id": "c",
+          "name": "Citation checker",
+          "evidence": "Four-day prototype. Compare claims against supplied sources. Useful to researchers. Many related tools exist. Text-based demo.",
+          "scores": {
+            "usefulness": 1.81,
+            "novelty": 0,
+            "ease": 1.13,
+            "shareability": 1.27
+          },
+          "confidence": {
+            "usefulness": 0.72,
+            "novelty": 1,
+            "ease": 0.76,
+            "shareability": 0.48
+          },
+          "missing_probability": 0.17,
+          "total": 0.5599999999999999
+        },
+        {
+          "id": "b",
+          "name": "Living atlas",
+          "evidence": "Two-week prototype. A procedural world changes as visitors describe it. Distinctive and visually shareable. Practical audience is uncertain.",
+          "scores": {
+            "usefulness": 0.63,
+            "novelty": 1.95,
+            "ease": 0.57,
+            "shareability": 1.78
+          },
+          "confidence": {
+            "usefulness": 0.45,
+            "novelty": 0.93,
+            "ease": 0.35,
+            "shareability": 0.67
+          },
+          "missing_probability": 0.33,
+          "total": 0.5443749999999999
+        }
+      ]
+    },
+    "zeroWeights": {
+      "ranked": [
+        {
+          "id": "a",
+          "total": 0
+        },
+        {
+          "id": "b",
+          "total": 0
+        },
+        {
+          "id": "c",
+          "total": 0
+        }
+      ],
+      "winnerCard": "a",
+      "runnerEqualWeightFallback": [
+        {
+          "id": "a",
+          "utility": 0.71125
+        },
+        {
+          "id": "b",
+          "utility": 0.61625
+        },
+        {
+          "id": "c",
+          "utility": 0.52625
+        }
+      ]
+    },
+    "grid": {
+      "configurations": 1296,
+      "nonzero": 1295,
+      "uniqueWinnerCounts": {
+        "a": 832,
+        "b": 450,
+        "c": 12
+      },
+      "trueTieCount": 2,
+      "roundedTopTieCount": 24
+    },
+    "hiddenFields": [
+      "raw rubric text",
+      "other cases",
+      "recorded next_question",
+      "score probability distributions",
+      "dominance",
+      "visible missing-evidence judgments"
+    ],
+    "note": "Confidence and missing_probability survive inside ranked JSON but are not rendered as review controls; raw answers and rubrics are not in the component inspector."
+  }
+}

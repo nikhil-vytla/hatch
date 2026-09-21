@@ -1,0 +1,175 @@
+{
+  "at": "2026-09-21T01:04:51.794Z",
+  "origin": "https://jev-experiments.vercel.app",
+  "passed": true,
+  "results": [
+    {
+      "path": "/",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 963,
+      "passed": true
+    },
+    {
+      "path": "/data/live-worlds.json",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 467,
+      "result": {
+        "kind": "interactive prototypes",
+        "recordedModelResults": true,
+        "recordedCoverage": {
+          "crowd": "One authored notice, 12 fictional resident plans",
+          "ghostBrush": "Two authored phrases, 20 recipe-fit judgments",
+          "liveTetris": "No new model recording; local timing demo and visitor-key play"
+        },
+        "description": "Original playable worlds with separate local, recorded and visitor-key Jev attribution. These demonstration examples are not a benchmark."
+      },
+      "passed": true
+    },
+    {
+      "path": "/research/quality-review/review.html",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 338306,
+      "passed": true
+    },
+    {
+      "path": "/data/judgment-reliability.json",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 307887,
+      "availability": {
+        "planned": 7440,
+        "completed": 7440,
+        "unavailable": 0,
+        "planned_decisions": 14880,
+        "completed_decisions": 14880,
+        "completed_batches": 1177,
+        "transient_failed_invocations": 5,
+        "blocked_invocations": 0,
+        "attempts": 1779,
+        "unsuccessful_attempts": 602,
+        "median_latency_ms": 487,
+        "p95_latency_ms": 36546,
+        "returned_models": [
+          "typesafe-ai/jev"
+        ],
+        "reported_cost_usd": 0,
+        "first_at": "2026-09-20T20:05:27.680Z",
+        "last_at": "2026-09-20T22:46:50.077Z"
+      },
+      "completeStudy": true,
+      "passed": true
+    },
+    {
+      "path": "/judgment-reliability/analysis.json",
+      "method": "GET",
+      "expectedStatus": 200,
+      "status": 200,
+      "bytes": 1554,
+      "analysis": {
+        "version": "judge-reliability-analysis-v2.1",
+        "amendment": {
+          "id": "missing-source-id-clusters",
+          "date": "2026-09-20",
+          "reason": "The frozen source+original_id analysis grouped 312 pairs with missing IDs into three source-wide clusters. Exact-question grouping separates those questions and merges one identical-text group with different valid source IDs, without changing any recorded judgment or accuracy denominator.",
+          "preserved": "Frozen protocol.ts, manifest.json, cases.jsonl and append-only events.jsonl remain byte-identical. Only analysis grouping, confidence intervals and descriptive cluster counts are amended."
+        },
+        "cluster_rule": "Group every pair by source plus SHA-256 of its exact question string. This keeps repeated questions together when original_id is missing or when identical text has different source IDs. The archive is checked to contain no non-null source+ID spanning multiple question texts; such variants would require connected-component grouping.",
+        "source_clusters": 528,
+        "frozen_protocol_source_questions": 268,
+        "pairs_with_source_id": 308,
+        "pairs_without_source_id": 312,
+        "nonnull_source_id_groups": 265,
+        "null_id_question_groups": 264,
+        "distinct_question_texts": 528,
+        "same_text_distinct_id_groups": 1,
+        "source_id_multiple_text_groups": 0,
+        "bootstrap": {
+          "draws": 10000,
+          "seed": 73421
+        },
+        "evidence_coverage": {
+          "normalized_questions": 14880,
+          "raw_matched_questions": 14614,
+          "normalized_only_questions": 266,
+          "normalized_only_batches": 21
+        }
+      },
+      "passed": true
+    },
+    {
+      "path": "/api/evaluate",
+      "method": "POST",
+      "expectedStatus": 401,
+      "status": 401,
+      "bytes": 108,
+      "cacheControl": "no-store",
+      "error": "Enter your Vercel AI Gateway API key to run live. Recorded examples are available without a key.",
+      "passed": true
+    },
+    {
+      "path": "/api/compose",
+      "method": "POST",
+      "expectedStatus": 401,
+      "status": 401,
+      "bytes": 61,
+      "cacheControl": "no-store",
+      "error": "Enter your Vercel AI Gateway API key to run live.",
+      "passed": true
+    },
+    {
+      "path": "/api/wardrobe-token",
+      "method": "POST",
+      "expectedStatus": 401,
+      "status": 401,
+      "bytes": 56,
+      "cacheControl": "no-store",
+      "error": "Enter your own fal API key to connect video.",
+      "passed": true
+    },
+    {
+      "path": "/api/wardrobe-token",
+      "method": "GET",
+      "expectedStatus": 405,
+      "status": 405,
+      "bytes": 21,
+      "cacheControl": "no-store",
+      "error": "Use POST.",
+      "passed": true
+    },
+    {
+      "path": "/api/wardrobe-token",
+      "method": "POST",
+      "expectedStatus": 400,
+      "status": 400,
+      "bytes": 66,
+      "cacheControl": "no-store",
+      "error": "This endpoint only connects the wardrobe try-on model.",
+      "passed": true
+    }
+  ],
+  "media": [
+    {
+      "path": "/wardrobe/try-on-demo.webm",
+      "status": 200,
+      "bytes": 905077,
+      "sha256": "beb3e7b1ea086e86821fe691189438e61a8e72602cf3843297373c3ac532f3a9",
+      "expectedDurationSeconds": 29.905,
+      "passed": true
+    },
+    {
+      "path": "/wardrobe/spoken-try-on-demo.webm",
+      "status": 200,
+      "bytes": 994578,
+      "sha256": "1e0f9b6c2b1f847208267835c835b1dad6b5d8875593040ba0d201e2a3456d26",
+      "expectedDurationSeconds": 29.954,
+      "passed": true
+    }
+  ]
+}

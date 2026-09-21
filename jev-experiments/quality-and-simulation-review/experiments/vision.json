@@ -1,0 +1,151 @@
+{
+  "id": "vision",
+  "title": "Vision to action",
+  "evidenceStatus": "One authored screenshot and recorded caption/Jev response; offline provenance/merge probe; external metadata counted but zero external evaluations; frozen main 4c0c40d5",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The honest smoke test exposes a captioning failure and Jev rates evidence at 0.25, but its action label does not gather evidence or complete a task. The current repair handler also retains old caption/task metadata beside new answers. A grounded crop/OCR loop with independent task checks would turn this into a useful experiment.",
+  "strengths": [
+    "The real input image and erroneous caption are both preserved and the UI clearly discloses the failure.",
+    "The record correctly calls one example a composition smoke test, not vision accuracy.",
+    "The archived upload/worker flow has progress, an 8 MB limit and cancellation; published image bytes match the original."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Low evidence does not produce a concrete inspection step",
+      "evidence": "results/vision.jsonl chooses describe at 0.50 while enough_evidence is 0.25. web/src/recipes.ts:324–339 and misc.tsx:343–362 return labels without targets, crop requests or action execution.",
+      "impact": "Uncertainty detection cannot repair missing evidence, and the generic task has no independent success condition.",
+      "fix": "Define concrete goals, grounded region/evidence actions and code-owned tool budgets and abstention policy; score completed tasks."
+    },
+    {
+      "priority": "P1",
+      "title": "Repaired decisions retain old input metadata",
+      "evidence": "misc.tsx:343–357 sends edited description/question then merges row and reply. The synthetic offline probe retains original caption/task/model beside new answers; no request/revision guard is stored.",
+      "impact": "A saved decision cannot reconstruct the evidence that produced it, and late responses can appear under later edits.",
+      "fix": "Store exact request and image/caption/question versions, separate manual intervention from original perception, and reject stale updates."
+    },
+    {
+      "priority": "P2",
+      "title": "Repair comparison changes the protocol as well as evidence",
+      "evidence": "web/src/recipes.ts:321–339 asks three questions with descriptive criteria; misc.tsx:343–355 changes state keys, criteria wording and asks only two. Python compositions.py:426 is a third variant.",
+      "impact": "Changed answers cannot be attributed solely to caption repair.",
+      "fix": "Use one versioned protocol and paired original/repaired requests with fixed tasks/settings; preserve historical output separately."
+    },
+    {
+      "priority": "P2",
+      "title": "The current page cannot gather new visual evidence",
+      "evidence": "misc.tsx:291–365 has a fixed image and editable text, no image input, worker, crop/OCR or target overlay; alt text does not describe screenshot content.",
+      "impact": "Manual caption repair cannot demonstrate recovery by the perception pipeline or grounded action.",
+      "fix": "Add explicit local perception, source-linked crop/OCR evidence, keyboard region controls, meaningful alt text and clearly labeled manual/recorded fallback."
+    },
+    {
+      "priority": "P2",
+      "title": "One record lacks per-stage attribution",
+      "evidence": "Probe finds one image/task, no image hash/model revision/config/request or caption timing, transport null; 237.3 ms is gateway latency from web/src/recipes.ts:371–380.",
+      "impact": "Neither perception accuracy nor end-to-end speed and reproducibility are established.",
+      "fix": "Pin stage inputs/runtime, retain full timing/failure records and independently evaluate perception, sufficiency and task outcomes."
+    }
+  ],
+  "simulation": {
+    "title": "Inspect a fictional screen",
+    "description": "Find and operate a named control in a sandbox dashboard by requesting numbered crops/OCR, clarifying ambiguity and proposing grounded targets. Human takeover, checkpoints and branches preserve the exact evidence state.",
+    "jevsRole": "Choose the next evidence request and interpret the user goal against observed regions; never receive gold target labels.",
+    "codeRole": "Own image hashes, region geometry, revisions, budgets, sandbox transitions, hidden goal checks and stale-response handling.",
+    "acceptanceCriteria": [
+      "Every target links to observed source evidence and coordinates remain correct after scaling.",
+      "No hidden evaluator labels enter model input.",
+      "Human takeover, cancellation, undo and branching cannot be overwritten by late responses.",
+      "Manual, recorded and generated evidence have distinct provenance.",
+      "Missing-target cases clarify or abstain within budget; complete goals are independently checked.",
+      "Keyboard region selection matches pointer controls and raw versus guarded actions remain visible."
+    ]
+  },
+  "evaluation": {
+    "design": "Authored study: 40 held-out screens × three goals × two visual conditions = 240 tasks; separate 20-screen development set. Four evidence modes × three repeats × at most three decisions gives at most 8640 evaluations/25920 typed answers, plus separately counted perception/tool calls. Freeze perception for a decision-only ablation and bootstrap by source screen. Full external ScreenSpot-v2: 1272 cases × three methods × three repeats = 11448 single-step evaluations, 576 batches of 20 before retries; adaptive three-step ceiling 34344. Use official point-in-box accuracy with invalid outputs counted and no gold-derived candidate proposals.",
+    "baselines": [
+      "Deterministic OCR token matching and seeded random regions",
+      "Global caption, caption plus OCR and adaptive crop/OCR",
+      "Human-authored complete evidence as an explicit upper-bound intervention",
+      "Direct multimodal grounding as a separately budgeted condition"
+    ],
+    "metrics": [
+      "Independent goal completion and unsupported-action rate",
+      "Point-in-box accuracy by platform and text/icon; candidate recall",
+      "Missing-target abstention and clarification usefulness",
+      "Evidence retention, tool budget, latency by stage, download/memory and provider failures",
+      "Paired source-screen bootstrap intervals and raw/guarded outcomes"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "One authored screenshot/task and three recorded decisions; 0/1272 external grounding cases. Offline probe is structural, not inference.",
+      "full": "ScreenSpot-v2 pinned revision 5efbb1f1b5463a575f2eb7bc30fe29e49c15f93c has 334 desktop + 501 mobile + 437 web = 1272 instructions across 730 unique image filenames, counted from official JSON.",
+      "feasibility": "Small annotations verified; no images/weights downloaded. Full evaluation needs images, image-derived candidates, local perception compute, scorer parity and a request budget. Hub auto-viewer fails, so load named annotation files directly."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Transformers.js 3.8.1",
+      "url": "https://huggingface.co/docs/transformers.js/v3.8.1/en/pipelines",
+      "use": "Reuse the browser perception worker with pinned model revision and measured download/inference stages."
+    },
+    {
+      "name": "Tesseract.js",
+      "url": "https://github.com/naptha/tesseract.js",
+      "use": "Add local OCR for missed UI labels, retaining explicitly requested region/word output and source boxes."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Fix exact-input provenance and revision/abort guards."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Define grounded evidence/target actions and a development-chosen abstention policy."
+    },
+    {
+      "priority": "P2",
+      "size": "S",
+      "action": "Unify prompts and store paired repair results."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Restore local perception with crop/OCR and full stage records."
+    },
+    {
+      "priority": "P2",
+      "size": "L",
+      "action": "Build the complete sandbox journey and authored study, then run all external cases under a declared plan."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Caption model card",
+      "url": "https://huggingface.co/Xenova/vit-gpt2-image-captioning"
+    },
+    {
+      "label": "Transformers.js pinned-version API",
+      "url": "https://huggingface.co/docs/transformers.js/v3.8.1/en/pipelines"
+    },
+    {
+      "label": "Tesseract.js primary repository",
+      "url": "https://github.com/naptha/tesseract.js"
+    },
+    {
+      "label": "ScreenSpot-v2 official release",
+      "url": "https://huggingface.co/datasets/OS-Copilot/ScreenSpot-v2"
+    },
+    {
+      "label": "ScreenSpot-v2 authors",
+      "url": "https://github.com/OS-Copilot/OS-Atlas"
+    },
+    {
+      "label": "Official ScreenSpot scoring code",
+      "url": "https://raw.githubusercontent.com/njucckevin/SeeClick/main/pretrain/screenspot_test.py"
+    }
+  ]
+}

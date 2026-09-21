@@ -1,0 +1,147 @@
+{
+  "id": "reward",
+  "title": "Learning from rewards",
+  "evidenceStatus": "One published run: 44/48 training requests annotated, 80 authored test cases, exact offline reproduction",
+  "verdict": "redesign",
+  "highestPriority": "P1",
+  "summary": "The local optimizer really changes 576 parameters, and Jev ranks the correct drink first on all 44 annotated requests. Held-out temperature words are absent from the student vocabulary: normalizing only warm/chilled raises the unchanged policy from 51/80 to 74/80. The present curve comparison mixes reward quality, representation shift, and stochastic versus greedy scoring, so it cannot explain the source of the gap.",
+  "strengths": [
+    "Published weights and all 13 curve points reproduce exactly without API calls.",
+    "Independent menu facts supply task labels, and the fixed 240-step recipe does not select a checkpoint from the test curve.",
+    "The page identifies the learner as a linear policy rather than a language model.",
+    "The existing optimizer test passes, and the record retains the failed annotation batch."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "The test split erases temperature information",
+      "evidence": "src/jev_lab/compositions.py:269 and src/jev_lab/teach.py:13; probes/reward.json records warm/chilled absent from vocabulary, identical features for all 60 valid temperature counterfactuals, and accuracy rising from 63.75% to 92.5% after only synonym normalization.",
+      "impact": "The published gap largely reflects a student representation confound. Different temperature requirements cannot change the policy when their only distinguishing tokens disappear.",
+      "fix": "Separate ordinary and lexical-shift tests, declare normalization controls before testing, and add decisive-attribute minimal pairs. Keep the current score as historical evidence."
+    },
+    {
+      "priority": "P1",
+      "title": "The reward and task curves do not isolate reward quality",
+      "evidence": "src/jev_lab/teach.py:121 measures expected training reward and greedy test accuracy; experience-prototypes/src/benchmarks.tsx:455 emphasizes their divergence. Jev reward argmax is correct on 44/44 training rows, a supervised same-feature baseline also scores 51/80, and exact oracle rewards score 50/80.",
+      "impact": "Dataset shift, train/test generalization, and action-selection rules are mixed. The records do not demonstrate reward exploitation or a reward-training advantage over supervised labels.",
+      "fix": "Evaluate reward and oracle validity on the same cases under the same stochastic or greedy rule. Publish supervised, oracle-reward, grammar-parser, and random controls."
+    },
+    {
+      "priority": "P1",
+      "title": "One authored menu and wording seed cannot establish stable learning",
+      "evidence": "src/jev_lab/compositions.py:246 and :266 cycle eight fixed drink targets through four shuffled requirements. src/jev_lab/teach.py:141 hardcodes train seed 17 and test seed 82 while the manifest reports seed 42. The frozen policy ranges from 50% to 70% across 20 test wording seeds, averaging 57.13%.",
+      "impact": "The current evidence omits missing preferences, impossible requests, changed menus, independently varied training sets, and case-level test predictions. Template-specific correlations limit the learning claim.",
+      "fix": "Persist actual seeds and predictions; split language and menu families; include impossible and ambiguous cases; run independent training datasets and report clustered paired uncertainty."
+    },
+    {
+      "priority": "P1",
+      "title": "Partial annotation is labeled complete",
+      "evidence": "results/reward.jsonl:59 records an exhausted HTTP 429 batch at start 40, leaving 44/48 planned examples. The manifest at line 1 says complete. src/jev_lab/teach.py:164 only marks the all-failed case partial, and src/jev_lab/core.py:204 otherwise defaults to complete.",
+      "impact": "The missing batch changes class balance, and the UI shows usable training size without planned coverage. Provider availability is obscured even though it is distinct from prediction quality.",
+      "fix": "Persist planned/successful/failed IDs, show annotation coverage, mark incomplete runs, resume missing batches, and train all baselines on the same available rows."
+    },
+    {
+      "priority": "P2",
+      "title": "The visitor cannot inspect policy changes or failed orders",
+      "evidence": "experience-prototypes/src/benchmarks.tsx:425 provides curves and counts; :585 restricts the example browser to teach; :618 exposes only raw recorded measurements for reward. The runner saves no intermediate weights or test predictions.",
+      "impact": "The central interaction does not explain why a policy chose a drink or how a reward update changed that choice. An empty curve can also default to 0% at :449.",
+      "fix": "Save checkpoint predictions and add case replay showing actions, probabilities, Jev rewards, independent validity, and clear unavailable states."
+    }
+  ],
+  "simulation": {
+    "title": "Run a cafe with an imperfect reward",
+    "description": "Replay the same customer queue with starting, reward-trained, supervised, and oracle-reward policies. Requests can be incomplete or impossible, and menu facts can change. Visitors inspect serve, clarify, no-match, and failed-order decisions across checkpoints.",
+    "jevsRole": "Score visible state-action compatibility for eight drink actions, four preference clarifications, and no_match. Supply cached semantic rewards without seeing private customer constraints or oracle outcomes.",
+    "codeRole": "Own the seeded environment, menu and inventory facts, private constraints, acceptable-action sets, clarification replies, three-decision limit, transitions, independent completion scores, policy updates, and recorded replay. Missing reward data remains unavailable; invalid actions remain failed transitions.",
+    "acceptanceCriteria": [
+      "Every displayed decision traces to a checkpoint, state, candidate set, reward record, and independent outcome; identical seeds replay identically.",
+      "Temperature minimal pairs remain distinguishable, and swapping menu facts changes oracle validity while drink names stay fixed.",
+      "Visitors can inspect serve, clarify, no-match, and failure trajectories; each chart names its dataset, evaluator, denominator, and action-selection rule.",
+      "Missing annotations, invalid actions, and timeouts remain visible and separate from prediction accuracy.",
+      "A labeled synthetic biased-reward control can demonstrate reward gain with utility loss without attributing that behavior to the existing Jev run."
+    ]
+  },
+  "evaluation": {
+    "design": "Five independent training sets of 320 authored decision states, 160 development states, and a locked 640-state test with 128 cases in each of five slices: ordinary wording, unseen language families, changed menus, missing preferences, and impossible requests. Use three genuinely stochastic learner/order seeds per training set where applicable, yielding 15 runs per method; repeating deterministic inputs does not count as replication. Group language/menu families before splitting and check duplicates. Add 200 locked short sessions for independent completion. Choose checkpoints only on development data; report paired 95% intervals over training datasets and held-out families. A useful-policy target is at least 90% acceptable-action accuracy, at most 1% hard-constraint violations, and at least a 15-point gain over untrained. Claim superiority over supervised learning only when the paired lower interval exceeds zero. Score all 13 actions per state, requiring 2,400 logical Jev requests and 31,200 judgments before retries; a stratified 10% repeat brings the proposal to 2,640 requests and 34,320 judgments. Cache reuse makes local replicates and direct greedy Jev comparisons free of further reward calls. No such calls were made in this audit.",
+    "baselines": [
+      "Uniform random and most-frequent action",
+      "Declared grammar parser with menu lookup, currently 80/80 on the authored fixture grammar",
+      "Supervised logistic regression on Jev reward argmax, currently 51/80 with the same features",
+      "Exact oracle-reward policy, currently 50/80 with the same optimizer",
+      "Direct greedy Jev scoring on cached test reward tables",
+      "Shuffled-reward control and separately declared normalized/raw representation conditions"
+    ],
+    "metrics": [
+      "Expected Jev reward and expected independent oracle validity on identical states and action distributions",
+      "Greedy acceptable-action accuracy, broken out by test slice and menu family",
+      "Per-constraint violations, no-match precision/recall, useful-clarification rate",
+      "Episode completion and mean decisions per completed order",
+      "Reward Brier error against independent validity, false-high-score rate, top-ranked action validity",
+      "Annotation coverage, latency, request/judgment volume, and paired uncertainty"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "One published full-information pilot, 44 of 48 planned training requests and 80 test requests from one eight-drink generator. Offline probe reproduces it exactly and adds 20 wording-seed sensitivity checks, not independent training runs.",
+      "full": "Proposed authored evaluation: 1,600 training states across five datasets, 160 development states, 640 locked test states, plus 200 independent short sessions. This is not an external benchmark and has no external official split or score.",
+      "feasibility": "Small local learners are feasible without large weights. Blockers are validated ambiguity/no-match cases, clean language/menu-family splits, and a future annotation budget of up to 2,640 logical requests before retries. No paid calls were made."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Gymnasium",
+      "url": "https://gymnasium.farama.org/introduction/create_custom_env/",
+      "use": "Seeded reset, declared state/action spaces, explicit transitions and outcome flags, and environment checking for the cafe simulation. Jev adds semantic rewards; code retains independent outcomes."
+    },
+    {
+      "name": "Vowpal Wabbit",
+      "url": "https://vowpalwabbit.org/docs/vowpal_wabbit/python/latest/tutorials/python_Contextual_bandits_and_Vowpal_Wabbit.html",
+      "use": "A later cb_explore_adf mode for changing action sets and chosen-action cost/probability feedback. Jev supplies cached rewards; VW supplies the learner and exploration instead of a new handwritten bandit algorithm."
+    },
+    {
+      "name": "scikit-learn GroupKFold",
+      "url": "https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GroupKFold.html",
+      "use": "Keep whole language/menu families apart during development and retain the existing supervised baseline. Leave the final test outside model selection."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Publish the temperature-confound diagnosis, matched cheap baselines, annotation coverage, and comparable reward/oracle metric labels while preserving the historical record."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Persist full test cases, predictions, actual seeds, planned annotation IDs, and same-state reward/oracle measurements; add temperature-pair and partial-coverage checks."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Author grouped cafe cases and cached action scores, then run the independent training-set evaluation under a future annotation budget."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Build recorded checkpoint replay and failed-order inspection backed by deterministic Gymnasium outcomes."
+    },
+    {
+      "priority": "P2",
+      "size": "L",
+      "action": "Reuse the state/action cache in a VW chosen-feedback study, then a separate sequential clarification-policy experiment."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Gymnasium custom environments",
+      "url": "https://gymnasium.farama.org/introduction/create_custom_env/"
+    },
+    {
+      "label": "Vowpal Wabbit contextual bandits",
+      "url": "https://vowpalwabbit.org/docs/vowpal_wabbit/python/latest/tutorials/python_Contextual_bandits_and_Vowpal_Wabbit.html"
+    },
+    {
+      "label": "scikit-learn GroupKFold",
+      "url": "https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GroupKFold.html"
+    }
+  ]
+}

@@ -1,0 +1,647 @@
+{
+  "sourceHashes": {
+    "local-models-and-games/arcade/engine.ts": "76854aaa07c476d8294d04193d2bd65f5ae5b4a65d825a34078149ae6944f15c",
+    "local-models-and-games/arcade/record.ts": "f6b39d4061455be6466a7f092bdc649142539d8a5494f01b801d8e59c8486f08",
+    "local-models-and-games/arcade/results.jsonl": "ccc4022446a59f984c0dca7bd631609b88428272d2873aacb7ac4228614cc8d6",
+    "experience-prototypes/src/arcade.tsx": "3e4e64b4cd8a4f68db0c7ddfc35331b56317fcc3e8e47f7608efcd8265bd3198"
+  },
+  "manifest": {
+    "created": "2026-09-20T18:18:08.793Z",
+    "experiment": "arcade"
+  },
+  "method": "Seeded original game environments. Same initial seeds for Jev and a greedy code baseline. Code supplies immediate action previews; Jev chooses one action per turn. These are fixed game-clock replays, not a real-time latency claim.",
+  "episodes": [
+    {
+      "id": "snake-7-jev",
+      "policy": "jev",
+      "seed": 7,
+      "moves": 90,
+      "score": 9,
+      "status": "timeout",
+      "reason": "90-move evaluation finished",
+      "completed": true,
+      "greedyAgreement": 73,
+      "immediateCollisions": 0,
+      "avoidableImmediateCollisions": 0,
+      "nonGreedyDistanceMoves": 0,
+      "latency": {
+        "median": 313,
+        "p95": 440,
+        "max": 1011
+      },
+      "last": {
+        "state": {
+          "game": "snake",
+          "seed": 7,
+          "tick": 89,
+          "score": 9,
+          "status": "playing",
+          "reason": "",
+          "rng": 4225977241,
+          "snake": [
+            {
+              "x": 5,
+              "y": 9
+            },
+            {
+              "x": 5,
+              "y": 8
+            },
+            {
+              "x": 5,
+              "y": 7
+            },
+            {
+              "x": 5,
+              "y": 6
+            },
+            {
+              "x": 5,
+              "y": 5
+            },
+            {
+              "x": 5,
+              "y": 4
+            },
+            {
+              "x": 5,
+              "y": 3
+            },
+            {
+              "x": 5,
+              "y": 2
+            },
+            {
+              "x": 6,
+              "y": 2
+            },
+            {
+              "x": 7,
+              "y": 2
+            },
+            {
+              "x": 7,
+              "y": 1
+            },
+            {
+              "x": 7,
+              "y": 0
+            }
+          ],
+          "heading": 2,
+          "food": {
+            "x": 8,
+            "y": 9
+          }
+        },
+        "action": "left"
+      }
+    },
+    {
+      "id": "snake-7-greedy",
+      "policy": "greedy",
+      "seed": 7,
+      "moves": 90,
+      "score": 12,
+      "status": "timeout",
+      "reason": "90-move evaluation finished",
+      "completed": true,
+      "greedyAgreement": 90,
+      "immediateCollisions": 0,
+      "avoidableImmediateCollisions": 0,
+      "nonGreedyDistanceMoves": 0,
+      "latency": {
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "last": {
+        "state": {
+          "game": "snake",
+          "seed": 7,
+          "tick": 89,
+          "score": 12,
+          "status": "playing",
+          "reason": "",
+          "rng": 1940713718,
+          "snake": [
+            {
+              "x": 3,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 4
+            },
+            {
+              "x": 2,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 7
+            },
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 2,
+              "y": 9
+            },
+            {
+              "x": 3,
+              "y": 9
+            },
+            {
+              "x": 4,
+              "y": 9
+            },
+            {
+              "x": 5,
+              "y": 9
+            },
+            {
+              "x": 6,
+              "y": 9
+            },
+            {
+              "x": 7,
+              "y": 9
+            },
+            {
+              "x": 8,
+              "y": 9
+            },
+            {
+              "x": 8,
+              "y": 8
+            }
+          ],
+          "heading": 1,
+          "food": {
+            "x": 8,
+            "y": 3
+          }
+        },
+        "action": "straight"
+      }
+    },
+    {
+      "id": "snake-19-jev",
+      "policy": "jev",
+      "seed": 19,
+      "moves": 90,
+      "score": 12,
+      "status": "timeout",
+      "reason": "90-move evaluation finished",
+      "completed": true,
+      "greedyAgreement": 84,
+      "immediateCollisions": 0,
+      "avoidableImmediateCollisions": 0,
+      "nonGreedyDistanceMoves": 0,
+      "latency": {
+        "median": 313,
+        "p95": 440,
+        "max": 1011
+      },
+      "last": {
+        "state": {
+          "game": "snake",
+          "seed": 19,
+          "tick": 89,
+          "score": 12,
+          "status": "playing",
+          "reason": "",
+          "rng": 748150994,
+          "snake": [
+            {
+              "x": 4,
+              "y": 4
+            },
+            {
+              "x": 4,
+              "y": 5
+            },
+            {
+              "x": 4,
+              "y": 6
+            },
+            {
+              "x": 4,
+              "y": 7
+            },
+            {
+              "x": 5,
+              "y": 7
+            },
+            {
+              "x": 6,
+              "y": 7
+            },
+            {
+              "x": 7,
+              "y": 7
+            },
+            {
+              "x": 8,
+              "y": 7
+            },
+            {
+              "x": 8,
+              "y": 6
+            },
+            {
+              "x": 8,
+              "y": 5
+            },
+            {
+              "x": 8,
+              "y": 4
+            },
+            {
+              "x": 8,
+              "y": 3
+            },
+            {
+              "x": 7,
+              "y": 3
+            },
+            {
+              "x": 6,
+              "y": 3
+            },
+            {
+              "x": 5,
+              "y": 3
+            }
+          ],
+          "heading": 0,
+          "food": {
+            "x": 4,
+            "y": 1
+          }
+        },
+        "action": "straight"
+      }
+    },
+    {
+      "id": "snake-19-greedy",
+      "policy": "greedy",
+      "seed": 19,
+      "moves": 90,
+      "score": 12,
+      "status": "timeout",
+      "reason": "90-move evaluation finished",
+      "completed": true,
+      "greedyAgreement": 90,
+      "immediateCollisions": 0,
+      "avoidableImmediateCollisions": 0,
+      "nonGreedyDistanceMoves": 0,
+      "latency": {
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "last": {
+        "state": {
+          "game": "snake",
+          "seed": 19,
+          "tick": 89,
+          "score": 12,
+          "status": "playing",
+          "reason": "",
+          "rng": 748150994,
+          "snake": [
+            {
+              "x": 4,
+              "y": 6
+            },
+            {
+              "x": 4,
+              "y": 7
+            },
+            {
+              "x": 5,
+              "y": 7
+            },
+            {
+              "x": 6,
+              "y": 7
+            },
+            {
+              "x": 7,
+              "y": 7
+            },
+            {
+              "x": 8,
+              "y": 7
+            },
+            {
+              "x": 8,
+              "y": 6
+            },
+            {
+              "x": 8,
+              "y": 5
+            },
+            {
+              "x": 8,
+              "y": 4
+            },
+            {
+              "x": 8,
+              "y": 3
+            },
+            {
+              "x": 7,
+              "y": 3
+            },
+            {
+              "x": 6,
+              "y": 3
+            },
+            {
+              "x": 5,
+              "y": 3
+            },
+            {
+              "x": 4,
+              "y": 3
+            },
+            {
+              "x": 3,
+              "y": 3
+            }
+          ],
+          "heading": 0,
+          "food": {
+            "x": 4,
+            "y": 1
+          }
+        },
+        "action": "straight"
+      }
+    },
+    {
+      "id": "snake-42-jev",
+      "policy": "jev",
+      "seed": 42,
+      "moves": 68,
+      "score": 10,
+      "status": "lost",
+      "reason": "Hit a wall or the snake body",
+      "completed": true,
+      "greedyAgreement": 68,
+      "immediateCollisions": 1,
+      "avoidableImmediateCollisions": 0,
+      "nonGreedyDistanceMoves": 0,
+      "latency": {
+        "median": 313,
+        "p95": 418,
+        "max": 1011
+      },
+      "last": {
+        "state": {
+          "game": "snake",
+          "seed": 42,
+          "tick": 67,
+          "score": 10,
+          "status": "playing",
+          "reason": "",
+          "rng": 3664477795,
+          "snake": [
+            {
+              "x": 9,
+              "y": 9
+            },
+            {
+              "x": 8,
+              "y": 9
+            },
+            {
+              "x": 8,
+              "y": 8
+            },
+            {
+              "x": 9,
+              "y": 8
+            },
+            {
+              "x": 9,
+              "y": 7
+            },
+            {
+              "x": 9,
+              "y": 6
+            },
+            {
+              "x": 9,
+              "y": 5
+            },
+            {
+              "x": 9,
+              "y": 4
+            },
+            {
+              "x": 9,
+              "y": 3
+            },
+            {
+              "x": 8,
+              "y": 3
+            },
+            {
+              "x": 8,
+              "y": 2
+            },
+            {
+              "x": 8,
+              "y": 1
+            },
+            {
+              "x": 7,
+              "y": 1
+            }
+          ],
+          "heading": 1,
+          "food": {
+            "x": 3,
+            "y": 8
+          }
+        },
+        "action": "left"
+      }
+    },
+    {
+      "id": "snake-42-greedy",
+      "policy": "greedy",
+      "seed": 42,
+      "moves": 68,
+      "score": 10,
+      "status": "lost",
+      "reason": "Hit a wall or the snake body",
+      "completed": true,
+      "greedyAgreement": 68,
+      "immediateCollisions": 1,
+      "avoidableImmediateCollisions": 0,
+      "nonGreedyDistanceMoves": 0,
+      "latency": {
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "last": {
+        "state": {
+          "game": "snake",
+          "seed": 42,
+          "tick": 67,
+          "score": 10,
+          "status": "playing",
+          "reason": "",
+          "rng": 3664477795,
+          "snake": [
+            {
+              "x": 9,
+              "y": 9
+            },
+            {
+              "x": 8,
+              "y": 9
+            },
+            {
+              "x": 8,
+              "y": 8
+            },
+            {
+              "x": 9,
+              "y": 8
+            },
+            {
+              "x": 9,
+              "y": 7
+            },
+            {
+              "x": 9,
+              "y": 6
+            },
+            {
+              "x": 9,
+              "y": 5
+            },
+            {
+              "x": 9,
+              "y": 4
+            },
+            {
+              "x": 9,
+              "y": 3
+            },
+            {
+              "x": 8,
+              "y": 3
+            },
+            {
+              "x": 8,
+              "y": 2
+            },
+            {
+              "x": 8,
+              "y": 1
+            },
+            {
+              "x": 7,
+              "y": 1
+            }
+          ],
+          "heading": 1,
+          "food": {
+            "x": 3,
+            "y": 8
+          }
+        },
+        "action": "left"
+      }
+    }
+  ],
+  "replayMismatches": [],
+  "paired": [
+    {
+      "seed": 7,
+      "jevScore": 9,
+      "greedyScore": 12,
+      "scoreDifference": -3,
+      "firstDifferentActionTick": 1,
+      "firstDifferentFoodAtSameTick": 63,
+      "firstDifferentFoodByCollectionIndex": 8,
+      "jevMoves": 90,
+      "greedyMoves": 90
+    },
+    {
+      "seed": 19,
+      "jevScore": 12,
+      "greedyScore": 12,
+      "scoreDifference": 0,
+      "firstDifferentActionTick": 1,
+      "firstDifferentFoodAtSameTick": 39,
+      "firstDifferentFoodByCollectionIndex": -1,
+      "jevMoves": 90,
+      "greedyMoves": 90
+    },
+    {
+      "seed": 42,
+      "jevScore": 10,
+      "greedyScore": 10,
+      "scoreDifference": 0,
+      "firstDifferentActionTick": -1,
+      "firstDifferentFoodAtSameTick": -1,
+      "firstDifferentFoodByCollectionIndex": -1,
+      "jevMoves": 68,
+      "greedyMoves": 68
+    }
+  ],
+  "latencySemantics": "Stored trace latency_ms is response.service_latency_ms from a multi-game batch. It is not end-to-end wall latency; one response is copied to multiple episode rows.",
+  "coverage": {
+    "snakeEpisodes": 6,
+    "uniqueSeeds": [
+      7,
+      19,
+      42
+    ],
+    "jevActions": 248,
+    "greedyActions": 248,
+    "totalActions": 496,
+    "physicalRequestsIdentifiable": false,
+    "rawGatewayResponsesStored": false,
+    "providerFailuresRecorded": false,
+    "modelCallsMadeByAudit": 0
+  },
+  "jevLatency": {
+    "median": 313,
+    "p95": 430,
+    "max": 1011,
+    "batchSizes": [
+      6,
+      5,
+      4,
+      3,
+      2
+    ]
+  },
+  "cap": {
+    "boardCells": 100,
+    "initialLength": 3,
+    "maxMoves": 90,
+    "minimumMovesToFillEvenWithFoodEveryMove": 97,
+    "maxReachableLength": 93,
+    "winReachable": false
+  }
+}

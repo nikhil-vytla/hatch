@@ -1,0 +1,8 @@
+.recording.lock
+recording.log
+preview-data/
+
+.vite/
+.playwright-cli/
+.finalization.json
+finalization.log

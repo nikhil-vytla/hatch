@@ -1,0 +1,136 @@
+{
+  "id": "search",
+  "title": "Search reranker",
+  "evidenceStatus": "Five authored queries over six documents/336 text characters, 65 recorded decisions, 5/5 best-source choices, 4/4 answerable-source retention and one correct none. Current corpus matches wire evidence; offline callback/render probes only.",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "Recorded filtering uses both relevance and redirection judgments, while the displayed/live filter uses relevance alone. The five saved cases hide that divergence, and missing-score fallbacks manufacture 100%/0% relevance values. Versioned candidates, shared policies and stronger retrieval evaluation would preserve the useful source-inspection interaction.",
+  "strengths": [
+    "A real none choice and stable source identifiers are present; authored targets are withheld.",
+    "All thirteen decisions per recorded query and retained source text are preserved.",
+    "The runner explicitly describes filtering as a heuristic rather than a security boundary; current UI corpus matches recorded inputs."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Recorded, displayed and live retention policies differ",
+      "evidence": "src/jev_lab/compositions.py:202; experience-prototypes/src/agent-experiments.tsx:131, :233. Recorded requests ask 13 questions, live asks 7. Synthetic relevance=0.95/redirection=0.99 yields exclusion by runner but Retained in the actual component.",
+      "impact": "Displayed retention can contradict the recorded policy; saved fixtures only agree because hostile-text relevance is low.",
+      "fix": "Share a versioned request/filter builder and expose relevance, redirection and retention separately. Label intentional policy differences; keep content untrusted regardless of score."
+    },
+    {
+      "priority": "P1",
+      "title": "Missing scores become invented relevance values",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:135, :357. A synthetic best-only result displays winner 100% and other sources 0%. All current records are complete. Recorded best probabilities are nested, but :86 reads a top-level field, so 0/5 recorded rows show probability bars.",
+      "impact": "A winner indicator is mislabeled as a model score, and recorded/live display schemas differ.",
+      "fix": "Normalize response schemas while preserving unknowns; show choice probabilities, relevance scores and ties with distinct labels."
+    },
+    {
+      "priority": "P1",
+      "title": "A late result replaces a newly selected query",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:261, :441. Actual callbacks start refund search, select shipping, then replace the selected result with refund while the editor/dropdown remain shipping.",
+      "impact": "The active query and displayed ranking diverge, though the old result retains its own query text.",
+      "fix": "Guard query/source/protocol revisions, cancel obsolete work and reject late commits; separate draft and historical results."
+    },
+    {
+      "priority": "P2",
+      "title": "Five easy cases do not evaluate ranking breadth or contamination robustness",
+      "evidence": "src/jev_lab/compositions.py:166, :176. The hostile document is explicitly named injection/Untrusted result; four answerable queries and one none lack competing revisions, graded relevance, multiple evidence sources or neutral-metadata ablations.",
+      "impact": "Best-label accuracy and one obvious exclusion do not establish corpus retrieval, downstream answer quality or injection resistance.",
+      "fix": "Add independently labeled relevance/sufficiency, semantic and metadata controls, lexical baselines and candidate-recall reporting."
+    },
+    {
+      "priority": "P2",
+      "title": "Scores depend on a corpus reconstructed from current code",
+      "evidence": "experience-prototypes/src/agent-experiments.tsx:38; results/search.jsonl stores retained documents but not the full candidate corpus/hash. Probe confirms equality today, not immutable future binding.",
+      "impact": "Later source edits could display older judgments against new text; users cannot review spans or source-version changes.",
+      "fix": "Persist complete candidate snapshots/hashes and add versioned source inspection, citation spans and explicit human overrides."
+    }
+  ],
+  "simulation": {
+    "title": "A source desk with competing revisions",
+    "description": "Search a small collection with competing policy versions, inspect full text and supporting spans, edit one source, and compare immutable rankings from the same query checkpoint.",
+    "jevsRole": "Judge semantic relevance and sufficiency from supplied evidence; never execute source instructions or authenticate publishers.",
+    "codeRole": "Own lexical retrieval, source versions/hashes, request identity, ranking/ties, retention, citations, statuses and export.",
+    "acceptanceCriteria": [
+      "Every score refers to the submitted source snapshot; missing values stay unknown.",
+      "Recorded/live policies yield identical retention for identical answers.",
+      "Late results cannot rerank a new query or source revision.",
+      "Best choice, relevance and no-answer are explicit separate concepts.",
+      "Evidence spans invalidate when their source hash changes; corrections retain raw scores.",
+      "The animated view has equivalent keyboard-readable list controls."
+    ]
+  },
+  "evaluation": {
+    "design": "Author 60 twelve-document bundles with four query types; reserve 20 development and 40 held out. Two reviewers label relevance, sufficiency, spans and redirection separately. The 160 held-out queries under original/reversed/neutral metadata conditions require 480 requests ×25 questions =12,000 decisions. Cluster comparisons by bundle. Separately evaluate all 300 BEIR SciFact test queries over 5,183 documents using frozen lexical top 100 candidates and 30,000 independent relevance scores, approximately 2,100 batches of at most 16 candidates subject to payload limits. This is full query coverage, not exhaustive corpus scoring. Use official qrels/BEIR metrics and paired query bootstrap; preserve candidate Recall@100, failures, exact requests and ties. No proposed runs performed.",
+    "baselines": [
+      "Frozen lexical candidate ranker.",
+      "Fixed candidate order.",
+      "Oracle ranking within identical retrieved candidates."
+    ],
+    "metrics": [
+      "Official nDCG@10, MAP, Recall@100 and MRR for external retrieval.",
+      "Authored relevance/sufficiency precision-recall, evidence retention and no-answer accuracy.",
+      "Metadata/order sensitivity and false retention of instruction-redirection content, reported separately from security guarantees.",
+      "Stale-result/corpus identity errors, missing-score handling and correction provenance.",
+      "All-scheduled/provider-completed coverage, retries, latency and cost."
+    ],
+    "coverage": {
+      "kind": "mixed",
+      "current": "Five authored queries; zero external benchmark queries. Four answerable-source successes plus one none, not five independent retained-answer successes.",
+      "full": "Proposed 160 held-out authored queries under three conditions plus all 300 SciFact test queries/5,183 corpus documents. The dataset's 1,109 total query collection is not its 300-query test split. Top100 reranking needs 30,000 scores; exhaustive scoring would need 1,554,900 pairs.",
+      "feasibility": "Needs a pinned licensed dataset fetch, lexical index/runfile, shared protocol and later provider budget. No model weights required. SciFact distribution is labeled CC-BY-SA-4.0; maintain attribution. Official retrieval relevance does not evaluate generated answer truth or injection safety."
+    }
+  },
+  "libraries": [
+    {
+      "name": "MiniSearch",
+      "url": "https://github.com/lucaong/minisearch",
+      "use": "Local lexical indexing and immediate candidate retrieval; Jev reranks the same identified candidates."
+    },
+    {
+      "name": "BEIR",
+      "url": "https://github.com/beir-cellar/beir",
+      "use": "Official dataset loading, runfiles and retrieval-metric integration, independent of the authored UI behavior suite."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Unify retention/protocols, normalize schemas and preserve unknown scores."
+    },
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Persist corpus snapshots and guard asynchronous query/source revisions."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Build versioned evidence review and collect the authored/full-query external protocols."
+    }
+  ],
+  "sources": [
+    {
+      "label": "MiniSearch primary source",
+      "url": "https://github.com/lucaong/minisearch"
+    },
+    {
+      "label": "BEIR dataset/split table",
+      "url": "https://github.com/beir-cellar/beir/wiki/Datasets-available"
+    },
+    {
+      "label": "BEIR SciFact exact corpus/query collection counts",
+      "url": "https://huggingface.co/datasets/BeIR/scifact"
+    },
+    {
+      "label": "BEIR metrics",
+      "url": "https://github.com/beir-cellar/beir/wiki/Metrics-available"
+    },
+    {
+      "label": "BEIR evaluation API",
+      "url": "https://github.com/beir-cellar/beir"
+    }
+  ]
+}

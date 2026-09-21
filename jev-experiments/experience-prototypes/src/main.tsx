@@ -29,17 +29,29 @@ import {
   Changes,
 } from "./new-experiments";
 import { GeneratedUI } from "./generated-ui";
-import { Worlds, Pixels, Music } from "./creative";
+import { Worlds, Pixels } from "./creative";
 import { Games, GameGrid } from "./games";
 import { Benchmarks, Learning } from "./benchmarks";
 import { RewardBench } from "./rewardbench";
 import { LocalModels, ResearchMap } from "./local-models";
 import { Provenance } from "./provenance";
-import { AgentExperiment, Beverage } from "./agent-experiments";
+import { AgentExperiment } from "./agent-experiments";
 import { Logos, Decisions, Vision, Adapters } from "./misc";
 import { Journeys } from "./journeys";
 import { getApiKey, setApiKey } from "./api";
 import "./style.css";
+const Music = lazy(() => import("./music-arranger").then(m => ({ default: m.Music })));
+const JudgeBench = lazy(() => import("./judgment-reliability").then(m => ({ default: m.JudgeBench })));
+const Beverage = lazy(() => import("./cafe-jev").then(m => ({ default: m.Beverage })));
+const VisualSearch = lazy(() => import("./visual-search").then(m => ({ default: m.VisualSearch })));
+const Wardrobe = lazy(() => import("./wardrobe").then(m => ({ default: m.Wardrobe })));
+const IconStudio = lazy(() => import("./icon-studio").then(m => ({ default: m.IconStudio })));
+const TetrisExperience = lazy(() => import("./tetris-experience").then(m => ({ default: m.TetrisExperience })));
+const GhostBrush = lazy(() => import("./ghost-brush").then(m => ({ default: m.GhostBrush })));
+const LiveCrowd = lazy(() => import("./live-crowd").then(m => ({ default: m.LiveCrowd })));
+const LiveWorldPreview = lazy(() => import("./live-world-preview").then(m => ({ default: m.LiveWorldPreview })));
+const MiniExperimentPreview = lazy(() => import("./live-world-preview").then(m => ({ default: m.MiniExperimentPreview })));
+const DrawingFraming = lazy(() => import("./outcome-framing").then(m => ({ default: m.DrawingFraming })));
 const Arcade = lazy(() =>
   import("./arcade").then((m) => ({ default: m.Arcade })),
 );
@@ -205,6 +217,8 @@ function Header() {
   );
 }
 function MiniPreview({ kind }: { kind: string }) {
+  if (["tetris", "crowd", "ghost-brush", "visual-search", "wardrobe", "icon-studio", "drawing-framing"].includes(kind))
+    return <Suspense fallback={null}><MiniExperimentPreview kind={kind} /></Suspense>;
   if (kind === "worlds") return <MotionArt small scene="garden" />;
   if (kind === "pixels")
     return (
@@ -435,23 +449,23 @@ function Home() {
             something, follow a decision, and see what changes.
           </p>
           <div className="hero-actions">
-            <a className="button" href="#experiment/ui">
-              Make an interface <ArrowUpRight size={16} />
+            <a className="button" href="#experiment/tetris">
+              Play and branch <ArrowUpRight size={16} />
             </a>
-            <a className="text-link" href="#experiment/paste">
-              Try a smarter paste <ArrowRight size={15} />
+            <a className="text-link" href="#experiment/ghost-brush">
+              Draw with Ghost Brush <ArrowRight size={15} />
             </a>
           </div>
           <span className="hero-footnote">
             LIVE EXPERIMENTS · RECORDED EVIDENCE · OPEN QUESTIONS
           </span>
         </div>
-        <a className="hero-window" href="#experiment/worlds">
-          <MotionArt scene="garden" />
+        <a className="hero-window" href="#experiment/crowd">
+          <Suspense fallback={<div className="loading-stage">Opening the square…</div>}><LiveWorldPreview /></Suspense>
           <div className="hero-window-caption">
             <div>
               <span>NOW PLAYING</span>
-              <strong>A quiet world, coming to life</strong>
+              <strong>A notice can change an afternoon</strong>
             </div>
             <span className="round-arrow">
               <ArrowUpRight size={22} />
@@ -472,17 +486,17 @@ function Home() {
       </div>
       <nav className="latest-work" aria-label="Latest experiments">
         <span>LATEST</span>
-        <a href="#experiment/local-models">
-          Decision models on a Mac <ArrowUpRight size={12} />
+        <a href="#experiment/tetris">
+          Tetris: play and branch <ArrowUpRight size={12} />
         </a>
-        <a href="#experiment/snake">
-          Snake <ArrowUpRight size={12} />
+        <a href="#experiment/crowd">
+          The square at five <ArrowUpRight size={12} />
         </a>
-        <a href="#experiment/orbital">
-          Orbital rescue <ArrowUpRight size={12} />
+        <a href="#experiment/ghost-brush">
+          Ghost Brush <ArrowUpRight size={12} />
         </a>
-        <a href="#experiment/benchmark-atlas">
-          The next experiments <ArrowUpRight size={12} />
+        <a href="#experiment/wardrobe">
+          A change of clothes <ArrowUpRight size={12} />
         </a>
       </nav>
       <section className="collection">
@@ -565,6 +579,7 @@ function Home() {
             Meet Jev ↗
           </a>
           <a href="/research/EXPERIENCE_PROTOTYPES.md">Read the research ↗</a>
+          <a href="/research/quality-review/review.html">Review all 33 original experiments ↗</a>
           <a href="/companion.zip" download>
             Get the paste companion ↓
           </a>
@@ -627,6 +642,21 @@ function View({
     case "journeys":
       return <Journeys record={result} />;
     case "judge":
+      return <JudgeBench result={result} />;
+    case "tetris":
+      return <TetrisExperience result={result} />;
+    case "drawing-framing":
+      return <DrawingFraming result={result} />;
+    case "visual-search":
+      return <VisualSearch result={result} />;
+    case "wardrobe":
+      return <Wardrobe result={result} />;
+    case "icon-studio":
+      return <IconStudio result={result} />;
+    case "ghost-brush":
+      return <GhostBrush />;
+    case "crowd":
+      return <LiveCrowd />;
     case "classify":
     case "robustness":
       return <Benchmarks id={exp.id} result={result} />;
@@ -674,6 +704,16 @@ function Detail({ id }: { id: string }) {
     };
   }, [id]);
   const layoutStudy = ![
+    "music",
+    "beverage",
+    "judge",
+    "tetris",
+    "drawing-framing",
+    "visual-search",
+    "wardrobe",
+    "icon-studio",
+    "ghost-brush",
+    "crowd",
     "snake",
     "orbital",
     "local-models",
@@ -740,12 +780,14 @@ function Detail({ id }: { id: string }) {
       {error && <Notice error>{error}</Notice>}
       {record && <Provenance result={record.result ?? {}} />}
       {record ? (
+        <Suspense fallback={<div className="loading-stage"><span className="loader" /> Opening the experiment…</div>}>
         <View
           key={id}
           exp={exp}
           result={record.result ?? {}}
           composition={composition}
         />
+        </Suspense>
       ) : (
         <div className="loading-stage">
           <span className="loader" /> Opening the experiment…

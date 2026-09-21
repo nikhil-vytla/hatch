@@ -1,0 +1,31 @@
+// Offline original Preference explorer audit, with real slider callbacks.
+import {readFileSync,writeFileSync} from "node:fs";
+import {createHash} from "node:crypto";
+import vm from "node:vm";
+import assert from "node:assert/strict";
+import {readRecord} from "../../experience-prototypes/scripts/records";
+const root=new URL("../../../",import.meta.url),app=new URL("../../experience-prototypes/",import.meta.url);
+const current=readFileSync(new URL("src/misc.tsx",app),"utf8"), old=Bun.spawnSync(["git","show","4c0c40d:jev-experiments/experience-prototypes/src/misc.tsx"],{cwd:root.pathname}).stdout.toString();
+const extract=(s:string)=>s.slice(s.indexOf("export function Decisions"),s.indexOf("export function Vision"));assert.equal(extract(current),extract(old));
+const source=extract(old),doc=readRecord(new URL("../results/decisions.jsonl",app)),rows=doc.result.rows,good=rows.filter((r:any)=>r.assessments),criteria=["usefulness","novelty","ease","shareability"];
+const code=new Bun.Transpiler({loader:"tsx",tsconfig:JSON.stringify({compilerOptions:{jsx:"react",jsxFactory:"__auditElement"}})}).transformSync(source).replace(/\bexport\s+/g,"");
+const slots:any[]=[];let cursor=0,tree:any;
+const ctx:any={__auditElement:(type:any,props:any,...children:any[])=>({type,props:{...props,children}}),useState:(v:any)=>{const i=cursor++;if(!(i in slots))slots[i]=v;return[slots[i],(x:any)=>slots[i]=typeof x==="function"?x(slots[i]):x]},motion:{article:"motion.article"},pretty:(s:string)=>s.replaceAll("_"," "),...Object.fromEntries(["Pane","Field","Bars","State"].map(n=>[n,n]))};
+vm.runInNewContext(code+"\nthis.component=Decisions",ctx);
+const nodes=(v:any):any[]=>Array.isArray(v)?v.flatMap(nodes):v&&typeof v==="object"?[v,...nodes(v.props?.children)]:[];
+const render=()=>{cursor=0;tree=ctx.component({result:doc.result})};const all=()=>nodes(tree),state=()=>JSON.parse(JSON.stringify(all().find(n=>n.type==="State").props.value));render();const initial=state();
+const set=(weights:number[])=>{weights.forEach((v,i)=>{all().filter(n=>n.type==="input")[i].props.onChange({target:{value:String(v)}});render()})};
+set([0,0,0,0]);const zero=state(),zeroWinnerCard=all().find(n=>n.props.className?.includes("winner"))?.props.key;
+assert.equal(zeroWinnerCard,"a");assert.ok(zero.ranked.every((r:any)=>r.total===0));
+const grid:any[]=[];
+for(let a=0;a<=5;a++)for(let b=0;b<=5;b++)for(let c=0;c<=5;c++)for(let d=0;d<=5;d++){
+set([a,b,c,d]);const s=state(),max=s.ranked[0].total,tied=s.ranked.filter((x:any)=>Math.abs(x.total-max)<1e-12).map((x:any)=>x.id);
+grid.push({weights:[a,b,c,d],winner:s.ranked[0].id,tied,roundedTie:Math.round(s.ranked[0].total*100)===Math.round(s.ranked[1].total*100)});
+}
+const contentKey=(r:any)=>JSON.stringify([...r.assessments].sort((a,b)=>a.id.localeCompare(b.id)).map(a=>({id:a.id,evidence:a.evidence}))),orderedKey=(r:any)=>JSON.stringify(r.assessments.map((a:any)=>({id:a.id,evidence:a.evidence})));
+const groups=Object.values(Object.groupBy(good,orderedKey)).map((g:any)=>({cases:g.map((r:any)=>r.case),order:g[0].assessments.map((a:any)=>a.id),prototypeAddedTo:g[0].assessments.filter((a:any)=>a.evidence.includes("already exists")).map((a:any)=>a.id)}));
+const changes=good.filter((r:any)=>r.case>=3),baseline=good.filter((r:any)=>r.case<3);
+const variations=criteria.flatMap(k=>["a","b","c"].map(id=>{const vals=baseline.map((r:any)=>r.assessments.find((a:any)=>a.id===id).scores[k]);return{id,criterion:k,min:Math.min(...vals),max:Math.max(...vals),range:Math.max(...vals)-Math.min(...vals)}})).sort((a,b)=>b.range-a.range);
+const first=good[0];const pyEqual=[...first.assessments].map((a:any)=>({id:a.id,utility:criteria.reduce((s,k)=>s+a.scores[k]/2,0)/4})).sort((a,b)=>b.utility-a.utility||a.id.localeCompare(b.id));
+const out={method:"Shared decoded evidence plus frozen component executed with mocked React hooks/elements; exhaustive integer slider grid. No browser/provider calls. These are sensitivity and setup checks, not independent project-quality judgments.",baselineCommit:"4c0c40d",sourceUnchanged:true,sourceHash:createHash("sha256").update(source).digest("hex"),evidenceHash:createHash("sha256").update(readFileSync(new URL("../results/decisions.jsonl",app))).digest("hex"),evidence:{cases:rows.length,completed:good.length,failed:rows.filter((r:any)=>r.error).map((r:any)=>({case:r.case,error:r.error.slice(0,90)})),scoreJudgments:good.length*12,missingJudgments:good.length*3,uniqueOrderedInputs:new Set(good.map(orderedKey)).size,uniqueContentSets:new Set(good.map(contentKey)).size,groups,prototypeAddedAlwaysFirst:changes.every((r:any)=>r.assessments[0].evidence.includes("already exists")),equalWeightWinners:Object.fromEntries(["a","b","c"].map(id=>[id,good.filter((r:any)=>r.ranking[0].id===id).length])),baselineScoreRanges:variations,transport:doc.result.transport},ui:{caseUsed:first.case,initial,zeroWeights:{ranked:zero.ranked.map((a:any)=>({id:a.id,total:a.total})),winnerCard:zeroWinnerCard,runnerEqualWeightFallback:pyEqual},grid:{configurations:grid.length,nonzero:grid.filter(r=>r.weights.some(Boolean)).length,uniqueWinnerCounts:Object.fromEntries(["a","b","c"].map(id=>[id,grid.filter(r=>r.weights.some(Boolean)&&r.tied.length===1&&r.winner===id).length])),trueTieCount:grid.filter(r=>r.tied.length>1).length,roundedTopTieCount:grid.filter(r=>r.roundedTie).length},hiddenFields:["raw rubric text","other cases","recorded next_question","score probability distributions","dominance","visible missing-evidence judgments"],note:"Confidence and missing_probability survive inside ranked JSON but are not rendered as review controls; raw answers and rubrics are not in the component inspector."}};
+writeFileSync(new URL("decisions.json",import.meta.url),JSON.stringify(out,null,2)+"\n");console.log(JSON.stringify({evidence:{cases:rows.length,completed:good.length,scoreJudgments:out.evidence.scoreJudgments,missingJudgments:out.evidence.missingJudgments,uniqueOrderedInputs:out.evidence.uniqueOrderedInputs,uniqueContentSets:out.evidence.uniqueContentSets,failures:out.evidence.failed,prototypeAddedAlwaysFirst:out.evidence.prototypeAddedAlwaysFirst,maxBaselineVariation:variations[0]},zero:out.ui.zeroWeights,grid:out.ui.grid},null,2));

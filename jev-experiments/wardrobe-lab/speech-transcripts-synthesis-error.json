@@ -1,0 +1,40 @@
+{
+  "source": "macOS say synthetic speech; no user microphone",
+  "recognizer": "mlx-whisper",
+  "model": "mlx-community/whisper-base.en-mlx",
+  "inference": "local after downloading model weights",
+  "turns": [
+    {
+      "id": "jacket",
+      "audio": "speech/01-jacket.wav",
+      "text": "",
+      "seconds": 0.0,
+      "transcriptionMs": 188,
+      "segments": []
+    },
+    {
+      "id": "sunglasses",
+      "audio": "speech/02-sunglasses.wav",
+      "text": "",
+      "seconds": 0.0,
+      "transcriptionMs": 0,
+      "segments": []
+    },
+    {
+      "id": "pink",
+      "audio": "speech/03-pink.wav",
+      "text": "",
+      "seconds": 0.0,
+      "transcriptionMs": 0,
+      "segments": []
+    },
+    {
+      "id": "bigger",
+      "audio": "speech/04-bigger.wav",
+      "text": "",
+      "seconds": 0.0,
+      "transcriptionMs": 0,
+      "segments": []
+    }
+  ]
+}

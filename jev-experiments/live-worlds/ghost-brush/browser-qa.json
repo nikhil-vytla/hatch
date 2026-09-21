@@ -1,0 +1,22 @@
+{
+  "checks": [
+    "pointer stroke committed",
+    "keyboard stroke committed",
+    "undo hides one completed stroke",
+    "local selection is labeled separately",
+    "restore returns to the saved stroke count",
+    "restore preserves the abandoned sheet",
+    "recorded Jev has its own attribution",
+    "recorded result selects the saved winner",
+    "paired preview shows two replays",
+    "live request without a key stays local and explains the missing key",
+    "artwork SVG downloads",
+    "stroke and judgment evidence downloads",
+    "390px layout has no horizontal overflow",
+    "reduced motion removes animated sample classes"
+  ],
+  "count": 14,
+  "realModelCallsDuringBrowserQA": 0,
+  "checkedAt": "2026-09-20T21:33:53.708Z",
+  "page": "http://127.0.0.1:5193/#experiment/ghost-brush"
+}

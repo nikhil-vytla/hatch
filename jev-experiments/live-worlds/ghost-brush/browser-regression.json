@@ -1,0 +1,9 @@
+{
+  "checks": [
+    "Control+Z during an active second stroke preserves the first and active strokes",
+    "Restoring a recorded brush variant restores Recorded Jev attribution"
+  ],
+  "count": 2,
+  "realModelCalls": 0,
+  "checkedAt": "2026-09-20T21:37:59.928Z"
+}

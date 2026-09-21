@@ -1,0 +1,112 @@
+{
+  "generatedAt": "2026-09-20T21:38:43.998Z",
+  "engine": "ghost-brush/1.0.0",
+  "protocol": "ghost-brush-description-fit/v1",
+  "originalCodeOnly": true,
+  "modelCallsDuringValidation": 0,
+  "bankSha256": "deaff8516adb1a3ec9d92d4f00af1cc9dbebca44217b99d916e2f92a9c1a6832",
+  "sampleRequestSha256": "6cb3bbe4e429b959f60f8aba7be8fc2806d43e840596b0250f0966c89869a181",
+  "sources": [
+    {
+      "path": "engine.ts",
+      "sha256": "d2452e7b1f25e4dcd8a1be74d0a54d54ca3bf0d75c4335e1960cbc33dac81a18"
+    },
+    {
+      "path": "model.ts",
+      "sha256": "6015e4f07dab967a02f40ab235ef0b99c0bc8ccbaa4b2086666d65ba38bcbd94"
+    },
+    {
+      "path": "session.ts",
+      "sha256": "279f99f6f627a7b68271dcd2d4939d3f22701f671646b8f18b28bba21ad3eab5"
+    },
+    {
+      "path": "engine.test.ts",
+      "sha256": "2792b01cc910a21163655a99dccdc00d4c9f700647f6abd9f8e8bce8e98fe653"
+    },
+    {
+      "path": "session.test.ts",
+      "sha256": "360b87e633c2b99ff5d70ec3d16837023e8b7afb6a87fb1d7372418acdf35b00"
+    },
+    {
+      "path": "../../experience-prototypes/src/ghost-brush.tsx",
+      "sha256": "584637a347c74c70920424515d53cb9bf59677a1dfceba5afdcdb624dbd30e0b"
+    },
+    {
+      "path": "../../experience-prototypes/src/ghost-brush.css",
+      "sha256": "0ae6477c506a594482fa5cfeb73336752298cfeec9c0d1caaa9bcdf4d3951153"
+    }
+  ],
+  "geometry": [
+    {
+      "id": "indigo-loom",
+      "pathCount": 67,
+      "markSha256": "2b87f2934cea49deda808830203f6c134cab64f377f48c96ded8b00713666426",
+      "medianGeometryMs": 0.314,
+      "p95GeometryMs": 0.385
+    },
+    {
+      "id": "copper-mesh",
+      "pathCount": 69,
+      "markSha256": "4464b96c4115249161cb01dbc36471c7f6e48be090a8bd375b2238a7d6f18123",
+      "medianGeometryMs": 0.402,
+      "p95GeometryMs": 0.499
+    },
+    {
+      "id": "coastal-wind",
+      "pathCount": 282,
+      "markSha256": "8e50c261d69fb52798b79bb8f2fc7eb28d616137f407b5e15b7ca9ad94156014",
+      "medianGeometryMs": 0.25,
+      "p95GeometryMs": 0.301
+    },
+    {
+      "id": "ember-drift",
+      "pathCount": 376,
+      "markSha256": "3d2733d66df65a18bc7c0b2b2a7558b11bd7d15f543a31ac24f7f93772003afe",
+      "medianGeometryMs": 0.26,
+      "p95GeometryMs": 0.424
+    },
+    {
+      "id": "fern-script",
+      "pathCount": 373,
+      "markSha256": "6204f2c2b6f46a829bf4f1efc4092923d2e12a9f4152ba11eed58caf5bd9c804",
+      "medianGeometryMs": 0.308,
+      "p95GeometryMs": 0.363
+    },
+    {
+      "id": "coral-nerve",
+      "pathCount": 373,
+      "markSha256": "4d15dbf7de15a0cce29e7fa763a9db58644e734336a8c93ab53599b97d7c5e6c",
+      "medianGeometryMs": 0.302,
+      "p95GeometryMs": 0.377
+    },
+    {
+      "id": "graphite-dust",
+      "pathCount": 752,
+      "markSha256": "2a9186bdae4fc1b9f44570a788040b63e648ce69c324bc48ef7e7a74b87e9a51",
+      "medianGeometryMs": 0.565,
+      "p95GeometryMs": 0.701
+    },
+    {
+      "id": "pollen-cloud",
+      "pathCount": 940,
+      "markSha256": "63ecb06d52f967b6795b12190447cbf9da1acf5d1493e2ee66306ef499373099",
+      "medianGeometryMs": 0.671,
+      "p95GeometryMs": 0.814
+    },
+    {
+      "id": "prism-fold",
+      "pathCount": 47,
+      "markSha256": "b3b7ada648f5782c90d215f0c0665bdea813ae18e12e03d97b2ed65c717d6a73",
+      "medianGeometryMs": 0.063,
+      "p95GeometryMs": 0.098
+    },
+    {
+      "id": "rose-kite",
+      "pathCount": 47,
+      "markSha256": "9a9ca0c1ccee6a1f72ef588ce6e14a80daac623b723b99991515ef7bbe21a6e7",
+      "medianGeometryMs": 0.062,
+      "p95GeometryMs": 0.069
+    }
+  ],
+  "note": "Bun CPU path-construction timings on one 82-point sample, 50 repeats per recipe. This is not a browser frame-rate or aesthetic-quality benchmark. Browser/lifecycle checks are described in README."
+}

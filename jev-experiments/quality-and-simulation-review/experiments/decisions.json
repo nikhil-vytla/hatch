@@ -1,0 +1,135 @@
+{
+  "id": "decisions",
+  "title": "Preference explorer",
+  "evidenceStatus": "20 authored cases, 18 completed, 216 criterion scores and 54 missingness judgments; exhaustive offline 1296-setting slider probe",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The fixed-assessment ranking responds correctly to positive weights, but all-zero weights still highlight an arbitrary winner and ties lack explanation. The saved evidence update always puts the changed option first, confounding new information with position. Expose rubric assumptions, evidence and corrections before treating the weighted index as a useful recommendation.",
+  "strengths": [
+    "The UI explicitly separates fixed Jev assessments from deterministic weighted ranking.",
+    "Source evidence and editable criterion weights are visible.",
+    "Concrete three-level source rubrics and raw recorded answers support inspection.",
+    "Records preserve confidence, missingness, dominance and a clearly labeled question heuristic for future review flows."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Zero weights and ties produce an unsupported winner",
+      "evidence": "src/misc.tsx:228 gives zero utilities for all-zero weights, while line 244 highlights the first item. The Python runner instead falls back to equal weights at pilots.py:285. Probe finds two true ties including zero and 24 visually rounded top ties among 1296 settings.",
+      "impact": "Input order is presented as a preference decision, and runner/UI zero semantics differ.",
+      "fix": "Share a zero/tie policy, preferably no ranking until priorities exist; show tie sets and near-tie margins."
+    },
+    {
+      "priority": "P1",
+      "title": "Assessments cannot be inspected or repaired through the main interaction",
+      "evidence": "src/misc.tsx:213 reads only the first successful row; line 255 displays score/2 without rubric labels. Raw distributions, other cases, recorded next_question and dominance are unused; confidence/missingness survive only inside inspector JSON.",
+      "impact": "Visitors can change priorities but cannot correct the evidence judgments that determine every recommendation.",
+      "fix": "Expose cases, rubric definitions and supporting text; add evidence edits and versioned human overrides with source/current provenance."
+    },
+    {
+      "priority": "P1",
+      "title": "New evidence and first position are confounded",
+      "evidence": "pilots.py:377 augments item i%3 and line 381 rotates that same item first. All modified cases obey this pairing. The baseline Citation checker ease score varies 1.13 to 1.57 across three ordered runs, which alone cannot separate order from sampling variation.",
+      "impact": "Recorded changes cannot establish responsiveness to evidence or robustness to ordering.",
+      "fix": "Independently cross all six option orders, matched evidence versions and repeats, retaining exact failed inputs and paired score changes."
+    },
+    {
+      "priority": "P1",
+      "title": "Ordinal rubric indices lack validated cardinal utility",
+      "evidence": "pilots.py:317 supplies three ordered verbal levels per criterion; the ranker averages their numeric positions and compensates across criteria. The UI presents a rounded score and winner without exposing scaling assumptions.",
+      "impact": "A weighted index may look like calibrated quality even though real utility and assessment accuracy are unmeasured.",
+      "fix": "Label it weighted rubric index, expose sensitivity/scaling, apply hard constraints separately and evaluate assessments independently from user-specific preference outcomes."
+    }
+  ],
+  "simulation": {
+    "title": "An evidence-review and priority session",
+    "description": "Review three project options, impose a hard workshop deadline, vary soft priorities, inspect break-even points, answer a consequential evidence question, correct a rubric judgment and save a reproducible final scenario.",
+    "jevsRole": "Map supplied evidence to bounded rubric outcomes and flag missing support with source spans.",
+    "codeRole": "Own constraints, normalization, contributions, ties, Pareto checks, sensitivity calculations and revision-bound assessment updates.",
+    "acceptanceCriteria": [
+      "Zero priorities produce no arbitrary winner and ties remain visible.",
+      "Every score links to versioned evidence and rubric definitions.",
+      "Manual overrides survive unrelated changes and stale answers cannot overwrite new evidence.",
+      "Hard constraints cannot be compensated away by soft weights.",
+      "Saved scenarios replay exact rankings and contribution sums.",
+      "Suggested questions identify assumptions capable of changing a decision, with any heuristic labeled honestly."
+    ]
+  },
+  "evaluation": {
+    "design": "Check all 1296 current slider settings offline. Independently annotate 24 development and 120 held-out three-option/four-criterion dossiers across six strata. Six option orders, two evidence versions and two repeats require 2880 future logical requests with 15 judgments each, totaling 43200. Use matched baselines, independent rubric support and user-specific or explicitly synthetic utility outcomes; bootstrap 10000 times clustered by dossier.",
+    "baselines": [
+      "Frozen evidence keyword/rule assessor",
+      "Human-reviewed rubric table with the same weighted engine",
+      "Independent oracle assessments to isolate execution errors",
+      "Manual evidence review under identical weights and constraints"
+    ],
+    "metrics": [
+      "Evidence-supported rubric agreement and unsupported high scores",
+      "Missing-evidence detection and irrelevant-change invariance",
+      "Matched evidence responsiveness and order/repeat rank sensitivity",
+      "Exact arithmetic replay, ties and hard-constraint violations",
+      "Synthetic payoff regret separately from subjective user acceptance",
+      "All-attempt availability, retry-inclusive latency/cost and review effort"
+    ],
+    "coverage": {
+      "kind": "authored",
+      "current": "20 attempts,18 complete,2 HTTP 429 failures;6 distinct ordered inputs and 4 evidence sets. One case shown;1296 weight settings exhaust the current integer controls.",
+      "full": "24 development/120 held-out dossiers;2880 requests/43200 judgments before retries. Twelve-dossier pilot is a 288-request subset. Proposed 12-person six-task study uses 72 frozen sessions with no new model calls.",
+      "feasibility": "Feasible without external data or training. Needs independently adjudicated rubric support, declared utility assumptions, crossed experiment setup and future call budget. Proposed model calls and user study were not performed."
+    }
+  },
+  "libraries": [
+    {
+      "name": "Observable Plot",
+      "url": "https://observablehq.com/plot/marks/line",
+      "use": "Display exact criterion-weight sensitivity curves and break-even points without conflating them with model confidence."
+    },
+    {
+      "name": "fast-check command testing",
+      "url": "https://fast-check.dev/docs/advanced/model-based-testing/",
+      "use": "Generate evidence edits, delayed assessment results and manual overrides against independent arithmetic/revision invariants."
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Share zero/tie handling and show margins."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Add case, rubric and evidence review with manual assessment overrides."
+    },
+    {
+      "priority": "P1",
+      "size": "S",
+      "action": "Label the weighted rubric index and separate hard constraints."
+    },
+    {
+      "priority": "P1",
+      "size": "M",
+      "action": "Independently cross evidence, order and repeats in a full authored evaluation."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Add contribution/break-even plots and saved scenarios."
+    },
+    {
+      "priority": "P2",
+      "size": "M",
+      "action": "Support consequential evidence questions and guarded updates."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Observable Plot line documentation",
+      "url": "https://observablehq.com/plot/marks/line"
+    },
+    {
+      "label": "fast-check command testing documentation",
+      "url": "https://fast-check.dev/docs/advanced/model-based-testing/"
+    }
+  ]
+}

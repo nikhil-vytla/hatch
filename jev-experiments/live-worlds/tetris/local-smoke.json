@@ -1,0 +1,58 @@
+{
+  "protocol": "Pure-engine local planner, seed 19, 60 seconds simulated time, 20ms steps, artificial 450ms response delay, 900ms request interval, 700ms fallback wait from each new piece in the assisted lane. No model calls. This bounded smoke check does not cap actual play.",
+  "worldMs": 60000,
+  "lanes": [
+    {
+      "settings": {
+        "source": "local",
+        "framing": "landing",
+        "assisted": true,
+        "delayMs": 450,
+        "intervalMs": 900,
+        "fallbackWaitMs": 700
+      },
+      "pieces": 62,
+      "lines": 23,
+      "level": 3,
+      "score": 6652,
+      "status": "playing",
+      "stats": {
+        "accepted": 56,
+        "stale": 11,
+        "failed": 0,
+        "cancelled": 0,
+        "jevMs": 0,
+        "demoMs": 13620,
+        "fallbackMs": 6500,
+        "humanMs": 0,
+        "gravityMs": 39880
+      }
+    },
+    {
+      "settings": {
+        "source": "local",
+        "framing": "landing",
+        "assisted": false,
+        "delayMs": 450,
+        "intervalMs": 900,
+        "fallbackWaitMs": 700
+      },
+      "pieces": 61,
+      "lines": 23,
+      "level": 3,
+      "score": 6618,
+      "status": "playing",
+      "stats": {
+        "accepted": 62,
+        "stale": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "jevMs": 0,
+        "demoMs": 16060,
+        "fallbackMs": 0,
+        "humanMs": 0,
+        "gravityMs": 43940
+      }
+    }
+  ]
+}

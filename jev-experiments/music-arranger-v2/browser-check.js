@@ -1,0 +1,50 @@
+async (page) => {
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const results = {};
+  await page.getByRole("button", { name: "Play arrangement", exact: true }).click();
+  await page.waitForFunction(() => document.querySelector(".ma-play-status").textContent.startsWith("Playing"));
+  await page.getByRole("button", { name: "Mute Bass", exact: true }).click();
+  results.queued = await page.locator(".ma-play-status").textContent();
+  assert(results.queued.includes("queued"), "Mute was not queued while playing");
+  await page.waitForFunction(() => document.querySelector(".ma-play-status").textContent.startsWith("Playing"), null, { timeout: 6000 });
+  results.afterBoundary = await page.locator(".ma-play-status").textContent();
+  await page.getByRole("button", { name: "Stop playback", exact: true }).click();
+  for (let i = 0; i < 4; i++) {
+    await page.getByRole("button", { name: "Play arrangement", exact: true }).click();
+    await page.getByRole("button", { name: "Stop playback", exact: true }).click();
+  }
+  await page.waitForTimeout(300);
+  assert(await page.locator(".ma-playhead").count() === 0, "Playhead survived stop");
+  results.rapidStop = await page.locator(".ma-play-status").textContent();
+  const first = page.locator(".ma-note").first();
+  results.beforeEdit = await first.getAttribute("aria-label");
+  await first.click();
+  await page.getByRole("button", { name: "Lower selected note one scale step", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  results.afterKeyboardEdit = await first.getAttribute("aria-label");
+  assert(results.afterKeyboardEdit !== results.beforeEdit, "Keyboard pitch edit did not change the note");
+  await page.getByRole("button", { name: "Rest", exact: true }).click();
+  assert((await first.getAttribute("aria-label")).startsWith("Rest"), "Rest edit failed");
+  await page.getByRole("button", { name: "Lock phrase 1", exact: true }).click();
+  assert(await page.getByRole("button", { name: "Ask Jev for a phrase", exact: true }).isDisabled(), "Locked phrase still allows a Jev request");
+  assert(await page.getByRole("button", { name: "Add note", exact: true }).isDisabled(), "Locked phrase still allows note editing");
+  await page.getByRole("button", { name: "Unlock phrase 1", exact: true }).click();
+  results.lockGuard = "passed";
+  await page.getByRole("button", { name: "Audition Settle", exact: true }).click();
+  await page.waitForFunction(() => document.querySelector(".ma-play-status").textContent.includes("Auditioning Settle"));
+  results.audition = await page.locator(".ma-play-status").textContent();
+  await page.getByRole("button", { name: "Stop playback", exact: true }).click();
+  await page.getByRole("combobox", { name: "Arrangement to compare", exact: true }).selectOption("rule");
+  results.rule = await page.locator(".ma-scenes").textContent();
+  assert(results.rule.includes("Procedural"), "Rule baseline mislabeled");
+  await page.getByRole("combobox", { name: "Arrangement to compare", exact: true }).selectOption("random");
+  results.seeded = await page.locator(".ma-scenes").textContent();
+  assert(results.seeded.includes("Procedural"), "Seeded baseline mislabeled");
+  await page.getByRole("combobox", { name: "Arrangement to compare", exact: true }).selectOption("jev");
+  await page.getByRole("button", { name: "Ask Jev for a phrase", exact: true }).click();
+  results.noKey = await page.locator(".notice.error").textContent();
+  assert(results.noKey.includes("Connect"), "Missing key did not produce an actionable message");
+  results.horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  assert(!results.horizontalOverflow, "Desktop page overflows horizontally");
+  return results;
+}

@@ -1,0 +1,36 @@
+{
+  "route": "http://127.0.0.1:5193/#experiment/crowd",
+  "browser_session": "crowd",
+  "checks": {
+    "pause_stable": true,
+    "clock_advances_after_play": true,
+    "human_destination_applied": true,
+    "scrub_returns_to_zero": true,
+    "replay_disables_posting": true,
+    "fork_preserves_old_run": true,
+    "notice_changes_only_selected_lane": true,
+    "desktop_no_horizontal_overflow": true,
+    "mobile_390_no_horizontal_overflow": true,
+    "mobile_canvas_width": 344,
+    "dark_theme": true,
+    "reduced_motion": true
+  },
+  "explicitly_mocked_network_checks": {
+    "delay_ms": 2200,
+    "clock_advanced_while_waiting": true,
+    "human_intervention_survived": true,
+    "stale_actor_replies": { "lane_a": 0, "lane_b": 1 },
+    "provider_503_visible": true,
+    "clock_continued_after_503": true,
+    "owner_key_used_in_browser": false
+  },
+  "actual_recording": {
+    "source": "../demo.jsonl",
+    "batches": 1,
+    "questions": 24,
+    "residents": 12,
+    "service_latency_ms": 578,
+    "retries": 0,
+    "benchmark_claim": false
+  }
+}

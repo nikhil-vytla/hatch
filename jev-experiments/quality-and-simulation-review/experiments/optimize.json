@@ -1,0 +1,120 @@
+{
+  "id": "optimize",
+  "title": "Prompt evolution",
+  "evidenceStatus": "Real corrected GEPA search; one seed, ten intents, 20 validation and 50 test cases; no held-out gain",
+  "verdict": "repair",
+  "highestPriority": "P1",
+  "summary": "The corrected GEPA run made 11 reflection calls and retained four mutations, then selected the original prompt. Unchanged, random, hill climbing and GEPA produced identical 43/50 held-out predictions; OPRO scored 42/50. Provider outages enter optimizer fitness as incorrect answers, and completed test results are replaced by later reruns without a repeat identifier.",
+  "strengths": [
+    "Uses externally labeled Banking77 examples, recorded source hashes and disjoint selected splits; no test-label path into reflection was found.",
+    "The corrected GEPA integration performed real proposals and validation, and the published negative result is supported by all 250 final predictions.",
+    "All five final methods answered 50/50 cases, and the UI correctly cautions that validation gains alone do not establish generalization.",
+    "An offline full 77-intent TF-IDF/logistic baseline scored 2741/3080, or 88.99%; this separate baseline uses more labeled training data and is not a full Jev evaluation."
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Provider outages are treated as prompt-quality failures",
+      "evidence": "src/jev_lab/optimize.py:79-83 converts exceptions to zero scores. results/optimize.jsonl:155,157 contains two 45% OPRO scores with ten missing records each. Current GEPA rejected two five-record proposals after repeated HTTP 429 responses; probes/optimize.results.json records these batches.",
+      "impact": "OPRO conditions proposals on outage-contaminated scores and GEPA rejects text without a completed task comparison.",
+      "fix": "Represent incomplete fitness explicitly, recover only missing exact requests within a fixed policy, preserve completed answers, and compare complete matched cases. Keep operational all-attempted accuracy separate. Restart an identified search after correcting historical fitness."
+    },
+    {
+      "priority": "P1",
+      "title": "Tiny validation and repeated-scoring noise obscure prompt effects",
+      "evidence": "optimize.py:45 uses 20 validation records. The identical seed scores 80%, 85% and 90% across searches; an identical hill-climb instruction scores 85%, 90%, then 85% at results/optimize.jsonl:83,84,87. Current test covers 50/3080 examples and 10/77 intents, with one optimizer seed.",
+      "impact": "One validation prediction changes the score by five points, so selecting the best of many candidates can select noise. The observed negative result cannot establish optimizer performance generally.",
+      "fix": "Use larger duplicate-aware validation splits, five seeds, a repeated unchanged control, deduplicated proposals, fixed batch layouts and paired uncertainty. Report ten-intent and full 77-intent tasks separately."
+    },
+    {
+      "priority": "P1",
+      "title": "Resumption silently replaces completed held-out observations",
+      "evidence": "optimize.py:89-104 resumes by latest-run configuration equality, currently only quick and seed, then :216 reruns every method's test. Hill climbing moved from 42/50 to 43/50 with the identical prompt and no missing prior test answers. recover.ts:13 excludes optimize.",
+      "impact": "Repeat variability disappears when only the later record is shown. Changed data, code, packing or models can resume an incompatible search; shared RNG consumption also depends on which methods were resumed.",
+      "fix": "Hash the full protocol, isolate method RNGs, preserve completed test observations, and assign repeat IDs. Show correction provenance and source-run links for resumed candidate histories."
+    },
+    {
+      "priority": "P1",
+      "title": "Missing test scores can be mislabeled as held-out accuracy",
+      "evidence": "experience-prototypes/src/benchmarks.tsx:518-524 falls back to validation accuracy or zero while labeling the card as accuracy on 50 held-out cases. optimize.py:47 makes quick tests contain 20 cases.",
+      "impact": "The current complete record renders correctly, but partial or quick records can show a false metric or denominator.",
+      "fix": "Render a held-out score only from completed held-out evidence. Derive counts from data, show not evaluated when absent, and test complete, quick and partial states."
+    },
+    {
+      "priority": "P2",
+      "title": "The gallery omits rejected proposals and unequal search resources",
+      "evidence": "optimize.py:209 publishes only five retained GEPA candidates although logs show 11 proposals and 19 iterations. GEPA used 100 validation plus 150 training metric records, including five-record training batches; other methods used 240 validation records. Reflection requests are outside that ceiling.",
+      "impact": "Visitors cannot trace the unchanged winner, and a common record ceiling can be mistaken for equal information access or equal request cost. Shared record context may affect classifications.",
+      "fix": "Publish proposal, parent, minibatch, acceptance and failure events, plus API attempts and generator usage. State method information access and compare packed versus singleton scoring on development data."
+    }
+  ],
+  "simulation": {
+    "title": "Replay the search and choose a candidate",
+    "description": "Step through the recorded proposal, training-check, validation, retain/reject and freeze events. Inspect prompt diffs and changed cases, predict the winner, then reveal the frozen selection and held-out result. Editing creates a separately identified sandbox.",
+    "jevsRole": "Classify utterances into supported intents and return probabilities. Gemini writes proposals; GEPA controls its optimizer search.",
+    "codeRole": "Maintain immutable protocol, candidate, request and prediction IDs; compute gold-label scores; select candidates; track resources; stop incomplete evaluations; replay without model calls.",
+    "acceptanceCriteria": [
+      "Reconstruct all 11 GEPA proposals, seven rejections, four retained mutations, eight skipped perfect minibatches and the original-prompt winner.",
+      "Every score exposes split, numerator, denominator, completion state and evidence record; all 250 test predictions reproduce the published totals.",
+      "A transport timeout cannot replace a successful answer or create a ranked zero-quality score.",
+      "Held-out reveal freezes the sandbox; subsequent edits create a new exploratory branch.",
+      "Recorded replay is deterministic and uses zero API calls."
+    ]
+  },
+  "evaluation": {
+    "design": "Repair outage handling and protocol hashes first. Preregister five seeds, 770 train-derived validation examples with duplicate groups kept together, and all 77 labels. Freeze every candidate before official testing. Allow four search methods 16000 metric records and at most 19 proposals per seed, with a separate generation ceiling. Use independent gold labels, paired seed/request-group bootstrap intervals with 10000 resamples, and report per-seed outcomes. Primary success is at least +2 percentage points versus unchanged, a positive multiplicity-adjusted interval lower bound, and no more than +0.5 points unavailable rate under the declared budget. Preserve the 50 previously inspected cases as identified repeat evidence and report the 3030 cases unused by this optimize pilot separately.",
+    "baselines": [
+      "Unchanged Jev, including repeated identical requests to estimate serving noise",
+      "Random mutation and hill climbing with explicit authored mutation sets",
+      "OPRO-inspired generation with matched label descriptions and stated information access",
+      "GEPA with the pinned adapter and complete proposal lineage",
+      "TF-IDF/logistic regression trained on the same allowed training partition; full-training version in a separate reference column",
+      "Additional fixed training-derived label-definition prompt to isolate clearer definitions from optimizer effects"
+    ],
+    "metrics": [
+      "Official exact-label accuracy over all 3080 cases and 77 choices; macro-F1 and per-intent recall",
+      "Paired accuracy change, changed predictions, five-seed variation and 95% intervals accounting for shared request groups",
+      "Answered accuracy, all-attempted accuracy, unavailable rate and completed fitness coverage",
+      "Validation-to-test change and proposal acceptance rate",
+      "Evaluator records, logical requests, attempts, generator tokens, recorded cost and end-to-end latency"
+    ],
+    "coverage": {
+      "kind": "external",
+      "current": "50 official-test cases from ten intents, 1.62% of 3080; 50 train and 20 validation records; one optimizer seed. Offline audit additionally evaluated a separate full-data TF-IDF baseline on all 3080 cases and scored 2741 correct.",
+      "full": "Banking77 official train 10003 and test 3080, with 77 intents and 40 test cases per intent. Full comparable Jev evaluation needs all 77 choices and newly optimized prompts.",
+      "feasibility": "Pinned CSVs and deterministic scoring are ready. Five methods across five seeds require 77000 final decisions or 7700 ten-record requests before retries. Search ceilings imply up to 320000 record evaluations, roughly 32000-40000 evaluator requests plus at most 190 OPRO/GEPA generation calls. A one-seed frozen baseline-plus-winner check needs 616 packed requests. Additional definition-only control costs 1540 final requests across five seeds. Blockers are outage-safe selection, protocol/event recording, validated request size and a paid run budget; no paid calls ran in this audit."
+    }
+  },
+  "libraries": [
+    {
+      "name": "GEPA",
+      "url": "https://github.com/gepa-ai/gepa/blob/v0.1.4/src/gepa/api.py",
+      "use": "Keep the pinned optimizer and adapter; expose candidate and evaluation events for the replay. Jev supplies structured classifications, while GEPA supplies search and lineage."
+    },
+    {
+      "name": "scikit-learn",
+      "url": "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html",
+      "use": "Conventional exact-label scoring and the existing offline TF-IDF/logistic reference, with explicit training-data scope."
+    },
+    {
+      "name": "SciPy bootstrap",
+      "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html",
+      "use": "Paired confidence intervals after grouping dependent requests and seeds; handle identical predictions and degenerate intervals explicitly."
+    }
+  ],
+  "nextSteps": [
+    { "priority": "P1", "size": "S", "action": "Remove validation-as-test fallback, derive denominators and visibly identify the unchanged GEPA winner." },
+    { "priority": "P1", "size": "M", "action": "Add incomplete fitness states, immutable successful predictions, protocol hashes, per-method RNGs and repeat IDs, with offline contract checks." },
+    { "priority": "P1", "size": "M", "action": "Export complete optimizer events and build a recorded candidate replay." },
+    { "priority": "P1", "size": "M", "action": "Run training-only noise and packing diagnostics, then freeze a full evaluation protocol." },
+    { "priority": "P2", "size": "L", "action": "Run one full 77-intent seed, measure request costs and complete five seeds within the agreed budget; reuse the event format for routing-prompt optimization." }
+  ],
+  "sources": [
+    { "label": "Official Banking77 dataset and split counts", "url": "https://github.com/PolyAI-LDN/task-specific-datasets" },
+    { "label": "Original Banking77 paper and accuracy protocol", "url": "https://arxiv.org/html/2003.04807v1" },
+    { "label": "Pinned GEPA 0.1.4 API source", "url": "https://github.com/gepa-ai/gepa/blob/v0.1.4/src/gepa/api.py" },
+    { "label": "Current GEPA optimizer and callback documentation", "url": "https://gepa-ai.github.io/gepa/api/core/optimize/" },
+    { "label": "scikit-learn exact-label accuracy", "url": "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html" },
+    { "label": "SciPy paired bootstrap", "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html" }
+  ]
+}

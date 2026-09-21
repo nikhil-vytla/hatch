@@ -1,0 +1,28 @@
+{
+  "attempted": 24,
+  "completed": 23,
+  "failed_case_ids": [
+    "drink/test/12"
+  ],
+  "unique_completed_request_texts": 22,
+  "exact_duplicate_texts": {
+    "Please recommend a drink that is without caffeine, sweet, chilled, without dairy.": 2
+  },
+  "jev_correct_completed": 23,
+  "literal_phrase_baseline_correct_completed": 23,
+  "completed_predictions_with_probability_one": 23,
+  "all_partial_preference_states": 81,
+  "partial_states_by_number_of_matches": {
+    "0": 16,
+    "1": 29,
+    "2": 23,
+    "3": 4,
+    "4": 7,
+    "5": 1,
+    "8": 1
+  },
+  "fully_specified_preference_states": 16,
+  "fully_specified_supported_states": 8,
+  "fully_specified_unsupported_states": 8,
+  "note": "The literal baseline exploits known authored templates; this is not evidence of open-language performance."
+}
