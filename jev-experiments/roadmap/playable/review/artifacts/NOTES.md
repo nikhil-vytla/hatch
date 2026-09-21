@@ -1,0 +1,11 @@
+# Final scoped artifact audit notes
+
+- Root requested an artifact-only audit of roadmap design-research, materials, playable and Tetris work.
+- Check binary size limits, downloaded full-code copies, source credits/URLs, accidental private data and stale public claims. No model calls, GPU/performance runs or browser automation.
+- Root already fixed the materials evidence-download gap and the Tetris no-new-runs wording. Do not modify root/delivery documents or product code; only clear prose defects in this scope may be corrected.
+- Scanned 90 pre-existing files, excluding this audit's folder. No file reaches 2,000,000 bytes. The 20 WebPs total 2,627,744 bytes; largest is the 334,018-byte Maggie Appleton garden capture. All 20 images are ignored by `output/`.
+- Offline contact-sheet inspection covered every retained image. The figures show public sites or our own demo; no credential fields, account chrome, private messages or private instructions were visible. Contact sheets remain outside the repository. None of the WebPs has EXIF or XMP chunks.
+- Text scanning produced one false positive: “root/home/current-directory targets” in the Mac review matched the home-path pattern. An initial interpretation of that flag as a removed local path was corrected to root promptly; no actual private path was found or removed.
+- All eleven reference-board figures have live-source URLs, captions/alt text and present image files. The style study has explicit inspiration links and original implementation claims. No repository/dependency tree, archive, model file, symlink or full copied upstream implementation was found in the scope.
+- Clarified historical timing and pending-work wording in the Mac and training review reports; linked later reviews/current release status. Appended root's subsequent Tetris wording correction to the earlier scene review's scope notes. No product, raw evidence, frozen protocol, root or delivery file changed.
+- `record.local.log` is the only ignored non-image file in scope; it duplicates console progress and should remain excluded. The exact 20 selected image paths and their hashes/sizes are retained for root's staging decision. No staging or commit performed.

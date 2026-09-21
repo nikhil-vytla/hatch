@@ -1,0 +1,149 @@
+{
+  "recordedAt": "2026-09-21T04:57:55.722Z",
+  "status": 200,
+  "sources": {
+    "live-route.ts": "84f2567b9718c86aabfafd18f830f76c33354fa9c17e35204623e89c8abc87ed",
+    "../routing/web-handler.ts": "486e720f835be542eb3c3127d4f21eb385d1adb805b2aca0c6799b6801c7abc1",
+    "../routing/execute.ts": "222b9d0331d45b06617765bb06d61755422167c918dc0267f51b9d321d63b415",
+    "../routing/http-executor.ts": "342231d60bb7f819cec22d81944bb1c952c13b2c181c87268aa4ebee5e41d473",
+    "../routing/artifacts.ts": "b20a560b090a6c917115f45044e1f2d2318b2948cbbd4406646647283de780fe"
+  },
+  "task": {
+    "id": "routing-demo",
+    "prompt": "Fix the bug. totalThrough(n) must sum every integer from 1 through n inclusive. Return a proposed unified diff for sum.ts.",
+    "context": "sum.ts:\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n",
+    "requiredCapabilities": [
+      "text",
+      "coding"
+    ],
+    "outputTokens": 2048
+  },
+  "result": {
+    "schemaVersion": "1",
+    "taskId": "routing-demo",
+    "status": "ok",
+    "classification": {
+      "source": "heuristic",
+      "category": "bug-fix",
+      "difficulty": 0.5,
+      "confidence": 0.5,
+      "latencyMs": 0,
+      "costUsd": 0,
+      "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+    },
+    "selection": {
+      "status": "selected",
+      "routeId": "gpt-4.1-mini",
+      "candidates": [
+        {
+          "routeId": "gpt-4.1-mini",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.20617949123084214,
+          "estimatedCostUsd": 0.004244,
+          "maximumCostUsd": 0.004244,
+          "quality": {
+            "value": 0.65,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 1600,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        },
+        {
+          "routeId": "claude-haiku-4.5",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": 0.07999999999999999,
+          "estimatedCostUsd": 0.012658,
+          "maximumCostUsd": 0.012658,
+          "quality": {
+            "value": 0.8,
+            "basis": "simulation",
+            "evidence": "Illustrative difficulty interpolation, not measured accuracy."
+          },
+          "latency": {
+            "value": 2400,
+            "basis": "simulation",
+            "evidence": "Illustrative latency, not a measurement."
+          },
+          "cacheBasis": "none"
+        }
+      ],
+      "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+      "inputTokenUpperBound": 2418,
+      "outputTokens": 2048
+    },
+    "attempts": [
+      {
+        "actualModel": "openai/gpt-4.1-mini",
+        "identityBasis": "provider-reported",
+        "usage": {
+          "inputTokens": 345,
+          "outputTokens": 134,
+          "cachedInputTokens": 0
+        },
+        "costUsd": null,
+        "status": "ok",
+        "artifact": {
+          "kind": "patch",
+          "text": "--- a/sum.ts\n+++ b/sum.ts\n@@ -1,5 +1,5 @@\n-export function totalThrough(n: number): number {\n-  let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n-  return total;\n-}\n+export function totalThrough(n: number): number {\n+  let total = 0;\n+  for (let i = 1; i <= n; i++) total += i;\n+  return total;\n+}\n",
+          "repair": {
+            "kind": "single-hunk-counts-v1",
+            "originalText": "--- a/sum.ts\n+++ b/sum.ts\n@@ -1,5 +1,6 @@\n-export function totalThrough(n: number): number {\n-  let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n-  return total;\n-}\n+export function totalThrough(n: number): number {\n+  let total = 0;\n+  for (let i = 1; i <= n; i++) total += i;\n+  return total;\n+}\n",
+            "originalWasMalformed": true,
+            "headerLine": 3,
+            "originalHeader": "@@ -1,5 +1,6 @@",
+            "normalizedHeader": "@@ -1,5 +1,5 @@",
+            "validation": "syntax-only; host application and tests required"
+          }
+        },
+        "routeId": "gpt-4.1-mini",
+        "latencyMs": 1462.274291,
+        "trigger": "initial",
+        "reservedCostUsd": 0.004244
+      }
+    ],
+    "outcome": {
+      "actualRouteId": "gpt-4.1-mini",
+      "actualModel": "openai/gpt-4.1-mini",
+      "totalLatencyMs": 1462.757791,
+      "totalCostUsd": null,
+      "artifact": {
+        "kind": "patch",
+        "text": "--- a/sum.ts\n+++ b/sum.ts\n@@ -1,5 +1,5 @@\n-export function totalThrough(n: number): number {\n-  let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n-  return total;\n-}\n+export function totalThrough(n: number): number {\n+  let total = 0;\n+  for (let i = 1; i <= n; i++) total += i;\n+  return total;\n+}\n",
+        "repair": {
+          "kind": "single-hunk-counts-v1",
+          "originalText": "--- a/sum.ts\n+++ b/sum.ts\n@@ -1,5 +1,6 @@\n-export function totalThrough(n: number): number {\n-  let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n-  return total;\n-}\n+export function totalThrough(n: number): number {\n+  let total = 0;\n+  for (let i = 1; i <= n; i++) total += i;\n+  return total;\n+}\n",
+          "originalWasMalformed": true,
+          "headerLine": 3,
+          "originalHeader": "@@ -1,5 +1,6 @@",
+          "normalizedHeader": "@@ -1,5 +1,5 @@",
+          "validation": "syntax-only; host application and tests required"
+        }
+      },
+      "note": "The model returned malformed hunk counts. One header was deterministically recounted; the original is retained. Host application and tests are still required."
+    }
+  },
+  "independentCheck": {
+    "baselineExit": 1,
+    "baseline": "bun test v1.3.14 (0d9b296a)\n\nsum.test.ts:\n1 | import {test,expect} from 'bun:test'; import {totalThrough} from './sum'; test('inclusive totals',()=>{for(const n of [0,1,2,10,42])expect(totalThrough(n)).toBe(n*(n+1)/2)});\n                                                                                                                                                                ^\nerror: expect(received).toBe(expected)\n\nExpected: 1\nReceived: 0\n\n      at <anonymous> (/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-web-route-0UxxKo/sum.test.ts:1:157)\n(fail) inclusive totals [0.22ms]\n\n 0 pass\n 1 fail\n 2 expect() calls\nRan 1 test across 1 file. [7.00ms]\n",
+    "strictCheck": {
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "strictPatchApplied": true,
+    "patchApplied": true,
+    "testsExit": 0,
+    "tests": "bun test v1.3.14 (0d9b296a)\n\nsum.test.ts:\n(pass) inclusive totals [0.12ms]\n\n 1 pass\n 0 fail\n 5 expect() calls\nRan 1 test across 1 file. [6.00ms]\n",
+    "hostRepairApplied": false,
+    "toolkitNormalizationApplied": true
+  },
+  "billingVerified": false,
+  "reportAnnotation": "After the run, renamed the recorder field repairApplied to hostRepairApplied and derived toolkitNormalizationApplied from the retained artifact.repair. No model output, source content or test result changed; source hashes describe the actual invocation."
+}

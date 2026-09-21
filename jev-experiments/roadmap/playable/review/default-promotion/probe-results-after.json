@@ -1,0 +1,96 @@
+{
+  "scope": "CPU only. Dependency imports stubbed for doctor; no installation, model execution, GPU or production promotion.",
+  "sourceHashes": {
+    "training/promote_default.py": "d8028c6596730228ef7f8b763d339b7f579acdb205496f2674c4ee6620599d60",
+    "training/select_default.py": "ba718a411a840d9a2d48311b1f7d0866783a1422be6f5928dc53becd480e4b8a",
+    "training/audit_release.py": "f960eebef37877834af2f2dfa9d7234273178d920617f27a6d6dcc0a50e9c812",
+    "mac/verify_default_package.py": "8de596d24067e25898357b99ac4bd0433cc8f382cd31800f9577483a556742fd",
+    "mac/jev_local.py": "5b2685ac4197796cb069b2533b186eeb04f7212a24c632d43ea188f7a4eb340f",
+    "mac/install.sh": "42e6f36538b2b47087dc242a98aaf7ed5fc7d5577be2cecf41f5823d8d9492ec"
+  },
+  "freshDefaultDoctor": {
+    "installerOriginalCommand": {
+      "exitCode": 2,
+      "response": {
+        "platform": "macOS-26.6.2-arm64-arm-64bit",
+        "machine": "arm64",
+        "python": "3.12.10",
+        "localOnly": true,
+        "limits": {
+          "maxStateBytes": 65536,
+          "maxInputBytes": 131072,
+          "maxQuestions": 32,
+          "maxOptions": 8,
+          "maxTokens": 768,
+          "supportedKinds": [
+            "choice",
+            "boolean",
+            "ordinal"
+          ]
+        },
+        "defaultModel": "laya-readout-experimental",
+        "issues": [
+          {
+            "code": "model_missing",
+            "message": "Missing model file: model.safetensors"
+          },
+          {
+            "code": "model_missing",
+            "message": "Missing model file: encoder/config.json"
+          },
+          {
+            "code": "model_missing",
+            "message": "Missing model file: tokenizer/tokenizer.json"
+          },
+          {
+            "code": "model_missing",
+            "message": "Missing model file: readout.safetensors"
+          }
+        ],
+        "status": "error"
+      }
+    },
+    "installerRuntimeOnlyCommand": {
+      "exitCode": 0,
+      "response": {
+        "platform": "macOS-26.6.2-arm64-arm-64bit",
+        "machine": "arm64",
+        "python": "3.12.10",
+        "localOnly": true,
+        "limits": {
+          "maxStateBytes": 65536,
+          "maxInputBytes": 131072,
+          "maxQuestions": 32,
+          "maxOptions": 8,
+          "maxTokens": 768,
+          "supportedKinds": [
+            "choice",
+            "boolean",
+            "ordinal"
+          ]
+        },
+        "defaultModel": "laya-readout-experimental",
+        "issues": [],
+        "status": "ok"
+      }
+    },
+    "installerUsesRuntimeOnly": true
+  },
+  "unchangedFixtureControl": {
+    "promoted": true,
+    "output": "{\"installedDefault\": \"fixture-readout\", \"experimental\": true}",
+    "verifiedHelperSha256": "013da9df8684f30cf5bc00d5608419ccee624d1f044f1b4155bba3ba8d289cc3",
+    "changedHelperSha256": "013da9df8684f30cf5bc00d5608419ccee624d1f044f1b4155bba3ba8d289cc3",
+    "registryDefaultAfter": "fixture-readout",
+    "scope": "Research-complete and validation-selection gates stubbed; all writes confined to a synthetic temporary selection/package fixture."
+  },
+  "changedInferenceHelper": {
+    "promoted": false,
+    "errorType": "ValueError",
+    "message": "Shipped source files changed after fresh installation verification",
+    "verifiedHelperSha256": "013da9df8684f30cf5bc00d5608419ccee624d1f044f1b4155bba3ba8d289cc3",
+    "changedHelperSha256": "f6a53dc70900eb2a3d1c991e8cee698df17ad89d6c729c9a0efc1ea6e5f2e424",
+    "registryDefaultAfter": null,
+    "scope": "Research-complete and validation-selection gates stubbed; all writes confined to a synthetic temporary selection/package fixture."
+  }
+}

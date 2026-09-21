@@ -1,0 +1,2332 @@
+{
+  "gate": "release",
+  "requested_model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+  "observed_models": [
+    {
+      "provider": "amazon-bedrock",
+      "model": "global.anthropic.claude-fable-5-1"
+    }
+  ],
+  "session_ids": [
+    "ses_f3d451f16ffewivNx71yMq0tCk"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 337.0765051841736,
+  "prompt_sha256": "69302b6a23b8845ccb9bcf110561bc0aba20c88051c6a48aaf88b05231c66b81",
+  "files": [
+    {
+      "path": "jev-experiments/roadmap/IMPLEMENTATION.md",
+      "sha256": "46781415c560edfddf6bb58065d54dc09e940e9be393c0df325973ad5172f0bf"
+    },
+    {
+      "path": "jev-experiments/roadmap/ARCHITECTURE.md",
+      "sha256": "497003e7db76f956e2dcb2bf1c7021138e326e336f7769c2b6ab39089de7ecf9"
+    },
+    {
+      "path": "jev-experiments/roadmap/MAP.md",
+      "sha256": "f9c3339d72f8fb429e764729c808e1a739b42d47213a39473bb50817856f8c83"
+    },
+    {
+      "path": "jev-experiments/roadmap/_summary.md",
+      "sha256": "71a2f23e57e9dd55d0b31fcb7544a85a2c9efd83f1a50834894952b93ca7006a"
+    },
+    {
+      "path": "jev-experiments/roadmap/apply.sh",
+      "sha256": "58eb91f59ae6087c017ff010c8266c42088136a8591c9dc44e1dfa74c1a583e9"
+    },
+    {
+      "path": "jev-experiments/roadmap/README.md",
+      "sha256": "753b6bda695f034c1a9d0489d319d1d764a80070a1406aa4786b9bec6a5011b8"
+    },
+    {
+      "path": "jev-experiments/roadmap/package.json",
+      "sha256": "c5eec3da5b3b36a34bc76f475aa5e99d29d46297cbb3d7fc2af3024c5ec9f107"
+    },
+    {
+      "path": "jev-experiments/roadmap/tsconfig.json",
+      "sha256": "5f2cfcdd6e6ebdf006ee0271d685980b0909c843c82ea1f86e3277b50ca06e5c"
+    },
+    {
+      "path": "jev-experiments/roadmap/NOTES.md",
+      "sha256": "39a51ef6fbc4c1981a3996eb2befa476287ef00520b3498a29641e8534b1c07c"
+    },
+    {
+      "path": "jev-experiments/roadmap/assets.d.ts",
+      "sha256": "0310c682d90c9d3d84bcf07d28bd2abf1e251b2cc83a9ab3e7d0bdbf0253cf3e"
+    },
+    {
+      "path": "jev-experiments/roadmap/credits.tsx",
+      "sha256": "f11a7f2e740dd246fbf98b8787d41dab4dc164159e9bec5d0ae101c4024c24f2"
+    },
+    {
+      "path": "jev-experiments/roadmap/application.patch",
+      "sha256": "58663d91310786d13c375119324d3ab74bf0eaccc9ba98b548f08780ce55ce74"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/MaterialsSandbox.tsx",
+      "sha256": "092d474c16b97d214844a8d7613b7cf47f38a7444fe0d54d537d2a2352870357"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/_summary.md",
+      "sha256": "43b91c370f22327f91c3abd6ad3bc6e44be90e63303ae395870e992c1e856368"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.test.ts",
+      "sha256": "6816b37a8a7fffb3ede4640e1933d692d7b4a9f20975374ea0e920ae5d25fefc"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/engine.ts",
+      "sha256": "b325e84014c7370ceaa54f3f6a12ca646e2e678a9dfbc941ea8fcb3a937104b3"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/materials.css",
+      "sha256": "dafb96a57c1d2aa8c5c9db56b7e0e7a3810425d88625af98711a472605d0fad9"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/labels.v1.json",
+      "sha256": "668acad097533b58d5227e6ef02fe778b86a52c39059616a130663e3fd6ac8d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/README.md",
+      "sha256": "9dbae62f559b0656d8266ab39a6e76f283a2e59b3ed49dec4de8d50d421c6a31"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/NOTES.md",
+      "sha256": "bd19bea239d31f8e85eb0082ab2cf0f38e7165503a21d2eedace1a99b6fa0cc6"
+    },
+    {
+      "path": "jev-experiments/roadmap/materials/PROTOCOL.md",
+      "sha256": "710eb01a3c54547fb0d1f85f5a04cdfc22142948f2e9d0ef56b847b25a10a0d2"
+    },
+    {
+      "path": "jev-experiments/roadmap/ci/jev-checks.yml",
+      "sha256": "280edefe55c51ba06db975b4ee7de8c61a4044c25b8528b27bb29d0388e1bf19"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/run_harness.py",
+      "sha256": "67c643708675d63a08e3b7882524cb19e4b2191b69d591759e437e356228e018"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence_index.py",
+      "sha256": "4b5267ea7d4e1674e37897929e04da31dfa54be02153b749d96b967666c4b4d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/_summary.md",
+      "sha256": "602360cc9837b413c7245df3a484434fbb4bea13baac16ad697387b85017d851"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/README.md",
+      "sha256": "4b7375af47ecc1fccba80ead218e1120c6dbcfe1c8245f69795d3609d5af800d"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/malformed_harness.py",
+      "sha256": "167e82fc1eefb231a6f7571de5339264e45395863b93fd68cbdb84fea273f077"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/NOTES.md",
+      "sha256": "c5bc0b8839e0f6e5c6da9e26d79444264283d16297a65ffb148d9cba2377947b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/cancel_harness.py",
+      "sha256": "8ff5c4762872fa4d5c34a81bcd58177ddc92706eb5501d4839f41fa68e1cdd37"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/boundary_harness.py",
+      "sha256": "11f472a388408d87cd6201e61f01e62e27e20b7278027c77eb463fb559701034"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/FAILURE-PROTOCOL.md",
+      "sha256": "86749591957f0b90ef2ea7c2383708bbb1116c0385150f3b407951118af6253c"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/_summary.md",
+      "sha256": "5d99d2e41b2d369d31f3ec52c4b5ebc0f5950d4ebde045ea138aa5e09b62af18"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/README.md",
+      "sha256": "7ea36ddb4dab3187d8d9089f32346d849897b8e49d1486995ef273431fc0e049"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/reference-board.html",
+      "sha256": "c1296146ff23c8997b0403b6a56140d85cadff79db0ea040449c729e7a308c17"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/NOTES.md",
+      "sha256": "574db6dc0816ebaec4e01f44024387a37d5fac48b8bb2c1588b69d4c033569a8"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/style-study.html",
+      "sha256": "ff762001db98ad9b862bcd11bd018575b0648886567c0ac5a10980928eafb18e"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/study.css",
+      "sha256": "01489aa2fd6118a22a7f8d2fe2dd7fbad9aef9f44b8f1341fe6afde323fab5c7"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/promote_default.py",
+      "sha256": "d8028c6596730228ef7f8b763d339b7f579acdb205496f2674c4ee6620599d60"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/sources.json",
+      "sha256": "998e1ee369ced03ff0a9746c1e58bf1c223c2ac0d79abcb7c98142520baec73a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/frozen-baselines-laya.json",
+      "sha256": "25623166a053ad799716f29ddc46bc666e40f2b90869ad76501d94a4dd49d767"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-smol-17.json",
+      "sha256": "3afae95a2aa42544fa175f71f2974ede7f8e5f4bb33f0787046e53c94202d940"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/default-selection.json",
+      "sha256": "08f771a3a6e333f759dde131fe01156a6eed73076d3bf9e30287c22494f65ae2"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/cache-verification-laya.json",
+      "sha256": "36b38d07fc795793856182fe09e7d2d0d9e2275d7cc6e312f012905eba67f4ae"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/corpus-manifest.json",
+      "sha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/results-qwen.json",
+      "sha256": "78893b3a7c3f6bbb0b205cb062f8565234a29d8364f0ec96b309cc9d4b691d07"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/models-manifest.json",
+      "sha256": "e7ffb1c8ec89de0ef00f2356af205c7577bd06d5da39f3d513c4a3a44401f3d7"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/download_models.py",
+      "sha256": "5e3b143f65d3d3c6782368ac220fdaa904945ea12f8ca26efa87fde115fc1c3c"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/_summary.md",
+      "sha256": "a4b7c716f8d6b3be988d47fc2e26b057b234ef99dba6a4b0747cb1241a4b562f"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/benchmark_coreml.py",
+      "sha256": "f83eabbb6215e330e013644d68f5c634d3f343e1d3dc0b3c6415689685dd0b2c"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-decisions-smol-17-ALL.jsonl",
+      "sha256": "e5c6cab9a44765d48ae422386dc5c2a6e9093a06c3bb2ece432097758c79a3b2"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/summeval-provenance-check.json",
+      "sha256": "1c1e7e4b4bb9ef2f36ac8c4a6f3034c31307342e4dedf3a0b55ad3917e6eb81e"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-decisions-smol-17-CPU_ONLY.jsonl",
+      "sha256": "516841d234e1eff0357dbd6f1f2666866d3c207a819cdb4a430b7f29d396d8c1"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/release-status.json",
+      "sha256": "ed9ed57c06e083a8903af286175866983c674af867ccca02bc4b08cb2e2bfdea"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/verify_export_provenance.py",
+      "sha256": "60b9af5e99bacf840d3326200a6e813d06bef937d735e4054725ee64570842d6"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/PROVENANCE.md",
+      "sha256": "a79fa457bc92d1aaaed59f6f882fac8e9af810fb0985d701b54cca30b5d43bd0"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/model-cache-verification.json",
+      "sha256": "be7acfdc2b54b3bf63b8e17e09ec6bd3d532b6cc40b341877612702bf7fa5fc4"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/results-smol.json",
+      "sha256": "b90bec090102108397ab9ed17c4f62ec080ea0ccf41129bd5341d88e47da2124"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/robustness-laya.json",
+      "sha256": "5d005becb925f33324f65ee666329ade2631d265ef10291d080dbc9a9f9c328d"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/test_export_rows.py",
+      "sha256": "ce85b25bcef2100a5e4adbba8aba2c4d20dfbbd2bd0e3008537aee4e951915c5"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-decisions-qwen-17-CPU_ONLY.jsonl",
+      "sha256": "0fd357eed3184a04615821f47b6c349c7e584d916d376c9a691cd710d2fe7b93"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/test_selection.py",
+      "sha256": "c257972d7ec134a3d80ba8e0105fa608d250e09bbac2ffdd80e1ab183a663b78"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/metric-correction.json",
+      "sha256": "5a27b2ea12c7efb18eee13628301d0f04fbf855b1b7e85019a344c955e6fe5da"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/test_study.py",
+      "sha256": "1034987a7d438033bdbd98dd02c05f01efff1bffa6a2a7dc2b60ce7bd0a0e43c"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-decisions-laya-17-CPU_ONLY.jsonl",
+      "sha256": "e2269f40cdf328a985fd1e43bb8e6d8e399708e01ddfeecbeccf7b124d0a627a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/verify_feature_cache.py",
+      "sha256": "236004247948b5f3de5fa1c5939f2b920d81e98914a7989013ac9fe1df3fd93f"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/TypedDecisionStudy.tsx",
+      "sha256": "26a4a38822818a322cef3ab2f7c25bd4d0c4a2949f73cd63307c407894afa213"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/REVIEW-DISPOSITION.md",
+      "sha256": "e6495afa53fb102fa8a48f5e7f3a050428a76386bf47847b16d7e4f84f902d0b"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/README.md",
+      "sha256": "3e527ff5f4be257c65bf76cba6f7c48fa7f7b54ef0d7852248221b13e708f61b"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export_coreml.py",
+      "sha256": "39268b723004295de84fb505ef2cf56116d73c2735c596c41088a5aaf0239f18"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/robustness.py",
+      "sha256": "160b982290f21db9aa1e0b34e9e7a440a7e4fd2d17ad9478c172a4fc2eba93f3"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/frozen-baselines-qwen.json",
+      "sha256": "e5ea5c2ffbf933df4a062c0f7bcddeb9f09b7671132d9ebf20f1980ed0d37b5a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/audit_release.py",
+      "sha256": "2577c8e1171b68d3ca0135ea30bb67def90a390bbe8bcf32995eda196eeed8f8"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/baseline-results.json",
+      "sha256": "d1f719a0745fb7e32a9d670e7e19c17da4177c863f37566f62d3b24cd801c2e4"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-decisions-laya-17-ALL.jsonl",
+      "sha256": "2b8d4ef6a48e4ffd8d5fe136fe7e34432fc4bfa1f002fe6be9e527bc16aae1b7"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-laya-17.json",
+      "sha256": "72cf6c3508127b54449dbce5195d8bd4c1e737b7a130ab0de5d8ae7d91c0a116"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/robustness-smol.json",
+      "sha256": "c87850c1d9151cb78d4d6027ebaec2b36137425b7933d2ca8319a031119a3989"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/results-laya.json",
+      "sha256": "14743eaa9c68c001d01ee4911421aa99e5b0d961aad45a9428a49dc86228eedd"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/select_default.py",
+      "sha256": "ba718a411a840d9a2d48311b1f7d0866783a1422be6f5928dc53becd480e4b8a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-qwen-17.json",
+      "sha256": "75b65c899b43ff402b0b90fe0ec38721f7af6ad3a0bf3b7432d135b498ce1afd"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-decisions-qwen-17-ALL.jsonl",
+      "sha256": "eec4b226dd4d3329f136302841f4134efd9a1e8f644971a495e94e6d9bfce153"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/record_metric_correction.py",
+      "sha256": "a970ccbd8e39d61a0209fa2a7ea5505dce2a842339e453aaa1f3fa71a83ad37f"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/publication.json",
+      "sha256": "f981e51670a913368e7123c2a228e8660c3cdf3056d73eaf02ded4d45c7b9ed1"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/requirements-training.txt",
+      "sha256": "378cbaea2a5cd3c7013285fbd2be6e63c149b0f45fead6b27915e1b22cad8a3a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/NOTES.md",
+      "sha256": "09d28310a7286cd230e27128a360174cc3bc2c638227b5d01618e8dfd9154999"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/frozen-baselines-smol.json",
+      "sha256": "e632be73a493dea25572537ae3bcbfcab28debb62d0f7cfdd6b643f1811dabf8"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/cache-verification-smol.json",
+      "sha256": "c996089337795266cc69ddfe0e4d1f7f9242db2e6fe9342c522188b158a764d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/robustness-qwen.json",
+      "sha256": "6fccdab612e2a2e035bf27ea190512ceafb468cee6d7b8e92f25a7e54681c9c1"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/retain_checkpoints.py",
+      "sha256": "5ad4708f3380241a22e4bfdf102f34153519fadb3b49ca697dd562cf064c3324"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/evidence.py",
+      "sha256": "7b7b26917fc97258d785e3164110ed33c3167de441250b1c84ccf37ec2e9d13a"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/prepare.py",
+      "sha256": "293d43b12d1a585570936dec1811c6db58850eaee16b815bd45eb572b46e18ee"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/verify_summeval.py",
+      "sha256": "a0a8db84b8f2d494a256e16178ce166a932ec0fe183f432739d6ba1b286b483b"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/measure_export_runtime.py",
+      "sha256": "1737332c5c86e44d1fc9520507aceb154a044d878b3a7b422f1a1a5957ecf201"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/study.py",
+      "sha256": "388ac58af161476138ee0192ff9f3422c9eec15d1dca95c7480f628b480eb804"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/publish.py",
+      "sha256": "0502691f2ed405c4cf821d38694c11190fbdb9306d09331bffdf07e32e08a540"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export_decision_rows.py",
+      "sha256": "60121ec7b41c3d6dae977532002944a1e9c9a6f4ffd929a407bc7ca14c1870d8"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/PROTOCOL.md",
+      "sha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/summary.json",
+      "sha256": "de4a110455ff7b4ac85677c3c6ae6833b69eab66ca84ece852a3fedd7fa826d8"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/record.ts",
+      "sha256": "9359f80d27f9a9c4181c33fc07912f11829bb4d2e207137d3de5423c4d0f652c"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/README.md",
+      "sha256": "12e8ff88b7113f8db37d753e4f642a1cd364981a2ac6458c8a22249dc3b2b7eb"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/games.jsonl",
+      "sha256": "99e6861edc764a2c8fb7ef17d9dbe81d4eefe5a9dae1319a7fe52d99f3f37b6c"
+    },
+    {
+      "path": "jev-experiments/roadmap/tetris/PROTOCOL.md",
+      "sha256": "97c0cba31d5431f01ede96eaa7ac4f7c97523b2c3bbd51f20b07cc9a066daaca"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/contract.ts",
+      "sha256": "1d2c234d8da9b55489a7cc0d795163583d655f1312735fd714e15be1ff95becc"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/_summary.md",
+      "sha256": "a181d4d72817cfc87266376e3c2e0326a948cbf11555b478e490d0450f798ec5"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/README.md",
+      "sha256": "c987774a68c9a4cb0cfbd35a99c3e9b2d0c7f88668fbb94ef7b5a5ca19f5a586"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/existing-contract.test.ts",
+      "sha256": "c6f493a8a5821fd54176a867bfe40bc20be775d70feeed7546870c257a8b0b3e"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/existing-contracts.patch",
+      "sha256": "a28112d8f5b4c763ac84caeb77db1e3928c3afd468c44a369a110458c5c7e4e4"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/execute.ts",
+      "sha256": "5a9b5eec0b39ce46beda0fb21f53484d319c851dc7908186323fcab22c64ee20"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/contract.test.ts",
+      "sha256": "9647e2a50f6cb6d6eeba7140ec077175db86ea0df6d8c71b8312a95762b5f9c5"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/standalone-check.json",
+      "sha256": "c6fd82f29563821cc4e0a602b20ef621d63527273eabdd736519172285671e8b"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/NOTES.md",
+      "sha256": "b7eb3dbbfe606485d7131ded63a0a95fed79b2440ed871e173a4419dbbd8dedc"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/verify-standalone.py",
+      "sha256": "d43cdc46387c9d1b7f8ca76450d52deb02c2866a3c31efe82cf4e50d98a3d2ad"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/execute.test.ts",
+      "sha256": "96408c1e634ed0f023ca02f8eb19480d7e9e84d681e6cfa870ec235c523acac9"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/edge-cases.test.ts",
+      "sha256": "31f4137d3fa57f91678a1de6272a4720d59a45ad06a1ec8dd7991250dafc0037"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/jev.ts",
+      "sha256": "335f23a26816cefcd09ecb1668f4872dd06f9d07c4a42bf21fdbfcfdf46a26d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/local-default.md",
+      "sha256": "9a4ea176f98045a391fbcde369f85c777d5d3e5637384b37401e0e6ddb5ec6b3"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/routing-policy.md",
+      "sha256": "2f59372abf54460a88a77c07c0cde48d2045869d19f279c8f0fec0f3939c43bc"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/harness-evidence.md",
+      "sha256": "5028a4dc78367b4398e286acf46f8121a33e9226350da848d7489b6291e0c555"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/local-observation.md",
+      "sha256": "98498044d4aa14a4592436a1cae03e5b855f8d0be9e3d9613c64be7d39054fd0"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/release-gate.md",
+      "sha256": "c584e8cf5d49109210a1d948f2457dae1a42fafed1ec0b3e365426af68cd59ea"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/private-extension.md",
+      "sha256": "972368271e6f4bf8396cb68e00f4dbaa48ab9714865095125ea25a65ea8de6ca"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/local-rules.md",
+      "sha256": "cb3562b8f2464e026fade0f5e2527e1d2fdc6761f68cf0609ff88a3f89e64fc6"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/brush-and-icons.md",
+      "sha256": "a06f8f5cd1c6bd24616e1457cfb8bd02f1193aa6f2a70dd9a8a4af59c30fc152"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/decision-contract.md",
+      "sha256": "a4b7df13e1ce2ed0c67a17f5f5dd40c4bc8c65553c1b13a5bf342ecb895ed5c4"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/games-and-gpu.md",
+      "sha256": "d94238f243905dd1a8f07162f61d78dc5686128db18138258cfc5e0ac568f889"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/source-annotations.md",
+      "sha256": "8cd062cea733a00b76ec6dd30aeb142007cbdb5fd484d07d7f232007ee2b8713"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/email-workflows.md",
+      "sha256": "a13a8051898c56ef856c01dacb149b1fa2083a6f2d300c3ff953f21e17a19de7"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/useful-uncertainty.md",
+      "sha256": "20716419a74285dd49c2bca7b180a911a325a5ba9f99812d62af0fb806be1992"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/selective-perception.md",
+      "sha256": "6edcd5a72a9362245b34321ed4aeb5e8003cfd91d562e16658f1d28ef8ab59f9"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/deployment-boundary.md",
+      "sha256": "c78846c5356f5589ec45f89b56cc91d698bdf8571c204caad32f5a07fbf991b1"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/creative-products.md",
+      "sha256": "851f2a1c80bcce92a0687936c5958fc70cb4700ed53312f95859ff3266ee1bf4"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/training-protocol.md",
+      "sha256": "eb68c29a2e843a80e0f38d15ccf82c36d794f4b9c13eeaab48efb552b4325ca4"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/playable-defaults.md",
+      "sha256": "ed22130893d117afa465c2fc2c7a49d8ebf12321383424a2d46460c7bdb727b5"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/local-creative-choice.md",
+      "sha256": "b0e4e1cdfbb2837f2514860b614b12243b05193d690f32a78948abcda807a5d7"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/email-readout-evaluation.json",
+      "sha256": "421fad7d8efe839aba6a4ffd81cbceb088d618e37d79fc1b1eab05d63f6a1cc7"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/models.json",
+      "sha256": "4ca8388eaec5fa94ca573be4a46ff85435802c4a57234b0a050ed42344c1a4a4"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/_summary.md",
+      "sha256": "9314ed43a771ae85d758b13d8180fcdd065d914909e94a2dafb0681ddc5bdc54"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/evaluate_email.py",
+      "sha256": "1b872e76d6c332d6bdf580e854ef9b26e91d63d0b685720b1bccfff542dc2d1c"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/CREDITS.md",
+      "sha256": "909cc6e8fbacecc69aaa1aab18e4249d7dcacf2f7231d8b6067b8e082c29dcf5"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/install.sh",
+      "sha256": "e7973b859d60748adc90f3cad722daaf0009dc50baba3239d787f360c0f88987"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/package_sources.py",
+      "sha256": "acbbd2def1da275a7c65308515c5edaea6e6d710673dba4ef68f62834ddedade"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/installation-evidence.json",
+      "sha256": "d5f80ae56d1523c8bc081ab3b4111c499999a61bd215886e4c00cec2187110d0"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/email-fixtures.json",
+      "sha256": "0e2de8e7bcf673f1f0ad0711f09d2be86cded09fef3bd98316e7478f3fbcaba6"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/verify_readout_runtime.py",
+      "sha256": "89129e2d40f4cb7c14f646d9ea0042ce8b141107ad624fdea0e29ea5b7115643"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/README.md",
+      "sha256": "a8513aaa3623644fcd2ff228a7382abc39e7d2bbc08e319df048118a4bd0038f"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/readout-runtime-verification.json",
+      "sha256": "e21063f86b4d0abf01fc350c88437a68bc683ec45bde07533e9b73e8c39d0124"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/default-package-verification.json",
+      "sha256": "d0ea0d1fdaac474da6a61c19c9c1403702568dd5259a21ebbedd70b547d9bda0"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/uninstall.py",
+      "sha256": "f1832ad728248fba6e5049cd0f6cc4a386776cfc79612cd4d43309cd2a589c1b"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/test_local.py",
+      "sha256": "8e3a5bf4c9f208e35f6b5ae3944457024f6e2d55d473a536d80948ed48286945"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/verify_default_package.py",
+      "sha256": "8de596d24067e25898357b99ac4bd0433cc8f382cd31800f9577483a556742fd"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/requirements-inference.txt",
+      "sha256": "0f00ad757ae46778735735925e6dc761bbe945e5d969c43b375f03d1148f6ca5"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/jev_local.py",
+      "sha256": "5b2685ac4197796cb069b2533b186eeb04f7212a24c632d43ea188f7a4eb340f"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/NOTES.md",
+      "sha256": "910c4f71003df7ba2a3576e0ecfcede60fe9411b017dd91ee4c2c7d8e8fa7a6f"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/email-evaluation.json",
+      "sha256": "99277556d22e1e498e62c1be1ac4822b0e42e7b39701922a87849167fd677e11"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/record-integrity.ts",
+      "sha256": "888c9e852a3ba8f92a2c714a36db6df2a7854490a861e45ccd4f59aac9f297b2"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/materials-downloads.json",
+      "sha256": "3200902ecd6593f5a2d009b8edca239cca416e9fc8bdf2a86b0096e519b30685"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/visual-release.json",
+      "sha256": "63703bac39977955a0de0ed05cd55fd3ed0dd71a8c7d69849e77b4d1dbeb9efb"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route-strict-failure.json",
+      "sha256": "4601a7904ec7fec5c73280f58a2ab8d6f0265850421bf5815835ef8d1f7ff5a0"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/publication-index.json",
+      "sha256": "f77f6b7aead318f5737618d28e187f99af9c3780e34dd7dac82c5ab9c8f679e0"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/clean-checkout.py",
+      "sha256": "53e4e71fcc3e66a19fbed4703526bc1cb289041ad8f06188617c7976fc3c87a3"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/downloads-release.json",
+      "sha256": "ac64d209325238801c927ce35c7bbf7e1550ff20030b8d7132f99038505abeb0"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/profile-browser.py",
+      "sha256": "11f1a02c437a3403857c89c39763722e58a5787e18881c1883c41c42cf17a045"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/publication.ts",
+      "sha256": "d2fcf338c34640166aa21a03c18f287ff1708a9d860aaece4d20efa7cd611317"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/evidence-assets.json",
+      "sha256": "c13774aaceb3a802186e2933a231f8b66ac3a8a2c1477a0e06caa10dbf224e50"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/evidence-assets.ts",
+      "sha256": "eb93d53ec4991da202f3f30236a498e585724f660c33ba3fa745b82d0fbeb133"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/canonical-deployment.json",
+      "sha256": "f39be59bb24734ad17c85aab394d7926b01df78caf577b49bb65685cc719a67c"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/tetris-downloads.json",
+      "sha256": "d5dbc7c814f761af5f376dad8b60923499037b1cfccde58d583adbcad63641d8"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-crowd-mobile.json",
+      "sha256": "9b30417274d3b20561b4d9508ba1bba020cf886c24fda2533439aba30e086b9e"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/vercel-root-correction.json",
+      "sha256": "436b0059fef28f991c57cce4bb5cb609fedabf7e0d8c99b4572a80445e5c304a"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/PERFORMANCE.md",
+      "sha256": "add60b44169f26b7265ac5c57ed7d9f408d3be7254c7740747f5bf7364eb23d6"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-music-mobile.json",
+      "sha256": "9454f79a33876f1f44073a803e8cda0aac941172f846c2eaaf69fc7c6085816c"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-tetris-mobile.json",
+      "sha256": "9f98c424497fde2e4118cee6e5d99887154c1d064b75d7d11a688197ec611372"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/checks.json",
+      "sha256": "5db697f1bc15c125e2a0db7ae3f38c8c87ea7b0d64ab6898e7d20f4f72ffb48b"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-tetris-desktop.json",
+      "sha256": "f9b005b5e5fe93bc8ccde502eb948e1632d8d0964037c154f30f7bb39e1d0a95"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/other-adapters.py",
+      "sha256": "d6adda876591a3cc1033393535b70a1cccc7e7023c1c2f917202eed8002f4f75"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-materials-mobile.json",
+      "sha256": "d70893b21707774803121d398f538176d18a70b3ecc0bf4d5a654b60d0cbed2d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/capture-release.py",
+      "sha256": "2335058da7bf6f960179e0c27559ec522098f37f79ca65c83b79947b0f878c2a"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/performance-summary.json",
+      "sha256": "9543217b6392c192c20fb278514a8ba7b842f3ef7a7bddc0716ecbf34bb98602"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/download-release.py",
+      "sha256": "2bf1a3754cf36ff7ca28b5766d90bac3dc60c751a10b112400ae2a273b6bf5c6"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/clean-checkout.json",
+      "sha256": "eb6657d4bdca36ff0f7e215ac158aede474122d5252c818ee63fe82684eafc74"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/package-patch.py",
+      "sha256": "578af2293fb36f781f806326461438e6b6c01f4d23462d0938d61e7d10955b78"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-music-desktop.json",
+      "sha256": "da2524c17d9987cea6d744f29e0326cac115624bcbeed3209e9e2c2897b16fc8"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/check.ts",
+      "sha256": "2dfc5a63a1c23e6b6d2ea1f28a68ba1d7e9cbeb965804e16f946570246b1f453"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route-first-malformed.json",
+      "sha256": "19ec290cf19b64744f25371b00c0c9ac319094ac03ab29e22aec1eda38c3f0ca"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/vercel-root-first.json",
+      "sha256": "a528bf88e7c9bd8cfdac7e08077e3987a7a37e310756f1d598c78c4c36243e1b"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route.json",
+      "sha256": "a1bfc7856986c57033f8779e08a39534a03f43e43ce583109775ef807f469ee8"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/browser.json",
+      "sha256": "a1044ab973e9743d3ca7616a02e25cbdb055492e4a667136783eacf64eadae82"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route.ts",
+      "sha256": "54f7025a4c38f7b8c32c965efb37ecb95e644dfe524359edbfb3c3246487934d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/other-adapters.json",
+      "sha256": "6cef822bd725cc882dbc7b5efcbff57be6610009c90e044489c61add8965f998"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/live-route-historical-host-repair.json",
+      "sha256": "c46eca1c63b50e6ba7952cba025d76cd80e3e92d842c91b3504a59a6a105fe74"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/routing-downloads.json",
+      "sha256": "9b2fcab59ff4135573d217d14cf78a297a8839f7211cd1293d42581661170e37"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/canonical-deployment.py",
+      "sha256": "49890c754b89a26c3b7cfbda94bdeca9df715d0a61276632f9e597047bcfbf7a"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-crowd-desktop.json",
+      "sha256": "f89ea1bb2f27f8c1a031874f647fa1197fdb48fb86e9494174c59a581fc455d4"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/frames-materials-desktop.json",
+      "sha256": "08b41584b857e144d37b2905f7664d47c4cb1621196932ed24a3c517bf723cd2"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/integration-pr.md",
+      "sha256": "a0fa877eb5e415df4c7a3af449f0ecc44bc93cb96eb56e7eb13a212127aa2b8c"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/runtime-pr.md",
+      "sha256": "747832633cacb766638ef07835769bf63a2bc4ddcd87d88cb58e3c6dcbd1c81c"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/assemble.py",
+      "sha256": "827386598b26aafa6197ee0b739aa9ef6233fbd2f4e6486931d92fc7a487cc85"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/README.md",
+      "sha256": "b274b9644680acf9df3f61d8608eb5b56fe61bc27573d6a080eb434a7364bed4"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/NOTES.md",
+      "sha256": "4772963da45715342dbfb90782d5164ded77bf5ec4cbc92be997f04cba46d211"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/routing-pr.md",
+      "sha256": "104d998cba080994f47ad9d9baf5ff2fee56977ccee4a4bf6c6c247d682b956b"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/training-pr.md",
+      "sha256": "37133ce163dc42efc1189d57f30f00c389cb9f85c36af240c37b4b9011b68019"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/routing-notes.md",
+      "sha256": "6c67737fa75d9ef86129efaa65e82cb53826d0977289e8360116977fec862b3c"
+    },
+    {
+      "path": "jev-experiments/roadmap/delivery/playable-pr.md",
+      "sha256": "7d19d919066c646c9b9ea6b62c8a9a388cf7c674601662278dcc270ab329e87a"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/_summary.md",
+      "sha256": "36c2f0d836b7e7857fff2d5c985473d1d7395e60135f2c8863e3e7de5014229d"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/music.ts",
+      "sha256": "b12b12b25e67eb9d28fa26f19d7f1ff19d325ecc4fc0de04c3ab1c33d3535f40"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/crowd.test.ts",
+      "sha256": "2e58f3d142ed98ed4b3252b069d139fa6bfd5e8a03d6f365c6eedd101d94b578"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/README.md",
+      "sha256": "4c7544c5c4cecfdb92513aa51480e5505586fb5e72cd9138ccb9579068ee276b"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/crowd.ts",
+      "sha256": "13f7cacd01aa92bce8b1a99dff0e9ad8b01e858497d25b867f0012573cb6be25"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/NOTES.md",
+      "sha256": "77ab7f418a2f00072bcbd9d0fabcd304b0cac714eb66103ccd1db749440525fb"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/music.test.ts",
+      "sha256": "8516d05ab6a0ebfb72bc7f342bab4b614a274be815ba6e22f47eeb352095b2e1"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/fresh_install.py",
+      "sha256": "1e0b5806ef00214685f30be7f5be75018aefe71ac10b4b29e12c88fb0965b6ca"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/normalization.test.ts",
+      "sha256": "67ced3b5a5c016993ed1c937c7e95eef569af94dbf6a3c4515e02843d83d121e"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/http-executor.test.ts",
+      "sha256": "e8523a38321bce40e72308664d2cff91fc7784f926ad7dbc6082eed6fee00abe"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/mac-adapter.test.ts",
+      "sha256": "ebebbbef1b8784abf7cb0d40a0901088d4bee8a328dee0ec15b24fe394a2b6f6"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/mcp.test.ts",
+      "sha256": "3aa4af4498a6cadbd4477b8d79fdd41b29f32b3425f84a09b63ad63b8a5ff4a3"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/ModelRoutingLab.tsx",
+      "sha256": "c1fdad40b067cb34c0aff3e3c5ea609018982a11c8a97cbe8bd1959357326316"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/web-registry.ts",
+      "sha256": "5be61d37fdb0ff817d58ea1b2af1ff67040bc5f290cf9c883dd8316801934c11"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/_summary.md",
+      "sha256": "1e40ce4e1f541868c4415e578aeb6d6ec17a942a0d4f298be7800968910094e7"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/evidence-links.ts",
+      "sha256": "7de3ad0b7ed1cfa795a15e3c36d12c7ffe8d8726c77f2141e3a0f14e367d4af0"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/policy.test.ts",
+      "sha256": "6c9f21218bab3b42744d14fa9a191ccc21679d6833e469922d4a177ed722e8c2"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/local-mcp-base.json",
+      "sha256": "3dd9ece47d7ac64284c483495e72f62538793b262727c484c468edee50d97570"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/router.ts",
+      "sha256": "fa6898a47c4ab75d8cd25ee0d61343997675e1d54163fa81634238ba54d53f4a"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/ATTRIBUTION.md",
+      "sha256": "c42bc62ae9f23d6d96b77a5c08b4010fd2df3726baacd031d7158ef882e653e2"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/artifacts.ts",
+      "sha256": "b20a560b090a6c917115f45044e1f2d2318b2948cbbd4406646647283de780fe"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/artifacts.test.ts",
+      "sha256": "5468d8786705bf7dbb8da4ed521aecbfcd92b303e6f9a48f0f56fec236a6a9eb"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/fresh-install.json",
+      "sha256": "a2c1c4ba6d7add9f33b26c87999b98fa5dab85472dd97cf6f1ec476a79feab16"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/install.sh",
+      "sha256": "2db1ea55fef7717b96086e3156c2350c59929bb14984f5a879cde35ca2f90f0a"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/verify-isolated.py",
+      "sha256": "f3ce124b711863f436b278d7aa4ceff787f610a814231e8c4c15b113597e95a4"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/email.ts",
+      "sha256": "59eee418c94bec067fa1906b78f145f1ff812fd8a07570749be1de9f33943d53"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/mcp.ts",
+      "sha256": "55f11399cc8966247bcd940e2e43fab5ecfe95c8c4eab1c54e3c43c424617e14"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/mac-adapter.ts",
+      "sha256": "8251d30fd9e07d7b74d286a045117588d008aeb1b2c0cf2b0854e650b66dde6c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/cli.ts",
+      "sha256": "4794f3e6c8c8898f753513cc4334ee821d16d34eeb272ace055e805d7ad62db0"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/decide.ts",
+      "sha256": "3b7fe935639023454e960fa87873f1f15580ae5863efdca4ecba49221f9937a5"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/review-disposition.md",
+      "sha256": "9ca9166c734a18ee1a2e2ab3346b47ff82107c2f85b1ded520a305e7deb9f7d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/local_mcp_smoke.py",
+      "sha256": "ed3401c0828a68fcf77ad4b21948c85b5be9222b145b93238e034a5f10bc873c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/README.md",
+      "sha256": "abd7a27cb6e0f40e01f801f8cec40b24f96153c502b617078d79a1801057d7ac"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/types.ts",
+      "sha256": "13c35ce1f4a9d3282e9514298609b40817ce3847622d254a859e35b0142659c7"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/recorded-example.json",
+      "sha256": "7b7c184a1ee6ad71e65f1cc59d0c2232de67fd8da48a61647800ca3936f87641"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/HUNK-NORMALIZATION.md",
+      "sha256": "2055cdd2ae1f1573750179137ef4167a0d2dc1cb3ab663454ab7b2a8d7f5285c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/policy.ts",
+      "sha256": "e033d248e56eaf6aa3280a0b225e085d0019f8930632c58037a6236a8a2b9587"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/package.json",
+      "sha256": "2f8496cad81eeef3dd21dc3f931e1f9b64e07e1ba35725d288962bf31779d900"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/hooks.test.ts",
+      "sha256": "3eabbc694127740e433ad9c73e7c58c2938ac52602a59eed9e5a099827274f09"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/execute.ts",
+      "sha256": "9fd00b0486e564ce434e27ee40db3118792d500d4f11387b3323b7017e3e848c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/isolated-check.json",
+      "sha256": "bf1e08b0e4643df033ec1a3b56cf6add2bbd8a607874a6ba901d091a5a3813c9"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/index.ts",
+      "sha256": "01e23919a91275b0e402146d7a65729bf45da3b64f92a97ae0bf4a9600e1ae1c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/http-executor.ts",
+      "sha256": "edfbeb230f8d5a1723b1ea2ad719849f91b427d1d065c2a0a5db3c5d09d8465f"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/NOTES.md",
+      "sha256": "e47e8c48f7f7349ea3ebaa070505aa9ddde454a71ed7f2992dd620499efb9cbb"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/config.ts",
+      "sha256": "b8e22e388993ed75327b119b1f0e78a964845f16482a7b430ad09dd19cfdca4d"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/classifier.ts",
+      "sha256": "3c32b641eb01f410fa78675936e80681ae2d6560c5ac454b788a8c7cd4292660"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/web-handler.ts",
+      "sha256": "486e720f835be542eb3c3127d4f21eb385d1adb805b2aca0c6799b6801c7abc1"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/local-mcp-readout.json",
+      "sha256": "eb8e6229c37eca1a81eb3f1ff7585a7fbc451b2747924bdd183598660ccac8bf"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/hooks.ts",
+      "sha256": "c0ed2f61c713c9d358904766ea6e01432cb870891f5ae8c3f5e746a22435109f"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/ARTIFACT-AUDIT.md",
+      "sha256": "569bc0dfb53d2e849d8a0a1ef15e1eb9ba81154059e1dfd542b396d08791e2a9"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/PROTOCOL.md",
+      "sha256": "5a21d795a7fd1bdfbed691e7ade17ae634f04d526b924025e14d4abd48388542"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/release-prompt.md",
+      "sha256": "69302b6a23b8845ccb9bcf110561bc0aba20c88051c6a48aaf88b05231c66b81"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/prototype-prompt.md",
+      "sha256": "a5526a825aca573e2098f611cba80cec8796dc1c88d3e70e13a6783c95b4106a"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/run.py",
+      "sha256": "dea14fd3bf3f5e88b77255feb2257512a59e53fade482d2ce831ff2b522cc129"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/prototype-provenance.json",
+      "sha256": "1f4f1af61158935dfe9c234aed0dc6a58bc57b3ff1fe4c64257d999296f95ff2"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/README.md",
+      "sha256": "f46d2e3aea4e3f704cf61172a01708acef2999fd47dbe60ece1a00cb4ba589a6"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/protocol-feedback.md",
+      "sha256": "e33dc71ce6cb5138e30cc4cc19fe645cf65391ce94ddbe35d84cc510c3a43a75"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/protocol-prompt.md",
+      "sha256": "38e5ae514d6f811a9e704112efdaa9728a37d02251cbafe03a902780376d299d"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/protocol-provenance.json",
+      "sha256": "6253d465a265bbaeb1c5f8f70740ec4cfcfc46fcde2036381b54f43f9aa73608"
+    },
+    {
+      "path": "jev-experiments/roadmap/reviews/prototype-feedback.md",
+      "sha256": "3976e97e02ed767eff4d296447fec421e84594d6b2b8a980540f712a72f33433"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/index.json",
+      "sha256": "47276c546f78b69d62a14045db82fe1c9e9b188039118309ca210654f7c03ee4"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/local-runtime.json",
+      "sha256": "0305b8d45f51437e8a6649dbbc44d279ae65a3064faf449fca09ba9ad0f709d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/task.json",
+      "sha256": "cc7258db132ac7ec2a1330de579a72365cde4d3ca54c7af688cff4376c717cef"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/claude.mcp.json",
+      "sha256": "7c8d57c83e212b6005db0ee0fc2caba258ecb30d344ab701c10eb70b3dddfd6f"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/codex.toml",
+      "sha256": "1978a614cd94a1823fe2a5176bb190c58d166a2cd7f610b58e4b57a541ff51d0"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/opencode.json",
+      "sha256": "d474187a30a3cbdeaa81277944aaf49cd0019a942f1f39319a2da9f7757bee1d"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/examples/router.json",
+      "sha256": "3b08c90ea762f5dd33611a5aec8fed9ad490065e8b4ce558dd8c6f5b0c450ca3"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/tests-after.txt",
+      "sha256": "54a830a813820d014c16582ce18cb90cbfd5842d46f2c4205b52299946aae1d6"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/summary.json",
+      "sha256": "eac0becac6f7948aef475a114400d3060d5b1644ed9811ea57e660180da2cd68"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/prompt.txt",
+      "sha256": "ea9ce28e636add71a3bab7948a266b1f0654cfe583475f9e69095d7cf4d3a388"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/mcp-audit.jsonl",
+      "sha256": "23ac4e857128dd6e0264f82c8c536bba21edbcd7434e4d29dd4cccf898fbe3f4"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/final-ANALYSIS.md",
+      "sha256": "16515d1c3803cb21067de32343dfd79ced1f1cafe99bfb4e4ed3363a3347226e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/stdout.jsonl",
+      "sha256": "e42418a6f1e568d13c1a22594cfed820afade61452b077d46600dd52e2dc5250"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/tests-before.txt",
+      "sha256": "837d831b6e7f7464076272263f00c5aa0e216bf581436bf915bef7d4ffd6d612"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-after.txt",
+      "sha256": "251e640df3589c39bfac6e5607dad249eaccec84c3ca903a8e67b2f0c8c76871"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/summary.json",
+      "sha256": "20f8e2bc8ec84c77aa4c9f6edcbc96c654a5d3afdfb6ea5bad8b39b41368ba78"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/prompt.txt",
+      "sha256": "3596303d81728880e6ab04e59b4bb6e42b5f0fd2548a1d0415215c0a931ccd29"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/mcp-audit.jsonl",
+      "sha256": "45e4b5482f2fe655ac95e38c94941d262c5a5302022a94949a8d5efcbdaaab0b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/stdout.jsonl",
+      "sha256": "974c919d1431f5b6cb6310a6680733233c264ef4a48b5beac3ad65f7e01ef3bb"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-before.txt",
+      "sha256": "86d3cd6fb8c8988fb74f9de19e5c240ef5eb2463b4c926abc567ec7e96963bd8"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-after.txt",
+      "sha256": "b794743a2dd646b97b497000a28b566187540474e4465cab751a47fe508b5fe0"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/summary.json",
+      "sha256": "e90a5963022e4d15fab4efbc15e9639ff013aea90e1aa679445100133c05dba8"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/prompt.txt",
+      "sha256": "cfab4bb82c6e863f6ec63a2f21a9b7b54d85ead01a4a923ebb537a48affc212e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/mcp-audit.jsonl",
+      "sha256": "87b7368598664e4078c0a2333650e0eded24056bf6537f60efaff0bcf6c09d81"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/stdout.jsonl",
+      "sha256": "9de2424d85ff569816a17cee11177a3333a76c7a90849a735b0ae2b46fe16568"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-before.txt",
+      "sha256": "0ce9e1d8d28d86b1c9e692ea6277ba96b6772ccf7faf5fb2b36aff13559b8bd3"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-after.txt",
+      "sha256": "7e148bc6bfb82e2a5781c18c78c626f03b859adb6d373da5a1a35c576706e16f"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/summary.json",
+      "sha256": "641e495c9a7675cddee966fea7c8a9d7c7d594ecae6f514cf48ed246e63d3a14"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/prompt.txt",
+      "sha256": "cfab4bb82c6e863f6ec63a2f21a9b7b54d85ead01a4a923ebb537a48affc212e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/mcp-audit.jsonl",
+      "sha256": "1c93971c8c3fd7ed0fafb3553a30d876c82c4c8afeb8bee3c5782e625717212e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/stdout.jsonl",
+      "sha256": "996d92fd365a437464c44ad0e0ea57eaf0c3198966428842ce7cfcc80e37be75"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-before.txt",
+      "sha256": "2b84e6574f5d9a03e2e0ac0a67f2fa823bf98203dd330dec27fbd8a912e25c50"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-after.txt",
+      "sha256": "23bccb5eab154ad4fa238bebaf3fa0bdf26ca687283ec6ce5f684a8de0962f90"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/summary.json",
+      "sha256": "60f51c16943fe04bbf890a6db92d31e20be168090498dd6fd7ce1f1dcce9efb0"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/prompt.txt",
+      "sha256": "3596303d81728880e6ab04e59b4bb6e42b5f0fd2548a1d0415215c0a931ccd29"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/mcp-audit.jsonl",
+      "sha256": "c01cd5175f85f99b2d14ece545eba9d6cb4a20f6810e4eca0440e4f292de93ed"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/final-ANALYSIS.md",
+      "sha256": "01809b9ffbc19b5790fb2a48b5e8ed5b5d1bc6281ee6253b208954b00907f990"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/stdout.jsonl",
+      "sha256": "fd6e9ae3e2c2f660f240e597a8070ef76bc734c1ed56bf6645fbc66b1c66d088"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-before.txt",
+      "sha256": "0a9edfad2bb0685d67ecbfd5e7b2e93a24dfa131aaee20faf8701e4a0eb09c01"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/tests-after.txt",
+      "sha256": "995260304c85d504156a5ca76780782ce2c8c24e90b897c0356e98a0d2134776"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/summary.json",
+      "sha256": "4bddb6db049d61cca4ade9b4d27cc61e9b2dfcd98b7abcd6f08c2feb37cfb7be"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/prompt.txt",
+      "sha256": "cfab4bb82c6e863f6ec63a2f21a9b7b54d85ead01a4a923ebb537a48affc212e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/mcp-audit.jsonl",
+      "sha256": "7c09b926c22d242c509d858c9c2f1567322a0f8fef70ff674e29e950e380795a"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/final-sum.test.ts",
+      "sha256": "98e98e82a47d1a26bd18398ab0c870a91561a9aa8cd15018e1a7f217c1fb0c42"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/host.diff",
+      "sha256": "cf46cdcd72fe1bcf8531b14046bc181dd3e7c185a77a36bff442cd9973b7c702"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/final-ANALYSIS.md",
+      "sha256": "0c4bb22a361b1b4b5ecfb66a2d1ccb1a81812e3a457c656686a7e1b7fd75f6f7"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/stdout.jsonl",
+      "sha256": "aa38d8461da8d3fc210ea7d9075ff8b41d25c373ea88d301b13e66c73ccbf15a"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/tests-before.txt",
+      "sha256": "7614cf15c47e986cc1483e06437049f2193f83977d900952309fff8bcb5775bb"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/tests-after.txt",
+      "sha256": "8a230f0e6aac9453d530e7c1bbc32676a17786c5ce2e0a583a8b4bf4f6d16302"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/summary.json",
+      "sha256": "2c6f161e318a02e2502b3edff7f883dcf5bdaad9e6de3d4c8c52bb5b7844de3e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/prompt.txt",
+      "sha256": "cfab4bb82c6e863f6ec63a2f21a9b7b54d85ead01a4a923ebb537a48affc212e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/mcp-audit.jsonl",
+      "sha256": "86d69b3974f6976ce3c41746f25b004125f6f75d047cd78904c8c21b07b1d26f"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/final-sum.test.ts",
+      "sha256": "d05a104aeeda1471d874ab463b05c5a6eda9d31d13ba4b89da1bc7843af09c39"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/host.diff",
+      "sha256": "0430c5e3ed51c426b33fe06166bcc1a292c815c8adfac8cea2fcdfd07c80b603"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/final-ANALYSIS.md",
+      "sha256": "ab61d4bed8b8af732ecb9b2d4c034e3d52b174b47f1ce0a4310ebf0789512e22"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/stdout.jsonl",
+      "sha256": "12b3261ae4e64ff9bd8026bcdc4d10e8ed273bd8a777ea5416620e284d095354"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/tests-before.txt",
+      "sha256": "1db4df10be414afa10ec62ebaf8b17b8fc04c13c3c39eeed20e7eb95ef55687a"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-after.txt",
+      "sha256": "00e11c9e4ad8fef5255d43a5f416bce6ddd25715252cd782733d4e239eb1b162"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/summary.json",
+      "sha256": "c3681f864c992e4dd5b60138661e6416f84d23d66925b59cc111b93484ccaaaf"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/prompt.txt",
+      "sha256": "3596303d81728880e6ab04e59b4bb6e42b5f0fd2548a1d0415215c0a931ccd29"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/mcp-audit.jsonl",
+      "sha256": "22dc5ceba3dba77cc9a6575a093383c1ce6f6490f4c4ae939099fab2f1123229"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/final-ANALYSIS.md",
+      "sha256": "5ab5be2964543892dcb9d3fff8ec829b49a9c7290342599dd14fec2a87428392"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/stdout.jsonl",
+      "sha256": "0a7cb9b8bd84d1e70ee634a58e5f8027dbdc5ebea11bd147822b7d440c4f0e9e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-before.txt",
+      "sha256": "7fca82180a1fe81a3fedc81350599e1fe2e00eb240d4550fa98c9cc7d7afac3c"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/summary.json",
+      "sha256": "f322644017d80abf274162162d1f76482e1eb3f1014883feb010e0ca5247efe0"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/mcp-audit.jsonl",
+      "sha256": "bb361b3d99124f6092d474b76c73fc9b116ad01a41e0d4619acd4d375c3cf81d"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/stdout.jsonl",
+      "sha256": "ea97490d5c225b556fb9475215d0bc4c6613ed0606849740e2e992c839880c7f"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-opencode/summary.json",
+      "sha256": "bfc4cc3458efd0494a5876ae379fa368808c3566db3b57fcbd8dc4b13b20fe02"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-opencode/mcp-audit.jsonl",
+      "sha256": "e3a643e1d0e13889babeb70d6e6efb43238ea71d46ee8808b76fd211cbc26617"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-opencode/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-opencode/stdout.jsonl",
+      "sha256": "a9ea3d56f83de2a687d72790021a600bdabef1bc0e90401ecf97744a20056674"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/tests-after.txt",
+      "sha256": "84720b1a51028ac8c96a680d2d42b80b05d95b5bd826c0a03da4bbb86f0328f0"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/summary.json",
+      "sha256": "b0e07352418b37fc9caef2c59d7efa1293832d0666db231c745c562d68503926"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/prompt.txt",
+      "sha256": "3596303d81728880e6ab04e59b4bb6e42b5f0fd2548a1d0415215c0a931ccd29"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/mcp-audit.jsonl",
+      "sha256": "d77d550055127b159fe87729c17c678bce467e8e7de22c0b2608d9f486d4118d"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/final-ANALYSIS.md",
+      "sha256": "f19cba98da4a71fa795ed72c6f45dbd7c97c3a44f5b5ed54550084bf9de5b8dc"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/stdout.jsonl",
+      "sha256": "9430edb34ef9a129a7cc226ef83b690ba1e215682cd59014d889192391615a9a"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/tests-before.txt",
+      "sha256": "adfd924fa51651e2d21c5c5724606c9dc56ebada06c9980bd9284d4506469bb4"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/summary.json",
+      "sha256": "1ddfbe621b7998af8f4fc23b9cc3671e3c86945302c8de639b17de42f9de3be7"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/mcp-audit.jsonl",
+      "sha256": "3a8603ae387754d14e1524b8b34db462e74b9a08a4e385a24e8921c2056a1d10"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/stdout.jsonl",
+      "sha256": "98185b1525949f31c27e1bafba4c00909f60b7b962e3ce2ac75e037b89db404f"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-after.txt",
+      "sha256": "d01a1092523db4f74f1d4e0a9d7f71f33dd3953659b0c9e3dc53e4c8001c3f38"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/summary.json",
+      "sha256": "188b4aa0c89aceea8ec2ce61beeeff89360b6d514a6c1c9c566e65867a19ae12"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/prompt.txt",
+      "sha256": "ea9ce28e636add71a3bab7948a266b1f0654cfe583475f9e69095d7cf4d3a388"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/mcp-audit.jsonl",
+      "sha256": "513b791e041287a41524ca790d30f199419e16ad6546ec76ee6cec4c8dac7099"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/final-ANALYSIS.md",
+      "sha256": "0c6744ed85869b46b15750fd2b6a65a304ea903d42c68ba5251d4f204a634af1"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/stdout.jsonl",
+      "sha256": "b58d5a94b20a4e26b70429d3abfeedc31a1cb7610e7ee90278afab5b3624e3c9"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-before.txt",
+      "sha256": "5f0d3d2602e50563d564cab750283857eab70a8061688e1b2e7903669b78c5a8"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/tests-after.txt",
+      "sha256": "cdc7cff5f570a1ef0b8b97bd20bb3d59832bb0e97c46cbd6ab83b64821831cee"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/summary.json",
+      "sha256": "be7a47019d99c9524565f590cfa40229703287a8bace2249dc8ea504d0e51c30"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/prompt.txt",
+      "sha256": "cfab4bb82c6e863f6ec63a2f21a9b7b54d85ead01a4a923ebb537a48affc212e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/mcp-audit.jsonl",
+      "sha256": "971ee50393e601a5326cb7ed5dc3544acfe809c3e8a7758bd251587522c59495"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/final-sum.test.ts",
+      "sha256": "42e193961e85c354a4a2a24d828f286423b710983d66317ffd442263ddbf7df4"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/host.diff",
+      "sha256": "b5bbe32c91fc9eed109232a3291e7d883f812b1ab8b7e0d666662f324eaa24d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/final-ANALYSIS.md",
+      "sha256": "b77568c839ad5340f766321ef46f116d30635ae234a97f9db0a66792d37d09ed"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/stdout.jsonl",
+      "sha256": "85f1f0a6ea03a53138727975dde3321121cbd0cbf0413086b87069ddc69e6218"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/tests-before.txt",
+      "sha256": "8780f5c25999c03643e2edb17c0353b1e9ed733be4403c38f12ecceaa03f3ef3"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/tests-after.txt",
+      "sha256": "dee2a51bcab3d306209506f889e22fb45c50d7dd160b6b5be7063f8482f9f823"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/summary.json",
+      "sha256": "65cf0d1538b54c2ba847047b8142a50e706e3215879263673d72f843a0a13dc1"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/prompt.txt",
+      "sha256": "cfab4bb82c6e863f6ec63a2f21a9b7b54d85ead01a4a923ebb537a48affc212e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/mcp-audit.jsonl",
+      "sha256": "abf4759d6d57349e001774fbe3116268bb6d28024548c03348c56d0f4f2fced9"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/host.diff",
+      "sha256": "c3ad4ff4eab1cb86fbe42c04345a59ae3c61c1c3d449efb852276a13fd19e4dd"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/final-ANALYSIS.md",
+      "sha256": "97849c7367aa1ac0cfbb94eb80ea08986a6f6bbe913493470624f34ad40ff0f6"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/stdout.jsonl",
+      "sha256": "9375285e7cad5675612e8078fb6d682d35aa68c264dc84b7ae1e7ded520b40e9"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/final-sum.boundary.test.ts",
+      "sha256": "b16d0f0999fa8fd13b9bb9bafae4b8dcf2bf8344ae3749735a1602a31bc37822"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/tests-before.txt",
+      "sha256": "feaba7f3a8679ff39e52c30a98696b0f71398821f733022fe40a54c2c0f77485"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-after.txt",
+      "sha256": "b1591a4c7fb5f0d6e62a325ce842b277e6877638b111022b71c042f7c9ae334b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/summary.json",
+      "sha256": "62894a2a09556bb0e64cbbb48b9f8f7aaa338e4ed3008ce7b05e4fed782ae724"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/prompt.txt",
+      "sha256": "ea9ce28e636add71a3bab7948a266b1f0654cfe583475f9e69095d7cf4d3a388"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/mcp-audit.jsonl",
+      "sha256": "6d90be93bbcb015eede63c18437fd4c185c48aa53bead11e8438cd3e436188fd"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/stderr.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/final-sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/host.diff",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/final-ANALYSIS.md",
+      "sha256": "dde7318aff60a6ec3f1aac6ae9e6ff31d46aa10c3c620b42b543236de472490e"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/stdout.jsonl",
+      "sha256": "634d4144b4e27dd798e57b7de45ab717379dc4de3bf120fa58a627e15094195a"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-before.txt",
+      "sha256": "4a483abe8bd3a27490e7518a7d09663afdab07879f88dc1bc7812049af953ffb"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/generated-fixture/sum.ts",
+      "sha256": "7599ca4d26c0834e5487afe85d79c4901305b1c33caa7890f290bbfba93c9e35"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/generated-fixture/sum.test.ts",
+      "sha256": "1dde1a291bef364cdd45a6fd3d0a7bece6c30762f463452acfcce7be3412785b"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/generated-fixture/NOTES.md",
+      "sha256": "02bf92f5bd714bff8db71bcabe6acfa1d58d2bbffbcaf3a9cf1627c41b90a1c1"
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/skills/jev-route-task/SKILL.md",
+      "sha256": "8582b0aaa60fc9f4ce2b6d3a1552f237bd34b498c986553a5f0fbc32e5c5181d"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-playground-desktop.webp",
+      "sha256": "e33f9373e337f78b0b69c5852fdcc844918f8210cc839904ed36840e89d35758"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-mobile.webp",
+      "sha256": "5fb6cbe07e90e3dc6bb19976a290aeb2720b62f8c70aa0ff52ae1bf4c1db1de3"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-desktop.webp",
+      "sha256": "0bb02498e170a3cee25c8f472840b0a2e51e3f3743d03e9e760e8c7dd34d70eb"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-music-desktop.webp",
+      "sha256": "049893fa4401eb68ba99a0ddffd5b72489f68d403b26631f2266ac532d9abfe7"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/emil-animation-tips.webp",
+      "sha256": "2617d0fcd38d1de93b416032052e9c86098857c84f9c9cd4fa22f20c4e2f1866"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/rauno-fractional-slider.webp",
+      "sha256": "daf45bba394a94cafa09cb536e00064fcca6e95ab4b64e941dc822e786489d89"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/style-study-dark.webp",
+      "sha256": "d4fb09489bd3dab64eb24bcd130f93ca77cdfe78f38aaa7f17c3a466c0910f8c"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/paco-tabs-selected.webp",
+      "sha256": "697b9680662733c4928b4ba396e54a388f2f92bdd063dbb4996b771a1b86d3bd"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-home.webp",
+      "sha256": "bc8750bb3f355ac5e5fe469f2cd3e259ca6ef9c09e2c07923ceed5cb8f1e23b7"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/maggie-garden.webp",
+      "sha256": "9fe337fd68e63a6156c36facb0300de30683261b89bae5f6edcfc26dfb265c73"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/laya-mobile.webp",
+      "sha256": "c6b109c5bbd54cfc5375e977ee07b34a104001fa277c5a0fee52222c69fda1d3"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-gradients.webp",
+      "sha256": "7c957fcf02f6f64480e396c6c7bf5c162f4ca6317649102b939616f05e397000"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/bfc-redraw.webp",
+      "sha256": "b91a2b6f50055b73aa51ba212bd0ce3162f6c3bc721d01416ad3b23b68462ab9"
+    },
+    {
+      "path": "jev-experiments/roadmap/design-research/output/playwright/josh-linear-timing.webp",
+      "sha256": "6a60f6998a074941554d9355e847b6bac2b8c982037b24df6a96ddd333f932b0"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/checkpoints/manifest.json",
+      "sha256": "b822275c6fdc5e827ddba86b67412052e06006276637076729a2cb58a9293190"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-attempts/laya-17-fp16-mask-failure.json",
+      "sha256": "c65f6388ed3b4972473f049a91e6bcb814b44cfee04d57d7f8ee328ef39e5c8d"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-attempts/laya-17-scalar-conversion-failure.json",
+      "sha256": "e66ff45f8d04a5ab4c89eb2e6355b5aa0c1e1956e1d021fd21409a64c41f64a4"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-attempts/laya-17-float32-before-row-retention.json",
+      "sha256": "c205823518c50d9b3542f4917ba79c9d4d8d4c30fbd90412c9562a9faa20c219"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-attempts/laya-17-finite-mask-only-failure.json",
+      "sha256": "f6d5059f41046f4f193d3b017ccecabe423f5ed1f0e9c619d27fcc9506dd5b41"
+    },
+    {
+      "path": "jev-experiments/roadmap/training/export-attempts/laya-17-fixed-rope-fp16-failure.json",
+      "sha256": "c5eef24cfd1df024ea9773a4a496ba5554c449adacd56643853d9bdf2d249fee"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/examples/decision.json",
+      "sha256": "ebabff0b65b863e926914b2d723a031bfd479dbe0313507c3b51906eb7f469a2"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-materials-canvas-mobile.png",
+      "sha256": "008008199a674dc799263518fef0da09d3a4ea185d9c783788683caaba1d5d60"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/materials-dark-final.png",
+      "sha256": "ad576e113776a536b47a5a0275cf9c8926c94d0e35aeb3a637a6f6610b6584e8"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-music-desktop.png",
+      "sha256": "224674e376e46d439327c37ea6556e9b9ceeceaf6f8f5d931ce387dc2d35ce63"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/study-mobile-final.png",
+      "sha256": "2539a4fd307e1ac9cc250abf1b225bfafc8ce49f00e721c98f3d9d4910ea58af"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-routing.png",
+      "sha256": "164197709b3ed608f92e300f58c84045dac51c77c6239589e4641e1c4c7f669d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-materials-mobile.png",
+      "sha256": "49ebfa899ba7cb787e56618a98a985e7c8fd36010f4fb87a047eb292a2f4ad45"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-music-mobile.png",
+      "sha256": "ff3498b79bdc01af33cad269a19421916392bb9874a473de42a50cebb34593e1"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-crowd-mobile.png",
+      "sha256": "bb4e1e330e1f2797402741c7d7932f780aad7548eeb21b05f11f72839345c2f6"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/README.md",
+      "sha256": "40b17dba12570eca3dbd943382682824dfdd50ee45e76d7837f0a4bb5a3acc5e"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-home.png",
+      "sha256": "39d76ff2aaacbd3d5d271e27f7ceb7f5143b617fc0cb23768aa0832b038d5406"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/study-desktop-final.png",
+      "sha256": "ebfe23616cea8a798fc1a59fa16645818848b7a62b6aa909a164d36c42353771"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/jev-release-crowd-desktop.png",
+      "sha256": "86ed376afdec4f75136abebcb0a58528aea42c1d69f452a6551c57654eaf051d"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/home-desktop-final.png",
+      "sha256": "e9d9b69608c04854aa46e83f3bde3aa8fa452f47ca8a02fe059e7a634d9a3d59"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/home-mobile-final.png",
+      "sha256": "630730a3d17a5b36993faea9cd81ac98873e0404b37cd6591914e536d297dcfb"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/screenshots/routing-mobile-final.png",
+      "sha256": "e4c4c029031976e7a3f56aec41360866ed436faf59668efb444fbb03c135519f"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/other-adapters/_summary.md",
+      "sha256": "b9660e97422bd94e70e5a1152954db5680eb53e3fb9a3cd9fe77bc76fb9ea257"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/other-adapters/README.md",
+      "sha256": "5b56bbf52215be58b66648dce3c0e79475b681e7710c0a0ffca12f4adf8c852f"
+    },
+    {
+      "path": "jev-experiments/roadmap/verification/other-adapters/NOTES.md",
+      "sha256": "7168701b743162d898c6ef3bb163e64ffaf50346370bd050db96622b79f72746"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/_summary.md",
+      "sha256": "f708293d07b892afb685030813822e576c9dabda7c54c17f6d97221a343c24e0"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/README.md",
+      "sha256": "5b2f249a0521ec802f49066ee5b6ca8da89735963932fcde2a6c788b42c5efaa"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/NOTES.md",
+      "sha256": "1ea081ac6b220b397ce9c970ac22a158dc323602eebd51380dfa1da314860575"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/routing-post-fix.json",
+      "sha256": "18f92c0649691ebd2549b14f7bc464308d49d53483ede371363f4dedc5ff9c1b"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/routing-review.ts",
+      "sha256": "cc40136bd9cfcd7904cb2b8b25d3261b09d653c1521a6b1dbbe72fe4fbe89735"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/README.md",
+      "sha256": "6d6ca9d00e9fade0faa44476dcbc81750dd004ecd7e7f70d029d9fc198cc7071"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/materials-dark-mobile.webp",
+      "sha256": "ca4b08f7c02b5a609d6402f1d2a200b997a5b06892bf3d0ee4c0f8c13547d722"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/inspect-desktop.webp",
+      "sha256": "12c4058f1f11049bea31ce72acaf8b2320fd932a37ebe6bfa2267cf4314ad4eb"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/materials-mobile.webp",
+      "sha256": "d0e6a219ef15d21eae0cd6298c97ce4e1467afcf1dc86cac801e85a1def9f988"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/home-desktop.webp",
+      "sha256": "30cdabfb29af8783935a44b50291ebd7d2f4a10eb16ca9ce7448739aff4ec6cc"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/before-desktop.webp",
+      "sha256": "dd9879aa49410e5e90ec7f0266a738b67b6ad8916c9e7f7472062a94eb0bde09"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/materials-craft/output/playwright/touch-preview-mobile.webp",
+      "sha256": "a0ad0d9ec6b2dd9a9a4611301ba27cd3df6e0b4011c0581f8a7aedd1c488c7cf"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/artifacts/audit.py",
+      "sha256": "2b098321a5514aa9283f2fff6446fc1067f6e08d591662aa4dccd7be038daed3"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/artifacts/_summary.md",
+      "sha256": "a8ea981cfee7dd92bca301afe1012598c8149a7e81baf6c3588ffe57b10dad6a"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/artifacts/README.md",
+      "sha256": "18b6ba4323511509edfc3938735a76c31590da83b14c55ef2ebb3aef501c1fca"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/artifacts/selected-binaries.txt",
+      "sha256": "9f44f4c16f7b1a35de178f4ed646ebc0503350fe47438f02c611d4251ce1a263"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/artifacts/artifact-inventory.json",
+      "sha256": "941470748d1adb0cfcb31e97827b71d16f9121c342ed5a14b98201b27714264c"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/artifacts/NOTES.md",
+      "sha256": "0a29f8e7538f3a40d01310b093c692b5480c98fe57ff7fcdadc8f6997543554e"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probe-results-after.json",
+      "sha256": "cf5588e6d250ca55f55ca7b93b2b86b116d0530a9afdd2e9b419abc29e7616ec"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/_summary.md",
+      "sha256": "2ec22963fda3da28fc12f0fea13975369ccb2fd60a86f347418a8a12a61f7065"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/README.md",
+      "sha256": "17a5d9c19f435cea70a7968908ba8e23b12c62d88867a5ea4fd51cce083cb60c"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probe-results-before.json",
+      "sha256": "856f5b008b40f2cf345f0e0c04ceddf3a1ebb6014b0846e35513e6e1b9537a61"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probe-results-partial-fix.json",
+      "sha256": "9d0c68a540ab0256356017413b134baaf0b906750afa514714222602ebdb2f9d"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/probes.py",
+      "sha256": "e9cfd7d0b141c5afad09854896d7c09ac11aed47eb90eec5a5cc2233e5790caa"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/training/NOTES.md",
+      "sha256": "f2a2f81130443c517b5488b737b7cd4af8c308db50e0ae7ef00a1f8295a1330e"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/_summary.md",
+      "sha256": "a45fb260599b92d14ca3d768691eaba932e27de24b49dbdf65339077d1e13237"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/source-audit-after.json",
+      "sha256": "b4f36dfdd2d5b74dec09a4e0118657e641c781ae9a66040efa1a8d02fc78748e"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/README.md",
+      "sha256": "0960abe86f2027d82e4b7c1e60a68e31f627b5fa785a24c1ddede366eeb1e4af"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/NOTES.md",
+      "sha256": "7fc984e745b45dd53216d1f1554aa478d63ed91b7cc4f1e49710b33e599e8358"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/release-scenes/source-audit.ts",
+      "sha256": "f84acd76a0662d799b0761d18524839710278051d0b0655d2dfbde42cc2078cd"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/patch-probe-results-after-fixes.json",
+      "sha256": "465585fd3793bfae4b63e179cdf4a50f22bf6b5c8167f0e1f9b1ced33d1b1f33"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/_summary.md",
+      "sha256": "c56896626e0f829f925fd222e91f902b6e089cbb2b121ffb93b652caab15b3a5"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/probes.ts",
+      "sha256": "347bc469df500dfb5f4264dae4a242d36021ce11c9b1e5cb5878a250785f4961"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-probe.ts",
+      "sha256": "e53b4c5fd2161011d76db98a859bfd689cf9439f2f8777c932219eae75fd3c95"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/probe-results.json",
+      "sha256": "f3b5b4c0eb7c8793d08b1db339742fa73420103b846f10f88cac13a63ead7f11"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/README.md",
+      "sha256": "b09d03cfd9011199c1e0cd2bdcf47cc92b388ed5ddf60a7db6a4177d28f7c0d4"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-probe-results.json",
+      "sha256": "fb4152db029e5bc911102df9887673c38c95789ea6b6c999e2a85deff1c0992b"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-probe-results-after-fixes.json",
+      "sha256": "a2e660425f472a04cc23cca117a824fbbd9e9964807692ccdc85b769c7caafc0"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/publication-current-check.json",
+      "sha256": "bb933504c9482b8fca0042c39f2d097320d3e729695afeb960dddc531d4a31d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/patch-probe-results.json",
+      "sha256": "385aaca48ce90006357209195ed821afadf6b7676c5cee9ec83d3e57154833ab"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/foundations.test.ts",
+      "sha256": "9d9c687abc405da89421e674532541e5b3c9432f2c25fe5feb1f9711b64e8e58"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/NOTES.md",
+      "sha256": "92bf75cfba80122f99c02efca227dde2818c610d192feb8ec571dc118ee84020"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/patch-probes.py",
+      "sha256": "d89a62f0f44b89e172b55c341508ea41d139a67fdef71b685e8b1905cd924e00"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/foundations/probe-results-after-fixes.json",
+      "sha256": "cbc13871cfee0cd81097bc0d16578ec283b308b64cfe9a6b8e77d57358c2072d"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/probe-results-after.json",
+      "sha256": "faa6f527a05a56fce1d5d19143bd70d396c08259e04b5ca84b49f65ea603f710"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/_summary.md",
+      "sha256": "c6b9f467cea0cd21fd8ff0df331f657dc74d9581394cf810717cb9d1dec63658"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/README.md",
+      "sha256": "7de86dedaf5d6b43f716dd308be17de395dd8dcd0e3dc5a0768b422e950f75e3"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/probes.py",
+      "sha256": "263e448549a708cd8c01f01511ae3e5afe9857751d4c82ac5be4bf5e0d41cae1"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/default-promotion/NOTES.md",
+      "sha256": "47c6cd4ed18edf011c56b4b2b241dcd55a6e296545b88e3031ff30eb0b49edf4"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/_summary.md",
+      "sha256": "bf9f269cb9b43dfd8638daca492216ab3fca13c7d3c14c376a3639704f594970"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/probe-results.json",
+      "sha256": "42c57a5230f246160cd1b8743f1516edd68cfbc22e8f19a90d9accaf20472618"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/README.md",
+      "sha256": "96051488ac25e87791aed22d72c0fd1a529ef20b164fa8854845f6841d0dcd24"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/probes.py",
+      "sha256": "ce2eda43aabb4f90dca3515ec5e4a32b4a6b56c0bdee43b8c49d4f2d14200818"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/NOTES.md",
+      "sha256": "ea88907e92d75fe795e386f35dbd25591d1eda58379ca5c9a93058da39f96222"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/mac-toolkit/probe-results-after-fixes.json",
+      "sha256": "85d518ce1320142324c9c6c6bce757cf86d5c61a062a73f050864f95ee629ae6"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/smol-export/_summary.md",
+      "sha256": "cce2334f200a73632ba61d9615d9f161c8799fd4887f7311695caf91bbf8ceca"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/smol-export/README.md",
+      "sha256": "a83608f5fac731cae651ae494156b150ee67259b124ea818091716e90e9c51b1"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/smol-export/verification.json",
+      "sha256": "6399e79e2c3e2ef710b06156ee0b8a84dc042ce614b2ad15366a722a32098306"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/smol-export/verify.py",
+      "sha256": "6c31b6b787ddc6feaad01893990803f023960b0eff5dd3ee46c6d5ea9bf3351d"
+    },
+    {
+      "path": "jev-experiments/roadmap/playable/review/smol-export/NOTES.md",
+      "sha256": "ef4b9107a4cc24b313ef67426154d2e6bf2ce23fcd6d58470695c102b5daee11"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/grade.ts",
+      "sha256": "0e83c3a80e247fc08ccb2f595704a6be46323e2803d26c6a9c2c51030dd0cca0"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/labels.json",
+      "sha256": "692bc96e06428e9aebf071fe4b9bfb5765eecbb1bf5fdeb9eac7f90cde6235a6"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/initial-report.json",
+      "sha256": "6728ffa97d8505d5d490c3b6c57e5e137fd617271568e46e819e299b1098e4fd"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/PROTOCOL.v1.md",
+      "sha256": "50a4c05fcacd62ef842d4c114984be225e92496672bf86de9d824a1499616f6b"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/report.json",
+      "sha256": "823fcc08c329576c142f52d9352dbb3b474cc77fdd224bf05112b2d0164f5b93"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/alternative-access.json",
+      "sha256": "5ae9fba64e42e246bb0d74ac63e053f4b9a2b9cd69f2aa3d58938aece3d72496"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/haiku-compatibility.json",
+      "sha256": "e54bc01b66a579c3f975f1003f1178aba30df01a84151b64fafa9ae88d588b69"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/calibrated-registry.json",
+      "sha256": "52ce91eb9ffd399b122d466377f1f0f8fae1327602551a9f55171f209ff45e75"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/host-classifications.json",
+      "sha256": "28f9604c1b79fbea39f3bc987ffaf8add5a28b202d0a281c404d5c1250701738"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/local_classify.py",
+      "sha256": "5cc1721b27f07ec4a63a357da134a0623506a2cea67335cb7fb4ffd06dc3ed3c"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/README.md",
+      "sha256": "3c2ddf6a439a511e14194936f04279b82a9deb35a7d063c5202aa7deeaa349dd"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/local.jsonl",
+      "sha256": "2e9cb11e343a3607d32d4aacfb4d878853c357d9a2b1d9bf593a3de1ac576870"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/probe-haiku.ts",
+      "sha256": "9466a3a8a88c8e655285eeb6fbd448dcd23f41796848a4cdcd61cf64a0e9b6b4"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/matrix.jsonl",
+      "sha256": "245b0ff7c3b56fb6af4a15da40ffb14637f0b0b9b3307e723ae121f7192b2ece"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/alternative-access-first-check.json",
+      "sha256": "dfb7857ec56648593157e1adc281b665d8a03440e34320d681f0bf311b8c834a"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/tasks.json",
+      "sha256": "48e71af1486a2000b7fe5c748788c44bb7125c20d372b918df73166ab32bc911"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/run.ts",
+      "sha256": "ba9eb094fbb7f011a59ec08a1ca96664040554b785f92957d7bcc604aaa01660"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/initial-calibrated-registry.json",
+      "sha256": "a40de0651bb1208931baab1e63debf1de9f368450e9179e7ab645c9aca11a268"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/hosted.jsonl",
+      "sha256": "b19d1d58255ef9853df650b46c42e15091b9ede0f0dcf3529eb62bc6e33b80e4"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/PROTOCOL.md",
+      "sha256": "6cdd6c722ae372086a9b464c1780bdcebe8e928f1f1bc559b4b48b9dd12bfd21"
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/comparison/access-alternative.ts",
+      "sha256": "284ee85eb61fc34de06f57ec77e0b80f797173566cd2b8f06cf1fb1d501dbd35"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/icon-studio.tsx",
+      "sha256": "420d4f8f6df8d95625efc35eb38e1cd29567ec49d34bcd71091c38b67152d362"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-world-preview.tsx",
+      "sha256": "1300e5f248acf16c234d299eb882c5481e03267137ec66ace464cdec98afa15e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/music-arranger.tsx",
+      "sha256": "047f3a5d45788a146f575ac83f0b5afdde807631505d5935fca6e85bb6dcfbdb"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/local-models.tsx",
+      "sha256": "13e12f5bae9730b88f7c949af37a5dcf738bddc9140a4ef22dfda75544f10966"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/main.tsx",
+      "sha256": "2c3650169e1e449020e632610769aa9861aee134d85dfe151333c91df8457266"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/agent-experiments.tsx",
+      "sha256": "6fe88a44a808915094b8012eb5cdb9606ab6c3d774fe24e0cd8b79cb54bc5523"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/tetris-experience.tsx",
+      "sha256": "df82bd1fb824c4ad89323fcd27fffbfe574de76e60ed74c0b013afde2dfb70da"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/arcade.tsx",
+      "sha256": "3e4e64b4cd8a4f68db0c7ddfc35331b56317fcc3e8e47f7608efcd8265bd3198"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-crowd.tsx",
+      "sha256": "fb257933c9cb1774b493a286a86140d2e4a6f8172116414a023c11d4e1563958"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.tsx",
+      "sha256": "1497a48865a67511de408991b348d1188bf2ac707aa2d9bdf57baa232f9ba41f"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/judgment-reliability.css",
+      "sha256": "293b039c0e4c6639a0cec1cb8a93ecb9428eff680ad5e6cae6c9333326e9657b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/shared.tsx",
+      "sha256": "2d614a74286a1b23287c0f0c5f6c268ed9ee549a251c0bf58b9e35e724df8150"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ui-catalog.ts",
+      "sha256": "93d9e40650734f6a476c429c0277659b999113e8e86e2fd1f1cf8fb71e4b423e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/cafe-jev.tsx",
+      "sha256": "7f9be4ef9ac1d666b8c3a2a9fe3898926ef780aec2aa7c87c8c5b718e07c7744"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/generated-ui.tsx",
+      "sha256": "6c8b7f6e353cdcf3ae6ec0996cc60d9da4227f1c5dc8a611ea466fd238ba74b7"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/rewardbench.tsx",
+      "sha256": "b3aa442f08b5968f940633adaeb755029bb8a3a3307dfa0f8e9f0ced9987d5c8"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-tetris.css",
+      "sha256": "f7702e385aebdc007276b5186ff47e17c5aad2e49ab9c748fa33522fc27226ee"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/judgment-reliability.tsx",
+      "sha256": "6537494abd606466d9933267e73bb740766e64ed5cf37861e9e2f8a6ab814982"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.css",
+      "sha256": "4a4568fbad342bd6b5f6282f0ab129e57729fe4b517a5160a6070c3c5e06ab40"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-tetris.tsx",
+      "sha256": "4427146b286e035a87cd52539eb7a31e8dd1de28b2457492d73bfe13e7a3d84b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/cafe-jev.css",
+      "sha256": "cece4f6c9c3d49f1a7f9e64b085c6741d3691d5d5aaeae6ac79a33bf7e24bccc"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx",
+      "sha256": "300f6dd9fb92206e5285540c0c51ab8a9f157955d719f52adc4e4330ea245b54"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-world-preview.css",
+      "sha256": "d16d0c08863b6c7990f66fe5cddeee6093b0b7ee9fe97b8f59e8c1a9e4456a6d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/music-arranger.css",
+      "sha256": "96571a0715fca8b4adba13441a914aa12af65f0dcfc322612a82066e26f0bff1"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/games.tsx",
+      "sha256": "27ae9be8ac4898e59a989ab7d85e80a0bdcda1ee8f95bc915817f10103247483"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/icon-studio.css",
+      "sha256": "70b8b6fb7e57b55764265d1a5f12f00b5dedac78cd210808d0edcc8842d759be"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/api.ts",
+      "sha256": "7da4ee18e73b180b81a35cb2c95714722a081fccaa54142bf94207e4a17f1342"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/live-crowd.css",
+      "sha256": "18b7525a2ef995ec01c771e4575b8edd0075f399dd9350773d971bd261d6436b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/outcome-framing.tsx",
+      "sha256": "872587e5bfc4cc46efe1ad7156b4da1e1fde5d27115bfafeabb51ff06c7dfe6e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/creative.tsx",
+      "sha256": "b9da4b93d6ac50841508af6534171943219b829b0c263f0b482bbfaceea54040"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/wardrobe.css",
+      "sha256": "80dc7873e7ab518c09157eee070cbd36ed008652290e3a672b53d9e15ecacbd7"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/journeys.tsx",
+      "sha256": "a49d9a68dc124ffda510ee31688d9e8c980acd27fe430cc77cc819b08f1af719"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/style.css",
+      "sha256": "7077b4aab2fd62b0cd227d4f416f18ed47be97b4d58f8d489e62494261c95e28"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ghost-brush.tsx",
+      "sha256": "584637a347c74c70920424515d53cb9bf59677a1dfceba5afdcdb624dbd30e0b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/motion-art.tsx",
+      "sha256": "f490b6656fbe9ad4e5b63099b6c19cb590e688267ed885e42c616838cdb4417e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/misc.tsx",
+      "sha256": "a232e3a8514ec55f32b8cbe261e019bcbb28c36cb2f5e741281ad967c753bdd4"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ghost-brush.css",
+      "sha256": "0ae6477c506a594482fa5cfeb73336752298cfeec9c0d1caaa9bcdf4d3951153"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/provenance.tsx",
+      "sha256": "3d6b3ae408ae1f795273a4bf8cf410257737dd3955ac2051ad6c749d48f731d1"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/wardrobe.tsx",
+      "sha256": "8df7d8aedba89f0fcb091f2b5c6e556a7130fd28b7b55d78e6ca7e721b2fdb07"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/new-experiments.tsx",
+      "sha256": "8cdcdba29a13d2d7712615376ac5ab56f24feebf216766640b728f3b8bbd509d"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/catalog.ts",
+      "sha256": "7ccb033029359a32e6550a13cc5811901ba47a62b3f101c71e397fdde3bed2f1"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/outcome-framing.css",
+      "sha256": "e2362b86594fb4ac88e00b77d5fe6b361939283ba718252fecbff6085cf4af9b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "sha256": "7267283ab3909711a9f1a7ba6593c26107b88595ba0ee7939c0c0e2281a3c989"
+    },
+    {
+      "path": "jev-experiments/adapters/typescript/index.ts",
+      "sha256": "7b6b07dda8ef0d13f30d1fd56f2e6a6572a0a04299e9fe345b5d1c08c744783c"
+    }
+  ],
+  "answer_sha256": "b1c49e004ef8718b746224278d339f50f17a98560393de54337fd564d4112438",
+  "opencode_reported_cost_usd": 3.0817277499999993,
+  "billing_verified": false,
+  "raw_output_local": "/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-release-review-bal9hrgs",
+  "assistant_messages": 24,
+  "provenanceRecovery": "Piped export was truncated at 65,534 bytes and could not be parsed. Export of the same session directly to a local file verified the model; no new inference."
+}

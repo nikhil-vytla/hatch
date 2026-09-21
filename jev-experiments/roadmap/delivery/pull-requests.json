@@ -1,0 +1,34 @@
+[
+  {
+    "slice": "runtime",
+    "branch": "nikhil-20260920-jevTypedRuntime",
+    "base": "main",
+    "url": "https://github.com/nikhil-vytla/hatch/pull/58",
+    "commit": "4adf8c1fb80f2a0c2f6344b41192291e70d1cd06",
+    "implementationCommit": "884074b321709bbb33afbd081d42ca06af636dea"
+  },
+  {
+    "slice": "routing",
+    "branch": "nikhil-20260920-jevRoutingToolkit",
+    "base": "nikhil-20260920-jevTypedRuntime",
+    "url": "https://github.com/nikhil-vytla/hatch/pull/59",
+    "commit": "afb7cbf129d8c98833cd7430924a7bf06c0a4bf9",
+    "implementationCommit": "246bb5f823f8e0732f2f74e868d01c5cebd0d730"
+  },
+  {
+    "slice": "training",
+    "branch": "nikhil-20260920-jevLocalStudy",
+    "base": "nikhil-20260920-jevRoutingToolkit",
+    "url": "https://github.com/nikhil-vytla/hatch/pull/60",
+    "commit": "d627e243769eabd975647ea0f0f6c399809b4314",
+    "implementationCommit": "e3f5d3e0cbb9e9289aab74c523c20f6680aae536"
+  },
+  {
+    "slice": "playable",
+    "branch": "nikhil-20260920-jevPlayableLab",
+    "base": "nikhil-20260920-jevLocalStudy",
+    "url": "https://github.com/nikhil-vytla/hatch/pull/61",
+    "commit": "ce8b0243dae2813e58aca5aed2a8851f93606ba8",
+    "implementationCommit": "d5461b4cdc2ccb9849b5675fda09de4b9bdff4ff"
+  }
+]
