@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1",
+  "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+  "corpusSha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b",
+  "models": {
+    "laya": {
+      "trainedSeeds": [
+        17,
+        29,
+        43
+      ],
+      "coremlStatus": "complete",
+      "trainingComplete": true,
+      "coremlCompleteComparison": true,
+      "coremlAgreementPassed": true,
+      "robustnessComplete": true,
+      "frozenBaselinesComplete": true
+    },
+    "smol": {
+      "trainedSeeds": [
+        17,
+        29,
+        43
+      ],
+      "coremlStatus": "complete",
+      "trainingComplete": true,
+      "coremlCompleteComparison": true,
+      "coremlAgreementPassed": true,
+      "robustnessComplete": true,
+      "frozenBaselinesComplete": true
+    },
+    "qwen": {
+      "trainedSeeds": [
+        17,
+        29,
+        43
+      ],
+      "coremlStatus": "complete",
+      "trainingComplete": true,
+      "coremlCompleteComparison": true,
+      "coremlAgreementPassed": true,
+      "robustnessComplete": true,
+      "frozenBaselinesComplete": true
+    }
+  },
+  "researchEvidenceComplete": true,
+  "installedDefault": "laya-readout-experimental",
+  "defaultSelection": "Predefined seed17 validation macro NLL and validation export parity; ALL warm median breaks 0.01 NLL ties. Promotion requires a fresh matching package check.",
+  "releaseReady": true,
+  "blockers": []
+}

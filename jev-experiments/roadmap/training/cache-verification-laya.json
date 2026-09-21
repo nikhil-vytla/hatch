@@ -1,0 +1,29 @@
+{
+  "model": "laya",
+  "originalCorpusAndRevisionMatched": true,
+  "allBackboneFileHashesMatched": true,
+  "allTargetAndMetadataRowsMatched": true,
+  "featureManifestSha256": "44bccd7ec1dab7793b98154290bd41e5aee78d9dabc2bc5373a2186417de75e7",
+  "splits": {
+    "train": {
+      "rows": 2304,
+      "arraysSha256": "c62db8c4326163686bba25875f0e53bed8119a5865e4904869c7f3472c000c2a",
+      "metadataSha256": "548d9e84ca685eedf992a6ff359710e8f5d9af4eb99f43208cd0d1b4a81bbdda"
+    },
+    "validation": {
+      "rows": 192,
+      "arraysSha256": "e6e5c0b4cdbdefc7475b6c466c6ffa602dc0ba804f4ee636b63a3d9652b10ad7",
+      "metadataSha256": "7e095556aceaf8dc494c96c2cd7b298bd2ce71c5217a72e1ec9454994dab282e"
+    },
+    "test": {
+      "rows": 384,
+      "arraysSha256": "59c34b7ba1c9d37b12261e42b1e9c3cacd84cab1b56092c0fc86edb0b434e896",
+      "metadataSha256": "bee8018209952ea6ca4b0d4260dfeb13341aae5228ec29d338b520383695176c"
+    },
+    "transfer": {
+      "rows": 2384,
+      "arraysSha256": "7cde67dc74772ccf2a62f4445bddec6fc622f7cc803bc27fe3ac2ca7ae45ff38",
+      "metadataSha256": "6046507cc4a5c35711c7d1be82f61fbf27e916beba9cafd6b463d8e9c66d19e2"
+    }
+  }
+}

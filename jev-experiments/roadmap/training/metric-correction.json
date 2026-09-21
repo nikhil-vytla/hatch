@@ -1,0 +1,116 @@
+{
+  "recordedAt": "2026-09-21T04:43:38.003178+00:00",
+  "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+  "protocolWasChanged": false,
+  "classification": "Implementation correction after protocol freeze and after Laya fitting; Smol and Qwen fitting use the corrected implementation from their first reported run.",
+  "before": "A prediction was correct only if it matched the first position in a tied soft-gold maximum.",
+  "after": "A prediction is correct when its gold mass differs from the maximum gold mass by at most 1e-12, regardless of option position.",
+  "reason": "A tied soft-gold argmax is a set. First-position tie breaking introduced arbitrary order dependence.",
+  "affectedMetrics": [
+    "accuracy",
+    "expected calibration error"
+  ],
+  "unaffected": [
+    "model predictions",
+    "negative log likelihood",
+    "Brier score",
+    "ordinal MAE",
+    "coverage",
+    "learning rate selection",
+    "epoch selection",
+    "temperature selection"
+  ],
+  "selectionImpact": "None. Configuration and calibration use macro validation NLL exclusively. Saved predictions were aggregated again; no inference, fitting or checkpoint selection was rerun for this correction.",
+  "comparisons": [
+    {
+      "model": "laya",
+      "seed": 17,
+      "split": "validation",
+      "predictionFileSha256": "2a144dae8991bc89c5dac99edb7bb78a7e2d01248d44ba01a94fa9c4232508f6",
+      "oldAccuracy": 0.6302083333333334,
+      "correctedAccuracy": 0.6302083333333334,
+      "oldEce": 0.058479473615686096,
+      "correctedEce": 0.058479473615686096
+    },
+    {
+      "model": "laya",
+      "seed": 17,
+      "split": "test",
+      "predictionFileSha256": "db754edaa02837df8c1a91ab95acfa2acf2df8f6d34b0f78cebc08e1542a3dda",
+      "oldAccuracy": 0.609375,
+      "correctedAccuracy": 0.6119791666666666,
+      "oldEce": 0.032753875207466386,
+      "correctedEce": 0.03535804187413305
+    },
+    {
+      "model": "laya",
+      "seed": 17,
+      "split": "transfer",
+      "predictionFileSha256": "b7a7c64e37e52d97296e6cfb4a97772e5f8be668db6bece2f893c1c926ede1d2",
+      "oldAccuracy": 0.3586409395973154,
+      "correctedAccuracy": 0.36283557046979864,
+      "oldEce": 0.1371152718307688,
+      "correctedEce": 0.13292064095828557
+    },
+    {
+      "model": "laya",
+      "seed": 29,
+      "split": "validation",
+      "predictionFileSha256": "80f6ca95c310e7d293b858bec3b4fb2308629aceae3ca947ead546d4fde827ec",
+      "oldAccuracy": 0.6145833333333334,
+      "correctedAccuracy": 0.6145833333333334,
+      "oldEce": 0.058433484906951584,
+      "correctedEce": 0.058433484906951584
+    },
+    {
+      "model": "laya",
+      "seed": 29,
+      "split": "test",
+      "predictionFileSha256": "1d8a7176b264a79619acf435ec02c8c7bdd8ddfe388d44a607ee1b6deef3a87c",
+      "oldAccuracy": 0.609375,
+      "correctedAccuracy": 0.6145833333333334,
+      "oldEce": 0.029528072918765247,
+      "correctedEce": 0.03473640625209858
+    },
+    {
+      "model": "laya",
+      "seed": 29,
+      "split": "transfer",
+      "predictionFileSha256": "0fd0a19cadfcfbfdb1b901f4f5cd805e4d55b08f2c6a4288497d06a18c760b20",
+      "oldAccuracy": 0.3699664429530201,
+      "correctedAccuracy": 0.37416107382550334,
+      "oldEce": 0.13554244572234234,
+      "correctedEce": 0.1330256671988524
+    },
+    {
+      "model": "laya",
+      "seed": 43,
+      "split": "validation",
+      "predictionFileSha256": "8ca734d7d762cc6c2fde9731af8e7e1d7648b9bc636759f7a3e92f82f267fee5",
+      "oldAccuracy": 0.6354166666666666,
+      "correctedAccuracy": 0.6354166666666666,
+      "oldEce": 0.06003008169742922,
+      "correctedEce": 0.06003008169742922
+    },
+    {
+      "model": "laya",
+      "seed": 43,
+      "split": "test",
+      "predictionFileSha256": "735d851ba7b8c6574f4c769ccb67ec759ce563e823bc928fd222a1bc7a32654d",
+      "oldAccuracy": 0.6119791666666666,
+      "correctedAccuracy": 0.6145833333333334,
+      "oldEce": 0.03814048727508634,
+      "correctedEce": 0.03553632060841968
+    },
+    {
+      "model": "laya",
+      "seed": 43,
+      "split": "transfer",
+      "predictionFileSha256": "963fd027430d8a9a577efef518c9301b2ce07d275057d0edbaabe0f5bcb1c050",
+      "oldAccuracy": 0.3561241610738255,
+      "correctedAccuracy": 0.36073825503355705,
+      "oldEce": 0.13774128416990675,
+      "correctedEce": 0.1331271902101752
+    }
+  ]
+}

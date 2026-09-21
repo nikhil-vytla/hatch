@@ -1,0 +1,9 @@
+# Local toolkit credits
+
+The local runtime uses **Laya**, created by **Nandakishor M and Convai Innovations**. Its pinned base weights are [`convaiinnovations/laya`](https://huggingface.co/convaiinnovations/laya/tree/1c5edc17a7acd8701df6fc341c0d179f1c62c982), revision `1c5edc17a7acd8701df6fc341c0d179f1c62c982`, published under **Apache-2.0**. The upstream implementation and architecture are documented in [NandhaKishorM/laya](https://github.com/NandhaKishorM/laya/tree/42626c348753fbb17572a813127df2278a1ec527). The linked pinned model card records the license; model installation checks every installed file against the toolkit registry.
+
+The installed `lib/mlx_model.py` comes from this repository's `jev-experiments/local-models-and-games/apple/mlx_model.py`: an original implementation of the published Laya inference equations, with Laya and Hugging Face ModernBERT as architectural references. It runs with Apple's [MLX](https://github.com/ml-explore/mlx), published under the MIT license. This runtime does not contain a port of SGLang's CUDA scoring implementation.
+
+The `laya-readout-experimental` variant adds Jev's newly trained residual readout to the frozen Laya backbone. Its seed17 checkpoint and temperature were selected through the separate versioned typed-decision study using validation data. That readout is distinct from the earlier workflow specialist: the new adaptation excludes Typed Decisions and evaluates all 400 released cases only as transfer data. The base and adapted variants remain experimental; the published task evaluations describe their limitations.
+
+The toolkit, model registry, training protocol, new readout, and installation checks are authored in the Jev experiments repository. The upstream projects retain their own authorship and licenses; installing an adapted readout does not change the provenance of the backbone.

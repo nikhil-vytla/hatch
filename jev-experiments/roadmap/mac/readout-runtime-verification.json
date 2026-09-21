@@ -1,0 +1,87 @@
+{
+  "status": "passed",
+  "installedRuntimeDirectory": "/tmp/jev-local-readout-test/lib",
+  "model": "jev/laya-typed-readout-v1-seed17",
+  "revision": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+  "networkBlocked": true,
+  "validationOnly": true,
+  "decisions": 15,
+  "maxProbabilityDelta": 1.043081283569336e-07,
+  "checks": [
+    {
+      "id": "banking77/train/9210",
+      "kind": "choice",
+      "maxProbabilityDelta": 0.0
+    },
+    {
+      "id": "banking77/train/7732",
+      "kind": "choice",
+      "maxProbabilityDelta": 1.4901161193847656e-08
+    },
+    {
+      "id": "banking77/train/5010",
+      "kind": "choice",
+      "maxProbabilityDelta": 5.960464477539063e-08
+    },
+    {
+      "id": "banking77/train/5102",
+      "kind": "choice",
+      "maxProbabilityDelta": 7.450580596923828e-09
+    },
+    {
+      "id": "banking77/train/9444",
+      "kind": "choice",
+      "maxProbabilityDelta": 4.470348358154297e-08
+    },
+    {
+      "id": "boolq/train/7710",
+      "kind": "boolean",
+      "maxProbabilityDelta": 5.960464477539063e-08
+    },
+    {
+      "id": "boolq/train/2940",
+      "kind": "boolean",
+      "maxProbabilityDelta": 0.0
+    },
+    {
+      "id": "boolq/train/8834",
+      "kind": "boolean",
+      "maxProbabilityDelta": 5.960464477539063e-08
+    },
+    {
+      "id": "boolq/train/4245",
+      "kind": "boolean",
+      "maxProbabilityDelta": 5.960464477539063e-08
+    },
+    {
+      "id": "boolq/train/8046",
+      "kind": "boolean",
+      "maxProbabilityDelta": 7.450580596923828e-08
+    },
+    {
+      "id": "stsb/validation/1300",
+      "kind": "ordinal",
+      "maxProbabilityDelta": 5.960464477539063e-08
+    },
+    {
+      "id": "stsb/validation/95",
+      "kind": "ordinal",
+      "maxProbabilityDelta": 8.940696716308594e-08
+    },
+    {
+      "id": "stsb/validation/695",
+      "kind": "ordinal",
+      "maxProbabilityDelta": 1.043081283569336e-07
+    },
+    {
+      "id": "stsb/validation/840",
+      "kind": "ordinal",
+      "maxProbabilityDelta": 4.470348358154297e-08
+    },
+    {
+      "id": "stsb/validation/756",
+      "kind": "ordinal",
+      "maxProbabilityDelta": 7.450580596923828e-08
+    }
+  ]
+}

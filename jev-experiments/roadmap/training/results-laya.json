@@ -1,0 +1,902 @@
+{
+  "status": "trained_readout_only_export_pending",
+  "model": "laya",
+  "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+  "protocolSha256": "118f4edc242fcf8b9223cc808a8a681bbc5edfa20556d4a81b53e5654331e7c9",
+  "selectedOn": "macro validation NLL only",
+  "selected": {
+    "seed": 17,
+    "learningRate": 0.0001,
+    "epoch": 3,
+    "macroValidationNll": 0.893024440533762
+  },
+  "search": [
+    {
+      "seed": 17,
+      "learningRate": 0.0001,
+      "epoch": 1,
+      "macroValidationNll": 0.896160889392205
+    },
+    {
+      "seed": 17,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "macroValidationNll": 0.893024440533762
+    },
+    {
+      "seed": 17,
+      "learningRate": 0.001,
+      "epoch": 1,
+      "macroValidationNll": 0.9756332578510221
+    },
+    {
+      "seed": 17,
+      "learningRate": 0.001,
+      "epoch": 3,
+      "macroValidationNll": 0.9774955949332336
+    }
+  ],
+  "recipes": [
+    {
+      "seed": 17,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "calibration": {
+        "temperature": 1.3,
+        "macroValidationNll": 0.8842626375504512
+      },
+      "temperatureCandidates": [
+        {
+          "temperature": 0.7,
+          "macroValidationNll": 0.9446816874376416
+        },
+        {
+          "temperature": 1,
+          "macroValidationNll": 0.8930244472521541
+        },
+        {
+          "temperature": 1.3,
+          "macroValidationNll": 0.8842626375504512
+        },
+        {
+          "temperature": 1.6,
+          "macroValidationNll": 0.8951316602161463
+        },
+        {
+          "temperature": 2,
+          "macroValidationNll": 0.9239708977608271
+        }
+      ],
+      "splits": {
+        "validation": {
+          "overall": {
+            "total": 192,
+            "supported": 192,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 0.8842626375504512,
+            "brier": 0.34291174573959293,
+            "accuracy": 0.6302083333333334,
+            "ece": 0.058479473615686096,
+            "ordinalMae": 1.3450915765482931
+          },
+          "datasets": {
+            "banking77": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5071384391474425,
+              "brier": 0.22894370581182644,
+              "accuracy": 0.84375,
+              "ece": 0.12351098330691457
+            },
+            "boolq": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.36828059874430075,
+              "brier": 0.23219098111842482,
+              "accuracy": 0.84375,
+              "ece": 0.04920544475317001
+            },
+            "stsb": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7773688747596104,
+              "brier": 0.5676005502885274,
+              "accuracy": 0.203125,
+              "ece": 0.01152027165517211,
+              "ordinalMae": 1.3450915765482931
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5071384391474425,
+              "brier": 0.22894370581182644,
+              "accuracy": 0.84375,
+              "ece": 0.12351098330691457
+            },
+            "boolean": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.36828059874430075,
+              "brier": 0.23219098111842482,
+              "accuracy": 0.84375,
+              "ece": 0.04920544475317001
+            },
+            "ordinal": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7773688747596104,
+              "brier": 0.5676005502885274,
+              "accuracy": 0.203125,
+              "ece": 0.01152027165517211,
+              "ordinalMae": 1.3450915765482931
+            }
+          },
+          "macroNll": 0.8842626375504512
+        },
+        "test": {
+          "overall": {
+            "total": 384,
+            "supported": 384,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 0.9283550087107247,
+            "brier": 0.36719465862632195,
+            "accuracy": 0.6119791666666666,
+            "ece": 0.03535804187413305,
+            "ordinalMae": 1.2970340486848726
+          },
+          "datasets": {
+            "banking77": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.4986683400039321,
+              "brier": 0.21286338397737764,
+              "accuracy": 0.8359375,
+              "ece": 0.054875791538506746
+            },
+            "boolq": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5056509183615928,
+              "brier": 0.3112756632219562,
+              "accuracy": 0.8046875,
+              "ece": 0.08834300190210342
+            },
+            "stsb": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7807457677666492,
+              "brier": 0.5774449286796319,
+              "accuracy": 0.1953125,
+              "ece": 0.016931293183006346,
+              "ordinalMae": 1.2970340486848726
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.4986683400039321,
+              "brier": 0.21286338397737764,
+              "accuracy": 0.8359375,
+              "ece": 0.054875791538506746
+            },
+            "boolean": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5056509183615928,
+              "brier": 0.3112756632219562,
+              "accuracy": 0.8046875,
+              "ece": 0.08834300190210342
+            },
+            "ordinal": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7807457677666492,
+              "brier": 0.5774449286796319,
+              "accuracy": 0.1953125,
+              "ece": 0.016931293183006346,
+              "ordinalMae": 1.2970340486848726
+            }
+          },
+          "macroNll": 0.9283550087107247
+        },
+        "transfer": {
+          "overall": {
+            "total": 2384,
+            "supported": 2384,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 1.2917543595405132,
+            "brier": 0.35150722757054914,
+            "accuracy": 0.36283557046979864,
+            "ece": 0.13292064095828557,
+            "ordinalMae": 0.8535665552338023
+          },
+          "datasets": {
+            "clinc": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.0870140128852348,
+              "brier": 0.02839518456349184,
+              "accuracy": 0.984375,
+              "ece": 0.04071612888947129
+            },
+            "multirc": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.3470219351103607,
+              "brier": 0.823338241110623,
+              "accuracy": 0.484375,
+              "ece": 0.3952836012467742
+            },
+            "summeval": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.6124892808104427,
+              "brier": 0.7074260472918058,
+              "accuracy": 0.21875,
+              "ece": 0.01091664971318096,
+              "ordinalMae": 1.7750418897873412
+            },
+            "typed_decisions": {
+              "total": 2000,
+              "supported": 2000,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.3447935819287051,
+              "brier": 0.31921040899427566,
+              "accuracy": 0.3245,
+              "ece": 0.13664856800436972,
+              "ordinalMae": 0.7061305017052361
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 728,
+              "supported": 728,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.276041597460873,
+              "brier": 0.27005058019544315,
+              "accuracy": 0.41483516483516486,
+              "ece": 0.12030692619609308
+            },
+            "boolean": {
+              "total": 728,
+              "supported": 728,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.1193156759595875,
+              "brier": 0.5046848695573483,
+              "accuracy": 0.45879120879120877,
+              "ece": 0.3170765834031524
+            },
+            "ordinal": {
+              "total": 928,
+              "supported": 928,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.4393559246707848,
+              "brier": 0.29524334386654855,
+              "accuracy": 0.24676724137931033,
+              "ece": 0.004922829648672506,
+              "ordinalMae": 0.8535665552338023
+            }
+          },
+          "macroNll": 1.0978297026836858
+        }
+      }
+    },
+    {
+      "seed": 29,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "calibration": {
+        "temperature": 1.3,
+        "macroValidationNll": 0.8900505138352403
+      },
+      "temperatureCandidates": [
+        {
+          "temperature": 0.7,
+          "macroValidationNll": 0.9506155247454445
+        },
+        {
+          "temperature": 1,
+          "macroValidationNll": 0.8997673229101619
+        },
+        {
+          "temperature": 1.3,
+          "macroValidationNll": 0.8900505138352403
+        },
+        {
+          "temperature": 1.6,
+          "macroValidationNll": 0.8991588089105361
+        },
+        {
+          "temperature": 2,
+          "macroValidationNll": 0.9255834730261966
+        }
+      ],
+      "splits": {
+        "validation": {
+          "overall": {
+            "total": 192,
+            "supported": 192,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 0.8900505138352403,
+            "brier": 0.3441889460410828,
+            "accuracy": 0.6145833333333334,
+            "ece": 0.058433484906951584,
+            "ordinalMae": 1.353719079028815
+          },
+          "datasets": {
+            "banking77": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5086292623349337,
+              "brier": 0.22729924089582018,
+              "accuracy": 0.84375,
+              "ece": 0.1306110646110028
+            },
+            "boolq": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.3703686780188749,
+              "brier": 0.2331234607595317,
+              "accuracy": 0.84375,
+              "ece": 0.058656612411141396
+            },
+            "stsb": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7911536011519122,
+              "brier": 0.5721441364678965,
+              "accuracy": 0.15625,
+              "ece": 0.01885835942812264,
+              "ordinalMae": 1.353719079028815
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5086292623349337,
+              "brier": 0.22729924089582018,
+              "accuracy": 0.84375,
+              "ece": 0.1306110646110028
+            },
+            "boolean": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.3703686780188749,
+              "brier": 0.2331234607595317,
+              "accuracy": 0.84375,
+              "ece": 0.058656612411141396
+            },
+            "ordinal": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7911536011519122,
+              "brier": 0.5721441364678965,
+              "accuracy": 0.15625,
+              "ece": 0.01885835942812264,
+              "ordinalMae": 1.353719079028815
+            }
+          },
+          "macroNll": 0.8900505138352403
+        },
+        "test": {
+          "overall": {
+            "total": 384,
+            "supported": 384,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 0.9266702526930423,
+            "brier": 0.36722191039725366,
+            "accuracy": 0.6145833333333334,
+            "ece": 0.03473640625209858,
+            "ordinalMae": 1.3123433949192986
+          },
+          "datasets": {
+            "banking77": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5029041229819233,
+              "brier": 0.21465178314810798,
+              "accuracy": 0.8359375,
+              "ece": 0.042856444139033556
+            },
+            "boolq": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.49062269286247834,
+              "brier": 0.30770702005117895,
+              "accuracy": 0.796875,
+              "ece": 0.06110353767871857
+            },
+            "stsb": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7864839422347252,
+              "brier": 0.579306927992474,
+              "accuracy": 0.2109375,
+              "ece": 0.035894316737540066,
+              "ordinalMae": 1.3123433949192986
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5029041229819233,
+              "brier": 0.21465178314810798,
+              "accuracy": 0.8359375,
+              "ece": 0.042856444139033556
+            },
+            "boolean": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.49062269286247834,
+              "brier": 0.30770702005117895,
+              "accuracy": 0.796875,
+              "ece": 0.06110353767871857
+            },
+            "ordinal": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7864839422347252,
+              "brier": 0.579306927992474,
+              "accuracy": 0.2109375,
+              "ece": 0.035894316737540066,
+              "ordinalMae": 1.3123433949192986
+            }
+          },
+          "macroNll": 0.9266702526930423
+        },
+        "transfer": {
+          "overall": {
+            "total": 2384,
+            "supported": 2384,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 1.267333450289686,
+            "brier": 0.3416301256151831,
+            "accuracy": 0.37416107382550334,
+            "ece": 0.1330256671988524,
+            "ordinalMae": 0.848586001649534
+          },
+          "datasets": {
+            "clinc": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.08241556113082785,
+              "brier": 0.02732120021162015,
+              "accuracy": 0.984375,
+              "ece": 0.0361796289216727
+            },
+            "multirc": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.2119243307156622,
+              "brier": 0.7856453351056191,
+              "accuracy": 0.4765625,
+              "ece": 0.368844136595726
+            },
+            "summeval": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.5888761525327193,
+              "brier": 0.6979834510601958,
+              "accuracy": 0.3828125,
+              "ece": 0.1724648412782699,
+              "ordinalMae": 1.7506606993653502
+            },
+            "typed_decisions": {
+              "total": 2000,
+              "supported": 2000,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.3261356459050362,
+              "brier": 0.3105223106051424,
+              "accuracy": 0.328,
+              "ece": 0.12574327604472638,
+              "ordinalMae": 0.7042540500150034
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 728,
+              "supported": 728,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.2838927126897428,
+              "brier": 0.27405465054352496,
+              "accuracy": 0.41483516483516486,
+              "ece": 0.12720947260303156
+            },
+            "boolean": {
+              "total": 728,
+              "supported": 728,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.0342371250929818,
+              "brier": 0.4693329741410483,
+              "accuracy": 0.45879120879120877,
+              "ece": 0.2913522972510411
+            },
+            "ordinal": {
+              "total": 928,
+              "supported": 928,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.437203042656021,
+              "brier": 0.29446123781921035,
+              "accuracy": 0.27586206896551724,
+              "ece": 0.03001686039477073,
+              "ordinalMae": 0.848586001649534
+            }
+          },
+          "macroNll": 1.0523379225710614
+        }
+      }
+    },
+    {
+      "seed": 43,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "calibration": {
+        "temperature": 1.3,
+        "macroValidationNll": 0.8827899391266412
+      },
+      "temperatureCandidates": [
+        {
+          "temperature": 0.7,
+          "macroValidationNll": 0.9379007202087685
+        },
+        {
+          "temperature": 1,
+          "macroValidationNll": 0.8888631562885253
+        },
+        {
+          "temperature": 1.3,
+          "macroValidationNll": 0.8827899391266412
+        },
+        {
+          "temperature": 1.6,
+          "macroValidationNll": 0.8960834046228454
+        },
+        {
+          "temperature": 2,
+          "macroValidationNll": 0.9275748891325227
+        }
+      ],
+      "splits": {
+        "validation": {
+          "overall": {
+            "total": 192,
+            "supported": 192,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 0.8827899391266412,
+            "brier": 0.34256510396822965,
+            "accuracy": 0.6354166666666666,
+            "ece": 0.06003008169742922,
+            "ordinalMae": 1.3419630023185163
+          },
+          "datasets": {
+            "banking77": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5069364621981771,
+              "brier": 0.22895643448331804,
+              "accuracy": 0.84375,
+              "ece": 0.10513186710886657
+            },
+            "boolq": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.368668798813951,
+              "brier": 0.23259511244517747,
+              "accuracy": 0.84375,
+              "ece": 0.07425833214074373
+            },
+            "stsb": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7727645563677956,
+              "brier": 0.5661437649761935,
+              "accuracy": 0.21875,
+              "ece": 0.02734905481338501,
+              "ordinalMae": 1.3419630023185163
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5069364621981771,
+              "brier": 0.22895643448331804,
+              "accuracy": 0.84375,
+              "ece": 0.10513186710886657
+            },
+            "boolean": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.368668798813951,
+              "brier": 0.23259511244517747,
+              "accuracy": 0.84375,
+              "ece": 0.07425833214074373
+            },
+            "ordinal": {
+              "total": 64,
+              "supported": 64,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7727645563677956,
+              "brier": 0.5661437649761935,
+              "accuracy": 0.21875,
+              "ece": 0.02734905481338501,
+              "ordinalMae": 1.3419630023185163
+            }
+          },
+          "macroNll": 0.8827899391266412
+        },
+        "test": {
+          "overall": {
+            "total": 384,
+            "supported": 384,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 0.9272378929563566,
+            "brier": 0.36712594659569153,
+            "accuracy": 0.6145833333333334,
+            "ece": 0.03553632060841968,
+            "ordinalMae": 1.2902005051728338
+          },
+          "datasets": {
+            "banking77": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.4993530796399898,
+              "brier": 0.2137317108392778,
+              "accuracy": 0.8359375,
+              "ece": 0.04065974964760244
+            },
+            "boolq": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5025138639609722,
+              "brier": 0.310290043661306,
+              "accuracy": 0.8046875,
+              "ece": 0.06246022041887045
+            },
+            "stsb": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7798467352681075,
+              "brier": 0.5773560852864907,
+              "accuracy": 0.203125,
+              "ece": 0.05083142255898565,
+              "ordinalMae": 1.2902005051728338
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.4993530796399898,
+              "brier": 0.2137317108392778,
+              "accuracy": 0.8359375,
+              "ece": 0.04065974964760244
+            },
+            "boolean": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.5025138639609722,
+              "brier": 0.310290043661306,
+              "accuracy": 0.8046875,
+              "ece": 0.06246022041887045
+            },
+            "ordinal": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.7798467352681075,
+              "brier": 0.5773560852864907,
+              "accuracy": 0.203125,
+              "ece": 0.05083142255898565,
+              "ordinalMae": 1.2902005051728338
+            }
+          },
+          "macroNll": 0.9272378929563566
+        },
+        "transfer": {
+          "overall": {
+            "total": 2384,
+            "supported": 2384,
+            "coverage": 1.0,
+            "unsupportedReasons": {},
+            "nll": 1.2838066350232284,
+            "brier": 0.3479111943666299,
+            "accuracy": 0.36073825503355705,
+            "ece": 0.1331271902101752,
+            "ordinalMae": 0.8554501817639419
+          },
+          "datasets": {
+            "clinc": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 0.09225018779183135,
+              "brier": 0.029114883471888533,
+              "accuracy": 0.984375,
+              "ece": 0.046329408418387175
+            },
+            "multirc": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.3231654770409214,
+              "brier": 0.815384836662499,
+              "accuracy": 0.484375,
+              "ece": 0.3903658464550972
+            },
+            "summeval": {
+              "total": 128,
+              "supported": 128,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.6189564556910168,
+              "brier": 0.7099179229330499,
+              "accuracy": 0.171875,
+              "ece": 0.04128746944479644,
+              "ordinalMae": 1.7828851273904245
+            },
+            "typed_decisions": {
+              "total": 2000,
+              "supported": 2000,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.336097693234167,
+              "brier": 0.3152274145287068,
+              "accuracy": 0.325,
+              "ece": 0.13426003500819206,
+              "ordinalMae": 0.7070605904637047
+            }
+          },
+          "kinds": {
+            "choice": {
+              "total": 728,
+              "supported": 728,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.2673542259313577,
+              "brier": 0.26574862041273895,
+              "accuracy": 0.41483516483516486,
+              "ece": 0.11353949318220327
+            },
+            "boolean": {
+              "total": 728,
+              "supported": 728,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.1009182335189034,
+              "brier": 0.4967961740638393,
+              "accuracy": 0.46016483516483514,
+              "ece": 0.3099460517475893
+            },
+            "ordinal": {
+              "total": 928,
+              "supported": 928,
+              "coverage": 1.0,
+              "unsupportedReasons": {},
+              "nll": 1.4401860640254165,
+              "brier": 0.29556861744730234,
+              "accuracy": 0.24030172413793102,
+              "ece": 0.018137636401786887,
+              "ordinalMae": 0.8554501817639419
+            }
+          },
+          "macroNll": 1.0926174534394841
+        }
+      }
+    }
+  ],
+  "defaultSelected": false,
+  "trainingRuntime": "MLX",
+  "trainableParameters": 3075,
+  "supportedTrainingViews": 2304,
+  "trainingViews": 2304,
+  "trainingSeconds": null,
+  "trainingTimingNote": "Not instrumented in the initial completed run; later script invocations record elapsed training time.",
+  "corpusSha256": "e76c31832c095332c0cbe8f325ece07d3ff425d20ab06790669f667b9068c78b",
+  "accuracyDefinition": "Prediction belongs to the full argmax set of the soft gold distribution, including exact ties."
+}
