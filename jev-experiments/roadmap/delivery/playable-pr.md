@@ -6,11 +6,11 @@ These authored modules and reports precede the final app-wiring patch. Each simu
 
 <pr-train-toc>
 
-- Typed runtime: pending root links
-- Routing and client integration: pending root links
-- Local study and Mac toolkit: pending root links
-- Playable scenes and design research: pending root links, current PR
-- Application and release evidence: pending root links
+- [Typed runtime](https://github.com/nikhil-vytla/hatch/pull/58)
+- [Routing and client integration](https://github.com/nikhil-vytla/hatch/pull/59)
+- [Local study and Mac toolkit](https://github.com/nikhil-vytla/hatch/pull/60)
+- [Playable scenes and design research](https://github.com/nikhil-vytla/hatch/pull/61) (current PR)
+- [Application and release evidence](https://github.com/nikhil-vytla/hatch/pull/62)
 
 </pr-train-toc>
 
