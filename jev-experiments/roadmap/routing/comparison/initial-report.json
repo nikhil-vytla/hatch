@@ -1,0 +1,1419 @@
+{
+  "protocol": "Bounded routing comparison v1",
+  "generatedAt": "2026-09-21T04:35:22.955Z",
+  "mode": "offline policy replay of recorded answers",
+  "limitations": [
+    "4 calibration and4 held-out synthetic tasks cannot establish model superiority or savings.",
+    "Aggregate task-quality calibration is flat across category and difficulty, so this study cannot measure a classifier-induced quality benefit.",
+    "Host incremental latency/cost and hosted Jev price are unknown.",
+    "Configured token-price arithmetic is not verified invoice cost."
+  ],
+  "summaries": [
+    {
+      "condition": "fixed-gpt-4.1-mini",
+      "tasks": 4,
+      "covered": 4,
+      "success": 2,
+      "totalLatencyMs": 4813.857749,
+      "totalCostUsd": 0.0008340000000000001,
+      "categoryCorrect": 0,
+      "meanCategoryBrier": null
+    },
+    {
+      "condition": "fixed-claude-haiku-4.5",
+      "tasks": 4,
+      "covered": 0,
+      "success": 0,
+      "totalLatencyMs": 673.1771250000002,
+      "totalCostUsd": null,
+      "categoryCorrect": 0,
+      "meanCategoryBrier": null
+    },
+    {
+      "condition": "heuristic",
+      "tasks": 4,
+      "covered": 4,
+      "success": 2,
+      "totalLatencyMs": 4814.435749,
+      "totalCostUsd": 0.0008340000000000001,
+      "categoryCorrect": 3,
+      "meanCategoryBrier": null
+    },
+    {
+      "condition": "host-agent",
+      "tasks": 4,
+      "covered": 4,
+      "success": 2,
+      "totalLatencyMs": null,
+      "totalCostUsd": null,
+      "categoryCorrect": 4,
+      "meanCategoryBrier": null
+    },
+    {
+      "condition": "hosted-jev",
+      "tasks": 4,
+      "covered": 4,
+      "success": 2,
+      "totalLatencyMs": 6006.813708000001,
+      "totalCostUsd": null,
+      "categoryCorrect": 4,
+      "meanCategoryBrier": 0
+    },
+    {
+      "condition": "local-laya",
+      "tasks": 4,
+      "covered": 4,
+      "success": 2,
+      "totalLatencyMs": 6949.48979198294,
+      "totalCostUsd": 0.0008340000000000001,
+      "categoryCorrect": 3,
+      "meanCategoryBrier": 0.21450127635198787
+    }
+  ],
+  "rows": [
+    {
+      "condition": "fixed-gpt-4.1-mini",
+      "taskId": "test-search",
+      "routeId": "gpt-4.1-mini",
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "replayedDestinationLatencyMs": 802.0507500000003,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 802.0507500000003,
+      "pricedUsageUsd": 0.0001788,
+      "totalCostUsd": 0.0001788,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "fixed-claude-haiku-4.5",
+      "taskId": "test-search",
+      "routeId": "claude-haiku-4.5",
+      "covered": false,
+      "selectionCovered": true,
+      "destinationStatus": "error",
+      "success": false,
+      "replayedDestinationLatencyMs": 217.4823749999996,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 217.4823749999996,
+      "pricedUsageUsd": null,
+      "totalCostUsd": null,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "heuristic",
+      "taskId": "test-search",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "heuristic",
+        "category": "bug-fix",
+        "difficulty": 0.5,
+        "confidence": 0.5,
+        "latencyMs": 0,
+        "costUsd": 0,
+        "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.25,
+      "categoryBrier": null,
+      "classifierOverheadMs": 0.03991699999999909,
+      "replayedDestinationLatencyMs": 802.0507500000003,
+      "selectionLatencyMs": 0.45937499999999787,
+      "totalLatencyMs": 802.5500420000003,
+      "pricedUsageUsd": 0.0001788,
+      "totalCostUsd": 0.0001788,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16345067647445158,
+            "estimatedCostUsd": 0.0026356000000000005,
+            "maximumCostUsd": 0.0026356000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007613,
+            "maximumCostUsd": 0.007613,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2493,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "host-agent",
+      "taskId": "test-search",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "category": "bug-fix",
+        "difficulty": 0.25,
+        "confidence": 0.99,
+        "source": "host",
+        "latencyMs": 0,
+        "costUsd": null,
+        "evidence": "Frozen root host judgment before destination outcomes."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0,
+      "categoryBrier": null,
+      "classifierOverheadMs": null,
+      "replayedDestinationLatencyMs": 802.0507500000003,
+      "selectionLatencyMs": 0.03262499999999946,
+      "totalLatencyMs": null,
+      "pricedUsageUsd": 0.0001788,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16345067647445158,
+            "estimatedCostUsd": 0.0026356000000000005,
+            "maximumCostUsd": 0.0026356000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007613,
+            "maximumCostUsd": 0.007613,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2493,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "hosted-jev",
+      "taskId": "test-search",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "hosted",
+        "category": "bug-fix",
+        "difficulty": 0.25,
+        "confidence": 1,
+        "latencyMs": 234.89575000000013,
+        "costUsd": null,
+        "evidence": "Version 1 shared typed category/difficulty questions. Confidence is adapter output; calibration has not been established on routing tasks.",
+        "execution": {
+          "source": "hosted",
+          "local": false,
+          "model": "typesafe-ai/jev"
+        },
+        "status": "ok"
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0,
+      "categoryBrier": 0,
+      "classifierOverheadMs": 235.03137500000003,
+      "replayedDestinationLatencyMs": 802.0507500000003,
+      "selectionLatencyMs": 0.027666999999997444,
+      "totalLatencyMs": 1037.1097920000004,
+      "pricedUsageUsd": 0.0001788,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16345067647445158,
+            "estimatedCostUsd": 0.0026356000000000005,
+            "maximumCostUsd": 0.0026356000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007613,
+            "maximumCostUsd": 0.007613,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2493,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "local-laya",
+      "taskId": "test-search",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "local",
+        "category": "bug-fix",
+        "difficulty": 0.5,
+        "confidence": 0.7933865189552307,
+        "latencyMs": 529.0287090465426,
+        "costUsd": 0,
+        "evidence": "Frozen experimental Laya. Cold CLI invocation including checksum and loading."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.25,
+      "categoryBrier": 0.060547353040522764,
+      "classifierOverheadMs": 529.0287090465426,
+      "replayedDestinationLatencyMs": 802.0507500000003,
+      "selectionLatencyMs": 0.028874999999999318,
+      "totalLatencyMs": 1331.108334046543,
+      "pricedUsageUsd": 0.0001788,
+      "totalCostUsd": 0.0001788,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16345067647445158,
+            "estimatedCostUsd": 0.0026356000000000005,
+            "maximumCostUsd": 0.0026356000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007613,
+            "maximumCostUsd": 0.007613,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2493,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "fixed-gpt-4.1-mini",
+      "taskId": "test-median",
+      "routeId": "gpt-4.1-mini",
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "replayedDestinationLatencyMs": 1738.2873330000002,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 1738.2873330000002,
+      "pricedUsageUsd": 0.00027560000000000003,
+      "totalCostUsd": 0.00027560000000000003,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "fixed-claude-haiku-4.5",
+      "taskId": "test-median",
+      "routeId": "claude-haiku-4.5",
+      "covered": false,
+      "selectionCovered": true,
+      "destinationStatus": "error",
+      "success": false,
+      "replayedDestinationLatencyMs": 173.03737499999988,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 173.03737499999988,
+      "pricedUsageUsd": null,
+      "totalCostUsd": null,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "heuristic",
+      "taskId": "test-median",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "heuristic",
+        "category": "writing",
+        "difficulty": 0.5,
+        "confidence": 0.5,
+        "latencyMs": 0,
+        "costUsd": 0,
+        "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": false,
+      "difficultyAbsoluteError": 0.25,
+      "categoryBrier": null,
+      "classifierOverheadMs": 0.023500000000002075,
+      "replayedDestinationLatencyMs": 1738.2873330000002,
+      "selectionLatencyMs": 0.02245800000000031,
+      "totalLatencyMs": 1738.3332910000001,
+      "pricedUsageUsd": 0.00027560000000000003,
+      "totalCostUsd": 0.00027560000000000003,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1633611691022964,
+            "estimatedCostUsd": 0.002656,
+            "maximumCostUsd": 0.002656,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007664,
+            "maximumCostUsd": 0.007664,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2544,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "host-agent",
+      "taskId": "test-median",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "category": "test-writing",
+        "difficulty": 0.2,
+        "confidence": 0.99,
+        "source": "host",
+        "latencyMs": 0,
+        "costUsd": null,
+        "evidence": "Frozen root host judgment before destination outcomes."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.04999999999999999,
+      "categoryBrier": null,
+      "classifierOverheadMs": null,
+      "replayedDestinationLatencyMs": 1738.2873330000002,
+      "selectionLatencyMs": 0.02712500000000162,
+      "totalLatencyMs": null,
+      "pricedUsageUsd": 0.00027560000000000003,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1633611691022964,
+            "estimatedCostUsd": 0.002656,
+            "maximumCostUsd": 0.002656,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007664,
+            "maximumCostUsd": 0.007664,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2544,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "hosted-jev",
+      "taskId": "test-median",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "hosted",
+        "category": "test-writing",
+        "difficulty": 0.5,
+        "confidence": 1,
+        "latencyMs": 334.55712500000004,
+        "costUsd": null,
+        "evidence": "Version 1 shared typed category/difficulty questions. Confidence is adapter output; calibration has not been established on routing tasks.",
+        "execution": {
+          "source": "hosted",
+          "local": false,
+          "model": "typesafe-ai/jev"
+        },
+        "status": "ok"
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.25,
+      "categoryBrier": 0,
+      "classifierOverheadMs": 334.6868340000001,
+      "replayedDestinationLatencyMs": 1738.2873330000002,
+      "selectionLatencyMs": 0.022583999999998383,
+      "totalLatencyMs": 2072.996751,
+      "pricedUsageUsd": 0.00027560000000000003,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1633611691022964,
+            "estimatedCostUsd": 0.002656,
+            "maximumCostUsd": 0.002656,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007664,
+            "maximumCostUsd": 0.007664,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2544,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "local-laya",
+      "taskId": "test-median",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "local",
+        "category": "writing",
+        "difficulty": 1,
+        "confidence": 0.44271185994148254,
+        "latencyMs": 540.4537089634687,
+        "costUsd": 0,
+        "evidence": "Frozen experimental Laya. Cold CLI invocation including checksum and loading."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": true,
+      "categoryCorrect": false,
+      "difficultyAbsoluteError": 0.75,
+      "categoryBrier": 0.7923506649000382,
+      "classifierOverheadMs": 540.4537089634687,
+      "replayedDestinationLatencyMs": 1738.2873330000002,
+      "selectionLatencyMs": 0.014582999999998236,
+      "totalLatencyMs": 2278.755624963469,
+      "pricedUsageUsd": 0.00027560000000000003,
+      "totalCostUsd": 0.00027560000000000003,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1633611691022964,
+            "estimatedCostUsd": 0.002656,
+            "maximumCostUsd": 0.002656,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007664,
+            "maximumCostUsd": 0.007664,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2544,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "fixed-gpt-4.1-mini",
+      "taskId": "test-cycle",
+      "routeId": "gpt-4.1-mini",
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "replayedDestinationLatencyMs": 1331.04425,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 1331.04425,
+      "pricedUsageUsd": 0.00021360000000000001,
+      "totalCostUsd": 0.00021360000000000001,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "fixed-claude-haiku-4.5",
+      "taskId": "test-cycle",
+      "routeId": "claude-haiku-4.5",
+      "covered": false,
+      "selectionCovered": true,
+      "destinationStatus": "error",
+      "success": false,
+      "replayedDestinationLatencyMs": 140.67670800000087,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 140.67670800000087,
+      "pricedUsageUsd": null,
+      "totalCostUsd": null,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "heuristic",
+      "taskId": "test-cycle",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "heuristic",
+        "category": "repository-analysis",
+        "difficulty": 0.5,
+        "confidence": 0.5,
+        "latencyMs": 0,
+        "costUsd": 0,
+        "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.25,
+      "categoryBrier": null,
+      "classifierOverheadMs": 0.00195799999999835,
+      "replayedDestinationLatencyMs": 1331.04425,
+      "selectionLatencyMs": 0.01658300000000068,
+      "totalLatencyMs": 1331.062791,
+      "pricedUsageUsd": 0.00021360000000000001,
+      "totalCostUsd": 0.00021360000000000001,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16362245576692827,
+            "estimatedCostUsd": 0.0025972000000000005,
+            "maximumCostUsd": 0.0025972000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007517,
+            "maximumCostUsd": 0.007517,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2397,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "host-agent",
+      "taskId": "test-cycle",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "category": "repository-analysis",
+        "difficulty": 0.2,
+        "confidence": 0.99,
+        "source": "host",
+        "latencyMs": 0,
+        "costUsd": null,
+        "evidence": "Frozen root host judgment before destination outcomes."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.04999999999999999,
+      "categoryBrier": null,
+      "classifierOverheadMs": null,
+      "replayedDestinationLatencyMs": 1331.04425,
+      "selectionLatencyMs": 0.010957999999998691,
+      "totalLatencyMs": null,
+      "pricedUsageUsd": 0.00021360000000000001,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16362245576692827,
+            "estimatedCostUsd": 0.0025972000000000005,
+            "maximumCostUsd": 0.0025972000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007517,
+            "maximumCostUsd": 0.007517,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2397,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "hosted-jev",
+      "taskId": "test-cycle",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "hosted",
+        "category": "repository-analysis",
+        "difficulty": 0.75,
+        "confidence": 1,
+        "latencyMs": 304.6116670000001,
+        "costUsd": null,
+        "evidence": "Version 1 shared typed category/difficulty questions. Confidence is adapter output; calibration has not been established on routing tasks.",
+        "execution": {
+          "source": "hosted",
+          "local": false,
+          "model": "typesafe-ai/jev"
+        },
+        "status": "ok"
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.5,
+      "categoryBrier": 0,
+      "classifierOverheadMs": 304.76466600000003,
+      "replayedDestinationLatencyMs": 1331.04425,
+      "selectionLatencyMs": 0.02758400000000094,
+      "totalLatencyMs": 1635.8365,
+      "pricedUsageUsd": 0.00021360000000000001,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16362245576692827,
+            "estimatedCostUsd": 0.0025972000000000005,
+            "maximumCostUsd": 0.0025972000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007517,
+            "maximumCostUsd": 0.007517,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2397,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "local-laya",
+      "taskId": "test-cycle",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "local",
+        "category": "repository-analysis",
+        "difficulty": 1,
+        "confidence": 0.9730733036994934,
+        "latencyMs": 524.0372080006637,
+        "costUsd": 0,
+        "evidence": "Frozen experimental Laya. Cold CLI invocation including checksum and loading."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.75,
+      "categoryBrier": 0.0009475721933201507,
+      "classifierOverheadMs": 524.0372080006637,
+      "replayedDestinationLatencyMs": 1331.04425,
+      "selectionLatencyMs": 0.012167000000001593,
+      "totalLatencyMs": 1855.0936250006637,
+      "pricedUsageUsd": 0.00021360000000000001,
+      "totalCostUsd": 0.00021360000000000001,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.16362245576692827,
+            "estimatedCostUsd": 0.0025972000000000005,
+            "maximumCostUsd": 0.0025972000000000005,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007517,
+            "maximumCostUsd": 0.007517,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2397,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "fixed-gpt-4.1-mini",
+      "taskId": "test-concurrency",
+      "routeId": "gpt-4.1-mini",
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "replayedDestinationLatencyMs": 942.4754159999993,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 942.4754159999993,
+      "pricedUsageUsd": 0.000166,
+      "totalCostUsd": 0.000166,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "fixed-claude-haiku-4.5",
+      "taskId": "test-concurrency",
+      "routeId": "claude-haiku-4.5",
+      "covered": false,
+      "selectionCovered": true,
+      "destinationStatus": "error",
+      "success": false,
+      "replayedDestinationLatencyMs": 141.9806669999998,
+      "classifierOverheadMs": 0,
+      "totalLatencyMs": 141.9806669999998,
+      "pricedUsageUsd": null,
+      "totalCostUsd": null,
+      "selectionSource": "Fixed baseline"
+    },
+    {
+      "condition": "heuristic",
+      "taskId": "test-concurrency",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "heuristic",
+        "category": "bug-fix",
+        "difficulty": 0.5,
+        "confidence": 0.5,
+        "latencyMs": 0,
+        "costUsd": 0,
+        "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.25,
+      "categoryBrier": null,
+      "classifierOverheadMs": 0.0007919999999970173,
+      "replayedDestinationLatencyMs": 942.4754159999993,
+      "selectionLatencyMs": 0.013416999999996904,
+      "totalLatencyMs": 942.4896249999994,
+      "pricedUsageUsd": 0.000166,
+      "totalCostUsd": 0.000166,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1634259866264586,
+            "estimatedCostUsd": 0.0026412000000000002,
+            "maximumCostUsd": 0.0026412000000000002,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007627,
+            "maximumCostUsd": 0.007627,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2507,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "host-agent",
+      "taskId": "test-concurrency",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "category": "bug-fix",
+        "difficulty": 0.3,
+        "confidence": 0.95,
+        "source": "host",
+        "latencyMs": 0,
+        "costUsd": null,
+        "evidence": "Frozen root host judgment before destination outcomes."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.45,
+      "categoryBrier": null,
+      "classifierOverheadMs": null,
+      "replayedDestinationLatencyMs": 942.4754159999993,
+      "selectionLatencyMs": 0.012582999999999345,
+      "totalLatencyMs": null,
+      "pricedUsageUsd": 0.000166,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1634259866264586,
+            "estimatedCostUsd": 0.0026412000000000002,
+            "maximumCostUsd": 0.0026412000000000002,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007627,
+            "maximumCostUsd": 0.007627,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2507,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "hosted-jev",
+      "taskId": "test-concurrency",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "hosted",
+        "category": "bug-fix",
+        "difficulty": 0.75,
+        "confidence": 1,
+        "latencyMs": 318.23237500000005,
+        "costUsd": null,
+        "evidence": "Version 1 shared typed category/difficulty questions. Confidence is adapter output; calibration has not been established on routing tasks.",
+        "execution": {
+          "source": "hosted",
+          "local": false,
+          "model": "typesafe-ai/jev"
+        },
+        "status": "ok"
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0,
+      "categoryBrier": 0,
+      "classifierOverheadMs": 318.38029099999994,
+      "replayedDestinationLatencyMs": 942.4754159999993,
+      "selectionLatencyMs": 0.014958000000000027,
+      "totalLatencyMs": 1260.8706649999992,
+      "pricedUsageUsd": 0.000166,
+      "totalCostUsd": null,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1634259866264586,
+            "estimatedCostUsd": 0.0026412000000000002,
+            "maximumCostUsd": 0.0026412000000000002,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007627,
+            "maximumCostUsd": 0.007627,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2507,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    },
+    {
+      "condition": "local-laya",
+      "taskId": "test-concurrency",
+      "routeId": "gpt-4.1-mini",
+      "classification": {
+        "source": "local",
+        "category": "bug-fix",
+        "difficulty": 1,
+        "confidence": 0.9430932402610779,
+        "latencyMs": 542.0324999722652,
+        "costUsd": 0,
+        "evidence": "Frozen experimental Laya. Cold CLI invocation including checksum and loading."
+      },
+      "covered": true,
+      "selectionCovered": true,
+      "destinationStatus": "ok",
+      "success": false,
+      "categoryCorrect": true,
+      "difficultyAbsoluteError": 0.25,
+      "categoryBrier": 0.004159515274070319,
+      "classifierOverheadMs": 542.0324999722652,
+      "replayedDestinationLatencyMs": 942.4754159999993,
+      "selectionLatencyMs": 0.024291999999999092,
+      "totalLatencyMs": 1484.5322079722646,
+      "pricedUsageUsd": 0.000166,
+      "totalCostUsd": 0.000166,
+      "selection": {
+        "status": "selected",
+        "routeId": "gpt-4.1-mini",
+        "candidates": [
+          {
+            "routeId": "gpt-4.1-mini",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": 0.1634259866264586,
+            "estimatedCostUsd": 0.0026412000000000002,
+            "maximumCostUsd": 0.0026412000000000002,
+            "quality": {
+              "value": 0.6666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 988.0237080000002,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          },
+          {
+            "routeId": "claude-haiku-4.5",
+            "eligible": true,
+            "reasons": [],
+            "rankScore": -0.20027359753395718,
+            "estimatedCostUsd": 0.007627,
+            "maximumCostUsd": 0.007627,
+            "quality": {
+              "value": 0.16666666666666666,
+              "basis": "measured",
+              "evidence": "Aggregate calibration score; insufficient data for category/difficulty fitting."
+            },
+            "latency": {
+              "value": 331.143375,
+              "basis": "measured",
+              "evidence": "Median over4 calibration fixture calls."
+            },
+            "cacheBasis": "none"
+          }
+        ],
+        "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+        "inputTokenUpperBound": 2507,
+        "outputTokens": 1024
+      },
+      "source": "Offline replay of one actual destination response per model/task"
+    }
+  ]
+}
