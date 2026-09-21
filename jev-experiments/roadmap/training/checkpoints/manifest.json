@@ -1,0 +1,96 @@
+{
+  "selection": "Learning rate, epoch and temperature use validation only. Seeds 17/29/43 are all retained; no test-based checkpoint choice.",
+  "backbones": "Frozen backbone weights are excluded; these files contain only newly learned residual readout parameters.",
+  "files": {
+    "laya-17.safetensors": {
+      "model": "laya",
+      "seed": 17,
+      "sha256": "9284b27b176556060316731915a144831655f57c8840d2cccbfdb165156fdf29",
+      "bytes": 12458,
+      "temperature": 1.3,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "baseRevision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
+    },
+    "laya-29.safetensors": {
+      "model": "laya",
+      "seed": 29,
+      "sha256": "67398be72053dfff08544c6f36c81c04e58281b35e4d7e82e3fee018717e1f7b",
+      "bytes": 12458,
+      "temperature": 1.3,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "baseRevision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
+    },
+    "laya-43.safetensors": {
+      "model": "laya",
+      "seed": 43,
+      "sha256": "a29f85012849a7c1be8ff3dcbfb87a09f28a37d1ad64495a9ae217ac848b3907",
+      "bytes": 12458,
+      "temperature": 1.3,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "baseRevision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
+    },
+    "smol-17.safetensors": {
+      "model": "smol",
+      "seed": 17,
+      "sha256": "ed6c891535da8585326cffd95ffe87c3ac820b22b119a1decd32942176b59d3b",
+      "bytes": 92413,
+      "temperature": 2,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "baseRevision": "a10cc1512eabd3dde888204e902eca88bddb4951"
+    },
+    "smol-29.safetensors": {
+      "model": "smol",
+      "seed": 29,
+      "sha256": "1947cccdba8f8a8016fe043b47ea8dfa52983e5ce86a5df16fefa9919f4cd06c",
+      "bytes": 92413,
+      "temperature": 2,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "baseRevision": "a10cc1512eabd3dde888204e902eca88bddb4951"
+    },
+    "smol-43.safetensors": {
+      "model": "smol",
+      "seed": 43,
+      "sha256": "aec1901f23a7b9240dc6b2e8775f47ecd370dd6827f595f06e724f2e57f663ff",
+      "bytes": 92413,
+      "temperature": 2,
+      "learningRate": 0.0001,
+      "epoch": 3,
+      "baseRevision": "a10cc1512eabd3dde888204e902eca88bddb4951"
+    },
+    "qwen-17.safetensors": {
+      "model": "qwen",
+      "seed": 17,
+      "sha256": "4fd59a8e4c7811b09f0ded36c0d87264e4c439a8a416304ccfab29d605f7ae9d",
+      "bytes": 98558,
+      "temperature": 2,
+      "learningRate": 0.0001,
+      "epoch": 1,
+      "baseRevision": "73e3e38d981303bc594367cd910ea6eb48349da8"
+    },
+    "qwen-29.safetensors": {
+      "model": "qwen",
+      "seed": 29,
+      "sha256": "e0a64c63d50e20c92ae04a8c1024473d4cc2cc65b3e23a0254ef9568993eaee3",
+      "bytes": 98558,
+      "temperature": 1.6,
+      "learningRate": 0.0001,
+      "epoch": 1,
+      "baseRevision": "73e3e38d981303bc594367cd910ea6eb48349da8"
+    },
+    "qwen-43.safetensors": {
+      "model": "qwen",
+      "seed": 43,
+      "sha256": "a3a7df67e1d72e3a2d50397dba35907401df7906c7a6a0a610939dd44ea99aa7",
+      "bytes": 98558,
+      "temperature": 2,
+      "learningRate": 0.0001,
+      "epoch": 1,
+      "baseRevision": "73e3e38d981303bc594367cd910ea6eb48349da8"
+    }
+  }
+}

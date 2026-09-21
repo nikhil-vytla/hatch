@@ -1,0 +1,90 @@
+{
+  "model": "laya",
+  "seed": 17,
+  "completeGraph": true,
+  "pilotLimit": 0,
+  "status": "failed",
+  "defaultSelected": false,
+  "parameterElements": {
+    "backbone": 421029889,
+    "readout": 3075
+  },
+  "exportNumerics": "Finite FP16 attention masks and rotary tables precomputed in float32 before tracing.",
+  "torchBridgeValidationIds": [
+    "banking77/train/9210",
+    "boolq/train/7710",
+    "stsb/validation/1300"
+  ],
+  "torchVsMlxValidationProbabilityDelta": [
+    1.1920928955078125e-07,
+    1.4901161193847656e-07,
+    7.450580596923828e-08
+  ],
+  "inputSpecification": {
+    "input_ids": {
+      "shape": [
+        1,
+        768
+      ],
+      "dtype": "int32"
+    },
+    "attention_mask": {
+      "shape": [
+        1,
+        768
+      ],
+      "dtype": "int32"
+    },
+    "marker_pos": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "option_mask": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "kind": {
+      "shape": [
+        1
+      ],
+      "dtype": "int32"
+    },
+    "last_index": {
+      "shape": [
+        1
+      ],
+      "dtype": "int32"
+    }
+  },
+  "outputSpecification": {
+    "probabilities": {
+      "shape": [
+        1,
+        8
+      ],
+      "meaning": "final calibrated masked decision probabilities"
+    }
+  },
+  "artifact": {
+    "bytes": 844080950,
+    "files": {
+      "Manifest.json": "5b2c67b74efb767a74cb1c8e26773bebf6352815b71f094868c61a08ca5c1b1a",
+      "Data/com.apple.CoreML/model.mlmodel": "001f9b92577a911e54938cca8ed074cd9e910ae1eda95f7052ff44a8705f2231",
+      "Data/com.apple.CoreML/weights/weight.bin": "b290064c592dc19808095e2a726ccc3e963163476c58e88b92c2be967493d92f"
+    }
+  },
+  "error": {
+    "type": "ValueError",
+    "message": "Core ML returned invalid probabilities"
+  },
+  "passed": false,
+  "elapsedSeconds": 21.642832042009104,
+  "peakProcessRssBytes": 6501433344,
+  "peakMlxBytes": 2648739346
+}
