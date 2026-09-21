@@ -1,0 +1,87 @@
+{
+  "harness": "opencode",
+  "directory": "/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-opencode-xmjwi91m",
+  "command": [
+    "opencode",
+    "run",
+    "--dir",
+    "/private/var/folders/j0/m98l8dr1233_xb709dbmd__80000gn/T/jev-opencode-xmjwi91m",
+    "--pure",
+    "--format",
+    "json",
+    "--agent",
+    "jev-fixture",
+    "--model",
+    "amazon-bedrock/global.anthropic.claude-fable-5-1"
+  ],
+  "elapsedSeconds": 57.36,
+  "exitCode": 0,
+  "timedOut": false,
+  "baselineTestsExitCode": 1,
+  "independentTestsExitCode": 1,
+  "mcpDiscovered": true,
+  "toolCalls": [
+    {
+      "time": "2026-09-21T05:20:57.352Z",
+      "event": "tools/call",
+      "tool": "route_task",
+      "requestId": 2,
+      "contextBytes": 368
+    },
+    {
+      "time": "2026-09-21T05:21:04.008Z",
+      "event": "tools/call",
+      "tool": "route_task",
+      "requestId": 3,
+      "contextBytes": 368
+    }
+  ],
+  "toolResults": [
+    {
+      "time": "2026-09-21T05:20:57.353Z",
+      "event": "tools/result",
+      "tool": "route_task",
+      "requestId": 2,
+      "status": "unsupported"
+    },
+    {
+      "time": "2026-09-21T05:21:04.008Z",
+      "event": "tools/result",
+      "tool": "route_task",
+      "requestId": 3,
+      "status": "unavailable"
+    }
+  ],
+  "patchedBug": false,
+  "analysisFileWritten": true,
+  "additionalTestsWritten": false,
+  "mcpConfigUnchanged": true,
+  "routerConfigUnchanged": true,
+  "delegationOccurred": false,
+  "usableDelegatedArtifacts": 0,
+  "cliVersion": "1.18.31",
+  "hostModel": {
+    "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+    "identityBasis": "command configuration"
+  },
+  "firstAuditTime": "2026-09-21T05:20:43.867Z",
+  "sourceUnchanged": true,
+  "contextComplete": true,
+  "observedBoundaryStatuses": {
+    "": "unsupported",
+    "boundary-no-route": "unavailable"
+  },
+  "noDestinationAttempts": true,
+  "boundaryExplanations": {
+    "": "Task id is required.",
+    "boundary-no-route": "No destination meets every restriction. Eligibility was not widened."
+  },
+  "evidenceGate": {
+    "condition": "unsupported-task-and-unavailable-route",
+    "passed": true,
+    "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
+    "historicalFailure": false
+  },
+  "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+  "auditChronologyOrder": 16
+}

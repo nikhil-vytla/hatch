@@ -1,0 +1,14 @@
+bun test v1.3.14 (0d9b296a)
+
+sum.test.ts:
+(pass) inclusive total [0.07ms]
+(pass) zero yields an empty sum
+(pass) one includes the single term
+(pass) two includes the upper bound
+(pass) five includes every term through five
+(pass) negative inputs currently return zero
+
+ 6 pass
+ 0 fail
+ 9 expect() calls
+Ran 6 tests across 1 file. [6.00ms]

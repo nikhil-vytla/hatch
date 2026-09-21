@@ -1,0 +1,179 @@
+{
+  "baseCommit": "eb3c18d6db2891f0dfeff87d6a760d5936be37f4",
+  "scope": "Runtime plus routing SDK/CLI/MCP, excluding later app component, evidence-link module and web handler.",
+  "extraDependency": "Only roadmap/mac/models.json; no Mac runtime implementation, training code or weights copied.",
+  "providerCalls": false,
+  "gpuCalls": false,
+  "copiedSourceSha256": {
+    "jev-experiments/roadmap/runtime/contract.ts": "1d2c234d8da9b55489a7cc0d795163583d655f1312735fd714e15be1ff95becc",
+    "jev-experiments/roadmap/runtime/_summary.md": "a181d4d72817cfc87266376e3c2e0326a948cbf11555b478e490d0450f798ec5",
+    "jev-experiments/roadmap/runtime/README.md": "c987774a68c9a4cb0cfbd35a99c3e9b2d0c7f88668fbb94ef7b5a5ca19f5a586",
+    "jev-experiments/roadmap/runtime/existing-contract.test.ts": "c6f493a8a5821fd54176a867bfe40bc20be775d70feeed7546870c257a8b0b3e",
+    "jev-experiments/roadmap/runtime/existing-contracts.patch": "a28112d8f5b4c763ac84caeb77db1e3928c3afd468c44a369a110458c5c7e4e4",
+    "jev-experiments/roadmap/runtime/execute.ts": "5a9b5eec0b39ce46beda0fb21f53484d319c851dc7908186323fcab22c64ee20",
+    "jev-experiments/roadmap/runtime/contract.test.ts": "9647e2a50f6cb6d6eeba7140ec077175db86ea0df6d8c71b8312a95762b5f9c5",
+    "jev-experiments/roadmap/runtime/NOTES.md": "b7eb3dbbfe606485d7131ded63a0a95fed79b2440ed871e173a4419dbbd8dedc",
+    "jev-experiments/roadmap/runtime/verify-standalone.py": "d43cdc46387c9d1b7f8ca76450d52deb02c2866a3c31efe82cf4e50d98a3d2ad",
+    "jev-experiments/roadmap/runtime/execute.test.ts": "96408c1e634ed0f023ca02f8eb19480d7e9e84d681e6cfa870ec235c523acac9",
+    "jev-experiments/roadmap/runtime/edge-cases.test.ts": "31f4137d3fa57f91678a1de6272a4720d59a45ad06a1ec8dd7991250dafc0037",
+    "jev-experiments/roadmap/runtime/jev.ts": "335f23a26816cefcd09ecb1668f4872dd06f9d07c4a42bf21fdbfcfdf46a26d9",
+    "jev-experiments/roadmap/routing/fresh_install.py": "1e0b5806ef00214685f30be7f5be75018aefe71ac10b4b29e12c88fb0965b6ca",
+    "jev-experiments/roadmap/routing/normalization.test.ts": "47f3bf00567a9238be75e416b6eee6653cc53db2dd39dc24ef1c560863ba889b",
+    "jev-experiments/roadmap/routing/http-executor.test.ts": "e8523a38321bce40e72308664d2cff91fc7784f926ad7dbc6082eed6fee00abe",
+    "jev-experiments/roadmap/routing/mac-adapter.test.ts": "ebebbbef1b8784abf7cb0d40a0901088d4bee8a328dee0ec15b24fe394a2b6f6",
+    "jev-experiments/roadmap/routing/mcp.test.ts": "3aa4af4498a6cadbd4477b8d79fdd41b29f32b3425f84a09b63ad63b8a5ff4a3",
+    "jev-experiments/roadmap/routing/web-registry.ts": "5be61d37fdb0ff817d58ea1b2af1ff67040bc5f290cf9c883dd8316801934c11",
+    "jev-experiments/roadmap/routing/_summary.md": "1e40ce4e1f541868c4415e578aeb6d6ec17a942a0d4f298be7800968910094e7",
+    "jev-experiments/roadmap/routing/policy.test.ts": "d55c4690cefec99a7a6a4f8153b3c3d7b724f145829fe116c0f9444a23486854",
+    "jev-experiments/roadmap/routing/local-mcp-base.json": "3dd9ece47d7ac64284c483495e72f62538793b262727c484c468edee50d97570",
+    "jev-experiments/roadmap/routing/router.ts": "bd456aec1d918edfb60e8e226d7bbd80975066c6dbc2e5a52139e5c438a52cf3",
+    "jev-experiments/roadmap/routing/ATTRIBUTION.md": "c42bc62ae9f23d6d96b77a5c08b4010fd2df3726baacd031d7158ef882e653e2",
+    "jev-experiments/roadmap/routing/artifacts.ts": "1e603beb9c2f64509598387b3297958ad89f890fbb1ed05806c7cf469d50eb07",
+    "jev-experiments/roadmap/routing/artifacts.test.ts": "6d106107d4a7983fc89aebf79b42d1f61acb28afd971fee38b3c7df818d71d3a",
+    "jev-experiments/roadmap/routing/fresh-install.json": "c01a5049bd17b0633eb7a6791f9e91e3ee1e220ce74717475342449b9948d9dc",
+    "jev-experiments/roadmap/routing/install.sh": "2db1ea55fef7717b96086e3156c2350c59929bb14984f5a879cde35ca2f90f0a",
+    "jev-experiments/roadmap/routing/verify-isolated.py": "f3ce124b711863f436b278d7aa4ceff787f610a814231e8c4c15b113597e95a4",
+    "jev-experiments/roadmap/routing/email.ts": "59eee418c94bec067fa1906b78f145f1ff812fd8a07570749be1de9f33943d53",
+    "jev-experiments/roadmap/routing/mcp.ts": "55f11399cc8966247bcd940e2e43fab5ecfe95c8c4eab1c54e3c43c424617e14",
+    "jev-experiments/roadmap/routing/mac-adapter.ts": "8251d30fd9e07d7b74d286a045117588d008aeb1b2c0cf2b0854e650b66dde6c",
+    "jev-experiments/roadmap/routing/cli.ts": "4794f3e6c8c8898f753513cc4334ee821d16d34eeb272ace055e805d7ad62db0",
+    "jev-experiments/roadmap/routing/decide.ts": "3b7fe935639023454e960fa87873f1f15580ae5863efdca4ecba49221f9937a5",
+    "jev-experiments/roadmap/routing/review-disposition.md": "742665f6f589dbd8cb91d651e6620afcb45652a08d9e29c6e488b84ba4180250",
+    "jev-experiments/roadmap/routing/local_mcp_smoke.py": "ed3401c0828a68fcf77ad4b21948c85b5be9222b145b93238e034a5f10bc873c",
+    "jev-experiments/roadmap/routing/README.md": "35a8489fad1a2f41cc3c94436cc04af8e56d15f728241bd7208221a0666ec2e9",
+    "jev-experiments/roadmap/routing/types.ts": "13c35ce1f4a9d3282e9514298609b40817ce3847622d254a859e35b0142659c7",
+    "jev-experiments/roadmap/routing/recorded-example.json": "7b7c184a1ee6ad71e65f1cc59d0c2232de67fd8da48a61647800ca3936f87641",
+    "jev-experiments/roadmap/routing/HUNK-NORMALIZATION.md": "2055cdd2ae1f1573750179137ef4167a0d2dc1cb3ab663454ab7b2a8d7f5285c",
+    "jev-experiments/roadmap/routing/policy.ts": "99c72d18408213811a72995a57d2ec8f5d783daae30f171d1ae5182c07dc430b",
+    "jev-experiments/roadmap/routing/package.json": "2f8496cad81eeef3dd21dc3f931e1f9b64e07e1ba35725d288962bf31779d900",
+    "jev-experiments/roadmap/routing/hooks.test.ts": "3eabbc694127740e433ad9c73e7c58c2938ac52602a59eed9e5a099827274f09",
+    "jev-experiments/roadmap/routing/execute.ts": "9fd00b0486e564ce434e27ee40db3118792d500d4f11387b3323b7017e3e848c",
+    "jev-experiments/roadmap/routing/index.ts": "01e23919a91275b0e402146d7a65729bf45da3b64f92a97ae0bf4a9600e1ae1c",
+    "jev-experiments/roadmap/routing/http-executor.ts": "edfbeb230f8d5a1723b1ea2ad719849f91b427d1d065c2a0a5db3c5d09d8465f",
+    "jev-experiments/roadmap/routing/NOTES.md": "f20bd2bed25686a473cfdac672c978b3a7d34b108dd582bee93bf117b527acbc",
+    "jev-experiments/roadmap/routing/config.ts": "b8e22e388993ed75327b119b1f0e78a964845f16482a7b430ad09dd19cfdca4d",
+    "jev-experiments/roadmap/routing/classifier.ts": "3c32b641eb01f410fa78675936e80681ae2d6560c5ac454b788a8c7cd4292660",
+    "jev-experiments/roadmap/routing/local-mcp-readout.json": "eb8e6229c37eca1a81eb3f1ff7585a7fbc451b2747924bdd183598660ccac8bf",
+    "jev-experiments/roadmap/routing/hooks.ts": "c0ed2f61c713c9d358904766ea6e01432cb870891f5ae8c3f5e746a22435109f",
+    "jev-experiments/roadmap/routing/ARTIFACT-AUDIT.md": "569bc0dfb53d2e849d8a0a1ef15e1eb9ba81154059e1dfd542b396d08791e2a9",
+    "jev-experiments/roadmap/routing/PROTOCOL.md": "5a21d795a7fd1bdfbed691e7ade17ae634f04d526b924025e14d4abd48388542",
+    "jev-experiments/roadmap/routing/comparison/grade.ts": "0e83c3a80e247fc08ccb2f595704a6be46323e2803d26c6a9c2c51030dd0cca0",
+    "jev-experiments/roadmap/routing/comparison/labels.json": "692bc96e06428e9aebf071fe4b9bfb5765eecbb1bf5fdeb9eac7f90cde6235a6",
+    "jev-experiments/roadmap/routing/comparison/initial-report.json": "6728ffa97d8505d5d490c3b6c57e5e137fd617271568e46e819e299b1098e4fd",
+    "jev-experiments/roadmap/routing/comparison/PROTOCOL.v1.md": "50a4c05fcacd62ef842d4c114984be225e92496672bf86de9d824a1499616f6b",
+    "jev-experiments/roadmap/routing/comparison/report.json": "823fcc08c329576c142f52d9352dbb3b474cc77fdd224bf05112b2d0164f5b93",
+    "jev-experiments/roadmap/routing/comparison/alternative-access.json": "5ae9fba64e42e246bb0d74ac63e053f4b9a2b9cd69f2aa3d58938aece3d72496",
+    "jev-experiments/roadmap/routing/comparison/frozen.sha256": "177e6e9191a20a6eedd5245455a749d48f5ec105a5b3432d570493bdb78ec621",
+    "jev-experiments/roadmap/routing/comparison/haiku-compatibility.json": "e54bc01b66a579c3f975f1003f1178aba30df01a84151b64fafa9ae88d588b69",
+    "jev-experiments/roadmap/routing/comparison/calibrated-registry.json": "52ce91eb9ffd399b122d466377f1f0f8fae1327602551a9f55171f209ff45e75",
+    "jev-experiments/roadmap/routing/comparison/host-classifications.json": "28f9604c1b79fbea39f3bc987ffaf8add5a28b202d0a281c404d5c1250701738",
+    "jev-experiments/roadmap/routing/comparison/local_classify.py": "5cc1721b27f07ec4a63a357da134a0623506a2cea67335cb7fb4ffd06dc3ed3c",
+    "jev-experiments/roadmap/routing/comparison/README.md": "3c2ddf6a439a511e14194936f04279b82a9deb35a7d063c5202aa7deeaa349dd",
+    "jev-experiments/roadmap/routing/comparison/local.jsonl": "2e9cb11e343a3607d32d4aacfb4d878853c357d9a2b1d9bf593a3de1ac576870",
+    "jev-experiments/roadmap/routing/comparison/probe-haiku.ts": "9466a3a8a88c8e655285eeb6fbd448dcd23f41796848a4cdcd61cf64a0e9b6b4",
+    "jev-experiments/roadmap/routing/comparison/matrix.jsonl": "245b0ff7c3b56fb6af4a15da40ffb14637f0b0b9b3307e723ae121f7192b2ece",
+    "jev-experiments/roadmap/routing/comparison/amendment.sha256": "75648efbc747fe7eb6a46676c04400f132126c3f142e894ab5a968d0fba84877",
+    "jev-experiments/roadmap/routing/comparison/annotations.sha256": "4c7b7875865507c82ad1c79e65d2bf687e6427550112d39092db4a10cff04f97",
+    "jev-experiments/roadmap/routing/comparison/alternative-access-first-check.json": "dfb7857ec56648593157e1adc281b665d8a03440e34320d681f0bf311b8c834a",
+    "jev-experiments/roadmap/routing/comparison/tasks.json": "48e71af1486a2000b7fe5c748788c44bb7125c20d372b918df73166ab32bc911",
+    "jev-experiments/roadmap/routing/comparison/run.ts": "ba9eb094fbb7f011a59ec08a1ca96664040554b785f92957d7bcc604aaa01660",
+    "jev-experiments/roadmap/routing/comparison/initial-calibrated-registry.json": "a40de0651bb1208931baab1e63debf1de9f368450e9179e7ab645c9aca11a268",
+    "jev-experiments/roadmap/routing/comparison/hosted.jsonl": "b19d1d58255ef9853df650b46c42e15091b9ede0f0dcf3529eb62bc6e33b80e4",
+    "jev-experiments/roadmap/routing/comparison/PROTOCOL.md": "6cdd6c722ae372086a9b464c1780bdcebe8e928f1f1bc559b4b48b9dd12bfd21",
+    "jev-experiments/roadmap/routing/comparison/access-alternative.ts": "284ee85eb61fc34de06f57ec77e0b80f797173566cd2b8f06cf1fb1d501dbd35",
+    "jev-experiments/roadmap/package.json": "c5eec3da5b3b36a34bc76f475aa5e99d29d46297cbb3d7fc2af3024c5ec9f107",
+    "jev-experiments/roadmap/bun.lock": "5ed0f2c4db0a0035769b8e5f85b4c1ebb32afbde1aed5b175e7fb17d4cde16f6",
+    "jev-experiments/roadmap/mac/models.json": "4ca8388eaec5fa94ca573be4a46ff85435802c4a57234b0a050ed42344c1a4a4"
+  },
+  "checks": [
+    {
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "jev-experiments/roadmap/runtime/existing-contracts.patch"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.007446291972883046,
+      "output": ""
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "jev-experiments/roadmap/runtime/existing-contracts.patch"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.006739749922417104,
+      "output": ""
+    },
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/adapters/typescript",
+      "exitCode": 0,
+      "elapsedSeconds": 0.025170332984998822,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ typescript@5.9.3\n+ zod@4.6.5\n\n6 packages installed [19.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "elapsedSeconds": 0.020368583034723997,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ typescript@5.9.3\n+ react@19.2.4\n+ react-dom@19.2.4\n\n11 packages installed [12.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "test",
+        "jev-experiments/roadmap/runtime",
+        "jev-experiments/roadmap/routing"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.9954819160047919,
+      "output": "bun test v1.3.14 (0d9b296a)\n\njev-experiments/roadmap/runtime/existing-contract.test.ts:\n(pass) gateway rejects undeclared score probabilities without rerolling [1.80ms]\n(pass) direct decoder rejects inherited option names [0.30ms]\n\njev-experiments/roadmap/runtime/contract.test.ts:\n(pass) preserves meaning for choice, boolean and fractional ordinal [0.44ms]\n(pass) rejects undeclared and inherited keys, missing mass and duplicate answers [0.05ms]\n(pass) rejects oversized requests without truncating [0.07ms]\n(pass) requires explicit error and identity, rejects non-JSON values [0.13ms]\n\njev-experiments/roadmap/runtime/execute.test.ts:\n(pass) cancels even a runtime that ignores the signal [0.36ms]\n(pass) native boolean response becomes a complete distribution [0.23ms]\n(pass) missing provider distributions fail explicitly [0.14ms]\n\njev-experiments/roadmap/runtime/edge-cases.test.ts:\n(pass) untyped invalid requests return an explicit unsupported response [0.05ms]\n(pass) configured revision cannot silently change [0.08ms]\n(pass) representable adjacent ordinal values retain identities [0.05ms]\n(pass) null provider JSON fails once instead of rerolling [0.07ms]\n(pass) gateway checks cancellation after a transport returns [0.06ms]\n(pass) native instruction limit is declared and rejected before calling provider [0.09ms]\n(pass) direct decoder preserves string enum identity [0.04ms]\n(pass) direct decoder rejects array probability containers [0.03ms]\n\njev-experiments/roadmap/routing/normalization.test.ts:\n(pass) normalization changes only the two count fields and retains the original malformed proposal [0.46ms]\n(pass) ambiguous or structurally invalid patches are never normalized [0.10ms]\n(pass) already valid patches have no repair claim [0.04ms]\n(pass) host strict application rejects original counts, accepts disclosed normalization, and independently tests source [63.69ms]\n(pass) syntax normalization cannot make a mismatched source patch applicable [20.26ms]\n(pass) SQL and Lua comment deletions strictly apply after count-only normalization [49.42ms]\n\njev-experiments/roadmap/routing/http-executor.test.ts:\n(pass) null and primitive HTTP bodies are malformed, never availability failures [0.44ms]\n(pass) shared HTTP path rejects negative usage and never calculates a negative charge [0.10ms]\n(pass) cached usage is capped by total input and web accounting stays explicitly unknown [0.09ms]\n(pass) shared transport prohibits redirect following and sends the same strict artifact schema [0.25ms]\n(pass) cancelled HTTP response cannot return a usable artifact [0.15ms]\n(pass) a different provider-reported model is rejected with observed usage and unknown charge [0.06ms]\n(pass) absent HTTP model metadata stays explicitly configured-unverified [0.05ms]\n\njev-experiments/roadmap/routing/mac-adapter.test.ts:\n(pass) explicit Mac bridge passes stdin and selected model without a cloud fallback [674.26ms]\n(pass) missing explicitly selected local executable returns an error, never a baseline [0.77ms]\n\njev-experiments/roadmap/routing/mcp.test.ts:\n(pass) MCP invalid request does not kill server; tools expose required operations [27.18ms]\n(pass) MCP unsupported task and question return explicit errors without a provider [24.73ms]\n(pass) an unwritable optional audit does not kill MCP discovery or ping [24.12ms]\n(pass) MCP cancellation reaches destination and suppresses late artifact [44.08ms]\n\njev-experiments/roadmap/routing/policy.test.ts:\n(pass) hard eligibility > never widens when no route meets permissions [0.42ms]\n(pass) hard eligibility > rejects local-only cloud destinations [0.04ms]\n(pass) hard eligibility > rejects excessive context without truncating [0.04ms]\n(pass) hard eligibility > requires configured known prices for hard caps [0.04ms]\n(pass) hard eligibility > does not spend cache savings against hard caps [0.04ms]\n(pass) hard eligibility > cache expiry changes estimate, never permissions [0.04ms]\n(pass) hard eligibility > weights cannot override spending limits [0.02ms]\n(pass) execution records > records actual destination and null for unknown charges [0.76ms]\n(pass) execution records > availability fallback stays eligible and explicit [0.31ms]\n(pass) execution records > unknown first charge reserves full maximum before retry [0.19ms]\n(pass) execution records > malformed response is not treated as availability failure [0.09ms]\n(pass) execution records > cancelled result discards late answer [0.12ms]\n(pass) execution records > quality escalation requires measured stronger route [0.27ms]\n(pass) prior declares identity and exact uniform distribution [0.15ms]\n(pass) email baseline rejects unsupported MIME and leaves input unchanged [0.43ms]\n(pass) invalid route limits cannot qualify through NaN comparisons [0.09ms]\n(pass) simulated quality cannot satisfy a hard minimum [0.18ms]\n(pass) local-only blocks a hosted classifier before sending input [0.17ms]\n(pass) an already cancelled task never calls its classifier [0.05ms]\n(pass) classification changes soft ranking under the same policy without changing eligibility [0.20ms]\n(pass) invalid SDK spending policy is rejected before a paid classifier can run [0.05ms]\n(pass) remaining reservation can tighten but never widen a configured spending cap [0.07ms]\n(pass) malformed registry entries stay ineligible without crashing valid candidate selection [0.08ms]\n(pass) contradictory OpenCode model configuration is ineligible before any executor call [0.06ms]\n(pass) direct OpenCode execution rejects a model conflict without resolving an executable [13.32ms]\n(pass) minimumQuality remains an aggregate measured floor despite a higher task-calibrated score [0.13ms]\n(pass) quality escalation requires improvement in both aggregate and calibrated measured quality [0.34ms]\n\njev-experiments/roadmap/routing/artifacts.test.ts:\n(pass) accepts a valid hunk while leaving application to caller [0.05ms]\n(pass) rejects valid JSON carrying mismatched patch line counts [0.04ms]\n(pass) rejects prose and incomplete diffs as patches [0.04ms]\n(pass) accepts a new-file diff with /dev/null old path [0.02ms]\n(pass) deleting a SQL comment is hunk content, not a new file header [0.02ms]\n(pass) multiple files require complete structural header pairs and correct hunk counts [0.18ms]\n\njev-experiments/roadmap/routing/hooks.test.ts:\n(pass) local-only never invokes an undeclared, remote or malformed-locality verifier [0.34ms]\n(pass) an explicitly local verifier runs and preserves unknown charge plus evidence [0.08ms]\n(pass) malformed verifier decisions cannot certify an answer, corrupt totals or cause either fallback [0.42ms]\n(pass) a thrown verifier records unknown charge and fails without escalation [0.26ms]\n(pass) valid rejection alone triggers quality escalation and includes all known verifier charges [0.12ms]\n(pass) cancellation during verification discards the proposal and leaves verifier charge unknown [0.10ms]\n(pass) invalid custom executor metadata cannot create negative budgets or a false usable result [0.20ms]\n(pass) classifier identity contradictions stop before destination execution [0.27ms]\n(pass) consistent declared classifier identity works, including host traits without repeated identity [0.16ms]\n(pass) hard budget skips unreserved verification and records an unverified proposal [0.07ms]\n(pass) a rejected first proposal is not returned when the stronger destination fails [0.11ms]\n(pass) finite reported charges cannot overflow the public total [0.06ms]\n(pass) reported hosted identity remains visible when it contradicts declared locality [0.06ms]\n(pass) a custom executor cannot substitute a different model or cause an identity fallback [0.08ms]\n\n 83 pass\n 0 fail\n 448 expect() calls\nRan 83 tests across 11 files. [988.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "x",
+        "--no-install",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.json"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "elapsedSeconds": 1.0169467920204625,
+      "output": ""
+    },
+    {
+      "command": [
+        "python3",
+        "jev-experiments/roadmap/routing/fresh_install.py"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.33153458405286074,
+      "output": "{\n  \"bundleBytes\": 84933,\n  \"elapsedSeconds\": 0.2872042909730226,\n  \"mailUnchanged\": true,\n  \"uninstalled\": true\n}\n"
+    }
+  ],
+  "freshInstall": {
+    "bundleBytes": 84933,
+    "bundleSha256": "fadcab2dac09c7ee03368bd3f7df7316c9195f8920e5d297731c199165d56a9f",
+    "mailUnchanged": true,
+    "uninstalled": true
+  },
+  "passed": true
+}

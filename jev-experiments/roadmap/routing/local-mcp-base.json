@@ -1,0 +1,194 @@
+{
+  "condition": "Actual local MCP-to-MLX invocation, explicit experimental model; synthetic typed question and supplied email. Smoke only, not calibration or benchmark evidence.",
+  "model": "laya-base-experimental",
+  "runtime": "/tmp/jev-local-fresh-test/bin/jev-local",
+  "dataDirectory": "/tmp/jev-local-model-test",
+  "exitCode": 0,
+  "stderr": "",
+  "calls": [
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-06-18",
+          "clientInfo": {
+            "name": "local-mcp-smoke",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {
+            "tools": {
+              "listChanged": false
+            }
+          },
+          "serverInfo": {
+            "name": "jev-model-routing-lab",
+            "version": "0.1.0"
+          },
+          "instructions": "Use route_task for bounded delegation with complete context. It returns proposed artifacts; you retain control of tools and applying changes. Default decide and classify_eml are explicitly labeled baselines."
+        }
+      },
+      "wallMs": 19.807207980193198
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+          "name": "decide",
+          "arguments": {
+            "request": {
+              "schemaVersion": "1",
+              "requestId": "synthetic-local-smoke",
+              "state": "The parcel arrived today.",
+              "questions": [
+                {
+                  "id": "arrived",
+                  "kind": "boolean",
+                  "prompt": "Has the parcel arrived?"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"schemaVersion\":\"1\",\"requestId\":\"synthetic-local-smoke\",\"status\":\"ok\",\"decisions\":[{\"questionId\":\"arrived\",\"distribution\":[{\"value\":false,\"probability\":0.14137260615825653},{\"value\":true,\"probability\":0.8586273193359375}],\"selected\":true}],\"execution\":{\"adapter\":\"jev-local-mlx\",\"model\":\"convaiinnovations/laya\",\"revision\":\"1c5edc17a7acd8701df6fc341c0d179f1c62c982\",\"local\":true},\"timing\":{\"loadMs\":459.6891669789329,\"inferenceMs\":30.416624969802797,\"totalMs\":611.0029999999999},\"issues\":[]}"
+            }
+          ],
+          "structuredContent": {
+            "schemaVersion": "1",
+            "requestId": "synthetic-local-smoke",
+            "status": "ok",
+            "decisions": [
+              {
+                "questionId": "arrived",
+                "distribution": [
+                  {
+                    "value": false,
+                    "probability": 0.14137260615825653
+                  },
+                  {
+                    "value": true,
+                    "probability": 0.8586273193359375
+                  }
+                ],
+                "selected": true
+              }
+            ],
+            "execution": {
+              "adapter": "jev-local-mlx",
+              "model": "convaiinnovations/laya",
+              "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+              "local": true
+            },
+            "timing": {
+              "loadMs": 459.6891669789329,
+              "inferenceMs": 30.416624969802797,
+              "totalMs": 611.0029999999999
+            },
+            "issues": []
+          },
+          "isError": false
+        }
+      },
+      "wallMs": 611.836709023919
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+          "name": "classify_eml",
+          "arguments": {
+            "eml": "Subject: Receipt for order123\nContent-Type: text/plain\n\nPayment received. Here is your receipt.\n"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"schemaVersion\":\"1\",\"requestId\":\"eml-49d82ff189a32522\",\"status\":\"ok\",\"decisions\":[{\"questionId\":\"category\",\"distribution\":[{\"value\":\"action_required\",\"probability\":0.009192065335810184},{\"value\":\"transactional\",\"probability\":0.9457118511199951},{\"value\":\"newsletter\",\"probability\":0.019311122596263885},{\"value\":\"personal\",\"probability\":0.014982206746935844},{\"value\":\"uncertain\",\"probability\":0.010802747681736946}],\"selected\":\"transactional\"}],\"execution\":{\"adapter\":\"jev-local-mlx\",\"model\":\"convaiinnovations/laya\",\"revision\":\"1c5edc17a7acd8701df6fc341c0d179f1c62c982\",\"local\":true},\"timing\":{\"loadMs\":394.7389589739032,\"inferenceMs\":33.921249967534095,\"totalMs\":57.07312497543171},\"issues\":[],\"artifact\":{\"sha256\":\"49d82ff189a32522b3d7e98af0ddb96bc49619add715a3cb272387f855ae578d\",\"modified\":false},\"uncertainty\":{\"maximumProbability\":0.9457118511199951,\"normalizedEntropy\":0.17643921039001392,\"calibration\":\"Uncalibrated for email; these scores are not verified correctness probabilities.\"}}"
+            }
+          ],
+          "structuredContent": {
+            "schemaVersion": "1",
+            "requestId": "eml-49d82ff189a32522",
+            "status": "ok",
+            "decisions": [
+              {
+                "questionId": "category",
+                "distribution": [
+                  {
+                    "value": "action_required",
+                    "probability": 0.009192065335810184
+                  },
+                  {
+                    "value": "transactional",
+                    "probability": 0.9457118511199951
+                  },
+                  {
+                    "value": "newsletter",
+                    "probability": 0.019311122596263885
+                  },
+                  {
+                    "value": "personal",
+                    "probability": 0.014982206746935844
+                  },
+                  {
+                    "value": "uncertain",
+                    "probability": 0.010802747681736946
+                  }
+                ],
+                "selected": "transactional"
+              }
+            ],
+            "execution": {
+              "adapter": "jev-local-mlx",
+              "model": "convaiinnovations/laya",
+              "revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+              "local": true
+            },
+            "timing": {
+              "loadMs": 394.7389589739032,
+              "inferenceMs": 33.921249967534095,
+              "totalMs": 57.07312497543171
+            },
+            "issues": [],
+            "artifact": {
+              "sha256": "49d82ff189a32522b3d7e98af0ddb96bc49619add715a3cb272387f855ae578d",
+              "modified": false
+            },
+            "uncertainty": {
+              "maximumProbability": 0.9457118511199951,
+              "normalizedEntropy": 0.17643921039001392,
+              "calibration": "Uncalibrated for email; these scores are not verified correctness probabilities."
+            }
+          },
+          "isError": false
+        }
+      },
+      "wallMs": 513.3396669989452
+    }
+  ]
+}

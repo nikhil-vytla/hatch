@@ -1,0 +1,23 @@
+{
+  "routes": [{
+    "id": "bedrock-delegate",
+    "model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+    "available": true,
+    "local": false,
+    "capabilities": ["text", "coding"],
+    "tools": [],
+    "contextTokens": 200000,
+    "maxOutputTokens": 4096,
+    "quality": { "value": 0.5, "basis": "simulation", "evidence": "Unmeasured neutral prior. Single route, not a model comparison." },
+    "latencyMs": { "value": 1000, "basis": "simulation", "evidence": "Display placeholder, not measured latency." },
+    "pricing": null,
+    "destination": { "kind": "opencode", "model": "amazon-bedrock/global.anthropic.claude-fable-5-1" }
+  }],
+  "policy": {
+    "weights": { "quality": 0.6, "cost": 0.25, "latency": 0.15 },
+    "allowedTools": [],
+    "allowAvailabilityFallback": false,
+    "allowQualityEscalation": false,
+    "maxAttempts": 1
+  }
+}

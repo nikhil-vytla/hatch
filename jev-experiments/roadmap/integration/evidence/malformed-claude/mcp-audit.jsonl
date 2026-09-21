@@ -1,0 +1,4 @@
+{"time":"2026-09-21T04:44:31.334Z","event":"initialize","client":{"name":"claude-code","title":"Claude Code","version":"2.1.278","description":"Anthropic's agentic coding tool","websiteUrl":"https://claude.com/claude-code"}}
+{"time":"2026-09-21T04:44:31.348Z","event":"tools/list"}
+{"time":"2026-09-21T04:44:41.585Z","event":"tools/call","tool":"route_task","requestId":2,"contextBytes":367}
+{"time":"2026-09-21T04:44:41.591Z","event":"tools/result","tool":"route_task","requestId":2,"status":"error"}

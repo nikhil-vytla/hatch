@@ -1,0 +1,100 @@
+{
+  "recordedAt": "2026-09-20",
+  "kind": "actual-bounded-delegation",
+  "task": {
+    "id": "off-by-one-demo",
+    "prompt": "Fix the bug. totalThrough(n) must sum all integers from 1 through n inclusive. Return a proposed unified diff for sum.ts.",
+    "context": "sum.ts:\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n",
+    "requiredCapabilities": [
+      "text",
+      "coding"
+    ],
+    "outputTokens": 2048
+  },
+  "result": {
+    "schemaVersion": "1",
+    "taskId": "off-by-one-demo",
+    "status": "ok",
+    "classification": {
+      "source": "heuristic",
+      "category": "bug-fix",
+      "difficulty": 0.5,
+      "confidence": 0.5,
+      "latencyMs": 0,
+      "costUsd": 0,
+      "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+    },
+    "selection": {
+      "status": "selected",
+      "routeId": "bedrock-delegate",
+      "candidates": [
+        {
+          "routeId": "bedrock-delegate",
+          "eligible": true,
+          "reasons": [],
+          "rankScore": -0.1,
+          "estimatedCostUsd": null,
+          "maximumCostUsd": null,
+          "quality": {
+            "value": 0.5,
+            "basis": "simulation",
+            "evidence": "Unmeasured neutral prior. Single route, not a model comparison."
+          },
+          "latency": {
+            "value": 1000,
+            "basis": "simulation",
+            "evidence": "Display placeholder, not measured latency."
+          },
+          "cacheBasis": "none"
+        }
+      ],
+      "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+      "inputTokenUpperBound": 2420,
+      "outputTokens": 2048
+    },
+    "attempts": [
+      {
+        "status": "ok",
+        "artifact": {
+          "kind": "patch",
+          "text": "--- a/sum.ts\n+++ b/sum.ts\n@@ -1,5 +1,5 @@\n export function totalThrough(n: number): number {\n   let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n+  for (let i = 1; i <= n; i++) total += i;\n   return total;\n }\n",
+          "data": {
+            "file": "sum.ts",
+            "summary": "Loop condition used `<` which excluded n; changed to `<=` so the sum is inclusive of n."
+          }
+        },
+        "actualModel": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+        "usage": {
+          "inputTokens": 493,
+          "outputTokens": 189,
+          "cachedInputTokens": 0
+        },
+        "costUsd": null,
+        "routeId": "bedrock-delegate",
+        "latencyMs": 6948.894625,
+        "trigger": "initial",
+        "reservedCostUsd": null,
+        "identityBasis": "configured-unverified"
+      }
+    ],
+    "outcome": {
+      "actualRouteId": "bedrock-delegate",
+      "actualModel": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+      "totalLatencyMs": 6949.586542,
+      "totalCostUsd": null,
+      "artifact": {
+        "kind": "patch",
+        "text": "--- a/sum.ts\n+++ b/sum.ts\n@@ -1,5 +1,5 @@\n export function totalThrough(n: number): number {\n   let total = 0;\n-  for (let i = 1; i < n; i++) total += i;\n+  for (let i = 1; i <= n; i++) total += i;\n   return total;\n }\n",
+        "data": {
+          "file": "sum.ts",
+          "summary": "Loop condition used `<` which excluded n; changed to `<=` so the sum is inclusive of n."
+        }
+      }
+    }
+  },
+  "caveats": [
+    "The OpenCode CLI used the configured Fable 5.1 Global model; provider identity was not returned independently.",
+    "This is one task, not a quality or savings comparison.",
+    "Cost is unknown. No invoice claim."
+  ]
+}

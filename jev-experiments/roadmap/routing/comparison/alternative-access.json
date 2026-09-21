@@ -1,0 +1,84 @@
+{
+  "frozenOrder": [
+    "openai/gpt-4.1",
+    "openai/gpt-4.1-nano"
+  ],
+  "prompt": "Return kind answer with text ready.",
+  "probes": [
+    {
+      "model": "openai/gpt-4.1",
+      "result": {
+        "status": "ok",
+        "actualModel": "openai/gpt-4.1",
+        "identityBasis": "provider-reported",
+        "usage": {
+          "inputTokens": 266,
+          "outputTokens": 11,
+          "cachedInputTokens": 0
+        },
+        "costUsd": 0.00062,
+        "artifact": {
+          "kind": "answer",
+          "text": "ready."
+        }
+      },
+      "latencyMs": 943.3675830000001
+    },
+    {
+      "model": "openai/gpt-4.1-nano",
+      "result": {
+        "status": "ok",
+        "actualModel": "openai/gpt-4.1-nano",
+        "identityBasis": "provider-reported",
+        "usage": {
+          "inputTokens": 266,
+          "outputTokens": 20,
+          "cachedInputTokens": 0
+        },
+        "costUsd": 3.4599999999999994e-05,
+        "artifact": {
+          "kind": "answer",
+          "text": "Here is the answer you requested, formatted as specified."
+        }
+      },
+      "latencyMs": 828.168917
+    }
+  ],
+  "selected": {
+    "id": "gpt-4.1",
+    "model": "openai/gpt-4.1",
+    "available": true,
+    "local": false,
+    "capabilities": [
+      "text",
+      "coding"
+    ],
+    "tools": [],
+    "contextTokens": 1047576,
+    "maxOutputTokens": 32768,
+    "quality": {
+      "value": 0.5,
+      "basis": "simulation",
+      "evidence": "Unmeasured neutral prior before calibration."
+    },
+    "latencyMs": {
+      "value": 1000,
+      "basis": "simulation",
+      "evidence": "Placeholder before calibration."
+    },
+    "pricing": {
+      "inputPerMillion": 2.0,
+      "outputPerMillion": 8.0,
+      "cachedInputPerMillion": 0.5,
+      "basis": "configured",
+      "evidence": "Gateway public model catalog,2026-09-20; list-price arithmetic only."
+    },
+    "destination": {
+      "kind": "openai-compatible",
+      "endpoint": "https://ai-gateway.vercel.sh/v1/chat/completions",
+      "apiKeyEnv": "AI_GATEWAY_API_KEY"
+    }
+  },
+  "selectionBasis": "First API/schema-eligible candidate, no benchmark outcome inspected.",
+  "selectionCorrection": "The first access-check code additionally required text exactly ready, although the frozen gate was API/schema eligibility. GPT4.1 returned a valid answer with text ready. including punctuation. Corrected the gate to valid typed artifact only, selecting the first eligible candidate from existing probe evidence before any alternative benchmark call. The unnecessary nano probe is retained; no request was rerolled."
+}

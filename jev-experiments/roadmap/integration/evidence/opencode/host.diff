@@ -1,0 +1,11 @@
+diff --git a/sum.ts b/sum.ts
+index 93fd8ba..6647591 100644
+--- a/sum.ts
++++ b/sum.ts
+@@ -1,5 +1,5 @@
+ export function totalThrough(n: number): number {
+   let total = 0;
+-  for (let i = 1; i < n; i++) total += i;
++  for (let i = 1; i <= n; i++) total += i;
+   return total;
+ }
