@@ -1,0 +1,96 @@
+.source-code {
+  min-width: 0;
+  max-width: 100%;
+  color: inherit;
+}
+.source-code > figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  font-size: 14px;
+}
+.source-code figcaption small,
+.source-code-meta {
+  display: block;
+  font: 12px/1.6 var(--mono, monospace);
+  opacity: 0.8;
+}
+.source-code figcaption small {
+  margin-top: 6px;
+}
+.source-code pre {
+  max-width: 100%;
+  overflow: auto;
+  tab-size: 2;
+  font: 12px/1.7 var(--mono, monospace);
+}
+.source-code .source-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.source-code-actions button,
+.source-code-actions a {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.source-code-actions button {
+  border: 1px solid var(--line, #667662);
+  border-radius: 3px;
+  padding: 8px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.source-code-actions a {
+  color: inherit;
+}
+.source-code-actions [role="status"] {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.source-code-actions [role="status"]:empty {
+  display: none;
+}
+.source-code-fingerprint {
+  min-width: 0;
+  font-size: 12px;
+}
+.source-code-fingerprint summary {
+  min-height: 44px;
+  padding: 12px 0;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.source-code-fingerprint code,
+.source-code-fingerprint small {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.source-code-fingerprint small {
+  margin: 8px 0;
+}
+.source-code-unavailable {
+  line-height: 1.6;
+}
+.source-code :is(pre, summary, button, a):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .source-code * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

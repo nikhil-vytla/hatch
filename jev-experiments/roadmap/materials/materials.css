@@ -713,6 +713,53 @@
   margin-left: auto;
   margin-right: auto;
 }
+/* Put the tools beside the complete world when this full scene has room. */
+@container materials (min-width: 1100px) {
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-workbench:not(:fullscreen) {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-toolbar {
+    grid-column: 1 / -1;
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-palette {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    padding: 12px 8px 0;
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-palette button {
+    min-height: 44px;
+    padding: 8px 5px;
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-palette kbd {
+    display: none;
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-brush {
+    grid-column: 1;
+    grid-row: 3;
+    flex-direction: column;
+    align-items: start;
+    justify-content: start;
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-selected strong {
+    max-width: 155px;
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-stage {
+    grid-column: 2;
+    grid-row: 2 / 5;
+    align-self: start;
+    border-block: 0;
+    border-left: 1px solid var(--line);
+  }
+  .materials-lab:not(.is-compact):not(.is-explaining) .mat-scene-tools {
+    grid-column: 1;
+    grid-row: 4;
+    flex-direction: column;
+    justify-content: end;
+  }
+}
 @container materials (max-width:860px) {
   .mat-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -876,4 +923,243 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* The explanation opens inside the existing canvas workbench. */
+.materials-lab.is-explaining .mat-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.materials-lab.is-compact > .mat-inspector {
+  margin: 0 0 20px;
+}
+.materials-lab.is-compact .mat-expand {
+  margin: 12px 0;
+}
+.mat-mechanism-toggle {
+  grid-column: 1/-1;
+  border-top: 1px solid var(--line);
+  padding: 10px 15px;
+}
+.mat-mechanism-toggle > button {
+  min-height: 44px;
+  font-size: 13px;
+  text-align: left;
+}
+.mat-mechanism {
+  grid-column: 1/-1;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding: 24px;
+  background: var(--surface);
+}
+.mat-mechanism > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+}
+.mat-mechanism h3 {
+  margin: 8px 0 18px;
+  font:
+    normal clamp(28px, 3vw, 38px)/1.2 Georgia,
+    serif;
+}
+.mat-mechanism h4 {
+  margin: 0 0 14px;
+  font:
+    normal 24px/1.3 Georgia,
+    serif;
+}
+.mat-mechanism p {
+  font-size: 16px;
+  line-height: 1.7;
+  max-width: 65ch;
+  margin: 0 0 16px;
+}
+.mat-mechanism .mat-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.mat-mechanism button,
+.mat-mechanism select,
+.mat-mechanism textarea {
+  min-height: 44px;
+  font-size: 14px;
+}
+.mat-mechanism-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 2px 0 20px;
+  margin-bottom: 24px;
+}
+.mat-mechanism-parts [aria-pressed="true"] {
+  background: var(--soft);
+  border-color: var(--mat-focus);
+}
+.mat-mechanism-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 28px;
+}
+.mat-mechanism-reading {
+  min-width: 0;
+}
+.mat-rule-sentence {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 20px;
+}
+.mat-mechanism label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.mat-mechanism select,
+.mat-mechanism textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+.mat-mechanism textarea {
+  resize: vertical;
+  font-size: 15px;
+}
+.mat-mechanism-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+.mat-mechanism .mat-mechanism-small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.mat-step-window {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 20px 0;
+}
+.mat-neighborhood {
+  margin: 0;
+}
+.mat-neighborhood figcaption {
+  font: 12px/1.6 var(--mono);
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.mat-neighborhood > div {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  gap: 3px;
+}
+.mat-neighborhood span {
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  font: 12px var(--mono);
+  color: #242c27;
+}
+.mat-neighborhood .selected {
+  outline: 2px solid var(--mat-focus);
+  outline-offset: 0;
+}
+.mat-mechanism-source {
+  margin: 0;
+  align-self: start;
+  border: 1px solid var(--line);
+  padding: 18px;
+  background: var(--bg);
+}
+.mat-mechanism-source pre {
+  max-height: 390px;
+  padding: 16px 0;
+  font-size: 12px;
+}
+.mat-mechanism-source figcaption {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+.mat-question-options {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  font-size: 13px;
+}
+.mat-question-options > div {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 10px;
+}
+.mat-question-options dt {
+  font-family: var(--mono);
+}
+.mat-question-options dd {
+  margin: 0;
+}
+.mat-returned-rule {
+  border-block: 1px solid var(--line);
+  padding: 14px 0;
+  margin-bottom: 16px;
+}
+.mat-returned-rule > strong {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+.mat-returned-rule > div {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) minmax(50px, 1fr) 42px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  min-height: 28px;
+}
+.mat-returned-rule meter {
+  width: 100%;
+}
+.mat-mechanism-reading details > pre {
+  max-height: 320px;
+  overflow: auto;
+  padding: 14px;
+  background: var(--soft);
+  font: 12px/1.6 var(--mono);
+}
+.mat-mechanism summary {
+  min-height: 44px;
+  padding: 12px 0;
+  font-size: 13px;
+}
+.mat-mechanism .mat-rule-attempt {
+  font-size: 13px;
+  font-family: var(--mono);
+}
+@container materials (max-width:850px) {
+  .mat-mechanism-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container materials (max-width:530px) {
+  .mat-mechanism {
+    padding: 20px 14px;
+  }
+  .mat-mechanism > header {
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 18px;
+  }
+}
+
+.mat-neighborhood .is-empty {
+  color: var(--muted);
 }

@@ -72,6 +72,24 @@ describe("material simulation", () => {
   });
 });
 describe("interpretation safety", () => {
+  test("choice arrays and coercible objects cannot become material controls", () => {
+    const answers = {
+      support: { value: "supported" },
+      motion: { value: "powder" },
+      contact: { value: "water" },
+      becomes: { value: "wood" },
+    };
+    for (const key of ["motion", "contact", "becomes"] as const) {
+      for (const value of [
+        [answers[key].value],
+        { toString: () => answers[key].value },
+      ]) {
+        expect(() =>
+          ruleFromAnswers({ ...answers, [key]: { value } }, "An authored rule"),
+        ).toThrow("invalid");
+      }
+    }
+  });
   test("invalid and unsupported replies never become rules", () => {
     expect(() => ruleFromAnswers({}, "anything")).toThrow();
     expect(() =>
