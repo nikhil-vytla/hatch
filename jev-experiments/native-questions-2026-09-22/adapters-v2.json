@@ -1,0 +1,113 @@
+{
+  "sourceCommit": "c219f57266d2e8905c66212a181fac3bd8c236ac",
+  "recordedAt": "2026-09-22T15:51:35.498087+00:00",
+  "condition": "exact Git archive; temporary official toolchains and caches",
+  "verifierSha256": "3caea0a3f60daf7aade9ebd130d5a8f81f1c1e5f17e769fc2474dfcab42e62f0",
+  "providerCalls": 0,
+  "trainingRequested": false,
+  "checks": {
+    "go": {
+      "status": "passed",
+      "version": "go version go1.23.12 darwin/arm64",
+      "officialArchive": "https://go.dev/dl/go1.23.12.darwin-arm64.tar.gz",
+      "archiveSha256": "5bfa117e401ae64e7ffb960243c448b535fe007e682a13ff6c7371f4a6f0ccaa",
+      "archiveChecksumVerified": true,
+      "isolation": {
+        "GOROOT": "<temporary>/go-toolchain/go",
+        "GOPATH": "<temporary>/gopath",
+        "GOCACHE": "<temporary>/go-build",
+        "GOMODCACHE": "<temporary>/go-modules",
+        "GOENV": "off",
+        "GOTOOLCHAIN": "local",
+        "GOTELEMETRY": "off",
+        "GOFLAGS": "-mod=readonly -p=2"
+      },
+      "test": {
+        "command": [
+          "<temporary-go>/bin/go",
+          "test",
+          "./..."
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 9.693,
+        "stdout": "?   \tjev-lab/adapter/cmd/demo\t[no test files]\nok  \tjev-lab/adapter\t0.338s",
+        "stderr": "[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]"
+      },
+      "sourceHashes": {
+        "adapter.go": "c43fe496667c02d93df3583d604e23a7f65beafcf80195cae47c4acf1122d345",
+        "adapter_test.go": "9061c35ee54e87901585520cb30237a2ba35c1f052ed9ef632bda8d55c710103",
+        "cmd/demo/main.go": "8984c0888a0347af3071747e81340160e2f7595125f53d5b102120bc0adf3e1e",
+        "go.mod": "f7742b0a09711e6edd13e0713b57e9eb369769f1f9f3f6686b297937903220b3",
+        "go.sum": "f432f72a7bc624d589034521bbe476681ccda92e9d865bc5893f69c9ff874196"
+      },
+      "sourceUnchanged": true
+    },
+    "rust": {
+      "status": "passed",
+      "rustupVersion": "rustup 1.28.2 (e4f3ad6f8 2025-04-28)",
+      "rustcVersion": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "cargoVersion": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+      "officialChannel": "https://static.rust-lang.org/dist/channel-rust-stable.toml",
+      "channelDate": "2026-09-03",
+      "channelSha256": "a7c8774a5fd8441c997d94c029776cbc5eb111e9d72ab5d256fa69866644347e",
+      "verifiedExecutablePaths": {
+        "rustc": "<temporary>/rustup/toolchains/1.98.1-aarch64-apple-darwin/bin/rustc",
+        "cargo": "<temporary>/rustup/toolchains/1.98.1-aarch64-apple-darwin/bin/cargo"
+      },
+      "integrity": "rustup verifies the official component checksums during installation.",
+      "isolation": {
+        "RUSTUP_HOME": "<temporary>/rustup",
+        "CARGO_HOME": "<temporary>/cargo",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "RUSTUP_AUTO_INSTALL": "0",
+        "CARGO_TARGET_DIR": "<temporary>/rust-target",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "install": {
+        "command": [
+          "rustup",
+          "toolchain",
+          "install",
+          "1.98.1",
+          "--profile",
+          "minimal",
+          "--no-self-update"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 10.281,
+        "stdout": "  1.98.1-aarch64-apple-darwin installed - rustc 1.98.1 (48a229cea 2026-09-01)",
+        "stderr": "[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]\n[assignment redacted]"
+      },
+      "test": {
+        "command": [
+          "rustup",
+          "run",
+          "1.98.1",
+          "cargo",
+          "test",
+          "--locked"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 8.193,
+        "stdout": "running 13 tests\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\ntest [assignment redacted]\nrunning 0 tests\ntest [assignment redacted]\nrunning 0 tests\ntest [assignment redacted]",
+        "stderr": "  Downloaded serde_json v1.0.151\n  Downloaded syn v3.0.6\n   Compiling proc-macro2 v1.0.107\n   Compiling unicode-ident v1.0.26\n   Compiling quote v1.0.47\n   Compiling serde_core v1.0.229\n   Compiling syn v3.0.6\n   Compiling zmij v1.0.23\n   Compiling serde v1.0.229\n   Compiling serde_json v1.0.151\n   Compiling ref-cast v1.0.27\n   Compiling serde_derive v1.0.229\n   Compiling ref-cast-impl v1.0.27\n   Compiling serde_derive_internals v0.30.0\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling schemars_derive v1.2.2\n   Compiling dyn-clone v1.0.20\n   Compiling schemars v1.2.2\n   Compiling jev-schemars-lab v0.1.0 ([path]<local>[path]\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.24s\n     Running unittests src/lib.rs (<local>[path]\n     Running unittests src/main.rs (<local>[path]\n   Doc-tests jev_schemars_lab"
+      },
+      "sourceHashes": {
+        "Cargo.lock": "6e383af2e94c5780a066149eca73532c37c1d5e9d23d1333fa67a0ed9b85863c",
+        "Cargo.toml": "a4f1184df3c4784c54d302c9f666265e6602a6c1dba46ecd884372db8fce51a9",
+        "src/lib.rs": "f5a2bd8637063bcea6810ac53be814fba97d6c31bc17f5f317df9850a5259c5e",
+        "src/main.rs": "d9a5feb96d139b26574cfe8652726e30c11a87e03c076dbd45222263c3bf9b88"
+      },
+      "sourceUnchanged": true
+    }
+  },
+  "passed": true,
+  "limitations": [
+    "Local macOS arm64 execution, not the GitHub Linux CI run.",
+    "Toolchain and dependency downloads use public registries."
+  ],
+  "archiveSha256": "cfe4cc474f3f03476b1e6ca61f9127ec9e0dc2ca14a4c298fd6d829016226b78",
+  "archivedRunnerSha256": "d6adda876591a3cc1033393535b70a1cccc7e7023c1c2f917202eed8002f4f75",
+  "globalConfigurationUnchanged": true,
+  "temporaryFilesRemoved": true
+}
