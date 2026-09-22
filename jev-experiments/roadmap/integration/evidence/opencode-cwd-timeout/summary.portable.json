@@ -1,0 +1,126 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "opencode",
+  "kind": "summary",
+  "source": {
+    "sha256": "e90a5963022e4d15fab4efbc15e9639ff013aea90e1aa679445100133c05dba8",
+    "bytes": 2550,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/directory",
+        "originalSha256": "aef5f732b894493e7120ca0320bc303e92fc97b660bc3faaab53821cafb91f3d",
+        "derivativeSha256": "eadf0cb5d2252b137884b04b0069c1ac6f87bbe3a29089565174d3ba4dba757a",
+        "bindings": [
+          {
+            "sourcePathSha256": "aef5f732b894493e7120ca0320bc303e92fc97b660bc3faaab53821cafb91f3d",
+            "uri": "record://location/aef5f732b894493e7120ca03",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "93a3615505c28f8b658fc4257eb73756b264e3c8fd4103051216fa1ae20751cf",
+  "payload": {
+    "harness": "opencode",
+    "directory": "record://location/aef5f732b894493e7120ca03",
+    "command": [
+      "opencode",
+      "run",
+      "--pure",
+      "--format",
+      "json",
+      "--agent",
+      "jev-fixture",
+      "--model",
+      "amazon-bedrock/global.anthropic.claude-fable-5-1"
+    ],
+    "elapsedSeconds": 240.34,
+    "exitCode": null,
+    "timedOut": true,
+    "baselineTestsExitCode": 1,
+    "independentTestsExitCode": 1,
+    "mcpDiscovered": true,
+    "toolCalls": [
+      {
+        "time": "2026-09-21T04:22:58.784Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 2,
+        "contextBytes": 458
+      },
+      {
+        "time": "2026-09-21T04:23:17.476Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 3,
+        "contextBytes": 505
+      },
+      {
+        "time": "2026-09-21T04:23:38.782Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 4,
+        "contextBytes": 580
+      },
+      {
+        "time": "2026-09-21T04:24:23.991Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 5,
+        "contextBytes": 580
+      }
+    ],
+    "toolResults": [
+      {
+        "time": "2026-09-21T04:23:07.898Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 2,
+        "status": "ok",
+        "artifactKind": "patch"
+      },
+      {
+        "time": "2026-09-21T04:23:28.600Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 3,
+        "status": "ok",
+        "artifactKind": "patch"
+      },
+      {
+        "time": "2026-09-21T04:24:10.346Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 4,
+        "status": "error"
+      }
+    ],
+    "patchedBug": false,
+    "analysisFileWritten": false,
+    "additionalTestsWritten": false,
+    "delegationOccurred": true,
+    "usableDelegatedArtifacts": 3,
+    "cliVersion": "1.18.31",
+    "hostModel": {
+      "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+      "identityBasis": "command configuration"
+    },
+    "firstAuditTime": "2026-09-21T04:20:39.112Z",
+    "evidenceGate": {
+      "condition": "bounded-delegation",
+      "passed": false,
+      "reason": "Effective project cwd differed from subprocess cwd; timed out without completing host application.",
+      "historicalFailure": true
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 1
+  }
+}

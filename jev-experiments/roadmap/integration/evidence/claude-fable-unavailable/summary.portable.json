@@ -1,0 +1,93 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "claude",
+  "kind": "summary",
+  "source": {
+    "sha256": "641e495c9a7675cddee966fea7c8a9d7c7d594ecae6f514cf48ed246e63d3a14",
+    "bytes": 1623,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/directory",
+        "originalSha256": "96acb9e810f124685701a714275a3c1b74acb8fc42ed6dfe2d65aeea5641c8fb",
+        "derivativeSha256": "616f398c692175c65937372e4a2496da96c116b0e178ad58c281f1864fd56c10",
+        "bindings": [
+          {
+            "sourcePathSha256": "96acb9e810f124685701a714275a3c1b74acb8fc42ed6dfe2d65aeea5641c8fb",
+            "uri": "record://location/96acb9e810f124685701a714",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/4",
+        "originalSha256": "c2c621bf00b3273ea1b9c9b649a276d5f252cd5bedb1da8bd59ad015995c1cd9",
+        "derivativeSha256": "6848a63ec6da7616d8e9bbc73a25b81f397e0e8b297be99271662e7fc260469f",
+        "bindings": [
+          {
+            "sourcePathSha256": "c2c621bf00b3273ea1b9c9b649a276d5f252cd5bedb1da8bd59ad015995c1cd9",
+            "uri": "record://location/c2c621bf00b3273ea1b9c9b6",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "5a65cce8ffd1569e0a9bb0042e1f8753026588be76b3e9cf92cb7bd8bcd6f38c",
+  "payload": {
+    "harness": "claude",
+    "directory": "record://location/96acb9e810f124685701a714",
+    "command": [
+      "claude",
+      "--bare",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "record://location/c2c621bf00b3273ea1b9c9b6",
+      "--model",
+      "claude-fable-5-1",
+      "--permission-mode",
+      "acceptEdits",
+      "--allowedTools",
+      "Read,Write,Edit,Glob,Grep,Bash(bun test*),Bash(git diff*),Bash(git apply*),mcp__jev__route_task,mcp__jev__decide",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "-p"
+    ],
+    "elapsedSeconds": 2.18,
+    "exitCode": 1,
+    "timedOut": false,
+    "baselineTestsExitCode": 1,
+    "independentTestsExitCode": 1,
+    "mcpDiscovered": true,
+    "toolCalls": [],
+    "toolResults": [],
+    "patchedBug": false,
+    "analysisFileWritten": false,
+    "additionalTestsWritten": false,
+    "delegationOccurred": false,
+    "usableDelegatedArtifacts": 0,
+    "cliVersion": "2.1.278",
+    "hostModel": {
+      "configured": "claude-fable-5-1",
+      "identityBasis": "command configuration"
+    },
+    "firstAuditTime": "2026-09-21T04:20:40.276Z",
+    "evidenceGate": {
+      "condition": "bounded-delegation",
+      "passed": false,
+      "reason": "The host provider rejected the configured Fable request before any delegation.",
+      "historicalFailure": true
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 2
+  }
+}

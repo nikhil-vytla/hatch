@@ -14,12 +14,14 @@ import { projectRewardBenchDocument } from "./benchmark-publication";
 import { enrichProvenance } from "./provenance";
 import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
 import { prepareLiveWorlds } from "../../live-worlds/prepare";
+import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
 const lab = resolve(".."),
   dest = resolve("public/data");
 const publication: Record<string, string> = JSON.parse(
   readFileSync("publication.json", "utf8"),
 );
 mkdirSync(dest, { recursive: true });
+preparePublicHarnessEvidence(lab, resolve("public/routing-evidence"));
 const hasSources = existsSync("results") || existsSync(resolve(lab, "results"));
 if (hasSources) {
   prepareLiveWorlds();

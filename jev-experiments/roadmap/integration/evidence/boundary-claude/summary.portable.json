@@ -1,0 +1,136 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "claude",
+  "kind": "summary",
+  "source": {
+    "sha256": "c3681f864c992e4dd5b60138661e6416f84d23d66925b59cc111b93484ccaaaf",
+    "bytes": 2945,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/directory",
+        "originalSha256": "65d887f0f8398ee8f1ab7e0bacf0f381c0e1e85515df2ec52e349433bbe4b5db",
+        "derivativeSha256": "7b4dd5e6ec64a6e74ccf4fe35651636390e97b937930bd25e3f85c495b7966b5",
+        "bindings": [
+          {
+            "sourcePathSha256": "65d887f0f8398ee8f1ab7e0bacf0f381c0e1e85515df2ec52e349433bbe4b5db",
+            "uri": "record://location/65d887f0f8398ee8f1ab7e0b",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/4",
+        "originalSha256": "86a8854bd9ba6db9971b16d713543184114c5941b55cb37393fcf81747b693b1",
+        "derivativeSha256": "7c45adea3a09e3b09d0da1ad3e9a4f7c9b1b47f035ec3d44436d1dacf57b1001",
+        "bindings": [
+          {
+            "sourcePathSha256": "86a8854bd9ba6db9971b16d713543184114c5941b55cb37393fcf81747b693b1",
+            "uri": "record://location/86a8854bd9ba6db9971b16d7",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "648816618ee991ee0fe0dd4afde3dde29d24fe3e10d6afa62dd84b79dd74335c",
+  "payload": {
+    "harness": "claude",
+    "directory": "record://location/65d887f0f8398ee8f1ab7e0b",
+    "command": [
+      "claude",
+      "--bare",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "record://location/86a8854bd9ba6db9971b16d7",
+      "--model",
+      "claude-sonnet-4-6",
+      "--permission-mode",
+      "acceptEdits",
+      "--allowedTools",
+      "Read,Write,Edit,Glob,Grep,Bash(bun test*),Bash(git diff*),Bash(git apply*),mcp__jev__route_task,mcp__jev__decide",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "-p"
+    ],
+    "elapsedSeconds": 68.72,
+    "exitCode": 0,
+    "timedOut": false,
+    "baselineTestsExitCode": 1,
+    "independentTestsExitCode": 1,
+    "mcpDiscovered": true,
+    "toolCalls": [
+      {
+        "time": "2026-09-21T05:19:30.041Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 2,
+        "contextBytes": 367
+      },
+      {
+        "time": "2026-09-21T05:19:31.683Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 3,
+        "contextBytes": 367
+      }
+    ],
+    "toolResults": [
+      {
+        "time": "2026-09-21T05:19:30.042Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 2,
+        "status": "unsupported"
+      },
+      {
+        "time": "2026-09-21T05:19:31.684Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 3,
+        "status": "unavailable"
+      }
+    ],
+    "patchedBug": false,
+    "analysisFileWritten": true,
+    "additionalTestsWritten": false,
+    "mcpConfigUnchanged": true,
+    "routerConfigUnchanged": true,
+    "delegationOccurred": false,
+    "usableDelegatedArtifacts": 0,
+    "cliVersion": "2.1.278",
+    "hostModel": {
+      "configured": "claude-sonnet-4-6",
+      "identityBasis": "command configuration"
+    },
+    "firstAuditTime": "2026-09-21T05:19:20.370Z",
+    "sourceUnchanged": true,
+    "contextComplete": true,
+    "observedBoundaryStatuses": {
+      "": "unsupported",
+      "boundary-no-route": "unavailable"
+    },
+    "noDestinationAttempts": true,
+    "boundaryExplanations": {
+      "": "Task id is required.",
+      "boundary-no-route": "No destination meets every restriction. Eligibility was not widened."
+    },
+    "evidenceGate": {
+      "condition": "unsupported-task-and-unavailable-route",
+      "passed": true,
+      "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
+      "historicalFailure": false
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 14
+  }
+}

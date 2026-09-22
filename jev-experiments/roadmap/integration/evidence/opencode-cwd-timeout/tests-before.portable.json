@@ -1,0 +1,34 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "opencode",
+  "kind": "text",
+  "source": {
+    "sha256": "0ce9e1d8d28d86b1c9e692ea6277ba96b6772ccf7faf5fb2b36aff13559b8bd3",
+    "bytes": 650,
+    "format": "utf8",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/text",
+        "originalSha256": "0ce9e1d8d28d86b1c9e692ea6277ba96b6772ccf7faf5fb2b36aff13559b8bd3",
+        "derivativeSha256": "153e922f1f85f1cd3e39660002ce6994f9dd060d8f7c0bfcc9d78c1c1a4c5bc4",
+        "bindings": [
+          {
+            "sourcePathSha256": "c55be5b176df88b14dbe3f0051bb33b59ce84e0099e5afe005396b1b350cef9b",
+            "uri": "record://fixture/c55be5b176df88b14dbe3f00/sum.test.ts",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "4e708edbf9a057f527335adf31dcf8cabc4313dd3c5246f5b6471bc9ade0525a",
+  "payload": {
+    "text": "bun test v1.3.14 (0d9b296a)\n\nsum.test.ts:\n1 | import { expect, test } from \"bun:test\";\n2 | import { totalThrough } from \"./sum\";\n3 | test(\"inclusive total\", () => { expect(totalThrough(0)).toBe(0); expect(totalThrough(1)).toBe(1); expect(totalThrough(4)).toBe(10); });\n                                                                                             ^\nerror: expect(received).toBe(expected)\n\nExpected: 1\nReceived: 0\n\n      at <anonymous> (record://fixture/c55be5b176df88b14dbe3f00/sum.test.ts:3:90)\n(fail) inclusive total [0.15ms]\n\n 0 pass\n 1 fail\n 2 expect() calls\nRan 1 test across 1 file. [6.00ms]\n"
+  }
+}
