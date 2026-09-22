@@ -1,0 +1,30 @@
+{
+  "baseCommit": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+  "prerequisitePatch": "../design-revamp-2026-09-21/roadmap-update.patch",
+  "prerequisiteSha256": "bc72fdf982d24f0f5426569e45e56a7ab3843f26ff6e8dffebcd94e3130535de",
+  "patchSha256": "d708e69a51356daedea72cf1c9ae33a97a70048c181edb64ea6d0c1d3ab258e6",
+  "cleanBaseApplyCheck": "passed",
+  "resultHashesMatched": true,
+  "files": [
+    {
+      "path": "jev-experiments/roadmap/MAP.md",
+      "beforeSha256": "3f8d011a53e17951c02029596482e89a79c1972f18279b4cf2dc76664d96c264",
+      "afterSha256": "79ee5949f6f51b75406938836eb5b063a88b9bd98dae53c2e15c58e6647f92ff"
+    },
+    {
+      "path": "jev-experiments/roadmap/IMPLEMENTATION.md",
+      "beforeSha256": "c87c1dd74e260953d20cd88c63dbc2f22bed09f5a58dd5c793c2c83e0338a375",
+      "afterSha256": "59e5d848e972d9ff646b1a957166fb9c867a3b0b4bee00ad070d903e09d6cf75"
+    },
+    {
+      "path": "jev-experiments/roadmap/ARCHITECTURE.md",
+      "beforeSha256": "497003e7db76f956e2dcb2bf1c7021138e326e336f7769c2b6ab39089de7ecf9",
+      "afterSha256": "a0d5b9222ef7bc8a1c616f93d293f5837568291b7d37f0ee4f98b9e1b09ae4bd"
+    },
+    {
+      "path": "jev-experiments/roadmap/decisions/release-gate.md",
+      "beforeSha256": "08e1c634f518360dd3ef64273bc8ed2d503318fdaa2a0ab56c516dad8a35aafe",
+      "afterSha256": "e2a5c340aa8f258f45bc8405e2a6dacf07f686eec590b74b1a9c427559b39107"
+    }
+  ]
+}

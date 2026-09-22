@@ -1,0 +1,33 @@
+# Adaptive interfaces from explicit notebook state
+
+Research date: 2026-09-21. This is a source-based proposal for the next wave. No package was installed, model invoked or adaptive interface implemented for this addition.
+
+## Source, revision and credit
+
+The inspected project is [marimo-pets](https://github.com/ktaletsk/marimo-pets), by **Konstantin Taletskiy**. The pinned revision is [`d1ddf24e97d56ea2a49d064bf063e25767750a9a`](https://github.com/ktaletsk/marimo-pets/commit/d1ddf24e97d56ea2a49d064bf063e25767750a9a), committed on 2026-09-16 with the message "Make companion example reproducible and link to molab". Its [package metadata](https://github.com/ktaletsk/marimo-pets/blob/d1ddf24e97d56ea2a49d064bf063e25767750a9a/pyproject.toml) identifies version 0.1.0 and the author. The [MIT license](https://github.com/ktaletsk/marimo-pets/blob/d1ddf24e97d56ea2a49d064bf063e25767750a9a/LICENSE) names Taletskiy as the copyright holder and requires preservation of its copyright and permission notice when distributing copies or substantial portions.
+
+The project's [credits](https://github.com/ktaletsk/marimo-pets/blob/d1ddf24e97d56ea2a49d064bf063e25767750a9a/README.md#credits) identify **Vincent Warmerdam's [wigglystuff FloatingPanel](https://koaning.github.io/wigglystuff/reference/floating-panel/)** as an inspiration. They also credit [Mo the Mossball from Wanderland](https://taletskiy.com/blogs/wanderland/) for the character's body, feet and sprout. The FloatingPanel documentation was inspected; the Wanderland attribution is reported from marimo-pets' own credits. Jev can credit these interaction precedents while using its own interface and artwork. This addition copies no upstream code or assets.
+
+## What exists today
+
+marimo-pets supplies a draggable notebook companion with synchronized Python-controlled position, mood and message traits. Its [Python API](https://github.com/ktaletsk/marimo-pets/blob/d1ddf24e97d56ea2a49d064bf063e25767750a9a/src/marimo_pets/pet.py) can mark task progress and completion, propagating failures and cancellation. A contextual help inspector lets a user choose a cell, inspect captured context, prepare a draft or submit a question through marimo's configured AI chat. This is a contextual companion and chat handoff. The inspected material does not establish a learned policy that restructures the notebook's interface.
+
+The [compatibility document](https://github.com/ktaletsk/marimo-pets/blob/d1ddf24e97d56ea2a49d064bf063e25767750a9a/docs/compatibility.md) describes per-browser context held in JavaScript memory: selected cell, visible cells, selected text, current code and available runtime state. The inspector is a snapshot; sending refreshes the chosen cell's code and runtime state. Code previews have a 12,000-character limit; selection and output previews have 4,000-character limits. Native references can expose more context through marimo's normal chat settings.
+
+Native integration targets one verified marimo 0.24.0 frontend fingerprint and uses internal interfaces. Unknown builds fall back to DOM context and a copyable question. Hidden or virtualized code may be unavailable. A consumed handoff is not proof of a completed model answer. The documented draft-preservation and pending-question behavior, together with the [frontend's context and handoff functions](https://github.com/ktaletsk/marimo-pets/blob/d1ddf24e97d56ea2a49d064bf063e25767750a9a/src/marimo_pets/static/widget.js), are useful implementation precedents. Upstream reports tests and browser checks; this investigation did not rerun them.
+
+## One bounded Jev experiment
+
+Test whether choosing the content of a stable notebook side panel helps people finish a small cell task. Keep the editor, cell order and main controls fixed. Let Jev choose one predefined panel state: keep the current view, show the selected cell's input controls, show its error details, or compare its current output with its last successful output. Code determines which choices are available. Every choice remains manually accessible.
+
+The observation contains an explicit task description, selected cell ID, notebook revision, run status, output kind, available comparison, supported controls and interaction state. Include draft-present, editing, composition, focus and user-lock flags. Start with authored fixtures; include only the selected task's required content in the inspectable request. Treat cell text as data. The model returns a typed distribution over eligible choices, with runtime identity and timing. Unsupported inputs, malformed responses and timeouts preserve the current view.
+
+Request a proposal at an explicit task or completed-run boundary. Apply it only when the notebook revision and target still match and editing is idle. Keep editor instances, draft values, selection, focus and scroll position intact. A changed target, reset, undo or new edit invalidates the pending proposal. A visible lock freezes the panel; undo restores its previous state and locks it against immediate reapplication. Keep the panel's dimensions stable, use keyboard-operable controls, and honor reduced motion. These are proposed acceptance requirements, not capabilities claimed for marimo-pets.
+
+## Comparison and evidence
+
+Freeze task fixtures, development/held-out splits, candidate eligibility, trigger rules and scoring before model measurements. Compare a static panel, a deterministic heuristic and Jev using the same controls, observation limits and application rules. The heuristic can prioritize an error, then an available comparison, then inputs. Counterbalance condition order and task variants so practice effects do not favor adaptation. Choose any confidence threshold on development data only.
+
+Measure independently checked task completion and time to completion, including model delay. Report adaptation reversals, unwanted changes, lock/undo use, stale proposals rejected, unsupported coverage and total inference overhead. Draft loss, focus theft and edits applied to the wrong revision are correctness failures. Include fixtures for an existing chat draft, rapid cell changes, a late response, cancellation and keyboard-only work. Report sample size and uncertainty; an underpowered pilot supports feasibility conclusions only.
+
+The decision is whether bounded adaptation improves task success enough to justify its delay and instability. A static or heuristic result may win. Keep source observations, future model traces and eventual user-task evidence separate. A pleasant companion or a plausible panel suggestion alone does not establish useful adaptive UI.

@@ -1,0 +1,81 @@
+{
+  "purpose": "Attributed visual reference study; not product assets or model-performance evidence",
+  "captures": [
+    {
+      "path": "output/playwright/jeverative-about.webp",
+      "state": "About explanation",
+      "source": "https://jeverative-ui.vercel.app/",
+      "creator": "@hckmstrrahul",
+      "creatorUrl": "https://x.com/hckmstrrahul",
+      "date": "2026-09-21",
+      "viewport": {
+        "width": 1440,
+        "height": 1080
+      },
+      "image": {
+        "width": 1440,
+        "height": 1080,
+        "format": "WEBP"
+      },
+      "bytes": 35242,
+      "sha256": "14a916ef8e0b5cc7e9dc7cd39374701a0f35eca2838341892d2447b7ff67b826"
+    },
+    {
+      "path": "output/playwright/jeverative-unsupported.webp",
+      "state": "Authored inbox request returned unsupported",
+      "source": "https://jeverative-ui.vercel.app/",
+      "creator": "@hckmstrrahul",
+      "creatorUrl": "https://x.com/hckmstrrahul",
+      "date": "2026-09-21",
+      "viewport": {
+        "width": 1440,
+        "height": 1080
+      },
+      "image": {
+        "width": 1440,
+        "height": 1080,
+        "format": "WEBP"
+      },
+      "bytes": 194880,
+      "sha256": "a84f03c6a8520e227c07dfe69018aa76763f9285aa3c2bf3acd4046091593e61"
+    },
+    {
+      "path": "output/playwright/jeverative-preset.webp",
+      "state": "Built-in inbox result, desktop, after preview switching",
+      "source": "https://jeverative-ui.vercel.app/",
+      "creator": "@hckmstrrahul",
+      "creatorUrl": "https://x.com/hckmstrrahul",
+      "date": "2026-09-21",
+      "viewport": {
+        "width": 1440,
+        "height": 1080
+      },
+      "image": {
+        "width": 1440,
+        "height": 1216,
+        "format": "WEBP"
+      },
+      "bytes": 190364,
+      "sha256": "b7b36a6b03c1aff5df37d49f19256cccea8cdfb5fb22b67aa574df950358a9d2"
+    },
+    {
+      "path": "output/playwright/jeverative-mobile-preview.webp",
+      "state": "390 by 844 mobile preview inside desktop editor",
+      "source": "https://jeverative-ui.vercel.app/",
+      "creator": "@hckmstrrahul",
+      "creatorUrl": "https://x.com/hckmstrrahul",
+      "date": "2026-09-21",
+      "viewport": {
+        "width": 1440,
+        "height": 1080
+      },
+      "image": {
+        "width": 1440,
+        "height": 1080,
+        "format": "WEBP"
+      },
+      "bytes": 175732,
+      "sha256": "7c1155a340afe17ca93d5f534200a92bcd0e8261db7cf407d6424ba24dab38ac"
+    }
+  ]
+}
