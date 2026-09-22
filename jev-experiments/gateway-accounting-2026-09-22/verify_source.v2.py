@@ -20,7 +20,7 @@ CHECKS = [
     ("app frozen install", "experience-prototypes", ["bun", "install", "--frozen-lockfile"]),
     ("app production build", "experience-prototypes", ["bun", "run", "build"]),
     ("decoder frozen install", "adapters/typescript", ["bun", "install", "--frozen-lockfile"]),
-    ("gateway, score, accounting and existing transport contracts", ".", ["bun", "test", "gateway-accounting-2026-09-22/gateway.test.ts", "gateway-accounting-2026-09-22/score.test.ts", "gateway-accounting-2026-09-22/accounting.test.ts", "gateway-accounting-2026-09-22/observer-usage.test.ts", "experience-prototypes/server/byok.test.ts", "experience-prototypes/server/gateway.test.ts", "roadmap/runtime/existing-contract.test.ts"]),
+    ("gateway, score, accounting and existing transport contracts", ".", ["bun", "test", "gateway-accounting-2026-09-22", "experience-prototypes/server/byok.test.ts", "experience-prototypes/server/gateway.test.ts", "roadmap/runtime/existing-contract.test.ts"]),
     ("publication integrity", "roadmap", ["bun", "verification/publication.ts"]),
 ]
 

@@ -1,0 +1,22 @@
+[
+  {
+    "version": "v2",
+    "onlyHistoricalFilesUpdated": [
+      "README.md",
+      "run-review.py"
+    ],
+    "allOtherHistoricalFilesUnchanged": true,
+    "executedDriverPrivatelyPreserved": true,
+    "publishedManifestMatches": true
+  },
+  {
+    "version": "v3",
+    "onlyHistoricalFilesUpdated": [
+      "README.md",
+      "run-review.py"
+    ],
+    "allOtherHistoricalFilesUnchanged": true,
+    "executedDriverPrivatelyPreserved": true,
+    "publishedManifestMatches": true
+  }
+]

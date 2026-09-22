@@ -1,0 +1,22 @@
+[
+  {
+    "name": "maintained",
+    "exitCode": 0,
+    "summaries": [
+      "38 pass",
+      "0 fail",
+      "981 expect() calls"
+    ],
+    "logSha256": "97a6af82cfb44344a696e0a197f093a022560fbf2bcac9e00adfa8a40b19b23f"
+  },
+  {
+    "name": "independent-boundaries",
+    "exitCode": 0,
+    "summaries": [
+      "3 pass",
+      "0 fail",
+      "164 expect() calls"
+    ],
+    "logSha256": "1f4d206d5f14840c8afa5410037aa53aef29a1128488ae5562307e80830f9dd6"
+  }
+]
