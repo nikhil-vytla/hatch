@@ -30,4 +30,6 @@ jobs:
         working-directory: jev-experiments/experience-prototypes
         run: bun run build
       - name: Verify request, timer and media lifetimes
-        run: bun test jev-experiments/scene-lifetimes-2026-09-22
+        run: bun test jev-experiments/scene-lifetimes-2026-09-22 jev-experiments/rewardbench2/publication-source.test.ts jev-experiments/rewardbench2/publication.test.ts
+      - name: Verify public record integrity
+        run: bun run jev-experiments/roadmap/verification/publication.ts

@@ -8,7 +8,7 @@ const object = (value: unknown): Record<string, unknown> => {
 };
 
 export type WithheldCandidate = { subset: string; id: string; sha256: string };
-const withheldCandidates: readonly WithheldCandidate[] = [
+export const withheldCandidates: readonly WithheldCandidate[] = [
   {
     subset: "Safety",
     id: "828",
@@ -30,9 +30,9 @@ const withheldCandidates: readonly WithheldCandidate[] = [
     sha256: "9b39c32ca0521de3e662ac5cbb75ccd244df3751f7584aee5ec3e7eb2c19be10",
   },
 ];
-const withheldNotice = "[Candidate text withheld from this publication copy.]";
+export const withheldNotice = "[Candidate text withheld from this publication copy.]";
 
-/** Clone the decoded public document. Labels, scores, counts and original JSONL are unchanged. */
+/** Clone the decoded display document. Derivative source lineage belongs in manifest.publication_source. */
 export function projectRewardBenchDocument<T>(
   input: T,
   manifest: readonly WithheldCandidate[] = withheldCandidates,
@@ -73,7 +73,7 @@ export function projectRewardBenchDocument<T>(
   result.publication_projection = {
     version: "jev-public-candidate-text-v1",
     withheldCandidateTexts: manifest.length,
-    note: "Additional display-only text withholding. Original source records, row counts, labels, model scores and aggregate metrics are unchanged; this is separate from the benchmark's content-review omissions.",
+    note: "Display-only text withholding. Recorded row counts, labels, model scores and aggregate metrics are unchanged. Source lineage is recorded separately from this projection and the benchmark's content-review omissions.",
   };
   return output;
 }
