@@ -1,0 +1,16 @@
+{
+  "base": "ed52d6d255f4448999ddc44b708b53541a5a0e9d",
+  "sourceSha256": "2ca0909321660ea9a80cf635b947ee48e9128ee844f1b51d825eb6c086246f4d",
+  "commands": [
+    {
+      "command": "bun install --frozen-lockfile",
+      "exitCode": 0
+    },
+    {
+      "command": "bun run build",
+      "exitCode": 0
+    }
+  ],
+  "buildOutputSha256": "d96331637326b745e0afebcb2416a5be0903c11b03d50eecd8428516a849d517",
+  "scope": "Fresh isolated canonical-root installation and production build; one exact footer paragraph changed. No provider calls."
+}
