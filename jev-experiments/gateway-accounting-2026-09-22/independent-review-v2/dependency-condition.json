@@ -1,0 +1,13 @@
+{
+  "initialVerifierHashMatches": true,
+  "correctedVerifierHashMatches": true,
+  "initialArchiveFound": true,
+  "initialLogHashesMatch": true,
+  "initialZodMissing": true,
+  "initialLogPassCount": true,
+  "initialTestSummary": [
+    "29 pass",
+    "1 fail",
+    "934 expect() calls"
+  ]
+}

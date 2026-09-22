@@ -1,0 +1,30 @@
+{
+  "historicalExecution": {
+    "driverSha256": "9cf539fc617c903b08a04b9c39cc43020f725a06f4d701ebc1e9cc77cb4fe0c9",
+    "reviewManifestSha256": "62764c3e340f25212a99c8e97059a4c47f34dda6e3fd9844623bcdcfcc32e098",
+    "results": [
+      {
+        "path": "independent-boundaries.log",
+        "sha256": "1f4d206d5f14840c8afa5410037aa53aef29a1128488ae5562307e80830f9dd6"
+      },
+      {
+        "path": "maintained.log",
+        "sha256": "97a6af82cfb44344a696e0a197f093a022560fbf2bcac9e00adfa8a40b19b23f"
+      },
+      {
+        "path": "review-checks.json",
+        "sha256": "72e50088a7954d5db4d19604f03119e49f290abf148a1d8fc0f14a8666e894d8"
+      }
+    ]
+  },
+  "publishedRerunner": {
+    "driverSha256": "97fd5ba6e7a3bb949c5bdf5fc50bdc44570afce62127169f4861a45e78d3c103",
+    "interface": [
+      "--archive",
+      "--output",
+      "--preflight-only"
+    ],
+    "validation": "Argument and preflight checks only; this version did not produce the historical observations or logs.",
+    "suiteExecutionPerformedForMaintenance": false
+  }
+}

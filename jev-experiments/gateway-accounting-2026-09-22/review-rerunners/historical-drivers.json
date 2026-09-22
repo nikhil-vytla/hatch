@@ -1,0 +1,46 @@
+{
+  "v2": {
+    "executedDriverSha256": "e52a29621868db29a8eb9793e9c8ab036bd64568ddac4ddbbc272ff7299681e0",
+    "historicalReviewManifestSha256": "dab5300a8fd6870abb28bff084fd7528c5f75f9540e52bac55870c082672efaf",
+    "historicalResults": [
+      {
+        "path": "existing.log",
+        "sha256": "ca1ef32ee0ddde81a99452b93d0a36ae3150e8f402e9543a90f78d5dd0ba9df9"
+      },
+      {
+        "path": "observations.json",
+        "sha256": "581845782f291fd5907430bedc215e8ab77c798fd4f8f50a32ed1cb0e3d1aec2"
+      },
+      {
+        "path": "observations.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "regressions.log",
+        "sha256": "cb5f648e4dec1b58e1596e9165742d399f4e421a703644de6b4b1a6d79f7a590"
+      },
+      {
+        "path": "review-checks.json",
+        "sha256": "30203c10a854c1854c35bd4fb64c451b7044f4377116e5b607858879bb68f479"
+      }
+    ]
+  },
+  "v3": {
+    "executedDriverSha256": "9cf539fc617c903b08a04b9c39cc43020f725a06f4d701ebc1e9cc77cb4fe0c9",
+    "historicalReviewManifestSha256": "62764c3e340f25212a99c8e97059a4c47f34dda6e3fd9844623bcdcfcc32e098",
+    "historicalResults": [
+      {
+        "path": "independent-boundaries.log",
+        "sha256": "1f4d206d5f14840c8afa5410037aa53aef29a1128488ae5562307e80830f9dd6"
+      },
+      {
+        "path": "maintained.log",
+        "sha256": "97a6af82cfb44344a696e0a197f093a022560fbf2bcac9e00adfa8a40b19b23f"
+      },
+      {
+        "path": "review-checks.json",
+        "sha256": "72e50088a7954d5db4d19604f03119e49f290abf148a1d8fc0f14a8666e894d8"
+      }
+    ]
+  }
+}

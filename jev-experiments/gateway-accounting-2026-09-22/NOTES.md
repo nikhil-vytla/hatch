@@ -7,3 +7,5 @@
 
 - The first exact archive built successfully and passed 29 tests before the decoder suite could import its missing sibling Zod dependency. Preserved the failed condition and verifier. Added the adapter frozen install after the application build in CI and the verifier; product source is unchanged.
 - The corrected exact archive passes all five verification steps: app install/build, adapter install, 31 focused tests with 948 assertions, and all 45 publication checks. No provider calls or new model measurements were requested.
+- Independent review of that source found final-observer cancellation, undispatched-attempt counting and partial-token coherence defects. Preserved four failing regressions and two passing controls against the reviewed source.
+- Corrected all three issues and added pre-dispatch abort/earlier-attempt coverage. The new exact archive passes 38 tests with 981 assertions and all five verification steps. Independent correction review adds 18 boundary cases with 164 passing assertions; prior review artifacts remain unchanged.

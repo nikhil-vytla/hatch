@@ -1,0 +1,58 @@
+{
+  "baseCommit": "075fe78c65558085bf364aee1cd32d4479d508fa",
+  "sourceCommit": "d93be44fde84ac83992eaa1c7ca2b1f8359aa99d",
+  "branch": "nikhil-20260922-jevGatewayAccounting",
+  "archiveSha256": "57fd3fcf7e2f127f7c0a69004b5d2bd441552267742903465bca21740e412c31",
+  "files": [
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "sha256": "806559e60f7c17ebb25a5020b02193e3f5947dc1ad26846b61ef1ff0604dd471",
+      "bytes": 15129
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/compose.ts",
+      "sha256": "4ec079a6fb38c1c3c469f3ce2869bdbd07d4754f0182086c2ea872f784b0eaa9",
+      "bytes": 2602
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/byok.test.ts",
+      "sha256": "a7ad1300b2efce447b69b3a402dc60ef7c18b74ef9aa85a33b7cbd044587e1f7",
+      "bytes": 5528
+    },
+    {
+      "path": "jev-experiments/packages/decision-runtime/src/score.ts",
+      "sha256": "0a77828dd8908cbe941c5bda9d364e2d2861ce4673fbe46ba169058fcb6db9fb",
+      "bytes": 3148
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/accounting.ts",
+      "sha256": "119dad69a0b24a4b1968f33737b8c5dd809e3452201664b0d55e6f9f84dc77b1",
+      "bytes": 6423
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts",
+      "sha256": "020f7f577ff52e2e533b400bd667077e08cd82f8d14de33801cc78404b72e60c",
+      "bytes": 11461
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/score.test.ts",
+      "sha256": "eeee5ec08ba9d3caf3553b33f5fda5c4848b3f7b2160008b1ad5645b6c55a52d",
+      "bytes": 4955
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts",
+      "sha256": "f25b3a1a5f0803cb2b7a3fa0816e53da9503dedd466008d33a12cb0b28281a07",
+      "bytes": 2515
+    },
+    {
+      "path": ".github/workflows/jev-gateway.yml",
+      "sha256": "b1e7389f599c657e6fa00398c7d2579c14d605a3ed11068a257dcc3bc72128d8",
+      "bytes": 1987
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/observer-usage.test.ts",
+      "sha256": "f902c3524853894d4e8e7e172142ddb701e0727e69798eec4acfb5c441043df8",
+      "bytes": 3213
+    }
+  ]
+}
