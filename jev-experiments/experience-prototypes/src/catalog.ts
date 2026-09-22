@@ -34,6 +34,7 @@ const e = (
           : "gold",
 });
 export const experiments = [
+  e("materials", "", "Material sandbox", "Games & simulations", "Paint a world. Rewrite one material. Preserve another future.", "Can a typed rule make an instruction visible in a local simulation?"),
   e(
     "paste",
     "paste",
@@ -141,10 +142,10 @@ export const experiments = [
   e(
     "routing",
     "routing",
-    "Model router",
+    "Model Routing Lab",
     "Agents & tooling",
-    "A task arrives. Jev chooses where it goes.",
-    "Can Jev identify the appropriate handler for a request?",
+    "Inspect a route, set your preferences, and delegate a bounded task.",
+    "Can task classification improve model selection under fixed permissions and spending limits?",
   ),
   e(
     "verify",
@@ -287,8 +288,8 @@ export const experiments = [
     "local-models",
     "Decision models on a Mac",
     "Training & local",
-    "MLX, Core ML, and hosted Jev on the same questions.",
-    "How do shared-prefix language models compare with a trained decision head?",
+    "Train small typed readouts, measure transfer, and inspect the exports.",
+    "Where do small local decision models work, and where do they fail?",
   ),
   e(
     "benchmark-atlas",

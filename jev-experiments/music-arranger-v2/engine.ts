@@ -146,12 +146,92 @@ export function makeCandidates(score: Score, index: number): Candidate[] {
     return { id: `p${index}-${score.seed}-${ci}`, contour, title: { rising: "Lift", falling: "Settle", arch: "Reach & return", inverted: "Dip & rise", breath: "Leave a breath", syncopated: "Find the offbeat" }[contour], description: DESCRIPTIONS[contour], events: [...melody, ...accompaniment(score, index)].sort((a, b) => a.beat - b.beat || a.track.localeCompare(b.track) || (a.midi ?? -1) - (b.midi ?? -1)) };
   });
 }
-export function phraseRequest(score: Score, index: number, candidates = makeCandidates(score, index)) {
-  return { state: { task: "Choose one complete, procedural two-bar phrase by how well it expresses the scene. You select from valid candidates; you do not generate the notes. No audio is provided.", engine: ENGINE_VERSION, brief: score.brief, scoreVersion: score.version, settings: score.settings, phrase: (({ decision, ...semantic }) => semantic)(score.phrases[index]), history: score.phrases.slice(0, index).map(({ decision, ...semantic }) => semantic), previousPhraseEvents: score.events.filter(e => e.phrase === index - 1), harmony: score.chords.filter(c => c.beat >= index * 8 && c.beat < (index + 1) * 8), tracks: score.tracks, candidateEncoding: "Each candidate contains melody events. sharedAccompaniment supplies the identical remaining five tracks for every candidate; combine both event lists to recover the full candidate.", sharedAccompaniment: candidates[0].events.filter(e => e.track !== "melody"), candidates: candidates.map(c => ({ ...c, events: c.events.filter(e => e.track === "melody") })) }, questions: { phrase: { type: "choice" as const, instructions: "Choose the candidate that best follows the requested direction and tension while making a coherent continuation of the supplied previous phrase. Consider the actual pitch, duration and rest events. Prefer explicit contour requests when present. These candidates have equal playback gain. Confidence is not listener preference.", criteria: Object.fromEntries(candidates.map(c => [c.id, `${c.title}: ${c.contour}. ${c.description}`])) } } };
+export function phraseRequest(
+  score: Score,
+  index: number,
+  candidates = makeCandidates(score, index),
+) {
+  return {
+    state: {
+      task: "Choose one complete, procedural two-bar phrase by how well it expresses the scene. You select from valid candidates; you do not generate the notes. No audio is provided.",
+      engine: ENGINE_VERSION,
+      brief: score.brief,
+      scoreVersion: score.version,
+      settings: score.settings,
+      phrase: (({ decision, ...semantic }) => semantic)(score.phrases[index]),
+      history: score.phrases
+        .slice(0, index)
+        .map(({ decision, ...semantic }) => semantic),
+      previousPhraseEvents: score.events.filter((e) => e.phrase === index - 1),
+      harmony: score.chords.filter(
+        (c) => c.beat >= index * 8 && c.beat < (index + 1) * 8,
+      ),
+      tracks: score.tracks,
+      candidateEncoding:
+        "Each candidate contains melody events. sharedAccompaniment supplies the identical remaining five tracks for every candidate; combine both event lists to recover the full candidate.",
+      sharedAccompaniment: candidates[0].events.filter(
+        (e) => e.track !== "melody",
+      ),
+      candidates: candidates.map((c) => ({
+        ...c,
+        events: c.events.filter((e) => e.track === "melody"),
+      })),
+    },
+    questions: {
+      phrase: {
+        type: "choice" as const,
+        instructions:
+          "Choose the candidate that best follows the requested direction and tension while making a coherent continuation of the supplied previous phrase. Consider the actual pitch, duration and rest events. Prefer explicit contour requests when present. These candidates have equal playback gain. Confidence is not listener preference.",
+        criteria: Object.fromEntries(
+          candidates.map((c) => [
+            c.id,
+            `${c.title}: ${c.contour}. ${c.description}`,
+          ]),
+        ),
+      },
+    },
+  };
 }
-export function applyCandidate(score: Score, index: number, candidate: Candidate, source: Phrase["source"], decision?: unknown): Score {
+export function applyCandidate(
+  score: Score,
+  index: number,
+  candidate: Candidate,
+  source: Phrase["source"],
+  decision?: unknown,
+): Score {
   if (score.phrases[index].locked) return score;
-  return { ...score, version: score.version + 1, phrases: score.phrases.map((p, i) => i === index ? { ...p, candidateId: candidate.id, contour: candidate.contour, source, decision } : p), events: [...score.events.filter(e => e.phrase !== index), ...candidate.events].sort((a, b) => a.beat - b.beat || a.id.localeCompare(b.id)), provenance: { ...score.provenance, decisions: decision ? [...score.provenance.decisions, decision] : score.provenance.decisions, edits: source === "user" ? [...score.provenance.edits, `Selected ${candidate.contour} for phrase ${index + 1}`] : score.provenance.edits } };
+  return {
+    ...score,
+    version: score.version + 1,
+    phrases: score.phrases.map((p, i) =>
+      i === index
+        ? {
+            ...p,
+            candidateId: candidate.id,
+            contour: candidate.contour,
+            source,
+            decision,
+          }
+        : p,
+    ),
+    events: [
+      ...score.events.filter((e) => e.phrase !== index),
+      ...candidate.events,
+    ].sort((a, b) => a.beat - b.beat || a.id.localeCompare(b.id)),
+    provenance: {
+      ...score.provenance,
+      decisions: decision
+        ? [...score.provenance.decisions, decision]
+        : score.provenance.decisions,
+      edits:
+        source === "user"
+          ? [
+              ...score.provenance.edits,
+              `Selected ${candidate.contour} for phrase ${index + 1}`,
+            ]
+          : score.provenance.edits,
+    },
+  };
 }
 export function starterScore(brief?: string, settings?: Settings, seed = 17): Score {
   let score = blankScore(brief, settings, seed);
@@ -209,9 +289,19 @@ export function populateMidi(midi: any, score: Score) {
 export class BarScore {
   current: Score;
   pending: Score | null = null;
-  constructor(score: Score) { this.current = score; }
-  queue(score: Score) { this.pending = score; }
-  atBeat(beat: number) { if (beat % 4 === 0 && this.pending) { this.current = this.pending; this.pending = null; } return this.current; }
+  constructor(score: Score) {
+    this.current = score;
+  }
+  queue(score: Score) {
+    this.pending = score;
+  }
+  atBeat(beat: number) {
+    if (beat % 4 === 0 && this.pending) {
+      this.current = this.pending;
+      this.pending = null;
+    }
+    return this.current;
+  }
 }
 export class Generation {
   private value = 0;

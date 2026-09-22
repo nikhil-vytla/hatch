@@ -1,70 +1,23 @@
-import React, { useEffect, useState, Suspense, lazy } from "react";
+import { Activity, useEffect, useState, useRef, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
-import { MotionConfig, motion } from "motion/react";
-import {
-  ArrowUpRight,
-  ArrowRight,
-  ArrowLeft,
-  Search,
-  Sun,
-  Moon,
-  Monitor,
-  KeyRound,
-  X,
-  Play,
-  FlaskConical,
-  PanelLeft,
-  Columns3,
-  BookOpen,
-  Check,
-  ChevronDown,
-} from "lucide-react";
-import { experiments, categories, lookup, type Experiment } from "./catalog";
-import { MotionArt } from "./motion-art";
-import { Pane, Button, Field, Notice, State, Stat } from "./shared";
-import {
-  Paste,
-  SemanticTable,
-  UndoExperiment,
-  Changes,
-} from "./new-experiments";
-import { GeneratedUI } from "./generated-ui";
-import { Worlds, Pixels } from "./creative";
-import { Games, GameGrid } from "./games";
-import { Benchmarks, Learning } from "./benchmarks";
-import { RewardBench } from "./rewardbench";
-import { LocalModels, ResearchMap } from "./local-models";
-import { Provenance } from "./provenance";
-import { AgentExperiment } from "./agent-experiments";
-import { Logos, Decisions, Vision, Adapters } from "./misc";
-import { Journeys } from "./journeys";
+import { MotionConfig } from "motion/react";
+import { ArrowUpRight, ArrowRight, Sun, Moon, Monitor, KeyRound, X } from "lucide-react";
+import { lookup } from "./catalog";
+import { Button, Field } from "./shared";
 import { getApiKey, setApiKey } from "./api";
+import { BuilderCredits } from "../../roadmap/credits";
+import { PlayPage } from "./pages/play";
 import "./style.css";
-const Music = lazy(() => import("./music-arranger").then(m => ({ default: m.Music })));
-const JudgeBench = lazy(() => import("./judgment-reliability").then(m => ({ default: m.JudgeBench })));
-const Beverage = lazy(() => import("./cafe-jev").then(m => ({ default: m.Beverage })));
-const VisualSearch = lazy(() => import("./visual-search").then(m => ({ default: m.VisualSearch })));
-const Wardrobe = lazy(() => import("./wardrobe").then(m => ({ default: m.Wardrobe })));
-const IconStudio = lazy(() => import("./icon-studio").then(m => ({ default: m.IconStudio })));
-const TetrisExperience = lazy(() => import("./tetris-experience").then(m => ({ default: m.TetrisExperience })));
-const GhostBrush = lazy(() => import("./ghost-brush").then(m => ({ default: m.GhostBrush })));
-const LiveCrowd = lazy(() => import("./live-crowd").then(m => ({ default: m.LiveCrowd })));
-const LiveWorldPreview = lazy(() => import("./live-world-preview").then(m => ({ default: m.LiveWorldPreview })));
-const MiniExperimentPreview = lazy(() => import("./live-world-preview").then(m => ({ default: m.MiniExperimentPreview })));
-const DrawingFraming = lazy(() => import("./outcome-framing").then(m => ({ default: m.DrawingFraming })));
-const Arcade = lazy(() =>
-  import("./arcade").then((m) => ({ default: m.Arcade })),
-);
-const cache = new Map<string, any>();
-async function load(name: string) {
-  if (!cache.has(name)) {
-    const response = await fetch(`/data/${name}.json`);
-    if (!response.ok) throw new Error("No recorded run is attached yet.");
-    cache.set(name, await response.json());
-  }
-  return cache.get(name);
-}
-function Header() {
+import "./pages/reading-workspace.css";
+
+const ExperimentPage = lazy(() => import("./pages/experiment").then(m => ({ default: m.ExperimentPage })));
+const AboutPage = lazy(() => import("./pages/about").then(m => ({ default: m.AboutPage })));
+const NotesIndex = lazy(() => import("./notes").then(m => ({ default: m.NotesIndex })));
+const ExperimentNote = lazy(() => import("./notes").then(m => ({ default: m.ExperimentNote })));
+
+function Header({ route }: { route: string }) {
+  const keyTrigger = useRef<HTMLButtonElement>(null);
+  const keyDialog = useRef<HTMLElement>(null);
   const [theme, setTheme] = useState(
       localStorage.getItem("jev-theme") ?? "system",
     ),
@@ -74,11 +27,28 @@ function Header() {
   const close = () => {
     setKey("");
     setOpen(false);
+    keyTrigger.current?.focus();
   };
   useEffect(() => {
     if (!open) return;
     const dismiss = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+      }
+      if (e.key !== "Tab") return;
+      const targets = keyDialog.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), a[href]',
+      );
+      if (!targets?.length) return;
+      const first = targets[0], last = targets[targets.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
@@ -97,18 +67,19 @@ function Header() {
   return (
     <>
       <header className="site-header">
-        <a href="#" className="brand">
+        <a href="#/" className="brand">
           <span className="brandmark">
             {Array.from({ length: 9 }, (_, i) => (
               <i key={i} />
             ))}
           </span>
           <strong>jev</strong>
-          <span className="brand-edition">a living laboratory</span>
+          <span className="brand-edition">experiments & notes</span>
         </a>
-        <nav>
-          <a href="#">Experiments</a>
-          <a href="#about">Field notes</a>
+        <nav aria-label="Main navigation">
+          <a href="#/" aria-current={!route || route === "#" || route === "#/" || route === "#collection" || route.startsWith("#experiment/") ? "page" : undefined}>Play</a>
+          <a href="#/notes" aria-current={route.startsWith("#/notes") ? "page" : undefined}>Notes</a>
+          <a href="#/about" aria-current={route === "#/about" ? "page" : undefined}>About</a>
           <div className="theme-picker" aria-label="Color theme">
             {[
               ["light", Sun],
@@ -128,6 +99,7 @@ function Header() {
             ))}
           </div>
           <button
+            ref={keyTrigger}
             className={"key-button " + (connected ? "connected" : "")}
             aria-label={connected ? "API key added" : "Connect live"}
             onClick={() => setOpen(true)}
@@ -140,6 +112,7 @@ function Header() {
       {open && (
         <div className="modal-backdrop" onClick={close}>
           <section
+            ref={keyDialog}
             className="modal"
             role="dialog"
             aria-modal="true"
@@ -216,669 +189,110 @@ function Header() {
     </>
   );
 }
-function MiniPreview({ kind }: { kind: string }) {
-  if (["tetris", "crowd", "ghost-brush", "visual-search", "wardrobe", "icon-studio", "drawing-framing"].includes(kind))
-    return <Suspense fallback={null}><MiniExperimentPreview kind={kind} /></Suspense>;
-  if (kind === "worlds") return <MotionArt small scene="garden" />;
-  if (kind === "pixels")
-    return (
-      <div className="mini-pixels">
-        {Array.from({ length: 144 }, (_, i) => (
-          <i
-            key={i}
-            style={{
-              background: [
-                28, 29, 30, 31, 39, 40, 41, 42, 43, 44, 51, 52, 53, 54, 55, 56,
-                63, 64, 65, 66, 67, 68, 76, 77, 78, 79, 89, 101, 113,
-              ].includes(i)
-                ? i > 80
-                  ? "#87a186"
-                  : "#d48a6c"
-                : i % 19 === 0
-                  ? "#e6d3a7"
-                  : "#233e38",
-            }}
-          />
-        ))}
-      </div>
-    );
-  if (kind === "music")
-    return (
-      <div className="mini-music">
-        {Array.from({ length: 28 }, (_, i) => (
-          <i
-            key={i}
-            style={{
-              height: 18 + ((i * 17) % 53),
-              animationDelay: (i % 7) * -0.24 + "s",
-            }}
-          />
-        ))}
-        <div className="mini-music-line" />
-      </div>
-    );
-  if (kind === "ui")
-    return (
-      <div className="mini-ui">
-        <div />
-        <span />
-        <span />
-        <label />
-        <label />
-        <span className="mini-save">
-          Save changes <ArrowRight size={10} />
-        </span>
-        <i className="mini-cursor">
-          <ArrowUpRight size={14} />
-        </i>
-      </div>
-    );
-  if (kind === "paste")
-    return (
-      <div className="mini-paste">
-        <div className="mini-source">
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-        <ArrowRight size={19} />
-        <div className="mini-destination">
-          <span />
-          <span />
-          <span />
-        </div>
-        <i className="transfer-dot" />
-      </div>
-    );
-  if (kind === "snake")
-    return (
-      <svg className="mini-chart" viewBox="0 0 220 120" aria-hidden="true">
-        <path
-          d="M35 80H90V40H140V75H175"
-          fill="none"
-          stroke="var(--sage)"
-          strokeWidth="15"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        <circle cx="175" cy="75" r="3" fill="var(--ink)" />
-        <circle cx="180" cy="30" r="7" fill="var(--coral)" />
-      </svg>
-    );
-  if (kind === "orbital")
-    return (
-      <svg className="mini-chart" viewBox="0 0 220 120" aria-hidden="true">
-        <path
-          d="M30 85 100 113 195 67 125 39ZM30 85V35L125 2 195 26V67M125 2V39M30 35 100 63 195 26M100 63V113"
-          fill="none"
-          stroke="var(--sage)"
-          strokeWidth="1"
-          opacity=".4"
-        />
-        <path d="m110 42 12 8-12 8-12-8Z" fill="var(--sage)" />
-        <path
-          d="m60 55 6 10-6 10-6-10Zm90 17 6 10-6 10-6-10Z"
-          fill="var(--coral)"
-        />
-      </svg>
-    );
-  if (kind === "games")
-    return (
-      <div className="mini-game">
-        {Array.from({ length: 25 }, (_, i) => (
-          <i
-            key={i}
-            className={
-              [
-                0, 1, 2, 3, 4, 5, 9, 10, 14, 15, 19, 20, 21, 22, 23, 24,
-              ].includes(i)
-                ? "wall"
-                : i === 18
-                  ? "goal"
-                  : ""
-            }
-          >
-            {i === 7 ? (
-              <span className="mini-agent" />
-            ) : i === 12 ? (
-              <KeyRound size={12} />
-            ) : null}
-          </i>
-        ))}
-      </div>
-    );
-  if (kind === "logos")
-    return (
-      <svg className="mini-mark" viewBox="0 0 160 120">
-        <g fill="none" stroke="currentColor" strokeWidth="3">
-          <path d="M80 98C17 61 47 9 113 15C139 71 109 105 80 98ZM80 98 103 34" />
-        </g>
-      </svg>
-    );
-  if (
-    [
-      "reward",
-      "teach",
-      "replica",
-      "optimize",
-      "latency",
-      "local-models",
-    ].includes(kind)
-  )
-    return (
-      <svg className="mini-chart" viewBox="0 0 220 120">
-        <path
-          d="M20 100H200M20 65H200M20 30H200"
-          stroke="currentColor"
-          opacity=".12"
-        />
-        <path
-          d="M20 95C55 96 51 60 85 61S144 43 200 22"
-          fill="none"
-          stroke="var(--coral)"
-          strokeWidth="3"
-        />
-        <path
-          d="M20 96C49 69 68 26 91 39S150 57 200 48"
-          fill="none"
-          stroke="var(--sage)"
-          strokeWidth="3"
-        />
-      </svg>
-    );
-  if (
-    [
-      "judge",
-      "classify",
-      "robustness",
-      "rewardbench2",
-      "benchmark-atlas",
-    ].includes(kind)
-  )
-    return (
-      <div className="mini-answers">
-        <div>
-          <strong>A</strong>
-          <span />
-          <span />
-          <span />
-        </div>
-        <div>
-          <strong>
-            B <Check size={12} />
-          </strong>
-          <span />
-          <span />
-          <span />
-        </div>
-      </div>
-    );
-  return (
-    <div className="mini-nodes">
-      <i />
-      <span />
-      <i />
-      <span />
-      <i />
-    </div>
-  );
-}
-function Home() {
-  const [category, setCategory] = useState("All"),
-    [query, setQuery] = useState("");
-  const matches = experiments.filter(
-    (e) =>
-      (category === "All" || e.category === category) &&
-      `${e.title} ${e.description}`.toLowerCase().includes(query.toLowerCase()),
-  );
-  return (
-    <main className="home">
-      <section className="hero">
-        <div className="hero-copy">
-          <span className="eyebrow">
-            <i className="live-dot" /> FIELD NOTES / 002
-          </span>
-          <h1>
-            Small decisions.
-            <br />
-            <em>Wonderful possibilities.</em>
-          </h1>
-          <p>
-            A playground for what happens when intelligence is abundant. Make
-            something, follow a decision, and see what changes.
-          </p>
-          <div className="hero-actions">
-            <a className="button" href="#experiment/tetris">
-              Play and branch <ArrowUpRight size={16} />
-            </a>
-            <a className="text-link" href="#experiment/ghost-brush">
-              Draw with Ghost Brush <ArrowRight size={15} />
-            </a>
-          </div>
-          <span className="hero-footnote">
-            LIVE EXPERIMENTS · RECORDED EVIDENCE · OPEN QUESTIONS
-          </span>
-        </div>
-        <a className="hero-window" href="#experiment/crowd">
-          <Suspense fallback={<div className="loading-stage">Opening the square…</div>}><LiveWorldPreview /></Suspense>
-          <div className="hero-window-caption">
-            <div>
-              <span>NOW PLAYING</span>
-              <strong>A notice can change an afternoon</strong>
-            </div>
-            <span className="round-arrow">
-              <ArrowUpRight size={22} />
-            </span>
-          </div>
-        </a>
-      </section>
-      <div className="editorial-strip">
-        <span>
-          <strong>{experiments.length}</strong> directions to explore
-        </span>
-        <span>
-          <i className="live-dot" /> Motion, music, and meaningful decisions
-        </span>
-        <a href="#experiment/judge">
-          Read the evidence yourself <ArrowUpRight size={14} />
-        </a>
-      </div>
-      <nav className="latest-work" aria-label="Latest experiments">
-        <span>LATEST</span>
-        <a href="#experiment/tetris">
-          Tetris: play and branch <ArrowUpRight size={12} />
-        </a>
-        <a href="#experiment/crowd">
-          The square at five <ArrowUpRight size={12} />
-        </a>
-        <a href="#experiment/ghost-brush">
-          Ghost Brush <ArrowUpRight size={12} />
-        </a>
-        <a href="#experiment/wardrobe">
-          A change of clothes <ArrowUpRight size={12} />
-        </a>
-      </nav>
-      <section className="collection">
-        <div className="collection-heading">
-          <div>
-            <span className="eyebrow">THE COLLECTION</span>
-            <h2>Pick a thread. See where it goes.</h2>
-          </div>
-          <label className="search-box">
-            <Search size={16} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find an experiment"
-            />
-          </label>
-        </div>
-        <div className="category-tabs">
-          {categories.map((c) => (
-            <button
-              className={category === c ? "active" : ""}
-              key={c}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-              {c === "All" && <small>{experiments.length}</small>}
-            </button>
-          ))}
-        </div>
-        <div className="experiment-grid">
-          {matches.map((e, i) => (
-            <motion.a
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: (i % 3) * 0.04, duration: 0.3 }}
-              className={`experiment-card ${e.accent}`}
-              href={`#experiment/${e.id}`}
-              key={e.id}
-            >
-              <div className="card-preview">
-                <MiniPreview kind={e.kind} />
-                <span className="card-open">
-                  <ArrowUpRight size={17} />
-                </span>
-              </div>
-              <div className="card-body">
-                <div className="card-meta">
-                  <span>{e.category}</span>
-                  <span>
-                    {String(experiments.indexOf(e) + 1).padStart(2, "0")}
-                  </span>
-                </div>
-                <h3>{e.title}</h3>
-                <p>{e.description}</p>
-              </div>
-            </motion.a>
-          ))}
-        </div>
-      </section>
-      <section className="about" id="about">
-        <span className="eyebrow">A LABORATORY, NOT A LEADERBOARD</span>
-        <h2>
-          Good questions deserve
-          <br />
-          experiments you can touch.
-        </h2>
-        <p>
-          Jev makes fast, typed judgments. Here, those judgments become
-          interfaces, music, images, and small pieces of useful software. Each
-          experiment exposes what the model did, what the surrounding code
-          supplied, and what the result actually establishes.
-        </p>
-        <div className="about-links">
-          <a
-            href="https://docs.typesafe.ai/introduction"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Meet Jev ↗
-          </a>
-          <a href="/research/EXPERIENCE_PROTOTYPES.md">Read the research ↗</a>
-          <a href="/research/quality-review/review.html">Review all 33 original experiments ↗</a>
-          <a href="/companion.zip" download>
-            Get the paste companion ↓
-          </a>
-        </div>
-      </section>
-    </main>
-  );
-}
-function View({
-  exp,
-  result,
-  composition,
-}: {
-  exp: Experiment;
-  result: any;
-  composition: any;
-}) {
-  switch (exp.id) {
-    case "snake":
-    case "orbital":
-      return (
-        <Suspense
-          fallback={<div className="loading-stage">Opening the arena…</div>}
-        >
-          <Arcade key={exp.id} game={exp.id} result={result} />
-        </Suspense>
-      );
-    case "local-models":
-      return <LocalModels result={result} />;
-    case "benchmark-atlas":
-      return <ResearchMap result={result} />;
-    case "paste":
-      return <Paste record={result} />;
-    case "semantic-table":
-      return <SemanticTable record={result} />;
-    case "undo":
-      return <UndoExperiment record={result} />;
-    case "changes":
-      return <Changes record={result} />;
-    case "ui":
-      return <GeneratedUI record={composition} />;
-    case "worlds":
-      return <Worlds result={result} />;
-    case "pixels":
-      return <Pixels result={result} />;
-    case "music":
-      return <Music result={result} />;
-    case "games":
-      return <Games result={result} />;
-    case "logos":
-      return <Logos result={result} />;
-    case "decisions":
-      return <Decisions result={result} />;
-    case "vision":
-      return <Vision result={result} />;
-    case "adapters":
-      return <Adapters result={result} />;
-    case "beverage":
-      return <Beverage result={result} />;
-    case "journeys":
-      return <Journeys record={result} />;
-    case "judge":
-      return <JudgeBench result={result} />;
-    case "tetris":
-      return <TetrisExperience result={result} />;
-    case "drawing-framing":
-      return <DrawingFraming result={result} />;
-    case "visual-search":
-      return <VisualSearch result={result} />;
-    case "wardrobe":
-      return <Wardrobe result={result} />;
-    case "icon-studio":
-      return <IconStudio result={result} />;
-    case "ghost-brush":
-      return <GhostBrush />;
-    case "crowd":
-      return <LiveCrowd />;
-    case "classify":
-    case "robustness":
-      return <Benchmarks id={exp.id} result={result} />;
-    case "rewardbench2":
-      return <RewardBench result={result} />;
-    case "reward":
-    case "teach":
-    case "replica":
-    case "optimize":
-    case "latency":
-      return <Learning id={exp.id} result={result} />;
-    default:
-      return <AgentExperiment id={exp.id} result={result} />;
-  }
-}
-const variantNames = ["studio", "comparison", "notebook"];
-function Detail({ id }: { id: string }) {
-  const exp = lookup(id),
-    [record, setRecord] = useState<any>(null),
-    [composition, setComposition] = useState<any>(null),
-    [error, setError] = useState(""),
-    [variant, setVariant] = useState(
-      new URL(location.href).searchParams.get("variant") ?? "studio",
-    );
-  useEffect(() => {
-    let alive = true;
-    setRecord(null);
-    setError("");
-    load(exp.data)
-      .then((r) => {
-        if (alive) setRecord(r);
-      })
-      .catch((e) => {
-        if (alive) {
-          setError(e.message);
-          setRecord({ result: {} });
-        }
-      });
-    if (id === "ui")
-      load("composed-ui")
-        .then((r) => alive && setComposition(r.result))
-        .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [id]);
-  const layoutStudy = ![
-    "music",
-    "beverage",
-    "judge",
-    "tetris",
-    "drawing-framing",
-    "visual-search",
-    "wardrobe",
-    "icon-studio",
-    "ghost-brush",
-    "crowd",
-    "snake",
-    "orbital",
-    "local-models",
-    "benchmark-atlas",
-  ].includes(id);
-  const change = (v: string) => {
-    setVariant(v);
-    const u = new URL(location.href);
-    u.searchParams.set("variant", v);
-    history.replaceState(null, "", u);
-  };
-  useEffect(() => {
-    const listener = (e: KeyboardEvent) => {
-      if (!layoutStudy) return;
-      if (
-        e.target instanceof Element &&
-        e.target.closest("input,textarea,select,[contenteditable],.react-flow")
-      )
-        return;
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        const i = variantNames.indexOf(variant);
-        change(variantNames[(i + (e.key === "ArrowRight" ? 1 : 2)) % 3]);
-      }
-    };
-    window.addEventListener("keydown", listener);
-    return () => window.removeEventListener("keydown", listener);
-  }, [variant, layoutStudy]);
-  return (
-    <main
-      className={
-        "detail " +
-        (layoutStudy ? "variant-" + variant : "published-experiment")
-      }
-    >
-      <div className="breadcrumbs">
-        <a href="#">
-          <ArrowLeft size={13} /> All experiments
-        </a>
-        <span>/</span>
-        <span>{exp.category}</span>
-      </div>
-      <section className="detail-heading">
-        <div>
-          <span className="eyebrow">
-            EXPERIMENT {String(experiments.indexOf(exp) + 1).padStart(2, "0")} /{" "}
-            {exp.category.toUpperCase()}
-          </span>
-          <h1>{exp.title}</h1>
-          <p>{exp.description}</p>
-        </div>
-        <div className="experiment-question">
-          <FlaskConical size={17} />
-          <p>{exp.question}</p>
-        </div>
-      </section>
-      <div className="notebook-intro">
-        <span className="eyebrow">THE OPEN QUESTION</span>
-        <h2>{exp.question}</h2>
-        <p>
-          Work through the example, change one thing, and inspect the resulting
-          state. Recorded outcomes remain separate from your exploratory runs.
-        </p>
-      </div>
-      {error && <Notice error>{error}</Notice>}
-      {record && <Provenance result={record.result ?? {}} />}
-      {record ? (
-        <Suspense fallback={<div className="loading-stage"><span className="loader" /> Opening the experiment…</div>}>
-        <View
-          key={id}
-          exp={exp}
-          result={record.result ?? {}}
-          composition={composition}
-        />
-        </Suspense>
-      ) : (
-        <div className="loading-stage">
-          <span className="loader" /> Opening the experiment…
-        </div>
-      )}
-      <div className="comparison-notes">
-        <Pane title="Compare what changed">
-          <p>
-            Use the revision history, candidate alternatives, and state
-            inspector beside the artifact. A change in a model score is
-            different from an independently better result.
-          </p>
-          <div className="comparison-legend">
-            <span>Input</span>
-            <ArrowRight size={15} />
-            <span>Decision</span>
-            <ArrowRight size={15} />
-            <span>Visible outcome</span>
-          </div>
-        </Pane>
-      </div>
-      {record?.manifest && (
-        <p className="record-footer">
-          Recorded {String(record.manifest.created ?? "").slice(0, 10)} ·{" "}
-          {record.manifest.experiment ?? exp.id} ·{" "}
-          <a
-            href={`/data/${id === "ui" ? "composed-ui" : exp.data}.json`}
-            download
-          >
-            Download evidence ↓
-          </a>
-        </p>
-      )}
-      {layoutStudy && (
-        <div className="prototype-switcher">
-          <button
-            aria-label="Previous layout"
-            onClick={() =>
-              change(variantNames[(variantNames.indexOf(variant) + 2) % 3])
-            }
-          >
-            <ArrowLeft size={15} />
-          </button>
-          <span>LAYOUT STUDY</span>
-          {variantNames.map((v, i) => {
-            const Icon = [PanelLeft, Columns3, BookOpen][i];
-            return (
-              <button
-                className={v === variant ? "active" : ""}
-                key={v}
-                onClick={() => change(v)}
-              >
-                <Icon size={14} />
-                {v}
-              </button>
-            );
-          })}
-          <button
-            aria-label="Next layout"
-            onClick={() =>
-              change(variantNames[(variantNames.indexOf(variant) + 1) % 3])
-            }
-          >
-            <ArrowRight size={15} />
-          </button>
-        </div>
-      )}
-    </main>
-  );
-}
 function App() {
-  const [route, setRoute] = useState(location.hash);
+  const pathRoute = () =>
+    location.hash ||
+    ({
+      "/materials": "#experiment/materials",
+      "/routing": "#experiment/routing",
+    }[location.pathname.replace(/\/$/, "")] ??
+      "");
+  const sceneId = (value: string) => value.startsWith("#experiment/") ? value.split("/")[1] : null;
+  const [navigation, setNavigation] = useState(() => {
+    const route = pathRoute();
+    return { route, scene: sceneId(route) };
+  });
+  const { route, scene } = navigation;
+  const currentNavigation = useRef(navigation);
+  currentNavigation.current = navigation;
+  const scenePosition = useRef<{ y: number; focus: HTMLElement | null } | null>(null);
+  const restorePosition = useRef(false);
   useEffect(() => {
     const fn = () => {
-      setRoute(location.hash);
-      if (location.hash !== "#about") window.scrollTo(0, 0);
+      const next = pathRoute();
+      const previous = currentNavigation.current;
+      const nextScene = sceneId(next);
+      if (sceneId(previous.route) && next.startsWith("#/notes")) {
+        const focused = document.activeElement;
+        scenePosition.current = {
+          y: window.scrollY,
+          focus: focused instanceof HTMLElement && focused !== document.body && focused !== document.documentElement ? focused : null,
+        };
+      }
+      restorePosition.current = previous.route.startsWith("#/notes") && nextScene === previous.scene && nextScene !== null;
+      setNavigation({ route: next, scene: nextScene ?? (next.startsWith("#/notes") ? previous.scene : null) });
+      if (!next.startsWith("#/notes") && !restorePosition.current) scenePosition.current = null;
+      if (location.hash !== "#collection") window.scrollTo(0, 0);
     };
     window.addEventListener("hashchange", fn);
     return () => window.removeEventListener("hashchange", fn);
   }, []);
-  const id = route.startsWith("#experiment/") ? route.split("/")[1] : null;
+  const id = sceneId(route);
+  useEffect(() => {
+    if (!restorePosition.current || !scenePosition.current) {
+      if (!route.startsWith("#/notes")) return;
+      const frame = requestAnimationFrame(() => document.getElementById("main-content")?.focus({ preventScroll: true }));
+      return () => cancelAnimationFrame(frame);
+    }
+    restorePosition.current = false;
+    const position = scenePosition.current;
+    const frame = requestAnimationFrame(() => {
+      const target = position.focus?.isConnected && position.focus.getClientRects().length
+        ? position.focus
+        : document.getElementById("main-content");
+      target?.focus({ preventScroll: true });
+      if (document.activeElement !== target) document.getElementById("main-content")?.focus({ preventScroll: true });
+      window.scrollTo(0, position.y);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [route]);
+  useEffect(() => {
+    const label = route.startsWith("#/notes/")
+      ? route.split("/")[2].replaceAll("-", " ")
+      : route.startsWith("#/notes") ? "Notes"
+      : route === "#/about" || route === "#about" ? "About"
+      : id ? lookup(id).title : "Play";
+    document.title = `${label.charAt(0).toUpperCase()}${label.slice(1)} · Jev experiments`;
+  }, [route, id]);
   return (
     <MotionConfig reducedMotion="user">
-      <Header />
-      {id ? <Detail key={id} id={id} /> : <Home />}
+      <a className="skip-link" href="#main-content" onClick={(event) => {
+        event.preventDefault();
+        const main = document.getElementById("main-content");
+        main?.focus();
+        main?.scrollIntoView();
+      }}>Skip to content</a>
+      <Header route={route} />
+      {(scene || route.startsWith("#/notes")) && (
+        <main id="main-content" tabIndex={-1}>
+          {scene && <Activity mode={id === scene ? "visible" : "hidden"}>
+            <Suspense fallback={<div className="loading-stage">Opening the experiment…</div>}>
+              <ExperimentPage key={scene} id={scene} />
+            </Suspense>
+          </Activity>}
+          {route.startsWith("#/notes") && <>
+            {scene && <nav className="reading-workspace" aria-label="Current experiment">
+              <a href={`#experiment/${scene}`}>← Back to {lookup(scene).title}</a>
+            </nav>}
+            <Suspense fallback={<div className="loading-stage">Opening the notes…</div>}>
+              {route === "#/notes" || route === "#/notes/" ? <NotesIndex /> : <ExperimentNote key={route} slug={route.split("/")[2]} />}
+            </Suspense>
+          </>}
+        </main>
+      )}
+      {route === "#/about" || route === "#about" ? (
+        <Suspense fallback={<main className="loading-stage">Opening About…</main>}><AboutPage /></Suspense>
+      ) : id || route.startsWith("#/notes") ? null : <PlayPage />}
       <footer className="site-footer">
-        <a className="brand" href="#">
+        <a className="brand" href="#/">
           <strong>jev</strong>
-          <span>field notes / 002</span>
+          <span>experiments & notes</span>
         </a>
-        <p>Not affiliated with or endorsed by TypeSafe AI</p>
+        <div className="footer-notes">
+          <p>An independent lab for typed decisions.</p>
+          <p>Not affiliated with or endorsed by TypeSafe AI</p>
+          <BuilderCredits />
+        </div>
         <a href="https://docs.typesafe.ai/introduction">TypeSafe ↗</a>
       </footer>
     </MotionConfig>

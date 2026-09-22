@@ -1,0 +1,22 @@
+.reading-workspace {
+  width: min(1120px, 100%);
+  margin: 22px auto 0;
+  padding: 0 28px;
+}
+.reading-workspace a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.reading-workspace a:hover { color: var(--ink); }
+.reading-workspace a:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 4px;
+}
+@media (max-width: 720px) {
+  .reading-workspace { margin-top: 12px; padding: 0 18px; }
+}
