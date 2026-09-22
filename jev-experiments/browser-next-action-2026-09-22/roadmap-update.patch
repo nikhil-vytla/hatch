@@ -1,0 +1,18 @@
+--- a/jev-experiments/roadmap/MAP.md
++++ b/jev-experiments/roadmap/MAP.md
+@@ -13,6 +13,7 @@
+ - Code organization and style are first-release work: deliberate source/research/artifact boundaries, documented conventions, CI checks and removal of obsolete code. Keep these tasks visible beside the UI/UX revamp.
+ - Research Jeverative-style UI composition, JevFrame tables and marimo-pets-inspired adaptive interfaces as separate next-wave experiments. A 1–2 second first usable composition is a measurement target. Optional LLM refinement has separate timing and cost. Adding these tickets does not expand the first release.
+ - Add next-wave studies for Jimothy task specialists, AutoJev calibration, webctl evidence selection, editable workflow traces, synthetic recruiting-evidence inference, and Jev rubric grading for GRPO. Reuse existing workstreams; freeze protocols before new measurements. RL grading begins with fixed rollout replay, before a separate on-policy training pilot.
++- Research browser next-action prediction from the current page and permitted recent history, with learned abstention and bounded automatic preparation. Start with recorded/fixture evaluation; local browser integration and a live pilot follow separate gates.
+ - Extend the existing prompt-optimization experiment with the GEPA domain-adaptation study. Keep prompt/criterion optimization separate from the completed local-model readout adaptation, with its own frozen protocol and unchanged historical evidence.
+ - Keep Bun and the existing Vercel project and URL. Its root stays `jev-experiments/experience-prototypes`. Keep parent source access and committed JSONL inputs available to clean builds.
+ - Keep unfinished entry experiences out of the public catalog. Historical research remains labeled with its original protocol.
+@@ -74,6 +75,7 @@
+ | [Can typed branches improve a workflow?](../jev-tools-and-rl-2026-09-22/decisions/workflow-builder-experiment.md) | Existing React Flow, versioned graph/run contract and independent grader | Next wave; root/design + routing; recorded single-user prototype first |
+ | [Compare recruiting-evidence inference paths](../jev-tools-and-rl-2026-09-22/decisions/recruiter-experiment.md) | Synthetic criteria, human review, pinned V4.1/SGLang token conformance | Next wave; runtime/evaluation; supported non-thinking mode; scoring compatibility unmeasured |
+ | [Use Jev for GRPO rubric rewards](../jev-tools-and-rl-2026-09-22/decisions/rl-rubric-grader.md) | Resettable tasks, immutable rollout groups, independent labels and reward accounting | Next wave; training/runtime; offline grader replay first; training pilot separately gated |
++| [When should a browser anticipate the next step?](../browser-next-action-2026-09-22/decision.md) | Typed contract, private extension, grounded action candidates and calibrated abstention | Next wave; routing + training + design; Composite source study and proposed protocol; implementation open |
+ | [Selective observation resolution](decisions/selective-perception.md) | Render profiling and frozen visual labels | Next wave |
+ | [Private extension inference runtime](decisions/private-extension.md) | Local runtime and ONNX/browser measurements | Next wave |
+ | [Correct source-linked interpretations](decisions/source-annotations.md) | Café, wardrobe and paste artifact contracts | Next wave |

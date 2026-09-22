@@ -1,0 +1,9 @@
+{
+  "checked_on": "2026-09-22",
+  "local_links": 20,
+  "source_records": 3,
+  "prerequisite_map_patches": 4,
+  "map_patch_chain": "passed",
+  "result_hash": "6395ac3a2c37add971c99e1104d1704dd776557b944eb26928ed07de7d1c1b12",
+  "scope": "Documentation and patch integrity only. Browser implementation, model training and proposed evaluations have not run."
+}
