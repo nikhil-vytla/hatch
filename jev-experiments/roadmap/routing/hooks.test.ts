@@ -188,7 +188,7 @@ test("valid rejection alone triggers quality escalation and includes all known v
   expect(output.outcome.artifact?.text).toBe("strong proposal");
   expect(output.outcome.totalCostUsd).toBeCloseTo(0.00206, 10);
 });
-test("cancellation during verification discards the proposal and leaves verifier charge unknown", async () => {
+test("cancellation during verification discards the proposal and retains a returned charge", async () => {
   const abort = new AbortController();
   const output = await routeTask(
     task,
@@ -205,7 +205,8 @@ test("cancellation during verification discards the proposal and leaves verifier
   expect(output.status).toBe("cancelled");
   expect(output.outcome.artifact).toBeUndefined();
   expect(output.attempts[0].verification?.status).toBe("cancelled");
-  expect(output.outcome.totalCostUsd).toBeNull();
+  expect(output.attempts[0].verification?.costUsd).toBe(valid.costUsd);
+  expect(output.outcome.totalCostUsd).toBeCloseTo(resultFor().costUsd! + valid.costUsd!, 10);
 });
 test("invalid custom executor metadata cannot create negative budgets or a false usable result", async () => {
   for (const value of [
@@ -213,6 +214,10 @@ test("invalid custom executor metadata cannot create negative budgets or a false
     { ...resultFor(), costUsd: -1 },
     { ...resultFor(), costUsd: NaN },
     { ...resultFor(), usage: { inputTokens: -1, outputTokens: 1 } },
+    { ...resultFor(), usage: { inputTokens: 1.5, outputTokens: 2 } },
+    { ...resultFor(), usage: { inputTokens: 2, outputTokens: 0.5 } },
+    { ...resultFor(), usage: { inputTokens: 2, outputTokens: 1, cachedInputTokens: 0.5 } },
+    { ...resultFor(), usage: { inputTokens: Number.MAX_SAFE_INTEGER + 1, outputTokens: 1 } },
     { ...resultFor(), artifact: { kind: "answer", text: "" } },
   ]) {
     let calls = 0;
@@ -228,7 +233,7 @@ test("invalid custom executor metadata cannot create negative budgets or a false
     );
     expect(calls).toBe(1);
     expect(output.status).toBe("error");
-    expect(output.outcome.totalCostUsd).toBeNull();
+    expect(output.outcome.totalCostUsd).toBe(value && Number.isFinite(value.costUsd) && value.costUsd >= 0 ? value.costUsd : null);
     expect(output.outcome.artifact).toBeUndefined();
   }
 });
@@ -275,7 +280,7 @@ test("classifier identity contradictions stop before destination execution", asy
     expect(output.attempts).toHaveLength(0);
     expect(output.classification.status).toBe("error");
     expect(output.classification.category).toBe("bug-fix");
-    expect(output.outcome.totalCostUsd).toBeNull();
+    expect(output.outcome.totalCostUsd).toBe(returned === null ? null : 0);
   }
 });
 
@@ -390,6 +395,8 @@ test("reported hosted identity remains visible when it contradicts declared loca
   expect(output.classification.declaredExecution).toEqual(declared);
   expect(output.classification.evidence).toContain("contradicts");
   expect(output.attempts).toHaveLength(0);
+  expect(output.classification.costUsd).toBe(.001);
+  expect(output.outcome.totalCostUsd).toBe(.001);
 });
 
 test("a custom executor cannot substitute a different model or cause an identity fallback", async () => {
@@ -414,7 +421,7 @@ test("a custom executor cannot substitute a different model or cause an identity
   expect(output.status).toBe("error");
   expect(output.outcome.actualModel).toBe("substitute");
   expect(output.outcome.artifact).toBeUndefined();
-  expect(output.outcome.totalCostUsd).toBeNull();
+  expect(output.outcome.totalCostUsd).toBe(2);
   expect(output.attempts[0].usage).toEqual({
     inputTokens: 10,
     outputTokens: 10,
