@@ -1,0 +1,174 @@
+{
+  "sourceCommit": "c89327f7f94a7c70551485ffa0a132ee8640c715",
+  "reportCommit": "291e8817403f9442cfdb2d3040de0eb07af70a8a",
+  "base": "854657a49a89eb1d19808c9a0e0329be54f037bd",
+  "archiveSha256": "5c3971ee338fc5c4abe514d392afda1131c798925c20747dd97e0636739de5d1",
+  "condition": "Independent read-only Git object, import-boundary and retained-report inspection. No test, build, provider, client or deployment executed.",
+  "verifierSha256": "f9001d585e880120957580a186e085157da5b30b7dc16e8ed0596fc315b7416d",
+  "checks": [
+    {
+      "name": "source parent is the reviewed publication base",
+      "passed": true
+    },
+    {
+      "name": "report commit directly follows reviewed source",
+      "passed": true
+    },
+    {
+      "name": "report commit changes only its eight report files",
+      "passed": true
+    },
+    {
+      "name": "all retained report source identities match",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/packages/decision-runtime/src/native.ts",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/packages/decision-runtime/src/native.test.ts",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/adapters/typescript/index.ts",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/adapters/typescript/index.test.ts",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/adapters/go/adapter.go",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/adapters/go/adapter_test.go",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/adapters/rust/src/lib.rs",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/src/jev_lab/core.py",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/src/jev_lab/semantic.py",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/src/jev_lab/adapters.py",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/tests/test_contracts.py",
+      "passed": true
+    },
+    {
+      "name": "pinned source jev-experiments/tests/test_native_questions.py",
+      "passed": true
+    },
+    {
+      "name": "source slice contains 12 adapter paths and one workflow",
+      "passed": true
+    },
+    {
+      "name": "retained patch hash matches source manifest",
+      "passed": true
+    },
+    {
+      "name": "retained patch equals the complete source commit diff",
+      "passed": true
+    },
+    {
+      "name": "Git archive command completed",
+      "passed": true
+    },
+    {
+      "name": "all three reports match the exact Git archive",
+      "passed": true
+    },
+    {
+      "name": "retained source verifier identity matches its record",
+      "passed": true
+    },
+    {
+      "name": "recorded checks preserve build-before-sibling-install order",
+      "passed": true
+    },
+    {
+      "name": "all eight recorded source checks passed without timeout",
+      "passed": true
+    },
+    {
+      "name": "Python optional-dependency skip remains explicit",
+      "passed": true
+    },
+    {
+      "name": "go retained test exit is zero and source unchanged",
+      "passed": true
+    },
+    {
+      "name": "go archive source adapter.go",
+      "passed": true
+    },
+    {
+      "name": "go archive source adapter_test.go",
+      "passed": true
+    },
+    {
+      "name": "go archive source cmd/demo/main.go",
+      "passed": true
+    },
+    {
+      "name": "go archive source go.mod",
+      "passed": true
+    },
+    {
+      "name": "go archive source go.sum",
+      "passed": true
+    },
+    {
+      "name": "rust retained test exit is zero and source unchanged",
+      "passed": true
+    },
+    {
+      "name": "rust archive source Cargo.lock",
+      "passed": true
+    },
+    {
+      "name": "rust archive source Cargo.toml",
+      "passed": true
+    },
+    {
+      "name": "rust archive source src/lib.rs",
+      "passed": true
+    },
+    {
+      "name": "rust archive source src/main.rs",
+      "passed": true
+    },
+    {
+      "name": "Go/Rust aggregate remains a local result",
+      "passed": true
+    },
+    {
+      "name": "TypeScript imports only the committed native module for the shared question definitions",
+      "passed": true
+    },
+    {
+      "name": "native definitions have no imported runtime or application dependency",
+      "passed": true
+    },
+    {
+      "name": "no hosted execution claimed by retained local reports",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "passedChecks": 40,
+  "totalChecks": 40,
+  "scopeLimit": "Original evidence predates the separately authored Go/Rust legend fix. This inspection does not test that fix or establish remote CI/deployment."
+}

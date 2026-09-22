@@ -1,0 +1,241 @@
+diff --git a/jev-experiments/adapters/go/adapter.go b/jev-experiments/adapters/go/adapter.go
+index 590b45b..07996c4 100644
+--- a/jev-experiments/adapters/go/adapter.go
++++ b/jev-experiments/adapters/go/adapter.go
+@@ -323,12 +323,25 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
+ 			}
+ 		}
+ 		if a.Legend != nil {
+-			if q.Type != "score" || len(a.Legend) != len(expected) {
+-				return result, fmt.Errorf("invalid score legend")
++			if len(a.Legend) != len(expected) {
++				return result, fmt.Errorf("legend must match the requested entries")
+ 			}
+-			for i, level := range q.Criteria.([]any) {
+-				if actual, ok := a.Legend[fmt.Sprint(i)]; !ok || !reflect.DeepEqual(actual, level) {
+-					return result, fmt.Errorf("score legend changed requested rubric")
++			var descriptions object
++			if q.Type == "score" {
++				descriptions = object{}
++				for i, level := range q.Criteria.([]any) {
++					descriptions[fmt.Sprint(i)] = level
++				}
++			} else if q.Criteria != nil {
++				descriptions = q.Criteria.(object)
++			}
++			for key := range expected {
++				actual, exists := a.Legend[key]
++				if !exists || !entry(actual) {
++					return result, fmt.Errorf("legend needs every requested native entry")
++				}
++				if descriptions != nil && !reflect.DeepEqual(actual, descriptions[key]) {
++					return result, fmt.Errorf("legend changed requested descriptions")
+ 				}
+ 			}
+ 		}
+diff --git a/jev-experiments/adapters/go/adapter_test.go b/jev-experiments/adapters/go/adapter_test.go
+index d37fa5f..be85b81 100644
+--- a/jev-experiments/adapters/go/adapter_test.go
++++ b/jev-experiments/adapters/go/adapter_test.go
+@@ -177,3 +177,97 @@ func TestUnrecognizedAnswerMetadataCannotDisappear(t *testing.T) {
+ 		t.Fatal("accepted missing Choice distribution")
+ 	}
+ }
++
++func TestNativeLegendsPreserveRequestedDescriptions(t *testing.T) {
++	type Result struct {
++		Value any `json:"value"`
++	}
++	for _, tc := range []struct {
++		name, field, answer, first string
++	}{
++		{"choice", `{"type":"string","enum":["a","b"],"description":"Choose","x-jev-criteria":{"a":{"boundary":[true,2,null]},"b":null}}`, `{"type":"choice","value":"a","probabilities":{"a":0.6,"b":0.4},"legend":{"a":{"boundary":[true,2,null]},"b":null}}`, "a"},
++		{"noul", `{"type":"boolean","description":"Check","x-jev-criteria":{"true":{"boundary":[true,2,null]},"false":null}}`, `{"type":"noul","value":0.6,"probabilities":{"true":0.6,"false":0.4},"legend":{"true":{"boundary":[true,2,null]},"false":null}}`, "true"},
++		{"score", `{"type":"number","minimum":0,"maximum":1,"description":"Rate","x-jev-levels":[{"boundary":[true,2,null]},null]}`, `{"type":"score","value":0.4,"probabilities":{"0":0.6,"1":0.4},"legend":{"0":{"boundary":[true,2,null]},"1":null}}`, "0"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			schema := nativeSchema(t, tc.field)
++			fresh := func() map[string]Answer {
++				var a Answer
++				if err := json.Unmarshal([]byte(tc.answer), &a); err != nil {
++					t.Fatal(err)
++				}
++				return map[string]Answer{"value": a}
++			}
++			answers := fresh()
++			result, err := Decode[Result](schema, answers)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(result.Answers, answers) {
++				t.Fatal("decode changed a valid legend")
++			}
++			for _, mutation := range []string{"description", "missing", "extra", "scalar"} {
++				t.Run(mutation, func(t *testing.T) {
++					bad := fresh()
++					legend := bad["value"].Legend
++					switch mutation {
++					case "description":
++						legend[tc.first] = object{"boundary": []any{float64(1), float64(2), nil}}
++					case "missing":
++						delete(legend, tc.first)
++					case "extra":
++						legend["extra"] = nil
++					case "scalar":
++						legend[tc.first] = true
++					}
++					if _, err := Decode[Result](schema, bad); err == nil {
++						t.Fatal("accepted a changed or incomplete legend")
++					}
++				})
++			}
++		})
++	}
++}
++
++func TestPlainNoulLegendUsesNativeBoundaryEntries(t *testing.T) {
++	type Result struct {
++		Value bool `json:"value"`
++	}
++	schema := nativeSchema(t, `{"type":"boolean","description":"Check"}`)
++	for _, legend := range []object{
++		{"true": object{"evidence": []any{true, float64(2)}}, "false": nil},
++		{"true": "Criterion met", "false": []any{"Criterion absent"}},
++	} {
++		answers := map[string]Answer{"value": {Type: "noul", Value: .6, Legend: legend}}
++		result, err := Decode[Result](schema, answers)
++		if err != nil || !result.Value.Value || !reflect.DeepEqual(result.Answers, answers) {
++			t.Fatalf("plain Noul legend was rejected or changed: %v", err)
++		}
++	}
++	for _, legend := range []object{
++		{"true": "Yes"},
++		{"true": "Yes", "false": "No", "extra": nil},
++		{"true": "Yes", "other": nil},
++		{"true": true, "false": nil},
++		{"true": "Yes", "false": float64(0)},
++	} {
++		if _, err := Decode[Result](schema, map[string]Answer{"value": {Type: "noul", Value: .6, Legend: legend}}); err == nil {
++			t.Fatal("plain Noul accepted invalid boundary entries")
++		}
++	}
++}
++
++func TestDefaultChoiceLegendUsesGeneratedDescriptions(t *testing.T) {
++	type Result struct {
++		Value string `json:"value"`
++	}
++	schema := nativeSchema(t, `{"type":"string","enum":["not_ready","ready"],"description":"Choose"}`)
++	answers := map[string]Answer{"value": {Type: "choice", Value: "ready", Probabilities: map[string]float64{"not_ready": .2, "ready": .8}, Legend: object{"not_ready": "not ready", "ready": "ready"}}}
++	if _, err := Decode[Result](schema, answers); err != nil {
++		t.Fatal(err)
++	}
++	answers["value"].Legend["not_ready"] = "different"
++	if _, err := Decode[Result](schema, answers); err == nil {
++		t.Fatal("default Choice accepted changed descriptions")
++	}
++}
+diff --git a/jev-experiments/adapters/rust/src/lib.rs b/jev-experiments/adapters/rust/src/lib.rs
+index 7352856..1d3a80f 100644
+--- a/jev-experiments/adapters/rust/src/lib.rs
++++ b/jev-experiments/adapters/rust/src/lib.rs
+@@ -313,16 +313,21 @@ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResul
+             }
+         }
+         if let Some(legend) = &answer.legend {
+-            if answer.kind != "score"
+-                || legend.len() != expected.len()
+-                || question["criteria"]
+-                    .as_array()
+-                    .unwrap()
+-                    .iter()
+-                    .enumerate()
+-                    .any(|(i, level)| legend.get(&i.to_string()) != Some(level))
++            if legend.len() != expected.len()
++                || expected.iter().any(|key| !legend.get(key).is_some_and(entry))
+             {
+-                return Err("Score legend changed the requested rubric".into());
++                return Err("Legend needs every requested native entry".into());
++            }
++            let descriptions: Option<Map<String, Value>> = if answer.kind == "score" {
++                Some(question["criteria"].as_array().unwrap().iter().enumerate()
++                    .map(|(i, level)| (i.to_string(), level.clone())).collect())
++            } else {
++                question["criteria"].as_object().cloned()
++            };
++            if descriptions.as_ref().is_some_and(|requested|
++                expected.iter().any(|key| legend.get(key) != requested.get(key)))
++            {
++                return Err("Legend changed requested descriptions".into());
+             }
+         }
+     }
+@@ -507,4 +512,68 @@ mod tests {
+         .unwrap();
+         assert!(decode::<Value>(&schema, answers).is_err());
+     }
++
++    #[test]
++    fn native_legends_preserve_requested_descriptions() {
++        let cases = [
++            ("choice", json!({"type":"string","enum":["a","b"],"description":"Choose","x-jev-criteria":{"a":{"boundary":[true,2,null]},"b":null}}), json!({"type":"choice","value":"a","probabilities":{"a":0.6,"b":0.4},"legend":{"a":{"boundary":[true,2,null]},"b":null}}), "a"),
++            ("noul", json!({"type":"boolean","description":"Check","x-jev-criteria":{"true":{"boundary":[true,2,null]},"false":null}}), json!({"type":"noul","value":0.6,"probabilities":{"true":0.6,"false":0.4},"legend":{"true":{"boundary":[true,2,null]},"false":null}}), "true"),
++            ("score", json!({"type":"number","minimum":0,"maximum":1,"description":"Rate","x-jev-levels":[{"boundary":[true,2,null]},null]}), json!({"type":"score","value":0.4,"probabilities":{"0":0.6,"1":0.4},"legend":{"0":{"boundary":[true,2,null]},"1":null}}), "0"),
++        ];
++        for (name, field, answer, first) in cases {
++            let schema = field_schema(field);
++            let raw = json!({"value": answer});
++            let answers: Answers = serde_json::from_value(raw.clone()).unwrap();
++            let before = serde_json::to_value(&answers).unwrap();
++            let result = decode::<Value>(&schema, answers)
++                .unwrap_or_else(|error| panic!("{name}: {error}"));
++            assert_eq!(serde_json::to_value(result.answers).unwrap(), before);
++            for mutation in ["description", "missing", "extra", "scalar"] {
++                let mut bad = raw.clone();
++                let legend = bad["value"]["legend"].as_object_mut().unwrap();
++                match mutation {
++                    "description" => { legend.insert(first.into(), json!({"boundary":[1,2,null]})); },
++                    "missing" => { legend.remove(first); },
++                    "extra" => { legend.insert("extra".into(), Value::Null); },
++                    _ => { legend.insert(first.into(), json!(true)); },
++                }
++                assert!(decode::<Value>(&schema, serde_json::from_value(bad).unwrap()).is_err(), "{name}: {mutation}");
++            }
++        }
++    }
++
++    #[test]
++    fn plain_noul_legend_uses_native_boundary_entries() {
++        let schema = field_schema(json!({"type":"boolean","description":"Check"}));
++        for legend in [
++            json!({"true":{"evidence":[true,2]},"false":null}),
++            json!({"true":"Criterion met","false":["Criterion absent"]}),
++        ] {
++            let answers: Answers = serde_json::from_value(json!({"value":{"type":"noul","value":0.6,"legend":legend}})).unwrap();
++            let before = serde_json::to_value(&answers).unwrap();
++            let result = decode::<Value>(&schema, answers).unwrap();
++            assert_eq!(result.value["value"], true);
++            assert_eq!(serde_json::to_value(result.answers).unwrap(), before);
++        }
++        for legend in [
++            json!({"true":"Yes"}),
++            json!({"true":"Yes","false":"No","extra":null}),
++            json!({"true":"Yes","other":null}),
++            json!({"true":true,"false":null}),
++            json!({"true":"Yes","false":0}),
++        ] {
++            let answers = serde_json::from_value(json!({"value":{"type":"noul","value":0.6,"legend":legend}})).unwrap();
++            assert!(decode::<Value>(&schema, answers).is_err());
++        }
++    }
++
++    #[test]
++    fn default_choice_legend_uses_generated_descriptions() {
++        let schema = field_schema(json!({"type":"string","enum":["not_ready","ready"],"description":"Choose"}));
++        let mut raw = json!({"value":{"type":"choice","value":"ready","probabilities":{"not_ready":0.2,"ready":0.8},"legend":{"not_ready":"not ready","ready":"ready"}}});
++        assert!(decode::<Value>(&schema, serde_json::from_value(raw.clone()).unwrap()).is_ok());
++        raw["value"]["legend"]["not_ready"] = json!("different");
++        assert!(decode::<Value>(&schema, serde_json::from_value(raw).unwrap()).is_err());
++    }
++
+ }

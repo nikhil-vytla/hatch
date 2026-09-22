@@ -1,0 +1,138 @@
+{
+  "recordedAt": "2026-09-22T15:51:36.376900+00:00",
+  "sourceCommit": "c219f57266d2e8905c66212a181fac3bd8c236ac",
+  "archiveSha256": "cfe4cc474f3f03476b1e6ca61f9127ec9e0dc2ca14a4c298fd6d829016226b78",
+  "verifierSha256": "1a5d8aa9acd5e4f3ff9b17bf26c76e2fe81843675cdc7b3cc4dcba0a8d01f358",
+  "condition": "Exact Git archive; no working-tree overlay; app builds before sibling install",
+  "providerCallsRequested": false,
+  "networkIsolated": false,
+  "checks": [
+    {
+      "name": "app frozen install",
+      "cwd": "jev-experiments/experience-prototypes",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 2.593,
+      "logSha256": "ef52c2278e774271316158bc694873c7c259f07233591b1aabc28c6ace6448d5",
+      "summaries": []
+    },
+    {
+      "name": "app production build",
+      "cwd": "jev-experiments/experience-prototypes",
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 9.536,
+      "logSha256": "6d758950743962381688a54f1a13ff18d3af07bb6492b288b663d5c9ac3a594f",
+      "summaries": []
+    },
+    {
+      "name": "adapter frozen install",
+      "cwd": "jev-experiments/adapters/typescript",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.422,
+      "logSha256": "6480ac115b21832c5208344e7f83020e531c9f35d1f0d945cb5f2d85c6d3f006",
+      "summaries": []
+    },
+    {
+      "name": "adapter TypeScript",
+      "cwd": "jev-experiments/adapters/typescript",
+      "command": [
+        "bunx",
+        "--no-install",
+        "tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 1.153,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "name": "native and adapter tests",
+      "cwd": "jev-experiments/adapters/typescript",
+      "command": [
+        "bun",
+        "test",
+        "index.test.ts",
+        "../../packages/decision-runtime/src/native.test.ts"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.127,
+      "logSha256": "cc715977ee96001cc2099d916d1c3c8af37319f542ef7152dec9f6c1825fb38e",
+      "summaries": [
+        "9 pass",
+        "0 fail",
+        "41 expect() calls"
+      ]
+    },
+    {
+      "name": "Python frozen install",
+      "cwd": "jev-experiments/.",
+      "command": [
+        "uv",
+        "sync",
+        "--extra",
+        "dev",
+        "--frozen",
+        "--python",
+        "python3"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 2.311,
+      "logSha256": "17fd54d7f5ce1bda1166d9e7aff60a59f7f1aaca6569c0736d662bc695f3aa6e",
+      "summaries": []
+    },
+    {
+      "name": "Python contracts",
+      "cwd": "jev-experiments/.",
+      "command": [
+        "uv",
+        "run",
+        "--frozen",
+        "pytest",
+        "-q",
+        "tests"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 31.637,
+      "logSha256": "449858dd9a8f2b64902d4f84f86254c7f7a9121566194078952351c926be029f",
+      "summaries": [
+        "59 passed, 1 skipped in 30.63s"
+      ]
+    },
+    {
+      "name": "publication integrity",
+      "cwd": "jev-experiments/roadmap",
+      "command": [
+        "bun",
+        "verification/publication.ts"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.546,
+      "logSha256": "ced5aaecfb1b054cd42ebf8bd53a5f6f8942159d49a83fa8c3063f335bf0c3e7",
+      "summaries": []
+    }
+  ],
+  "passed": true
+}

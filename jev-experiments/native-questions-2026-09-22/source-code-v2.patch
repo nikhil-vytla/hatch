@@ -1,0 +1,2000 @@
+diff --git a/.github/workflows/jev-native-questions.yml b/.github/workflows/jev-native-questions.yml
+new file mode 100644
+index 0000000..398895d
+--- /dev/null
++++ b/.github/workflows/jev-native-questions.yml
+@@ -0,0 +1,47 @@
++name: Jev native questions
++on:
++  pull_request:
++    paths: ['jev-experiments/packages/decision-runtime/**', 'jev-experiments/adapters/**', 'jev-experiments/src/jev_lab/**', 'jev-experiments/tests/**', '.github/workflows/jev-native-questions.yml']
++  push:
++    branches: [main]
++    paths: ['jev-experiments/packages/decision-runtime/**', 'jev-experiments/adapters/**', 'jev-experiments/src/jev_lab/**', 'jev-experiments/tests/**', '.github/workflows/jev-native-questions.yml']
++  workflow_dispatch:
++permissions:
++  contents: read
++jobs:
++  typescript:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: oven-sh/setup-bun@v2
++        with: { bun-version: '1.3.14' }
++      - run: bun install --frozen-lockfile
++        working-directory: jev-experiments/adapters/typescript
++      - run: bunx --no-install tsc --noEmit
++        working-directory: jev-experiments/adapters/typescript
++      - run: bun test index.test.ts ../../packages/decision-runtime/src/native.test.ts
++        working-directory: jev-experiments/adapters/typescript
++  python:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: astral-sh/setup-uv@v6
++      - run: uv sync --extra dev --frozen
++        working-directory: jev-experiments
++      - run: uv run --frozen pytest -q tests
++        working-directory: jev-experiments
++  go:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-go@v5
++        with: { go-version-file: jev-experiments/adapters/go/go.mod }
++      - run: go test ./...
++        working-directory: jev-experiments/adapters/go
++  rust:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: dtolnay/rust-toolchain@stable
++      - run: cargo test --locked
++        working-directory: jev-experiments/adapters/rust
+diff --git a/jev-experiments/adapters/go/adapter.go b/jev-experiments/adapters/go/adapter.go
+index c462692..07996c4 100644
+--- a/jev-experiments/adapters/go/adapter.go
++++ b/jev-experiments/adapters/go/adapter.go
+@@ -1,9 +1,11 @@
+ package adapter
+ 
+ import (
++	"bytes"
+ 	"encoding/json"
+ 	"fmt"
+ 	"math"
++	"reflect"
+ 	"strings"
+ 
+ 	"github.com/go-playground/validator/v10"
+@@ -12,15 +14,44 @@ import (
+ 
+ type Question struct {
+ 	Type         string `json:"type"`
+-	Instructions string `json:"instructions"`
++	Instructions any    `json:"instructions"`
+ 	Criteria     any    `json:"criteria,omitempty"`
+ }
+ type Answer struct {
+-	Type          string             `json:"type"`
+-	Value         any                `json:"value"`
+-	Probabilities map[string]float64 `json:"probabilities"`
+-	Confidence    *float64           `json:"confidence"`
++	Type                 string             `json:"type"`
++	Value                any                `json:"value"`
++	Probabilities        map[string]float64 `json:"probabilities"`
++	Confidence           *float64           `json:"confidence"`
++	Legend               map[string]any     `json:"legend,omitempty"`
++	Argmax               *int               `json:"argmax,omitempty"`
++	ProbabilityTrue      *float64           `json:"probabilityTrue,omitempty"`
++	ConfidenceDefinition string             `json:"confidenceDefinition,omitempty"`
++	NativeValue          any                `json:"nativeValue,omitempty"`
++	ProbabilityMass      *float64           `json:"probabilityMass,omitempty"`
+ }
++
++func (a *Answer) UnmarshalJSON(data []byte) error {
++	type wire Answer
++	var decoded wire
++	decoder := json.NewDecoder(bytes.NewReader(data))
++	decoder.DisallowUnknownFields()
++	if err := decoder.Decode(&decoded); err != nil {
++		return err
++	}
++	*a = Answer(decoded)
++	return nil
++}
++
++func entry(value any) bool {
++	switch value.(type) {
++	case nil, string, object, []any:
++		_, err := json.Marshal(value)
++		return err == nil
++	default:
++		return false
++	}
++}
++
+ type Decision[T any] struct {
+ 	Value     T                   `json:"value"`
+ 	Answers   map[string]Answer   `json:"answers"`
+@@ -88,6 +119,13 @@ func compileMap(root object) (map[string]Question, error) {
+ 			return err
+ 		}
+ 		kind, _ := schema["type"].(string)
++		for key := range schema {
++			if strings.HasPrefix(key, "x-jev-") {
++				if kind == "object" || key != "x-jev-instructions" && key != "x-jev-criteria" && key != "x-jev-levels" {
++					return fmt.Errorf("unknown or misplaced Jev annotation: %s", key)
++				}
++			}
++		}
+ 		if kind == "object" {
+ 			properties, ok := schema["properties"].(object)
+ 			if !ok || len(properties) == 0 {
+@@ -121,42 +159,75 @@ func compileMap(root object) (map[string]Question, error) {
+ 			}
+ 			return nil
+ 		}
++		instructions, explicit := schema["x-jev-instructions"]
+ 		description, _ := schema["description"].(string)
+-		if strings.TrimSpace(description) == "" || path == "" {
++		if !explicit {
++			instructions = description
++		}
++		if (!explicit && strings.TrimSpace(description) == "") || path == "" || !entry(instructions) {
+ 			return fmt.Errorf("semantic description required: %s", path)
+ 		}
+-		q := Question{Instructions: description}
++		q := Question{Instructions: instructions}
++		_, hasLevels := schema["x-jev-levels"]
++		criteriaValue, hasCriteria := schema["x-jev-criteria"]
++		if hasLevels && (kind != "number" || hasCriteria) {
++			return fmt.Errorf("misplaced score rubric")
++		}
+ 		if kind == "string" {
+ 			options, ok := schema["enum"].([]any)
+ 			if !ok || len(options) < 2 || len(options) > 255 {
+ 				return fmt.Errorf("only finite string enums are supported")
+ 			}
+-			criteria := map[string]string{}
++			criteria := object{}
+ 			for _, option := range options {
+ 				value, ok := option.(string)
+-				if !ok {
++				_, duplicate := criteria[value]
++				if !ok || strings.TrimSpace(value) == "" || duplicate {
+ 					return fmt.Errorf("enum option must be string")
+ 				}
+ 				criteria[value] = strings.ReplaceAll(value, "_", " ")
+ 			}
++			if hasCriteria {
++				native, ok := criteriaValue.(object)
++				if !ok || len(native) != len(criteria) {
++					return fmt.Errorf("criteria must match enum")
++				}
++				for key := range criteria {
++					value, exists := native[key]
++					if !exists || !entry(value) {
++						return fmt.Errorf("criteria must match enum with native entries")
++					}
++				}
++				criteria = native
++			}
+ 			q.Type = "choice"
+ 			q.Criteria = criteria
+-		} else if kind == "boolean" || kind == "number" && schema["minimum"] == float64(0) && schema["maximum"] == float64(1) {
++		} else if kind == "boolean" || kind == "number" && !hasLevels && schema["minimum"] == float64(0) && schema["maximum"] == float64(1) {
+ 			q.Type = "noul"
++			if hasCriteria {
++				criteria, ok := criteriaValue.(object)
++				if !ok || len(criteria) != 2 {
++					return fmt.Errorf("Noul needs true and false criteria")
++				}
++				for _, key := range []string{"true", "false"} {
++					value, exists := criteria[key]
++					if !exists || !entry(value) {
++						return fmt.Errorf("Noul needs true and false native entries")
++					}
++				}
++				q.Criteria = criteria
++			}
+ 		} else if levels, ok := schema["x-jev-levels"].([]any); kind == "number" && ok {
+-			if len(levels) < 2 || len(levels) > 255 || schema["minimum"] != float64(0) || schema["maximum"] != float64(len(levels)-1) {
++			if len(levels) < 2 || len(levels) > 10 || schema["minimum"] != float64(0) || schema["maximum"] != float64(len(levels)-1) {
+ 				return fmt.Errorf("invalid explicit score rubric")
+ 			}
+-			criteria := []string{}
+ 			for _, x := range levels {
+-				s, ok := x.(string)
+-				if !ok {
+-					return fmt.Errorf("score levels must be strings")
++				if !entry(x) {
++					return fmt.Errorf("score levels must be native entries")
+ 				}
+-				criteria = append(criteria, s)
+ 			}
+ 			q.Type = "score"
+-			q.Criteria = criteria
++			q.Criteria = levels
+ 		} else {
+ 			return fmt.Errorf("unsupported semantic type: %s", path)
+ 		}
+@@ -182,6 +253,9 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
+ 	if err != nil {
+ 		return result, err
+ 	}
++	if len(answers) != len(questions) {
++		return result, fmt.Errorf("answer IDs must match questions")
++	}
+ 	for id, q := range questions {
+ 		a, ok := answers[id]
+ 		if !ok || a.Type != q.Type {
+@@ -189,7 +263,7 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
+ 		}
+ 		expected := map[string]bool{}
+ 		if q.Type == "choice" {
+-			options := q.Criteria.(map[string]string)
++			options := q.Criteria.(object)
+ 			v, ok := a.Value.(string)
+ 			if _, exists := options[v]; !ok || !exists {
+ 				return result, fmt.Errorf("unknown choice")
+@@ -200,10 +274,12 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
+ 		} else {
+ 			upper := 1.0
+ 			if q.Type == "score" {
+-				upper = float64(len(q.Criteria.([]string)) - 1)
++				upper = float64(len(q.Criteria.([]any)) - 1)
+ 				for i := 0; i <= int(upper); i++ {
+ 					expected[fmt.Sprint(i)] = true
+ 				}
++			} else {
++				expected["false"], expected["true"] = true, true
+ 			}
+ 			v, ok := a.Value.(float64)
+ 			if !ok || math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > upper {
+@@ -224,10 +300,51 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
+ 			if math.Abs(sum-1) > .025 {
+ 				return result, fmt.Errorf("malformed distribution")
+ 			}
++			if q.Type == "noul" && (math.Abs(a.Probabilities["true"]-a.Value.(float64)) > 1e-6 || math.Abs(a.Probabilities["false"]-(1-a.Value.(float64))) > 1e-6) {
++				return result, fmt.Errorf("Noul distribution disagrees with scalar")
++			}
++		} else if q.Type != "noul" {
++			return result, fmt.Errorf("complete choice/score distribution required")
+ 		}
+ 		if a.Confidence != nil && (math.IsNaN(*a.Confidence) || math.IsInf(*a.Confidence, 0) || *a.Confidence < 0 || *a.Confidence > 1) {
+ 			return result, fmt.Errorf("invalid confidence")
+ 		}
++		if a.ProbabilityTrue != nil && (q.Type != "noul" || math.IsNaN(*a.ProbabilityTrue) || math.Abs(*a.ProbabilityTrue-a.Value.(float64)) > 1e-6) {
++			return result, fmt.Errorf("invalid probabilityTrue")
++		}
++		if a.Argmax != nil {
++			if q.Type != "score" || *a.Argmax < 0 || *a.Argmax >= len(expected) {
++				return result, fmt.Errorf("invalid score argmax")
++			}
++			for _, p := range a.Probabilities {
++				if p > a.Probabilities[fmt.Sprint(*a.Argmax)] {
++					return result, fmt.Errorf("argmax is not a modal level")
++				}
++			}
++		}
++		if a.Legend != nil {
++			if len(a.Legend) != len(expected) {
++				return result, fmt.Errorf("legend must match the requested entries")
++			}
++			var descriptions object
++			if q.Type == "score" {
++				descriptions = object{}
++				for i, level := range q.Criteria.([]any) {
++					descriptions[fmt.Sprint(i)] = level
++				}
++			} else if q.Criteria != nil {
++				descriptions = q.Criteria.(object)
++			}
++			for key := range expected {
++				actual, exists := a.Legend[key]
++				if !exists || !entry(actual) {
++					return result, fmt.Errorf("legend needs every requested native entry")
++				}
++				if descriptions != nil && !reflect.DeepEqual(actual, descriptions[key]) {
++					return result, fmt.Errorf("legend changed requested descriptions")
++				}
++			}
++		}
+ 	}
+ 	var decode func(object, string) (any, error)
+ 	decode = func(raw object, path string) (any, error) {
+diff --git a/jev-experiments/adapters/go/adapter_test.go b/jev-experiments/adapters/go/adapter_test.go
+index 5180775..be85b81 100644
+--- a/jev-experiments/adapters/go/adapter_test.go
++++ b/jev-experiments/adapters/go/adapter_test.go
+@@ -1,9 +1,13 @@
+ package adapter
+ 
+ import (
+-	"github.com/invopop/jsonschema"
++	"encoding/json"
+ 	"math"
++	"reflect"
++	"strings"
+ 	"testing"
++
++	"github.com/invopop/jsonschema"
+ )
+ 
+ type Ticket struct {
+@@ -55,3 +59,215 @@ func TestReferences(t *testing.T) {
+ 		t.Fatalf("%v %v", q, e)
+ 	}
+ }
++
++func nativeSchema(t *testing.T, field string) *jsonschema.Schema {
++	t.Helper()
++	var schema jsonschema.Schema
++	if err := json.Unmarshal([]byte(`{"type":"object","required":["value"],"properties":{"value":`+field+`}}`), &schema); err != nil {
++		t.Fatal(err)
++	}
++	// invopop's reflected-schema API carries custom annotations in Extras.
++	var raw map[string]any
++	if err := json.Unmarshal([]byte(field), &raw); err != nil {
++		t.Fatal(err)
++	}
++	property, _ := schema.Properties.Get("value")
++	property.Extras = map[string]any{}
++	for key, value := range raw {
++		if strings.HasPrefix(key, "x-jev-") {
++			property.Extras[key] = value
++		}
++	}
++	return &schema
++}
++
++func TestNativeAnnotationShapesAndScorePrecedence(t *testing.T) {
++	schema := nativeSchema(t, `{"type":"number","minimum":0,"maximum":1,"x-jev-instructions":null,"x-jev-levels":[{"meaning":"routine"},["severe",null]]}`)
++	questions, err := Compile(schema)
++	if err != nil || questions["value"].Type != "score" || questions["value"].Instructions != nil {
++		t.Fatalf("%+v %v", questions, err)
++	}
++	levels := questions["value"].Criteria.([]any)
++	if !reflect.DeepEqual(levels, []any{object{"meaning": "routine"}, []any{"severe", nil}}) {
++		t.Fatalf("lost rubric: %+v", levels)
++	}
++	for _, field := range []string{
++		`{"type":"boolean","x-jev-instructions":{"question":["Check",null]},"x-jev-criteria":{"true":{"has":"evidence"},"false":null}}`,
++		`{"type":"string","enum":["a","b"],"x-jev-instructions":[],"x-jev-criteria":{"a":{"subtree":[true,2]},"b":null}}`,
++	} {
++		if _, err := Compile(nativeSchema(t, field)); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
++
++func TestRejectsUnknownOrMisplacedNativeAnnotations(t *testing.T) {
++	for _, field := range []string{
++		`{"type":"boolean","description":"Check","x-jev-levels":["no","yes"]}`,
++		`{"type":"boolean","description":"Check","x-jev-critera":{"true":"yes","false":"no"}}`,
++		`{"type":"boolean","description":"Check","x-jev-criteria":null}`,
++		`{"type":"boolean","x-jev-instructions":3}`,
++		`{"type":"string","description":"Choose","enum":["a","b"],"x-jev-criteria":{"a":"A","different":"B"}}`,
++		`{"type":"number","description":"Rate","minimum":0,"maximum":10,"x-jev-levels":["0","1","2","3","4","5","6","7","8","9","10"]}`,
++		`{"type":"number","description":"Rate","minimum":0,"maximum":1,"x-jev-levels":["low","high"],"x-jev-criteria":{"true":"yes","false":"no"}}`,
++	} {
++		if _, err := Compile(nativeSchema(t, field)); err == nil {
++			t.Fatalf("accepted %s", field)
++		}
++	}
++}
++
++func TestNoulDistributionAndMetadataSurviveDecode(t *testing.T) {
++	raw := []byte(`{"area":{"type":"choice","value":"billing","probabilities":{"billing":0.9,"technical":0.03,"account":0.03,"other":0.04},"confidence":0.8,"confidenceDefinition":"provider-distribution-confidence"},"refund":{"type":"noul","value":0.9,"probabilities":{"false":0.1,"true":0.9},"probabilityTrue":0.9,"confidence":null},"missing_context":{"type":"noul","value":0.2,"probabilities":{"false":0.8,"true":0.2},"probabilityTrue":0.2,"confidence":null}}`)
++	var answers map[string]Answer
++	if err := json.Unmarshal(raw, &answers); err != nil {
++		t.Fatal(err)
++	}
++	result, err := Decode[Ticket](jsonschema.Reflect(&Ticket{}), answers)
++	if err != nil || !result.Value.Refund {
++		t.Fatalf("%+v %v", result, err)
++	}
++	encoded, err := json.Marshal(result.Answers)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var before, after any
++	json.Unmarshal(raw, &before)
++	json.Unmarshal(encoded, &after)
++	if !reflect.DeepEqual(before, after) {
++		t.Fatalf("metadata changed: %s", encoded)
++	}
++	bad := answers["refund"]
++	bad.Probabilities["true"], bad.Probabilities["false"] = .1, .9
++	answers["refund"] = bad
++	if _, err := Decode[Ticket](jsonschema.Reflect(&Ticket{}), answers); err == nil {
++		t.Fatal("accepted inconsistent Noul distribution")
++	}
++}
++
++func TestScoreLegendAndContinuousValueSurviveDecode(t *testing.T) {
++	type Result struct {
++		Value float64 `json:"value"`
++	}
++	schema := nativeSchema(t, `{"type":"number","minimum":0,"maximum":1,"x-jev-instructions":null,"x-jev-levels":[{"meaning":"routine"},["severe",null]]}`)
++	var answers map[string]Answer
++	if err := json.Unmarshal([]byte(`{"value":{"type":"score","value":0.35,"probabilities":{"0":0.65,"1":0.35},"confidence":0.4,"argmax":0,"legend":{"0":{"meaning":"routine"},"1":["severe",null]}}}`), &answers); err != nil {
++		t.Fatal(err)
++	}
++	result, err := Decode[Result](schema, answers)
++	if err != nil || result.Value.Value != .35 || *result.Answers["value"].Argmax != 0 {
++		t.Fatalf("%+v %v", result, err)
++	}
++	answers["value"].Legend["0"] = "different rubric"
++	if _, err := Decode[Result](schema, answers); err == nil {
++		t.Fatal("accepted changed legend")
++	}
++}
++
++func TestUnrecognizedAnswerMetadataCannotDisappear(t *testing.T) {
++	var answer Answer
++	if err := json.Unmarshal([]byte(`{"type":"noul","value":0.5,"unrecognizedMeaning":"lost"}`), &answer); err == nil {
++		t.Fatal("ignored unknown answer field")
++	}
++	answers := fixture()
++	area := answers["area"]
++	area.Probabilities = nil
++	answers["area"] = area
++	if _, err := Decode[Ticket](jsonschema.Reflect(&Ticket{}), answers); err == nil {
++		t.Fatal("accepted missing Choice distribution")
++	}
++}
++
++func TestNativeLegendsPreserveRequestedDescriptions(t *testing.T) {
++	type Result struct {
++		Value any `json:"value"`
++	}
++	for _, tc := range []struct {
++		name, field, answer, first string
++	}{
++		{"choice", `{"type":"string","enum":["a","b"],"description":"Choose","x-jev-criteria":{"a":{"boundary":[true,2,null]},"b":null}}`, `{"type":"choice","value":"a","probabilities":{"a":0.6,"b":0.4},"legend":{"a":{"boundary":[true,2,null]},"b":null}}`, "a"},
++		{"noul", `{"type":"boolean","description":"Check","x-jev-criteria":{"true":{"boundary":[true,2,null]},"false":null}}`, `{"type":"noul","value":0.6,"probabilities":{"true":0.6,"false":0.4},"legend":{"true":{"boundary":[true,2,null]},"false":null}}`, "true"},
++		{"score", `{"type":"number","minimum":0,"maximum":1,"description":"Rate","x-jev-levels":[{"boundary":[true,2,null]},null]}`, `{"type":"score","value":0.4,"probabilities":{"0":0.6,"1":0.4},"legend":{"0":{"boundary":[true,2,null]},"1":null}}`, "0"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			schema := nativeSchema(t, tc.field)
++			fresh := func() map[string]Answer {
++				var a Answer
++				if err := json.Unmarshal([]byte(tc.answer), &a); err != nil {
++					t.Fatal(err)
++				}
++				return map[string]Answer{"value": a}
++			}
++			answers := fresh()
++			result, err := Decode[Result](schema, answers)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(result.Answers, answers) {
++				t.Fatal("decode changed a valid legend")
++			}
++			for _, mutation := range []string{"description", "missing", "extra", "scalar"} {
++				t.Run(mutation, func(t *testing.T) {
++					bad := fresh()
++					legend := bad["value"].Legend
++					switch mutation {
++					case "description":
++						legend[tc.first] = object{"boundary": []any{float64(1), float64(2), nil}}
++					case "missing":
++						delete(legend, tc.first)
++					case "extra":
++						legend["extra"] = nil
++					case "scalar":
++						legend[tc.first] = true
++					}
++					if _, err := Decode[Result](schema, bad); err == nil {
++						t.Fatal("accepted a changed or incomplete legend")
++					}
++				})
++			}
++		})
++	}
++}
++
++func TestPlainNoulLegendUsesNativeBoundaryEntries(t *testing.T) {
++	type Result struct {
++		Value bool `json:"value"`
++	}
++	schema := nativeSchema(t, `{"type":"boolean","description":"Check"}`)
++	for _, legend := range []object{
++		{"true": object{"evidence": []any{true, float64(2)}}, "false": nil},
++		{"true": "Criterion met", "false": []any{"Criterion absent"}},
++	} {
++		answers := map[string]Answer{"value": {Type: "noul", Value: .6, Legend: legend}}
++		result, err := Decode[Result](schema, answers)
++		if err != nil || !result.Value.Value || !reflect.DeepEqual(result.Answers, answers) {
++			t.Fatalf("plain Noul legend was rejected or changed: %v", err)
++		}
++	}
++	for _, legend := range []object{
++		{"true": "Yes"},
++		{"true": "Yes", "false": "No", "extra": nil},
++		{"true": "Yes", "other": nil},
++		{"true": true, "false": nil},
++		{"true": "Yes", "false": float64(0)},
++	} {
++		if _, err := Decode[Result](schema, map[string]Answer{"value": {Type: "noul", Value: .6, Legend: legend}}); err == nil {
++			t.Fatal("plain Noul accepted invalid boundary entries")
++		}
++	}
++}
++
++func TestDefaultChoiceLegendUsesGeneratedDescriptions(t *testing.T) {
++	type Result struct {
++		Value string `json:"value"`
++	}
++	schema := nativeSchema(t, `{"type":"string","enum":["not_ready","ready"],"description":"Choose"}`)
++	answers := map[string]Answer{"value": {Type: "choice", Value: "ready", Probabilities: map[string]float64{"not_ready": .2, "ready": .8}, Legend: object{"not_ready": "not ready", "ready": "ready"}}}
++	if _, err := Decode[Result](schema, answers); err != nil {
++		t.Fatal(err)
++	}
++	answers["value"].Legend["not_ready"] = "different"
++	if _, err := Decode[Result](schema, answers); err == nil {
++		t.Fatal("default Choice accepted changed descriptions")
++	}
++}
+diff --git a/jev-experiments/adapters/rust/src/lib.rs b/jev-experiments/adapters/rust/src/lib.rs
+index 8ec36f4..1d3a80f 100644
+--- a/jev-experiments/adapters/rust/src/lib.rs
++++ b/jev-experiments/adapters/rust/src/lib.rs
+@@ -5,13 +5,42 @@ use serde_json::{json, Map, Value};
+ use std::collections::BTreeMap;
+ 
+ pub type LabResult<T> = Result<T, String>;
+-#[derive(Debug, Clone, Serialize, Deserialize)]
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
+ pub struct Answer {
+     #[serde(rename = "type")]
+     pub kind: String,
+     pub value: Value,
+     pub probabilities: Option<BTreeMap<String, f64>>,
+     pub confidence: Option<f64>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub legend: Option<BTreeMap<String, Value>>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub argmax: Option<usize>,
++    #[serde(
++        rename = "probabilityTrue",
++        default,
++        skip_serializing_if = "Option::is_none"
++    )]
++    pub probability_true: Option<f64>,
++    #[serde(
++        rename = "confidenceDefinition",
++        default,
++        skip_serializing_if = "Option::is_none"
++    )]
++    pub confidence_definition: Option<String>,
++    #[serde(
++        rename = "nativeValue",
++        default,
++        skip_serializing_if = "Option::is_none"
++    )]
++    pub native_value: Option<Value>,
++    #[serde(
++        rename = "probabilityMass",
++        default,
++        skip_serializing_if = "Option::is_none"
++    )]
++    pub probability_mass: Option<f64>,
+ }
+ pub type Answers = BTreeMap<String, Answer>;
+ #[derive(Debug, Serialize)]
+@@ -21,6 +50,13 @@ pub struct Decision<T> {
+     pub questions: Map<String, Value>,
+ }
+ 
++fn entry(value: &Value) -> bool {
++    matches!(
++        value,
++        Value::Null | Value::String(_) | Value::Object(_) | Value::Array(_)
++    )
++}
++
+ fn resolve(schema: &Value, root: &Value, depth: usize) -> LabResult<Value> {
+     if depth > 12 {
+         return Err("Recursive schema or nesting exceeds 12 levels".into());
+@@ -64,6 +100,15 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
+         }
+         let schema = resolve(raw, root, 0)?;
+         let kind = schema["type"].as_str().unwrap_or("");
++        for key in schema.as_object().ok_or("Expected schema object")?.keys() {
++            if key.starts_with("x-jev-")
++                && (kind == "object"
++                    || !["x-jev-instructions", "x-jev-criteria", "x-jev-levels"]
++                        .contains(&key.as_str()))
++            {
++                return Err(format!("Unknown or misplaced Jev annotation: {key}"));
++            }
++        }
+         if kind == "object" {
+             let properties = schema["properties"].as_object().ok_or("Empty object")?;
+             if properties.is_empty() {
+@@ -91,10 +136,22 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
+             }
+             return Ok(());
+         }
+-        let description = schema["description"]
+-            .as_str()
+-            .filter(|s| !s.trim().is_empty())
+-            .ok_or_else(|| format!("Missing semantic description: {path}"))?;
++        let instructions = match schema.get("x-jev-instructions") {
++            Some(value) if entry(value) => value.clone(),
++            Some(_) => return Err("Instructions must be a native entry".into()),
++            None => Value::String(
++                schema["description"]
++                    .as_str()
++                    .filter(|s| !s.trim().is_empty())
++                    .ok_or_else(|| format!("Missing semantic description: {path}"))?
++                    .into(),
++            ),
++        };
++        let has_levels = schema.get("x-jev-levels").is_some();
++        let native_criteria = schema.get("x-jev-criteria");
++        if has_levels && (kind != "number" || native_criteria.is_some()) {
++            return Err("Misplaced score rubric".into());
++        }
+         let question = if kind == "string" {
+             let options = schema["enum"]
+                 .as_array()
+@@ -103,25 +160,56 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
+             let mut criteria = Map::new();
+             for option in options {
+                 let value = option.as_str().ok_or("Enum option must be a string")?;
++                if value.trim().is_empty() || criteria.contains_key(value) {
++                    return Err("Enum options must be nonempty and unique".into());
++                }
+                 criteria.insert(value.into(), Value::String(value.replace('_', " ")));
+             }
+-            json!({"type":"choice", "instructions":description, "criteria":criteria})
++            if let Some(native) = native_criteria {
++                let native = native
++                    .as_object()
++                    .ok_or("Choice criteria must be named entries")?;
++                if native.len() != criteria.len()
++                    || criteria
++                        .keys()
++                        .any(|key| !native.get(key).is_some_and(entry))
++                {
++                    return Err("Criteria must match the enum with native entries".into());
++                }
++                criteria = native.clone();
++            }
++            json!({"type":"choice", "instructions":instructions, "criteria":criteria})
+         } else if kind == "boolean"
+             || kind == "number"
++                && !has_levels
+                 && schema["minimum"].as_f64() == Some(0.0)
+                 && schema["maximum"].as_f64() == Some(1.0)
+         {
+-            json!({"type":"noul", "instructions":description})
++            let mut question = json!({"type":"noul", "instructions":instructions});
++            if let Some(native) = native_criteria {
++                let criteria = native
++                    .as_object()
++                    .ok_or("Noul needs true and false entries")?;
++                if criteria.len() != 2
++                    || !["true", "false"]
++                        .iter()
++                        .all(|key| criteria.get(*key).is_some_and(entry))
++                {
++                    return Err("Noul needs true and false native entries".into());
++                }
++                question["criteria"] = native.clone();
++            }
++            question
+         } else if kind == "number" && schema["x-jev-levels"].is_array() {
+             let levels = schema["x-jev-levels"].as_array().unwrap();
+-            if !(2..=255).contains(&levels.len())
+-                || !levels.iter().all(Value::is_string)
++            if !(2..=10).contains(&levels.len())
++                || !levels.iter().all(entry)
+                 || schema["minimum"].as_f64() != Some(0.0)
+                 || schema["maximum"].as_f64() != Some((levels.len() - 1) as f64)
+             {
+                 return Err("Invalid explicit score rubric".into());
+             }
+-            json!({"type":"score", "instructions":description, "criteria":levels})
++            json!({"type":"score", "instructions":instructions, "criteria":levels})
+         } else {
+             return Err(format!("Unsupported semantic type: {path}"));
+         };
+@@ -138,6 +226,9 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
+ 
+ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResult<Decision<T>> {
+     let questions = compile(schema)?;
++    if answers.len() != questions.len() {
++        return Err("Answer IDs must match questions".into());
++    }
+     for (id, question) in &questions {
+         let answer = answers
+             .get(id)
+@@ -173,7 +264,7 @@ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResul
+                 if answer.kind == "score" {
+                     (0..=upper as usize).map(|i| i.to_string()).collect()
+                 } else {
+-                    vec![]
++                    vec!["false".into(), "true".into()]
+                 }
+             }
+         };
+@@ -186,6 +277,14 @@ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResul
+             {
+                 return Err("Malformed distribution".into());
+             }
++            if answer.kind == "noul"
++                && ((probs["true"] - answer.value.as_f64().unwrap()).abs() > 1e-6
++                    || (probs["false"] - (1.0 - answer.value.as_f64().unwrap())).abs() > 1e-6)
++            {
++                return Err("Noul distribution disagrees with scalar".into());
++            }
++        } else if answer.kind != "noul" {
++            return Err("Complete Choice/Score distribution required".into());
+         }
+         if answer
+             .confidence
+@@ -193,6 +292,44 @@ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResul
+         {
+             return Err("Invalid confidence".into());
+         }
++        if let Some(probability) = answer.probability_true {
++            if answer.kind != "noul"
++                || !probability.is_finite()
++                || (probability - answer.value.as_f64().unwrap()).abs() > 1e-6
++            {
++                return Err("Invalid probabilityTrue".into());
++            }
++        }
++        if let Some(argmax) = answer.argmax {
++            if answer.kind != "score" || argmax >= expected.len() {
++                return Err("Invalid Score argmax".into());
++            }
++            let probabilities = answer.probabilities.as_ref().unwrap();
++            if probabilities
++                .values()
++                .any(|p| *p > probabilities[&argmax.to_string()])
++            {
++                return Err("Argmax is not a modal level".into());
++            }
++        }
++        if let Some(legend) = &answer.legend {
++            if legend.len() != expected.len()
++                || expected.iter().any(|key| !legend.get(key).is_some_and(entry))
++            {
++                return Err("Legend needs every requested native entry".into());
++            }
++            let descriptions: Option<Map<String, Value>> = if answer.kind == "score" {
++                Some(question["criteria"].as_array().unwrap().iter().enumerate()
++                    .map(|(i, level)| (i.to_string(), level.clone())).collect())
++            } else {
++                question["criteria"].as_object().cloned()
++            };
++            if descriptions.as_ref().is_some_and(|requested|
++                expected.iter().any(|key| legend.get(key) != requested.get(key)))
++            {
++                return Err("Legend changed requested descriptions".into());
++            }
++        }
+     }
+     fn value(raw: &Value, root: &Value, path: &str, answers: &Answers) -> LabResult<Value> {
+         let schema = resolve(raw, root, 0)?;
+@@ -250,6 +387,7 @@ mod tests {
+                 value: json!(value),
+                 probabilities: None,
+                 confidence: None,
++                ..Default::default()
+             },
+         )])
+     }
+@@ -286,8 +424,156 @@ mod tests {
+                 value: json!("a"),
+                 probabilities: Some(BTreeMap::from([("a".into(), 1.0)])),
+                 confidence: None,
++                ..Default::default()
+             },
+         )]);
+         assert!(decode::<Value>(&schema, answers).is_err());
+     }
++
++    fn field_schema(field: Value) -> Value {
++        json!({"type":"object", "required":["value"], "properties":{"value":field}})
++    }
++
++    #[test]
++    fn native_annotations_and_two_level_score() {
++        let schema = field_schema(
++            json!({"type":"number","minimum":0,"maximum":1,"x-jev-instructions":null,"x-jev-levels":[{"when":"routine"},["severe",null]]}),
++        );
++        let question = &compile(&schema).unwrap()["value"];
++        assert_eq!(question["type"], "score");
++        assert!(question["instructions"].is_null());
++        assert_eq!(
++            question["criteria"],
++            json!([{"when":"routine"},["severe",null]])
++        );
++        for field in [
++            json!({"type":"boolean","x-jev-instructions":{"question":["Check",null]},"x-jev-criteria":{"true":{"has":"evidence"},"false":null}}),
++            json!({"type":"string","enum":["a","b"],"x-jev-instructions":[],"x-jev-criteria":{"a":{"tree":[true,2]},"b":null}}),
++        ] {
++            assert!(compile(&field_schema(field)).is_ok());
++        }
++    }
++
++    #[test]
++    fn rejects_unknown_or_misplaced_annotations() {
++        for field in [
++            json!({"type":"boolean","description":"Check","x-jev-levels":["no","yes"]}),
++            json!({"type":"boolean","description":"Check","x-jev-critera":{"true":"yes","false":"no"}}),
++            json!({"type":"boolean","description":"Check","x-jev-criteria":null}),
++            json!({"type":"boolean","x-jev-instructions":3}),
++            json!({"type":"string","description":"Choose","enum":["a","b"],"x-jev-criteria":{"a":"A","different":"B"}}),
++            json!({"type":"number","description":"Rate","minimum":0,"maximum":10,"x-jev-levels":["0","1","2","3","4","5","6","7","8","9","10"]}),
++            json!({"type":"number","description":"Rate","minimum":0,"maximum":1,"x-jev-levels":["low","high"],"x-jev-criteria":{"true":"yes","false":"no"}}),
++        ] {
++            assert!(compile(&field_schema(field)).is_err());
++        }
++    }
++
++    #[test]
++    fn preserves_noul_distribution_and_metadata() {
++        let raw = json!({"refund":{"type":"noul","value":0.9,"probabilities":{"false":0.1,"true":0.9},"confidence":null,"probabilityTrue":0.9}});
++        let answers: Answers = serde_json::from_value(raw.clone()).unwrap();
++        let result = decode::<Flag>(&schemars::schema_for!(Flag).to_value(), answers).unwrap();
++        assert_eq!(serde_json::to_value(result.answers).unwrap(), raw);
++        let mut bad = raw;
++        bad["refund"]["probabilities"] = json!({"false":0.9,"true":0.1});
++        assert!(decode::<Flag>(
++            &schemars::schema_for!(Flag).to_value(),
++            serde_json::from_value(bad).unwrap()
++        )
++        .is_err());
++    }
++
++    #[test]
++    fn preserves_score_value_legend_and_argmax() {
++        let schema = field_schema(
++            json!({"type":"number","minimum":0,"maximum":1,"x-jev-instructions":null,"x-jev-levels":[{"meaning":"routine"},["severe",null]]}),
++        );
++        let raw = json!({"value":{"type":"score","value":0.35,"probabilities":{"0":0.65,"1":0.35},"confidence":0.4,"confidenceDefinition":"provider-distribution-confidence","argmax":0,"legend":{"0":{"meaning":"routine"},"1":["severe",null]}}});
++        let result =
++            decode::<Value>(&schema, serde_json::from_value(raw.clone()).unwrap()).unwrap();
++        assert_eq!(result.value["value"], 0.35);
++        assert_eq!(serde_json::to_value(result.answers).unwrap(), raw);
++        let mut bad = raw;
++        bad["value"]["legend"]["0"] = json!("changed");
++        assert!(decode::<Value>(&schema, serde_json::from_value(bad).unwrap()).is_err());
++    }
++
++    #[test]
++    fn unknown_answer_metadata_and_missing_distribution_are_errors() {
++        assert!(serde_json::from_value::<Answer>(
++            json!({"type":"noul","value":0.5,"lostMeaning":true})
++        )
++        .is_err());
++        let schema = field_schema(json!({"type":"string","enum":["a","b"],"description":"Choose"}));
++        let answers = serde_json::from_value(
++            json!({"value":{"type":"choice","value":"a","confidence":null}}),
++        )
++        .unwrap();
++        assert!(decode::<Value>(&schema, answers).is_err());
++    }
++
++    #[test]
++    fn native_legends_preserve_requested_descriptions() {
++        let cases = [
++            ("choice", json!({"type":"string","enum":["a","b"],"description":"Choose","x-jev-criteria":{"a":{"boundary":[true,2,null]},"b":null}}), json!({"type":"choice","value":"a","probabilities":{"a":0.6,"b":0.4},"legend":{"a":{"boundary":[true,2,null]},"b":null}}), "a"),
++            ("noul", json!({"type":"boolean","description":"Check","x-jev-criteria":{"true":{"boundary":[true,2,null]},"false":null}}), json!({"type":"noul","value":0.6,"probabilities":{"true":0.6,"false":0.4},"legend":{"true":{"boundary":[true,2,null]},"false":null}}), "true"),
++            ("score", json!({"type":"number","minimum":0,"maximum":1,"description":"Rate","x-jev-levels":[{"boundary":[true,2,null]},null]}), json!({"type":"score","value":0.4,"probabilities":{"0":0.6,"1":0.4},"legend":{"0":{"boundary":[true,2,null]},"1":null}}), "0"),
++        ];
++        for (name, field, answer, first) in cases {
++            let schema = field_schema(field);
++            let raw = json!({"value": answer});
++            let answers: Answers = serde_json::from_value(raw.clone()).unwrap();
++            let before = serde_json::to_value(&answers).unwrap();
++            let result = decode::<Value>(&schema, answers)
++                .unwrap_or_else(|error| panic!("{name}: {error}"));
++            assert_eq!(serde_json::to_value(result.answers).unwrap(), before);
++            for mutation in ["description", "missing", "extra", "scalar"] {
++                let mut bad = raw.clone();
++                let legend = bad["value"]["legend"].as_object_mut().unwrap();
++                match mutation {
++                    "description" => { legend.insert(first.into(), json!({"boundary":[1,2,null]})); },
++                    "missing" => { legend.remove(first); },
++                    "extra" => { legend.insert("extra".into(), Value::Null); },
++                    _ => { legend.insert(first.into(), json!(true)); },
++                }
++                assert!(decode::<Value>(&schema, serde_json::from_value(bad).unwrap()).is_err(), "{name}: {mutation}");
++            }
++        }
++    }
++
++    #[test]
++    fn plain_noul_legend_uses_native_boundary_entries() {
++        let schema = field_schema(json!({"type":"boolean","description":"Check"}));
++        for legend in [
++            json!({"true":{"evidence":[true,2]},"false":null}),
++            json!({"true":"Criterion met","false":["Criterion absent"]}),
++        ] {
++            let answers: Answers = serde_json::from_value(json!({"value":{"type":"noul","value":0.6,"legend":legend}})).unwrap();
++            let before = serde_json::to_value(&answers).unwrap();
++            let result = decode::<Value>(&schema, answers).unwrap();
++            assert_eq!(result.value["value"], true);
++            assert_eq!(serde_json::to_value(result.answers).unwrap(), before);
++        }
++        for legend in [
++            json!({"true":"Yes"}),
++            json!({"true":"Yes","false":"No","extra":null}),
++            json!({"true":"Yes","other":null}),
++            json!({"true":true,"false":null}),
++            json!({"true":"Yes","false":0}),
++        ] {
++            let answers = serde_json::from_value(json!({"value":{"type":"noul","value":0.6,"legend":legend}})).unwrap();
++            assert!(decode::<Value>(&schema, answers).is_err());
++        }
++    }
++
++    #[test]
++    fn default_choice_legend_uses_generated_descriptions() {
++        let schema = field_schema(json!({"type":"string","enum":["not_ready","ready"],"description":"Choose"}));
++        let mut raw = json!({"value":{"type":"choice","value":"ready","probabilities":{"not_ready":0.2,"ready":0.8},"legend":{"not_ready":"not ready","ready":"ready"}}});
++        assert!(decode::<Value>(&schema, serde_json::from_value(raw.clone()).unwrap()).is_ok());
++        raw["value"]["legend"]["not_ready"] = json!("different");
++        assert!(decode::<Value>(&schema, serde_json::from_value(raw).unwrap()).is_err());
++    }
++
+ }
+diff --git a/jev-experiments/adapters/typescript/index.test.ts b/jev-experiments/adapters/typescript/index.test.ts
+index 853c44d..adb361e 100644
+--- a/jev-experiments/adapters/typescript/index.test.ts
++++ b/jev-experiments/adapters/typescript/index.test.ts
+@@ -89,3 +89,39 @@ test("supports nested schema references and refuses cycles", () => {
+     compile({ $defs: { x: { $ref: "#/$defs/x" } }, $ref: "#/$defs/x" }),
+   ).toThrow();
+ });
++
++test("annotations preserve structured instructions, criteria and two-level Score semantics", () => {
++  const schema = {type: "object", required: ["kind", "present", "severity"], properties: {
++    kind: {type: "string", enum: ["bug", "other"], "x-jev-instructions": {ask: "Which?"}, "x-jev-criteria": {bug: ["Broken behavior"], other: null}},
++    present: {type: "boolean", description: "Evidence present?", "x-jev-criteria": {true: {needs: "citation"}, false: null}},
++    severity: {type: "number", minimum: 0, maximum: 1, "x-jev-instructions": null, "x-jev-levels": [{impact: "low"}, {impact: "high"}]},
++  }};
++  const questions = compile(schema);
++  expect(questions.kind.instructions).toEqual({ask: "Which?"});
++  expect(questions.kind.criteria).toEqual({bug: ["Broken behavior"], other: null});
++  expect(questions.present.criteria).toEqual({true: {needs: "citation"}, false: null});
++  expect(questions.severity.type).toBe("score");
++  expect(questions.severity.instructions).toBeNull();
++  expect(decode(schema, {
++    kind: {type: "choice", value: "other", probabilities: {bug: .3, other: .7}, confidence: .2},
++    present: {type: "noul", value: .4, probabilities: null, confidence: null},
++    severity: {type: "score", value: .65, probabilities: {"0": .35, "1": .65}, confidence: .1},
++  })).toEqual({kind: "other", present: false, severity: .65});
++});
++
++test("unknown, mismatched and excessive annotations fail before transport", () => {
++  const field = {type: "string", enum: ["a", "b"], description: "Which?"};
++  for (const unsupported of [
++    {...field, "x-jev-criterai": {a: "A", b: "B"}},
++    {...field, "x-jev-criteria": {a: "A", c: "C"}},
++    {...field, "x-jev-levels": ["A", "B"]},
++    {type: "number", minimum: 0, maximum: 10, description: "Rate", "x-jev-levels": Array(11).fill("level")},
++  ]) expect(() => compile({type: "object", required: ["q"], properties: {q: unsupported}})).toThrow();
++});
++
++test("native Noul probability maps must agree with the scalar", () => {
++  const schema = {type: "object", required: ["q"], properties: {q: {type: "boolean", description: "Present?"}}};
++  const answer: Answer = {type: "noul", value: .7, probabilities: {false: .3, true: .7}, confidence: null};
++  expect(decode(schema, {q: answer})).toEqual({q: true});
++  expect(() => decode(schema, {q: {...answer, probabilities: {false: .4, true: .6}}})).toThrow("Malformed");
++});
+diff --git a/jev-experiments/adapters/typescript/index.ts b/jev-experiments/adapters/typescript/index.ts
+index 7651ed5..889b7aa 100644
+--- a/jev-experiments/adapters/typescript/index.ts
++++ b/jev-experiments/adapters/typescript/index.ts
+@@ -1,14 +1,12 @@
+ import * as z from "zod";
+-export type Question = {
+-  type: "choice" | "noul" | "score";
+-  instructions: string;
+-  criteria?: Record<string, string> | string[];
+-};
++import { jsonEqual, jsonIssue, nativeQuestionIssue, type NativeQuestion, type Entry } from "../../packages/decision-runtime/src/native";
++export type Question = NativeQuestion;
+ export type Answer = {
+   type: "choice" | "noul" | "score";
+   value: string | number;
+   probabilities: Record<string, number> | null;
+   confidence: number | null;
++  legend?: Record<string, Entry>;
+ };
+ type Schema = Record<string, any>;
+ export type Transport = (
+@@ -38,12 +36,25 @@ function resolve(
+   };
+ }
+ export function compile(root: Schema): Record<string, Question> {
++  // Zod attaches non-JSON Standard Schema metadata to the root only.
++  const descriptors = Object.getOwnPropertyDescriptors(root);
++  if (descriptors["~standard"]?.enumerable === false) {
++    delete descriptors["~standard"];
++    root = Object.create(Object.getPrototypeOf(root), descriptors);
++  }
++  const issue = jsonIssue(root);
++  if (issue) throw Error(issue);
+   const questions: Record<string, Question> = Object.create(null);
+   const visit = (raw: Schema, path: string[], depth = 0) => {
+     if (depth > 12) throw Error("Schema nesting exceeds 12 levels");
+     const schema = resolve(raw, root),
+       id = path.join(".");
++    for (const key of Object.keys(schema))
++      if (key.startsWith("x-jev-") && !["x-jev-instructions", "x-jev-criteria", "x-jev-levels"].includes(key))
++        throw Error(`Unknown Jev annotation: ${key}`);
+     if (schema.type === "object") {
++      if (Object.keys(schema).some(key => key.startsWith("x-jev-")))
++        throw Error("Jev annotations belong on decision fields.");
+       if (!schema.properties || Object.keys(schema.properties).length === 0)
+         throw Error("Empty objects are not decisions");
+       for (const [key, value] of Object.entries(schema.properties)) {
+@@ -60,10 +71,11 @@ export function compile(root: Schema): Record<string, Question> {
+     }
+     if (
+       !id ||
+-      typeof schema.description !== "string" ||
+-      !schema.description.trim()
++      (!Object.hasOwn(schema, "x-jev-instructions") &&
++        (typeof schema.description !== "string" || !schema.description.trim()))
+     )
+       throw Error(`A semantic description is required: ${id}`);
++    const instructions = Object.hasOwn(schema, "x-jev-instructions") ? schema["x-jev-instructions"] : schema.description;
+     if (
+       schema.type === "string" &&
+       Array.isArray(schema.enum) &&
+@@ -73,16 +85,16 @@ export function compile(root: Schema): Record<string, Question> {
+     )
+       questions[id] = {
+         type: "choice",
+-        instructions: schema.description,
+-        criteria: Object.fromEntries(
++        instructions,
++        criteria: Object.hasOwn(schema, "x-jev-criteria") ? schema["x-jev-criteria"] : Object.fromEntries(
+           schema.enum.map((x: string) => [x, x.replaceAll("_", " ")]),
+         ),
+       };
+     else if (
+       schema.type === "boolean" ||
+-      (schema.type === "number" && schema.minimum === 0 && schema.maximum === 1)
++      (schema.type === "number" && schema.minimum === 0 && schema.maximum === 1 && !Object.hasOwn(schema, "x-jev-levels"))
+     )
+-      questions[id] = { type: "noul", instructions: schema.description };
++      questions[id] = { type: "noul", instructions, ...(Object.hasOwn(schema, "x-jev-criteria") ? {criteria: schema["x-jev-criteria"]} : {}) };
+     else if (
+       schema.type === "number" &&
+       Array.isArray(schema["x-jev-levels"]) &&
+@@ -92,13 +104,22 @@ export function compile(root: Schema): Record<string, Question> {
+     )
+       questions[id] = {
+         type: "score",
+-        instructions: schema.description,
++        instructions,
+         criteria: schema["x-jev-levels"],
+       };
+     else
+       throw Error(
+         `Unsupported semantic type at ${id}. Use a finite enum, boolean, probability, or explicit score rubric.`,
+       );
++    const q = questions[id];
++    const problem = nativeQuestionIssue(q);
++    if (problem) throw Error(`${id}: ${problem}`);
++    if (q.type === "choice" && (new Set(schema.enum).size !== schema.enum.length ||
++      Object.keys(q.criteria).length !== schema.enum.length || schema.enum.some((option: string) => !Object.hasOwn(q.criteria, option))))
++      throw Error(`Criteria must match the enum exactly: ${id}`);
++    if ((q.type !== "score" && Object.hasOwn(schema, "x-jev-levels")) ||
++      (q.type === "score" && Object.hasOwn(schema, "x-jev-criteria")))
++      throw Error(`Rubric annotation does not match the decision type: ${id}`);
+   };
+   visit(root, []);
+   return questions;
+@@ -109,23 +130,30 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
+     const a = answers[id];
+     if (!a || a.type !== q.type)
+       throw Error(`Missing or wrong answer type: ${id}`);
+-    if (q.type === "choice" && !(String(a.value) in q.criteria!))
++    if (
++      q.type === "choice" &&
++      (typeof a.value !== "string" || !Object.hasOwn(q.criteria!, a.value))
++    )
+       throw Error(`Unknown option: ${id}`);
+     if (
+       q.type !== "choice" &&
+       (typeof a.value !== "number" ||
+         !Number.isFinite(a.value) ||
+         a.value < 0 ||
+-        a.value > (q.type === "noul" ? 1 : (q.criteria as string[]).length - 1))
++        a.value > (q.type === "noul" ? 1 : q.criteria.length - 1))
+     )
+       throw Error(`Out of range: ${id}`);
+-    if (a.probabilities) {
++    if (q.type !== "noul" && a.probabilities == null)
++      throw Error(`Missing complete distribution: ${id}`);
++    if (a.probabilities != null) {
++      if (typeof a.probabilities !== "object" || Array.isArray(a.probabilities))
++        throw Error(`Malformed probabilities: ${id}`);
+       const expected =
+         q.type === "choice"
+           ? Object.keys(q.criteria!)
+           : q.type === "score"
+-            ? (q.criteria as string[]).map((_, i) => String(i))
+-            : [];
++            ? q.criteria.map((_, i) => String(i))
++            : ["false", "true"];
+       const entries = Object.entries(a.probabilities);
+       if (
+         entries.length !== expected.length ||
+@@ -133,7 +161,8 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
+           ([k, v]) =>
+             !expected.includes(k) || !Number.isFinite(v) || v < 0 || v > 1,
+         ) ||
+-        Math.abs(entries.reduce((s, [, v]) => s + v, 0) - 1) > 0.025
++        Math.abs(entries.reduce((s, [, v]) => s + v, 0) - 1) > 0.025 ||
++        (q.type === "noul" && (Math.abs(a.probabilities.true - Number(a.value)) > 1e-6 || Math.abs(a.probabilities.false - (1 - Number(a.value))) > 1e-6))
+       )
+         throw Error(`Malformed probabilities: ${id}`);
+     }
+@@ -142,6 +171,14 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
+       (!Number.isFinite(a.confidence) || a.confidence < 0 || a.confidence > 1)
+     )
+       throw Error(`Invalid confidence: ${id}`);
++    if (a.legend !== undefined) {
++      const keys = q.type === "choice" ? Object.keys(q.criteria) : q.type === "score" ? q.criteria.map((_, i) => String(i)) : ["false", "true"];
++      if (!a.legend || typeof a.legend !== "object" || Array.isArray(a.legend) || jsonIssue(a.legend) ||
++        Object.keys(a.legend).length !== keys.length || keys.some(key => !Object.hasOwn(a.legend!, key)))
++        throw Error(`Invalid legend: ${id}`);
++      const requested = q.type === "score" ? Object.fromEntries(q.criteria.map((level, i) => [String(i), level])) : q.criteria;
++      if (requested !== undefined && !jsonEqual(requested, a.legend)) throw Error(`Legend disagrees with descriptions: ${id}`);
++    }
+   }
+   const visit = (raw: Schema, path: string[]): unknown => {
+     const schema = resolve(raw, root);
+diff --git a/jev-experiments/packages/decision-runtime/src/native.test.ts b/jev-experiments/packages/decision-runtime/src/native.test.ts
+new file mode 100644
+index 0000000..028bf9d
+--- /dev/null
++++ b/jev-experiments/packages/decision-runtime/src/native.test.ts
+@@ -0,0 +1,26 @@
++import { expect, test } from "bun:test";
++import { jsonIssue, nativeQuestionIssue } from "./native";
++
++test("JSON transport rejects lossy values without invoking accessors", () => {
++  let read = false;
++  const getter = { get value() { read = true; return "side effect"; } };
++  const cycle: any = {}; cycle.self = cycle;
++  for (const value of [getter, cycle, {x: undefined}, {x: NaN}, new Date(), [1,,3], {x: 1n}, {x: () => 1}])
++    expect(jsonIssue(value)).not.toBeNull();
++  expect(read).toBe(false);
++  expect(jsonIssue({same: {x: null}, nested: [true, 2, "value"]})).toBeNull();
++  const shared = {value: true};
++  expect(jsonIssue([shared, shared])).toBeNull();
++});
++
++test("native structure supports all entry shapes while enforcing documented Score limits", () => {
++  expect(nativeQuestionIssue({type: "choice", instructions: {ask: ["Which?", null]}, criteria: {a: null, b: [{evidence: true}]}})).toBeNull();
++  expect(nativeQuestionIssue({type: "noul", instructions: null, criteria: {true: {means: "Explicit evidence"}, false: ["Missing evidence"]}})).toBeNull();
++  expect(nativeQuestionIssue({type: "score", instructions: ["Rate"], criteria: Array(10).fill(null)})).toBeNull();
++  for (const q of [
++    {type: "score", instructions: "Rate", criteria: Array(11).fill("level")},
++    {type: "noul", instructions: "True?", criteria: {true: "yes"}},
++    {type: "choice", instructions: "Pick", criteria: {a: 3, b: "text"}},
++    {type: "choice", instructions: true, criteria: {a: null, b: "text"}},
++  ]) expect(nativeQuestionIssue(q)).not.toBeNull();
++});
+diff --git a/jev-experiments/packages/decision-runtime/src/native.ts b/jev-experiments/packages/decision-runtime/src/native.ts
+new file mode 100644
+index 0000000..ab1b9fa
+--- /dev/null
++++ b/jev-experiments/packages/decision-runtime/src/native.ts
+@@ -0,0 +1,85 @@
++/** Native Jev entries preserve JSON structure. Numbers/booleans are allowed inside an entry. */
++export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
++export type Entry = string | null | Json[] | { [key: string]: Json };
++export type EntryShape = "string" | "object" | "array" | "null";
++export type NativeQuestion =
++  | { type: "choice"; instructions: Entry; criteria: Record<string, Entry> }
++  | { type: "noul"; instructions: Entry; criteria?: { true: Entry; false: Entry } }
++  | { type: "score"; instructions: Entry; criteria: Entry[] };
++export const JSON_LIMITS = { maxDepth: 32, maxNodes: 16_384, maxCollection: 1_024 };
++export const isObject = (value: unknown): value is Record<string, unknown> =>
++  value !== null && typeof value === "object" && !Array.isArray(value);
++export function entryShape(value: unknown): EntryShape | undefined {
++  return value === null ? "null" : typeof value === "string" ? "string" :
++    Array.isArray(value) ? "array" : isObject(value) ? "object" : undefined;
++}
++/** JSON equality ignores object key order; array order remains semantic. */
++export function jsonEqual(a: unknown, b: unknown): boolean {
++  if (a === b) return true;
++  if (Array.isArray(a) || Array.isArray(b))
++    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => jsonEqual(v, b[i]));
++  if (!isObject(a) || !isObject(b)) return false;
++  return Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(key => Object.hasOwn(b, key) && jsonEqual(a[key], b[key]));
++}
++
++/** Reject lossy serialization, cycles and oversized recursive values before transport. */
++export function jsonIssue(value: unknown): string | null {
++  let nodes = 0;
++  const ancestors = new Set<object>();
++  function visit(item: unknown, depth: number): string | null {
++    if (++nodes > JSON_LIMITS.maxNodes) return "JSON exceeds the node limit.";
++    if (depth > JSON_LIMITS.maxDepth) return "JSON exceeds the nesting limit.";
++    if (item === null || typeof item === "string" || typeof item === "boolean") return null;
++    if (typeof item === "number") return Number.isFinite(item) ? null : "JSON numbers must be finite.";
++    if (typeof item !== "object") return "Only JSON values are supported.";
++    if (ancestors.has(item)) return "JSON must not contain cycles.";
++    if (!Array.isArray(item) && ![Object.prototype, null].includes(Object.getPrototypeOf(item)))
++      return "JSON objects must be plain records.";
++    const keys = Reflect.ownKeys(item).filter(key => !(Array.isArray(item) && key === "length"));
++    if (keys.length > JSON_LIMITS.maxCollection || (Array.isArray(item) && item.length > JSON_LIMITS.maxCollection))
++      return "JSON collection exceeds the item limit.";
++    if (Array.isArray(item) && keys.length !== item.length) return "JSON arrays must be dense.";
++    ancestors.add(item);
++    for (const key of keys) {
++      const descriptor = Object.getOwnPropertyDescriptor(item, key)!;
++      if (typeof key !== "string" || !descriptor.enumerable || !("value" in descriptor))
++        return "JSON cannot contain symbols, accessors or hidden fields.";
++      if (Array.isArray(item) && (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= item.length))
++        return "JSON arrays cannot have named properties.";
++      const error = visit(descriptor.value, depth + 1);
++      if (error) return error;
++    }
++    ancestors.delete(item);
++    return null;
++  }
++  try { return visit(value, 0); } catch { return "Invalid JSON structure."; }
++}
++export function nativeQuestionIssue(value: unknown): string | null {
++  const issue = jsonIssue(value);
++  if (issue) return issue;
++  if (!isObject(value) || Object.keys(value).some(key => !["type", "instructions", "criteria"].includes(key)))
++    return "Question contains unsupported fields.";
++  if (!Object.hasOwn(value, "instructions") || !entryShape(value.instructions))
++    return "Instructions must be a string, object, array or null.";
++  if (new TextEncoder().encode(JSON.stringify(value.instructions)).length > 48_000)
++    return "Question instructions exceed the byte limit.";
++  const criteria = value.criteria;
++  if (value.type === "noul") {
++    if (criteria === undefined) return null;
++    return isObject(criteria) && Object.keys(criteria).length === 2 &&
++      Object.hasOwn(criteria, "true") && Object.hasOwn(criteria, "false") &&
++      entryShape(criteria.true) && entryShape(criteria.false)
++      ? null : "Noul criteria must contain true and false entries.";
++  }
++  if (value.type === "choice") {
++    if (!isObject(criteria) || Object.keys(criteria).length < 2 || Object.keys(criteria).length > 255 ||
++      Object.keys(criteria).some(key => !key.trim()) || Object.values(criteria).some(entry => !entryShape(entry)))
++      return "Choice needs 2–255 named JSON entries.";
++    return null;
++  }
++  if (value.type === "score") {
++    return Array.isArray(criteria) && criteria.length >= 2 && criteria.length <= 10 &&
++      criteria.every(entry => !!entryShape(entry)) ? null : "Score needs 2–10 ordered JSON entries.";
++  }
++  return "Unknown question type.";
++}
+diff --git a/jev-experiments/src/jev_lab/adapters.py b/jev-experiments/src/jev_lab/adapters.py
+index 6cfe53c..2609f43 100644
+--- a/jev-experiments/src/jev_lab/adapters.py
++++ b/jev-experiments/src/jev_lab/adapters.py
+@@ -65,5 +65,5 @@ async def adapters(client, quick=False):
+         "latency_ms": out["latency_ms"],
+         "note": "One real Jev response is decoded independently in four languages. This checks interoperability, "
+         "not four independent judgments. Field descriptions are the semantic contract, not just type names. "
+-        "TypeScript, Rust, and Go also support explicit ordered score rubrics; Python's adapter intentionally stays narrower.",
++        "All four adapters support explicit ordered score rubrics through x-jev-levels field metadata.",
+     }
+diff --git a/jev-experiments/src/jev_lab/core.py b/jev-experiments/src/jev_lab/core.py
+index 8f913eb..3803fb4 100644
+--- a/jev-experiments/src/jev_lab/core.py
++++ b/jev-experiments/src/jev_lab/core.py
+@@ -5,6 +5,7 @@ from __future__ import annotations
+ import asyncio
+ import hashlib
+ import json
++import math
+ import os
+ import platform
+ import re
+@@ -17,7 +18,7 @@ from pathlib import Path
+ from typing import Any, Literal
+ 
+ import httpx
+-from pydantic import BaseModel, ConfigDict, Field, model_validator
++from pydantic import BaseModel, ConfigDict, JsonValue, field_validator, model_validator
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ JEV = "typesafe-ai/jev"
+@@ -50,6 +51,7 @@ def digest(value: Any) -> str:
+ def save(path: Path, value: Any) -> None:
+     if path.suffix == ".jsonl":
+         from .records import write_record
++
+         write_record(path, value)
+         return
+     path.parent.mkdir(parents=True, exist_ok=True)
+@@ -58,43 +60,94 @@ def save(path: Path, value: Any) -> None:
+     tmp.replace(path)
+ 
+ 
++EntryType = str | dict[str, JsonValue] | list[JsonValue] | None
++
++
++def validate_json(value: Any, active: set[int] | None = None) -> None:
++    """Reject values JSON would coerce or discard instead of changing their meaning."""
++    if value is None or type(value) in (str, bool, int):
++        return
++    if type(value) is float and math.isfinite(value):
++        return
++    if type(value) is list or (type(value) is dict and all(type(key) is str for key in value)):
++        active = set() if active is None else active
++        if id(value) in active:
++            raise ValueError("JSON values cannot contain cycles")
++        active.add(id(value))
++        for item in value if type(value) is list else value.values():
++            validate_json(item, active)
++        active.remove(id(value))
++        return
++    raise ValueError("Use only finite JSON values and string object keys")
++
++
++def json_equal(left: Any, right: Any) -> bool:
++    """JSON numbers may compare numerically; booleans never equal 0 or 1."""
++    if type(left) in (int, float) and type(right) in (int, float):
++        return left == right
++    if type(left) is not type(right):
++        return False
++    if isinstance(left, dict):
++        return left.keys() == right.keys() and all(
++            json_equal(value, right[key]) for key, value in left.items()
++        )
++    if isinstance(left, list):
++        return len(left) == len(right) and all(json_equal(a, b) for a, b in zip(left, right))
++    return left == right
++
++
+ class Question(BaseModel):
+-    model_config = ConfigDict(extra="forbid")
++    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+     type: Literal["choice", "score", "noul"]
+-    instructions: str = Field(min_length=1, max_length=30000)
+-    criteria: dict[str, str] | list[str] | None = None
++    instructions: EntryType
++    criteria: dict[str, EntryType] | list[EntryType] | None = None
++
++    @field_validator("instructions", "criteria", mode="before")
++    @classmethod
++    def check_json(cls, value):
++        validate_json(value)
++        return value
+ 
+     @model_validator(mode="after")
+     def check_criteria(self):
+         if self.type == "choice":
+             if not isinstance(self.criteria, dict) or not 2 <= len(self.criteria) <= 255:
+                 raise ValueError("Choice requires 2..255 named options")
++            if any(not name.strip() for name in self.criteria):
++                raise ValueError("Choice option names must be nonempty strings")
+         elif self.type == "score":
+-            if not isinstance(self.criteria, list) or not 2 <= len(self.criteria) <= 255:
+-                raise ValueError("Score requires 2..255 ordered descriptions")
+-        elif self.criteria is not None:
+-            raise ValueError("This lab uses plain Noul instructions without criteria")
++            if not isinstance(self.criteria, list) or not 2 <= len(self.criteria) <= 10:
++                raise ValueError("Score requires 2..10 ordered descriptions")
++        elif "criteria" in self.model_fields_set:
++            if not isinstance(self.criteria, dict) or set(self.criteria) != {"true", "false"}:
++                raise ValueError("Noul criteria require exactly true and false descriptions")
+         return self
+ 
++    def to_wire(self) -> dict:
++        # A null instruction is a native entry, not an omitted instruction.
++        return self.model_dump(exclude={"criteria"} if self.criteria is None else set())
++
+ 
+-def choice(instructions: str, options: dict[str, str] | list[str]) -> dict:
++def choice(instructions: EntryType, options: dict[str, EntryType] | list[str]) -> dict:
+     return Question(
+         type="choice",
+         instructions=instructions,
+         criteria=options
+         if isinstance(options, dict)
+         else {v: v.replace("_", " ") for v in options},
+-    ).model_dump(exclude_none=True)
++    ).to_wire()
+ 
+ 
+-def noul(instructions: str) -> dict:
+-    return Question(type="noul", instructions=instructions).model_dump(exclude_none=True)
++def noul(instructions: EntryType, criteria: dict[str, EntryType] | None = None) -> dict:
++    return Question(
++        type="noul",
++        instructions=instructions,
++        **({"criteria": criteria} if criteria is not None else {}),
++    ).to_wire()
+ 
+ 
+-def score(instructions: str, levels: list[str]) -> dict:
+-    return Question(type="score", instructions=instructions, criteria=levels).model_dump(
+-        exclude_none=True
+-    )
++def score(instructions: EntryType, levels: list[EntryType]) -> dict:
++    return Question(type="score", instructions=instructions, criteria=levels).to_wire()
+ 
+ 
+ class BudgetExceeded(RuntimeError):
+@@ -209,38 +262,55 @@ class Run:
+ 
+ 
+ def normalize(raw: dict, questions: dict) -> dict:
+-    if not isinstance(raw.get("answers"), dict):
++    if not isinstance(raw, dict) or not isinstance(raw.get("answers"), dict):
+         raise ValueError("Provider response has no answer map")
++    if set(raw["answers"]) != set(questions):
++        raise ValueError("Provider response must answer exactly the requested questions")
++
++    def number(value):
++        return type(value) in (int, float) and math.isfinite(value)
++
+     answers = {}
+     for key, q in questions.items():
+         a = raw["answers"].get(key)
+         if not isinstance(a, dict) or a.get("type") != q["type"]:
+             raise ValueError(f"Missing or wrong answer type: {key}")
+         value = a.get({"choice": "choice", "score": "score", "noul": "noul"}[q["type"]])
+-        if q["type"] == "choice" and value not in q["criteria"]:
++        if q["type"] == "choice" and (not isinstance(value, str) or value not in q["criteria"]):
+             raise ValueError(f"Unknown option for {key}")
+         if q["type"] in ("score", "noul"):
+             upper = len(q["criteria"]) - 1 if q["type"] == "score" else 1
+-            if not isinstance(value, (float, int)) or not 0 <= value <= upper:
++            if not number(value) or not 0 <= value <= upper:
+                 raise ValueError(f"Out-of-range answer for {key}")
+         probabilities = a.get("probabilities")
+-        if probabilities is not None:
++        if q["type"] == "noul":
++            # The scalar is already the entire Bernoulli distribution.
++            expected_probabilities = {"false": 1 - value, "true": value}
++            if probabilities is not None and (
++                not isinstance(probabilities, dict)
++                or set(probabilities) != set(expected_probabilities)
++                or any(
++                    not number(probabilities[k]) or abs(probabilities[k] - p) > 1e-6
++                    for k, p in expected_probabilities.items()
++                )
++            ):
++                raise ValueError(f"Noul distribution disagrees with its probability: {key}")
++            probabilities = expected_probabilities
++        else:
+             expected = (
+                 set(q["criteria"])
+                 if q["type"] == "choice"
+                 else {str(i) for i in range(len(q["criteria"]))}
+             )
+             if (
+-                set(probabilities) != expected
+-                or any(
+-                    not isinstance(p, (int, float)) or not 0 <= p <= 1
+-                    for p in probabilities.values()
+-                )
++                not isinstance(probabilities, dict)
++                or set(probabilities) != expected
++                or any(not number(p) or not 0 <= p <= 1 for p in probabilities.values())
+                 or abs(sum(probabilities.values()) - 1) > 0.025
+             ):
+                 raise ValueError(f"Malformed probability distribution: {key}")
+         confidence = a.get("confidence")
+-        if confidence is not None and not 0 <= confidence <= 1:
++        if confidence is not None and (not number(confidence) or not 0 <= confidence <= 1):
+             raise ValueError(f"Invalid confidence: {key}")
+         answers[key] = {
+             "type": q["type"],
+@@ -248,6 +318,35 @@ def normalize(raw: dict, questions: dict) -> dict:
+             "probabilities": probabilities,
+             "confidence": confidence,
+         }
++        if confidence is not None:
++            answers[key]["confidenceDefinition"] = "provider-distribution-confidence"
++        legend = a.get("legend")
++        if legend is not None:
++            expected_legend = (
++                {str(i): level for i, level in enumerate(q["criteria"])}
++                if q["type"] == "score"
++                else q.get("criteria")
++            )
++            expected_keys = (
++                set(expected_legend) if expected_legend is not None else {"false", "true"}
++            )
++            validate_json(legend)
++            if (
++                not isinstance(legend, dict)
++                or set(legend) != expected_keys
++                or any(
++                    value is not None and type(value) not in (str, list, dict)
++                    for value in legend.values()
++                )
++                or (expected_legend is not None and not json_equal(legend, expected_legend))
++            ):
++                raise ValueError(f"Provider legend disagrees with requested descriptions: {key}")
++            answers[key]["legend"] = legend
++        if q["type"] == "score":
++            # Keep the provider's continuous score separate from a discrete mode.
++            answers[key]["argmax"] = int(max(probabilities, key=probabilities.__getitem__))
++        elif q["type"] == "noul":
++            answers[key]["probabilityTrue"] = value
+     return answers
+ 
+ 
+@@ -354,12 +453,14 @@ class Client:
+ 
+     async def evaluate(self, state: Any, questions: dict, tag: str = "evaluate") -> dict:
+         started = time.perf_counter()
+-        if not questions or len(questions) > 512:
+-            raise ValueError("Supply 1..512 questions")
+-        questions = {
+-            k: Question.model_validate(v).model_dump(exclude_none=True)
+-            for k, v in questions.items()
+-        }
++        validate_json(state)
++        if (
++            not isinstance(questions, dict)
++            or not 1 <= len(questions) <= 512
++            or any(not isinstance(key, str) or not key.strip() for key in questions)
++        ):
++            raise ValueError("Supply 1..512 named questions with nonempty string IDs")
++        questions = {k: Question.model_validate(v).to_wire() for k, v in questions.items()}
+         result = await self.request(
+             "/typesafe/v1/systemone", {"model": JEV, "state": state, "questions": questions}, tag
+         )
+diff --git a/jev-experiments/src/jev_lab/semantic.py b/jev-experiments/src/jev_lab/semantic.py
+index 1bf3696..b544086 100644
+--- a/jev-experiments/src/jev_lab/semantic.py
++++ b/jev-experiments/src/jev_lab/semantic.py
+@@ -5,38 +5,72 @@ from typing import Literal, get_args, get_origin
+ 
+ from pydantic import BaseModel, Field
+ 
+-from .core import choice, normalize, noul
++from .core import choice, normalize, noul, score, validate_json
++
++
++def _annotations(extra, key):
++    if extra is None:
++        return {}
++    if not isinstance(extra, dict):
++        raise ValueError(f"Unsupported dynamic schema annotations at {key}")
++    validate_json(extra)
++    result = {name: value for name, value in extra.items() if name.startswith("x-jev-")}
++    if set(result) - {"x-jev-instructions", "x-jev-criteria", "x-jev-levels"}:
++        raise ValueError(f"Unknown Jev annotation at {key}")
++    return result
+ 
+ 
+ def questions_for(model: type[BaseModel], prefix="") -> dict:
++    if _annotations(model.model_config.get("json_schema_extra"), prefix or "root"):
++        raise ValueError("Jev annotations belong on decision fields, not objects")
+     questions = {}
+     for name, field in model.model_fields.items():
+         if not field.is_required():
+             raise ValueError(f"Optional/defaulted semantic fields are unsupported: {name}")
+         key, annotation = prefix + name, field.annotation
++        extras = _annotations(field.json_schema_extra, key)
+         if isinstance(annotation, type) and issubclass(annotation, BaseModel):
++            if extras:
++                raise ValueError(f"Jev annotations belong on decision fields: {key}")
+             questions.update(questions_for(annotation, key + "."))
+             continue
+-        if not field.description:
++        if "x-jev-instructions" not in extras and (
++            not isinstance(field.description, str) or not field.description.strip()
++        ):
+             raise ValueError(f"{key} needs a field description containing its question")
+-        if annotation is bool or annotation is float:
+-            if annotation is float:
+-                bounds = {
+-                    type(m).__name__: getattr(m, type(m).__name__.lower(), None)
+-                    for m in field.metadata
+-                }
+-                if bounds.get("Ge") != 0 or bounds.get("Le") != 1:
+-                    raise ValueError(f"{key}: float must be a probability bounded by ge=0, le=1")
+-            questions[key] = noul(field.description)
++        instructions = extras.get("x-jev-instructions", field.description)
++        if "x-jev-criteria" in extras and not isinstance(extras["x-jev-criteria"], dict):
++            raise ValueError(f"Explicit criteria must be a named object: {key}")
++        bounds = {
++            type(m).__name__: getattr(m, type(m).__name__.lower(), None)
++            for m in field.metadata
++        }
++        if "x-jev-levels" in extras:
++            if annotation is not float or "x-jev-criteria" in extras:
++                raise ValueError(f"Score levels require a float field and no other criteria: {key}")
++            question = score(instructions, extras["x-jev-levels"])
++            if bounds.get("Ge") != 0 or bounds.get("Le") != len(question["criteria"]) - 1:
++                raise ValueError(f"Score bounds must be ge=0, le=level count minus one: {key}")
++            questions[key] = question
++        elif annotation is bool or annotation is float:
++            if annotation is float and (bounds.get("Ge") != 0 or bounds.get("Le") != 1):
++                raise ValueError(f"{key}: float must be a probability bounded by ge=0, le=1")
++            criteria = extras.get("x-jev-criteria")
++            questions[key] = noul(instructions, criteria)
+         elif get_origin(annotation) is Literal:
+             options = get_args(annotation)
+             if not all(isinstance(x, str) for x in options):
+                 raise ValueError("Only string Literal choices are supported")
+-            questions[key] = choice(field.description, list(options))
++            questions[key] = choice(instructions, extras.get("x-jev-criteria", list(options)))
++            if set(questions[key]["criteria"]) != set(options):
++                raise ValueError(f"Choice criteria must match the field's options exactly: {key}")
+         elif isinstance(annotation, type) and issubclass(annotation, Enum):
+             if not all(isinstance(e.value, str) for e in annotation):
+                 raise ValueError("Only string-valued Enums are supported")
+-            questions[key] = choice(field.description, [e.value for e in annotation])
++            options = [e.value for e in annotation]
++            questions[key] = choice(instructions, extras.get("x-jev-criteria", options))
++            if set(questions[key]["criteria"]) != set(options):
++                raise ValueError(f"Choice criteria must match the field's options exactly: {key}")
+         else:
+             raise ValueError(f"Unsupported semantic field: {key}, {annotation}")
+     return questions
+@@ -51,6 +85,7 @@ def decode(model: type[BaseModel], answers: dict, prefix=""):
+                 answer["type"]: answer["value"],
+                 "probabilities": answer.get("probabilities"),
+                 "confidence": answer.get("confidence"),
++                **({"legend": answer["legend"]} if "legend" in answer else {}),
+             }
+             for key, answer in answers.items()
+         }
+diff --git a/jev-experiments/tests/test_contracts.py b/jev-experiments/tests/test_contracts.py
+index 3dfa3f0..de17d1c 100644
+--- a/jev-experiments/tests/test_contracts.py
++++ b/jev-experiments/tests/test_contracts.py
+@@ -99,7 +99,9 @@ def test_noul_boundaries_and_pydantic_validation():
+         with pytest.raises(ValueError):
+             normalize({"answers": {"x": {"type": "noul", "noul": value}}}, {"x": noul("True?")})
+     answers = {
+-        "area": {"type": "choice", "value": "billing"},
++        "area": {"type": "choice", "value": "billing", "probabilities": {
++            "billing": 1.0, "technical": 0.0, "account": 0.0, "other": 0.0,
++        }},
+         "refund": {"type": "noul", "value": 0.5},
+         "missing_context": {"type": "noul", "value": 0.2},
+     }
+diff --git a/jev-experiments/tests/test_native_questions.py b/jev-experiments/tests/test_native_questions.py
+new file mode 100644
+index 0000000..c23927d
+--- /dev/null
++++ b/jev-experiments/tests/test_native_questions.py
+@@ -0,0 +1,321 @@
++"""Native question transport conformance without a provider or model invocation."""
++
++import json
++from enum import Enum
++from typing import Literal
++from unittest.mock import AsyncMock
++
++import pytest
++from pydantic import BaseModel, ConfigDict, Field, create_model
++
++from jev_lab.core import Client, Question, choice, normalize, noul, score
++from jev_lab.semantic import decode, questions_for
++
++
++@pytest.mark.parametrize(
++    "entry",
++    [None, "Describe it", [], {}, ["one", None], {"boundary": [None, True, 3, {"example": "x"}]}],
++)
++def test_native_entries_survive_every_question_field(entry):
++    questions = [
++        choice(entry, {"a": entry, "b": None}),
++        score(entry, [entry, None]),
++        noul(entry, {"true": entry, "false": None}),
++    ]
++    for question in questions:
++        assert Question.model_validate(question).to_wire() == question
++        assert "instructions" in question
++        assert question["instructions"] == entry
++        assert json.loads(json.dumps(question)) == question
++
++
++@pytest.mark.parametrize(
++    "invalid",
++    [
++        3,
++        0.25,
++        True,
++        ("tuple",),
++        {1: "integer key"},
++        {"not_json": {"a", "b"}},
++        {"infinite": float("inf")},
++    ],
++)
++def test_entry_validation_rejects_coercions_and_non_json(invalid):
++    for make in [
++        lambda: noul(invalid),
++        lambda: choice("Choose", {"a": invalid, "b": "B"}),
++        lambda: score("Rate", [invalid, "Other"]),
++        lambda: noul("Check", {"true": invalid, "false": "No"}),
++    ]:
++        with pytest.raises(ValueError):
++            make()
++
++
++def test_limits_are_specific_to_primitive():
++    assert len(score("Rate", [str(i) for i in range(10)])["criteria"]) == 10
++    assert len(choice("Choose", {str(i): None for i in range(255)})["criteria"]) == 255
++    for count in [0, 1, 11, 255]:
++        with pytest.raises(ValueError, match="2..10"):
++            score("Rate", [str(i) for i in range(count)])
++    with pytest.raises(ValueError, match="2..255"):
++        choice("Choose", {str(i): None for i in range(256)})
++
++
++@pytest.mark.parametrize(
++    "criteria",
++    [
++        {"true": "Yes"},
++        {"true": None, "false": None, "other": None},
++        ["No", "Yes"],
++        {True: "Yes", False: "No"},
++    ],
++)
++def test_noul_requires_exact_named_boundary(criteria):
++    with pytest.raises(ValueError):
++        noul("Check", criteria)
++
++
++def test_unknown_fields_are_rejected_and_absent_criteria_stays_absent():
++    assert noul(None) == {"type": "noul", "instructions": None}
++    with pytest.raises(ValueError):
++        Question.model_validate({"type": "noul", "instructions": "Check", "rubric": "Lost?"})
++    with pytest.raises(ValueError):
++        Question.model_validate({"type": "noul"})
++    with pytest.raises(ValueError):
++        Question.model_validate({"type": "noul", "instructions": "Check", "criteria": None})
++
++
++@pytest.mark.asyncio
++async def test_client_preserves_exact_native_wire_and_complete_output():
++    levels = [{"severity": "none"}, ["workaround", None], "blocked"]
++    questions = {
++        "choice": choice({"task": "choose", "context": None}, {"x": ["X"], "y": None}),
++        "score": score(None, levels),
++        "noul": noul(["boundary"], {"true": {"has": "evidence"}, "false": None}),
++    }
++    raw = {
++        "model": "fixture-model",
++        "answers": {
++            "choice": {
++                "type": "choice",
++                "choice": "x",
++                "probabilities": {"x": 0.6, "y": 0.4},
++                "confidence": 0.2,
++                "legend": questions["choice"]["criteria"],
++            },
++            "score": {
++                "type": "score",
++                "score": 1.6,
++                "probabilities": {"0": 0.1, "1": 0.2, "2": 0.7},
++                "legend": {str(i): v for i, v in enumerate(levels)},
++                "confidence": 0.4,
++            },
++            "noul": {"type": "noul", "noul": 0.35, "legend": questions["noul"]["criteria"]},
++        },
++        "usage": {"input_tokens": 50, "output_tokens": 10},
++    }
++    client = object.__new__(Client)
++    client.request = AsyncMock(return_value={"raw": raw, "latency_ms": 10})
++    result = await client.evaluate({"document": "fixture"}, questions)
++    assert client.request.call_args.args[1]["questions"] == questions
++    assert client.request.call_args.args[1]["state"] == {"document": "fixture"}
++    answer = result["answers"]["score"]
++    assert answer["value"] == 1.6
++    assert answer["argmax"] == 2
++    assert answer["legend"] == raw["answers"]["score"]["legend"]
++    assert answer["confidenceDefinition"] == "provider-distribution-confidence"
++    assert result["answers"]["noul"]["probabilityTrue"] == 0.35
++    assert result["answers"]["noul"]["probabilities"] == {"false": 0.65, "true": 0.35}
++    assert result["raw"] is raw
++    for key in questions:
++        assert result["answers"][key]["legend"] == raw["answers"][key]["legend"]
++
++
++@pytest.mark.parametrize("kind", ["choice", "noul", "score"])
++def test_all_native_legends_reject_changed_descriptions_and_lossy_shapes(kind):
++    question = (
++        choice("Choose", {"a": {"enabled": True}, "b": None})
++        if kind == "choice"
++        else noul("Check", {"true": {"enabled": True}, "false": None})
++        if kind == "noul"
++        else score("Rate", [{"enabled": True}, None])
++    )
++    legend = question["criteria"] if kind != "score" else {"0": question["criteria"][0], "1": None}
++    answer = (
++        {"type": kind, "choice": "a", "probabilities": {"a": 0.6, "b": 0.4}}
++        if kind == "choice"
++        else {"type": kind, "noul": 0.6}
++        if kind == "noul"
++        else {"type": kind, "score": 0.4, "probabilities": {"0": 0.6, "1": 0.4}}
++    )
++    first = next(iter(legend))
++    for bad in [
++        {**legend, first: {"enabled": 1}},
++        {**legend, first: True},
++        {**legend, "extra": None},
++    ]:
++        with pytest.raises(ValueError, match="legend"):
++            normalize({"answers": {"q": {**answer, "legend": bad}}}, {"q": question})
++    assert (
++        normalize({"answers": {"q": {**answer, "legend": legend}}}, {"q": question})["q"]["legend"]
++        == legend
++    )
++
++
++@pytest.mark.asyncio
++async def test_invalid_input_does_not_reach_transport():
++    client = object.__new__(Client)
++    client.request = AsyncMock()
++    cyclic = {}
++    cyclic["self"] = cyclic
++    for state, questions in [
++        ({1: "coerced"}, {"q": noul("Check")}),
++        (cyclic, {"q": noul("Check")}),
++        ("state", {"q": {"type": "score", "instructions": "Rate", "criteria": ["x"] * 11}}),
++        ("state", {1: noul("Check")}),
++    ]:
++        with pytest.raises(ValueError):
++            await client.evaluate(state, questions)
++    client.request.assert_not_called()
++
++
++@pytest.mark.parametrize(
++    "probabilities",
++    [
++        None,
++        [0.5, 0.5],
++        {"a": 0.5},
++        {"a": True, "b": 0},
++        {"a": float("nan"), "b": 1},
++        {"a": 0.1, "b": 0.1},
++        {"a": 0.5, "b": 0.5, "c": 0},
++    ],
++)
++def test_complete_numeric_distributions_are_required(probabilities):
++    with pytest.raises(ValueError, match="distribution"):
++        normalize(
++            {"answers": {"q": {"type": "choice", "choice": "a", "probabilities": probabilities}}},
++            {"q": choice("Choose", ["a", "b"])},
++        )
++
++
++@pytest.mark.parametrize("value", [True, "0.5", float("inf"), float("nan"), -1, 2])
++def test_noul_is_a_probability_not_a_coerced_boolean(value):
++    with pytest.raises(ValueError):
++        normalize({"answers": {"q": {"type": "noul", "noul": value}}}, {"q": noul("Check")})
++
++
++def test_response_cannot_change_the_rubric_or_hide_extra_answers():
++    question = score("Rate", ["low", "high"])
++    answer = {
++        "type": "score",
++        "score": 0.8,
++        "probabilities": {"0": 0.2, "1": 0.8},
++        "legend": {"0": "bad", "1": "high"},
++    }
++    with pytest.raises(ValueError, match="legend"):
++        normalize({"answers": {"q": answer}}, {"q": question})
++    with pytest.raises(ValueError, match="exactly"):
++        normalize(
++            {"answers": {"q": {"type": "noul", "noul": 0.5}, "other": {}}}, {"q": noul("Check")}
++        )
++
++
++def test_explicit_two_level_score_precedes_probability_inference():
++    levels = [{"when": "routine"}, ["severe", None]]
++    model = create_model(
++        "Severity",
++        severity=(
++            float,
++            Field(
++                ge=0,
++                le=1,
++                json_schema_extra={
++                    "x-jev-instructions": None,
++                    "x-jev-levels": levels,
++                },
++            ),
++        ),
++    )
++    questions = questions_for(model)
++    assert questions == {"severity": {"type": "score", "instructions": None, "criteria": levels}}
++    value = decode(
++        model,
++        {
++            "severity": {
++                "type": "score",
++                "value": 0.35,
++                "probabilities": {"0": 0.65, "1": 0.35},
++                "legend": {"0": levels[0], "1": levels[1]},
++            }
++        },
++    )
++    assert value.severity == 0.35
++
++
++def test_pydantic_annotations_preserve_native_boundaries_and_choice_subtrees():
++    class Category(str, Enum):
++        A = "a"
++        B = "b"
++
++    class Annotated(BaseModel):
++        category: Category = Field(
++            json_schema_extra={
++                "x-jev-instructions": {"task": ["choose", None]},
++                "x-jev-criteria": {"a": {"subtree": [True, 2]}, "b": None},
++            }
++        )
++        relevant: bool = Field(
++            description="Relevant?",
++            json_schema_extra={
++                "x-jev-criteria": {"true": {"evidence": ["quoted"]}, "false": None},
++            },
++        )
++
++    questions = questions_for(Annotated)
++    assert questions["category"]["instructions"] == {"task": ["choose", None]}
++    assert questions["category"]["criteria"] == {"a": {"subtree": [True, 2]}, "b": None}
++    assert questions["relevant"]["criteria"] == {"true": {"evidence": ["quoted"]}, "false": None}
++
++
++@pytest.mark.parametrize(
++    "annotation,extra,bounds",
++    [
++        (bool, {"x-jev-levels": ["no", "yes"]}, {}),
++        (
++            float,
++            {"x-jev-levels": ["low", "high"], "x-jev-criteria": {"true": "yes", "false": "no"}},
++            {"ge": 0, "le": 1},
++        ),
++        (float, {"x-jev-levels": ["x"] * 11}, {"ge": 0, "le": 10}),
++        (float, {"x-jev-levels": ["low", "high"]}, {"ge": 0, "le": 2}),
++        (int, {"x-jev-levels": ["low", "high"]}, {"ge": 0, "le": 1}),
++        (bool, {"x-jev-critera": {"true": "yes", "false": "no"}}, {}),
++        (bool, {"x-jev-criteria": None}, {}),
++        (Literal["a", "b"], {"x-jev-criteria": ["a", "b"]}, {}),
++        (Literal["a", "b"], {"x-jev-criteria": {"a": "A", "different": "B"}}, {}),
++    ],
++)
++def test_pydantic_rejects_unknown_misplaced_or_lossy_annotations(annotation, extra, bounds):
++    model = create_model(
++        "Invalid", value=(annotation, Field(description="Check", json_schema_extra=extra, **bounds))
++    )
++    with pytest.raises(ValueError):
++        questions_for(model)
++
++
++def test_pydantic_rejects_semantic_annotations_on_objects():
++    class Nested(BaseModel):
++        value: bool = Field(description="Check")
++
++    class Root(BaseModel):
++        model_config = ConfigDict(json_schema_extra={"x-jev-instructions": "Lost?"})
++        value: bool = Field(description="Check")
++
++    wrapper = create_model(
++        "Wrapper", value=(Nested, Field(json_schema_extra={"x-jev-instructions": "Lost?"}))
++    )
++    for model in [Root, wrapper]:
++        with pytest.raises(ValueError, match="decision fields"):
++            questions_for(model)

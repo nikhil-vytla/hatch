@@ -1,0 +1,48 @@
+{
+  "reviewedSourceCommit": "c89327f7f94a7c70551485ffa0a132ee8640c715",
+  "condition": "Uncommitted focused correction; original source and retained execution evidence unchanged",
+  "files": [
+    {
+      "path": "jev-experiments/adapters/go/adapter.go",
+      "beforeSha256": "35798e8ed5bd842eb9f3a7cb1dde9cf4478188c9d2e33bf0e002a403f64c7b3a",
+      "sha256": "c43fe496667c02d93df3583d604e23a7f65beafcf80195cae47c4acf1122d345",
+      "bytes": 11982
+    },
+    {
+      "path": "jev-experiments/adapters/go/adapter_test.go",
+      "beforeSha256": "3ede30af81f958d53d61290007c28615eaff3ac80393c0da0febe69ba43b6f3e",
+      "sha256": "9061c35ee54e87901585520cb30237a2ba35c1f052ed9ef632bda8d55c710103",
+      "bytes": 11074
+    },
+    {
+      "path": "jev-experiments/adapters/rust/src/lib.rs",
+      "beforeSha256": "ff32ee6f2b857587d77834fd54ac451d30e9601842bfdcb1bca8e1fe4da71893",
+      "sha256": "f5a2bd8637063bcea6810ac53be814fba97d6c31bc17f5f317df9850a5259c5e",
+      "bytes": 24715
+    }
+  ],
+  "patch": {
+    "file": "legend-fix.patch",
+    "sha256": "592f4b1910db335388f3fba6574e08062084319d9628406eb381a80997e1e61d",
+    "bytes": 11525
+  },
+  "tests": {
+    "authoredNewGoMethods": 3,
+    "authoredNewRustMethods": 3,
+    "goExecution": "not run: executable unavailable",
+    "rustBefore": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked"
+      ],
+      "exitCode": 1,
+      "phase": "launcher before compilation",
+      "result": "unavailable: no configured default toolchain",
+      "isRegressionFailure": false
+    },
+    "rustAfter": "not run: no configured default toolchain"
+  },
+  "requiredNextGate": "Root creates a new source commit and reruns exact-archive checks. The old passing reports do not verify this correction."
+}

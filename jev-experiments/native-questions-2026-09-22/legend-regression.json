@@ -1,0 +1,14 @@
+{
+  "originalImplementation": "c89327f7f94a7c70551485ffa0a132ee8640c715",
+  "beforeWithNewTests": "b2c293301a9a562785d7ce485f1a70dd02fc9fa9",
+  "changedPaths": [
+    "jev-experiments/adapters/go/adapter_test.go",
+    "jev-experiments/adapters/rust/src/lib.rs"
+  ],
+  "rustImplementationBeforeTestModuleUnchanged": true,
+  "goImplementationUnchanged": true,
+  "beforeBothTestSuitesFailed": true,
+  "fixedSourceCommit": "c219f57266d2e8905c66212a181fac3bd8c236ac",
+  "afterBothTestSuitesPassed": true,
+  "note": "The retained sanitized before logs omit individual test names. The exact fixture commit preserves the new test methods and original implementations; this is not a missing-toolchain failure."
+}
