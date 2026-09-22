@@ -1,9 +1,11 @@
 package adapter
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -12,15 +14,44 @@ import (
 
 type Question struct {
 	Type         string `json:"type"`
-	Instructions string `json:"instructions"`
+	Instructions any    `json:"instructions"`
 	Criteria     any    `json:"criteria,omitempty"`
 }
 type Answer struct {
-	Type          string             `json:"type"`
-	Value         any                `json:"value"`
-	Probabilities map[string]float64 `json:"probabilities"`
-	Confidence    *float64           `json:"confidence"`
+	Type                 string             `json:"type"`
+	Value                any                `json:"value"`
+	Probabilities        map[string]float64 `json:"probabilities"`
+	Confidence           *float64           `json:"confidence"`
+	Legend               map[string]any     `json:"legend,omitempty"`
+	Argmax               *int               `json:"argmax,omitempty"`
+	ProbabilityTrue      *float64           `json:"probabilityTrue,omitempty"`
+	ConfidenceDefinition string             `json:"confidenceDefinition,omitempty"`
+	NativeValue          any                `json:"nativeValue,omitempty"`
+	ProbabilityMass      *float64           `json:"probabilityMass,omitempty"`
 }
+
+func (a *Answer) UnmarshalJSON(data []byte) error {
+	type wire Answer
+	var decoded wire
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&decoded); err != nil {
+		return err
+	}
+	*a = Answer(decoded)
+	return nil
+}
+
+func entry(value any) bool {
+	switch value.(type) {
+	case nil, string, object, []any:
+		_, err := json.Marshal(value)
+		return err == nil
+	default:
+		return false
+	}
+}
+
 type Decision[T any] struct {
 	Value     T                   `json:"value"`
 	Answers   map[string]Answer   `json:"answers"`
@@ -88,6 +119,13 @@ func compileMap(root object) (map[string]Question, error) {
 			return err
 		}
 		kind, _ := schema["type"].(string)
+		for key := range schema {
+			if strings.HasPrefix(key, "x-jev-") {
+				if kind == "object" || key != "x-jev-instructions" && key != "x-jev-criteria" && key != "x-jev-levels" {
+					return fmt.Errorf("unknown or misplaced Jev annotation: %s", key)
+				}
+			}
+		}
 		if kind == "object" {
 			properties, ok := schema["properties"].(object)
 			if !ok || len(properties) == 0 {
@@ -121,42 +159,75 @@ func compileMap(root object) (map[string]Question, error) {
 			}
 			return nil
 		}
+		instructions, explicit := schema["x-jev-instructions"]
 		description, _ := schema["description"].(string)
-		if strings.TrimSpace(description) == "" || path == "" {
+		if !explicit {
+			instructions = description
+		}
+		if (!explicit && strings.TrimSpace(description) == "") || path == "" || !entry(instructions) {
 			return fmt.Errorf("semantic description required: %s", path)
 		}
-		q := Question{Instructions: description}
+		q := Question{Instructions: instructions}
+		_, hasLevels := schema["x-jev-levels"]
+		criteriaValue, hasCriteria := schema["x-jev-criteria"]
+		if hasLevels && (kind != "number" || hasCriteria) {
+			return fmt.Errorf("misplaced score rubric")
+		}
 		if kind == "string" {
 			options, ok := schema["enum"].([]any)
 			if !ok || len(options) < 2 || len(options) > 255 {
 				return fmt.Errorf("only finite string enums are supported")
 			}
-			criteria := map[string]string{}
+			criteria := object{}
 			for _, option := range options {
 				value, ok := option.(string)
-				if !ok {
+				_, duplicate := criteria[value]
+				if !ok || strings.TrimSpace(value) == "" || duplicate {
 					return fmt.Errorf("enum option must be string")
 				}
 				criteria[value] = strings.ReplaceAll(value, "_", " ")
 			}
+			if hasCriteria {
+				native, ok := criteriaValue.(object)
+				if !ok || len(native) != len(criteria) {
+					return fmt.Errorf("criteria must match enum")
+				}
+				for key := range criteria {
+					value, exists := native[key]
+					if !exists || !entry(value) {
+						return fmt.Errorf("criteria must match enum with native entries")
+					}
+				}
+				criteria = native
+			}
 			q.Type = "choice"
 			q.Criteria = criteria
-		} else if kind == "boolean" || kind == "number" && schema["minimum"] == float64(0) && schema["maximum"] == float64(1) {
+		} else if kind == "boolean" || kind == "number" && !hasLevels && schema["minimum"] == float64(0) && schema["maximum"] == float64(1) {
 			q.Type = "noul"
+			if hasCriteria {
+				criteria, ok := criteriaValue.(object)
+				if !ok || len(criteria) != 2 {
+					return fmt.Errorf("Noul needs true and false criteria")
+				}
+				for _, key := range []string{"true", "false"} {
+					value, exists := criteria[key]
+					if !exists || !entry(value) {
+						return fmt.Errorf("Noul needs true and false native entries")
+					}
+				}
+				q.Criteria = criteria
+			}
 		} else if levels, ok := schema["x-jev-levels"].([]any); kind == "number" && ok {
-			if len(levels) < 2 || len(levels) > 255 || schema["minimum"] != float64(0) || schema["maximum"] != float64(len(levels)-1) {
+			if len(levels) < 2 || len(levels) > 10 || schema["minimum"] != float64(0) || schema["maximum"] != float64(len(levels)-1) {
 				return fmt.Errorf("invalid explicit score rubric")
 			}
-			criteria := []string{}
 			for _, x := range levels {
-				s, ok := x.(string)
-				if !ok {
-					return fmt.Errorf("score levels must be strings")
+				if !entry(x) {
+					return fmt.Errorf("score levels must be native entries")
 				}
-				criteria = append(criteria, s)
 			}
 			q.Type = "score"
-			q.Criteria = criteria
+			q.Criteria = levels
 		} else {
 			return fmt.Errorf("unsupported semantic type: %s", path)
 		}
@@ -182,6 +253,9 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
 	if err != nil {
 		return result, err
 	}
+	if len(answers) != len(questions) {
+		return result, fmt.Errorf("answer IDs must match questions")
+	}
 	for id, q := range questions {
 		a, ok := answers[id]
 		if !ok || a.Type != q.Type {
@@ -189,7 +263,7 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
 		}
 		expected := map[string]bool{}
 		if q.Type == "choice" {
-			options := q.Criteria.(map[string]string)
+			options := q.Criteria.(object)
 			v, ok := a.Value.(string)
 			if _, exists := options[v]; !ok || !exists {
 				return result, fmt.Errorf("unknown choice")
@@ -200,10 +274,12 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
 		} else {
 			upper := 1.0
 			if q.Type == "score" {
-				upper = float64(len(q.Criteria.([]string)) - 1)
+				upper = float64(len(q.Criteria.([]any)) - 1)
 				for i := 0; i <= int(upper); i++ {
 					expected[fmt.Sprint(i)] = true
 				}
+			} else {
+				expected["false"], expected["true"] = true, true
 			}
 			v, ok := a.Value.(float64)
 			if !ok || math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > upper {
@@ -224,9 +300,50 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
 			if math.Abs(sum-1) > .025 {
 				return result, fmt.Errorf("malformed distribution")
 			}
+			if q.Type == "noul" && (math.Abs(a.Probabilities["true"]-a.Value.(float64)) > 1e-6 || math.Abs(a.Probabilities["false"]-(1-a.Value.(float64))) > 1e-6) {
+				return result, fmt.Errorf("Noul distribution disagrees with scalar")
+			}
+		} else if q.Type != "noul" {
+			return result, fmt.Errorf("complete choice/score distribution required")
 		}
 		if a.Confidence != nil && (math.IsNaN(*a.Confidence) || math.IsInf(*a.Confidence, 0) || *a.Confidence < 0 || *a.Confidence > 1) {
 			return result, fmt.Errorf("invalid confidence")
+		}
+		if a.ProbabilityTrue != nil && (q.Type != "noul" || math.IsNaN(*a.ProbabilityTrue) || math.Abs(*a.ProbabilityTrue-a.Value.(float64)) > 1e-6) {
+			return result, fmt.Errorf("invalid probabilityTrue")
+		}
+		if a.Argmax != nil {
+			if q.Type != "score" || *a.Argmax < 0 || *a.Argmax >= len(expected) {
+				return result, fmt.Errorf("invalid score argmax")
+			}
+			for _, p := range a.Probabilities {
+				if p > a.Probabilities[fmt.Sprint(*a.Argmax)] {
+					return result, fmt.Errorf("argmax is not a modal level")
+				}
+			}
+		}
+		if a.Legend != nil {
+			if len(a.Legend) != len(expected) {
+				return result, fmt.Errorf("legend must match the requested entries")
+			}
+			var descriptions object
+			if q.Type == "score" {
+				descriptions = object{}
+				for i, level := range q.Criteria.([]any) {
+					descriptions[fmt.Sprint(i)] = level
+				}
+			} else if q.Criteria != nil {
+				descriptions = q.Criteria.(object)
+			}
+			for key := range expected {
+				actual, exists := a.Legend[key]
+				if !exists || !entry(actual) {
+					return result, fmt.Errorf("legend needs every requested native entry")
+				}
+				if descriptions != nil && !reflect.DeepEqual(actual, descriptions[key]) {
+					return result, fmt.Errorf("legend changed requested descriptions")
+				}
+			}
 		}
 	}
 	var decode func(object, string) (any, error)
