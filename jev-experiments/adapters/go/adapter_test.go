@@ -177,3 +177,97 @@ func TestUnrecognizedAnswerMetadataCannotDisappear(t *testing.T) {
 		t.Fatal("accepted missing Choice distribution")
 	}
 }
+
+func TestNativeLegendsPreserveRequestedDescriptions(t *testing.T) {
+	type Result struct {
+		Value any `json:"value"`
+	}
+	for _, tc := range []struct {
+		name, field, answer, first string
+	}{
+		{"choice", `{"type":"string","enum":["a","b"],"description":"Choose","x-jev-criteria":{"a":{"boundary":[true,2,null]},"b":null}}`, `{"type":"choice","value":"a","probabilities":{"a":0.6,"b":0.4},"legend":{"a":{"boundary":[true,2,null]},"b":null}}`, "a"},
+		{"noul", `{"type":"boolean","description":"Check","x-jev-criteria":{"true":{"boundary":[true,2,null]},"false":null}}`, `{"type":"noul","value":0.6,"probabilities":{"true":0.6,"false":0.4},"legend":{"true":{"boundary":[true,2,null]},"false":null}}`, "true"},
+		{"score", `{"type":"number","minimum":0,"maximum":1,"description":"Rate","x-jev-levels":[{"boundary":[true,2,null]},null]}`, `{"type":"score","value":0.4,"probabilities":{"0":0.6,"1":0.4},"legend":{"0":{"boundary":[true,2,null]},"1":null}}`, "0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			schema := nativeSchema(t, tc.field)
+			fresh := func() map[string]Answer {
+				var a Answer
+				if err := json.Unmarshal([]byte(tc.answer), &a); err != nil {
+					t.Fatal(err)
+				}
+				return map[string]Answer{"value": a}
+			}
+			answers := fresh()
+			result, err := Decode[Result](schema, answers)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(result.Answers, answers) {
+				t.Fatal("decode changed a valid legend")
+			}
+			for _, mutation := range []string{"description", "missing", "extra", "scalar"} {
+				t.Run(mutation, func(t *testing.T) {
+					bad := fresh()
+					legend := bad["value"].Legend
+					switch mutation {
+					case "description":
+						legend[tc.first] = object{"boundary": []any{float64(1), float64(2), nil}}
+					case "missing":
+						delete(legend, tc.first)
+					case "extra":
+						legend["extra"] = nil
+					case "scalar":
+						legend[tc.first] = true
+					}
+					if _, err := Decode[Result](schema, bad); err == nil {
+						t.Fatal("accepted a changed or incomplete legend")
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestPlainNoulLegendUsesNativeBoundaryEntries(t *testing.T) {
+	type Result struct {
+		Value bool `json:"value"`
+	}
+	schema := nativeSchema(t, `{"type":"boolean","description":"Check"}`)
+	for _, legend := range []object{
+		{"true": object{"evidence": []any{true, float64(2)}}, "false": nil},
+		{"true": "Criterion met", "false": []any{"Criterion absent"}},
+	} {
+		answers := map[string]Answer{"value": {Type: "noul", Value: .6, Legend: legend}}
+		result, err := Decode[Result](schema, answers)
+		if err != nil || !result.Value.Value || !reflect.DeepEqual(result.Answers, answers) {
+			t.Fatalf("plain Noul legend was rejected or changed: %v", err)
+		}
+	}
+	for _, legend := range []object{
+		{"true": "Yes"},
+		{"true": "Yes", "false": "No", "extra": nil},
+		{"true": "Yes", "other": nil},
+		{"true": true, "false": nil},
+		{"true": "Yes", "false": float64(0)},
+	} {
+		if _, err := Decode[Result](schema, map[string]Answer{"value": {Type: "noul", Value: .6, Legend: legend}}); err == nil {
+			t.Fatal("plain Noul accepted invalid boundary entries")
+		}
+	}
+}
+
+func TestDefaultChoiceLegendUsesGeneratedDescriptions(t *testing.T) {
+	type Result struct {
+		Value string `json:"value"`
+	}
+	schema := nativeSchema(t, `{"type":"string","enum":["not_ready","ready"],"description":"Choose"}`)
+	answers := map[string]Answer{"value": {Type: "choice", Value: "ready", Probabilities: map[string]float64{"not_ready": .2, "ready": .8}, Legend: object{"not_ready": "not ready", "ready": "ready"}}}
+	if _, err := Decode[Result](schema, answers); err != nil {
+		t.Fatal(err)
+	}
+	answers["value"].Legend["not_ready"] = "different"
+	if _, err := Decode[Result](schema, answers); err == nil {
+		t.Fatal("default Choice accepted changed descriptions")
+	}
+}
