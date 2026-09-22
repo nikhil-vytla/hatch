@@ -1,0 +1,42 @@
+{
+  "baseCommit": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+  "path": "jev-experiments/roadmap/MAP.md",
+  "beforeSha256": "6395ac3a2c37add971c99e1104d1704dd776557b944eb26928ed07de7d1c1b12",
+  "afterSha256": "40002393ab5ca9faa525d3e1843ed0fe5d106e1e6611f36c48a6c246e22b8bbf",
+  "patchSha256": "8988452e69a076b07b1ac59ee2a20f3bd31f2f5244fe911fae39674543d1a8e4",
+  "prerequisites": [
+    {
+      "path": "../design-revamp-2026-09-21/roadmap-update.patch",
+      "sha256": "bc72fdf982d24f0f5426569e45e56a7ab3843f26ff6e8dffebcd94e3130535de"
+    },
+    {
+      "path": "../roadmap-additions-2026-09-21/roadmap-update.patch",
+      "sha256": "d708e69a51356daedea72cf1c9ae33a97a70048c181edb64ea6d0c1d3ab258e6"
+    },
+    {
+      "path": "../semantic-image-field-2026-09-21/roadmap-update.patch",
+      "sha256": "7ca001b9f7533a98f924c5b0ef9c3835629291385fdd8c1a29047208e05595d8"
+    },
+    {
+      "path": "../jev-tools-and-rl-2026-09-22/roadmap-update.patch",
+      "sha256": "4d376049f5841e1e58dc8c108dbbcbba526284eb9e4e90c5a5402a677ac26996"
+    },
+    {
+      "path": "../browser-next-action-2026-09-22/roadmap-update.patch",
+      "sha256": "90d5073ad24907011cae5d17651fb94b4433261158272db31fcb81e9dc51a82d"
+    }
+  ],
+  "application": {
+    "patch": "application.patch",
+    "sha256": "a53a4deb1723ca29137a0d25a988cb5e1b2ffbd6b8be9cce4b1c88f52c5ffff8",
+    "prerequisite": "../semantic-image-field-2026-09-21/application.patch",
+    "prerequisiteSha256": "a228d450e448b6d86028bcae5f0b9870806ca00a592bbd8e8e845890775ee05d",
+    "files": [
+      "jev-experiments/experience-prototypes/src/main.tsx",
+      "jev-experiments/experience-prototypes/scripts/prepare.ts",
+      "jev-experiments/experience-prototypes/vite.config.ts",
+      "jev-experiments/roadmap/routing/evidence-links.ts",
+      "jev-experiments/roadmap/routing/ModelRoutingLab.tsx"
+    ]
+  }
+}

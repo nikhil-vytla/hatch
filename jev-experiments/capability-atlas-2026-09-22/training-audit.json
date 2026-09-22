@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-22",
+  "scope": "The five Training & local catalog entries, their training and inference modes, and committed publication-selected evidence. Source inspection and provider-free wrapper probes only; no new training, inference or provider calls.",
+  "native_structure_definition": "False means the inspected question paths do not preserve native object/array/null instructions and rich criterion entries. JSON state, string-valued Choice maps and Score lists, and JSON serialized into prompt text are separate capabilities. It does not measure model quality.",
+  "records": [
+    {
+      "id": "optimize",
+      "title": "Prompt evolution",
+      "input": "BANKING77 customer messages restricted to ten fixed intent labels. Ten independent records share a state object; each question names its record. Full run uses 50 reflection-training, 20 validation and 50 final held-out records.",
+      "questions": [
+        { "scope": "each classified record", "primitives": "1 ten-option Choice", "count": 1 },
+        { "scope": "full request batch", "primitives": "10 independent Choices over the shared record map", "count": 10 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "String instruction plus fixed string intent descriptions. Random mutation, hill climbing, OPRO and GEPA change the instruction; GEPA's candidate has only an instruction component. No structured criterion optimization or Jev weight update occurs.",
+      "distribution_use": "Evaluation rows retain Choice probabilities and confidence. Search fitness is exact-label accuracy, not NLL, Brier or distribution matching. GEPA receives record-level outputs and correctness feedback; final test labels do not enter reflection.",
+      "output_effect": "Freezes one prompt per method using validation, then evaluates held-out tasks. The browser displays recorded candidate cards and test statistics; it does not run an optimizer.",
+      "execution_modes": [
+        "Unchanged instruction baseline",
+        "Random authored prompt mutations",
+        "Hill climbing over authored mutations",
+        "OPRO with a generative proposal model",
+        "Real GEPA adapter with a generative reflection model",
+        "Recorded browser inspection"
+      ],
+      "recorded_evidence": "Committed full-run records show held-out accuracy 0.86 for unchanged, random, hill climb and GEPA; OPRO is 0.84. The evaluation ceiling is 250 classified records per search, with 240 actual calls for the three non-GEPA searches and 250 for GEPA. This ten-label derivative does not establish a general prompt-optimization gain.",
+      "depth_opportunity": "Extend this experiment with a new frozen comparison of string instructions, equivalent JSON-as-text and native structured instructions/criteria. Separate instruction and criterion search components; select on validation with a declared distribution-sensitive objective and include reflection cost. Preserve the existing run and completed local readout study.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/optimize.py", "symbol": "LABELS; optimize; evaluate; Adapter; gepa.optimize; frozen" },
+        { "path": "jev-experiments/src/jev_lab/core.py", "symbol": "choice; Question.check_criteria" },
+        { "path": "jev-experiments/results/optimize.jsonl", "symbol": "result.methods; result.splits; result.metric_call_ceiling" },
+        { "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx", "symbol": "Learning, optimize branch" }
+      ]
+    },
+    {
+      "id": "teach",
+      "title": "Active labeling",
+      "input": "A deterministic fictional drink menu, 160 authored training-pool requests and 80 held-out request templates. Random and student-uncertainty acquisition start with the same eight examples and receive 32 attempted labels each in the full run.",
+      "questions": [
+        { "scope": "each selected training request", "primitives": "1 menu-item Choice", "count": 1 },
+        { "scope": "teacher annotation batch", "primitives": "up to 8 independent Choices", "count": 8 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "The menu and numbered requests are structured state. Choice instructions are prose, and each option's menu facts become Python str(dict), not native structured criterion values. The policy never rewrites these questions.",
+      "distribution_use": "Full teacher answers are cached and published, including probabilities when supplied. Logistic regression trains on only the selected teacher label. Uncertainty acquisition uses the student's 1 minus maximum predicted probability, not teacher confidence. Teacher distributions do not become soft targets.",
+      "output_effect": "Actual local TF-IDF logistic-regression weights are fitted and exported. Browser inspection shows learning curves and teacher-labeled examples; it does not fit or invoke the student interactively.",
+      "execution_modes": [
+        "Hosted Jev teacher annotation",
+        "Random acquisition with local logistic-regression fitting",
+        "Student-uncertainty acquisition with local logistic-regression fitting",
+        "Independent deterministic menu-label evaluation",
+        "Recorded browser inspection"
+      ],
+      "recorded_evidence": "51 unique teacher labels served both methods. At 32 attempted labels, random reaches 0.5375 test accuracy and uncertainty acquisition 0.525 on 80 authored cases. Recorded teacher labels agree with the menu oracle; that does not establish broader annotation quality.",
+      "depth_opportunity": "Compare hard labels with full-distribution distillation and a validation-fixed defer policy on ambiguous requests. Preserve attempted-label and cost budgets, use independent menu semantics for correctness, and test acquisition on a more varied frozen request set. Native menu criteria require the wrapper foundations change first.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/teach.py", "symbol": "features; teach; label; exported" },
+        { "path": "jev-experiments/src/jev_lab/compositions.py", "symbol": "DRINKS; drink_cases" },
+        { "path": "jev-experiments/results/teach.jsonl", "symbol": "result.methods; result.teacher_rows; result.unique_teacher_labels" },
+        { "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx", "symbol": "Learning, teach branch" }
+      ]
+    },
+    {
+      "id": "reward",
+      "title": "Learning from rewards",
+      "input": "Authored drink requests and the complete fictional menu. The full recipe attempts to annotate 48 training requests and evaluates on 80 independently labeled held-out requests.",
+      "questions": [
+        { "scope": "each request/menu-item pair", "primitives": "1 Noul for satisfying all explicit requirements", "count": 1 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Structured menu/request state, one prose Noul per candidate. The entire compatibility rule is in the instruction; there are no explicit true/false criteria and no separate per-requirement questions.",
+      "distribution_use": "Continuous probability of compatibility becomes the reward for that candidate. All candidate rewards are available, so the update computes the exact gradient of expected reward under the local softmax policy. Independent oracle accuracy is measured separately from teacher reward.",
+      "output_effect": "Updates and exports real linear TF-IDF policy weights over 240 fixed steps. It is full-information contextual-bandit optimization, not sampled RL or language-model RLHF. The test curve does not choose a checkpoint.",
+      "execution_modes": [
+        "Hosted Noul reward annotation for every menu candidate",
+        "Local linear-policy optimization with a full reward vector",
+        "Independent deterministic menu-label evaluation",
+        "Recorded reward and task-accuracy curves"
+      ],
+      "recorded_evidence": "The committed run has 44 successfully annotated training requests, 80 test cases and 576 nonzero policy parameters. At step 240, mean training reward is 0.7973929 and independent test accuracy is 0.6375. The two metrics have different meanings.",
+      "depth_opportunity": "Freeze a decomposed checklist and compare its code-defined aggregation with the existing single compatibility question. Add counterexamples that earn high predicted reward but violate a menu requirement; measure independent correctness and reward calibration. Any changed reward or structured rubric belongs to a new condition, not the recorded pilot.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/teach.py", "symbol": "reward; optimize_policy; softmax" },
+        { "path": "jev-experiments/results/reward.jsonl", "symbol": "result.rows; result.curve; result.model; result.failures" },
+        { "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx", "symbol": "Learning, reward branch" }
+      ]
+    },
+    {
+      "id": "replica",
+      "title": "SmolLM decision model",
+      "input": "BANKING77 messages transformed into four-candidate intent selection, a yes/no query about one intent and a three-level relevance rubric. Gold labels come from the dataset, not Jev distillation.",
+      "questions": [
+        { "scope": "each local training/evaluation example", "primitives": "1 four-option Choice + 1 Noul + 1 three-level Score derivative", "count": 3 },
+        { "scope": "hosted Jev reference per test example", "primitives": "1 four-option Choice only", "count": 1 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Custom string instruction and option-list format. A shared document prefix and branch attention mask isolate questions. Only endpoint Score labels are generated; no gold example trains the middle level. This is an architecture-transfer pilot attributed to Kev, not its full recipe.",
+      "distribution_use": "Learns option/query projections and rank-four LoRA updates in upper SmolLM2 attention layers using cross-entropy over all three tasks. Full probability vectors support accuracy and Brier evaluation. Checkpoint selection uses validation Choice accuracy only. Saved inference returns choice plus option-keyed probabilities for every question, without primitive-specific Score means or Noul fields.",
+      "output_effect": "Actual parameter updates and saved inference weights. The browser displays recorded before/after metrics. Local CLI inference is a separate Python path, not the roadmap decision wire contract.",
+      "execution_modes": [
+        "Frozen-base initialization with trainable projections and LoRA",
+        "240-step supervised parameter adaptation in the full recipe",
+        "Validation-selected checkpoint and 77-record test evaluation",
+        "Hosted Jev Choice-only reference",
+        "Saved local model inference",
+        "Recorded browser inspection"
+      ],
+      "recorded_evidence": "Across 77 test records, Choice accuracy rises from 0.3246753 to 0.6623377; Noul stays at 0.4025974 while its Brier worsens; Score endpoint accuracy rises from 0.3376623 to 0.4545455. Four-candidate results are not original 77-label BANKING77 scores. Packing rejects documents above 160 tokens; saved inference also caps the whole packed request at 2048 tokens, 16 questions and 32 options.",
+      "depth_opportunity": "Evaluate intermediate Score targets, full-distribution calibration and order sensitivity with a newly frozen protocol. Preserve descriptive criteria and typed output semantics in an explicit adapter, and measure all three primitives before implying native parity. Do not merge this LoRA pilot with the later frozen-readout study.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/replica.py", "symbol": "records; pack; branch_mask; build_model; train_local; replica" },
+        { "path": "jev-experiments/src/jev_lab/replica_infer.py", "symbol": "load_model; decide" },
+        { "path": "jev-experiments/results/replica.jsonl", "symbol": "result.before; result.after; result.before_rows; result.after_rows; result.limitations" },
+        { "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx", "symbol": "Learning, replica branch" }
+      ]
+    },
+    {
+      "id": "local-models",
+      "title": "Decision models on a Mac",
+      "input": "New study: 768 adaptation decisions from BANKING77, BoolQ and STS-B; 192 validation, 384 held-out and 2384 transfer decisions, including every question from all 400 released Typed Decisions test cases. Earlier specialist: a separate Typed Decisions train/validation/test study.",
+      "questions": [
+        { "scope": "new study transformed decision", "primitives": "1 Choice, Boolean or numeric ordinal; maximum 8 options", "count": 1 },
+        { "scope": "each original Typed Decisions case", "primitives": "5 mixed questions, evaluated as separate transformed rows in the new study", "count": 5 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "New shared contract uses string prompts, Choice labels, generic Boolean options and numeric ordinal labels. Transfer Noul criteria and Score rubrics are serialized into prompt text. The earlier Apple packer and untuned readers accept descriptive string levels and string true/false criteria; none establishes native structured EntryType support.",
+      "distribution_use": "New study trains residual readouts with soft-target cross-entropy while all three backbones stay frozen. Validation macro NLL selects recipes and temperature; three seeds repeat them. Evaluation uses full-vector NLL/Brier, ordinal expected-value error, coverage, order sensitivity and MLX/Core ML probability comparisons. Earlier specialist minimizes soft-target loss on its own workflow training set. Untuned first-token and full-option readers produce distributions without training.",
+      "output_effect": "Publishes complete research/export evidence and selects the experimental Laya seed17 readout for the local toolkit using validation-only criteria plus fresh package verification. Runtime returns complete distributions and argmax values. The web page shows this study above the separately labeled earlier specialist; it does not train in the browser.",
+      "execution_modes": [
+        "New MLX residual-readout adaptation: Laya, SmolLM2-360M-Instruct and Qwen3-0.6B; frozen backbones; seeds 17, 29 and 43",
+        "New state-blind prior, lexical, frozen readout and frozen token-embedding baselines",
+        "New complete Core ML export comparisons under CPU_ONLY and ALL",
+        "Installed local Laya base or experimental typed readout with no cloud fallback",
+        "Earlier Laya workflow-specialist head adaptation with frozen encoder",
+        "Earlier original Laya and untuned causal first-token/full-option readouts",
+        "Earlier hosted Jev workflow comparison",
+        "Recorded web evidence inspection"
+      ],
+      "recorded_evidence": "All three new candidates have completed three-seed fitting and full seed17 exports. Every compute condition compares 2960 validation/test/transfer decisions; six public JSONL streams retain 17760 comparisons. Public publication data and release gates link to frozen manifests. Weak causal order sensitivity, reused validation data and unknown upstream benchmark exposure remain explicit limitations. The earlier specialist's Typed Decisions training is separate from the new transfer-only use.",
+      "depth_opportunity": "Keep frozen results and the installed default intact. Add a separately versioned native-structure versus deterministic-text conversion condition only after wrapper preservation and explicit local unsupported behavior are reviewed. Compare equal semantic information, probability quality, coverage, order sensitivity and downstream decisions; do not infer general-purpose capability from a handful of datasets.",
+      "evidence": [
+        { "path": "jev-experiments/roadmap/training/prepare.py", "symbol": "make_corpus; ordinal_target; choice; bool_row; ordinal_row" },
+        { "path": "jev-experiments/roadmap/training/study.py", "symbol": "Backbone.compile; fit; baseline; frozen_baselines; metrics" },
+        { "path": "jev-experiments/roadmap/training/publication.json", "symbol": "models; corpus; defaultModel; release" },
+        { "path": "jev-experiments/roadmap/training/PROVENANCE.md", "symbol": "upstream dataset exposure and own adaptation separation" },
+        { "path": "jev-experiments/roadmap/mac/jev_local.py", "symbol": "options; validate; pack; Runtime.decide" },
+        { "path": "jev-experiments/local-models-and-games/apple/train.py", "symbol": "loss; evaluate; validation selection; report" },
+        { "path": "jev-experiments/local-models-and-games/apple/prefill.py", "symbol": "PrefillDecision.compile; PrefillDecision.predict" },
+        { "path": "jev-experiments/local-models-and-games/apple/sequence.py", "symbol": "SequenceDecision.predict" },
+        { "path": "jev-experiments/local-models-and-games/apple/record_jev.ts", "symbol": "instructions construction; evaluate payload" },
+        { "path": "jev-experiments/experience-prototypes/src/local-models.tsx", "symbol": "LocalModels; WorkflowSpecialist" }
+      ]
+    }
+  ]
+}

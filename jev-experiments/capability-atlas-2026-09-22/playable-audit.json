@@ -1,0 +1,901 @@
+{
+  "schema_version": "jev-capability-audit/v1",
+  "audited_at": "2026-09-22",
+  "scope": "22 playable, creative and productivity entries from the current 41-entry app catalog. Source and existing evidence inspection only; no new provider runs.",
+  "native_structure_definition": "True would mean native object-valued Jev question instructions or criteria. Objects in state, JSON serialized into strings, and composer configuration objects do not qualify.",
+  "shared_evidence": [
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "symbol": "Question; validate; evaluate"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/api.ts",
+      "symbol": "run; choice; judge"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/catalog.ts",
+      "symbol": "experiments"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/publication.json",
+      "symbol": "JSONL-to-public-JSON sources"
+    }
+  ],
+  "records": [
+    {
+      "id": "materials",
+      "title": "Material sandbox",
+      "input": "A written instruction for one configurable material, plus the supported motion/contact vocabulary. The particle grid is not supplied.",
+      "questions": [
+        {
+          "scope": "Interpret one rule",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 4
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat instructions and string options: supported/unsupported, motion, contact material, replacement material. Nested state describes engine limits.",
+      "distribution_use": "Winning options form a proposal; probabilities do not control simulation or automatic acceptance.",
+      "output_effect": "The user accepts a bounded rule. Deterministic code then moves particles and applies contact transformations; painting and playback work without Jev.",
+      "execution_modes": [
+        "Local manual simulation",
+        "Implemented BYOK rule proposal"
+      ],
+      "recorded_evidence": "No recorded model results. The frozen protocol and 12 authored instruction labels are evaluation preparation, not provider evidence.",
+      "depth_opportunity": "Compare flat versus native structured rule criteria on held-out instructions, then evaluate actual rollouts and unsupported-rule detection. Add supported multi-condition rules only after the deterministic engine can enforce them.",
+      "evidence": [
+        {
+          "path": "jev-experiments/roadmap/materials/engine.ts",
+          "symbol": "ruleRequest; ruleFromAnswers"
+        },
+        {
+          "path": "jev-experiments/roadmap/materials/MaterialsSandbox.tsx",
+          "symbol": "MaterialsSandbox; interpret"
+        },
+        {
+          "path": "jev-experiments/roadmap/materials/PROTOCOL.md",
+          "symbol": "Frozen interpretation protocol"
+        },
+        {
+          "path": "jev-experiments/roadmap/materials/labels.v1.json",
+          "symbol": "Authored labels"
+        }
+      ]
+    },
+    {
+      "id": "paste",
+      "title": "Smart paste",
+      "input": "Copied text, deterministically extracted line facts and a destination form with five fields.",
+      "questions": [
+        {
+          "scope": "One suggestion per destination field",
+          "primitives": [
+            "Choice"
+          ],
+          "count": "5 by default; batched dynamically"
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Each flat question selects a fact ID or none. Fact values live in state; they are not native structured criteria.",
+      "distribution_use": "Winning IDs drive suggestions; the response remains inspectable. No calibrated confidence policy decides whether to paste.",
+      "output_effect": "Code retrieves the original fact text. Users accept suggestions; fill-empty and transaction undo protect existing edits.",
+      "execution_modes": [
+        "Recorded examples",
+        "Implemented BYOK suggestions",
+        "Local accept/edit/undo"
+      ],
+      "recorded_evidence": "Three recorded source examples, five field decisions each. These are demonstrations, not an independent extraction benchmark.",
+      "depth_opportunity": "Make ambiguity actionable: compare several supporting facts, request clarification when rankings overlap, and evaluate exact field correctness plus preservation of user text. Contrast native fact objects with equivalent flat descriptions.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/new-experiments.tsx",
+          "symbol": "pasteQuestions; Paste; findSuggestions"
+        },
+        {
+          "path": "jev-experiments/quality-and-simulation-review/paste-transactions.ts",
+          "symbol": "extractLineFacts; pasteBatches; fillEmpty; undoFill"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/paste.jsonl",
+          "symbol": "Three recorded rows"
+        }
+      ]
+    },
+    {
+      "id": "ui",
+      "title": "Generative interfaces",
+      "input": "A UI request, existing component tree and form state, and a bounded catalog of component recipes and actions.",
+      "questions": [
+        {
+          "scope": "Sequential composition step",
+          "primitives": [
+            "Choice"
+          ],
+          "count": "Next operation, plus parent selection when needed; at most 32 new-build or 16 edit steps"
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "The composer configuration has an instructions object, but emitted Jev questions use flat strings and string criteria. The browser gateway rejects nested question instructions.",
+      "distribution_use": "server/compose.ts forwards only chosen value and confidence to the composer, discarding full distributions.",
+      "output_effect": "Choices add, replace, remove or move predefined components. Code validates and renders the specification while preserving live form state; Jev does not emit executable JavaScript.",
+      "execution_modes": [
+        "Recorded compositions",
+        "Implemented BYOK streamed composition and revision"
+      ],
+      "recorded_evidence": "Three recorded final compositions contain 8, 5 and 10 steps; previous attempts are retained. These are working examples, not measured user-task success.",
+      "depth_opportunity": "Test actual completion of user tasks while comparing sequential and batched composition. Add explicit accessibility and state-preservation objectives, then test structured component criteria without expanding the executable surface.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/server/compose.ts",
+          "symbol": "compose"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/generated-ui.tsx",
+          "symbol": "GeneratedUI; generate"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/ui-catalog.ts",
+          "symbol": "uiCatalog; uiCandidates"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/composed-ui.jsonl",
+          "symbol": "rows; previous_attempts"
+        }
+      ]
+    },
+    {
+      "id": "worlds",
+      "title": "Living scenes",
+      "input": "A text brief for a procedural animated scene.",
+      "questions": [
+        {
+          "scope": "Current live scene parameters",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 4
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat questions choose palette, terrain, motion and density. JSON state is the brief container, not native question structure.",
+      "distribution_use": "Winning values set scene parameters; probabilities are retained in the request inspector rather than driving animation.",
+      "output_effect": "Local rendering turns the choices into a continuously animated scene. No ongoing world observation or model-controlled simulation loop runs.",
+      "execution_modes": [
+        "Recorded scene presets",
+        "Implemented BYOK parameter selection",
+        "Local animation"
+      ],
+      "recorded_evidence": "Twenty recorded scene plans exist, but their older contract includes eight choices, including four shapes. The current four-question live builder differs.",
+      "depth_opportunity": "Move from a one-shot style selector to revisions that preserve named objects and relationships. Compare first-pass selection with state-aware edits using constraint satisfaction and preservation tests, rather than treating attractive animation as model reasoning evidence.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/creative.tsx",
+          "symbol": "Worlds; MotionArt"
+        },
+        {
+          "path": "jev-experiments/src/jev_lab/pilots.py",
+          "symbol": "scene_questions"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/visuals.jsonl",
+          "symbol": "result.scenes"
+        }
+      ]
+    },
+    {
+      "id": "games",
+      "title": "Key & door",
+      "input": "MiniGrid mission, symbolic visible grid, held item and legal actions; the memory condition adds the last eight action-history entries.",
+      "questions": [
+        {
+          "scope": "An uncached game observation",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 1
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat action instruction and legal-action strings. The symbolic observation is structured state, not visual input or nested criteria.",
+      "distribution_use": "The winning action is executed. Confidence is logged; it does not trigger replanning or fallback.",
+      "output_effect": "The recorder advances MiniGrid one legal action at a time. The current page replays those episodes; it does not call Jev while replaying.",
+      "execution_modes": [
+        "Recorded Jev reactive and memory policies",
+        "Recorded random and visible-BFS baselines",
+        "Local replay"
+      ],
+      "recorded_evidence": "240 episodes: two environments, four policies, 30 seeds each. Of these, 120 use Jev policies. Memoization shares repeated decisions, so replay steps are not all distinct provider calls.",
+      "depth_opportunity": "Test explicit belief-state memory and uncertainty-driven exploration on unseen layouts. Match observations, context and total cost across memory, reactive and planner conditions; separate cached from fresh decisions.",
+      "evidence": [
+        {
+          "path": "jev-experiments/src/jev_lab/games.py",
+          "symbol": "observation; episode; heuristic"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/games.tsx",
+          "symbol": "Games"
+        },
+        {
+          "path": "jev-experiments/results/games.jsonl",
+          "symbol": "episodes; memoized_states; cache_hits"
+        }
+      ]
+    },
+    {
+      "id": "music",
+      "title": "Music arranger",
+      "input": "A musical brief and symbolic settings, previous phrases, note events, harmony and six generated phrase candidates. Jev receives no audio.",
+      "questions": [
+        {
+          "scope": "Whole arrangement",
+          "primitives": [
+            "Choice"
+          ],
+          "count": "5 global choices, then 4 sequential phrase choices"
+        },
+        {
+          "scope": "One phrase revision",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 1
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat global and phrase instructions. Candidate event objects are supplied in state; Choice criteria remain short strings.",
+      "distribution_use": "The winning candidate is proposed or applied; candidate probabilities are shown for inspection, not treated as listener preference.",
+      "output_effect": "Code generates the notes and accompaniment. Jev selects global settings and upcoming phrases; locks, continuity filtering and musical-boundary scheduling remain deterministic.",
+      "execution_modes": [
+        "Immediate local playing",
+        "Recorded arrangements",
+        "Implemented BYOK arrangement/revision",
+        "Local blind auditions"
+      ],
+      "recorded_evidence": "Fourteen completed arrangements retain 70 successful calls and 126 typed answers, alongside failed attempts. Rule/random comparisons exist; listener preference collection does not establish musical superiority.",
+      "depth_opportunity": "Evaluate multi-phrase coherence under matched candidates, with held-out briefs, option-order controls and blinded listeners. Compare independent phrase choices against state-aware continuation while accounting for code-imposed continuity.",
+      "evidence": [
+        {
+          "path": "jev-experiments/music-arranger-v2/engine.ts",
+          "symbol": "globalRequest; phraseRequest; makeCandidates; applyCandidate"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/music-arranger.tsx",
+          "symbol": "askJev; arrange"
+        },
+        {
+          "path": "jev-experiments/music-arranger-v2/music-v2.jsonl",
+          "symbol": "rows; calls; baselines"
+        },
+        {
+          "path": "jev-experiments/music-arranger-v2/option-order.jsonl",
+          "symbol": "Recorded option-order comparisons"
+        }
+      ]
+    },
+    {
+      "id": "pixels",
+      "title": "Pixel studio",
+      "input": "A brief, composition mode and current procedural scene plan.",
+      "questions": [
+        {
+          "scope": "Current object-level composition",
+          "primitives": [
+            "Choice",
+            "Noul"
+          ],
+          "count": "20 Choice + 9 Noul = 29 questions"
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat instructions choose palette/weather, score nine object presences and place each object on discrete x/y coordinates. No native nested scene criteria.",
+      "distribution_use": "Presence values use a 0.5 threshold; position and palette winners drive rendering. Distributions do not enforce spatial consistency.",
+      "output_effect": "Code paints known objects on a 64×64 canvas. Palette lock and history are local controls; Jev does not draw arbitrary pixel art in this current mode.",
+      "execution_modes": [
+        "Recorded compositions",
+        "Implemented BYOK composition",
+        "Local painting/export/history"
+      ],
+      "recorded_evidence": "Three current object-level compositions are recorded. Four older direct pixel maps also exist; these are a different question framing and should not be combined as one method.",
+      "depth_opportunity": "Ask for relations such as under, inside and behind, then compare independent coordinates with constrained scene-graph selection. Evaluate instruction fulfillment and edit preservation separately from the procedural artwork quality.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/creative.tsx",
+          "symbol": "pixelQuestions; Pixels; paintPixels"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/visuals.jsonl",
+          "symbol": "compositions; pixels"
+        }
+      ]
+    },
+    {
+      "id": "semantic-table",
+      "title": "Semantic spreadsheet",
+      "input": "Eight authored support conversations and an editable natural-language row predicate.",
+      "questions": [
+        {
+          "scope": "One predicate judgment per row",
+          "primitives": [
+            "Noul"
+          ],
+          "count": 8
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat strings name the conversation and predicate; conversations are keyed text in state.",
+      "distribution_use": "The Noul scalar is displayed and thresholded at 0.5 to determine matching rows. It is not a calibrated correctness guarantee.",
+      "output_effect": "Jev marks rows satisfying the query; the interface filters them and allows user corrections. It does not produce arbitrary formulas or new data.",
+      "execution_modes": [
+        "One recorded query",
+        "Implemented BYOK row judgments",
+        "Local filtering/correction"
+      ],
+      "recorded_evidence": "One recorded batch contains eight answers. The authored expected facts support inspection, not broad spreadsheet accuracy claims.",
+      "depth_opportunity": "Add typed facts, source spans and an explicit unknown state, then compare predicate judgments against deterministic queries over extracted facts. Measure row correctness, correction effort and behavior under contradictory or missing evidence.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/new-experiments.tsx",
+          "symbol": "SemanticTable"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/semantic-table.jsonl",
+          "symbol": "answers; model; source"
+        }
+      ]
+    },
+    {
+      "id": "undo",
+      "title": "Intent-based undo",
+      "input": "A user undo request and five authored edit records with before/after values.",
+      "questions": [
+        {
+          "scope": "Select edits to undo",
+          "primitives": [
+            "Noul"
+          ],
+          "count": 5
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Each flat instruction asks whether one edit should be undone while preserving unrelated work. Edits are objects in state.",
+      "distribution_use": "A 0.5 scalar threshold proposes a subset. The user can change the subset before applying it.",
+      "output_effect": "Code restores selected before-values. Jev interprets scope; transaction mechanics perform the reversal.",
+      "execution_modes": [
+        "One recorded request",
+        "Implemented BYOK selection",
+        "Local preview and application"
+      ],
+      "recorded_evidence": "One recorded five-answer batch demonstrates selective undo. It does not cover realistic edit dependency graphs or collaborative conflicts.",
+      "depth_opportunity": "Evaluate intent-preserving undo when later edits depend on earlier ones. Compare independent judgments with selection among code-validated consistent subsets, and measure unintended loss plus the user effort needed to correct the proposal.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/new-experiments.tsx",
+          "symbol": "Undo"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/undo.jsonl",
+          "symbol": "answers"
+        }
+      ]
+    },
+    {
+      "id": "changes",
+      "title": "Change impact",
+      "input": "Before/after event facts and four conclusions, including their authored depends lists.",
+      "questions": [
+        {
+          "scope": "Review each conclusion",
+          "primitives": [
+            "Noul"
+          ],
+          "count": 4
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat per-conclusion instructions. Explicit dependency annotations are included in structured state; Jev is not discovering those links from scratch.",
+      "distribution_use": "A 0.5 threshold highlights conclusions requiring review. Full distributions do not determine a propagation policy.",
+      "output_effect": "Jev flags affected conclusions; code highlights them. It does not regenerate conclusions or maintain a dynamic dependency graph.",
+      "execution_modes": [
+        "One recorded change",
+        "Implemented BYOK review selection",
+        "Local fact editing"
+      ],
+      "recorded_evidence": "One recorded four-answer batch. Because dependency lists are supplied, this is evidence of review selection with known dependencies, not dependency discovery.",
+      "depth_opportunity": "Separate two tasks: infer dependency edges from text, then propagate an actual semantic change. Hold expected edges out of discovery input and compare against deterministic propagation, including spelling-only and irrelevant changes.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/new-experiments.tsx",
+          "symbol": "impactFacts; conclusions; Changes"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/changes.jsonl",
+          "symbol": "answers"
+        }
+      ]
+    },
+    {
+      "id": "logos",
+      "title": "Logo studio",
+      "input": "A branding brief for a fixed procedural symbol system.",
+      "questions": [
+        {
+          "scope": "Logo parameters",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 4
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat questions select symbol, palette, structure and stroke weight from fixed string options.",
+      "distribution_use": "Winning values choose the design. Raw probabilities are inspectable but do not govern exploration or acceptance.",
+      "output_effect": "A local SVG renderer creates the logo and variations; users can adjust parameters and export. Jev does not create arbitrary vector paths.",
+      "execution_modes": [
+        "Recorded briefs",
+        "Implemented BYOK parameter selection",
+        "Local variations and SVG export"
+      ],
+      "recorded_evidence": "Six recorded attempts include five available results and one unavailable case. No independent recognition or preference labels establish logo quality.",
+      "depth_opportunity": "Compare candidates in concrete product contexts using explicit legibility and semantic-fit criteria. Test whether structured design attributes improve consistent revisions; evaluate recognizability with people rather than equating confidence with good design.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/misc.tsx",
+          "symbol": "Logos"
+        },
+        {
+          "path": "jev-experiments/src/jev_lab/compositions.py",
+          "symbol": "logos"
+        },
+        {
+          "path": "jev-experiments/results/logos.jsonl",
+          "symbol": "rows"
+        }
+      ]
+    },
+    {
+      "id": "beverage",
+      "title": "Café Jev",
+      "input": "Up to twelve fictional customer turns, explicit preferences, menu and ingredient inventory. Hidden authored customer goals are excluded.",
+      "questions": [
+        {
+          "scope": "Interpret current conversation",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 16
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Seven preference/status choices plus seven source-turn choices, then clarification and drink-family choices. All instructions/criteria are flat strings; the conversation/menu state is structured.",
+      "distribution_use": "Winners provide preferences, provenance and suggestions. Code validates sources and enforces requirements, budget and inventory; probabilities do not relax hard rules.",
+      "output_effect": "The café updates its preference ledger, offers an unresolved question and filters recipes. Code may reject an illegal model suggestion.",
+      "execution_modes": [
+        "Recorded customer examples",
+        "Implemented BYOK conversation",
+        "Local explicit preferences and menu rules"
+      ],
+      "recorded_evidence": "102 completed development cases across 82 batches: 21 variants and 81 finite partial states. One wording and option order per state; this is not the proposed locked 120-customer evaluation.",
+      "depth_opportunity": "Compare clarification policies by information gained and successful customer outcomes under revisions and missing stock. Test native structured preference criteria with source-linked corrections and held-out conversations.",
+      "evidence": [
+        {
+          "path": "jev-experiments/cafe-jev/engine.ts",
+          "symbol": "publicState; modelQuestions; interpret; usefulQuestions"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/cafe-jev.tsx",
+          "symbol": "Beverage; askJev"
+        },
+        {
+          "path": "jev-experiments/cafe-jev/cafe.jsonl",
+          "symbol": "rows; coverage; requestBatches"
+        }
+      ]
+    },
+    {
+      "id": "journeys",
+      "title": "Adaptive forms",
+      "input": "An eight-drink menu and all 81 unknown/no/yes combinations of four preferences.",
+      "questions": [
+        {
+          "scope": "Offline next-question table",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 81
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "One flat question per finite state chooses a preference to ask, done or conflict. The state table is ordinary structured input.",
+      "distribution_use": "The recorded winning option selects the next question. Probabilities are inspectable; the UI does not calculate expected information gain from them.",
+      "output_effect": "The browser follows a precomputed lookup table and filters the menu locally as the user answers. It stops when one match remains or a conflict occurs.",
+      "execution_modes": [
+        "Recorded Jev lookup table",
+        "Local interactive form; no live Jev call"
+      ],
+      "recorded_evidence": "A recorded 81-answer batch covers the declared finite state space. Coverage of this table does not establish general adaptive interviewing.",
+      "depth_opportunity": "Compare the recorded policy with a deterministic entropy baseline, then move to unseen, larger menus and noisy answers. Measure clarification count, abandonment and final match quality before adding live decisions.",
+      "evidence": [
+        {
+          "path": "jev-experiments/experience-prototypes/src/journeys.tsx",
+          "symbol": "journeyStates; journeyQuestions; matchingDrinks; Journeys"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/results/journeys.jsonl",
+          "symbol": "answers; states"
+        }
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Preference explorer",
+      "input": "Three authored ideas with evidence, assessed on usefulness, novelty, ease and shareability.",
+      "questions": [
+        {
+          "scope": "Recorded assessment batch",
+          "primitives": [
+            "Score",
+            "Noul"
+          ],
+          "count": "12 three-level Score questions + 3 missing-evidence Noul questions"
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat per-idea instructions and ordered string rubric levels. The idea evidence is state, not native structured criteria.",
+      "distribution_use": "The UI takes ordinal answer values, normalizes them and applies user-chosen weights. Confidence and missing-evidence judgments do not drive its slider interaction.",
+      "output_effect": "Moving sliders reranks the fixed recorded assessments with a local weighted calculation. It makes no new Jev request.",
+      "execution_modes": [
+        "Recorded assessments",
+        "Local preference-weight exploration"
+      ],
+      "recorded_evidence": "Twenty attempted evidence/order variants contain eighteen available results and two errors. The page uses the first valid assessment; there is no objectively correct preference ranking.",
+      "depth_opportunity": "Ask clarification where uncertain evidence could change the winner, comparing against a simple sensitivity baseline. Test whether the ordinal scales support the weighted arithmetic and distinguish model uncertainty from user preference.",
+      "evidence": [
+        {
+          "path": "jev-experiments/src/jev_lab/pilots.py",
+          "symbol": "assess_decision; decisions"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/misc.tsx",
+          "symbol": "Decisions"
+        },
+        {
+          "path": "jev-experiments/results/decisions.jsonl",
+          "symbol": "rows; weight_sweeps"
+        }
+      ]
+    },
+    {
+      "id": "tetris",
+      "title": "Tetris: play and branch",
+      "input": "The board, active piece, next three pieces and clock. Landing framing also supplies code-computed reachable outcomes and features.",
+      "questions": [
+        {
+          "scope": "Each live lane decision",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 1
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat instructions; button/intent options are strings and landing feature objects are JSON-stringified inside criteria. These are not native object criteria.",
+      "distribution_use": "The winner controls a button or a code-executed landing plan. Distributions are logged; assistance uses timing rules, not confidence calibration.",
+      "output_effect": "Jev chooses at task boundaries while gravity continues. Code checks freshness/reachability, executes plans and separately attributes human or fallback actions.",
+      "execution_modes": [
+        "Implemented BYOK continuous play",
+        "Local planner/manual play",
+        "Recorded live traces",
+        "Historical untimed framing replay"
+      ],
+      "recorded_evidence": "New paired traces cover three seeds, six games, without fallback/human help; failed requests are retained. Historical data separately contains 25 Jev and 10 code games. Landing information and actuation differ from button control.",
+      "depth_opportunity": "Match information and action duration, then compare uncertainty-aware handoff against fixed grace periods. Report line clears, stale decisions and total latency/cost without attributing planner contributions to Jev.",
+      "evidence": [
+        {
+          "path": "jev-experiments/live-worlds/tetris/session.ts",
+          "symbol": "requests; receive"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/live-tetris.tsx",
+          "symbol": "LiveTetris"
+        },
+        {
+          "path": "jev-experiments/roadmap/tetris/games.jsonl",
+          "symbol": "Paired live games and requests"
+        },
+        {
+          "path": "jev-experiments/roadmap/tetris/summary.json",
+          "symbol": "completeSeeds; games"
+        },
+        {
+          "path": "jev-experiments/outcome-framing/tetris.jsonl",
+          "symbol": "Historical episodes"
+        }
+      ]
+    },
+    {
+      "id": "crowd",
+      "title": "The square at five",
+      "input": "An edited notice, places, weather, time, queues and each resident’s traits, needs, recent visits and current situation.",
+      "questions": [
+        {
+          "scope": "Each ready resident",
+          "primitives": [
+            "Choice"
+          ],
+          "count": "2 per resident: destination and reaction; up to 24 for twelve residents"
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat resident-specific instructions and destination/reaction string options; the observation is structured state.",
+      "distribution_use": "Winning destination and reaction values steer residents. Responses remain inspectable; uncertainty is a selectable reaction label, not a distribution-driven routing policy.",
+      "output_effect": "Local code validates destinations and freshness, then computes walking routes, queues and need changes. Jev does not generate movement coordinates.",
+      "execution_modes": [
+        "Recorded authored notice",
+        "Implemented BYOK resident decisions",
+        "Local needs/notice policies",
+        "Manual notice and matched paraphrase comparison"
+      ],
+      "recorded_evidence": "One recorded notice supplies twelve fictional resident plans. Visible live paraphrase comparisons are an interaction, not a completed held-out population study.",
+      "depth_opportunity": "Test whether independent resident choices cause avoidable congestion, then compare capacity-aware joint proposals with local validation. Freeze matched states and paraphrases; measure route diversity, crowding and request overhead.",
+      "evidence": [
+        {
+          "path": "jev-experiments/live-worlds/crowd/engine.ts",
+          "symbol": "observation; questions; applyReply"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/live-crowd.tsx",
+          "symbol": "LiveCrowd"
+        },
+        {
+          "path": "jev-experiments/live-worlds/crowd/demo.jsonl",
+          "symbol": "manifest; request; response"
+        }
+      ]
+    },
+    {
+      "id": "wardrobe",
+      "title": "A change of clothes",
+      "input": "A canonical outfit and latest text command, including optional transcription metadata. The Jev edit request receives no photograph or audio.",
+      "questions": [
+        {
+          "scope": "Bounded outfit edit",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 9
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat instructions select action and eight outfit attributes, with keep options. Outfit state is structured, but criteria remain strings.",
+      "distribution_use": "Winning values form a guarded patch; probabilities are retained with the response rather than used for ambiguity thresholds.",
+      "output_effect": "Code validates referents and legal edits, preserves unrelated attributes and applies undo/reset/clarify behavior. The illustration and optional Lucy video rendering are separate from Jev.",
+      "execution_modes": [
+        "Recorded text cases",
+        "Implemented BYOK text edits",
+        "Manual outfit controls",
+        "Separate speech/video pipelines"
+      ],
+      "recorded_evidence": "Twelve authored development cases and provider failures are retained. Guards were developed on these fixtures; raw and guarded results are distinguished. Video output is not evidence that Jev sees images.",
+      "depth_opportunity": "Evaluate held-out pronouns, corrections and ambiguous multi-attribute edits. Compare independent attribute choices with code-validated joint patches, measuring preservation and clarification quality separately from visual generation.",
+      "evidence": [
+        {
+          "path": "jev-experiments/wardrobe-lab/engine.ts",
+          "symbol": "editState; editQuestions; focusedEditScope; interpretEdit"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/wardrobe.tsx",
+          "symbol": "Wardrobe; submit"
+        },
+        {
+          "path": "jev-experiments/wardrobe-lab/wardrobe.jsonl",
+          "symbol": "rows; rawDecision; decision; coverage"
+        }
+      ]
+    },
+    {
+      "id": "ghost-brush",
+      "title": "Ghost Brush",
+      "input": "A style phrase and ten fixed brush recipes with descriptions, colors, geometry and parameters. No drawing, image or pointer path is sent.",
+      "questions": [
+        {
+          "scope": "Recipe fit ranking",
+          "primitives": [
+            "Noul"
+          ],
+          "count": 10
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat per-recipe instructions ask for aesthetic fit from zero to one. Recipe objects are in state; there are no native structured criteria.",
+      "distribution_use": "All ten scalar fit values are sorted, so more than the top answer is useful. They are labeled aesthetic fit, not probabilities of correctness.",
+      "output_effect": "The chosen procedural recipe changes subsequent marks while user strokes supply geometry. Session logic stages style changes around drawing gestures.",
+      "execution_modes": [
+        "Manual recipe choice",
+        "Local lexical ranking",
+        "Two recorded prompts",
+        "Implemented BYOK style ranking"
+      ],
+      "recorded_evidence": "Two authored demonstration examples retain requests, model responses and fingerprints. They are not a held-out brush-quality benchmark.",
+      "depth_opportunity": "Compare independent fit judgments with relative Choice over equivalent recipe descriptions. Add stroke-aware feasibility only with an explicit geometric input contract, and evaluate held-out paraphrases plus blinded user preference.",
+      "evidence": [
+        {
+          "path": "jev-experiments/live-worlds/ghost-brush/model.ts",
+          "symbol": "requestFor; parseRanking; lexicalRank"
+        },
+        {
+          "path": "jev-experiments/live-worlds/ghost-brush/session.ts",
+          "symbol": "initialSession; reduce; select"
+        },
+        {
+          "path": "jev-experiments/live-worlds/ghost-brush/recording-manifest.json",
+          "symbol": "cases; protocol"
+        },
+        {
+          "path": "jev-experiments/live-worlds/ghost-brush/recording-events.jsonl",
+          "symbol": "Recorded model events"
+        }
+      ]
+    },
+    {
+      "id": "snake",
+      "title": "Snake",
+      "input": "A symbolic snake board with body, food, heading and code-computed action previews.",
+      "questions": [
+        {
+          "scope": "Next movement",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 1
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "One flat instruction embeds JSON.stringify(observe(state)); criteria describe left, straight and right. The embedded JSON is still a string instruction.",
+      "distribution_use": "The selected action advances the game. Probabilities and timing are recorded, not used for confidence-based planning.",
+      "output_effect": "Code performs movement, food placement and collision checks. Jev chooses a relative turn; it does not render or simulate the board.",
+      "execution_modes": [
+        "Manual local play",
+        "Greedy code policy",
+        "Recorded Jev episodes",
+        "Implemented BYOK control"
+      ],
+      "recorded_evidence": "Three Jev and three greedy episodes share three seeds. Provider calls were batched across active games, so per-step recorded latency is not isolated single-game latency.",
+      "depth_opportunity": "Compare direct action selection with choosing validated multi-step plans under identical observations. Measure survival, food and trap avoidance on held-out seeds, including policy and candidate-generation overhead.",
+      "evidence": [
+        {
+          "path": "jev-experiments/local-models-and-games/arcade/engine.ts",
+          "symbol": "observe; options; question; step"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/arcade.tsx",
+          "symbol": "Arcade"
+        },
+        {
+          "path": "jev-experiments/local-models-and-games/arcade/results.jsonl",
+          "symbol": "snake episodes; trace"
+        }
+      ]
+    },
+    {
+      "id": "orbital",
+      "title": "Orbital rescue",
+      "input": "A symbolic 3D drone position, cores, hazards, health and code-computed movement previews.",
+      "questions": [
+        {
+          "scope": "Next flight movement",
+          "primitives": [
+            "Choice"
+          ],
+          "count": 1
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "One flat instruction embeds the serialized observation. Six string options move east/west/up/down/north/south; this is not image perception or native vector criteria.",
+      "distribution_use": "The winning direction advances the engine. Logged distributions do not govern risk thresholds.",
+      "output_effect": "Deterministic rules move the drone and resolve collections, collisions and health. Three.js visualizes the state; Jev receives symbolic coordinates.",
+      "execution_modes": [
+        "Manual local play",
+        "Greedy code policy",
+        "Recorded Jev episodes",
+        "Implemented BYOK control"
+      ],
+      "recorded_evidence": "Three Jev and three greedy episodes use three matched seeds. Shared batched provider timing must not be advertised as isolated decision latency.",
+      "depth_opportunity": "Compare immediate directions with reachable waypoint choices and short planner trajectories using the same hazard information. Evaluate rescue success and risk under held-out layouts, then test whether structured candidate attributes improve selection.",
+      "evidence": [
+        {
+          "path": "jev-experiments/local-models-and-games/arcade/engine.ts",
+          "symbol": "observe; options; question; step"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/arcade.tsx",
+          "symbol": "Arcade"
+        },
+        {
+          "path": "jev-experiments/local-models-and-games/arcade/results.jsonl",
+          "symbol": "orbital episodes; trace"
+        }
+      ]
+    },
+    {
+      "id": "drawing-framing",
+      "title": "Pixel questions",
+      "input": "A drawing description, 16×16 coordinates and, by condition, an explicit formula or completed previous rows.",
+      "questions": [
+        {
+          "scope": "One question per pixel",
+          "primitives": [
+            "Score",
+            "Noul"
+          ],
+          "count": "256 per image; batches of 64, or sixteen sequential row batches"
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat pixel instructions use five ordered intensity strings for Score or a membership Noul. Formula and prior rows are state; no nested question structures.",
+      "distribution_use": "Score values map to brightness by dividing by four; Noul values map directly to brightness or a 0.5 mask. Distributions do not enforce coherent shapes.",
+      "output_effect": "Code assembles the grayscale image. This directly tests question framing instead of selecting a whole prebuilt picture.",
+      "execution_modes": [
+        "Recorded framing comparisons",
+        "Implemented BYOK redraw",
+        "Deterministic geometric reference"
+      ],
+      "recorded_evidence": "Thirty-three recorded maps span nine cases: geometry conditions include formula references; creative cases do not have objective target masks. The conditions differ in supplied information.",
+      "depth_opportunity": "Compare per-pixel judgments against object/shape decisions rendered by code, with matched information and measured request cost. Add unseen shapes and wording variants; report geometric accuracy separately from creative preference.",
+      "evidence": [
+        {
+          "path": "jev-experiments/outcome-framing/drawing.ts",
+          "symbol": "drawingPayload; intensity; drawingMetrics"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/outcome-framing.tsx",
+          "symbol": "DrawingFraming"
+        },
+        {
+          "path": "jev-experiments/outcome-framing/drawing.jsonl",
+          "symbol": "maps; cases; availability"
+        }
+      ]
+    },
+    {
+      "id": "icon-studio",
+      "title": "A symbol for an idea",
+      "input": "A UI label, product context and names of 1,703 existing Lucide icons. Jev does not inspect SVG geometry.",
+      "questions": [
+        {
+          "scope": "Two-stage icon tournament",
+          "primitives": [
+            "Choice"
+          ],
+          "count": "27 shard choices, then up to 1 final choice; normally 5 requests"
+        }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Flat instructions and icon-name criteria, with none in each group. Shards contain at most 64 icons and use a fixed shuffled grouping.",
+      "distribution_use": "Each group winner advances; the final winner is previewed. Probabilities are conditional on candidate groups, not a global library ranking.",
+      "output_effect": "Code supplies the SVG artwork, manual styling, pins and exports. Jev selects existing artwork rather than drawing an icon.",
+      "execution_modes": [
+        "Six recorded searches",
+        "Implemented BYOK tournament",
+        "Local lexical browsing and manual selection"
+      ],
+      "recorded_evidence": "Six completed authored product examples have no independent preference labels. Earlier elimination can hide a better icon, and changing groups may change the result.",
+      "depth_opportunity": "Measure tournament loss and grouping sensitivity against bounded per-icon fit scoring. Test recognizability in real UI tasks; compare text names with structured semantic metadata without claiming visual understanding.",
+      "evidence": [
+        {
+          "path": "jev-experiments/icon-studio/protocol.ts",
+          "symbol": "shards; shardQuestion; finalQuestion; finalists"
+        },
+        {
+          "path": "jev-experiments/experience-prototypes/src/icon-studio.tsx",
+          "symbol": "IconStudio; match"
+        },
+        {
+          "path": "jev-experiments/icon-studio/results.jsonl",
+          "symbol": "rows; library"
+        }
+      ]
+    }
+  ]
+}

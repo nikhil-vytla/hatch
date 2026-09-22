@@ -1,0 +1,171 @@
+--- a/jev-experiments/experience-prototypes/src/main.tsx
++++ b/jev-experiments/experience-prototypes/src/main.tsx
+@@ -20,6 +20,7 @@
+   ChevronDown,
+ } from "lucide-react";
+ import { experiments, categories, lookup, type Experiment } from "./catalog";
++import { CapabilityInspector } from "../../capability-atlas-2026-09-22/capability-inspector";
+ import { MotionArt } from "./motion-art";
+ import { Pane, Button, Field, Notice, State, Stat } from "./shared";
+ import {
+@@ -570,6 +571,7 @@
+           <div>
+             <span className="eyebrow">THE COLLECTION</span>
+             <h2>Pick a thread. See where it goes.</h2>
++            <a className="text-link" href="/capabilities.html">How each experiment uses Jev ↗</a>
+           </div>
+           <label className="search-box">
+             <Search size={16} />
+@@ -867,6 +869,7 @@
+           <p>{exp.question}</p>
+         </div>
+       </section>
++      <CapabilityInspector key={id} id={id} />
+       <div className="notebook-intro">
+         <span className="eyebrow">THE OPEN QUESTION</span>
+         <h2>{exp.question}</h2>
+--- a/jev-experiments/experience-prototypes/scripts/prepare.ts
++++ b/jev-experiments/experience-prototypes/scripts/prepare.ts
+@@ -13,12 +13,16 @@
+ import { enrichProvenance } from "./provenance";
+ import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
+ import { prepareLiveWorlds } from "../../live-worlds/prepare";
++import { prepareCapabilityAtlas } from "../../capability-atlas-2026-09-22/prepare-atlas";
++import { preparePublicHarnessEvidence, projectRewardBenchDocument } from "../../capability-atlas-2026-09-22/publication-projection";
+ const lab = resolve(".."),
+   dest = resolve("public/data");
+ const publication: Record<string, string> = JSON.parse(
+   readFileSync("publication.json", "utf8"),
+ );
+ mkdirSync(dest, { recursive: true });
++prepareCapabilityAtlas(lab, resolve("public"));
++preparePublicHarnessEvidence(lab, resolve("public/routing-evidence"));
+ const hasSources = existsSync("results") || existsSync(resolve(lab, "results"));
+ if (hasSources) {
+   prepareLiveWorlds();
+@@ -58,11 +62,13 @@
+         unavailable: rows.filter((row: any) => !!row.error).length,
+       };
+     }
+-    writeFileSync(target, JSON.stringify(document) + "\n");
++    writeFileSync(target, JSON.stringify(name === "rewardbench2" ? projectRewardBenchDocument(document) : document) + "\n");
+   } else if (!existsSync(target)) {
+     throw new Error(
+       `Missing prepared evidence: ${name}. Run bun run build before deployment.`,
+     );
++  } else if (name === "rewardbench2") {
++    writeFileSync(target, JSON.stringify(projectRewardBenchDocument(JSON.parse(readFileSync(target, "utf8")))) + "\n");
+   }
+ }
+ mkdirSync("public/research", { recursive: true });
+--- a/jev-experiments/experience-prototypes/vite.config.ts
++++ b/jev-experiments/experience-prototypes/vite.config.ts
+@@ -1,9 +1,13 @@
+ import { defineConfig } from "vite";
+ import react from "@vitejs/plugin-react";
+ import tailwind from "@tailwindcss/vite";
++import { readFileSync } from "node:fs";
++const { buildId } = JSON.parse(readFileSync(new URL("./public/capability-build.json", import.meta.url), "utf8"));
++if (typeof buildId !== "string" || !/^[a-f0-9]{64}$/.test(buildId)) throw new Error("Prepare the capability metadata before starting Vite.");
+ export default defineConfig({
++  define: { __JEV_CAPABILITY_BUILD_ID__: JSON.stringify(buildId) },
+   plugins: [react(), tailwind()],
+   resolve: { dedupe: ["react", "react-dom"] },
+-  server: { proxy: { "/api": "http://127.0.0.1:8793" } },
++  server: { proxy: { "/api": `http://127.0.0.1:${process.env.JEV_API_PORT ?? 8793}` } },
+   build: { chunkSizeWarningLimit: 1100 },
+ });
+--- a/jev-experiments/roadmap/routing/evidence-links.ts
++++ b/jev-experiments/roadmap/routing/evidence-links.ts
+@@ -3,22 +3,10 @@
+ import comparisonReport from "./comparison/report.json?url&no-inline";
+ import comparisonReadme from "./comparison/README.md?url&no-inline";
+ import failureProtocol from "../integration/FAILURE-PROTOCOL.md?url&no-inline";
+-import evidenceIndex from "../integration/evidence/index.json?url&no-inline";
+-import opencodeSummary from "../integration/evidence/opencode/summary.json?url&no-inline";
+-import opencodeAudit from "../integration/evidence/opencode/mcp-audit.jsonl?url&no-inline";
+-import opencodeTranscript from "../integration/evidence/opencode/stdout.jsonl?url&no-inline";
+-import opencodeDiff from "../integration/evidence/opencode/host.diff?url&no-inline";
+-import opencodeTests from "../integration/evidence/opencode/tests-after.txt?url&no-inline";
+-import claudeSummary from "../integration/evidence/claude/summary.json?url&no-inline";
+-import claudeAudit from "../integration/evidence/claude/mcp-audit.jsonl?url&no-inline";
+-import claudeTranscript from "../integration/evidence/claude/stdout.jsonl?url&no-inline";
+-import claudeDiff from "../integration/evidence/claude/host.diff?url&no-inline";
+-import claudeTests from "../integration/evidence/claude/tests-after.txt?url&no-inline";
+-import codexSummary from "../integration/evidence/codex/summary.json?url&no-inline";
+-import codexAudit from "../integration/evidence/codex/mcp-audit.jsonl?url&no-inline";
+-import codexTranscript from "../integration/evidence/codex/stdout.jsonl?url&no-inline";
+-import codexDiff from "../integration/evidence/codex/host.diff?url&no-inline";
+-import codexTests from "../integration/evidence/codex/tests-after.txt?url&no-inline";
++
++// Build-only publication copies preserve the retained task evidence without
++// bundling raw host transcripts. Their index records source and output hashes.
++const evidenceUrl = (path: string) => `/routing-evidence/${path}`;
+ 
+ export const protocolDownloads = [
+   {
+@@ -48,7 +36,7 @@
+   },
+   {
+     label: "Client evidence index",
+-    url: evidenceIndex,
++    url: evidenceUrl("index.json"),
+     file: "jev-client-evidence-index.json",
+   },
+ ];
+@@ -56,28 +44,28 @@
+   {
+     name: "OpenCode",
+     id: "opencode",
+-    summary: opencodeSummary,
+-    audit: opencodeAudit,
+-    transcript: opencodeTranscript,
+-    diff: opencodeDiff,
+-    tests: opencodeTests,
++    summary: evidenceUrl("opencode/summary.json"),
++    audit: evidenceUrl("opencode/mcp-audit.jsonl"),
++    transcript: evidenceUrl("opencode/stdout.jsonl"),
++    diff: evidenceUrl("opencode/host.diff"),
++    tests: evidenceUrl("opencode/tests-after.txt"),
+   },
+   {
+     name: "Claude Code",
+     id: "claude",
+-    summary: claudeSummary,
+-    audit: claudeAudit,
+-    transcript: claudeTranscript,
+-    diff: claudeDiff,
+-    tests: claudeTests,
++    summary: evidenceUrl("claude/summary.json"),
++    audit: evidenceUrl("claude/mcp-audit.jsonl"),
++    transcript: evidenceUrl("claude/stdout.jsonl"),
++    diff: evidenceUrl("claude/host.diff"),
++    tests: evidenceUrl("claude/tests-after.txt"),
+   },
+   {
+     name: "Codex",
+     id: "codex",
+-    summary: codexSummary,
+-    audit: codexAudit,
+-    transcript: codexTranscript,
+-    diff: codexDiff,
+-    tests: codexTests,
++    summary: evidenceUrl("codex/summary.json"),
++    audit: evidenceUrl("codex/mcp-audit.jsonl"),
++    transcript: evidenceUrl("codex/stdout.jsonl"),
++    diff: evidenceUrl("codex/host.diff"),
++    tests: evidenceUrl("codex/tests-after.txt"),
+   },
+ ];
+--- a/jev-experiments/roadmap/routing/ModelRoutingLab.tsx
++++ b/jev-experiments/roadmap/routing/ModelRoutingLab.tsx
+@@ -496,7 +496,8 @@
+           proposals through host permissions, and passed independent task tests.
+           Their summaries identify client versions and run conditions. These
+           retained sessions predate later code fixes and are not relabeled as
+-          new runs.
++          new runs. Downloads are publication copies with normalized paths and
++          source hashes.
+         </p>
+         {harnessDownloads.map((client) => (
+           <details key={client.id}>

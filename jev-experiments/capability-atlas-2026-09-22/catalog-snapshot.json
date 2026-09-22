@@ -1,0 +1,248 @@
+[
+  {
+    "id": "materials",
+    "title": "Material sandbox",
+    "category": "Games & simulations",
+    "data": ""
+  },
+  {
+    "id": "paste",
+    "title": "Smart paste",
+    "category": "Productivity",
+    "data": "paste"
+  },
+  {
+    "id": "ui",
+    "title": "Generative interfaces",
+    "category": "Creative tools",
+    "data": "ui"
+  },
+  {
+    "id": "worlds",
+    "title": "Living scenes",
+    "category": "Creative tools",
+    "data": "visuals"
+  },
+  {
+    "id": "games",
+    "title": "Key & door",
+    "category": "Games & simulations",
+    "data": "games"
+  },
+  {
+    "id": "music",
+    "title": "Music arranger",
+    "category": "Creative tools",
+    "data": "music-v2"
+  },
+  {
+    "id": "pixels",
+    "title": "Pixel studio",
+    "category": "Creative tools",
+    "data": "visuals"
+  },
+  {
+    "id": "semantic-table",
+    "title": "Semantic spreadsheet",
+    "category": "Productivity",
+    "data": "semantic-table"
+  },
+  {
+    "id": "undo",
+    "title": "Intent-based undo",
+    "category": "Productivity",
+    "data": "undo"
+  },
+  {
+    "id": "changes",
+    "title": "Change impact",
+    "category": "Productivity",
+    "data": "changes"
+  },
+  {
+    "id": "logos",
+    "title": "Logo studio",
+    "category": "Creative tools",
+    "data": "logos"
+  },
+  {
+    "id": "beverage",
+    "title": "Café Jev",
+    "category": "Productivity",
+    "data": "cafe"
+  },
+  {
+    "id": "journeys",
+    "title": "Adaptive forms",
+    "category": "Productivity",
+    "data": "journeys"
+  },
+  {
+    "id": "decisions",
+    "title": "Preference explorer",
+    "category": "Productivity",
+    "data": "decisions"
+  },
+  {
+    "id": "routing",
+    "title": "Model Routing Lab",
+    "category": "Agents & tooling",
+    "data": "routing"
+  },
+  {
+    "id": "verify",
+    "title": "Agent verifier",
+    "category": "Agents & tooling",
+    "data": "verify"
+  },
+  {
+    "id": "search",
+    "title": "Search reranker",
+    "category": "Agents & tooling",
+    "data": "search"
+  },
+  {
+    "id": "context",
+    "title": "Context filter",
+    "category": "Agents & tooling",
+    "data": "search"
+  },
+  {
+    "id": "micro",
+    "title": "Micro-agent team",
+    "category": "Agents & tooling",
+    "data": "micro"
+  },
+  {
+    "id": "vision",
+    "title": "Vision to action",
+    "category": "Agents & tooling",
+    "data": "vision"
+  },
+  {
+    "id": "classify",
+    "title": "Intent recognition",
+    "category": "Benchmarks",
+    "data": "classify"
+  },
+  {
+    "id": "judge",
+    "title": "JudgeBench",
+    "category": "Benchmarks",
+    "data": "judgment-reliability"
+  },
+  {
+    "id": "robustness",
+    "title": "Decision stability",
+    "category": "Benchmarks",
+    "data": "robustness"
+  },
+  {
+    "id": "latency",
+    "title": "Batching & latency",
+    "category": "Benchmarks",
+    "data": "latency"
+  },
+  {
+    "id": "optimize",
+    "title": "Prompt evolution",
+    "category": "Training & local",
+    "data": "optimize"
+  },
+  {
+    "id": "teach",
+    "title": "Active labeling",
+    "category": "Training & local",
+    "data": "teach"
+  },
+  {
+    "id": "reward",
+    "title": "Learning from rewards",
+    "category": "Training & local",
+    "data": "reward"
+  },
+  {
+    "id": "replica",
+    "title": "SmolLM decision model",
+    "category": "Training & local",
+    "data": "replica"
+  },
+  {
+    "id": "rewardbench2",
+    "title": "RewardBench 2",
+    "category": "Benchmarks",
+    "data": "rewardbench2"
+  },
+  {
+    "id": "adapters",
+    "title": "Typed schema adapters",
+    "category": "Agents & tooling",
+    "data": "adapters"
+  },
+  {
+    "id": "snake",
+    "title": "Snake",
+    "category": "Games & simulations",
+    "data": "arcade"
+  },
+  {
+    "id": "orbital",
+    "title": "Orbital rescue",
+    "category": "Games & simulations",
+    "data": "arcade"
+  },
+  {
+    "id": "local-models",
+    "title": "Decision models on a Mac",
+    "category": "Training & local",
+    "data": "local-models"
+  },
+  {
+    "id": "benchmark-atlas",
+    "title": "The next experiments",
+    "category": "Benchmarks",
+    "data": "research-map"
+  },
+  {
+    "id": "tetris",
+    "title": "Tetris: play and branch",
+    "category": "Games & simulations",
+    "data": "tetris-framing"
+  },
+  {
+    "id": "drawing-framing",
+    "title": "Pixel questions",
+    "category": "Creative tools",
+    "data": "drawing-framing"
+  },
+  {
+    "id": "visual-search",
+    "title": "The visual archive",
+    "category": "Creative tools",
+    "data": "visual-search"
+  },
+  {
+    "id": "wardrobe",
+    "title": "A change of clothes",
+    "category": "Creative tools",
+    "data": "wardrobe"
+  },
+  {
+    "id": "icon-studio",
+    "title": "A symbol for an idea",
+    "category": "Creative tools",
+    "data": "icon-studio"
+  },
+  {
+    "id": "crowd",
+    "title": "The square at five",
+    "category": "Games & simulations",
+    "data": "live-worlds"
+  },
+  {
+    "id": "ghost-brush",
+    "title": "Ghost Brush",
+    "category": "Creative tools",
+    "data": "live-worlds"
+  }
+]

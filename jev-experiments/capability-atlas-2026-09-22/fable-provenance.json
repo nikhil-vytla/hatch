@@ -1,0 +1,68 @@
+{
+  "requested_model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+  "observed_models": [
+    {
+      "provider": "amazon-bedrock",
+      "model": "global.anthropic.claude-fable-5-1"
+    }
+  ],
+  "input_files": [
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/atlas.css",
+      "sha256": "b92a7305093de89f3f08d102068b8d186f799f61421413095a32725a6ef92c4f"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/atlas.js",
+      "sha256": "c4b7a9f545d7371458d30aa13182a8f7f1472e513a0c14eccc16cae798b11103"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/build-atlas.py",
+      "sha256": "ecfe06ce1b0326ef715ba8042143f6ccd55c7eac2155d39a962c8d8816e34445"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/capability-inspector.tsx",
+      "sha256": "f4092fa14e3852465c83a3242596dd821f598f7780206cc47c56358bcacffb43"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/capability-inspector.css",
+      "sha256": "c53552c206c77ddd1797b895dceefdfef7bf580ce131c18e0fabd9248e5bf88c"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/atlas.json",
+      "sha256": "e5ab73478890ac4d4f14fd6ef083b4f6978f2706e4e3a17bbcd404d1eca3c8cd"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/docs-research.md",
+      "sha256": "9981a249fa6f19180af7909b013715a29ee62a6e8d287851ae6119d990bf8531"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/runtime-audit.md",
+      "sha256": "5039df9ea2965c592da6af5b87ca8007c82bf3bff5fb0769853f7dda3943e605"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/decision.md",
+      "sha256": "ab4cf0c9de92a701ab993d35b3b1247d5024f6f6b79ec9f514d189d9b3177ee5"
+    },
+    {
+      "path": "jev-experiments/capability-atlas-2026-09-22/prepare-atlas.ts",
+      "sha256": "16f17500d4c13c80cad6a689ca229732c23bf61c88327b28ba60eb58dd4311ad"
+    },
+    {
+      "path": "output/playwright/jev-capability-atlas-desktop.png",
+      "sha256": "5edaa8e790ba5b5048995f8d77e5a54c739ca363dd1a91ec8588436cade7515f",
+      "published_path": "jev-experiments/capability-atlas-2026-09-22/screenshots/jev-capability-atlas-desktop-reviewed.png"
+    },
+    {
+      "path": "output/playwright/jev-capability-atlas-mobile-dark.png",
+      "sha256": "faf9c27bf3117e7d648df5b621f711e1916f8e723e29e2726e2ffb3888b5960d",
+      "published_path": "jev-experiments/capability-atlas-2026-09-22/screenshots/jev-capability-atlas-mobile-dark-reviewed.png"
+    }
+  ],
+  "prompt": "Review the integrated Jev capability atlas and per-experiment role inspector in this curated source snapshot. Read the files under jev-experiments/capability-atlas-2026-09-22, especially docs-research.md, runtime-audit.md, decision.md, atlas.json, atlas.js, atlas.css, build-atlas.py and capability-inspector.tsx/.css and prepare-atlas.ts. The latest inspector guards current-role claims with ID-bound source-fingerprint status; inspect that boundary carefully. Inspect both provided output/playwright screenshots. The snapshot contains exactly the public source and screenshot inputs for this review; it does not contain the application implementations behind the atlas records.\n\nEvaluate accuracy of the explanation, distinctions between flat text, JSON state and native structured questions, treatment of recorded versus live versus proposed behavior, visual hierarchy, clarity, useful navigation, keyboard/focus behavior, mobile/reduced-motion code and unnecessary complexity. Prefer a few consequential findings; distinguish confirmed source/screenshot defects from suggestions or unverified concerns. Inspect current code rather than assuming earlier issues persist. Do not expand the review into unprovided files, browsing, shell commands, model execution or project implementation.\n\nYou may read files only. There is no browser tool: do not claim interactive or accessibility verification from screenshots. The root integrator reports a separate 31-assertion browser pass; that is context, not evidence you independently reproduced. Do not infer model-quality gains from API structure or claim research measurements that are only proposed. Return at most 800 words of concise Markdown: verdict, numbered findings with repository-relative file and line references, and what is worth keeping. Never include local absolute paths, environment details, secrets, session identifiers, private transcripts or unrelated company references.",
+  "prompt_sha256": "9742ad7fbfca54f1a150ebf2b002243e3b7e87d22e1dd0f740f1c188b9823851",
+  "exit_code": 0,
+  "export_exit_code": 0,
+  "elapsed_seconds": 254.22,
+  "answer_sha256": "8abec5cc34e5af261b5c8250814616560dffaae1b4fefb975a6f6c80d194084c",
+  "source_commit": "23e5a026985c73829457e30604f70067999986e9"
+}
