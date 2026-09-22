@@ -1,6 +1,6 @@
 # Typed runtime and configured toolkit
 
-The version 2 runtime and configured CLI/MCP toolkit are ready for review on `nikhil-20260922-jevTypedRuntime`. The source is based on PR72 head `48ea2f6a35cf4d0ee4fcf3be4275af0aac2d392e`. The final tested source commit is `1b74f0f3acfa8b3f7461390c91674f51a9a0d389`. Nothing has been pushed or deployed.
+The version 2 runtime and configured CLI/MCP toolkit are ready for review on `nikhil-20260922-jevTypedRuntime`. The source is based on PR72 head `48ea2f6a35cf4d0ee4fcf3be4275af0aac2d392e`. The final tested source commit is `1b74f0f3acfa8b3f7461390c91674f51a9a0d389`. This report records local verification. Remote CI and canonical deployment require separate evidence.
 
 ## What changes
 
