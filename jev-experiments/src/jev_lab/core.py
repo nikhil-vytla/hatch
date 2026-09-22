@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, JsonValue, field_validator, model_validator
 
 ROOT = Path(__file__).resolve().parents[2]
 JEV = "typesafe-ai/jev"
@@ -50,6 +51,7 @@ def digest(value: Any) -> str:
 def save(path: Path, value: Any) -> None:
     if path.suffix == ".jsonl":
         from .records import write_record
+
         write_record(path, value)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -58,43 +60,94 @@ def save(path: Path, value: Any) -> None:
     tmp.replace(path)
 
 
+EntryType = str | dict[str, JsonValue] | list[JsonValue] | None
+
+
+def validate_json(value: Any, active: set[int] | None = None) -> None:
+    """Reject values JSON would coerce or discard instead of changing their meaning."""
+    if value is None or type(value) in (str, bool, int):
+        return
+    if type(value) is float and math.isfinite(value):
+        return
+    if type(value) is list or (type(value) is dict and all(type(key) is str for key in value)):
+        active = set() if active is None else active
+        if id(value) in active:
+            raise ValueError("JSON values cannot contain cycles")
+        active.add(id(value))
+        for item in value if type(value) is list else value.values():
+            validate_json(item, active)
+        active.remove(id(value))
+        return
+    raise ValueError("Use only finite JSON values and string object keys")
+
+
+def json_equal(left: Any, right: Any) -> bool:
+    """JSON numbers may compare numerically; booleans never equal 0 or 1."""
+    if type(left) in (int, float) and type(right) in (int, float):
+        return left == right
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(
+            json_equal(value, right[key]) for key, value in left.items()
+        )
+    if isinstance(left, list):
+        return len(left) == len(right) and all(json_equal(a, b) for a, b in zip(left, right))
+    return left == right
+
+
 class Question(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
     type: Literal["choice", "score", "noul"]
-    instructions: str = Field(min_length=1, max_length=30000)
-    criteria: dict[str, str] | list[str] | None = None
+    instructions: EntryType
+    criteria: dict[str, EntryType] | list[EntryType] | None = None
+
+    @field_validator("instructions", "criteria", mode="before")
+    @classmethod
+    def check_json(cls, value):
+        validate_json(value)
+        return value
 
     @model_validator(mode="after")
     def check_criteria(self):
         if self.type == "choice":
             if not isinstance(self.criteria, dict) or not 2 <= len(self.criteria) <= 255:
                 raise ValueError("Choice requires 2..255 named options")
+            if any(not name.strip() for name in self.criteria):
+                raise ValueError("Choice option names must be nonempty strings")
         elif self.type == "score":
-            if not isinstance(self.criteria, list) or not 2 <= len(self.criteria) <= 255:
-                raise ValueError("Score requires 2..255 ordered descriptions")
-        elif self.criteria is not None:
-            raise ValueError("This lab uses plain Noul instructions without criteria")
+            if not isinstance(self.criteria, list) or not 2 <= len(self.criteria) <= 10:
+                raise ValueError("Score requires 2..10 ordered descriptions")
+        elif "criteria" in self.model_fields_set:
+            if not isinstance(self.criteria, dict) or set(self.criteria) != {"true", "false"}:
+                raise ValueError("Noul criteria require exactly true and false descriptions")
         return self
 
+    def to_wire(self) -> dict:
+        # A null instruction is a native entry, not an omitted instruction.
+        return self.model_dump(exclude={"criteria"} if self.criteria is None else set())
 
-def choice(instructions: str, options: dict[str, str] | list[str]) -> dict:
+
+def choice(instructions: EntryType, options: dict[str, EntryType] | list[str]) -> dict:
     return Question(
         type="choice",
         instructions=instructions,
         criteria=options
         if isinstance(options, dict)
         else {v: v.replace("_", " ") for v in options},
-    ).model_dump(exclude_none=True)
+    ).to_wire()
 
 
-def noul(instructions: str) -> dict:
-    return Question(type="noul", instructions=instructions).model_dump(exclude_none=True)
+def noul(instructions: EntryType, criteria: dict[str, EntryType] | None = None) -> dict:
+    return Question(
+        type="noul",
+        instructions=instructions,
+        **({"criteria": criteria} if criteria is not None else {}),
+    ).to_wire()
 
 
-def score(instructions: str, levels: list[str]) -> dict:
-    return Question(type="score", instructions=instructions, criteria=levels).model_dump(
-        exclude_none=True
-    )
+def score(instructions: EntryType, levels: list[EntryType]) -> dict:
+    return Question(type="score", instructions=instructions, criteria=levels).to_wire()
 
 
 class BudgetExceeded(RuntimeError):
@@ -209,38 +262,55 @@ class Run:
 
 
 def normalize(raw: dict, questions: dict) -> dict:
-    if not isinstance(raw.get("answers"), dict):
+    if not isinstance(raw, dict) or not isinstance(raw.get("answers"), dict):
         raise ValueError("Provider response has no answer map")
+    if set(raw["answers"]) != set(questions):
+        raise ValueError("Provider response must answer exactly the requested questions")
+
+    def number(value):
+        return type(value) in (int, float) and math.isfinite(value)
+
     answers = {}
     for key, q in questions.items():
         a = raw["answers"].get(key)
         if not isinstance(a, dict) or a.get("type") != q["type"]:
             raise ValueError(f"Missing or wrong answer type: {key}")
         value = a.get({"choice": "choice", "score": "score", "noul": "noul"}[q["type"]])
-        if q["type"] == "choice" and value not in q["criteria"]:
+        if q["type"] == "choice" and (not isinstance(value, str) or value not in q["criteria"]):
             raise ValueError(f"Unknown option for {key}")
         if q["type"] in ("score", "noul"):
             upper = len(q["criteria"]) - 1 if q["type"] == "score" else 1
-            if not isinstance(value, (float, int)) or not 0 <= value <= upper:
+            if not number(value) or not 0 <= value <= upper:
                 raise ValueError(f"Out-of-range answer for {key}")
         probabilities = a.get("probabilities")
-        if probabilities is not None:
+        if q["type"] == "noul":
+            # The scalar is already the entire Bernoulli distribution.
+            expected_probabilities = {"false": 1 - value, "true": value}
+            if probabilities is not None and (
+                not isinstance(probabilities, dict)
+                or set(probabilities) != set(expected_probabilities)
+                or any(
+                    not number(probabilities[k]) or abs(probabilities[k] - p) > 1e-6
+                    for k, p in expected_probabilities.items()
+                )
+            ):
+                raise ValueError(f"Noul distribution disagrees with its probability: {key}")
+            probabilities = expected_probabilities
+        else:
             expected = (
                 set(q["criteria"])
                 if q["type"] == "choice"
                 else {str(i) for i in range(len(q["criteria"]))}
             )
             if (
-                set(probabilities) != expected
-                or any(
-                    not isinstance(p, (int, float)) or not 0 <= p <= 1
-                    for p in probabilities.values()
-                )
+                not isinstance(probabilities, dict)
+                or set(probabilities) != expected
+                or any(not number(p) or not 0 <= p <= 1 for p in probabilities.values())
                 or abs(sum(probabilities.values()) - 1) > 0.025
             ):
                 raise ValueError(f"Malformed probability distribution: {key}")
         confidence = a.get("confidence")
-        if confidence is not None and not 0 <= confidence <= 1:
+        if confidence is not None and (not number(confidence) or not 0 <= confidence <= 1):
             raise ValueError(f"Invalid confidence: {key}")
         answers[key] = {
             "type": q["type"],
@@ -248,6 +318,35 @@ def normalize(raw: dict, questions: dict) -> dict:
             "probabilities": probabilities,
             "confidence": confidence,
         }
+        if confidence is not None:
+            answers[key]["confidenceDefinition"] = "provider-distribution-confidence"
+        legend = a.get("legend")
+        if legend is not None:
+            expected_legend = (
+                {str(i): level for i, level in enumerate(q["criteria"])}
+                if q["type"] == "score"
+                else q.get("criteria")
+            )
+            expected_keys = (
+                set(expected_legend) if expected_legend is not None else {"false", "true"}
+            )
+            validate_json(legend)
+            if (
+                not isinstance(legend, dict)
+                or set(legend) != expected_keys
+                or any(
+                    value is not None and type(value) not in (str, list, dict)
+                    for value in legend.values()
+                )
+                or (expected_legend is not None and not json_equal(legend, expected_legend))
+            ):
+                raise ValueError(f"Provider legend disagrees with requested descriptions: {key}")
+            answers[key]["legend"] = legend
+        if q["type"] == "score":
+            # Keep the provider's continuous score separate from a discrete mode.
+            answers[key]["argmax"] = int(max(probabilities, key=probabilities.__getitem__))
+        elif q["type"] == "noul":
+            answers[key]["probabilityTrue"] = value
     return answers
 
 
@@ -354,12 +453,14 @@ class Client:
 
     async def evaluate(self, state: Any, questions: dict, tag: str = "evaluate") -> dict:
         started = time.perf_counter()
-        if not questions or len(questions) > 512:
-            raise ValueError("Supply 1..512 questions")
-        questions = {
-            k: Question.model_validate(v).model_dump(exclude_none=True)
-            for k, v in questions.items()
-        }
+        validate_json(state)
+        if (
+            not isinstance(questions, dict)
+            or not 1 <= len(questions) <= 512
+            or any(not isinstance(key, str) or not key.strip() for key in questions)
+        ):
+            raise ValueError("Supply 1..512 named questions with nonempty string IDs")
+        questions = {k: Question.model_validate(v).to_wire() for k, v in questions.items()}
         result = await self.request(
             "/typesafe/v1/systemone", {"model": JEV, "state": state, "questions": questions}, tag
         )
