@@ -313,16 +313,21 @@ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResul
             }
         }
         if let Some(legend) = &answer.legend {
-            if answer.kind != "score"
-                || legend.len() != expected.len()
-                || question["criteria"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                    .any(|(i, level)| legend.get(&i.to_string()) != Some(level))
+            if legend.len() != expected.len()
+                || expected.iter().any(|key| !legend.get(key).is_some_and(entry))
             {
-                return Err("Score legend changed the requested rubric".into());
+                return Err("Legend needs every requested native entry".into());
+            }
+            let descriptions: Option<Map<String, Value>> = if answer.kind == "score" {
+                Some(question["criteria"].as_array().unwrap().iter().enumerate()
+                    .map(|(i, level)| (i.to_string(), level.clone())).collect())
+            } else {
+                question["criteria"].as_object().cloned()
+            };
+            if descriptions.as_ref().is_some_and(|requested|
+                expected.iter().any(|key| legend.get(key) != requested.get(key)))
+            {
+                return Err("Legend changed requested descriptions".into());
             }
         }
     }
@@ -507,4 +512,68 @@ mod tests {
         .unwrap();
         assert!(decode::<Value>(&schema, answers).is_err());
     }
+
+    #[test]
+    fn native_legends_preserve_requested_descriptions() {
+        let cases = [
+            ("choice", json!({"type":"string","enum":["a","b"],"description":"Choose","x-jev-criteria":{"a":{"boundary":[true,2,null]},"b":null}}), json!({"type":"choice","value":"a","probabilities":{"a":0.6,"b":0.4},"legend":{"a":{"boundary":[true,2,null]},"b":null}}), "a"),
+            ("noul", json!({"type":"boolean","description":"Check","x-jev-criteria":{"true":{"boundary":[true,2,null]},"false":null}}), json!({"type":"noul","value":0.6,"probabilities":{"true":0.6,"false":0.4},"legend":{"true":{"boundary":[true,2,null]},"false":null}}), "true"),
+            ("score", json!({"type":"number","minimum":0,"maximum":1,"description":"Rate","x-jev-levels":[{"boundary":[true,2,null]},null]}), json!({"type":"score","value":0.4,"probabilities":{"0":0.6,"1":0.4},"legend":{"0":{"boundary":[true,2,null]},"1":null}}), "0"),
+        ];
+        for (name, field, answer, first) in cases {
+            let schema = field_schema(field);
+            let raw = json!({"value": answer});
+            let answers: Answers = serde_json::from_value(raw.clone()).unwrap();
+            let before = serde_json::to_value(&answers).unwrap();
+            let result = decode::<Value>(&schema, answers)
+                .unwrap_or_else(|error| panic!("{name}: {error}"));
+            assert_eq!(serde_json::to_value(result.answers).unwrap(), before);
+            for mutation in ["description", "missing", "extra", "scalar"] {
+                let mut bad = raw.clone();
+                let legend = bad["value"]["legend"].as_object_mut().unwrap();
+                match mutation {
+                    "description" => { legend.insert(first.into(), json!({"boundary":[1,2,null]})); },
+                    "missing" => { legend.remove(first); },
+                    "extra" => { legend.insert("extra".into(), Value::Null); },
+                    _ => { legend.insert(first.into(), json!(true)); },
+                }
+                assert!(decode::<Value>(&schema, serde_json::from_value(bad).unwrap()).is_err(), "{name}: {mutation}");
+            }
+        }
+    }
+
+    #[test]
+    fn plain_noul_legend_uses_native_boundary_entries() {
+        let schema = field_schema(json!({"type":"boolean","description":"Check"}));
+        for legend in [
+            json!({"true":{"evidence":[true,2]},"false":null}),
+            json!({"true":"Criterion met","false":["Criterion absent"]}),
+        ] {
+            let answers: Answers = serde_json::from_value(json!({"value":{"type":"noul","value":0.6,"legend":legend}})).unwrap();
+            let before = serde_json::to_value(&answers).unwrap();
+            let result = decode::<Value>(&schema, answers).unwrap();
+            assert_eq!(result.value["value"], true);
+            assert_eq!(serde_json::to_value(result.answers).unwrap(), before);
+        }
+        for legend in [
+            json!({"true":"Yes"}),
+            json!({"true":"Yes","false":"No","extra":null}),
+            json!({"true":"Yes","other":null}),
+            json!({"true":true,"false":null}),
+            json!({"true":"Yes","false":0}),
+        ] {
+            let answers = serde_json::from_value(json!({"value":{"type":"noul","value":0.6,"legend":legend}})).unwrap();
+            assert!(decode::<Value>(&schema, answers).is_err());
+        }
+    }
+
+    #[test]
+    fn default_choice_legend_uses_generated_descriptions() {
+        let schema = field_schema(json!({"type":"string","enum":["not_ready","ready"],"description":"Choose"}));
+        let mut raw = json!({"value":{"type":"choice","value":"ready","probabilities":{"not_ready":0.2,"ready":0.8},"legend":{"not_ready":"not ready","ready":"ready"}}});
+        assert!(decode::<Value>(&schema, serde_json::from_value(raw.clone()).unwrap()).is_ok());
+        raw["value"]["legend"]["not_ready"] = json!("different");
+        assert!(decode::<Value>(&schema, serde_json::from_value(raw).unwrap()).is_err());
+    }
+
 }

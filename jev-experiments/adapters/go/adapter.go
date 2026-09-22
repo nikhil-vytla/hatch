@@ -323,12 +323,25 @@ func Decode[T any](schema *jsonschema.Schema, answers map[string]Answer) (Decisi
 			}
 		}
 		if a.Legend != nil {
-			if q.Type != "score" || len(a.Legend) != len(expected) {
-				return result, fmt.Errorf("invalid score legend")
+			if len(a.Legend) != len(expected) {
+				return result, fmt.Errorf("legend must match the requested entries")
 			}
-			for i, level := range q.Criteria.([]any) {
-				if actual, ok := a.Legend[fmt.Sprint(i)]; !ok || !reflect.DeepEqual(actual, level) {
-					return result, fmt.Errorf("score legend changed requested rubric")
+			var descriptions object
+			if q.Type == "score" {
+				descriptions = object{}
+				for i, level := range q.Criteria.([]any) {
+					descriptions[fmt.Sprint(i)] = level
+				}
+			} else if q.Criteria != nil {
+				descriptions = q.Criteria.(object)
+			}
+			for key := range expected {
+				actual, exists := a.Legend[key]
+				if !exists || !entry(actual) {
+					return result, fmt.Errorf("legend needs every requested native entry")
+				}
+				if descriptions != nil && !reflect.DeepEqual(actual, descriptions[key]) {
+					return result, fmt.Errorf("legend changed requested descriptions")
 				}
 			}
 		}
