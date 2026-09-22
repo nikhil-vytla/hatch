@@ -1,0 +1,50 @@
+{
+  "sourceCommit": "d93be44fde84ac83992eaa1c7ca2b1f8359aa99d",
+  "archiveSha256Matches": true,
+  "verifierSha256Matches": true,
+  "logs": [
+    {
+      "index": 0,
+      "name": "app frozen install",
+      "sha256Matches": true,
+      "exitCode": 0
+    },
+    {
+      "index": 1,
+      "name": "app production build",
+      "sha256Matches": true,
+      "exitCode": 0
+    },
+    {
+      "index": 2,
+      "name": "decoder frozen install",
+      "sha256Matches": true,
+      "exitCode": 0
+    },
+    {
+      "index": 3,
+      "name": "gateway, score, accounting and existing transport contracts",
+      "sha256Matches": true,
+      "exitCode": 0
+    },
+    {
+      "index": 4,
+      "name": "publication integrity",
+      "sha256Matches": true,
+      "exitCode": 0
+    }
+  ],
+  "workflowTargets": [
+    "jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts",
+    "jev-experiments/gateway-accounting-2026-09-22/score.test.ts",
+    "jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts",
+    "jev-experiments/gateway-accounting-2026-09-22/observer-usage.test.ts",
+    "jev-experiments/experience-prototypes/server/byok.test.ts",
+    "jev-experiments/experience-prototypes/server/gateway.test.ts",
+    "jev-experiments/roadmap/runtime/existing-contract.test.ts"
+  ],
+  "workflowMatchesVerifierTargets": true,
+  "targetsAreExplicitTestFiles": true,
+  "archivedVerificationPassed": true,
+  "remoteExecutionAtCorrectionHeadEstablished": false
+}
