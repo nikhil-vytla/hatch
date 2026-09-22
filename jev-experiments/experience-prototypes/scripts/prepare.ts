@@ -10,6 +10,7 @@ import {
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { readRecord } from "./records";
+import { projectRewardBenchDocument } from "./benchmark-publication";
 import { enrichProvenance } from "./provenance";
 import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
 import { prepareLiveWorlds } from "../../live-worlds/prepare";
@@ -58,11 +59,13 @@ for (const [name, source] of Object.entries(publication)) {
         unavailable: rows.filter((row: any) => !!row.error).length,
       };
     }
-    writeFileSync(target, JSON.stringify(document) + "\n");
+    writeFileSync(target, JSON.stringify(name === "rewardbench2" ? projectRewardBenchDocument(document) : document) + "\n");
   } else if (!existsSync(target)) {
     throw new Error(
       `Missing prepared evidence: ${name}. Run bun run build before deployment.`,
     );
+  } else if (name === "rewardbench2") {
+    writeFileSync(target, JSON.stringify(projectRewardBenchDocument(JSON.parse(readFileSync(target, "utf8")))) + "\n");
   }
 }
 mkdirSync("public/research", { recursive: true });

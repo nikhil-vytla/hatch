@@ -417,6 +417,7 @@ export function Beverage({ result }: { result: any }) {
     request.current?.abort();
     request.current = null;
     if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
     setBusy(false);
     setPreparing(false);
   }
@@ -447,9 +448,10 @@ export function Beverage({ result }: { result: any }) {
     }
   }, [result]);
   useEffect(
-    () => () => {
-      request.current?.abort();
-      if (timer.current) clearTimeout(timer.current);
+    () => {
+      setBusy(false);
+      setPreparing(false);
+      return () => invalidate();
     },
     [],
   );
@@ -609,7 +611,7 @@ export function Beverage({ result }: { result: any }) {
         modelQuestions(),
         aborter.signal,
       );
-      if (!isCurrent(ticket, current.current)) return;
+      if (aborter.signal.aborted || !isCurrent(ticket, current.current)) return;
       const interpreted = interpret(response, input);
       commit(
         {
