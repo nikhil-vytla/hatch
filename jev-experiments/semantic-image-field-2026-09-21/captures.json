@@ -1,0 +1,77 @@
+{
+  "captured_on": "2026-09-21/22",
+  "captures": [
+    {
+      "path": "output/playwright/desktop-field.webp",
+      "sha256": "bd9ceac5dcf9af2903d152761de15d1b501f1dba29d812fb515e6fe11ea5b972",
+      "bytes": 92924,
+      "state": "Final optional field at100% zoom, Quiet water; scrolled to field.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    },
+    {
+      "path": "output/playwright/desktop-grid.webp",
+      "sha256": "3f86b69f57e92c0f2e7b243db832af2a94b316a7d5b36e97a9cfc22039761c7b",
+      "bytes": 76462,
+      "state": "Final default grid, Quiet water recorded caption ranking,1440\u00d71050 viewport; scene controls visible.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    },
+    {
+      "path": "output/playwright/mobile-dark.webp",
+      "sha256": "60fd7d62b5fb061f4ed1d04bbabf09ca86a84647a1a370ec54f9ddea4359b971",
+      "bytes": 30078,
+      "state": "Final optional field at390\u00d7844; dark theme, reduced motion, native touch scrolling.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    },
+    {
+      "path": "output/playwright/mobile-details.webp",
+      "sha256": "8fc20ca12ad3184ed2b9f11990292988baa9cf3764244067a3f9e0e35b41dc88",
+      "bytes": 22154,
+      "state": "Mobile artwork dialog scrolled to bottom with sticky close. Earlier field-only changes do not affect this dialog.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    },
+    {
+      "path": "output/playwright/mobile-field.webp",
+      "sha256": "d2297d7e6b7ab164d0ed91c87f74741a4f3e5393b76c11cefe6a915f41ebd2fa",
+      "bytes": 27626,
+      "state": "Earlier field before default-grid and native-touch-scroll changes.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    },
+    {
+      "path": "output/playwright/mobile-grid.webp",
+      "sha256": "44556c080535d8a8b7e57b12a8356dfbfd460326dc12d5822eddc25095caf7d2",
+      "bytes": 20624,
+      "state": "Final default grid at390\u00d7844; light theme, scene controls visible.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    },
+    {
+      "path": "output/playwright/reference-query.webp",
+      "sha256": "cf00341159689581b5d6ee73e8442b545cfac14c512d885a64846b0e97449b8e",
+      "bytes": 159222,
+      "state": "Semantic Image Field after blue mountains at dusk;60 match controls observed. Encoded to WebP for size, without changing framing.",
+      "source": "https://huggingface.co/spaces/webml-community/semantic-image-field",
+      "credit": "Joshua Lochner / Xenova and webml-community; Unsplash photographs belong to their contributors. Research reference only."
+    },
+    {
+      "path": "output/playwright/review-desktop.webp",
+      "sha256": "128dca98352756259d09f1e88ae4d7d3f021efa2813c41c8b514b5b68a63c264",
+      "bytes": 533148,
+      "state": "Earlier desktop field supplied to Fable; exact review input bytes.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    },
+    {
+      "path": "output/playwright/review-mobile.webp",
+      "sha256": "53d93bfeab814bba721ad85b1e2db6a44083650f96f43386d0cf3b8d9cc00303",
+      "bytes": 93050,
+      "state": "Earlier mobile field supplied to Fable; exact review input bytes.",
+      "source": "Local Jev artwork browser",
+      "credit": "Original Jev interface; public-domain Art Institute of Chicago artworks with credited Wikimedia image mirrors."
+    }
+  ]
+}

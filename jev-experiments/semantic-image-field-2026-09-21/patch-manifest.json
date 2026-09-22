@@ -1,0 +1,35 @@
+{
+  "baseCommit": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+  "applicationPatchSha256": "a228d450e448b6d86028bcae5f0b9870806ca00a592bbd8e8e845890775ee05d",
+  "applicationFiles": [
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.tsx",
+      "beforeSha256": "1497a48865a67511de408991b348d1188bf2ac707aa2d9bdf57baa232f9ba41f",
+      "afterSha256": "26d02858cf58f0da114dc9a5d7549ba1d74df1c66c5d58bccc24592dee1a8d0a"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/visual-search.css",
+      "beforeSha256": "4a4568fbad342bd6b5f6282f0ab129e57729fe4b517a5160a6070c3c5e06ab40",
+      "afterSha256": "269799d639b9212b4236166a0b661782b396160f85efed013fe5170f9445286e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/package.json",
+      "beforeSha256": "6f72c24685b4c6bcdb14f53f3f1ba768fb19d92877bea49cd60752d2cf9c4373",
+      "afterSha256": "8e60d3010034c99a0dcb71083ddfb8cf83194e4fcc51b326f4b7eca3f66ca2a9"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/tsconfig.json",
+      "beforeSha256": "559c8d47f4b159b5551f67194eec7daef0701d0968832f6ad289dc07124d81f0",
+      "afterSha256": "598b997fffafcd06036401ce1b1f7cff2d21bcfc3ce46da0d3450e8d18017555"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/vite.config.ts",
+      "beforeSha256": "0e9411aad943db7135f966b6727232768bf67780a8c326dfed00f434c9efdf96",
+      "afterSha256": "b25d5b86587796cb6626f5b1b44268a62539195ced2999222827a1f3a1c5e47c"
+    }
+  ],
+  "roadmapPrerequisite": "../roadmap-additions-2026-09-21/roadmap-update.patch",
+  "roadmapPatchSha256": "7ca001b9f7533a98f924c5b0ef9c3835629291385fdd8c1a29047208e05595d8",
+  "roadmapBeforeSha256": "79ee5949f6f51b75406938836eb5b063a88b9bd98dae53c2e15c58e6647f92ff",
+  "roadmapAfterSha256": "4458ea23c2e775e051481c88dfef0a0ee32ca470dca4f56e5021865eaf5e39c7"
+}

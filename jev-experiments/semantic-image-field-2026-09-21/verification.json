@@ -1,0 +1,85 @@
+{
+  "checked_on": "2026-09-22",
+  "scope": "Local implementation and separate clean application-patch checkout, not public deployment.",
+  "tests": {
+    "passed": 55,
+    "failed": 0,
+    "assertions": 1436,
+    "files": [
+      "collection.test.ts",
+      "field-layout.test.ts",
+      "../visual-search/search.test.ts"
+    ]
+  },
+  "clean_checkout": {
+    "base": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+    "application_patch_only": true,
+    "bun_frozen_install": "passed",
+    "bun_build": "passed",
+    "sibling_dependency_install_required": false
+  },
+  "recorded_evidence": {
+    "artworks": 204,
+    "queries": 6,
+    "conditions": 2,
+    "completed_scores": 2448,
+    "collection_sha256": "b2cbd8d3bbc160eddbcaba9b9d02f55f26fd4e2ba41df2224a0d14dac2dc844c",
+    "protocol_sha256": "42302a59358e2f93a35d788e19b3d06503fca297f60f37e3eb21fdcbd1d301a9"
+  },
+  "browser": {
+    "engine": "Chromium via Playwright CLI",
+    "desktop_viewport": [
+      1440,
+      1050
+    ],
+    "mobile_viewport": [
+      390,
+      844
+    ],
+    "default_grid": true,
+    "grid_page_counts": [
+      24,
+      48
+    ],
+    "ranking_export_total": 204,
+    "ranking_export_unique": 204,
+    "unrun_export": {
+      "evidence": "not run",
+      "scores": 0
+    },
+    "collection_imported": 1,
+    "collection_retained_after_malformed_file": 1,
+    "saved_query_context_retained": true,
+    "dialog_focus_return": true,
+    "sticky_mobile_close": true,
+    "native_touch_scroll_delta_px": 139,
+    "explicit_pinch_zoom_percent": 183,
+    "horizontal_overflow": false,
+    "dark_mode": true,
+    "reduced_motion": true,
+    "field_rank_navigation": true,
+    "overview_rendered": 190,
+    "focus_color": "rgb(167,95,18)",
+    "mocked_live_filter_count": 10,
+    "mocked_live_filter": "Drawings",
+    "edit_cancelled_mocked_run": true,
+    "recorded_scores_restored_after_live_cancel": 204,
+    "provider_requests_sent": 0
+  },
+  "profiling": {
+    "status": "Initial prototype only, not a final performance claim",
+    "frame_samples": 52,
+    "p50_ms": 8.3,
+    "p95_ms": 9,
+    "operation": "50-step desktop pointer pan",
+    "initial_render_cap": 72,
+    "final_render_cap": "none; viewport filtering only within204-work archive"
+  },
+  "limits": [
+    "No new model-quality evaluation.",
+    "No physical-phone or screen-reader audit.",
+    "External museum preview failures remain visible.",
+    "Real provider execution not rerun; intercepted transport and existing provider-free tests used.",
+    "No public application integration yet."
+  ]
+}
