@@ -1,18 +1,20 @@
 # Architecture decision records
 
 [ARCHITECTURE.md](../ARCHITECTURE.md) describes the current `strive`
-implementation. ADRs 0009 onward record its harness, benchmark, feedback and
-confinement decisions. ADRs 0001–0008 document earlier implementations and their
-rationale; their module names, APIs and rollout status are historical.
+implementation, decided in ADR-0015. ADRs 0001–0014 document the Python
+implementation (git tag `strive-py-final`) and earlier designs. Their module
+names and APIs are historical; the principles ADR-0015 lists as surviving
+still hold.
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [0009](0009-harness-as-model.md) | Harness pluggability through bounded generation | Accepted; native profiles and funded execution separately gated |
-| [0010](0010-benchmark-adapter-tau2.md) | General BenchmarkAdapter, tau2 telecom first | Accepted; installed workload qualification required |
-| [0011](0011-feedback-contracts.md) | Feedback A/B and isolated audit; C deferred | A/B implemented; C unsupported |
-| [0012](0012-linux-os-jail.md) | Linux OS jail confinement floor | Implemented; runtime capability checks required |
-| [0013](0013-adaptive-whole-group-split.md) | Adaptive 49/29/36 whole-group split | Implemented; separate fixed-stock mode |
-| [0014](0014-non-benchmark-workloads-scope.md) | Non-benchmark workloads need no core changes | Finding + minimal proof; real-environment adapter and generic driver unbuilt |
+| [0015](0015-rebuild-daemon-and-host.md) | Rebuild as a usable agent on a Rust daemon with thin clients | Accepted; M0 implemented |
+| [0009](0009-harness-as-model.md) | Harness pluggability through bounded generation | Historical (Python); Accepted; native profiles and funded execution separately gated |
+| [0010](0010-benchmark-adapter-tau2.md) | General BenchmarkAdapter, tau2 telecom first | Historical (Python); Accepted; installed workload qualification required |
+| [0011](0011-feedback-contracts.md) | Feedback A/B and isolated audit; C deferred | Historical (Python); A/B implemented; C unsupported |
+| [0012](0012-linux-os-jail.md) | Linux OS jail confinement floor | Historical (Python); Implemented; runtime capability checks required |
+| [0013](0013-adaptive-whole-group-split.md) | Adaptive 49/29/36 whole-group split | Historical (Python); Implemented; separate fixed-stock mode |
+| [0014](0014-non-benchmark-workloads-scope.md) | Non-benchmark workloads need no core changes | Historical (Python); Finding + minimal proof; real-environment adapter and generic driver unbuilt |
 | [0008](0008-vnext-substrate.md) | Policy-neutral adaptation with optional comparison | Historical implementation; policy-neutral principle retained |
 | [0001](0001-revisions-and-surfaces.md) | Harness revisions and evolvable surfaces | Historical; current bundles described in architecture |
 | [0002](0002-scopes.md) | Artifact scopes and inheritance | Historical; current run/lineage grants described in architecture |

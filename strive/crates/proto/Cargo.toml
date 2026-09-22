@@ -1,0 +1,15 @@
+[package]
+name = "strive-proto"
+description = "Wire protocol between the strive daemon and its clients (JSON-RPC 2.0 over a Unix socket)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+ts-rs.workspace = true
+
+[lints]
+workspace = true

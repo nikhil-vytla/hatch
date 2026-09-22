@@ -149,3 +149,38 @@ ever present as transitive dependencies of the now-removed `dspy`. Added both
 as explicit dev dependencies in `pyproject.toml` and regenerated `uv.lock` so
 `uv sync --frozen` reliably restores them; `uv run mypy --strict` is clean
 again (146 files).
+
+## 2026-09-22: Rebuild, M0 (branch `strive-rebuild`)
+
+- **Decision:** rebuild as a usable agent (ADR-0015). A Rust daemon owns the
+  trusted parts, and the TS agent host, TUI and Electron app are clients.
+  The Python tree was removed; its last state is tag `strive-py-final`.
+  Ignored local outputs (`live-results/`, `.venv/`, tau2 retained data) were
+  left on disk.
+- **UI spike** (throwaway, in `/tmp/strive-ui-spike`, not committed):
+  - Electron held 120 fps while streaming and delivered all 2000 tokens.
+  - Tauri was capped at 60 fps, used 73% CPU and delivered 1668 tokens.
+  - GPUI used the least memory (~100 MB settled) but collapsed to 24–30 fps.
+    The cause is frame pacing on ProMotion, not workload: it happened with
+    static content too.
+  - Electron was chosen.
+- **pi-mono check:**
+  - `pi-protocol`, `pi-server` and `pi-durable` exist but are "experimental,
+    no compatibility guarantees", so they aren't used.
+  - `pi-agent-core` has what the host needs: `execute` per tool (becomes a
+    daemon RPC), `beforeToolCall` (authorization), a pluggable `streamFn`
+    (the daemon gateway) and parallel tools.
+- **Build id bug, found by a test:** on macOS a file copy keeps the source's
+  mtime, so a size+mtime build id called a copied binary "current". The
+  inode is now part of the id. A false "stale" costs only a restart.
+- **`.gitignore` pitfall:** bare `src/` ignores every nested `src/`. Leftover
+  patterns are anchored with a leading `/`.
+- **tmux-driven TUI tests:** sending text and Enter in one `send-keys` call
+  looks like a paste to pi-tui, so Enter becomes a newline. Send them
+  separately.
+- **M0 measurements (macOS, release):**
+  - Warm `strive` to first TUI frame: 59 ms p50.
+  - Cold daemon start plus a request: 16 ms.
+  - Warm `strive status`: 3.1 ms.
+  - Binaries: `strive` 1.5 MB; `strive-tui` 64 MB, mostly the embedded Bun
+    runtime. The agent host should share that binary.

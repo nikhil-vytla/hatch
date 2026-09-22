@@ -1,78 +1,42 @@
 # strive
 
-Strive provides durable mechanisms for model-led adaptation. An agent can revise
-its code, prompts and memory while a fixed execution core enforces permissions,
-accounts for effects, records exact revisions and recovers without hiding
-uncertainty. Policies decide whether a change helped; comparative evaluation is
-optional.
+strive is a coding agent that learns from your sessions, and every lesson is
+one you can review, measure and undo. Proposed changes to its memory and
+skills are gated against the current version before they're kept. Budgets,
+a verifiable session log and an OS sandbox are on by default.
 
-The current implementation lives in `src/strive`. Read
-[ARCHITECTURE.md](docs/ARCHITECTURE.md) for the five integrity guarantees and
-[the ADRs](docs/adrs/README.md) for the decisions behind them.
-[HANDOFF.md](docs/HANDOFF.md) has verification commands and qualification gates;
-[ROADMAP.md](docs/ROADMAP.md) tracks remaining work.
+> **Status: rebuilding.** Milestone M0 is done: the daemon, protocol, TUI shell
+> and installer work. The agent loop arrives in M3. See
+> [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation is
+> at git tag `strive-py-final`.
 
-The implementation includes immutable bundles, an authenticated journal and CAS,
-pure verification, a serial supervisor and budget ledger, bounded candidate
-execution, a Linux OS jail, and model harness adapters behind a single-request
-gateway. `BenchmarkAdapter` separates task semantics and trusted scoring from
-the core. Counter supplies deterministic workflow tests; tau2 telecom is the
-first external benchmark, installed in a separate environment.
+## Install
 
-`ContinualRefine` operates, gathers authorized evidence, requests a proposal and
-keeps, revises or restores a complete bundle. Feedback A/B and isolated final
-audit control which evidence may influence adaptation. Journal-derived reports
-and optional OTLP export with a Langfuse profile expose results and accounting.
-
-## Run the recorded counter example
-
-Use Python 3.12 or newer, uv and Deno. From this directory:
+From this directory, with [Rust](https://rustup.rs) and [Bun](https://bun.sh):
 
 ```sh
-uv sync --frozen
-export PYTHONPATH="$PWD/adapters/counter/src${PYTHONPATH:+:$PYTHONPATH}"
-uv run python - <<'PY'
-from pathlib import Path
-from strive.cli.fixture import example
-print(example(Path(".cache/counter-example")))
-PY
-uv run python -m strive.cli --root .cache/counter-runs \
-  run .cache/counter-example/counter.toml --id adapting-17
-uv run python -m strive.cli --root .cache/counter-runs status adapting-17
-uv run python -m strive.cli --root .cache/counter-runs resume adapting-17
+./install.sh          # installs strive and strive-tui to ~/.local/bin
 ```
 
-The example uses recorded responses and makes no paid calls. Run IDs are unique;
-resume reuses the original bindings and retained state. The manifest CLI also
-provides `experiment`, `compare` and `project`; `--help` lists their arguments.
-The installed `strive` command delegates directly to vNext; there is no
-separate legacy CLI or run format.
-
-## Current limits
-
-The CLI currently composes the counter adapter and recorded provider. It rejects
-native harness campaign manifests. Native CLI single-request drives, Linux jail
-qualification on the executing host, installed tau2 grading/recovery checks and
-funded campaigns are separate gates. Host Deno permission tests do not establish
-the Linux confinement floor.
-
-Adaptive telecom uses whole scenario groups with 49 development, 29 validation
-and 36 audit tasks. Its separate fixed-stock runner uses the original 40 test
-IDs and an upstream fixed actor. These modes have different populations and
-implementations; their scores are reported separately. See the
-[tau2 adapter guide](adapters/tau2/README.md).
-
-`EvaluateFork` enactment and private-veto feedback C remain deferred. A valid
-execution history can contain failures, unknown outcomes and budget overruns.
-No fixture result establishes live-model improvement.
-
-## Verify
+## Use
 
 ```sh
-uv run mypy --strict
-uv run pytest tests/vnext -q
+cd any/repository
+strive                # opens the TUI; the per-user daemon starts on its own
+strive doctor         # checks sandbox, git, credentials and the daemon
+strive status         # daemon pid, uptime, clients
+strive stop           # stop the daemon (it also exits when idle)
 ```
 
-The [handoff](docs/HANDOFF.md) documents the local-cache/no-sync workaround for
-restricted macOS environments and the required Linux container checks. Core hash
-fixtures live in [tests/vnext/baselines](tests/vnext/baselines/README.md).
+No config file is needed. State lives in `~/.strive`, or in `STRIVE_HOME` if set.
+
+## Develop
+
+```sh
+./scripts/check.sh                        # fmt, clippy, tests, protocol drift, tsc, bun test
+STRIVE_TUI="bun packages/tui/src/main.ts" cargo run   # run the TUI from source
+```
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): the daemon, clients and protocol.
+- [ADR-0015](docs/adrs/0015-rebuild-daemon-and-host.md): why it's built this way.
+- [ADRs](docs/adrs/README.md): the full decision history.
