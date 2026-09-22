@@ -1,0 +1,58 @@
+[
+  {
+    "url": "https://docs.typesafe.ai/primitives/advanced",
+    "title": "Structured instructions and criteria",
+    "credit": "TypeSafe AI",
+    "retrieved_on": "2026-09-22",
+    "bytes": 352015,
+    "sha256": "08d5a0a41122c8750d5868ceef62698d1d86a01c092582b96b03d4654df9671a"
+  },
+  {
+    "url": "https://docs.typesafe.ai/primitives/score",
+    "title": "Score semantics",
+    "credit": "TypeSafe AI",
+    "retrieved_on": "2026-09-22",
+    "bytes": 581942,
+    "sha256": "9e06e3af3956ca760d03c2c59228ea0ad7b5f7553616e9b189131011f89ce031"
+  },
+  {
+    "url": "https://docs.typesafe.ai/confidence",
+    "title": "Probability and confidence",
+    "credit": "TypeSafe AI",
+    "retrieved_on": "2026-09-22",
+    "bytes": 349537,
+    "sha256": "9cc028418029ded616131e8c681af20201d7df0eeab039bae79b3172f7a0fb05"
+  },
+  {
+    "url": "https://docs.typesafe.ai/patterns/fan-out",
+    "title": "Speculative fan-out",
+    "credit": "TypeSafe AI",
+    "retrieved_on": "2026-09-22",
+    "bytes": 337775,
+    "sha256": "0550ca12b7f37cab85b8048a966d43db5dac1666e542bb0dcdac2ec4608bae9f"
+  },
+  {
+    "url": "https://docs.typesafe.ai/patterns/composite-scoring",
+    "title": "Composite scoring",
+    "credit": "TypeSafe AI",
+    "retrieved_on": "2026-09-22",
+    "bytes": 330395,
+    "sha256": "ef493031fe1e6ed744f3e460d2da02018e0c177429ee99091ae6dd42a48129bc"
+  },
+  {
+    "url": "https://docs.typesafe.ai/primitives/choice",
+    "title": "Choice semantics",
+    "credit": "TypeSafe AI",
+    "retrieved_on": "2026-09-22",
+    "bytes": 559991,
+    "sha256": "782b0fa1d7c20835e66a53f803877bf78c6cd7e2f115a00ae6a027d517d51d68"
+  },
+  {
+    "url": "https://docs.typesafe.ai/primitives/noul",
+    "title": "Noul semantics",
+    "credit": "TypeSafe AI",
+    "retrieved_on": "2026-09-22",
+    "bytes": 513286,
+    "sha256": "d4eefdfc4e8ac1f91d3c0470f100da2b725cd0da95425457499b6f7ab84c6d5c"
+  }
+]

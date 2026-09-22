@@ -1,0 +1,11 @@
+{
+  "checked_on": "2026-09-22",
+  "catalog_entries": 41,
+  "evidence_references": 136,
+  "local_links": 52,
+  "embedded_atlas": "matches",
+  "roadmap_patch_chain": "passed",
+  "application_patch_chain": "passed",
+  "browser_assertions": 31,
+  "scope": "Artifact integrity and recorded local browser checks. Source hashes identify the audited snapshot; a build guard checks current source separately. No new model evaluations."
+}

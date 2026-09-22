@@ -1,0 +1,24 @@
+{
+  "checked_on": "2026-09-22",
+  "source": "isolated Git checkout at browser-next-action PR head, with image-field and capability integration patches",
+  "source_commit": "456a912afef40e87eaea87bd64f60ef8a2e99eba",
+  "commands": [
+    {
+      "command": "bun install --frozen-lockfile",
+      "exit_code": 0,
+      "seconds": 0.33
+    },
+    {
+      "command": "bun run build",
+      "exit_code": 0,
+      "seconds": 6.31
+    }
+  ],
+  "capabilities_html_published": true,
+  "source_guard": {
+    "matching_records": 0,
+    "total_records": 41,
+    "older_reference_wiring_detected": true
+  },
+  "scope": "Build and artifact presence; source guards suppress current-behavior claims for the older reference application. No new provider or model evaluation."
+}

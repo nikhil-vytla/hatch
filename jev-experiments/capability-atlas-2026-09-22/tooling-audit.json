@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-22",
+  "scope": "Current catalog tooling and benchmark implementations, plus visual-search. Source inspection and decoding of existing publication-selected artifacts only; no new inference or provider calls.",
+  "native_structure_definition": "native_structure_status describes object/array-valued instructions or rich non-string criterion values. A native choice map or score list containing strings still uses its typed primitive, but JSON state or JSON.stringify inside instructions does not qualify as native structured instructions. False is a representation observation, not a quality score.",
+  "transport_findings": [
+    {
+      "summary": "The browser gateway requires string instructions, string choice-map values and string score-list items, and rejects Noul criteria. Python's shared Question model has the same string-only restriction and explicitly disallows Noul criteria. No audited current caller uses native structured instructions or rich criterion values.",
+      "evidence": [
+        { "path": "jev-experiments/experience-prototypes/server/gateway.ts", "symbol": "Question; validate" },
+        { "path": "jev-experiments/src/jev_lab/core.py", "symbol": "Question.check_criteria; choice; noul; score" }
+      ]
+    },
+    {
+      "summary": "Schema compilation, batching and JSON state are separate capabilities. Shared runtime choice/boolean/ordinal decisions preserve distributions and execution identity, while createJevAdapter converts prompt text and option descriptions to the narrower gateway format.",
+      "evidence": [
+        { "path": "jev-experiments/roadmap/runtime/contract.ts", "symbol": "DecisionRequest; DecisionResponse; Adapter" },
+        { "path": "jev-experiments/roadmap/runtime/jev.ts", "symbol": "createJevAdapter" }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "id": "routing",
+      "title": "Model Routing Lab",
+      "input": "Task prompt and repository context; code owns capabilities, permissions, prices and selection policy.",
+      "questions": [
+        { "scope": "current browser", "primitives": "none: lexical classifier", "count": 0 },
+        { "scope": "typed toolkit classifier", "primitives": "1 five-category choice + 1 five-level ordinal", "count": 2 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Object state; string prompts; category descriptions and ordinal levels become string criteria.",
+      "distribution_use": "Toolkit selects category/difficulty and retains maximum category probability. Comparison computes category Brier; hard eligibility remains code-controlled.",
+      "output_effect": "Code selects a destination which returns an answer, structured result or proposed patch. Default browser execution does not call Jev.",
+      "execution_modes": ["Browser lexical preview and BYOK destination execution", "SDK/CLI/MCP", "Hosted-Jev/local/host/heuristic comparison replay"],
+      "recorded_evidence": "Four calibration and four held-out tasks; flat measured quality mapping cannot establish classifier benefit or savings.",
+      "depth_opportunity": "Use Jev's task-trait distributions in a sufficiently sized, task-calibrated selector comparison and expose that classifier in the web flow.",
+      "evidence": [
+        { "path": "jev-experiments/roadmap/routing/classifier.ts", "symbol": "createDecisionClassifier" },
+        { "path": "jev-experiments/roadmap/routing/ModelRoutingLab.tsx", "symbol": "classification; selection; execute" },
+        { "path": "jev-experiments/roadmap/routing/web-handler.ts", "symbol": "handler" },
+        { "path": "jev-experiments/roadmap/routing/comparison/report.json", "symbol": "mode; limitations; summaries" }
+      ]
+    },
+    {
+      "id": "verify",
+      "title": "Agent verifier",
+      "input": "Task, visible trace and completion claim; unparseable browser input becomes trace text with a default completion claim.",
+      "questions": [
+        { "scope": "browser live", "primitives": "1 four-verdict choice", "count": 1 },
+        { "scope": "recorded runner", "primitives": "1 verdict choice + 1 evidence Noul", "count": 2 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Structured state; prose instructions and string verdict definitions.",
+      "distribution_use": "Verdict probabilities drive bars and recorded calibration metrics; the recording does not retain the auxiliary evidence answer in each result row.",
+      "output_effect": "Displays an advisory verdict; does not verify files, execute tests or authorize actions.",
+      "execution_modes": ["Recorded inspection", "BYOK verdict rerun"],
+      "recorded_evidence": "20 rows repeat five authored trace templates, not 20 independent real agent tasks.",
+      "depth_opportunity": "Separate outcome, scope and verification criteria, bind them to audit events, and compare abstention against executable checks.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/compositions.py", "symbol": "verifier_cases; verify" },
+        { "path": "jev-experiments/experience-prototypes/src/agent-experiments.tsx", "symbol": "AgentExperiment.evaluate: verify" },
+        { "path": "jev-experiments/results/verify.jsonl", "symbol": "result.rows; independent_templates" }
+      ]
+    },
+    {
+      "id": "search",
+      "title": "Search reranker",
+      "input": "Query plus six fixed documents, including an instruction-injection decoy and irrelevant text; no web retrieval.",
+      "questions": [
+        { "scope": "browser live", "primitives": "1 seven-option best-source choice + 6 relevance Noul", "count": 7 },
+        { "scope": "recorded runner", "primitives": "1 best choice + 6 relevance Noul + 6 injection Noul", "count": 13 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Document objects in shared state; plain string questions; choice criteria contain document titles.",
+      "distribution_use": "Relevance probabilities rank documents. Recorded retention also requires injection probability below 0.5; browser retention does not use that check.",
+      "output_effect": "Selects a source and marks retained documents; produces no generated answer or actual search request.",
+      "execution_modes": ["Five recorded queries", "BYOK rerun over fixed documents"],
+      "recorded_evidence": "Five authored cases; relevance filtering is not a security boundary.",
+      "depth_opportunity": "Use independently grounded passage criteria and downstream answer/citation tests on a broader captured corpus.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/compositions.py", "symbol": "retrieve; search" },
+        { "path": "jev-experiments/experience-prototypes/src/agent-experiments.tsx", "symbol": "evaluate; ranked; kept" },
+        { "path": "jev-experiments/results/search.jsonl", "symbol": "result.rows[].answers" }
+      ]
+    },
+    {
+      "id": "context",
+      "title": "Context filter",
+      "input": "The same query and six documents as Search reranker, plus a local source-slot allowance slider.",
+      "questions": [
+        { "scope": "browser live", "primitives": "1 best-source choice + 6 relevance Noul", "count": 7 },
+        { "scope": "shared search recording", "primitives": "1 choice + 12 Noul", "count": 13 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Object state and string questions/criterion descriptions; budget is not a model question.",
+      "distribution_use": "Code keeps relevance >= 0.5 within a rounded fraction of six source slots. Moving the slider makes no call.",
+      "output_effect": "Dims or retains cards. The UI does not run a downstream agent or measure token-budgeted context utility.",
+      "execution_modes": ["Shared recorded search evidence", "BYOK fixed-corpus relevance", "Local budget exploration"],
+      "recorded_evidence": "Catalog maps context to search data; this is not an independently measured context-compression study.",
+      "depth_opportunity": "Score evidence necessity and contradiction separately, preserve critical records, then test delayed-use success under actual token budgets.",
+      "evidence": [
+        { "path": "jev-experiments/experience-prototypes/src/catalog.ts", "symbol": "context data: search" },
+        { "path": "jev-experiments/experience-prototypes/src/agent-experiments.tsx", "symbol": "budget; ranked; kept; Context allowance" },
+        { "path": "jev-experiments/results/search.jsonl", "symbol": "result.rows[].kept_characters" }
+      ]
+    },
+    {
+      "id": "micro",
+      "title": "Micro-agent team",
+      "input": "Goal, then fixed help documents or fictional drink facts, then the selected answer and evidence.",
+      "questions": [
+        { "scope": "browser supported route", "primitives": "route choice; answer choice; 2 verification Noul across 3 calls", "count": 4 },
+        { "scope": "recorded runner", "primitives": "route choice; branch-specific search/drink questions; 2 Noul", "count": "16 search / 8 drink / 3 unsupported" }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Sequential object states; string questions and stringified candidate facts.",
+      "distribution_use": "Selected route/answer control branching. Support/completeness probabilities are displayed, not enforced as a repair or rejection gate.",
+      "output_effect": "Runs one bounded local evidence operation; no autonomous shell, browser or mailbox tools.",
+      "execution_modes": ["Recorded traces", "BYOK three-stage chain; ask exits after routing"],
+      "recorded_evidence": "Three rows: one search error, one drink result, one unsupported result. Current browser branching differs from the recorder.",
+      "depth_opportunity": "Turn verification into an explicit calibrated accept/clarify decision, with independent task tests and bounded recovery.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/compositions.py", "symbol": "microagent; retrieve; order_drink" },
+        { "path": "jev-experiments/experience-prototypes/src/agent-experiments.tsx", "symbol": "evaluate: micro" },
+        { "path": "jev-experiments/results/micro.jsonl", "symbol": "result.rows" }
+      ]
+    },
+    {
+      "id": "vision",
+      "title": "Vision to action",
+      "input": "A caption and user question. The recorded caption came from browser-WASM Xenova/vit-gpt2-image-captioning; Jev receives text, not pixels.",
+      "questions": [
+        { "scope": "browser live", "primitives": "1 four-action choice + 1 sufficiency Noul", "count": 2 },
+        { "scope": "recorded", "primitives": "action choice + sufficiency Noul + four-scene choice", "count": 3 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Description/question object in state; prose instructions; string action and scene criteria.",
+      "distribution_use": "Records probabilities and evidence sufficiency; browser mainly exposes the full result inspector.",
+      "output_effect": "Displays a proposed action. No navigation or visual reinspection executes.",
+      "execution_modes": ["One recorded perception→decision example", "BYOK decision on manually edited caption"],
+      "recorded_evidence": "Retains a captioning failure that misidentifies the gallery screenshot as electronic devices; no vision-accuracy study.",
+      "depth_opportunity": "Let uncertainty choose a region or targeted perception question, then measure whether the extra observation improves the next decision.",
+      "evidence": [
+        { "path": "jev-experiments/experience-prototypes/src/misc.tsx", "symbol": "Vision" },
+        { "path": "jev-experiments/src/jev_lab/compositions.py", "symbol": "vision_decision" },
+        { "path": "jev-experiments/results/vision.jsonl", "symbol": "result.rows[0]" }
+      ]
+    },
+    {
+      "id": "classify",
+      "title": "Intent recognition",
+      "input": "One BANKING77 or CLINC utterance. Labels are hidden from the decision request; CLINC includes out_of_scope.",
+      "questions": [
+        { "scope": "benchmark case", "primitives": "1 choice over 77 or 151 labels", "count": 1 },
+        { "scope": "supplemental schema fixture", "primitives": "1 area choice + 2 Noul", "count": 3 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Utterance string state; common prose instruction; label-name descriptions in native choice mapping.",
+      "distribution_use": "Full probabilities support Brier, calibration bins and risk/coverage; argmax supplies intent and error comparisons.",
+      "output_effect": "Recorded benchmark explorer and TF-IDF/logistic comparison; no live classifier is exposed in this view.",
+      "execution_modes": ["Recorded results", "CLI evaluation runner"],
+      "recorded_evidence": "Publication-selected artifacts contain 385 BANKING77 and 400 CLINC rows, plus supplemental typed-ticket examples.",
+      "depth_opportunity": "Compare authored semantic label descriptions, structured criterion records and calibrated rejection while keeping held-out labels and complete option sets fixed.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/benchmarks.py", "symbol": "classify_rows; classify; INTENT_PROMPT" },
+        { "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx", "symbol": "Benchmarks" },
+        { "path": "jev-experiments/experience-prototypes/results/classify.jsonl", "symbol": "result.experiments" }
+      ]
+    },
+    {
+      "id": "judge",
+      "title": "JudgeBench",
+      "input": "Complete question and candidate answer(s), without gold labels or response-model identity. Pair-context and isolated-candidate conditions differ explicitly.",
+      "questions": [
+        { "scope": "pair-context orientation", "primitives": "1 A/B choice + 2 correctness Noul", "count": 3 },
+        { "scope": "isolated candidate", "primitives": "1 correctness Noul", "count": 1 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Constant shared policy state; each string instruction embeds its own JSON evidence; string A/B criteria.",
+      "distribution_use": "Canonical P(A), correctness-score gaps, ties, repeat drift and order disagreement support reliability analysis.",
+      "output_effect": "Blind answer comparison, swaps and recorded-method inspection; no answer generation or policy training.",
+      "execution_modes": ["Recorded explorer", "Resumable native-batch research runner"],
+      "recorded_evidence": "620 pairs, 7,440 evaluation records and 14,880 decisions; three repeated passes. Native batches cap at 24 questions/64 KB.",
+      "depth_opportunity": "Add criterion-level evidence judgments and calibrated deferral, then assess downstream verification or rubric-reward quality on disjoint tasks.",
+      "evidence": [
+        { "path": "jev-experiments/judgment-reliability/protocol.ts", "symbol": "questions; encodedQuestions; tasks; PROTOCOL" },
+        { "path": "jev-experiments/judgment-reliability/README.md", "symbol": "Results; Paired uncertainty; Availability and limitations" },
+        { "path": "jev-experiments/experience-prototypes/src/judgment-reliability.tsx", "symbol": "JudgeBench" }
+      ]
+    },
+    {
+      "id": "robustness",
+      "title": "Decision stability",
+      "input": "Forty BANKING77 utterances under original, repeat, reversed-options, distractor and quoted-injection interventions.",
+      "questions": [
+        { "scope": "each variant", "primitives": "1 77-label choice", "count": 1 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Original input is a string; distractor/injection variants use object state. All instructions and option descriptions remain strings.",
+      "distribution_use": "Retains full intent probabilities, per-variant classification/calibration metrics and displayed alternatives.",
+      "output_effect": "Compares recorded predictions to expected intent; changes do not execute actions.",
+      "execution_modes": ["Recorded benchmark explorer", "CLI randomized-schedule runner"],
+      "recorded_evidence": "Publication-selected artifact contains 200 variant rows. Injection is an adversarial intervention, not a meaning-preserving paraphrase.",
+      "depth_opportunity": "Add matched native structured-versus-string encodings, criterion wording and boundary controls, measuring distribution drift and repeat noise by original-case groups.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/benchmarks.py", "symbol": "robustness" },
+        { "path": "jev-experiments/experience-prototypes/results/robustness.jsonl", "symbol": "result.rows; variants; recovery" },
+        { "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx", "symbol": "Benchmarks" }
+      ]
+    },
+    {
+      "id": "latency",
+      "title": "Batching & latency",
+      "input": "Repeated library/reader sentence plus 100, 1,000 or 4,000 background words.",
+      "questions": [
+        { "scope": "one request", "primitives": "identical Noul question repeated under distinct IDs", "count": [1, 8, 32, 128] }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "String state and identical string instructions; no criteria supplied.",
+      "distribution_use": "Answer probabilities are not used in the published timing rows; the study records timing, usage and charges.",
+      "output_effect": "Plots recorded median/tail latency by batch/context size. It does not change a real batching policy.",
+      "execution_modes": ["Recorded chart", "CLI timing runner"],
+      "recorded_evidence": "120 attempted measurements in 12 cells, with two errors. Measures gateway wall time, not isolated provider inference; repeated identical questions are a synthetic workload.",
+      "depth_opportunity": "Benchmark distinct useful questions, joint completion/quality, payload shape, concurrency and cold/warm cache conditions with complete critical-path accounting.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/benchmarks.py", "symbol": "latency" },
+        { "path": "jev-experiments/results/latency.jsonl", "symbol": "result.rows; groups" },
+        { "path": "jev-experiments/experience-prototypes/src/benchmarks.tsx", "symbol": "Learning: latency-chart" }
+      ]
+    },
+    {
+      "id": "visual-search",
+      "title": "The visual archive",
+      "input": "Query and per-artwork museum metadata, optionally museum caption. Image pixels, URLs and acquisition-topic labels are excluded.",
+      "questions": [
+        { "scope": "one artwork/mode", "primitives": "1 five-level Score", "count": 1 },
+        { "scope": "complete live query", "primitives": "204 artworks × 2 text modes; batches up to 32 questions", "count": 408 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Object query/policy state; string instructions embed JSON artwork evidence; five ordered prose criteria.",
+      "distribution_use": "Fractional expected score controls rank; full answers stay in event evidence. App ranking does not use ordinal uncertainty.",
+      "output_effect": "Ranks artworks, drives the browse field and exports rankings/collections; keyword baseline uses no Jev.",
+      "execution_modes": ["Six recorded query comparisons", "BYOK full-collection reranking", "Local keyword search"],
+      "recorded_evidence": "2,448 scores across 204 works and two text modes. Agreement is measured; independent retrieval relevance is not.",
+      "depth_opportunity": "Use criterion distributions for uncertainty-aware refinement or targeted image observation; evaluate relevance with independent labels before claiming better retrieval.",
+      "evidence": [
+        { "path": "jev-experiments/visual-search/protocol.ts", "symbol": "question; searchState; makeBatches; readScores" },
+        { "path": "jev-experiments/visual-search/events.jsonl", "symbol": "batch_completed; completed" },
+        { "path": "jev-experiments/experience-prototypes/src/visual-search.tsx", "symbol": "rankWithJev; exportRanking" }
+      ]
+    },
+    {
+      "id": "adapters",
+      "title": "Typed schema adapters",
+      "input": "Support-ticket text and a typed schema with semantic field descriptions.",
+      "questions": [
+        { "scope": "shared demonstration", "primitives": "1 four-area choice + 2 Noul", "count": 3 }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Schema descriptions compile to string questions; literals compile to string-valued choice criteria. Missing-context float is a Noul probability, not free-form numeric extraction.",
+      "distribution_use": "Preserves answer evidence; thresholds refund at 0.5, retains missing-context probability, decodes area to a typed value.",
+      "output_effect": "Shows validated data in four languages; changing language changes the displayed adapter example, not the live model.",
+      "execution_modes": ["One recorded Jev response decoded by Python/TypeScript/Rust/Go", "BYOK shared-contract browser rerun"],
+      "recorded_evidence": "Four successful decoders share one inference response. This is interoperability evidence, not four independent judgments.",
+      "depth_opportunity": "Expose nested schemas, explicit ordinal rubrics and rejection diagnostics while preserving complete distributions and adapter-specific limits.",
+      "evidence": [
+        { "path": "jev-experiments/src/jev_lab/adapters.py", "symbol": "Contract; adapters" },
+        { "path": "jev-experiments/src/jev_lab/semantic.py", "symbol": "questions_for; decode" },
+        { "path": "jev-experiments/experience-prototypes/src/misc.tsx", "symbol": "Adapters" },
+        { "path": "jev-experiments/results/adapters.jsonl", "symbol": "result.questions; rows" }
+      ]
+    },
+    {
+      "id": "rewardbench2",
+      "title": "RewardBench 2",
+      "input": "One complete user prompt and candidate answer per question. Preferred labels and candidate model identities are excluded.",
+      "questions": [
+        { "scope": "one candidate", "primitives": "1 ten-level Score", "count": 1 },
+        { "scope": "native batch", "primitives": "independent candidate Score questions", "count": "up to 128 under 90 KB" }
+      ],
+      "native_structure_status": false,
+      "instructions_and_criteria": "Policy object in state; instructions are JSON.stringify of prompt/candidate/question, not a native object; ten ordered prose rubric strings.",
+      "distribution_use": "Preserves score distributions/confidence; expected score plus one drives candidate ranking and tie/margin metrics.",
+      "output_effect": "Recorded blind candidate comparison and official benchmark scoring; no model training.",
+      "execution_modes": ["Recorded explorer", "Resumable native-batch research runner"],
+      "recorded_evidence": "1,865 cases and 8,977 candidate judgments across six categories; quality scores are not calibrated correctness probabilities.",
+      "depth_opportunity": "Compare criterion-decomposed rewards against the existing holistic rubric, retaining ties, independent outcomes and downstream selection regret.",
+      "evidence": [
+        { "path": "jev-experiments/rewardbench2/protocol.ts", "symbol": "scoreQuestion; RUBRIC; batchPayload" },
+        { "path": "jev-experiments/rewardbench2/run.ts", "symbol": "candidate.score; candidate.probabilities" },
+        { "path": "jev-experiments/rewardbench2/results.jsonl", "symbol": "result.rows; metrics; protocol" }
+      ]
+    },
+    {
+      "id": "benchmark-atlas",
+      "title": "The next experiments",
+      "input": "Authored research cards with source links, proposed protocols and caveats.",
+      "questions": [
+        { "scope": "this catalog experience", "primitives": "none", "count": 0 }
+      ],
+      "native_structure_status": "not-applicable",
+      "instructions_and_criteria": "Static research metadata; proposed questions are explanatory text, not a Jev request.",
+      "distribution_use": "None.",
+      "output_effect": "Filters and displays benchmark/experiment ideas; performs no evaluation.",
+      "execution_modes": ["Static research map"],
+      "recorded_evidence": "Eight benchmark cards and twelve idea cards. Status explicitly says proposals unless marked implemented; links to other experiments do not make this page an inference run.",
+      "depth_opportunity": "Connect each card to a frozen protocol and actual evidence status. Add an interactive typed question preview only when it helps inspect a concrete experiment.",
+      "evidence": [
+        { "path": "jev-experiments/local-models-and-games/research.ts", "symbol": "benchmarks; ideas; writeRecord" },
+        { "path": "jev-experiments/local-models-and-games/research-map.jsonl", "symbol": "result.status; benchmarks; ideas" },
+        { "path": "jev-experiments/experience-prototypes/src/local-models.tsx", "symbol": "ResearchMap" }
+      ]
+    }
+  ]
+}

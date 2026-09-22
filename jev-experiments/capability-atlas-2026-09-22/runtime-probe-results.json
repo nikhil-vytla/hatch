@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "1",
+  "kind": "provider-free-authored-fixtures",
+  "typescript": {
+    "networkCalls": 0,
+    "gatewayValidation": {
+      "plainNoul": "accepted",
+      "structuredInstruction": "Invalid question.",
+      "structuredChoice": "Invalid choice options.",
+      "structuredScore": "Invalid score rubric.",
+      "noulCriteria": "Invalid question.",
+      "nullInstruction": "Invalid question.",
+      "nullChoiceDescription": "Invalid choice options.",
+      "scoreEleven": "accepted"
+    },
+    "sharedExtraFieldsIssues": [],
+    "sharedElevenLevelIssues": [],
+    "mockedWireQuestions": {
+      "q": {
+        "type": "score",
+        "instructions": "Which level?",
+        "criteria": [
+          "10",
+          "20",
+          "30"
+        ]
+      },
+      "b": {
+        "type": "noul",
+        "instructions": "Is it eligible?"
+      },
+      "c": {
+        "type": "choice",
+        "instructions": "Which option?",
+        "criteria": {
+          "a": "A: Detail A",
+          "b": "B"
+        }
+      }
+    },
+    "adaptedDecisions": [
+      {
+        "questionId": "q",
+        "distribution": [
+          {
+            "value": 10,
+            "probability": 0.1
+          },
+          {
+            "value": 20,
+            "probability": 0.2
+          },
+          {
+            "value": 30,
+            "probability": 0.7
+          }
+        ],
+        "selected": 30
+      },
+      {
+        "questionId": "b",
+        "distribution": [
+          {
+            "value": false,
+            "probability": 0.4
+          },
+          {
+            "value": true,
+            "probability": 0.6
+          }
+        ],
+        "selected": true
+      },
+      {
+        "questionId": "c",
+        "distribution": [
+          {
+            "value": "a",
+            "probability": 0.7
+          },
+          {
+            "value": "b",
+            "probability": 0.3
+          }
+        ],
+        "selected": "a"
+      }
+    ],
+    "twoLevelScoreCompilation": {
+      "rating": {
+        "type": "noul",
+        "instructions": "Severity?"
+      }
+    }
+  },
+  "python": {
+    "networkCalls": 0,
+    "coreValidation": {
+      "plainNoul": "accepted",
+      "structuredInstruction": "rejected: ValidationError",
+      "structuredChoice": "rejected: ValidationError",
+      "structuredScore": "rejected: ValidationError",
+      "noulCriteria": "rejected: ValidationError",
+      "nullInstruction": "rejected: ValidationError",
+      "nullChoiceDescription": "rejected: ValidationError",
+      "scoreEleven": "accepted"
+    },
+    "macExtraCriteriaValidation": "accepted",
+    "macOptions": [
+      [
+        false,
+        "No, the statement does not hold."
+      ],
+      [
+        true,
+        "Yes, the statement holds."
+      ]
+    ]
+  }
+}
