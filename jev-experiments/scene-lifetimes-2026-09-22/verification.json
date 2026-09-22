@@ -1,0 +1,118 @@
+{
+  "base": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+  "commit": "9eb695e1ad97949c91ed0600a32827c6dd25ffe7",
+  "condition": "exact Git archive without working-tree overlay or prepared assets",
+  "providerCallsRequested": false,
+  "checks": [
+    {
+      "name": "frozen install",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "elapsedSeconds": 0.699,
+      "logSha256": "1d26aebfcfe59a890e5263ddf5ae891fa3a62872e222fb6daf16b3e4d04d284e"
+    },
+    {
+      "name": "production build",
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "elapsedSeconds": 8.486,
+      "logSha256": "4dd4fdadc102b116fc1c64f027bb01d4f596d8070f3c110c91c8c1d1f7d520f9"
+    },
+    {
+      "name": "lifetime and publication regressions",
+      "command": [
+        "bun",
+        "test",
+        "jev-experiments/scene-lifetimes-2026-09-22"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "elapsedSeconds": 0.61,
+      "logSha256": "e8e4655cca1722cf68baafa75aa3562f4271c33a6c585d7f169e6c6993308949",
+      "summary": [
+        "19 pass",
+        "0 fail",
+        "91 expect() calls"
+      ]
+    }
+  ],
+  "passed": true,
+  "baselineRegression": {
+    "command": [
+      "bun",
+      "test",
+      "jev-experiments/scene-lifetimes-2026-09-22/lifecycle.test.ts",
+      "-t",
+      "Wardrobe pauses and releases"
+    ],
+    "sourceRevision": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+    "exitCode": 1,
+    "failedTests": 1,
+    "reason": "The captured video receives no pause after its DOM ref is detached.",
+    "sourceShapeFailure": false
+  },
+  "sourceFiles": [
+    {
+      "path": ".github/workflows/jev-scene-lifetimes.yml",
+      "sha256": "248de7cea947526ee5fe184c9948b5dd518e565a42e052f56e05274b993cbd83"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/scripts/benchmark-publication.ts",
+      "sha256": "db3bd3554ab5252daa344b8440ef3cd4349deb99e57738e16510b686fb462f87"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/scripts/prepare.ts",
+      "sha256": "3767a69dbd05e3a55e5a968f1d209efff07ba4726a1d18efda871db4acee8c75"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/arcade.tsx",
+      "sha256": "4bd3a482e0e0bdae0e2fdb3fc1ceb4c86bd04c6512b2072711d60b1c33d9a93b"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/cafe-jev.tsx",
+      "sha256": "6dee5db4dd9a2e49dc314b049f326a3f5398da48f782f6f3db08124340b5aaca"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/games.tsx",
+      "sha256": "e92b863b9acfc7cc5f3ada367c12ed57b434373f31db8efa4857434a6c272efe"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/ghost-brush.tsx",
+      "sha256": "c44dca97c77c175ef68220f4746c88bfeffc617a4699f698e7ed0311e5fc1b17"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/icon-studio.tsx",
+      "sha256": "651e4c79d63add55f7276a098b71e4154b18094cb2bd27a45031d2381ed4da67"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/judgment-reliability.tsx",
+      "sha256": "f13ef9cb01303d9f494c376d9547d0a74e7cae4d2a6842bca3afd5ae510ad092"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/outcome-framing.tsx",
+      "sha256": "57470df605993cccf3f43dd4d4349dc4b2fe8e0c4301b9ac744b2e65a1616d4e"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/src/wardrobe.tsx",
+      "sha256": "dc32e6cc2e15b65688f14f786cb91fcaf012ebfd7722861d0c0fb8b066c6abf1"
+    },
+    {
+      "path": "jev-experiments/scene-lifetimes-2026-09-22/benchmark-publication.test.ts",
+      "sha256": "ce7a82ae5edf0a3078660ea7b449dd0663c5e9ef4e9a5f20867a9f328f836714"
+    },
+    {
+      "path": "jev-experiments/scene-lifetimes-2026-09-22/lifecycle.test.ts",
+      "sha256": "201bc6bc750b9e394074b1a9847585886afd6246e05f2e4e5095e59209345cd1"
+    }
+  ]
+}
