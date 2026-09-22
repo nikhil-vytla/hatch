@@ -1,0 +1,82 @@
+bun test v1.3.14 (0d9b296a)
+
+../../../../../../../../../..<review>/missed-cases.test.ts:
+21 |     apiKey: "authored-key", signal: controller.signal,
+22 |     fetcher: (async () => { calls++; return response(); }) as typeof fetch,
+23 |     onAttempt: observer === "attempt" ? () => controller.abort() : undefined,
+24 |     onAccounting: observer === "accounting" ? (a: any) => { if (a.attempts.at(-1)?.status === 200) controller.abort(); } : undefined,
+25 |   });
+26 |   await expect(pending).rejects.toMatchObject({ code: "cancelled", status: 499 });
+                                     ^
+error: 
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (<review>/missed-cases.test.ts:26:33)
+(fail) cancellation inside final attempt observer must not resolve success [1.14ms]
+21 |     apiKey: "authored-key", signal: controller.signal,
+22 |     fetcher: (async () => { calls++; return response(); }) as typeof fetch,
+23 |     onAttempt: observer === "attempt" ? () => controller.abort() : undefined,
+24 |     onAccounting: observer === "accounting" ? (a: any) => { if (a.attempts.at(-1)?.status === 200) controller.abort(); } : undefined,
+25 |   });
+26 |   await expect(pending).rejects.toMatchObject({ code: "cancelled", status: 499 });
+                                     ^
+error: 
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (<review>/missed-cases.test.ts:26:33)
+(fail) cancellation inside final accounting observer must not resolve success [0.12ms]
+31 |   const error = await evaluate(payload, {
+32 |     apiKey: "authored-key", fetcher: (async () => { calls++; return response(); }) as typeof fetch,
+33 |     onAccounting: () => { throw Error("authored observer failure before dispatch"); },
+34 |   }).catch((error: unknown) => error);
+35 |   expect(error).toBeInstanceOf(GatewayError); expect(error.code).toBe("observer_error");expect(calls).toBe(0);
+36 |   expect(error.accounting.attempts).toEqual([]);expect(error.accounting.costUsd).toBe(0);
+                                         ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "accountingScope": "gateway-response",
++     "attempt": 1,
++     "costUsd": null,
++     "issues": [],
++     "model": "typesafe-ai/jev",
++     "modelSource": "configured-unverified",
++     "providerAttempts": "unknown",
++     "requestMs": 0,
++     "requestedModel": "typesafe-ai/jev",
++     "status": "pending",
++     "usage": null,
++   },
++ ]
+
+- Expected  - 1
++ Received  + 15
+
+      at <anonymous> (<review>/missed-cases.test.ts:36:37)
+(fail) an observer failure before dispatch must not invent an outbound attempt [0.18ms]
+34 |   }).catch((error: unknown) => error);
+35 |   expect(error).toBeInstanceOf(GatewayError); expect(error.code).toBe("observer_error");expect(calls).toBe(0);
+36 |   expect(error.accounting.attempts).toEqual([]);expect(error.accounting.costUsd).toBe(0);
+37 | });
+38 | test("a reported total cannot be smaller than an independently known token component", async () => {
+39 |   expect(usageIssue({ inputTokens: 10, totalTokens: 4 })).not.toBeNull();
+                                                                   ^
+error: expect(received).not.toBeNull()
+
+Received: null
+
+      at <anonymous> (<review>/missed-cases.test.ts:39:63)
+(fail) a reported total cannot be smaller than an independently known token component [0.08ms]
+(pass) control: complete success and valid partial observations remain accepted [0.22ms]
+(pass) control: cancellation while a response is outstanding rejects late success [0.22ms]
+
+ 2 pass
+ 4 fail
+ 12 expect() calls
+Ran 6 tests across 1 file. [14.00ms]

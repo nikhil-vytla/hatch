@@ -1,0 +1,58 @@
+bun test v1.3.14 (0d9b296a)
+
+gateway-accounting-2026-09-22/score.test.ts:
+(pass) Score rounding intervals include exact endpoints and reject values immediately outside [0.44ms]
+(pass) greedy Score interval equals independently enumerated feasible vertices for two through ten levels [2.75ms]
+(pass) simultaneous probability and Score rounding conservatively accepts generated underlying distributions [1.33ms]
+(pass) nonuniform and clipped Score intervals match independent feasible vertices [10.23ms]
+(pass) probability mass uses the declared decimal boundary [0.03ms]
+
+gateway-accounting-2026-09-22/gateway.test.ts:
+(pass) native questions preserve their JSON meanings and observed answer metadata [1.60ms]
+(pass) invalid native inputs fail before transport [0.23ms]
+(pass) semantic failures preserve independently observed cost and identity without another request [0.84ms]
+(pass) Score rejection retains the raw distribution and disagreement [0.25ms]
+(pass) an unknown earlier attempt prevents a claimed total; known retries are summed [0.40ms]
+(pass) one-attempt mode never retries transient or network failure [0.18ms]
+(pass) unknown model, partial usage and explicit zero remain distinct [0.47ms]
+(pass) caller cancellation prevents a late answer from becoming a success [0.22ms]
+(pass) observer failures cannot trigger another paid request [0.23ms]
+(pass) a pending observer can stop dispatch without inventing an outbound attempt [0.29ms]
+(pass) real loopback HTTP redirects never reach the redirected target [2.16ms]
+
+gateway-accounting-2026-09-22/accounting.test.ts:
+(pass) cost observations never use JavaScript coercions [0.04ms]
+(pass) token observations are nonnegative safe integers with coherent totals [0.05ms]
+(pass) accounting snapshots are independent and reject invented totals [0.13ms]
+(pass) overflowed sums are unknown while independent fields survive [0.07ms]
+
+gateway-accounting-2026-09-22/observer-usage.test.ts:
+(pass) cancellation inside final attempt observer must not resolve success [0.19ms]
+(pass) cancellation inside final accounting observer must not resolve success [0.08ms]
+(pass) an observer failure before dispatch must not invent an outbound attempt [0.09ms]
+(pass) a reported total cannot be smaller than an independently known token component [0.08ms]
+(pass) control: complete success and valid partial observations remain accepted [0.10ms]
+(pass) control: cancellation while a response is outstanding rejects late success [0.07ms]
+
+experience-prototypes/server/byok.test.ts:
+(pass) missing or malformed credentials never borrow environment credentials [0.41ms]
+(pass) concurrent callers retain their own keys through evaluation and composition [7.20ms]
+(pass) provider fields and oversized UTF-8 input fail before a provider request [0.18ms]
+(pass) provider rejection bodies are not exposed or retried [0.09ms]
+
+experience-prototypes/server/gateway.test.ts:
+(pass) 429 waits for Retry-After and records attempts separately from the answer [0.19ms]
+(pass) authorization rejection is not retried [0.07ms]
+(pass) a cooldown exceeding the deadline is returned for later resumption [0.07ms]
+(pass) network failure may retry, but an explicit cancellation stops [0.11ms]
+(pass) malformed model answers remain inspectable failures, never silently rerolled [0.13ms]
+(pass) request bounds and date Retry-After are enforced [0.05ms]
+
+roadmap/runtime/existing-contract.test.ts:
+(pass) gateway rejects undeclared score probabilities without rerolling [0.36ms]
+(pass) direct decoder rejects inherited option names [0.48ms]
+
+ 38 pass
+ 0 fail
+ 981 expect() calls
+Ran 38 tests across 7 files. [71.00ms]

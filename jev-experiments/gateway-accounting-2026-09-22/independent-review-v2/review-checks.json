@@ -1,0 +1,28 @@
+[
+  {
+    "name": "existing",
+    "exitCode": 0,
+    "summaries": [
+      "31 pass",
+      "0 fail",
+      "948 expect() calls"
+    ],
+    "logSha256": "ca1ef32ee0ddde81a99452b93d0a36ae3150e8f402e9543a90f78d5dd0ba9df9"
+  },
+  {
+    "name": "regressions",
+    "exitCode": 1,
+    "summaries": [
+      "2 pass",
+      "4 fail",
+      "12 expect() calls"
+    ],
+    "logSha256": "cb5f648e4dec1b58e1596e9165742d399f4e421a703644de6b4b1a6d79f7a590"
+  },
+  {
+    "name": "observations",
+    "exitCode": 0,
+    "summaries": [],
+    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

@@ -1,0 +1,45 @@
+{
+  "condition": "portable rerunner maintenance; argument/preflight checks only",
+  "files": [
+    {
+      "path": "NOTES.md",
+      "sha256": "2321ff5301e46e5eea0ee518cd6cd0844d58512044930afd259be94a153cbc10",
+      "bytes": 1506
+    },
+    {
+      "path": "README.md",
+      "sha256": "2670b9ac0a232ee1a277122f5b90a4186c71c220ad0d60539e9356c826268572",
+      "bytes": 1370
+    },
+    {
+      "path": "_summary.md",
+      "sha256": "2d1dc2d9a760d260fb78fbeb4b1a324e5439700ae178f0ea6c415bb228a15825",
+      "bytes": 499
+    },
+    {
+      "path": "driver-versions.json",
+      "sha256": "fbf72f67e8a4a9e58e0a73256a118a357ed6ae704dc10be1dc4a781f9949889e",
+      "bytes": 551
+    },
+    {
+      "path": "historical-drivers.json",
+      "sha256": "d99f1f183f44e9761c8650e4663084e8863c00563b431d4c4c4aff8571f27f70",
+      "bytes": 1613
+    },
+    {
+      "path": "immutability-check.json",
+      "sha256": "e774a84645714a147b49af74614bc9acd43ccfcfa78f8adba0a5b26658aac2a6",
+      "bytes": 489
+    },
+    {
+      "path": "preflight-checks.json",
+      "sha256": "3499d7b49672c6e6cfcebb03cb234100a006f4bbdf2563ef606919370e20d39d",
+      "bytes": 3192
+    },
+    {
+      "path": "test-preflight.py",
+      "sha256": "c1da1f8e3c5736436bd0db9edb8d7efe589e95fbb48479eb5636a76b170844ac",
+      "bytes": 4485
+    }
+  ]
+}

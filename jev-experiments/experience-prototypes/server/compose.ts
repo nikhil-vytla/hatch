@@ -1,6 +1,20 @@
 import { experimental_composeSpec } from "@json-render/core";
 import { uiCatalog, uiCandidates, uiInitial } from "../src/ui-catalog.js";
 import { evaluate, GatewayError } from "./gateway.js";
+// json-render uses undefined for absent optional element fields. Materialize
+// that documented library boundary explicitly; other non-JSON state still fails.
+function compositionState(state: any) {
+  if (!Array.isArray(state?.already_built)) return state;
+  return {
+    ...state,
+    context: state.context ?? {},
+    already_built: state.already_built.map((element: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(element).filter(([key, value]) =>
+        value !== undefined || !["content", "children", "slots"].includes(key),
+      )),
+    ),
+  };
+}
 export async function* compose(body: any, signal: AbortSignal, apiKey: string) {
   if (
     !body ||
@@ -31,7 +45,7 @@ export async function* compose(body: any, signal: AbortSignal, apiKey: string) {
     ...(body.spec ? { initialSpec: body.spec } : {}),
     evaluate: async ({ state, questions, signal }) => {
       const r = await evaluate(
-        { state, questions },
+        { state: compositionState(state), questions },
         { apiKey, signal, deadlineMs: 22000 },
       );
       return {

@@ -1,0 +1,11 @@
+bun test v1.3.14 (0d9b296a)
+
+../../../../../../../../../..<review>/correction-boundaries.test.ts:
+(pass) final-observer cancellation retains every real paid or unknown attempt [3.04ms]
+(pass) pending-observer throw or abort removes only the undispatched attempt [0.72ms]
+(pass) partial usage rejects impossible totals without inventing missing fields or losing charge [0.44ms]
+
+ 3 pass
+ 0 fail
+ 164 expect() calls
+Ran 3 tests across 1 file. [21.00ms]

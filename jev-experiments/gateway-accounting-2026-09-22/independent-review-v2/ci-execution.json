@@ -1,0 +1,20 @@
+{
+  "queryExitCode": 0,
+  "runId": 35752990035,
+  "logSha256": "8805106e0596b7ec84cf1d60c4e1fac9543bfa9879674e06e02897695c7a73b9",
+  "testSummaryMatches": [
+    "31 pass",
+    "0 fail",
+    "948 expect() calls"
+  ],
+  "executedCommands": [
+    "##[group]Run bun install --frozen-lockfile",
+    "##[group]Run bun run build",
+    "##[group]Run bun install --frozen-lockfile",
+    "##[group]Run bun test jev-experiments/gateway-accounting-2026-09-22 jev-experiments/experience-prototypes/server/byok.test.ts jev-experiments/experience-prototypes/server/gateway.test.ts jev-experiments/roadmap/runtime/existing-contract.test.ts",
+    "bun test v1.3.14 (0d9b296a)"
+  ],
+  "checkoutCommitCandidates": [
+    "edd5f8db53ff7443fde0a1c83603e5ee43acdbb4"
+  ]
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "case": "cancel-in-final-attempt",
+    "signalAborted": true,
+    "calls": 1,
+    "disposition": "success",
+    "cost": 0.001
+  },
+  {
+    "case": "cancel-in-final-accounting",
+    "signalAborted": true,
+    "calls": 1,
+    "disposition": "success",
+    "cost": 0.001
+  },
+  {
+    "case": "pre-dispatch-observer-failure",
+    "calls": 0,
+    "code": "observer_error",
+    "accounting": {
+      "scope": "outbound-http-attempts",
+      "providerAttempts": "unknown",
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "pending",
+          "requestMs": 0,
+          "requestedModel": "typesafe-ai/jev",
+          "model": "typesafe-ai/jev",
+          "modelSource": "configured-unverified",
+          "usage": null,
+          "costUsd": null,
+          "accountingScope": "gateway-response",
+          "providerAttempts": "unknown",
+          "issues": []
+        }
+      ],
+      "costUsd": null,
+      "usage": null
+    }
+  },
+  {
+    "case": "incoherent-partial-usage",
+    "reported": {
+      "input_tokens": 10,
+      "total_tokens": 4
+    },
+    "returned": {
+      "input_tokens": 10,
+      "total_tokens": 4
+    },
+    "issues": [],
+    "accountingIssue": null
+  },
+  {
+    "case": "incoherent-partial-usage",
+    "reported": {
+      "output_tokens": 10,
+      "total_tokens": 4
+    },
+    "returned": {
+      "output_tokens": 10,
+      "total_tokens": 4
+    },
+    "issues": [],
+    "accountingIssue": null
+  }
+]

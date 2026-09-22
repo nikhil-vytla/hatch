@@ -87,6 +87,7 @@ test("concurrent callers retain their own keys through evaluation and compositio
           q.type === "choice"
             ? {
                 type: "choice",
+                probabilities: Object.fromEntries(Object.keys(q.criteria).map(key => [key, key === (Object.hasOwn(q.criteria, "finish") ? "finish" : Object.keys(q.criteria)[0]) ? 1 : 0])),
                 choice: Object.hasOwn(q.criteria, "finish")
                   ? "finish"
                   : Object.keys(q.criteria)[0],

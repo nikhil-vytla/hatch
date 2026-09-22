@@ -1,0 +1,99 @@
+{
+  "selectedCommit": "8743d7282176e2bdbcff68ddc497c8803b55b6c0",
+  "expectedReportHead": "ed8862509fe2cdec98c4856656e845f153e61b44",
+  "selectedFiles": [
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "gitSha256": "a08c7db41dd24a62827b15b87190efa3032de56a39618d5ab635dd8e87164e50",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/compose.ts",
+      "gitSha256": "4ec079a6fb38c1c3c469f3ce2869bdbd07d4754f0182086c2ea872f784b0eaa9",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/byok.test.ts",
+      "gitSha256": "a7ad1300b2efce447b69b3a402dc60ef7c18b74ef9aa85a33b7cbd044587e1f7",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": "jev-experiments/packages/decision-runtime/src/score.ts",
+      "gitSha256": "0a77828dd8908cbe941c5bda9d364e2d2861ce4673fbe46ba169058fcb6db9fb",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/accounting.ts",
+      "gitSha256": "8a09f483965d55e64e11a909524e9494ee24ebb754b6ee91bc487a24422fa5c8",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts",
+      "gitSha256": "55adada6ee45d45f1d33bdf7b0544d3312ba5a2594bef688497dac7ce0afd5a7",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/score.test.ts",
+      "gitSha256": "eeee5ec08ba9d3caf3553b33f5fda5c4848b3f7b2160008b1ad5645b6c55a52d",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts",
+      "gitSha256": "f25b3a1a5f0803cb2b7a3fa0816e53da9503dedd466008d33a12cb0b28281a07",
+      "manifestMatches": true,
+      "archiveMatches": true
+    },
+    {
+      "path": ".github/workflows/jev-gateway.yml",
+      "gitSha256": "233931d1f07ce7c3194e31f4071691fd173df7b5e75f5b6548b7d2c73da3f7c2",
+      "manifestMatches": true,
+      "archiveMatches": true
+    }
+  ],
+  "archiveMatches": true,
+  "logs": [
+    {
+      "index": 0,
+      "matches": true
+    },
+    {
+      "index": 1,
+      "matches": true
+    },
+    {
+      "index": 2,
+      "matches": true
+    },
+    {
+      "index": 3,
+      "matches": true
+    },
+    {
+      "index": 4,
+      "matches": true
+    }
+  ],
+  "sourceCorrectionFiles": [
+    ".github/workflows/jev-gateway.yml"
+  ],
+  "reportCommitFiles": [
+    "jev-experiments/gateway-accounting-2026-09-22/NOTES.md",
+    "jev-experiments/gateway-accounting-2026-09-22/README.md",
+    "jev-experiments/gateway-accounting-2026-09-22/_summary.md",
+    "jev-experiments/gateway-accounting-2026-09-22/source-code-v2.patch",
+    "jev-experiments/gateway-accounting-2026-09-22/source-code.patch",
+    "jev-experiments/gateway-accounting-2026-09-22/source-v2.json",
+    "jev-experiments/gateway-accounting-2026-09-22/source.json",
+    "jev-experiments/gateway-accounting-2026-09-22/verification-v2.json",
+    "jev-experiments/gateway-accounting-2026-09-22/verification.json",
+    "jev-experiments/gateway-accounting-2026-09-22/verify_source.py",
+    "jev-experiments/gateway-accounting-2026-09-22/verify_source.v1.py"
+  ]
+}
