@@ -1,0 +1,338 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "claude",
+  "kind": "transcript",
+  "source": {
+    "sha256": "996d92fd365a437464c44ad0e0ea57eaf0c3198966428842ce7cfcc80e37be75",
+    "bytes": 4976,
+    "format": "claude-jsonl",
+    "recordCount": 3
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/cwd",
+        "originalSha256": "b3b20e4d4be66939f475a67ec252bcf49fe30cc1e7b8549903da8949eb0025c7",
+        "derivativeSha256": "a31fd7b593e334638893208085f8c0a44b7bd29d3cb4d710869a26ca51ba1459",
+        "bindings": [
+          {
+            "sourcePathSha256": "b3b20e4d4be66939f475a67ec252bcf49fe30cc1e7b8549903da8949eb0025c7",
+            "uri": "record://location/b3b20e4d4be66939f475a67e",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/plugins/0/path",
+        "originalSha256": "21063e567881f79a2760a3b737855a0350a04cafed769773347b8a84f12f235d",
+        "derivativeSha256": "d35613bc65f70ea5f465eca154c6b270889a2de2766c2e9384a14a478dd2657e",
+        "bindings": [
+          {
+            "sourcePathSha256": "21063e567881f79a2760a3b737855a0350a04cafed769773347b8a84f12f235d",
+            "uri": "record://location/21063e567881f79a2760a3b7",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/plugins/1/path",
+        "originalSha256": "280523c1c4b425d1939a6697ad37d80143bc2013f333691aaad9f49c2d7800ff",
+        "derivativeSha256": "88515058845aac99064b97cb9be3013bc4a57ab8db2b403cc5f7fbe3fa75092c",
+        "bindings": [
+          {
+            "sourcePathSha256": "280523c1c4b425d1939a6697ad37d80143bc2013f333691aaad9f49c2d7800ff",
+            "uri": "record://location/280523c1c4b425d1939a6697",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/plugins/2/path",
+        "originalSha256": "756892a7ba30f5689951a1e9a693f20f0b075126c095f4dbc9cdf881468eefb5",
+        "derivativeSha256": "a2aa44c145f1ee508c46c6be13064eb26c302e3e89cfbfa1dbe43bf4cb359f26",
+        "bindings": [
+          {
+            "sourcePathSha256": "756892a7ba30f5689951a1e9a693f20f0b075126c095f4dbc9cdf881468eefb5",
+            "uri": "record://location/756892a7ba30f5689951a1e9",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/plugins/3/path",
+        "originalSha256": "75d1c00ccfc7dab39b34d057d27635856c43528828a32990d8f3cc32058605ac",
+        "derivativeSha256": "5e1a4064a8c3ec60f7f2490e2ed3c6649ca412870b1d5b5ff75293894a195bd8",
+        "bindings": [
+          {
+            "sourcePathSha256": "75d1c00ccfc7dab39b34d057d27635856c43528828a32990d8f3cc32058605ac",
+            "uri": "record://location/75d1c00ccfc7dab39b34d057",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "a49d6795434faa3355359d8e1c26a2c592818f4b624acb7b2b9dedb12285b018",
+  "payload": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "cwd": "record://location/b3b20e4d4be66939f475a67e",
+      "session_id": "042a24b1-8ae6-43b2-abfc-3ac1d6077082",
+      "tools": [
+        "Bash",
+        "Edit",
+        "Read",
+        "mcp__jev__classify_eml",
+        "mcp__jev__decide",
+        "mcp__jev__route_task"
+      ],
+      "mcp_servers": [
+        {
+          "name": "jev",
+          "status": "connected",
+          "source": "dynamic"
+        }
+      ],
+      "model": "claude-fable-5-1",
+      "permissionMode": "acceptEdits",
+      "slash_commands": [
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "claude-api",
+        "run",
+        "run-skill-generator",
+        "advisor",
+        "agents",
+        "auto-mode-setup",
+        "autocompact",
+        "clear",
+        "color",
+        "compact",
+        "config",
+        "output-style",
+        "context",
+        "effort",
+        "fast",
+        "heapdump",
+        "init",
+        "mcp",
+        "import",
+        "model",
+        "__remote-workflow",
+        "workflow-launch-exec",
+        "reload-plugins",
+        "reload-skills",
+        "rename",
+        "security-review",
+        "usage",
+        "insights",
+        "recap",
+        "skill-doctor",
+        "goal",
+        "design-consent",
+        "design-revoke",
+        "list-agents",
+        "team-onboarding"
+      ],
+      "terminal_slash_commands": [
+        "doctor",
+        "color",
+        "reload-plugins"
+      ],
+      "apiKeySource": "ANTHROPIC_API_KEY",
+      "claude_code_version": "2.1.278",
+      "output_style": "default",
+      "agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "Plan",
+        "statusline-setup"
+      ],
+      "skills": [
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "claude-api",
+        "run",
+        "run-skill-generator"
+      ],
+      "plugins": [
+        {
+          "name": "document-skills",
+          "path": "record://location/21063e567881f79a2760a3b7",
+          "source": "document-skills@anthropic-agent-skills"
+        },
+        {
+          "name": "example-skills",
+          "path": "record://location/280523c1c4b425d1939a6697",
+          "source": "example-skills@anthropic-agent-skills"
+        },
+        {
+          "name": "otter-tools",
+          "path": "record://location/756892a7ba30f5689951a1e9",
+          "source": "otter-tools@otter-marketplace",
+          "version": "1.0.0"
+        },
+        {
+          "name": "codex",
+          "path": "record://location/75d1c00ccfc7dab39b34d057",
+          "source": "codex@openai-codex",
+          "version": "1.0.6"
+        }
+      ],
+      "capabilities": [
+        "interrupt_receipt_v1",
+        "interrupt_cancel_queued_v1",
+        "msg_lifecycle_v1"
+      ],
+      "analytics_disabled": false,
+      "product_feedback_disabled": true,
+      "uuid": "a55c80c5-1db8-494f-ac79-f774ea5dd99f",
+      "fast_mode_state": "off",
+      "fast_mode_disabled_reason": "sdk_opt_in_required"
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "diagnostics": null,
+        "id": "2c6b7c4f-d84b-4868-bff2-5bd530d3444a",
+        "container": null,
+        "model": "<synthetic>",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "stop_sequence",
+        "stop_sequence": "",
+        "type": "message",
+        "usage": {
+          "output_tokens_details": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": null,
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": null,
+          "iterations": null,
+          "speed": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "API Error: 400 In order to access this model, your organization or workspace must have data retention enabled."
+          }
+        ],
+        "context_management": null
+      },
+      "parent_tool_use_id": null,
+      "session_id": "042a24b1-8ae6-43b2-abfc-3ac1d6077082",
+      "uuid": "3ea24e8b-7ab9-40d5-83af-fccebeaae5c2",
+      "timestamp": "2026-09-21T04:20:40.614Z",
+      "error": "unknown",
+      "request_id": "req_011CfFwftf41eboKqiAZMzfh",
+      "is_api_error_message": true,
+      "api_error_code": "model_not_available"
+    },
+    {
+      "duration_api_ms": 0,
+      "stop_reason": "stop_sequence",
+      "session_id": "042a24b1-8ae6-43b2-abfc-3ac1d6077082",
+      "total_cost_usd": 0,
+      "usage": {
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 0,
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "",
+        "iterations": [],
+        "speed": "standard"
+      },
+      "modelUsage": {},
+      "permission_denials": [],
+      "terminal_reason": "api_error",
+      "fast_mode_state": "off",
+      "fast_mode_disabled_reason": "sdk_opt_in_required",
+      "subagent_stats": {
+        "spawned": 0,
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "started_in_background": 0,
+        "max_depth": 0,
+        "spawned_by_subagents": 0,
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "user": 0,
+          "system": 0
+        },
+        "refused": {
+          "depth_limit": 0,
+          "concurrency_limit": 0,
+          "budget": 0
+        },
+        "by_type": {}
+      },
+      "is_error": true,
+      "num_turns": 1,
+      "subtype": "success",
+      "api_error_status": 400,
+      "api_error_code": "model_not_available",
+      "result": "API Error: 400 In order to access this model, your organization or workspace must have data retention enabled.",
+      "type": "result",
+      "duration_ms": 335,
+      "uuid": "b29b0b02-a8bc-475b-9769-fb9143fdb897",
+      "queued_turn_count": 0,
+      "result_index": 0
+    }
+  ]
+}

@@ -1,0 +1,292 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "codex",
+  "kind": "transcript",
+  "source": {
+    "sha256": "e42418a6f1e568d13c1a22594cfed820afade61452b077d46600dd52e2dc5250",
+    "bytes": 14424,
+    "format": "codex-jsonl",
+    "recordCount": 13
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 3,
+        "pointer": "/item/command",
+        "originalSha256": "ea7843b55593f225e1637f8977a46ca066fa7df6a04f413b8d84d515536d5e56",
+        "derivativeSha256": "f5762752ac1e33df77a06a261d1e4f070dcdc2785cc878529890bd9aa27b9fbd",
+        "bindings": [
+          {
+            "sourcePathSha256": "b75a140a1ddbc1d7307d84062ef60963c24c4b20f22eae884656f1122b49a7a3",
+            "uri": "record://location/a65e9e03d3fb41da/SKILL.md",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 4,
+        "pointer": "/item/command",
+        "originalSha256": "ea7843b55593f225e1637f8977a46ca066fa7df6a04f413b8d84d515536d5e56",
+        "derivativeSha256": "f5762752ac1e33df77a06a261d1e4f070dcdc2785cc878529890bd9aa27b9fbd",
+        "bindings": [
+          {
+            "sourcePathSha256": "b75a140a1ddbc1d7307d84062ef60963c24c4b20f22eae884656f1122b49a7a3",
+            "uri": "record://location/a65e9e03d3fb41da/SKILL.md",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 9,
+        "pointer": "/item/changes/0/path",
+        "originalSha256": "08b5f6d49116780a77b81b7080709ccf903467ea7c66ab35e2b49598bf49dc98",
+        "derivativeSha256": "bf61e71bf67ca03ff1dd55bc6469e9a098069b71ab796941f7c6e8526694663c",
+        "bindings": [
+          {
+            "sourcePathSha256": "08b5f6d49116780a77b81b7080709ccf903467ea7c66ab35e2b49598bf49dc98",
+            "uri": "record://location/d587d9f5baed3f57/ANALYSIS.md",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 10,
+        "pointer": "/item/changes/0/path",
+        "originalSha256": "08b5f6d49116780a77b81b7080709ccf903467ea7c66ab35e2b49598bf49dc98",
+        "derivativeSha256": "bf61e71bf67ca03ff1dd55bc6469e9a098069b71ab796941f7c6e8526694663c",
+        "bindings": [
+          {
+            "sourcePathSha256": "08b5f6d49116780a77b81b7080709ccf903467ea7c66ab35e2b49598bf49dc98",
+            "uri": "record://location/d587d9f5baed3f57/ANALYSIS.md",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "c131220d72f0734b7be82ab6bb799ab60fd8447c03e3ff21b0bba033aa9c6778",
+  "payload": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a0c248-7d99-7412-9e0a-84b715547f7e"
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "I’ll read the source and test, call the Jev route once, then record its status and raw output in `ANALYSIS.md`. I’ll also apply the required unslop writing skill.\n"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_1",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'cat sum.ts sum.test.ts record://location/a65e9e03d3fb41da/SKILL.md'",
+        "aggregated_output": "",
+        "exit_code": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'cat sum.ts sum.test.ts record://location/a65e9e03d3fb41da/SKILL.md'",
+        "aggregated_output": "export function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\nimport { expect, test } from \"bun:test\";\nimport { totalThrough } from \"./sum\";\ntest(\"inclusive total\", () => { expect(totalThrough(0)).toBe(0); expect(totalThrough(1)).toBe(1); expect(totalThrough(4)).toBe(10); });\n---\nname: unslop\ndescription: Cut AI tells from any writing. Must always apply.\nmetadata:\n  source: \"https://github.com/cursor/plugins/blob/main/pstack/skills/unslop/SKILL.md\"\n  license: MIT\n---\n\n# Unslop\n\nEdit text to remove AI patterns and add human voice.\n\n## Process\n\n1. Scan for the patterns below.\n2. Rewrite. Preserve meaning, match intended tone.\n3. Add soul (see next section).\n4. Self-audit: \"What makes this obviously AI generated?\" Fix remaining tells.\n\n## Adding soul\n\nRemoving patterns is half the job. Sterile, voiceless writing is just as obvious.\n\n- **Have opinions.** React to facts instead of neutrally listing pros and cons.\n- **Vary rhythm.** Short sentences. Then longer ones that take their time. Mix it up.\n- **Acknowledge complexity.** \"Impressive but also kind of unsettling\" beats \"impressive.\"\n- **Use \"I\" when it fits.** First person isn't unprofessional.\n- **Let some mess in.** Perfect structure looks machine-made.\n- **Be specific.** Not \"this is concerning\" but \"there's something unsettling about agents churning away at 3am.\"\n\n## Patterns to detect and fix\n\n### Content\n\n1. **Puffery.** \"pivotal moment\", \"testament to\", \"evolving landscape\", \"setting the stage for\", \"indelible mark\", \"deeply rooted\". Cut puffery, state what happened.\n2. **Name-dropping.** Listing media outlets without context. Pick one, say what was said.\n3. **Superficial -ing phrases.** \"highlighting...\", \"ensuring...\", \"reflecting...\", \"showcasing...\", \"fostering...\". Delete or expand with real sources.\n4. **Promotional language.** \"nestled\", \"vibrant\", \"breathtaking\", \"groundbreaking\", \"renowned\", \"stunning\", \"must-visit\". Use neutral descriptions.\n5. **Vague attributions.** \"Experts believe\", \"Industry reports suggest\", \"Some critics argue\". Name the source or delete.\n6. **Formulaic challenges.** \"Despite challenges... continues to thrive.\" Replace with specific facts.\n\n### Language\n\n7. **AI vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant. Replace with plain words.\n8. **Fancy ways to say \"is\".** \"serves as\", \"stands as\", \"boasts\", \"features\". Just say \"is\" or \"has\".\n9. **\"Not just X, but Y.\"** State the point directly instead.\n10. **Rule of three.** Forcing ideas into groups of three. Use the natural number.\n11. **Synonym cycling.** Protagonist, main character, central figure, hero all in one paragraph. Pick one, repeat it.\n12. **False ranges.** \"from X to Y\" where X and Y aren't on a meaningful scale. List topics directly.\n\n### Style\n\n13. **Em dash overuse.** Avoid em dashes entirely. Use periods or commas only (no parentheses, no en dashes, no hyphen-as-dash substitutes). Em dashes are an AI tell, and reaching for parentheses instead just trades one tell for another. If a thought needs separation, end the sentence or use a comma.\n14. **Colon overuse.** Colons are fine before a list or example. Not as mid-sentence connectors. \"If you're coming from traditional automation: instead of registering event handlers, you describe conditions\" adds nothing with the colon. Rewrite to let the point stand on its own without comparison framing. \"Describing when the scheduler should fire works best as plain English.\" Same meaning, no crutch punctuation.\n15. **Boldface overuse.** Don't bold every proper noun or acronym.\n16. **Inline-header lists.** The tell is a bold label and colon that restates the line: \"**Performance:** Performance improved...\". Convert those to prose. A bold lead-in that ends in a period, names the item, and is followed by genuinely new detail (\"**Schema in TypeScript.** Tables live in one file.\") is fine, not a tell.\n17. **Title case headings.** Use sentence case.\n18. **Decorative emojis.** Remove from headings and bullets.\n19. **Curly quotes.** Replace with straight quotes.\n\n### Communication artifacts\n\n20. **Chatbot phrases.** \"I hope this helps!\", \"Let me know if...\", \"Of course!\", \"Certainly!\", \"Found the smoking gun!\" Remove.\n21. **Cutoff disclaimers.** \"While specific details are limited...\" Find sources or remove.\n22. **Sycophantic tone.** \"Great question! You're absolutely right!\" Respond directly.\n\n### Filler\n\n23. **Filler phrases.** \"In order to\" becomes \"To\". \"Due to the fact that\" becomes \"Because\". \"It is important to note that\" gets deleted.\n24. **Excessive hedging.** \"could potentially possibly be argued that it might\" becomes \"may\".\n25. **Generic conclusions.** \"The future looks bright.\" State specific plans or facts.\n\n### Jargon\n\n26. **Abstract metaphor nouns.** Substrate, wedge, vector, locus, vantage, nexus, primitive (as noun), harness (as metaphor), surface (as in \"API surface\"), bedrock, scaffolding (as metaphor), modality, paradigm, gold-plating, ratchet (as metaphor), evacuate (for moving code), endgame, north star, flywheel. These read as technical but usually have a plainer concrete word. \"Substrate\" becomes \"base\". \"Wedge in\" becomes \"add\". \"Vector\" becomes \"way\" or \"method\". \"Gold-plating\" becomes \"more than the job needs\". \"Ratchet\" becomes the mechanism's real name or \"a limit that only tightens\". \"Evacuate\" becomes \"move out\". \"Endgame\" becomes \"the last phase\". Pick the concrete word.\n\n### Plain speech\n\n27. **Say what it does, not how it feels.** \"the database stays close at hand\", \"SQL you can read\", \"types that follow your schema\" name a feeling. The fix names the mechanism or a number: \"`.toSQL()` returns the exact string sent to the database\", \"a column rename fails the build\". Ask what the sentence tells the reader to do or know, then write that. If you can't restate it as a concrete instruction, fact, or number, cut it. One more check: if the sentence could appear unchanged in another project's docs, it says nothing about this one. Cut it.\n28. **Shorten or split dense sentences.** If the reader has to backtrack to parse a sentence, break it in two or drop clauses. One idea per sentence.\n29. **Active voice.** Prefer it. Catch \"is/are/was/were + past participle\" and name the actor: \"queries are validated\" becomes \"the compiler validates queries\", \"the file is parsed by the loader\" becomes \"the loader parses the file\". Passive is fine only when the actor is unknown or genuinely doesn't matter.\n30. **Cut adverbs, or use a stronger verb.** \"runs quickly\" becomes \"is fast\" or the number. \"significantly improves\" becomes the measured delta. An adverb propping up a weak verb means the verb is wrong.\n31. **Prefer the plain word.** \"utilize\" becomes \"use\", \"leverage\" becomes \"use\", \"facilitate\" becomes \"help\", \"numerous\" becomes \"many\", \"in the event that\" becomes \"if\". The fancier synonym is rarely clearer.\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_2",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc \"rg --files -g AGENTS.md -g '*config*' -g 'package.json'\"",
+        "aggregated_output": "",
+        "exit_code": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_2",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc \"rg --files -g AGENTS.md -g '*config*' -g 'package.json'\"",
+        "aggregated_output": "",
+        "exit_code": 1,
+        "status": "failed"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_3",
+        "type": "mcp_tool_call",
+        "server": "jev",
+        "tool": "route_task",
+        "arguments": {
+          "task": {
+            "id": "malformed-fixture",
+            "prompt": "Fix the bug in totalThrough so it returns the inclusive total through n and satisfies the supplied tests. Return a proposed unified diff.",
+            "context": "Complete source of sum.ts:\n```ts\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n```\n\nComplete source of sum.test.ts:\n```ts\nimport { expect, test } from \"bun:test\";\nimport { totalThrough } from \"./sum\";\ntest(\"inclusive total\", () => { expect(totalThrough(0)).toBe(0); expect(totalThrough(1)).toBe(1); expect(totalThrough(4)).toBe(10); });\n```",
+            "outputTokens": 128
+          }
+        },
+        "result": null,
+        "error": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_3",
+        "type": "mcp_tool_call",
+        "server": "jev",
+        "tool": "route_task",
+        "arguments": {
+          "task": {
+            "id": "malformed-fixture",
+            "prompt": "Fix the bug in totalThrough so it returns the inclusive total through n and satisfies the supplied tests. Return a proposed unified diff.",
+            "context": "Complete source of sum.ts:\n```ts\nexport function totalThrough(n: number): number {\n  let total = 0;\n  for (let i = 1; i < n; i++) total += i;\n  return total;\n}\n```\n\nComplete source of sum.test.ts:\n```ts\nimport { expect, test } from \"bun:test\";\nimport { totalThrough } from \"./sum\";\ntest(\"inclusive total\", () => { expect(totalThrough(0)).toBe(0); expect(totalThrough(1)).toBe(1); expect(totalThrough(4)).toBe(10); });\n```",
+            "outputTokens": 128
+          }
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"schemaVersion\":\"1\",\"taskId\":\"malformed-fixture\",\"status\":\"error\",\"classification\":{\"source\":\"heuristic\",\"category\":\"test-writing\",\"difficulty\":0.5,\"confidence\":0.5,\"latencyMs\":0,\"costUsd\":0,\"evidence\":\"Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior.\"},\"selection\":{\"status\":\"selected\",\"routeId\":\"malformed-local\",\"candidates\":[{\"routeId\":\"malformed-local\",\"eligible\":true,\"reasons\":[],\"rankScore\":0.5,\"estimatedCostUsd\":null,\"maximumCostUsd\":null,\"quality\":{\"value\":0.5,\"basis\":\"simulation\",\"evidence\":\"Malformed output fixture\"},\"latency\":{\"value\":1,\"basis\":\"simulation\",\"evidence\":\"No performance claim\"},\"cacheBasis\":\"none\"}],\"explanation\":\"Selected by quality, estimated cost and latency weights among eligible destinations.\",\"inputTokenUpperBound\":2696,\"outputTokens\":128},\"attempts\":[{\"status\":\"malformed\",\"actualModel\":\"malformed-fixture\",\"identityBasis\":\"provider-reported\",\"usage\":{\"inputTokens\":1,\"outputTokens\":1,\"cachedInputTokens\":0},\"costUsd\":null,\"error\":\"Destination returned an invalid artifact.\",\"rawOutput\":\"MALFORMED_FIXTURE_PAYLOAD\",\"routeId\":\"malformed-local\",\"latencyMs\":18.076375000000553,\"trigger\":\"initial\",\"reservedCostUsd\":null}],\"outcome\":{\"actualRouteId\":\"malformed-local\",\"actualModel\":\"malformed-fixture\",\"totalLatencyMs\":18.580332999999882,\"totalCostUsd\":null,\"failure\":\"Destination returned an invalid artifact.\"}}"
+            }
+          ],
+          "structured_content": {
+            "schemaVersion": "1",
+            "taskId": "malformed-fixture",
+            "status": "error",
+            "classification": {
+              "source": "heuristic",
+              "category": "test-writing",
+              "difficulty": 0.5,
+              "confidence": 0.5,
+              "latencyMs": 0,
+              "costUsd": 0,
+              "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+            },
+            "selection": {
+              "status": "selected",
+              "routeId": "malformed-local",
+              "candidates": [
+                {
+                  "routeId": "malformed-local",
+                  "eligible": true,
+                  "reasons": [],
+                  "rankScore": 0.5,
+                  "estimatedCostUsd": null,
+                  "maximumCostUsd": null,
+                  "quality": {
+                    "value": 0.5,
+                    "basis": "simulation",
+                    "evidence": "Malformed output fixture"
+                  },
+                  "latency": {
+                    "value": 1,
+                    "basis": "simulation",
+                    "evidence": "No performance claim"
+                  },
+                  "cacheBasis": "none"
+                }
+              ],
+              "explanation": "Selected by quality, estimated cost and latency weights among eligible destinations.",
+              "inputTokenUpperBound": 2696,
+              "outputTokens": 128
+            },
+            "attempts": [
+              {
+                "status": "malformed",
+                "actualModel": "malformed-fixture",
+                "identityBasis": "provider-reported",
+                "usage": {
+                  "inputTokens": 1,
+                  "outputTokens": 1,
+                  "cachedInputTokens": 0
+                },
+                "costUsd": null,
+                "error": "Destination returned an invalid artifact.",
+                "rawOutput": "MALFORMED_FIXTURE_PAYLOAD",
+                "routeId": "malformed-local",
+                "latencyMs": 18.076375000000553,
+                "trigger": "initial",
+                "reservedCostUsd": null
+              }
+            ],
+            "outcome": {
+              "actualRouteId": "malformed-local",
+              "actualModel": "malformed-fixture",
+              "totalLatencyMs": 18.580332999999882,
+              "totalCostUsd": null,
+              "failure": "Destination returned an invalid artifact."
+            }
+          }
+        },
+        "error": null,
+        "status": "failed"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_4",
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "record://location/d587d9f5baed3f57/ANALYSIS.md",
+            "kind": "add"
+          }
+        ],
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_4",
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "record://location/d587d9f5baed3f57/ANALYSIS.md",
+            "kind": "add"
+          }
+        ],
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_5",
+        "type": "agent_message",
+        "text": "Created [ANALYSIS.md](ANALYSIS.md) recording the single Jev call, status `error`, attempt status `malformed`, and raw output `MALFORMED_FIXTURE_PAYLOAD`.\n\nNo usable artifact was returned. Source, tests, and configuration remain unchanged. No retries."
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 66990,
+        "cached_input_tokens": 48936,
+        "cache_write_input_tokens": 18042,
+        "output_tokens": 732,
+        "reasoning_output_tokens": 0
+      }
+    }
+  ]
+}
