@@ -26,5 +26,8 @@
     "playable/**/*.ts",
     "verification/**/*.ts",
     "*.d.ts"
+  ],
+  "exclude": [
+    "playable/review/**"
   ]
 }

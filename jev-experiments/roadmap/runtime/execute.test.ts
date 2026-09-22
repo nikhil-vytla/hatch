@@ -8,7 +8,7 @@ import {
   type DecisionResponse,
 } from "./contract";
 const request: DecisionRequest = {
-  schemaVersion: "1",
+  schemaVersion: "2",
   requestId: "one",
   state: "hello",
   questions: [{ id: "q", kind: "boolean", prompt: "Greeting?" }],
@@ -26,7 +26,7 @@ test("cancels even a runtime that ignores the signal", async () => {
   abort.abort();
   expect((await running).status).toBe("cancelled");
   finish({
-    schemaVersion: "1",
+    schemaVersion: "2",
     requestId: "one",
     status: "ok",
     decisions: [
@@ -37,6 +37,7 @@ test("cancels even a runtime that ignores the signal", async () => {
           { value: true, probability: 1 },
         ],
         selected: true,
+        probabilityTrue: 1,
       },
     ],
     execution: identity,

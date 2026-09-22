@@ -10,7 +10,7 @@ import {
 import { decide } from "./decide";
 import models from "../mac/models.json";
 const request = {
-  schemaVersion: "1" as const,
+  schemaVersion: "2" as const,
   requestId: "wiring",
   state: "Synthetic input",
   questions: [{ id: "q", kind: "boolean" as const, prompt: "True?" }],
@@ -24,7 +24,7 @@ test("explicit Mac bridge passes stdin and selected model without a cloud fallba
       model: "laya-base-experimental",
     },
     identity = createMacAdapter(config).identity;
-  const stub = `#!/usr/bin/env bun\nconst args=process.argv.slice(2);if(args[0]==='decide'){const request=JSON.parse(await Bun.stdin.text());console.log(JSON.stringify({schemaVersion:'1',requestId:request.requestId,status:'ok',decisions:[{questionId:'q',selected:true,distribution:[{value:false,probability:0},{value:true,probability:1}]}],execution:${JSON.stringify(identity)},timing:{totalMs:0},issues:[]}));}else{console.log(JSON.stringify({status:'ok',source:args.at(-1),received:await Bun.file(args.at(-1)).text(),model:args[2]}));}`;
+  const stub = `#!/usr/bin/env bun\nconst args=process.argv.slice(2);if(args[0]==='decide'){const request=JSON.parse(await Bun.stdin.text());console.log(JSON.stringify({schemaVersion:'2',requestId:request.requestId,status:'ok',decisions:[{questionId:'q',selected:true,probabilityTrue:1,distribution:[{value:false,probability:0},{value:true,probability:1}]}],execution:${JSON.stringify(identity)},timing:{totalMs:0},issues:[]}));}else{console.log(JSON.stringify({status:'ok',source:args.at(-1),received:await Bun.file(args.at(-1)).text(),model:args[2]}));}`;
   try {
     await writeFile(executable, stub, { mode: 0o700 });
     const result = await decide(request, { adapter: createMacAdapter(config) });

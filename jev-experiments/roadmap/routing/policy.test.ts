@@ -255,7 +255,7 @@ describe("execution records", () => {
 });
 test("prior declares identity and exact uniform distribution", async () => {
   const output = await decide({
-    schemaVersion: "1",
+    schemaVersion: "2",
     requestId: "one",
     state: "ignored",
     questions: [{ id: "q", kind: "boolean", prompt: "Yes?" }],

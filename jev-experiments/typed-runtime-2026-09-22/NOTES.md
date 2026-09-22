@@ -1,0 +1,7 @@
+# Native v2 runtime and configured toolkit delivery
+
+Prepare a small source slice on exact PR72 head 48ea2f6a35cf4d0ee4fcf3be4275af0aac2d392e in an isolated worktree and branch nikhil-20260922-jevTypedRuntime. Root owns publishing and review. Inventory current source explicitly, including physically untracked files, from the reviewed classifier source52 cutoff. Keep Music, UI redesign and publication transformations out. Verify a product commit via exact Git archive, app build before sibling installs, toolkit/native/type and necessary local checks. Preserve failed conditions. No provider calls, pushes, PR creation or root index/HEAD mutation.
+
+- Verified all 52 reviewed source hashes before selection. Gateway, native decoder/Score, accounting and model registry are inherited identical from PR72. Omitted web handler lifecycle, lab export and public evidence-link changes because they are separate UI/publication work.
+- Copied explicit v2 runtime/classifier/MCP/CLI/test dependencies by inventory, including untracked files. Included the Python local runtime, its tests and example so the configured bridge does not send v2 to a v1 executable. Moved the authored Python-to-TypeScript conformance test into the maintained routing suite.
+- Excluded frozen v1 review probes from the active TypeScript project, retaining their bytes. Historical comparison/smoke scripts and records remain unchanged and will be labeled as historical; no model rerun is part of this slice.
