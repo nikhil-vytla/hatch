@@ -1,0 +1,61 @@
+{
+  "recordedAt": "2026-09-22T16:12:22.919490+00:00",
+  "sourceCommit": "b913107493b6f4f8030960ca46ab9156aa62a05f",
+  "archiveSha256": "b74dc8738aaf5bb9ce86e62d21413ccfcb1d8a0ab52985f593e64feb26183339",
+  "verifierSha256": "0ba92d37355ba454540e82d77f3a37cb4ae8d930abb0cb26c1f5660d2dd51214",
+  "condition": "Exact Git archive; no working-tree overlay; app builds before sibling install",
+  "providerCallsRequested": false,
+  "networkIsolated": false,
+  "checks": [
+    {
+      "name": "app frozen install",
+      "cwd": "jev-experiments/experience-prototypes",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 2.523,
+      "logSha256": "2ee854a980067e55b7bc673f6b56c7c130db03533dfcb9967e89247c4517a9e1",
+      "summaries": []
+    },
+    {
+      "name": "app production build",
+      "cwd": "jev-experiments/experience-prototypes",
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 8.459,
+      "logSha256": "e6131e3cbb8d0c11894af88ecbcb8bafb4ce3b630414ba8e8a1dee85c259c132",
+      "summaries": []
+    },
+    {
+      "name": "gateway, score, accounting and existing transport contracts",
+      "cwd": "jev-experiments/.",
+      "command": [
+        "bun",
+        "test",
+        "gateway-accounting-2026-09-22",
+        "experience-prototypes/server/byok.test.ts",
+        "experience-prototypes/server/gateway.test.ts",
+        "roadmap/runtime/existing-contract.test.ts"
+      ],
+      "exitCode": 1,
+      "timedOut": false,
+      "elapsedSeconds": 0.133,
+      "logSha256": "5ec6bc8ff8f30d313e572187a92bc2097cd2dceb7a1d0221a87d0ede12e8f242",
+      "summaries": [
+        "29 pass",
+        "1 fail",
+        "934 expect() calls"
+      ]
+    }
+  ],
+  "passed": false
+}
