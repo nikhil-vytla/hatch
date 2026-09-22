@@ -19,12 +19,11 @@ for entry in catalog:
     record = by_id[entry["id"]]
     record.update({key: entry[key] for key in ("title", "category")})
     for question in record["questions"]:
-        question["count_note"] = ""
+        count = question["count"]
+        question["count_note"] = f"{count} question" + ("" if count == 1 else "s") if isinstance(count, int) else str(count)
         if isinstance(question["primitives"], list):
-            count = question["count"]
             names = " + ".join(question["primitives"])
             question["primitives"] = names
-            question["count_note"] = f"{count} question" + ("" if count == 1 else "s") if isinstance(count, int) else str(count)
     for evidence in record["evidence"]:
         path = ROOT / evidence["path"]
         assert path.is_file(), evidence["path"]
@@ -36,7 +35,16 @@ atlas = {
     "scope": "Current catalog and working-tree call sites. Execution modes describe available code paths; no new provider runs were made for this audit.",
     "source_bindings": [
         {"path": path, "sha256": hashlib.sha256((ROOT / path).read_bytes()).hexdigest()}
-        for path in ("jev-experiments/experience-prototypes/src/main.tsx", "jev-experiments/experience-prototypes/src/catalog.ts")
+        for path in (
+            "jev-experiments/experience-prototypes/src/main.tsx",
+            "jev-experiments/experience-prototypes/src/catalog.ts",
+            "jev-experiments/experience-prototypes/server/gateway.ts",
+            "jev-experiments/src/jev_lab/core.py",
+            "jev-experiments/roadmap/runtime/contract.ts",
+            "jev-experiments/roadmap/runtime/jev.ts",
+            "jev-experiments/roadmap/mac/jev_local.py",
+            "jev-experiments/adapters/typescript/index.ts",
+        )
     ],
     "records": ordered,
 }
@@ -54,19 +62,19 @@ html = """<!doctype html>
 <main>
 <h1>Where Jev does the work.</h1>
 <p class="lead">Follow a decision from the information the model sees to the change the code makes. Each experiment has a different division of work.</p>
-<p class="note">41 entries from the local catalog, including work not yet deployed.</p>
-<div class="finding"><p>We explore all three primitives. Native structured instructions and criteria are blocked by our wrappers. Preserving that part of the API is the first priority.</p></div>
+<p class="note">__COUNT__ entries from the local catalog, including work not yet deployed.</p>
+<div class="finding"><p>We explore all three primitives. Our hosted wrappers reject native structured questions; shared adapters can silently discard extra criteria. Preserving question semantics is the first priority.</p></div>
 <nav class="nav" aria-label="Atlas views"><button type="button" data-panel="experiments" aria-pressed="true">Experiments</button><button type="button" data-panel="structure" aria-pressed="false">The missing structure</button><button type="button" data-panel="studies" aria-pressed="false">Where to go deeper</button></nav>
 <section class="workspace" data-view="experiments">
 <aside class="finder" aria-label="Find an experiment">
 <label for="search">Find an experiment or capability</label><input id="search" type="search" placeholder="Try probabilities or music">
 <label for="category">Category</label><select id="category"><option value="">All categories</option></select>
-<p id="count" class="count" aria-live="polite"></p><div class="experiment-list" id="experiment-list"></div>
+<p id="count" class="count"></p><div class="experiment-list" id="experiment-list"></div>
 </aside><article class="detail" id="detail" aria-label="Selected experiment"></article><p id="selection-status" class="sr-only" aria-live="polite"></p>
 </section>
 <section class="essay" data-view="structure" hidden>
 <h2>The shape of the question matters.</h2>
-<p>JSON in <code>state</code> gives Jev context. A structured criterion describes the meaning of an answer. Our current wrappers allow the first and reject the second.</p>
+<p>JSON in <code>state</code> gives Jev context. A structured criterion describes the meaning of an answer. Our hosted wrappers reject these rich questions. The shared and Mac validators also accept extra criteria that their adapters silently drop, producing an answer to a weaker question.</p>
 <p>This authored example asks whether a proposed edit stays within a task. Both forms carry the same information. The structured version is an interface example, with no model result attached.</p>
 <div class="compare"><section><h3>Flat description</h3><pre>{
   "type": "choice",
@@ -106,6 +114,6 @@ html = """<!doctype html>
 <footer><span>Not affiliated with or endorsed by TypeSafe AI</span><button id="download-atlas" type="button">Download the audit data</button></footer>
 </div><script type="application/json" id="atlas-data">__DATA__</script><script>__SCRIPT__</script></html>
 """
-html = html.replace("__CSS__", css).replace("__DATA__", data).replace("__SCRIPT__", script)
+html = html.replace("__COUNT__", str(len(ordered))).replace("__CSS__", css).replace("__DATA__", data).replace("__SCRIPT__", script)
 (HERE / "show-me-jev-capabilities.html").write_text(html)
 print(json.dumps({"experiments": len(ordered), "html_bytes": len(html.encode())}))

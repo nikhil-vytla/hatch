@@ -3,6 +3,7 @@ import atlas from "./atlas.json";
 import "./capability-inspector.css";
 
 type SnapshotStatus = "checking" | "matches" | "differs" | "unavailable";
+declare const __JEV_CAPABILITY_BUILD_ID__: string;
 
 export function CapabilityInspector({ id }: { id: string }) {
   const [validation, setValidation] = useState<{ id: string; status: SnapshotStatus }>({ id, status: "checking" });
@@ -10,12 +11,11 @@ export function CapabilityInspector({ id }: { id: string }) {
   useEffect(() => {
     const controller = new AbortController();
     const setStatus = (status: SnapshotStatus) => setValidation({ id, status });
-    setStatus("checking");
-    fetch("/capability-build.json", { signal: controller.signal })
+    fetch("/capability-build.json", { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Audit metadata unavailable");
         const body = await response.json();
-        if (!controller.signal.aborted) setStatus(body.auditDate === atlas.audited_at && body.records?.[id] === true ? "matches" : "differs");
+        if (!controller.signal.aborted) setStatus(body.buildId === __JEV_CAPABILITY_BUILD_ID__ && body.auditDate === atlas.audited_at && body.records?.[id] === true ? "matches" : "differs");
       })
       .catch(() => { if (!controller.signal.aborted) setStatus("unavailable"); });
     return () => controller.abort();
@@ -32,6 +32,7 @@ export function CapabilityInspector({ id }: { id: string }) {
         {status !== "matches" ? (
           <p>{status === "checking" ? "Checking the implementation snapshot…" : status === "differs" ? "This build differs from the September 22 audit." : "The implementation snapshot is unavailable for this build."}</p>
         ) : <>
+        <p className="jev-role-modes">{record.execution_modes.join(" · ")}</p>
         <div className="jev-role-flow">
           <section>
             <h3>What it sees</h3>

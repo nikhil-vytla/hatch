@@ -13,6 +13,7 @@
     "keyboard_view_switch": true,
     "valid_question_examples": true,
     "mobile_structure_no_page_overflow": true,
+    "mobile_examples_show_complete_lines": true,
     "dark_mode": true,
     "reduced_motion": true,
     "mobile_experiments_no_page_overflow": true,
@@ -25,6 +26,7 @@
     "keyboard_opens_inspector": true,
     "input_visible": true,
     "model_scope_visible": true,
+    "execution_modes_visible": true,
     "atlas_deep_link": true,
     "atlas_link_touch_target": true,
     "dark_text": true,
@@ -35,6 +37,7 @@
     "new_experiment_correct_role": true,
     "new_deep_link": true,
     "stale_snapshot_disclosed": true,
-    "stale_claims_hidden": true
+    "stale_claims_hidden": true,
+    "another_build_cannot_authorize_claims": true
   }
 }

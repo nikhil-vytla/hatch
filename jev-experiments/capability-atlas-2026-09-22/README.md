@@ -8,7 +8,7 @@ The audit finds broad use of Choice, Noul and Score, but a clear limit in our wr
 
 The standalone file uses the paper, ink and editorial type direction from [DESIGN.md](../DESIGN.md). The experiment list leads to an input/question/code/evidence sequence. A second view compares an authored flat question with an equivalent native structured question. A third prioritizes deeper studies inside existing experiments. There are no model calls in the visual.
 
-[CapabilityInspector](capability-inspector.tsx) adds a compact "Jev's role" disclosure to each experiment. The application patch also adds a catalog link and publishes the self-contained atlas at `/capabilities.html`. A build-time source check binds each explanation to the audited files and application wiring. Changed or unavailable source metadata shows a dated-snapshot link rather than presenting old behavior as current.
+[CapabilityInspector](capability-inspector.tsx) adds a compact "Jev's role" disclosure to each experiment. The application patch also adds a catalog link and publishes the self-contained atlas at `/capabilities.html`. A build-time source check binds each explanation to the listed call sites, shared adapters and application wiring. A content hash binds the fetched metadata to the running app bundle. This checks source identity; it does not independently verify every sentence of the audit. Changed or unavailable source metadata shows a dated-snapshot link rather than presenting old behavior as current.
 
 This is a local implementation snapshot, including unreleased work. The reference Git catalog has 40 entries; the local catalog also includes the material sandbox. A clean base build can compile this integration while its older source correctly fails the audit-match guard. The standalone atlas always identifies itself as the local September 22 snapshot. These changes have not been deployed to the canonical site.
 
@@ -28,6 +28,10 @@ Every atlas entry includes a more specific opportunity. More questions or a larg
 TypeSafe AI's [advanced structure](https://docs.typesafe.ai/primitives/advanced), [Score](https://docs.typesafe.ai/primitives/score) and [confidence](https://docs.typesafe.ai/confidence) documentation informed the capability comparison. [Research notes](docs-research.md) distinguish provider interface descriptions from measured lab results; [source metadata](documentation-sources.json) records retrieval hashes.
 
 The [runtime audit](runtime-audit.md) traces the boundary restrictions. Separate [playable](playable-audit.json), [tooling](tooling-audit.json) and [training](training-audit.json) audits supply the visual. Existing recorded outcomes remain unchanged. No new Jev inference or training runs were performed for this audit. [NOTES.md](NOTES.md) records findings and design changes.
+
+## Independent review
+
+[Fable 5.1 Global feedback](fable-feedback.md) and [verified provider/model provenance](fable-provenance.json) are retained with [finding-by-finding dispositions](review-dispositions.md). The reviewer inspected a curated source and screenshot snapshot; the root separately ran browser checks, probes and build verification.
 
 ## Verification and integration
 

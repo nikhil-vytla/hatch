@@ -59,6 +59,8 @@ assert len(records) == len({record["id"] for record in records}) == 41
 assert [record["id"] for record in records] == [entry["id"] for entry in catalog]
 references = 0
 for record in records:
+    for question in record["questions"]:
+        assert question["count_note"], (record["id"], "missing question count")
     for field in ("input", "questions", "distribution_use", "output_effect", "execution_modes", "recorded_evidence", "depth_opportunity"):
         assert record[field], (record["id"], field)
     assert record["native_structure_status"] in (False, "not-applicable")
@@ -85,6 +87,13 @@ for document in HERE.rglob("*.md"):
         links += 1
 checks = json.loads((HERE / "browser-checks.json").read_text())
 assert all(checks["standalone"].values()) and all(checks["inspector"].values())
+review = json.loads((HERE / "fable-provenance.json").read_text())
+assert sha(review["prompt"].encode()) == review["prompt_sha256"]
+assert sha((HERE / "fable-feedback.md").read_bytes()) == review["answer_sha256"]
+assert review["observed_models"] == [{"provider": "amazon-bedrock", "model": "global.anthropic.claude-fable-5-1"}]
+for item in review["input_files"]:
+    if "published_path" in item:
+        assert sha((ROOT / item["published_path"]).read_bytes()) == item["sha256"]
 for image in (HERE / "screenshots").glob("*"):
     assert image.stat().st_size < 2_000_000
 result = {

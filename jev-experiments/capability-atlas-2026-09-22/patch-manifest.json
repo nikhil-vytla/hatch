@@ -28,12 +28,13 @@
   ],
   "application": {
     "patch": "application.patch",
-    "sha256": "d32a1b01fa160724acb64a96443a9fdbe6c7971f04ab6f27a104c7bf1979f956",
+    "sha256": "a53a4deb1723ca29137a0d25a988cb5e1b2ffbd6b8be9cce4b1c88f52c5ffff8",
     "prerequisite": "../semantic-image-field-2026-09-21/application.patch",
     "prerequisiteSha256": "a228d450e448b6d86028bcae5f0b9870806ca00a592bbd8e8e845890775ee05d",
     "files": [
       "jev-experiments/experience-prototypes/src/main.tsx",
       "jev-experiments/experience-prototypes/scripts/prepare.ts",
+      "jev-experiments/experience-prototypes/vite.config.ts",
       "jev-experiments/roadmap/routing/evidence-links.ts",
       "jev-experiments/roadmap/routing/ModelRoutingLab.tsx"
     ]

@@ -10,8 +10,8 @@ for (const name of [...new Set(atlas.records.map(r => r.category))]) {
 }
 function renderDetail() {
   const r = atlas.records.find(item => item.id === selected);
-  if (!r) { detail.innerHTML = '<p>Clear the filters to choose an experiment.</p>'; document.querySelector('#selection-status').textContent = 'No experiment selected'; return; }
-  document.querySelector('#selection-status').textContent = `Showing ${r.title}`;
+  if (!r) { detail.innerHTML = '<p>Clear the filters to choose an experiment.</p>'; document.querySelector('#selection-status').textContent = `${document.querySelector('#count').textContent}. No experiment selected`; return; }
+  document.querySelector('#selection-status').textContent = `${document.querySelector('#count').textContent}. Showing ${r.title}`;
   const questions = r.questions.map(q => `<li>${escape(q.primitives)}<span>${escape(q.scope)}${q.count_note ? ' · '+escape(q.count_note) : ''}</span></li>`).join('');
   detail.innerHTML = `<div class="eyebrow">${escape(r.category)}</div><h2>${escape(r.title)}</h2>
     <p class="modes">${r.execution_modes.map(escape).join(' · ')}</p>

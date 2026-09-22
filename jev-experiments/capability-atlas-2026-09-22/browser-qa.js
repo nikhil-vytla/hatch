@@ -24,6 +24,7 @@ async (page) => {
   check('valid_question_examples', examples.length === 2 && examples.every(value => JSON.parse(value).type === 'choice'));
   await page.setViewportSize({ width: 390, height: 844 });
   check('mobile_structure_no_page_overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  check('mobile_examples_show_complete_lines', await page.locator('.compare pre').evaluateAll(elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)));
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   check('dark_mode', await page.evaluate(() => getComputedStyle(document.body).backgroundColor === 'rgb(23, 29, 25)'));
   check('reduced_motion', await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches));

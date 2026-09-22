@@ -18,3 +18,6 @@
 - Added two browser assertions with a delayed metadata response to verify that a new experiment waits for its own audit match.
 - Increased the atlas download and per-experiment atlas link to 44-pixel touch targets, preserving native keyboard behavior.
 - Final browser run passed all 31 assertions across the standalone atlas and per-experiment disclosure. Local and isolated application builds both passed after the ID-bound validation change.
+- Fable 5.1 Global completed a source/screenshot review with verified Bedrock model identity. Root confirmed missing counts, omitted execution modes and incomplete criteria-loss wording, then corrected them.
+- Strengthened metadata checks with a content hash embedded in the running Vite bundle, common adapter source bindings and a stale-build browser fixture. Wrapped the mobile examples and consolidated screen-reader announcements. Review findings and dispositions are retained separately.
+- After review corrections, 34 browser assertions and 10 provider-free tests with 92 assertions passed. Both application builds passed again; all 41 local explanations match, and the older clean checkout correctly shows snapshot notices.

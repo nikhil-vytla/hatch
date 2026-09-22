@@ -6,12 +6,12 @@
     {
       "command": "bun install --frozen-lockfile",
       "exit_code": 0,
-      "seconds": 0.33
+      "seconds": 0.31
     },
     {
       "command": "bun run build",
       "exit_code": 0,
-      "seconds": 6.31
+      "seconds": 6.4
     }
   ],
   "capabilities_html_published": true,

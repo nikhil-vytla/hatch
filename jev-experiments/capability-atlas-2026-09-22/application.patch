@@ -58,6 +58,23 @@
    }
  }
  mkdirSync("public/research", { recursive: true });
+--- a/jev-experiments/experience-prototypes/vite.config.ts
++++ b/jev-experiments/experience-prototypes/vite.config.ts
+@@ -1,9 +1,13 @@
+ import { defineConfig } from "vite";
+ import react from "@vitejs/plugin-react";
+ import tailwind from "@tailwindcss/vite";
++import { readFileSync } from "node:fs";
++const { buildId } = JSON.parse(readFileSync(new URL("./public/capability-build.json", import.meta.url), "utf8"));
++if (typeof buildId !== "string" || !/^[a-f0-9]{64}$/.test(buildId)) throw new Error("Prepare the capability metadata before starting Vite.");
+ export default defineConfig({
++  define: { __JEV_CAPABILITY_BUILD_ID__: JSON.stringify(buildId) },
+   plugins: [react(), tailwind()],
+   resolve: { dedupe: ["react", "react-dom"] },
+-  server: { proxy: { "/api": "http://127.0.0.1:8793" } },
++  server: { proxy: { "/api": `http://127.0.0.1:${process.env.JEV_API_PORT ?? 8793}` } },
+   build: { chunkSizeWarningLimit: 1100 },
+ });
 --- a/jev-experiments/roadmap/routing/evidence-links.ts
 +++ b/jev-experiments/roadmap/routing/evidence-links.ts
 @@ -3,22 +3,10 @@

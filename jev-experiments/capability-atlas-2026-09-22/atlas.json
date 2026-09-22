@@ -10,6 +10,30 @@
     {
       "path": "jev-experiments/experience-prototypes/src/catalog.ts",
       "sha256": "7ccb033029359a32e6550a13cc5811901ba47a62b3f101c71e397fdde3bed2f1"
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "sha256": "7267283ab3909711a9f1a7ba6593c26107b88595ba0ee7939c0c0e2281a3c989"
+    },
+    {
+      "path": "jev-experiments/src/jev_lab/core.py",
+      "sha256": "38de31a2daa158c2846360646a45fb550d9fcc08b8c6bba18ce3adbcc9442967"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/contract.ts",
+      "sha256": "1d2c234d8da9b55489a7cc0d795163583d655f1312735fd714e15be1ff95becc"
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/jev.ts",
+      "sha256": "335f23a26816cefcd09ecb1668f4872dd06f9d07c4a42bf21fdbfcfdf46a26d9"
+    },
+    {
+      "path": "jev-experiments/roadmap/mac/jev_local.py",
+      "sha256": "5b2685ac4197796cb069b2533b186eeb04f7212a24c632d43ea188f7a4eb340f"
+    },
+    {
+      "path": "jev-experiments/adapters/typescript/index.ts",
+      "sha256": "7b6b07dda8ef0d13f30d1fd56f2e6a6572a0a04299e9fe345b5d1c08c744783c"
     }
   ],
   "records": [
@@ -603,13 +627,13 @@
           "scope": "current browser",
           "primitives": "none: lexical classifier",
           "count": 0,
-          "count_note": ""
+          "count_note": "0 questions"
         },
         {
           "scope": "typed toolkit classifier",
           "primitives": "1 five-category choice + 1 five-level ordinal",
           "count": 2,
-          "count_note": ""
+          "count_note": "2 questions"
         }
       ],
       "native_structure_status": false,
@@ -656,13 +680,13 @@
           "scope": "browser live",
           "primitives": "1 four-verdict choice",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         },
         {
           "scope": "recorded runner",
           "primitives": "1 verdict choice + 1 evidence Noul",
           "count": 2,
-          "count_note": ""
+          "count_note": "2 questions"
         }
       ],
       "native_structure_status": false,
@@ -703,13 +727,13 @@
           "scope": "browser live",
           "primitives": "1 seven-option best-source choice + 6 relevance Noul",
           "count": 7,
-          "count_note": ""
+          "count_note": "7 questions"
         },
         {
           "scope": "recorded runner",
           "primitives": "1 best choice + 6 relevance Noul + 6 injection Noul",
           "count": 13,
-          "count_note": ""
+          "count_note": "13 questions"
         }
       ],
       "native_structure_status": false,
@@ -750,13 +774,13 @@
           "scope": "browser live",
           "primitives": "1 best-source choice + 6 relevance Noul",
           "count": 7,
-          "count_note": ""
+          "count_note": "7 questions"
         },
         {
           "scope": "shared search recording",
           "primitives": "1 choice + 12 Noul",
           "count": 13,
-          "count_note": ""
+          "count_note": "13 questions"
         }
       ],
       "native_structure_status": false,
@@ -798,13 +822,13 @@
           "scope": "browser supported route",
           "primitives": "route choice; answer choice; 2 verification Noul across 3 calls",
           "count": 4,
-          "count_note": ""
+          "count_note": "4 questions"
         },
         {
           "scope": "recorded runner",
           "primitives": "route choice; branch-specific search/drink questions; 2 Noul",
           "count": "16 search / 8 drink / 3 unsupported",
-          "count_note": ""
+          "count_note": "16 search / 8 drink / 3 unsupported"
         }
       ],
       "native_structure_status": false,
@@ -845,13 +869,13 @@
           "scope": "browser live",
           "primitives": "1 four-action choice + 1 sufficiency Noul",
           "count": 2,
-          "count_note": ""
+          "count_note": "2 questions"
         },
         {
           "scope": "recorded",
           "primitives": "action choice + sufficiency Noul + four-scene choice",
           "count": 3,
-          "count_note": ""
+          "count_note": "3 questions"
         }
       ],
       "native_structure_status": false,
@@ -892,13 +916,13 @@
           "scope": "benchmark case",
           "primitives": "1 choice over 77 or 151 labels",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         },
         {
           "scope": "supplemental schema fixture",
           "primitives": "1 area choice + 2 Noul",
           "count": 3,
-          "count_note": ""
+          "count_note": "3 questions"
         }
       ],
       "native_structure_status": false,
@@ -939,13 +963,13 @@
           "scope": "pair-context orientation",
           "primitives": "1 A/B choice + 2 correctness Noul",
           "count": 3,
-          "count_note": ""
+          "count_note": "3 questions"
         },
         {
           "scope": "isolated candidate",
           "primitives": "1 correctness Noul",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         }
       ],
       "native_structure_status": false,
@@ -986,7 +1010,7 @@
           "scope": "each variant",
           "primitives": "1 77-label choice",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         }
       ],
       "native_structure_status": false,
@@ -1032,7 +1056,7 @@
             32,
             128
           ],
-          "count_note": ""
+          "count_note": "[1, 8, 32, 128]"
         }
       ],
       "native_structure_status": false,
@@ -1073,13 +1097,13 @@
           "scope": "each classified record",
           "primitives": "1 ten-option Choice",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         },
         {
           "scope": "full request batch",
           "primitives": "10 independent Choices over the shared record map",
           "count": 10,
-          "count_note": ""
+          "count_note": "10 questions"
         }
       ],
       "native_structure_status": false,
@@ -1129,13 +1153,13 @@
           "scope": "each selected training request",
           "primitives": "1 menu-item Choice",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         },
         {
           "scope": "teacher annotation batch",
           "primitives": "up to 8 independent Choices",
           "count": 8,
-          "count_note": ""
+          "count_note": "8 questions"
         }
       ],
       "native_structure_status": false,
@@ -1184,7 +1208,7 @@
           "scope": "each request/menu-item pair",
           "primitives": "1 Noul for satisfying all explicit requirements",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         }
       ],
       "native_structure_status": false,
@@ -1227,13 +1251,13 @@
           "scope": "each local training/evaluation example",
           "primitives": "1 four-option Choice + 1 Noul + 1 three-level Score derivative",
           "count": 3,
-          "count_note": ""
+          "count_note": "3 questions"
         },
         {
           "scope": "hosted Jev reference per test example",
           "primitives": "1 four-option Choice only",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         }
       ],
       "native_structure_status": false,
@@ -1283,13 +1307,13 @@
           "scope": "one candidate",
           "primitives": "1 ten-level Score",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         },
         {
           "scope": "native batch",
           "primitives": "independent candidate Score questions",
           "count": "up to 128 under 90 KB",
-          "count_note": ""
+          "count_note": "up to 128 under 90 KB"
         }
       ],
       "native_structure_status": false,
@@ -1330,7 +1354,7 @@
           "scope": "shared demonstration",
           "primitives": "1 four-area choice + 2 Noul",
           "count": 3,
-          "count_note": ""
+          "count_note": "3 questions"
         }
       ],
       "native_structure_status": false,
@@ -1462,13 +1486,13 @@
           "scope": "new study transformed decision",
           "primitives": "1 Choice, Boolean or numeric ordinal; maximum 8 options",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         },
         {
           "scope": "each original Typed Decisions case",
           "primitives": "5 mixed questions, evaluated as separate transformed rows in the new study",
           "count": 5,
-          "count_note": ""
+          "count_note": "5 questions"
         }
       ],
       "native_structure_status": false,
@@ -1550,7 +1574,7 @@
           "scope": "this catalog experience",
           "primitives": "none",
           "count": 0,
-          "count_note": ""
+          "count_note": "0 questions"
         }
       ],
       "native_structure_status": "not-applicable",
@@ -1685,13 +1709,13 @@
           "scope": "one artwork/mode",
           "primitives": "1 five-level Score",
           "count": 1,
-          "count_note": ""
+          "count_note": "1 question"
         },
         {
           "scope": "complete live query",
           "primitives": "204 artworks × 2 text modes; batches up to 32 questions",
           "count": 408,
-          "count_note": ""
+          "count_note": "408 questions"
         }
       ],
       "native_structure_status": false,

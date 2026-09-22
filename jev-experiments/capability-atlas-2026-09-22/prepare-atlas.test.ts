@@ -25,8 +25,14 @@ test("explanations are bound to source and app wiring, including missing files",
   writeFileSync(join(folder, "show-me-jev-capabilities.html"), "<h1>Authored fixture</h1>");
   const build = () => { prepareCapabilityAtlas(lab, output); return JSON.parse(readFileSync(join(output, "capability-build.json"), "utf8")).records; };
   expect(build()).toEqual({ first: true, second: true });
+  const metadata = () => JSON.parse(readFileSync(join(output, "capability-build.json"), "utf8"));
+  const firstBuildId = metadata().buildId;
+  expect(firstBuildId).toMatch(/^[a-f0-9]{64}$/);
+  build();
+  expect(metadata().buildId).toBe(firstBuildId);
   writeFileSync(join(root, "first.ts"), "changed behavior");
   expect(build()).toEqual({ first: false, second: true });
+  expect(metadata().buildId).not.toBe(firstBuildId);
   rmSync(join(root, "second.ts"));
   expect(build()).toEqual({ first: false, second: false });
   evidence("first.ts", "classify"); evidence("second.ts", "score");

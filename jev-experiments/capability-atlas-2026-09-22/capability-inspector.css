@@ -1,5 +1,5 @@
-.jev-role { --role-muted:#596259; margin:16px 0 24px; border-top:1px solid var(--line,#c5cdc3); border-bottom:1px solid var(--line,#c5cdc3); }
-:root[data-theme="dark"] .jev-role { --role-muted:#adb9ac; }
+.jev-role { --role-muted:#596259; --role-focus:#925800; margin:16px 0 24px; border-top:1px solid var(--line,#c5cdc3); border-bottom:1px solid var(--line,#c5cdc3); }
+:root[data-theme="dark"] .jev-role { --role-muted:#adb9ac; --role-focus:#e9b660; }
 .jev-role summary { min-height:48px; padding:12px 4px; cursor:pointer; font-size:14px; }
 .jev-role summary>span:first-child { font-weight:600; margin-left:5px; }
 .jev-role-preview { margin-left:20px; font-size:12px; color:var(--role-muted); }
@@ -13,5 +13,5 @@
 .jev-role p.jev-role-next { max-width:850px; }
 .jev-role a { display:inline-flex; align-items:center; min-height:44px; padding-block:8px; font-size:13px; text-underline-offset:3px; }
 .jev-role-date { display:block; margin-top:12px; font-size:12px; color:var(--role-muted); }
-.jev-role summary:focus-visible,.jev-role a:focus-visible { outline:3px solid #ad6e0a; outline-offset:4px; }
+.jev-role summary:focus-visible,.jev-role a:focus-visible { outline:3px solid var(--role-focus); outline-offset:4px; }
 @media(max-width:760px) { .jev-role-flow { grid-template-columns:1fr; gap:8px; } .jev-role-preview { display:block; margin-left:20px; margin-top:4px; } }
