@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { SourceCode } from "../../experience-prototypes/src/components/source-code/source-code";
 import engineSource from "./engine.ts?raw";
+import { materialFill } from "./palette";
+import { contactSides, readContact } from "./contact-reading";
 import { ruleRequest, type Rule, type Scene } from "./engine";
 import {
   inspectWindow,
@@ -15,16 +17,7 @@ const source = {
   text: engineSource,
   path: "jev-experiments/roadmap/materials/engine.ts",
 };
-const colors = [
-  "transparent",
-  "#c59a4a",
-  "#79abb3",
-  "#78836f",
-  "#ad7957",
-  "#e47d4c",
-  "#bbd5d0",
-  "#a487bd",
-];
+const glyphs = ["·", "●", "≈", "■", "▥", "▲", "○", "◆"];
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -33,10 +26,12 @@ function Neighborhood({
   window,
   name,
   title,
+  checkedSides = false,
 }: {
   window: CellWindow;
   name: string;
   title: string;
+  checkedSides?: boolean;
 }) {
   const description = window.cells
     .map(
@@ -53,18 +48,19 @@ function Neighborhood({
         {window.cells.map((cell, index) => (
           <span
             key={index}
-            className={`${index === 4 ? "selected" : ""} ${cell === 0 || cell === null ? "is-empty" : ""}`}
-            style={{ background: cell === null ? "transparent" : colors[cell] }}
+            className={`${index === 4 ? "selected" : ""} ${cell === 0 || cell === null ? "is-empty" : ""} ${checkedSides ? contactSides.some((side) => side.index === index) ? "checked-side" : index !== 4 ? "unchecked-corner" : "" : ""}`}
             title={materialName(cell, name)}
             aria-hidden="true"
           >
-            {cell === null
-              ? "×"
-              : cell === 0
-                ? "·"
-                : cell === 7
-                  ? "◆"
-                  : materialName(cell, name)}
+            <b
+              style={{
+                color:
+                  cell === null || cell === 0 ? undefined : materialFill(cell),
+              }}
+            >
+              {cell === null ? "×" : glyphs[cell]}
+            </b>
+            <small>{materialName(cell, name)}</small>
           </span>
         ))}
       </div>
@@ -106,6 +102,7 @@ export function MaterialMechanism({
   const [question, setQuestion] = useState("support");
   const rule = scene.rule;
   const current = inspectWindow(scene, cursor);
+  const contact = readContact(current, rule);
   const request = attempt?.request ?? ruleRequest(rule.instruction);
   const response = object(attempt?.response);
   const answer = object(object(response.answers)[question]);
@@ -121,24 +118,15 @@ export function MaterialMechanism({
     movement: "A powder can swap places with water",
     jev: "Four choices become a bounded rule",
   };
+  const name = rule.name || "Your material";
+  const motion = {
+    solid: "stays put",
+    powder: "falls and piles",
+    liquid: "falls and spreads",
+    gas: "rises and spreads",
+  }[rule.motion];
   return (
-    <section
-      id="mat-mechanism"
-      className="mat-mechanism"
-      aria-labelledby="mat-mechanism-title"
-    >
-      <header>
-        <div>
-          <span className="mat-eyebrow">Inside this scene · local rules</span>
-          <h3 id="mat-mechanism-title">A grain meets water.</h3>
-        </div>
-        <button onClick={onClose}>Back to painting</button>
-      </header>
-      <p>
-        Sand can sink through water. Purple dust has another possibility: a
-        contact rule can turn it into wood before it moves. Both behaviors come
-        from this engine.
-      </p>
+    <section className="mat-mechanism" aria-label="Material rule inspector">
       <div
         className="mat-mechanism-parts"
         role="group"
@@ -160,254 +148,294 @@ export function MaterialMechanism({
           </button>
         ))}
       </div>
-      <div className="mat-mechanism-columns">
-        <div className="mat-mechanism-reading">
-          {part !== "jev" ? (
-            <>
-              <h4>
-                {part === "contact"
-                  ? "Change the purple material."
-                  : "Look at one tick."}
-              </h4>
-              {part === "contact" ? (
-                <>
-                  <div className="mat-rule-sentence">
-                    <label>
-                      Movement
-                      <select
-                        value={rule.motion}
-                        onChange={(event) =>
-                          onRule({
-                            motion: event.target.value as Rule["motion"],
-                          })
-                        }
-                      >
-                        <option value="solid">Stay</option>
-                        <option value="powder">Fall and pile</option>
-                        <option value="liquid">Fall and spread</option>
-                        <option value="gas">Rise and spread</option>
-                      </select>
-                    </label>
-                    <label>
-                      When it touches
-                      <select
-                        value={rule.contact}
-                        onChange={(event) =>
-                          onRule({
-                            contact: event.target.value as Rule["contact"],
-                          })
-                        }
-                      >
-                        {["none", "water", "fire", "sand", "wood"].map((id) => (
-                          <option key={id} value={id}>
-                            {id === "none" ? "No contact reaction" : id}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      It becomes
-                      <select
-                        value={rule.becomes}
-                        disabled={rule.contact === "none"}
-                        onChange={(event) =>
-                          onRule({
-                            becomes: event.target.value as Rule["becomes"],
-                          })
-                        }
-                      >
-                        {[
-                          "sand",
-                          "water",
-                          "stone",
-                          "wood",
-                          "fire",
-                          "steam",
-                        ].map((id) => (
-                          <option key={id} value={id}>
-                            {id}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <p>
-                    The check reads four side neighbors. It changes the purple
-                    cell and skips its movement for that tick. The matching
-                    neighbor is not consumed by this rule.
-                  </p>
-                </>
-              ) : (
-                <p>
-                  Powders try below, then the two lower diagonals. They can swap
-                  with empty space or water. Liquids and gases also try
-                  sideways. The scan alternates direction each tick; this is a
-                  designed cellular rule, not a density calculation.
-                </p>
-              )}
-              <div className="mat-mechanism-actions">
-                <button onClick={onPair}>Place a test pair</button>
-                <button onClick={onStep}>Step one tick</button>
-              </div>
-              <p className="mat-mechanism-small">
-                The test pair preserves your current scene as a branch, then
-                places purple dust beside{" "}
-                {rule.contact === "none" ? "water" : rule.contact} in a small
-                stone cup.
-              </p>
-              <div className="mat-step-window">
-                {trace && (
-                  <Neighborhood
-                    window={trace.before}
-                    name={rule.name}
-                    title="Before"
-                  />
-                )}
+      <div className="mat-mechanism-reading">
+        {part !== "jev" ? (
+          <>
+            <p className="mat-rule-origin">
+              {rule.source === "jev"
+                ? "Applied Jev controls"
+                : "Manual controls"}{" "}
+              · local simulation
+            </p>
+            <h3 className="mat-rule-heading">
+              {part === "movement"
+                ? `${name} ${motion}.`
+                : rule.contact === "none"
+                  ? `${name} has no contact reaction.`
+                  : `${name} touches ${rule.contact}, becomes ${rule.becomes}.`}
+            </h3>
+            <p className="mat-mechanism-small">
+              {part === "contact"
+                ? "The rule checks four side neighbors before movement and changes only the custom cell. Other cells can still move during the tick."
+                : "Powders try below, then the lower diagonals, swapping with empty space or water. Liquids and gases also try sideways. The scan alternates each tick."}
+            </p>
+            <div className="mat-step-window">
+              {trace && (
                 <Neighborhood
-                  window={trace?.after ?? current}
+                  window={trace.before}
                   name={rule.name}
-                  title={trace ? "After" : "Selected neighborhood"}
+                  title="Before"
+                  checkedSides={part === "contact"}
                 />
+              )}
+              <Neighborhood
+                window={trace?.after ?? current}
+                name={rule.name}
+                title={trace ? "After" : "Selected neighborhood"}
+                checkedSides={part === "contact"}
+              />
+            </div>
+            <p className="mat-coordinate">
+              Cell {current.x + 1}, {current.y + 1} ·{" "}
+              {materialName(current.cells[4], rule.name)}
+            </p>
+            {trace && (
+              <p className="mat-mechanism-small">
+                The same grid positions before and after one tick.
+              </p>
+            )}
+            <div className="mat-mechanism-actions">
+              <button onClick={onPair}>Place a test pair</button>
+              <button onClick={onStep}>Step one tick</button>
+            </div>
+            <p className="mat-mechanism-small">
+              A test pair places {name} beside{" "}
+              {rule.contact === "none" ? "water" : rule.contact} in a stone cup
+              and preserves the earlier scene as a branch.
+            </p>
+            <details className="mat-rule-controls">
+              <summary>Edit material controls</summary>
+              <div className="mat-rule-sentence">
+                <label>
+                  Name
+                  <input
+                    maxLength={50}
+                    value={rule.name}
+                    onChange={(event) => onRule({ name: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Movement
+                  <select
+                    value={rule.motion}
+                    onChange={(event) =>
+                      onRule({ motion: event.target.value as Rule["motion"] })
+                    }
+                  >
+                    <option value="solid">Stay</option>
+                    <option value="powder">Fall and pile</option>
+                    <option value="liquid">Fall and spread</option>
+                    <option value="gas">Rise and spread</option>
+                  </select>
+                </label>
+                <label>
+                  When it touches
+                  <select
+                    value={rule.contact}
+                    onChange={(event) =>
+                      onRule({ contact: event.target.value as Rule["contact"] })
+                    }
+                  >
+                    {["none", "water", "fire", "sand", "wood"].map((id) => (
+                      <option key={id} value={id}>
+                        {id === "none" ? "No contact reaction" : id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  It becomes
+                  <select
+                    value={rule.becomes}
+                    disabled={rule.contact === "none"}
+                    onChange={(event) =>
+                      onRule({ becomes: event.target.value as Rule["becomes"] })
+                    }
+                  >
+                    {["sand", "water", "stone", "wood", "fire", "steam"].map(
+                      (id) => (
+                        <option key={id} value={id}>
+                          {id}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
               </div>
               <p className="mat-mechanism-small">
-                Cell {current.x + 1}, {current.y + 1}. These are the same grid
-                positions before and after the step, not a tracked particle.
+                Changes apply to every custom cell.{" "}
+                {scene.cells.filter((cell) => cell === 7).length} remain in this
+                world.
               </p>
-              <p className="mat-mechanism-small">
-                Current rule:{" "}
-                {rule.source === "jev"
-                  ? "applied Jev controls"
-                  : "manual controls"}
-                . Purple cells remaining:{" "}
-                {scene.cells.filter((cell) => cell === 7).length}.
-              </p>
-            </>
-          ) : (
-            <>
-              <h4>Words choose controls.</h4>
-              <p>
-                Jev can propose one movement and one contact transformation.
-                Code checks all four answers, then you choose whether to apply
-                the proposal. The canvas runs locally.
-              </p>
-              <label className="mat-mechanism-instruction">
-                Material instruction
-                <textarea
-                  maxLength={600}
-                  rows={3}
-                  value={rule.instruction}
-                  onChange={(event) =>
-                    onRule({ instruction: event.target.value })
-                  }
-                />
-              </label>
-              <div className="mat-mechanism-actions">
-                <button
-                  disabled={busy || !rule.instruction.trim()}
-                  onClick={onInterpret}
-                >
-                  {busy ? "Interpreting…" : "Propose typed controls"}
-                </button>
-                {busy && <button onClick={onCancel}>Cancel</button>}
-                {proposal && <button onClick={onApply}>Apply proposal</button>}
-              </div>
-              <p className="mat-mechanism-small">
-                Uses your connected key. Instruction accuracy has not been
-                measured.
-              </p>
-              <p className="mat-rule-attempt" role="status">
-                {attempt
-                  ? `${{ pending: "Awaiting Jev", proposed: "Proposed, not applied", applied: "Applied", discarded: "Discarded after a scene change", superseded: "Applied rule has since been edited", failed: "Interpretation failed" }[attempt.status]} · request revision ${attempt.revision}${attempt.appliedAt === undefined ? "" : ` · applied at tick ${attempt.appliedAt}`}`
-                  : rule.source === "jev"
-                    ? "The current scene contains an applied Jev rule."
-                    : "Question preview. No Jev response for this instruction."}
-              </p>
-              {attempt?.error && <p>{attempt.error}</p>}
-              <label>
-                Question
-                <select
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                >
-                  {Object.keys(request.questions).map((id) => (
-                    <option key={id} value={id}>
-                      {id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p>
-                {
-                  request.questions[question as keyof typeof request.questions]
-                    .instructions
+            </details>
+          </>
+        ) : (
+          <>
+            <h3>Describe a material.</h3>
+            <p>
+              Jev can propose one movement and one contact transformation. Code
+              checks all four answers, then you choose whether to apply the
+              proposal. The canvas runs locally.
+            </p>
+            <label className="mat-mechanism-instruction">
+              Material instruction
+              <textarea
+                maxLength={600}
+                rows={3}
+                value={rule.instruction}
+                onChange={(event) =>
+                  onRule({ instruction: event.target.value })
                 }
+              />
+            </label>
+            {proposal && (
+              <p className="mat-proposal-summary">
+                Proposed: {proposal.motion};{" "}
+                {proposal.contact === "none"
+                  ? "no contact reaction"
+                  : `touches ${proposal.contact} → becomes ${proposal.becomes}`}
+                .
               </p>
-              <dl className="mat-question-options">
-                {Object.entries(
-                  request.questions[question as keyof typeof request.questions]
-                    .criteria,
-                ).map(([key, text]) => (
+            )}
+            <div className="mat-mechanism-actions">
+              <button
+                disabled={busy || !rule.instruction.trim()}
+                onClick={onInterpret}
+              >
+                {busy ? "Interpreting…" : "Propose typed controls"}
+              </button>
+              {busy && <button onClick={onCancel}>Cancel</button>}
+              {proposal && <button onClick={onApply}>Apply proposal</button>}
+            </div>
+            <p className="mat-mechanism-small">
+              Uses your connected key. Instruction accuracy has not been
+              measured.
+            </p>
+            <p className="mat-rule-attempt" role="status">
+              {attempt
+                ? `${{ pending: "Awaiting Jev", proposed: "Proposed, not applied", applied: "Applied", discarded: "Discarded after a scene change", superseded: "Applied rule has since been edited", failed: "Interpretation failed" }[attempt.status]} · request revision ${attempt.revision}${attempt.appliedAt === undefined ? "" : ` · applied at tick ${attempt.appliedAt}`}`
+                : rule.source === "jev"
+                  ? "The current scene contains an applied Jev rule."
+                  : "Question preview. No Jev response for this instruction."}
+            </p>
+            {attempt?.error && <p>{attempt.error}</p>}
+            <label>
+              Question
+              <select
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+              >
+                {Object.keys(request.questions).map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>
+              {
+                request.questions[question as keyof typeof request.questions]
+                  .instructions
+              }
+            </p>
+            <dl className="mat-question-options">
+              {Object.entries(
+                request.questions[question as keyof typeof request.questions]
+                  .criteria,
+              ).map(([key, text]) => (
+                <div key={key}>
+                  <dt>{key}</dt>
+                  <dd>{text}</dd>
+                </div>
+              ))}
+            </dl>
+            {typeof answer.value === "string" && (
+              <div className="mat-returned-rule">
+                <strong>Returned: {answer.value}</strong>
+                {probabilities.map(([key, probability]) => (
                   <div key={key}>
-                    <dt>{key}</dt>
-                    <dd>{text}</dd>
+                    <span>{key}</span>
+                    <meter
+                      min={0}
+                      max={1}
+                      value={probability}
+                      aria-label={`${key} probability`}
+                    />
+                    <span>{Math.round(probability * 100)}%</span>
                   </div>
                 ))}
-              </dl>
-              {typeof answer.value === "string" && (
-                <div className="mat-returned-rule">
-                  <strong>Returned: {answer.value}</strong>
-                  {probabilities.map(([key, probability]) => (
-                    <div key={key}>
-                      <span>{key}</span>
-                      <meter
-                        min={0}
-                        max={1}
-                        value={probability}
-                        aria-label={`${key} probability`}
-                      />
-                      <span>{Math.round(probability * 100)}%</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {typeof response.model === "string" && (
-                <p className="mat-mechanism-small">
-                  {response.model_source === "provider-reported"
-                    ? "Provider-reported model"
-                    : response.model_source === "configured-unverified"
-                      ? "Configured model, unverified"
-                      : "Model, identity source not retained"}
-                  : {response.model}
-                </p>
-              )}
+              </div>
+            )}
+            {typeof response.model === "string" && (
+              <p className="mat-mechanism-small">
+                {response.model_source === "provider-reported"
+                  ? "Provider-reported model"
+                  : response.model_source === "configured-unverified"
+                    ? "Configured model, unverified"
+                    : "Model, identity source not retained"}
+                : {response.model}
+              </p>
+            )}
+            <details>
+              <summary>
+                {attempt
+                  ? "Exact request and retained response"
+                  : "Complete question preview"}
+              </summary>
+              <pre tabIndex={0}>
+                {JSON.stringify(attempt ?? request, null, 2)}
+              </pre>
+            </details>
+            {!attempt && rule.source === "jev" && (
               <details>
-                <summary>
-                  {attempt
-                    ? "Exact request and retained response"
-                    : "Complete question preview"}
-                </summary>
+                <summary>Applied rule evidence from this scene</summary>
                 <pre tabIndex={0}>
-                  {JSON.stringify(attempt ?? request, null, 2)}
+                  {JSON.stringify(rule.evidence ?? null, null, 2)}
                 </pre>
               </details>
-              {!attempt && rule.source === "jev" && (
-                <details>
-                  <summary>Applied rule evidence from this scene</summary>
-                  <pre tabIndex={0}>
-                    {JSON.stringify(rule.evidence ?? null, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </>
-          )}
-        </div>
+            )}
+          </>
+        )}
+      </div>
+      <details className="mat-source-disclosure">
+        <summary>Read the running code</summary>
+        {part === "contact" && (
+          <div className="mat-code-context" aria-label="Contact conditions in the displayed frame">
+            <Neighborhood
+              window={current}
+              name={rule.name}
+              title={`Cell ${current.x + 1}, ${current.y + 1}`}
+              checkedSides
+            />
+            <dl>
+              <div data-condition="custom">
+                <dt>Custom cell</dt>
+                <dd>{contact.custom ? "True" : "False"}</dd>
+              </div>
+              <div data-condition="enabled">
+                <dt>Contact enabled</dt>
+                <dd>{contact.enabled ? "True" : "False"}</dd>
+              </div>
+              <div data-condition="neighbor">
+                <dt>{contact.enabled ? `Touches ${rule.contact}` : "Matching neighbor"}</dt>
+                <dd>{!contact.enabled ? "Not checked" : contact.matchingSides.length ? `True · ${contact.matchingSides.map((side) => side.name).join(", ")}` : "False"}</dd>
+              </div>
+            </dl>
+            <p className="mat-mechanism-small">
+              Dashed cells are the four checked sides. These values describe this frame; a tick reads cells in scan order.
+            </p>
+          </div>
+        )}
         <SourceCode
           source={source}
           markers={materialSourceMarkers[part]}
           title={titles[part]}
           className="mat-mechanism-source"
         />
-      </div>
+      </details>
+      <button className="mat-close-inspector" onClick={onClose}>
+        Close inspector
+      </button>
     </section>
   );
 }
