@@ -5,13 +5,42 @@ use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 
 pub type LabResult<T> = Result<T, String>;
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Answer {
     #[serde(rename = "type")]
     pub kind: String,
     pub value: Value,
     pub probabilities: Option<BTreeMap<String, f64>>,
     pub confidence: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legend: Option<BTreeMap<String, Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub argmax: Option<usize>,
+    #[serde(
+        rename = "probabilityTrue",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub probability_true: Option<f64>,
+    #[serde(
+        rename = "confidenceDefinition",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub confidence_definition: Option<String>,
+    #[serde(
+        rename = "nativeValue",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub native_value: Option<Value>,
+    #[serde(
+        rename = "probabilityMass",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub probability_mass: Option<f64>,
 }
 pub type Answers = BTreeMap<String, Answer>;
 #[derive(Debug, Serialize)]
@@ -19,6 +48,13 @@ pub struct Decision<T> {
     pub value: T,
     pub answers: Answers,
     pub questions: Map<String, Value>,
+}
+
+fn entry(value: &Value) -> bool {
+    matches!(
+        value,
+        Value::Null | Value::String(_) | Value::Object(_) | Value::Array(_)
+    )
 }
 
 fn resolve(schema: &Value, root: &Value, depth: usize) -> LabResult<Value> {
@@ -64,6 +100,15 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
         }
         let schema = resolve(raw, root, 0)?;
         let kind = schema["type"].as_str().unwrap_or("");
+        for key in schema.as_object().ok_or("Expected schema object")?.keys() {
+            if key.starts_with("x-jev-")
+                && (kind == "object"
+                    || !["x-jev-instructions", "x-jev-criteria", "x-jev-levels"]
+                        .contains(&key.as_str()))
+            {
+                return Err(format!("Unknown or misplaced Jev annotation: {key}"));
+            }
+        }
         if kind == "object" {
             let properties = schema["properties"].as_object().ok_or("Empty object")?;
             if properties.is_empty() {
@@ -91,10 +136,22 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
             }
             return Ok(());
         }
-        let description = schema["description"]
-            .as_str()
-            .filter(|s| !s.trim().is_empty())
-            .ok_or_else(|| format!("Missing semantic description: {path}"))?;
+        let instructions = match schema.get("x-jev-instructions") {
+            Some(value) if entry(value) => value.clone(),
+            Some(_) => return Err("Instructions must be a native entry".into()),
+            None => Value::String(
+                schema["description"]
+                    .as_str()
+                    .filter(|s| !s.trim().is_empty())
+                    .ok_or_else(|| format!("Missing semantic description: {path}"))?
+                    .into(),
+            ),
+        };
+        let has_levels = schema.get("x-jev-levels").is_some();
+        let native_criteria = schema.get("x-jev-criteria");
+        if has_levels && (kind != "number" || native_criteria.is_some()) {
+            return Err("Misplaced score rubric".into());
+        }
         let question = if kind == "string" {
             let options = schema["enum"]
                 .as_array()
@@ -103,25 +160,56 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
             let mut criteria = Map::new();
             for option in options {
                 let value = option.as_str().ok_or("Enum option must be a string")?;
+                if value.trim().is_empty() || criteria.contains_key(value) {
+                    return Err("Enum options must be nonempty and unique".into());
+                }
                 criteria.insert(value.into(), Value::String(value.replace('_', " ")));
             }
-            json!({"type":"choice", "instructions":description, "criteria":criteria})
+            if let Some(native) = native_criteria {
+                let native = native
+                    .as_object()
+                    .ok_or("Choice criteria must be named entries")?;
+                if native.len() != criteria.len()
+                    || criteria
+                        .keys()
+                        .any(|key| !native.get(key).is_some_and(entry))
+                {
+                    return Err("Criteria must match the enum with native entries".into());
+                }
+                criteria = native.clone();
+            }
+            json!({"type":"choice", "instructions":instructions, "criteria":criteria})
         } else if kind == "boolean"
             || kind == "number"
+                && !has_levels
                 && schema["minimum"].as_f64() == Some(0.0)
                 && schema["maximum"].as_f64() == Some(1.0)
         {
-            json!({"type":"noul", "instructions":description})
+            let mut question = json!({"type":"noul", "instructions":instructions});
+            if let Some(native) = native_criteria {
+                let criteria = native
+                    .as_object()
+                    .ok_or("Noul needs true and false entries")?;
+                if criteria.len() != 2
+                    || !["true", "false"]
+                        .iter()
+                        .all(|key| criteria.get(*key).is_some_and(entry))
+                {
+                    return Err("Noul needs true and false native entries".into());
+                }
+                question["criteria"] = native.clone();
+            }
+            question
         } else if kind == "number" && schema["x-jev-levels"].is_array() {
             let levels = schema["x-jev-levels"].as_array().unwrap();
-            if !(2..=255).contains(&levels.len())
-                || !levels.iter().all(Value::is_string)
+            if !(2..=10).contains(&levels.len())
+                || !levels.iter().all(entry)
                 || schema["minimum"].as_f64() != Some(0.0)
                 || schema["maximum"].as_f64() != Some((levels.len() - 1) as f64)
             {
                 return Err("Invalid explicit score rubric".into());
             }
-            json!({"type":"score", "instructions":description, "criteria":levels})
+            json!({"type":"score", "instructions":instructions, "criteria":levels})
         } else {
             return Err(format!("Unsupported semantic type: {path}"));
         };
@@ -138,6 +226,9 @@ pub fn compile(root: &Value) -> LabResult<Map<String, Value>> {
 
 pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResult<Decision<T>> {
     let questions = compile(schema)?;
+    if answers.len() != questions.len() {
+        return Err("Answer IDs must match questions".into());
+    }
     for (id, question) in &questions {
         let answer = answers
             .get(id)
@@ -173,7 +264,7 @@ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResul
                 if answer.kind == "score" {
                     (0..=upper as usize).map(|i| i.to_string()).collect()
                 } else {
-                    vec![]
+                    vec!["false".into(), "true".into()]
                 }
             }
         };
@@ -186,12 +277,53 @@ pub fn decode<T: DeserializeOwned>(schema: &Value, answers: Answers) -> LabResul
             {
                 return Err("Malformed distribution".into());
             }
+            if answer.kind == "noul"
+                && ((probs["true"] - answer.value.as_f64().unwrap()).abs() > 1e-6
+                    || (probs["false"] - (1.0 - answer.value.as_f64().unwrap())).abs() > 1e-6)
+            {
+                return Err("Noul distribution disagrees with scalar".into());
+            }
+        } else if answer.kind != "noul" {
+            return Err("Complete Choice/Score distribution required".into());
         }
         if answer
             .confidence
             .is_some_and(|v| !v.is_finite() || !(0.0..=1.0).contains(&v))
         {
             return Err("Invalid confidence".into());
+        }
+        if let Some(probability) = answer.probability_true {
+            if answer.kind != "noul"
+                || !probability.is_finite()
+                || (probability - answer.value.as_f64().unwrap()).abs() > 1e-6
+            {
+                return Err("Invalid probabilityTrue".into());
+            }
+        }
+        if let Some(argmax) = answer.argmax {
+            if answer.kind != "score" || argmax >= expected.len() {
+                return Err("Invalid Score argmax".into());
+            }
+            let probabilities = answer.probabilities.as_ref().unwrap();
+            if probabilities
+                .values()
+                .any(|p| *p > probabilities[&argmax.to_string()])
+            {
+                return Err("Argmax is not a modal level".into());
+            }
+        }
+        if let Some(legend) = &answer.legend {
+            if answer.kind != "score"
+                || legend.len() != expected.len()
+                || question["criteria"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                    .any(|(i, level)| legend.get(&i.to_string()) != Some(level))
+            {
+                return Err("Score legend changed the requested rubric".into());
+            }
         }
     }
     fn value(raw: &Value, root: &Value, path: &str, answers: &Answers) -> LabResult<Value> {
@@ -250,6 +382,7 @@ mod tests {
                 value: json!(value),
                 probabilities: None,
                 confidence: None,
+                ..Default::default()
             },
         )])
     }
@@ -286,8 +419,92 @@ mod tests {
                 value: json!("a"),
                 probabilities: Some(BTreeMap::from([("a".into(), 1.0)])),
                 confidence: None,
+                ..Default::default()
             },
         )]);
+        assert!(decode::<Value>(&schema, answers).is_err());
+    }
+
+    fn field_schema(field: Value) -> Value {
+        json!({"type":"object", "required":["value"], "properties":{"value":field}})
+    }
+
+    #[test]
+    fn native_annotations_and_two_level_score() {
+        let schema = field_schema(
+            json!({"type":"number","minimum":0,"maximum":1,"x-jev-instructions":null,"x-jev-levels":[{"when":"routine"},["severe",null]]}),
+        );
+        let question = &compile(&schema).unwrap()["value"];
+        assert_eq!(question["type"], "score");
+        assert!(question["instructions"].is_null());
+        assert_eq!(
+            question["criteria"],
+            json!([{"when":"routine"},["severe",null]])
+        );
+        for field in [
+            json!({"type":"boolean","x-jev-instructions":{"question":["Check",null]},"x-jev-criteria":{"true":{"has":"evidence"},"false":null}}),
+            json!({"type":"string","enum":["a","b"],"x-jev-instructions":[],"x-jev-criteria":{"a":{"tree":[true,2]},"b":null}}),
+        ] {
+            assert!(compile(&field_schema(field)).is_ok());
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_or_misplaced_annotations() {
+        for field in [
+            json!({"type":"boolean","description":"Check","x-jev-levels":["no","yes"]}),
+            json!({"type":"boolean","description":"Check","x-jev-critera":{"true":"yes","false":"no"}}),
+            json!({"type":"boolean","description":"Check","x-jev-criteria":null}),
+            json!({"type":"boolean","x-jev-instructions":3}),
+            json!({"type":"string","description":"Choose","enum":["a","b"],"x-jev-criteria":{"a":"A","different":"B"}}),
+            json!({"type":"number","description":"Rate","minimum":0,"maximum":10,"x-jev-levels":["0","1","2","3","4","5","6","7","8","9","10"]}),
+            json!({"type":"number","description":"Rate","minimum":0,"maximum":1,"x-jev-levels":["low","high"],"x-jev-criteria":{"true":"yes","false":"no"}}),
+        ] {
+            assert!(compile(&field_schema(field)).is_err());
+        }
+    }
+
+    #[test]
+    fn preserves_noul_distribution_and_metadata() {
+        let raw = json!({"refund":{"type":"noul","value":0.9,"probabilities":{"false":0.1,"true":0.9},"confidence":null,"probabilityTrue":0.9}});
+        let answers: Answers = serde_json::from_value(raw.clone()).unwrap();
+        let result = decode::<Flag>(&schemars::schema_for!(Flag).to_value(), answers).unwrap();
+        assert_eq!(serde_json::to_value(result.answers).unwrap(), raw);
+        let mut bad = raw;
+        bad["refund"]["probabilities"] = json!({"false":0.9,"true":0.1});
+        assert!(decode::<Flag>(
+            &schemars::schema_for!(Flag).to_value(),
+            serde_json::from_value(bad).unwrap()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn preserves_score_value_legend_and_argmax() {
+        let schema = field_schema(
+            json!({"type":"number","minimum":0,"maximum":1,"x-jev-instructions":null,"x-jev-levels":[{"meaning":"routine"},["severe",null]]}),
+        );
+        let raw = json!({"value":{"type":"score","value":0.35,"probabilities":{"0":0.65,"1":0.35},"confidence":0.4,"confidenceDefinition":"provider-distribution-confidence","argmax":0,"legend":{"0":{"meaning":"routine"},"1":["severe",null]}}});
+        let result =
+            decode::<Value>(&schema, serde_json::from_value(raw.clone()).unwrap()).unwrap();
+        assert_eq!(result.value["value"], 0.35);
+        assert_eq!(serde_json::to_value(result.answers).unwrap(), raw);
+        let mut bad = raw;
+        bad["value"]["legend"]["0"] = json!("changed");
+        assert!(decode::<Value>(&schema, serde_json::from_value(bad).unwrap()).is_err());
+    }
+
+    #[test]
+    fn unknown_answer_metadata_and_missing_distribution_are_errors() {
+        assert!(serde_json::from_value::<Answer>(
+            json!({"type":"noul","value":0.5,"lostMeaning":true})
+        )
+        .is_err());
+        let schema = field_schema(json!({"type":"string","enum":["a","b"],"description":"Choose"}));
+        let answers = serde_json::from_value(
+            json!({"value":{"type":"choice","value":"a","confidence":null}}),
+        )
+        .unwrap();
         assert!(decode::<Value>(&schema, answers).is_err());
     }
 }
