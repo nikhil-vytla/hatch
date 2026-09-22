@@ -1,0 +1,39 @@
+{
+  "source_revision": "b746a0f0d1908adc6108e688208251e1e3b763df",
+  "matched_ids_and_labels": true,
+  "classification_cutoff": 0.5,
+  "inputs_sha256": {
+    "test_original.json": "a13227fe937d30660498f39290c576b08deaf769f6d7b254041247cdadb8e7f3",
+    "test_gepa.json": "af9b063f771a79de7583bae3fffdc1881e0a92be592ff00431e1493f0035d480"
+  },
+  "original": {
+    "n": 300,
+    "positive_n": 61,
+    "brier": 0.13565966666666665,
+    "accuracy": 0.83,
+    "precision": 0.5480769230769231,
+    "recall": 0.9344262295081968,
+    "f1": 0.6909090909090909,
+    "confusion_tn_fp_fn_tp": [
+      192,
+      47,
+      4,
+      57
+    ]
+  },
+  "selected": {
+    "n": 300,
+    "positive_n": 61,
+    "brier": 0.07474066666666666,
+    "accuracy": 0.9066666666666666,
+    "precision": 0.7142857142857143,
+    "recall": 0.9016393442622951,
+    "f1": 0.7971014492753623,
+    "confusion_tn_fp_fn_tp": [
+      217,
+      22,
+      6,
+      55
+    ]
+  }
+}

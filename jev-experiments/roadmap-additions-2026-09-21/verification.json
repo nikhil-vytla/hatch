@@ -1,0 +1,17 @@
+{
+  "kind": "research-artifact-verification",
+  "relativeLinksAndAnchors": {
+    "status": "passed",
+    "count": 76
+  },
+  "cleanBasePatchSequence": {
+    "status": "passed",
+    "files": 4
+  },
+  "captures": {
+    "status": "passed",
+    "count": 4,
+    "limitBytesEach": 2000000
+  },
+  "scope": "Links, hashes, file sizes and patch application only; no model or app evaluation"
+}
