@@ -41,7 +41,14 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
     const pending = inFlight.current;
     if (pending && (pending.token.revision !== session.revision || pending.token.epoch !== session.epoch)) { pending.controller.abort(); inFlight.current = null; }
   }, [session.revision, session.epoch]);
-  useEffect(() => () => inFlight.current?.controller.abort(), []);
+  useEffect(() => () => {
+    const pending = inFlight.current;
+    inFlight.current = null;
+    pending?.controller.abort();
+    if (pending) dispatch({ type: "cancel" });
+    dispatch({ type: "end" });
+    setKeyboardPen(p => p.down ? { ...p, down: false } : p);
+  }, []);
   useEffect(() => { if (!session.active) setKeyboardPen(p => p.down ? { ...p, down: false } : p); }, [session.active]);
 
   function changePrompt(value: string) { setPrompt(value); setKeyError(""); dispatch({ type: "edit" }); }
@@ -53,9 +60,9 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
     dispatch({ type: "request", token, source, request });
     if (source === "lexical") { dispatch({ type: "resolve", token, ranking: lexicalRank(prompt), response: { algorithm: "Exact token or tag-prefix matches; count matches; bank order breaks ties.", modelCalled: false } }); return; }
     const controller = new AbortController(); inFlight.current = { token, controller };
-    try { const response = await run(request.state, request.questions, controller.signal); dispatch({ type: "resolve", token, ranking: parseRanking(response), response }); }
-    catch (error) { dispatch({ type: "fail", token, error: error instanceof Error && error.name === "AbortError" ? "Request cancelled. The current brush is unchanged." : error instanceof Error ? error.message : "Jev could not complete this request. The current brush is unchanged." }); }
-    finally { if (inFlight.current?.token.id === token.id) inFlight.current = null; }
+    try { const response = await run(request.state, request.questions, controller.signal); if (controller.signal.aborted || inFlight.current?.token !== token) return; dispatch({ type: "resolve", token, ranking: parseRanking(response), response }); }
+    catch (error) { if (!controller.signal.aborted && inFlight.current?.token === token) dispatch({ type: "fail", token, error: error instanceof Error ? error.message : "Jev could not complete this request. The current brush is unchanged." }); }
+    finally { if (inFlight.current?.token === token) inFlight.current = null; }
   }
   function loadExample(example: RecordedExample) {
     inFlight.current?.controller.abort(); setPrompt(example.prompt); setKeyError("");
