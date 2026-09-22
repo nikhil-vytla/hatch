@@ -1,0 +1,425 @@
+diff --git a/.github/workflows/jev-scene-lifetimes.yml b/.github/workflows/jev-scene-lifetimes.yml
+index 98f096b..667eab1 100644
+--- a/.github/workflows/jev-scene-lifetimes.yml
++++ b/.github/workflows/jev-scene-lifetimes.yml
+@@ -30,4 +30,6 @@ jobs:
+         working-directory: jev-experiments/experience-prototypes
+         run: bun run build
+       - name: Verify request, timer and media lifetimes
+-        run: bun test jev-experiments/scene-lifetimes-2026-09-22
++        run: bun test jev-experiments/scene-lifetimes-2026-09-22 jev-experiments/rewardbench2/publication-source.test.ts jev-experiments/rewardbench2/publication.test.ts
++      - name: Verify public record integrity
++        run: bun run jev-experiments/roadmap/verification/publication.ts
+diff --git a/jev-experiments/experience-prototypes/scripts/benchmark-publication.ts b/jev-experiments/experience-prototypes/scripts/benchmark-publication.ts
+index a26503b..f5f6d62 100644
+--- a/jev-experiments/experience-prototypes/scripts/benchmark-publication.ts
++++ b/jev-experiments/experience-prototypes/scripts/benchmark-publication.ts
+@@ -8,7 +8,7 @@ const object = (value: unknown): Record<string, unknown> => {
+ };
+ 
+ export type WithheldCandidate = { subset: string; id: string; sha256: string };
+-const withheldCandidates: readonly WithheldCandidate[] = [
++export const withheldCandidates: readonly WithheldCandidate[] = [
+   {
+     subset: "Safety",
+     id: "828",
+@@ -30,9 +30,9 @@ const withheldCandidates: readonly WithheldCandidate[] = [
+     sha256: "9b39c32ca0521de3e662ac5cbb75ccd244df3751f7584aee5ec3e7eb2c19be10",
+   },
+ ];
+-const withheldNotice = "[Candidate text withheld from this publication copy.]";
++export const withheldNotice = "[Candidate text withheld from this publication copy.]";
+ 
+-/** Clone the decoded public document. Labels, scores, counts and original JSONL are unchanged. */
++/** Clone the decoded display document. Derivative source lineage belongs in manifest.publication_source. */
+ export function projectRewardBenchDocument<T>(
+   input: T,
+   manifest: readonly WithheldCandidate[] = withheldCandidates,
+@@ -73,7 +73,7 @@ export function projectRewardBenchDocument<T>(
+   result.publication_projection = {
+     version: "jev-public-candidate-text-v1",
+     withheldCandidateTexts: manifest.length,
+-    note: "Additional display-only text withholding. Original source records, row counts, labels, model scores and aggregate metrics are unchanged; this is separate from the benchmark's content-review omissions.",
++    note: "Display-only text withholding. Recorded row counts, labels, model scores and aggregate metrics are unchanged. Source lineage is recorded separately from this projection and the benchmark's content-review omissions.",
+   };
+   return output;
+ }
+diff --git a/jev-experiments/rewardbench2/publication-source.test.ts b/jev-experiments/rewardbench2/publication-source.test.ts
+new file mode 100644
+index 0000000..c1cb800
+--- /dev/null
++++ b/jev-experiments/rewardbench2/publication-source.test.ts
+@@ -0,0 +1,48 @@
++import { expect, test } from "bun:test";
++import { createHash } from "node:crypto";
++import { encodeRecord } from "../experience-prototypes/scripts/records";
++import { publicationSourceFromRecord, assertPublicationSource } from "./publication-source";
++const sha = (text: string) => createHash("sha256").update(text).digest("hex");
++const policy = [{ subset: "Safety", id: "fixture", sha256: sha("authored display text") }];
++const record = () => ({ manifest: { experiment: "rewardbench2", status: "complete" }, result: {
++  rows: [{ subset: "Safety", id: "fixture", candidates: [{ text: "authored display text", label: "chosen", chosen: true, score: 8, probabilities: { "8": 1 } }] }],
++  metrics: { score: 1 }, requests: [{ status: "completed", cost_usd: 0.01 }],
++} });
++
++test("source derivative retains exact lineage and all measurement fields without mutation", () => {
++  const input = record(), source = encodeRecord(input);
++  const derived = publicationSourceFromRecord(source, policy);
++  expect(encodeRecord(input)).toBe(source);
++  expect(derived.manifest.publication_source.source_sha256).toBe(sha(source));
++  expect(derived.manifest.publication_source.kind).toBe("display-only-derivative");
++  expect(derived.result.rows[0].candidates[0]).toMatchObject({ label: "chosen", chosen: true, score: 8, probabilities: { "8": 1 } });
++  expect(derived.result.metrics).toEqual(input.result.metrics);
++  expect(derived.result.requests).toEqual(input.result.requests);
++  expect(publicationSourceFromRecord(encodeRecord(derived), policy)).toEqual(derived);
++});
++
++test("changed display input, ambiguous rows and incomplete full results fail closed", () => {
++  const changed = record(); changed.result.rows[0].candidates[0].text = "changed";
++  expect(() => publicationSourceFromRecord(encodeRecord(changed), policy)).toThrow();
++  const duplicate = record(); duplicate.result.rows.push(structuredClone(duplicate.result.rows[0]));
++  expect(() => publicationSourceFromRecord(encodeRecord(duplicate), policy)).toThrow("Duplicate");
++  const missing = record(); missing.result.rows = [];
++  expect(() => publicationSourceFromRecord(encodeRecord(missing), policy)).toThrow("missing");
++});
++
++test("partial checkpoints apply only their present pinned rows", () => {
++  const partial = record(); partial.manifest.status = "partial"; partial.result.rows = [];
++  const derived = publicationSourceFromRecord(encodeRecord(partial), policy);
++  expect(derived.manifest.publication_source.withheld_candidate_texts).toBe(0);
++  expect(derived.result.publication_projection.withheldCandidateTexts).toBe(0);
++});
++
++test("missing lineage, malformed lineage and restored display strings are rejected", () => {
++  const derived = publicationSourceFromRecord(encodeRecord(record()), policy);
++  const missing = structuredClone(derived); delete missing.manifest.publication_source;
++  expect(() => publicationSourceFromRecord(encodeRecord(missing), policy)).toThrow("lineage");
++  const malformed = structuredClone(derived); malformed.manifest.publication_source.source_sha256 = "invalid";
++  expect(() => assertPublicationSource(malformed, policy)).toThrow("lineage");
++  const restored = structuredClone(derived); restored.result.rows[0].candidates[0].text = "authored display text";
++  expect(() => assertPublicationSource(restored, policy)).toThrow("display");
++});
+diff --git a/jev-experiments/rewardbench2/publication-source.ts b/jev-experiments/rewardbench2/publication-source.ts
+new file mode 100644
+index 0000000..7823cac
+--- /dev/null
++++ b/jev-experiments/rewardbench2/publication-source.ts
+@@ -0,0 +1,72 @@
++import { createHash } from "node:crypto";
++import { decodeRecord } from "../experience-prototypes/scripts/records";
++import {
++  projectRewardBenchDocument,
++  withheldCandidates,
++  type WithheldCandidate,
++} from "../experience-prototypes/scripts/benchmark-publication";
++
++const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
++const sourceNote = "Display-only derivative of the identified pre-derivation Jev result record, which already includes separate content-review omissions. These bytes are not the original evaluation record or upstream dataset. Recorded labels, scores, requests and metrics are retained.";
++
++function selectedPolicy(document: any, policy: readonly WithheldCandidate[]) {
++  if (document?.manifest?.experiment !== "rewardbench2" || !Array.isArray(document?.result?.rows))
++    throw Error("Expected a RewardBench2 result record.");
++  if (!["partial", "complete"].includes(document.manifest.status))
++    throw Error("Expected explicit result completion status.");
++  const keys = document.result.rows.map((row: any) => `${row.subset}:${row.id}`);
++  if (new Set(keys).size !== keys.length) throw Error("Duplicate result row identity.");
++  const selected = policy.filter((entry) => keys.includes(`${entry.subset}:${entry.id}`));
++  if (document.manifest.status === "complete" && selected.length !== policy.length)
++    throw Error("A complete result is missing a pinned publication row.");
++  return selected;
++}
++
++function metadata(sourceSha256: string, policy: readonly WithheldCandidate[], count: number) {
++  return {
++    format: "jev-publication-source-v1",
++    kind: "display-only-derivative",
++    transform: "jev-public-candidate-text-v1",
++    policy_sha256: sha256(JSON.stringify(policy)),
++    source_format: "jev-records-v1",
++    source_sha256: sourceSha256,
++    withheld_candidate_texts: count,
++    note: sourceNote,
++  };
++}
++
++/** Validate derivative shape and policy, not the unavailable predecessor's bytes. */
++export function assertPublicationSource(document: any, policy: readonly WithheldCandidate[] = withheldCandidates) {
++  const selected = selectedPolicy(document, policy);
++  const marker = document.manifest.publication_source;
++  if (!marker || !/^[0-9a-f]{64}$/.test(marker.source_sha256 ?? ""))
++    throw Error("Missing or invalid publication-source lineage.");
++  if (JSON.stringify(marker) !== JSON.stringify(metadata(marker.source_sha256, policy, selected.length)))
++    throw Error("Publication-source metadata or policy changed.");
++  const omissions = document.result.rows.flatMap((row: any) => row.candidates
++    .filter((candidate: any) => candidate.publication_omission)
++    .map((candidate: any) => ({ subset: row.subset, id: String(row.id), sha256: candidate.publication_omission.sha256 })));
++  if (omissions.length !== selected.length || omissions.some((entry: WithheldCandidate) =>
++    !selected.some((expected) => expected.subset === entry.subset && expected.id === entry.id && expected.sha256 === entry.sha256)))
++    throw Error("Unexpected publication-source omission.");
++  if (JSON.stringify(projectRewardBenchDocument(document, selected)) !== JSON.stringify(document))
++    throw Error("Publication-source display fields or projection changed.");
++  return marker;
++}
++
++/** Derive a publication source from exact serialized predecessor bytes; never mutate the predecessor. */
++export function publicationSourceFromRecord(text: string, policy: readonly WithheldCandidate[] = withheldCandidates) {
++  const document = decodeRecord(text);
++  if (document.manifest?.publication_source) {
++    assertPublicationSource(document, policy);
++    return document;
++  }
++  const selected = selectedPolicy(document, policy);
++  if (document.result.publication_projection || document.result.rows.some((row: any) =>
++    row.candidates.some((candidate: any) => candidate.publication_omission)))
++    throw Error("Already-projected input requires explicit predecessor lineage.");
++  const output = projectRewardBenchDocument(document, selected);
++  output.manifest.publication_source = metadata(sha256(text), policy, selected.length);
++  assertPublicationSource(output, policy);
++  return output;
++}
+diff --git a/jev-experiments/rewardbench2/run.ts b/jev-experiments/rewardbench2/run.ts
+index 3414644..f2a9884 100644
+--- a/jev-experiments/rewardbench2/run.ts
++++ b/jev-experiments/rewardbench2/run.ts
+@@ -9,7 +9,7 @@ import {
+ import { resolve } from "node:path";
+ import { createHash, randomUUID } from "node:crypto";
+ import { evaluate } from "../experience-prototypes/scripts/local-model";
+-import { writeRecord } from "../experience-prototypes/scripts/records";
++import { writeRecord, encodeRecord } from "../experience-prototypes/scripts/records";
+ import {
+   DATASET_REVISION,
+   SCORER_REVISION,
+@@ -22,6 +22,7 @@ import {
+ } from "./protocol";
+ import { summarize, completed } from "./metrics";
+ import { preparePublicResult } from "./publication";
++import { publicationSourceFromRecord } from "./publication-source";
+ 
+ const dir = import.meta.dir,
+   cache = resolve(dir, "../.cache/rewardbench2"),
+@@ -139,7 +140,7 @@ const publish = () => {
+       "Safety cases deliberately contain harmful material. Other subsets may contain sensitive topics or incorrect and offensive answers. Original text is used for evaluation; reviewed omissions affect public display only. A preferred label is not an endorsement or a guarantee of truth.",
+   };
+   preparePublicResult(result);
+-  writeRecord(resolve(dir, "results.jsonl"), {
++  writeRecord(resolve(dir, "results.jsonl"), publicationSourceFromRecord(encodeRecord({
+     manifest: {
+       experiment: "rewardbench2",
+       ...runMeta,
+@@ -147,7 +148,7 @@ const publish = () => {
+       status: rows.every(completed) ? "complete" : "partial",
+     },
+     result,
+-  });
++  })));
+ };
+ const saveCase = (row: Case) => {
+   const path = casePath(row);
+diff --git a/jev-experiments/rewardbench2/validate.ts b/jev-experiments/rewardbench2/validate.ts
+index 605348a..f0fb506 100644
+--- a/jev-experiments/rewardbench2/validate.ts
++++ b/jev-experiments/rewardbench2/validate.ts
+@@ -1,13 +1,20 @@
+ import { readFileSync, writeFileSync } from "node:fs";
+ import { resolve } from "node:path";
+-import { readRecord } from "../experience-prototypes/scripts/records";
++import { readRecord, encodeRecord } from "../experience-prototypes/scripts/records";
+ import { pack, SUBSETS } from "./protocol";
+ import { completed, summarize } from "./metrics";
+ import { hashText } from "./publication";
++import { assertPublicationSource } from "./publication-source";
++import { withheldCandidates, withheldNotice } from "../experience-prototypes/scripts/benchmark-publication";
+ import omissions from "./content-audit/public-omissions.json";
+ 
+ const root = import.meta.dir;
+-const { manifest, result } = readRecord(resolve(root, "results.jsonl"));
++const document = readRecord(resolve(root, "results.jsonl"));
++const { manifest, result } = document;
++const publicationSource = assertPublicationSource(document);
++const predecessor = structuredClone(document);
++delete predecessor.manifest.publication_source;
++delete predecessor.result.publication_projection;
+ const source = JSON.parse(
+   readFileSync(resolve(root, "../.cache/rewardbench2/dataset.json"), "utf8"),
+ ).map(pack);
+@@ -25,8 +32,9 @@ assert(
+ );
+ let omittedPrompts = 0,
+   omittedCandidates = 0,
++  publicationCandidates = 0,
+   candidateCount = 0;
+-for (const row of result.rows) {
++for (const [rowIndex, row] of result.rows.entries()) {
+   const raw: any = byId.get(`${row.subset}:${row.id}`);
+   assert(raw && raw.input_hash === row.input_hash, "Source input mismatch");
+   assert(completed(row), "Incomplete case");
+@@ -52,6 +60,7 @@ for (const row of result.rows) {
+       "Label, order, or attribution changed",
+     );
+     assert(c.score >= 1 && c.score <= 10, "Invalid score");
++    assert(!(c.omission && c.publication_omission), "Conflicting omission policies");
+     if (c.omission) {
+       omittedCandidates++;
+       assert(
+@@ -59,13 +68,23 @@ for (const row of result.rows) {
+           c.text === omissions.notice,
+         "Candidate omission mismatch",
+       );
++    } else if (c.publication_omission) {
++      publicationCandidates++;
++      assert(
++        withheldCandidates.some((entry) => entry.subset === row.subset && entry.id === String(row.id) && entry.sha256 === hashText(original.text)) &&
++          c.publication_omission.sha256 === hashText(original.text) && c.text === withheldNotice,
++        "Publication candidate omission mismatch",
++      );
++      predecessor.result.rows[rowIndex].candidates[i].text = original.text;
++      delete predecessor.result.rows[rowIndex].candidates[i].publication_omission;
+     } else assert(original.text === c.text, "Candidate text changed");
+   });
+ }
+ assert(
+-  candidateCount === 8977 && omittedPrompts === 3 && omittedCandidates === 6,
++  candidateCount === 8977 && omittedPrompts === 3 && omittedCandidates === 6 && publicationCandidates === 4,
+   "Coverage mismatch",
+ );
++assert(hashText(encodeRecord(predecessor)) === publicationSource.source_sha256, "Pre-derivation record hash mismatch");
+ const metrics = summarize(result.rows);
+ for (const s of SUBSETS)
+   assert(
+@@ -74,9 +93,9 @@ for (const s of SUBSETS)
+   );
+ assert(metrics.macro_score === result.metrics.macro_score, "Overall mismatch");
+ const prohibitedHashes = new Set(
+-  omissions.omissions.flatMap((o) =>
++  [...withheldCandidates.map((entry) => entry.sha256), ...omissions.omissions.flatMap((o) =>
+     [o.prompt_sha256, ...o.candidates.map((c) => c.sha256)].filter(Boolean),
+-  ),
++  )],
+ );
+ function scan(value: any): void {
+   if (typeof value === "string")
+@@ -96,6 +115,9 @@ const report = {
+   candidates: candidateCount,
+   omitted_prompts: omittedPrompts,
+   omitted_candidates: omittedCandidates,
++  publication_candidate_omissions: publicationCandidates,
++  publication_source: publicationSource,
++  predecessor_reconstructed_sha256: hashText(encodeRecord(predecessor)),
+   completed_requests: successful.length,
+   request_attempts: result.requests.reduce(
+     (n: number, r: any) => n + r.attempts.length,
+diff --git a/jev-experiments/roadmap/verification/publication.ts b/jev-experiments/roadmap/verification/publication.ts
+index 4f747e2..da204d5 100644
+--- a/jev-experiments/roadmap/verification/publication.ts
++++ b/jev-experiments/roadmap/verification/publication.ts
+@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
+ import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { assertPreserved } from "./record-integrity";
++import { assertPublicationSource } from "../../rewardbench2/publication-source";
++import { projectRewardBenchDocument } from "../../experience-prototypes/scripts/benchmark-publication";
+ import {
+   readRecord,
+   encodeRecord,
+@@ -29,16 +31,25 @@ const files = Object.entries(publication).map(([name, relative]) => {
+     throw Error(`JSONL round trip changed ${name}`);
+   if (!prepared || typeof prepared !== "object")
+     throw Error(`Invalid public JSON: ${name}`);
+-  assertPreserved(original, prepared, name);
++  // Compare the publication-source derivative in full. Its predecessor hash
++  // is lineage metadata, not a claim that committed bytes are original data.
++  const projected = name === "rewardbench2";
++  const derivation = projected ? assertPublicationSource(original) : null;
++  const expected = projected ? projectRewardBenchDocument(original) : original;
++  assertPreserved(expected, prepared, name);
+   return {
+     name,
+     source: relative,
+     sourceSha256: sha(readFileSync(source)),
+     publicSha256: sha(readFileSync(output)),
+     publicBytes: readFileSync(output).length,
++    comparison: projected ? "publication-source-derivative" : "original-record",
++    ...(derivation ? { sourceDerivation: derivation } : {}),
+     recipe:
+       name === "judgment-reliability"
+         ? "prepareJudgmentReliability"
++        : projected
++          ? "readRecord + enrichProvenance + projectRewardBenchDocument"
+         : "readRecord + enrichProvenance + availability",
+   };
+ });
+@@ -47,10 +58,11 @@ const unlisted = readdirSync(resolve(app, "public/data")).filter(
+ );
+ if (unlisted.length) throw Error(`Unlisted output: ${unlisted.join(", ")}`);
+ const report = {
+-  schemaVersion: 1,
++  schemaVersion: 3,
+   publicationCount: files.length,
+   roundTripPassed: true,
+-  originalFieldsPreserved: true,
++  expectedFieldsPreserved: true,
++  projectedPublications: files.filter((file) => file.comparison === "publication-source-derivative").map((file) => file.name),
+   unlistedPublicFiles: unlisted,
+   files,
+ };
+@@ -62,7 +74,8 @@ console.log(
+   JSON.stringify({
+     publicationCount: files.length,
+     roundTripPassed: true,
+-    originalFieldsPreserved: true,
++    expectedFieldsPreserved: true,
++    projectedPublications: report.projectedPublications,
+     unlistedPublicFiles: 0,
+   }),
+ );
+diff --git a/jev-experiments/scene-lifetimes-2026-09-22/benchmark-publication.test.ts b/jev-experiments/scene-lifetimes-2026-09-22/benchmark-publication.test.ts
+index 5475d42..5523707 100644
+--- a/jev-experiments/scene-lifetimes-2026-09-22/benchmark-publication.test.ts
++++ b/jev-experiments/scene-lifetimes-2026-09-22/benchmark-publication.test.ts
+@@ -2,7 +2,8 @@ import { resolve } from "node:path";
+ import { readRecord } from "../experience-prototypes/scripts/records";
+ import { createHash } from "node:crypto";
+ import { describe, expect, test } from "bun:test";
+-import { projectRewardBenchDocument } from "../experience-prototypes/scripts/benchmark-publication";
++import { projectRewardBenchDocument, withheldCandidates, withheldNotice } from "../experience-prototypes/scripts/benchmark-publication";
++import { assertPublicationSource } from "../rewardbench2/publication-source";
+ const hash = (text: string) => createHash("sha256").update(text).digest("hex");
+ 
+ describe("benchmark publication projection", () => {
+@@ -83,25 +84,23 @@ describe("benchmark publication projection", () => {
+   });
+ });
+ 
+-test("the pinned release changes exactly four display texts and retains every other source field", () => {
++test("the pinned source derivative projects idempotently and retains its lineage and measurements", () => {
+   const source = readRecord(resolve(import.meta.dir, "../rewardbench2/results.jsonl"));
+   const before = hash(JSON.stringify(source));
++  const lineage = assertPublicationSource(source);
++  expect(lineage.kind).toBe("display-only-derivative");
++  expect(lineage.source_sha256).toBe("cd4a22470cfde05ed0aa958c190bbc52e83b4aa21107eb1446f244a68bb957c8");
+   const projected = projectRewardBenchDocument(source);
+   expect(hash(JSON.stringify(source))).toBe(before);
++  expect(projected).toEqual(source);
+   expect(projected.result.publication_projection.withheldCandidateTexts).toBe(4);
+-  let omissions = 0;
+-  for (let row = 0; row < projected.result.rows.length; row++) {
+-    for (let candidate = 0; candidate < projected.result.rows[row].candidates.length; candidate++) {
+-      const value = projected.result.rows[row].candidates[candidate];
++  const omissions: { subset: string; id: string; sha256: string }[] = [];
++  for (const row of projected.result.rows) {
++    for (const value of row.candidates) {
+       if (!value.publication_omission) continue;
+-      const original = source.result.rows[row].candidates[candidate];
+-      expect(hash(original.text)).toBe(value.publication_omission.sha256);
+-      value.text = original.text;
+-      delete value.publication_omission;
+-      omissions++;
++      expect(value.text).toBe(withheldNotice);
++      omissions.push({ subset: row.subset, id: String(row.id), sha256: value.publication_omission.sha256 });
+     }
+   }
+-  expect(omissions).toBe(4);
+-  delete projected.result.publication_projection;
+-  expect(hash(JSON.stringify(projected))).toBe(before);
++  expect(omissions).toEqual(withheldCandidates);
+ });
