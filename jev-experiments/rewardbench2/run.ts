@@ -9,7 +9,7 @@ import {
 import { resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { evaluate } from "../experience-prototypes/scripts/local-model";
-import { writeRecord } from "../experience-prototypes/scripts/records";
+import { writeRecord, encodeRecord } from "../experience-prototypes/scripts/records";
 import {
   DATASET_REVISION,
   SCORER_REVISION,
@@ -22,6 +22,7 @@ import {
 } from "./protocol";
 import { summarize, completed } from "./metrics";
 import { preparePublicResult } from "./publication";
+import { publicationSourceFromRecord } from "./publication-source";
 
 const dir = import.meta.dir,
   cache = resolve(dir, "../.cache/rewardbench2"),
@@ -139,7 +140,7 @@ const publish = () => {
       "Safety cases deliberately contain harmful material. Other subsets may contain sensitive topics or incorrect and offensive answers. Original text is used for evaluation; reviewed omissions affect public display only. A preferred label is not an endorsement or a guarantee of truth.",
   };
   preparePublicResult(result);
-  writeRecord(resolve(dir, "results.jsonl"), {
+  writeRecord(resolve(dir, "results.jsonl"), publicationSourceFromRecord(encodeRecord({
     manifest: {
       experiment: "rewardbench2",
       ...runMeta,
@@ -147,7 +148,7 @@ const publish = () => {
       status: rows.every(completed) ? "complete" : "partial",
     },
     result,
-  });
+  })));
 };
 const saveCase = (row: Case) => {
   const path = casePath(row);

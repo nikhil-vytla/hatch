@@ -1,8 +1,11 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "publicationCount": 45,
   "roundTripPassed": true,
-  "originalFieldsPreserved": true,
+  "expectedFieldsPreserved": true,
+  "projectedPublications": [
+    "rewardbench2"
+  ],
   "unlistedPublicFiles": [],
   "files": [
     {
@@ -11,6 +14,7 @@
       "sourceSha256": "b7ab141e5759d2081a13242f4a034eec54a84063fc17cf1f1795f8a0c8d70615",
       "publicSha256": "15ec160d6500807d2805ea4f36a3835cf578d666a53bdfca4fd6377832f55ac9",
       "publicBytes": 3820,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -19,6 +23,7 @@
       "sourceSha256": "a336338fb53e7cc386cca9abb1137dc848dbec582adc306a3780bd4364e4409e",
       "publicSha256": "e4e53f4957f5015d3c5096a3b370889bf6fc5b5f01c3aa0238c6f35be15b2cbf",
       "publicBytes": 28410,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -27,6 +32,7 @@
       "sourceSha256": "210d7ce35beeb6a61a512ca47e06d22747a955643137935777f232cde505bef5",
       "publicSha256": "9d71b8da0adf27383b61ab807606741c0240f9e63f82fbb74a8ee69c3ebc8453",
       "publicBytes": 600,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -35,6 +41,7 @@
       "sourceSha256": "c3df1b080d53908ffcdebfe29ccdf65b7d128a37a3f1b171927de016f472bea9",
       "publicSha256": "ea0af5de6ed4119eb2218936346634404e7bcf4858d4f02adeaaa08a758d6308",
       "publicBytes": 2340858,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -43,6 +50,7 @@
       "sourceSha256": "93e54bb306d5b4cc715c31190e83221f044e01b5d21836692cf5443ff703efe2",
       "publicSha256": "db169b6a79299460acb512bd084a3da8413ff94cd051e95567b612f24626e92b",
       "publicBytes": 3462,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -51,6 +59,7 @@
       "sourceSha256": "83e6c9e302ab440fa0070bf7aca4d903f82b50871dadaedc8848256143386a35",
       "publicSha256": "09a97cc991b22cb08ed3ef2fc4d25e29ec3397a3b087e1ec8e9658f59b611ab1",
       "publicBytes": 20970,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -59,6 +68,7 @@
       "sourceSha256": "c313ef3a55789282bd035a08d6501a94c04a295b686a2e402749dc47253c29e2",
       "publicSha256": "7b9619bea3b0f4cc217df26d6d18967df8f2b97a5d562149e988ddbeddd9739a",
       "publicBytes": 181519,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -67,6 +77,7 @@
       "sourceSha256": "cbf2637d4005c6fbae9b1bbbf3457725c7895deb7a023f4a9f57e63e9ccac799",
       "publicSha256": "80cbb1d97ef11649ef0a666d6e1a39987d92b01e9bfb714a90b0525b1c69889e",
       "publicBytes": 210,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -75,6 +86,7 @@
       "sourceSha256": "c566b8ef39594f92e97f4166dad30a065bbdc1282a1fbb85264d0bf1f0f85e7c",
       "publicSha256": "9e4d1c99b16af3314bc33f137e76aaf269d06c692ed12d9e5d0342a1b4e4b293",
       "publicBytes": 724,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -83,6 +95,7 @@
       "sourceSha256": "f15f9f60abd7623eb2737fdb2ef6a1ddc91f4c4baad695e1ce2b2820385a529b",
       "publicSha256": "6f6475c9a3d9c642ce737281a8dd3a34817c7cc4bcaf349057197a53a9d8e23a",
       "publicBytes": 1006240,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -91,6 +104,7 @@
       "sourceSha256": "e9866094409bf4ad51c33f62b2fa8a73d7be529673f1359600d56740917f3ce9",
       "publicSha256": "50121a6350e8753fce2690d388b7a496b1009fe7f41cb77720c1363aeca95433",
       "publicBytes": 29497,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -99,6 +113,7 @@
       "sourceSha256": "c72be895e352ff514634ab97d59e8ce4ad2b80d719fd9305994289294f90b208",
       "publicSha256": "e423a3a6e1911b2dda6cdc41690bedd5e9606fe9ee72d7267ef30aaff4772b69",
       "publicBytes": 3578,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -107,6 +122,7 @@
       "sourceSha256": "813585ac4c3b7230a3e2b1260a6b702bb625f07cbb18ac53163ac70d358e0965",
       "publicSha256": "5e40cae94a634f5deb0778ff885e6c403f0cfddc3fe04af1f47a89ab12ea9ce2",
       "publicBytes": 20977,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -115,15 +131,27 @@
       "sourceSha256": "bbdda968bc29fe5a94dd992d8e083aa0cd73f67c03b9e4b1527d545784f4bfc7",
       "publicSha256": "bae13358777d1400fd8b78f63595bf182236ee595ce4b68d56318d7e19f10ce6",
       "publicBytes": 1006989,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
       "name": "rewardbench2",
       "source": "../rewardbench2/results.jsonl",
-      "sourceSha256": "cd4a22470cfde05ed0aa958c190bbc52e83b4aa21107eb1446f244a68bb957c8",
-      "publicSha256": "6242395de913f5cc4a2bd1f57fc694dcbfd570fca8b4e16bdce47dfcb71c141e",
-      "publicBytes": 15844662,
-      "recipe": "readRecord + enrichProvenance + availability"
+      "sourceSha256": "a220c4b6902a848fca2fa87e8c0f6cf46fa70ed90508eb740cb4220f23664027",
+      "publicSha256": "6102d5b5125a1c92f3520b66342070947fe043c1b7999254439eb55f3265a9f7",
+      "publicBytes": 15839046,
+      "comparison": "publication-source-derivative",
+      "sourceDerivation": {
+        "format": "jev-publication-source-v1",
+        "kind": "display-only-derivative",
+        "transform": "jev-public-candidate-text-v1",
+        "policy_sha256": "858ac44b9cba1e11da7392e92a74958f6e6706fbaa59e0dc5f7c0a7127c7ad12",
+        "source_format": "jev-records-v1",
+        "source_sha256": "cd4a22470cfde05ed0aa958c190bbc52e83b4aa21107eb1446f244a68bb957c8",
+        "withheld_candidate_texts": 4,
+        "note": "Display-only derivative of the identified pre-derivation Jev result record, which already includes separate content-review omissions. These bytes are not the original evaluation record or upstream dataset. Recorded labels, scores, requests and metrics are retained."
+      },
+      "recipe": "readRecord + enrichProvenance + projectRewardBenchDocument"
     },
     {
       "name": "latency",
@@ -131,6 +159,7 @@
       "sourceSha256": "a6fbf9b004ee397e65e350ade6ce1a65a6366714c5065e36cb83857817e45121",
       "publicSha256": "400ebfc821b7651e18f67a0dbc2b05138260041425e0d428a3be6c3018436253",
       "publicBytes": 24209,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -139,6 +168,7 @@
       "sourceSha256": "0cd41d223a11aa9156c7d02ea3ba32ad5db68f58754e6912fe31e8d07c95a693",
       "publicSha256": "c1d76de17dc5ee6c7dbe19d5cd2065f06096086f030cdd97e3a9e69b4c67a455",
       "publicBytes": 4995,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -147,6 +177,7 @@
       "sourceSha256": "33e0e4015a220a7761040da3dcc981cebee76813eb3acdd4797686391bfa187d",
       "publicSha256": "2593b12979279fab2473c7304bdc36a3c7aeac4b79b7489ad5b6d0d658f7ab74",
       "publicBytes": 3193,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -155,6 +186,7 @@
       "sourceSha256": "98f6486cdfb9a3dd5f260620672013ba423f11a1986b1ffac503411c6153db28",
       "publicSha256": "1bbc35506020b20c05f7a971690a9d1f517964a967a33e8499624b743885d5f0",
       "publicBytes": 18367,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -163,6 +195,7 @@
       "sourceSha256": "897412676c457f557dfd4a2c9ee8573eaa06f5eb44e0955cf3a278e229cc0da1",
       "publicSha256": "187627b814ea2dde7e4bec2c63a0392eb153b5b43d3e862930865e4b1d474084",
       "publicBytes": 137551,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -171,6 +204,7 @@
       "sourceSha256": "051ccfacf07b9f36b0e5c29533e3a8948b8866bb9bc008d6e0b60fc0ab5234f2",
       "publicSha256": "87395fe0b77e7a581992e71b05c5c79bca979d84de38e8ba3d9c49e85b4258c8",
       "publicBytes": 4097,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -179,6 +213,7 @@
       "sourceSha256": "f0e4aaa3b0dafe57849be78c60a1a5a64e38241ca4b3e6bad060c069a24dbc64",
       "publicSha256": "f96996302c8bf1425db488221f166c6f978d471dc55cc8a5b3258cf612a76fd0",
       "publicBytes": 78514,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -187,6 +222,7 @@
       "sourceSha256": "f3c806d1a6c62ed9bf78004c35d1ea2dd23cbafaf01c49a3d826f950c0cd3274",
       "publicSha256": "811a6610b3b3e756ca1c1d28a623f2fb78f3507380bc7e77231c57674fe6aa69",
       "publicBytes": 28437,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -195,6 +231,7 @@
       "sourceSha256": "a15f01437c005b9af16f191269f507c84149e70e8df92bbe901ff95ffa318407",
       "publicSha256": "f97d770ad4460deaa8d166a3c13d29a68de1379bc15fd2a07b63436d431b7784",
       "publicBytes": 618490,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -203,6 +240,7 @@
       "sourceSha256": "a6cc2acb54591a45c0eeba76d6bc17161d1d3982546e02ffddf91c0dc18a7e1b",
       "publicSha256": "9a167d715ac8d57c440fa7983db992abfbd99ca8e2ced1d244108ee99fa4e295",
       "publicBytes": 10530,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -211,6 +249,7 @@
       "sourceSha256": "acb6c171e8293304b72b8b0c248b2c4451fba7118142954f938bf39fcf227613",
       "publicSha256": "a15fb35cfd0fcb8f7ae660c8d78323f633a0421b0146de1a6d9075e0814389b1",
       "publicBytes": 9533,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -219,6 +258,7 @@
       "sourceSha256": "83dcbd69665b7b1c790402fa1888a55bdb053d818538b92a310f5c96e8d9f307",
       "publicSha256": "43f48172e715bdeea41fb3800b26209b3724849e94098b400e77c8fec802fb54",
       "publicBytes": 875,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -227,6 +267,7 @@
       "sourceSha256": "147667e18a7eaf5fbedc9ebc925c3c8dbb8e4cf9b16deb5219e41bdb47d13256",
       "publicSha256": "8888de5852541bfaddae87c33681fac78b05b9f42f35d48057637db50bea636f",
       "publicBytes": 45312,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -235,6 +276,7 @@
       "sourceSha256": "483c4ead28cc5f61184019a4ba70d667f4c28bf960bbe4e66d4fa20d4094c168",
       "publicSha256": "e22e0600389cf937b2e9ea2a5f6dd6f28c5f975dfcb46a0c7ca86eb8e8eabd84",
       "publicBytes": 34654,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -243,6 +285,7 @@
       "sourceSha256": "62d3ae3e89bc8ed5410a422c94f0127a6ecbbf5a3a82b47d4a46abdf89e165c4",
       "publicSha256": "ec202be593663551aa42e4f9b578756898e113477deed61327679b7dbd4e7555",
       "publicBytes": 648,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -251,6 +294,7 @@
       "sourceSha256": "ea7360303834b963afdc0e88ee7a77a74cb92c5c41624072bea58de2517cd551",
       "publicSha256": "e40a48e97cfb7416dc599550e0f1d31688a0e7a53fce04c0284715431385bf58",
       "publicBytes": 9911,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -259,6 +303,7 @@
       "sourceSha256": "189ded0e31c55aec474c2e5b625288acf08b1c9fa9807d7e8575af98cdbac85f",
       "publicSha256": "874ba8f02f2169bf44716ce75a9b7d416ebf81a743f4f4cb3b1075af8dc5ca82",
       "publicBytes": 1350,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -267,6 +312,7 @@
       "sourceSha256": "49c70e644f5113941b434664e8d20a5ccb22ee271e5883c9e1faf34bdee14b50",
       "publicSha256": "9e6efacbd6fc7b6bd84e9fb9c8149a058875e5f6b8f4892a9431c5986e3ea4a7",
       "publicBytes": 80796,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -275,6 +321,7 @@
       "sourceSha256": "ccc4022446a59f984c0dca7bd631609b88428272d2873aacb7ac4228614cc8d6",
       "publicSha256": "b79f41ae952ffd1df1e16f434fd38a60599c8bed04c964a14e518d2ff1fe556a",
       "publicBytes": 278812,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -283,6 +330,7 @@
       "sourceSha256": "656cdde73fcabee3ea7d70e58dc4a520d5750c0729f01aed142742c904d02894",
       "publicSha256": "a7e9aa27e37d01672552389a96a176123745bd7d9ec42e1848a7f95e372af6d1",
       "publicBytes": 13639,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -291,6 +339,7 @@
       "sourceSha256": "085655edbb470d688ae3a25b40630bf574975d3b7737cba8904ba40348511331",
       "publicSha256": "b4c27b914d678575dbb8fe574a58e77af74edc84a2eddc48360418799198d330",
       "publicBytes": 2766762,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -299,6 +348,7 @@
       "sourceSha256": "8021b352898fda4e1fdd37c50c11b7979a7cb22fa05b818df0c4b773e92894d5",
       "publicSha256": "42574478b0b836c2a91606056d5b95866d63c372e1bc30b4394ec4e82f80890c",
       "publicBytes": 3724660,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -307,6 +357,7 @@
       "sourceSha256": "7f0c059bd14dea9b229392428e71d4390a527ab4d8bc5db9c79f073528cc3a3d",
       "publicSha256": "9ad218efef019387adf2d536938bfe117f75e06cf711b3aff5629ea5a0b0d63f",
       "publicBytes": 2257632,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -315,6 +366,7 @@
       "sourceSha256": "abaf0b0e9900461239648e46e697714e72d0c504bfe1ae00ac410adb811d1adf",
       "publicSha256": "5af9d99604b4265bc998aba489a60bb3685e98c6d339310d95015ddb7efe7c02",
       "publicBytes": 307887,
+      "comparison": "original-record",
       "recipe": "prepareJudgmentReliability"
     },
     {
@@ -323,6 +375,7 @@
       "sourceSha256": "b3d8fef7309ca1fa8ee54305ae42ce42378fc83c73efbaa28542959fd02f05f3",
       "publicSha256": "fe3391ab82cb2ecc9e64dcd90a2e37518404ff845c78b9abe36249111616db75",
       "publicBytes": 1238476,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -331,14 +384,16 @@
       "sourceSha256": "8bf642c82fc5b471e5bf3c03db666bb0ff11b2d8621f652302f5504db2faba51",
       "publicSha256": "1f9314f1623768ffcd3cadefcd3d17ef7493a88f1dd4d31f8a2ee75d9d4b0707",
       "publicBytes": 95588,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
       "name": "visual-search",
       "source": "../visual-search/results.jsonl",
-      "sourceSha256": "9ab7b35a502bcabc7e6ebeb15c9426cdc7a8db2c6df9b8f35601179452a89895",
-      "publicSha256": "45c91efb05d66046a5e862888a469ed0faa96496ef66d1dedbd7e3f026caf089",
+      "sourceSha256": "d24771fb27756bd2177d1be40eacf619345607a1e68fd56443ae27cac78b1592",
+      "publicSha256": "d951d3dc0e41bf51087586049b54f6abf82dd85b91970e5908e4fa58459c4b8c",
       "publicBytes": 309579,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -347,6 +402,7 @@
       "sourceSha256": "98e56c7f262cb0ac1292ccbd536bf49e1a2889f93390857f1e805e053e300f9a",
       "publicSha256": "d2dbe011b7e5fe0731e0ac45029903c5aa0a65713fbdabd66249bafde93af15e",
       "publicBytes": 33010,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -355,6 +411,7 @@
       "sourceSha256": "5d94272b98168b8868426dee0c20cea40c0379bf261c0de1816773d98637ecd2",
       "publicSha256": "c9be5a9dc2ddaeb0a93885440bd8188319f4d7653fbae5eed3b095a9d55fd3c7",
       "publicBytes": 191189,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
@@ -363,6 +420,7 @@
       "sourceSha256": "f534ef24ce1a84ffa29fde3adefd2d6792330bffd4791dbb35bae40e1ed94937",
       "publicSha256": "c7406eeb857b739d5592dcdb42add398ba035ef148af0c84602e254e4a2fdc91",
       "publicBytes": 467,
+      "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     }
   ]
