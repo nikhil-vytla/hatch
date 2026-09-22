@@ -54,6 +54,22 @@ def extract(archive: bytes, destination: Path) -> None:
             else:
                 raise ValueError("Archive must contain regular files and directories only")
 
+def prepared_at_only(before: bytes, after: bytes) -> bool:
+    """PR72's existing image preparation refreshes this one manifest timestamp."""
+    try:
+        a = [json.loads(line) for line in before.splitlines() if line.strip()]
+        b = [json.loads(line) for line in after.splitlines() if line.strip()]
+        if not a or not b or a[0].get("format") != "jev-records-v1" or b[0].get("format") != "jev-records-v1":
+            return False
+        for rows in [a, b]:
+            manifest = rows[0]["document"]["manifest"]
+            if manifest.get("experiment") != "visual-search" or not isinstance(manifest.get("prepared_at"), str):
+                return False
+            del manifest["prepared_at"]
+        return json.dumps(a, ensure_ascii=False) == json.dumps(b, ensure_ascii=False)
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return False
+
 def run(ref: str, output: Path) -> dict:
     if output.exists():
         raise ValueError("Choose a new output directory")
@@ -68,6 +84,8 @@ def run(ref: str, output: Path) -> dict:
         area = Path(temporary); source = area / "source"; source.mkdir()
         extract(archive, source)
         inputs = {p.relative_to(source).as_posix(): sha(p.read_bytes()) for p in sorted(source.rglob("*")) if p.is_file()}
+        generated_path = "jev-experiments/visual-search/results.jsonl"
+        generated_before = (source / generated_path).read_bytes()
         (output / "source.json").write_text(json.dumps({"commit": commit, "files": inputs}, indent=2) + "\n")
         report["sourceManifestSha256"] = sha((output / "source.json").read_bytes())
         env = {"PATH": os.environ["PATH"], "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "CI": "1", "NO_COLOR": "1", "TERM": "dumb",
@@ -85,7 +103,8 @@ def run(ref: str, output: Path) -> dict:
             ("toolkit-frozen-install", ["bun", "install", "--frozen-lockfile"], road),
             ("adapter-typecheck", ["bun", "x", "--no-install", "tsc", "--noEmit"], adapter),
             ("toolkit-typecheck", ["bun", "run", "check"], road),
-            ("native-runtime-toolkit-tests", ["bun", "test", "jev-experiments/packages/decision-runtime", road + "/runtime", road + "/routing", adapter + "/index.test.ts", "jev-experiments/gateway-accounting-2026-09-22"], "."),
+            ("native-runtime-toolkit-tests", ["bun", "test", "jev-experiments/packages/decision-runtime", road + "/runtime", road + "/routing", adapter + "/index.test.ts", "jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts", "jev-experiments/gateway-accounting-2026-09-22/score.test.ts", "jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts", "jev-experiments/gateway-accounting-2026-09-22/observer-usage.test.ts"], "."),
+            ("verifier-boundary-tests", ["python3", "-m", "unittest", "discover", "-s", "jev-experiments/typed-runtime-2026-09-22", "-p", "test_verify.py"], "."),
             ("python-local-contract-tests", ["python3", "-m", "unittest", "discover", "-s", road + "/mac", "-p", "test_*.py"], "."),
             ("fresh-installed-cli-mcp", ["python3", road + "/routing/fresh_install.py", "--output", str(area / "installed.json")], "."),
         ]
@@ -123,7 +142,12 @@ def run(ref: str, output: Path) -> dict:
         changed = [name for name, digest in inputs.items() if not (source / name).is_file() or sha((source / name).read_bytes()) != digest]
         report["sourceUnchanged"] = not changed
         report["changedSourcePaths"] = changed
-        report["passed"] = len(report["checks"]) == len(steps) and all(row["passed"] for row in report["checks"]) and not changed
+        generated_after = (source / generated_path).read_bytes()
+        allowed = [generated_path] if generated_path in changed and prepared_at_only(generated_before, generated_after) else []
+        report["allowedGeneratedChanges"] = [{"path": name, "fields": ["document.manifest.prepared_at"], "beforeSha256": inputs[name], "afterSha256": sha((source / name).read_bytes()), "allOtherJsonlFieldsUnchanged": True} for name in allowed]
+        report["unexpectedSourceChanges"] = [name for name in changed if name not in allowed]
+        report["sourceCodeAndNonvolatileInputsUnchanged"] = not report["unexpectedSourceChanges"]
+        report["passed"] = len(report["checks"]) == len(steps) and all(row["passed"] for row in report["checks"]) and not report["unexpectedSourceChanges"]
         report["artifacts"] = {p.name: sha(p.read_bytes()) for p in sorted(output.iterdir()) if p.name != "checks.json" and p.is_file()}
         (output / "checks.json").write_text(json.dumps(report, indent=2) + "\n")
         return report
