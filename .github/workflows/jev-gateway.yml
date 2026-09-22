@@ -39,4 +39,12 @@ jobs:
         working-directory: jev-experiments/adapters/typescript
         run: bun install --frozen-lockfile
       - name: Verify native transport and accounting without provider calls
-        run: bun test jev-experiments/gateway-accounting-2026-09-22 jev-experiments/experience-prototypes/server/byok.test.ts jev-experiments/experience-prototypes/server/gateway.test.ts jev-experiments/roadmap/runtime/existing-contract.test.ts
+        run: >-
+          bun test
+          jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts
+          jev-experiments/gateway-accounting-2026-09-22/score.test.ts
+          jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts
+          jev-experiments/gateway-accounting-2026-09-22/observer-usage.test.ts
+          jev-experiments/experience-prototypes/server/byok.test.ts
+          jev-experiments/experience-prototypes/server/gateway.test.ts
+          jev-experiments/roadmap/runtime/existing-contract.test.ts

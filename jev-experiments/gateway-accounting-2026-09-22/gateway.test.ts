@@ -174,6 +174,40 @@ test("observer failures cannot trigger another paid request", async () => {
   }
 });
 
+test("a pending observer can stop dispatch without inventing an outbound attempt", async () => {
+  for (const earlierAttempt of [false, true]) {
+    let calls = 0;
+    const error = await rejected(evaluate(payload, {
+      apiKey: "fixture-only",
+      wait: async () => {},
+      fetcher: (async () => {
+        calls++;
+        return Response.json(reply(), { status: 503 });
+      }) as typeof fetch,
+      onAccounting: accounting => {
+        if (accounting.attempts.length === (earlierAttempt ? 2 : 1) &&
+            accounting.attempts.at(-1)?.status === "pending")
+          throw Error("Authored pre-dispatch observer failure");
+      },
+    }));
+    expect(error.code).toBe("observer_error");
+    expect(calls).toBe(earlierAttempt ? 1 : 0);
+    expect(error.accounting.attempts).toHaveLength(calls);
+    expect(error.accounting.costUsd).toBe(earlierAttempt ? 0.001 : 0);
+    expect(accountingIssue(error.accounting)).toBeNull();
+  }
+  const controller = new AbortController();
+  let calls = 0;
+  const error = await rejected(evaluate(payload, {
+    apiKey: "fixture-only", signal: controller.signal,
+    fetcher: (async () => { calls++; return Response.json(reply()); }) as typeof fetch,
+    onAccounting: () => controller.abort(),
+  }));
+  expect(error.code).toBe("cancelled");
+  expect(calls).toBe(0);
+  expect(error.accounting).toMatchObject({ attempts: [], costUsd: 0 });
+});
+
 test("real loopback HTTP redirects never reach the redirected target", async () => {
   let starts = 0, targets = 0;
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(request) {

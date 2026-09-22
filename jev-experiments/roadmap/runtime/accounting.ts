@@ -58,6 +58,12 @@ export function usageIssue(value: unknown): string | null {
     return "Usage must contain known nonnegative integer token counts.";
   const { inputTokens, outputTokens, totalTokens } = value as TokenUsage;
   if (
+    totalTokens !== undefined &&
+    ((inputTokens !== undefined && inputTokens > totalTokens) ||
+      (outputTokens !== undefined && outputTokens > totalTokens))
+  )
+    return "A known token count exceeds total tokens.";
+  if (
     inputTokens !== undefined &&
     outputTokens !== undefined &&
     totalTokens !== undefined &&
