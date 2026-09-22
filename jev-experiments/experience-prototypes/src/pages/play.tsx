@@ -52,9 +52,8 @@ export function PlayPage() {
     <main className="play-page" id="main-content" tabIndex={-1}>
       <section className="play-opening" aria-labelledby="play-title">
         <div className="play-invitation">
-          <p className="play-kicker">A playground for typed decisions</p>
-          <h1 id="play-title">Start with <em>sand.</em></h1>
-          <p>Paint the pool. Change what a material does. Open the code when you're curious.</p>
+          <h1 id="play-title">Make a <em>material.</em></h1>
+          <p>Paint a scene, then change how the purple dust behaves.</p>
           <a className="play-browse" href="#collection">More experiments <ArrowDown size={15} /></a>
         </div>
         <section className="play-material" aria-label="Try painting materials">

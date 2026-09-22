@@ -1,7 +1,7 @@
 import { Activity, useEffect, useState, useRef, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { ArrowUpRight, ArrowRight, Sun, Moon, Monitor, KeyRound, X } from "lucide-react";
+import { ArrowUpRight, ArrowRight, KeyRound, Settings2, X } from "lucide-react";
 import { lookup } from "./catalog";
 import { Button, Field } from "./shared";
 import { getApiKey, setApiKey } from "./api";
@@ -16,7 +16,8 @@ const NotesIndex = lazy(() => import("./notes").then(m => ({ default: m.NotesInd
 const ExperimentNote = lazy(() => import("./notes").then(m => ({ default: m.ExperimentNote })));
 
 function Header({ route }: { route: string }) {
-  const keyTrigger = useRef<HTMLButtonElement>(null);
+  const settings = useRef<HTMLDetailsElement>(null);
+  const settingsTrigger = useRef<HTMLElement>(null);
   const keyDialog = useRef<HTMLElement>(null);
   const [theme, setTheme] = useState(
       localStorage.getItem("jev-theme") ?? "system",
@@ -27,8 +28,17 @@ function Header({ route }: { route: string }) {
   const close = () => {
     setKey("");
     setOpen(false);
-    keyTrigger.current?.focus();
+    settingsTrigger.current?.focus();
   };
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (settings.current?.open && !settings.current.contains(event.target as Node)) {
+        settings.current.open = false;
+      }
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const dismiss = (e: KeyboardEvent) => {
@@ -80,33 +90,31 @@ function Header({ route }: { route: string }) {
           <a href="#/" aria-current={!route || route === "#" || route === "#/" || route === "#collection" || route.startsWith("#experiment/") ? "page" : undefined}>Play</a>
           <a href="#/notes" aria-current={route.startsWith("#/notes") ? "page" : undefined}>Notes</a>
           <a href="#/about" aria-current={route === "#/about" ? "page" : undefined}>About</a>
-          <div className="theme-picker" aria-label="Color theme">
-            {[
-              ["light", Sun],
-              ["dark", Moon],
-              ["system", Monitor],
-            ].map(([t, I]: any) => (
-              <button
-                key={t}
-                title={t + " theme"}
-                aria-label={t + " theme"}
-                aria-pressed={theme === t}
-                className={theme === t ? "active" : ""}
-                onClick={() => setTheme(t)}
-              >
-                <I size={15} />
+          <details className="header-settings" ref={settings} onKeyDown={(event) => {
+            if (event.key === "Escape" && event.currentTarget.open) {
+              event.preventDefault();
+              event.currentTarget.open = false;
+              settingsTrigger.current?.focus();
+            }
+          }}>
+            <summary ref={settingsTrigger} aria-label="Settings"><Settings2 size={17} aria-hidden="true"/><span>Settings</span></summary>
+            <div className="header-settings-panel">
+              <label className="theme-select">
+                <span>Theme</span>
+                <select aria-label="Color theme" value={theme} onChange={(event) => setTheme(event.target.value)}>
+                  <option value="system">Auto</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </label>
+              <button className={"key-button " + (connected ? "connected" : "")}
+                aria-label={connected ? "API key added" : "Connect live"}
+                onClick={() => { if (settings.current) settings.current.open = false; setOpen(true); }}>
+                <KeyRound size={14} aria-hidden="true"/>
+                <span>{connected ? "API key added" : "Connect live"}</span>
               </button>
-            ))}
-          </div>
-          <button
-            ref={keyTrigger}
-            className={"key-button " + (connected ? "connected" : "")}
-            aria-label={connected ? "API key added" : "Connect live"}
-            onClick={() => setOpen(true)}
-          >
-            <KeyRound size={14} />
-            <span>{connected ? "API key added" : "Connect live"}</span>
-          </button>
+            </div>
+          </details>
         </nav>
       </header>
       {open && (
