@@ -1,0 +1,17 @@
+{
+  "condition": "Actual source CLI/MCP child processes with authored local-executable or fetch-preload responses. No model inference or provider execution.",
+  "sourceCommit": "1b74f0f3acfa8b3f7461390c91674f51a9a0d389",
+  "records": 44,
+  "transports": {
+    "cli": 17,
+    "mcp": 27
+  },
+  "classifierConditions": {
+    "heuristic": 2,
+    "hosted-jev": 25,
+    "local": 17
+  },
+  "recordSha256": "db189ac62101e68b497db147f0d4a8a0ba3ec1f6fa5862a1a86e400f38a64cad",
+  "installedBundleSha256": "ca748f8365429ca13a7480f712491902cb53e3317afbb9ba08ebee0cffd80aba",
+  "installedBundleBytes": 136647
+}

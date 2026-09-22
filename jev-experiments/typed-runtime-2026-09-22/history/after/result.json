@@ -1,0 +1,18 @@
+{
+  "condition": "Exact 52-file corrected working-tree bytes copied before the independent run. Authored independent suite only; no Git archive, CI, model or provider claim.",
+  "sourceSha256": "aeaef7fd427813a28664b9d6429b94c917acef851ee4751636af505daa0c8fa9",
+  "fileCount": 52,
+  "suiteSha256": "7af046cba53ff535c0c8683ea8310fc2df271e3a6a85817846e1f0964bf36b00",
+  "driverSha256": "f8d9fee6d06686e1b1a108325e9862e45590bb1f77305c4297bd4660ef299dde",
+  "command": [
+    "bun",
+    "test",
+    "<independent-review>/correction-boundaries.test.ts"
+  ],
+  "exitCode": 0,
+  "sourceUnchanged": true,
+  "artifacts": {
+    "bun-test.log": "982aa42c2f1d180a0f57a1f34c1f6044d362c16f8f9096243682da08947bd347",
+    "observations.json": "36c9e5865d316926555d952b36941c5b340d1ecb6fa73fe4361e1482ee20a0e5"
+  }
+}
