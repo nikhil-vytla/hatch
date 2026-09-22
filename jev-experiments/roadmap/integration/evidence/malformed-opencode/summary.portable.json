@@ -1,0 +1,107 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "opencode",
+  "kind": "summary",
+  "source": {
+    "sha256": "62894a2a09556bb0e64cbbb48b9f8f7aaa338e4ed3008ce7b05e4fed782ae724",
+    "bytes": 1996,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/directory",
+        "originalSha256": "22851d47500bc792df99be036a3219528c3b9522f9b3153e7982c00aab176395",
+        "derivativeSha256": "897cb4046306be1a9b64a187082bd852f53bb582b281608cf945b54ffcef8a37",
+        "bindings": [
+          {
+            "sourcePathSha256": "22851d47500bc792df99be036a3219528c3b9522f9b3153e7982c00aab176395",
+            "uri": "record://location/22851d47500bc792df99be03",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/3",
+        "originalSha256": "22851d47500bc792df99be036a3219528c3b9522f9b3153e7982c00aab176395",
+        "derivativeSha256": "897cb4046306be1a9b64a187082bd852f53bb582b281608cf945b54ffcef8a37",
+        "bindings": [
+          {
+            "sourcePathSha256": "22851d47500bc792df99be036a3219528c3b9522f9b3153e7982c00aab176395",
+            "uri": "record://location/22851d47500bc792df99be03",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "df4008e0192c5e203c1d1adeaa3c1d1c05ebcd415c71226878ed6c84e93243ac",
+  "payload": {
+    "harness": "opencode",
+    "directory": "record://location/22851d47500bc792df99be03",
+    "command": [
+      "opencode",
+      "run",
+      "--dir",
+      "record://location/22851d47500bc792df99be03",
+      "--pure",
+      "--format",
+      "json",
+      "--agent",
+      "jev-fixture",
+      "--model",
+      "amazon-bedrock/global.anthropic.claude-fable-5-1"
+    ],
+    "elapsedSeconds": 63.23,
+    "exitCode": 0,
+    "timedOut": false,
+    "baselineTestsExitCode": 1,
+    "independentTestsExitCode": 1,
+    "mcpDiscovered": true,
+    "toolCalls": [
+      {
+        "time": "2026-09-21T04:43:43.692Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 2,
+        "contextBytes": 368
+      }
+    ],
+    "toolResults": [
+      {
+        "time": "2026-09-21T04:43:43.704Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 2,
+        "status": "error"
+      }
+    ],
+    "patchedBug": false,
+    "analysisFileWritten": true,
+    "additionalTestsWritten": false,
+    "sourceUnchanged": true,
+    "expectedTestsFail": true,
+    "purpose": "Actual client handling of one deterministic malformed loopback destination response.",
+    "delegationOccurred": false,
+    "usableDelegatedArtifacts": 0,
+    "cliVersion": "1.18.31",
+    "hostModel": {
+      "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+      "identityBasis": "command configuration"
+    },
+    "firstAuditTime": "2026-09-21T04:43:27.744Z",
+    "evidenceGate": {
+      "condition": "malformed-response",
+      "passed": true,
+      "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
+      "historicalFailure": false
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 10
+  }
+}

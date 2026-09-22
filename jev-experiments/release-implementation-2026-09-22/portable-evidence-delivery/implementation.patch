@@ -1,0 +1,1695 @@
+diff --git a/.github/workflows/jev-portable-evidence.yml b/.github/workflows/jev-portable-evidence.yml
+new file mode 100644
+index 0000000..3e245ae
+--- /dev/null
++++ b/.github/workflows/jev-portable-evidence.yml
+@@ -0,0 +1,39 @@
++name: Jev portable evidence
++
++on:
++  pull_request:
++    paths:
++      - "jev-experiments/**"
++      - ".github/workflows/jev-portable-evidence.yml"
++  push:
++    branches: [main]
++    paths:
++      - "jev-experiments/**"
++      - ".github/workflows/jev-portable-evidence.yml"
++
++permissions:
++  contents: read
++
++jobs:
++  portable-evidence:
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
++        with:
++          bun-version: "1.3.14"
++      - name: Install application from its lockfile
++        working-directory: jev-experiments/experience-prototypes
++        run: bun install --frozen-lockfile
++      - name: Build from committed evidence inputs
++        working-directory: jev-experiments/experience-prototypes
++        run: bun run build
++      - name: Verify portable records, indexes and publication projections
++        run: bun test jev-experiments/roadmap/integration/portable-records.test.ts jev-experiments/roadmap/integration/portable-clients.test.ts jev-experiments/roadmap/integration/portable-publication.test.ts jev-experiments/capability-atlas-2026-09-22/publication-projection.test.ts
++      - name: Check archive index is already current
++        run: |
++          python3 jev-experiments/roadmap/integration/evidence_index.py
++          git diff --exit-code -- jev-experiments/roadmap/integration/evidence/index.json
++      - name: Verify public record integrity
++        run: bun run jev-experiments/roadmap/verification/publication.ts
+diff --git a/jev-experiments/capability-atlas-2026-09-22/publication-projection.test.ts b/jev-experiments/capability-atlas-2026-09-22/publication-projection.test.ts
+new file mode 100644
+index 0000000..906044a
+--- /dev/null
++++ b/jev-experiments/capability-atlas-2026-09-22/publication-projection.test.ts
+@@ -0,0 +1,441 @@
++import { describe, expect, test } from "bun:test";
++import { createHash } from "node:crypto";
++import {
++  mkdtempSync,
++  mkdirSync,
++  readFileSync,
++  readdirSync,
++  rmSync,
++  symlinkSync,
++  writeFileSync,
++} from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import {
++  normalizeMachinePaths,
++  preparePublicHarnessEvidence,
++  projectRewardBenchDocument,
++  projectTranscriptEvent,
++} from "./publication-projection";
++
++const hash = (text: string) => createHash("sha256").update(text).digest("hex");
++const pathOptions = {
++  publicFileExists: (path: string) =>
++    path === "jev-experiments/roadmap/routing/mcp.ts",
++  fixtureFiles: new Set(["sum.ts"]),
++};
++
++describe("publication path projection", () => {
++  test("removes entire unknown Unix, Windows, UNC and home paths", () => {
++    const paths = [
++      "/Users/synthetic/hidden-sentinel/project/file.ts",
++      "/custom-root/hidden-sentinel/file.ts",
++      "C:\\Users\\synthetic\\hidden-sentinel\\file.ts",
++      "\\\\synthetic-host\\hidden-sentinel\\file.ts",
++      "~/hidden-sentinel/file.ts",
++      "file:///home/synthetic/hidden-sentinel/file.ts",
++    ];
++    for (const path of paths) {
++      expect(normalizeMachinePaths(`read ${path} now`)).toBe(
++        "read [machine-path] now",
++      );
++      expect(normalizeMachinePaths(`read '${path}' now`)).toBe(
++        "read '[machine-path]' now",
++      );
++    }
++    expect(
++      normalizeMachinePaths(
++        'read "/Users/synthetic/hidden sentinel/file.ts" now',
++      ),
++    ).toBe('read "[machine-path]" now');
++  });
++
++  test("only preserves grounded repository files or fixture basenames, and leaves URLs/code intact", () => {
++    expect(
++      normalizeMachinePaths(
++        "/checkout/jev-experiments/roadmap/routing/mcp.ts",
++        pathOptions,
++      ),
++    ).toBe("jev-experiments/roadmap/routing/mcp.ts");
++    expect(
++      normalizeMachinePaths(
++        "/checkout/jev-experiments/private-sentinel/file.ts",
++        pathOptions,
++      ),
++    ).toBe("[machine-path]");
++    expect(
++      normalizeMachinePaths("/tmp/hidden-sentinel/sum.ts", pathOptions),
++    ).toBe("sum.ts");
++    expect(
++      normalizeMachinePaths("/tmp/hidden-sentinel/other.ts", pathOptions),
++    ).toBe("[machine-path]");
++    const publicText =
++      "https://example.com/research/page?view=2 and ./sum.ts; for (let i = 0; i <= n; i++) total += i;";
++    expect(normalizeMachinePaths(publicText)).toBe(publicText);
++    const newFileDiff =
++      "--- /dev/null\n+++ b/sum.ts\n@@ -0,0 +1 @@\n+return 0;\n";
++    expect(normalizeMachinePaths(newFileDiff)).toBe(newFileDiff);
++  });
++
++  test("normalizes embedded JSON command arguments while retaining valid escaped quoting", () => {
++    const input = 'args=[\\"/home/synthetic/hidden-sentinel/file.ts\\"]';
++    expect(normalizeMachinePaths(input)).toBe('args=[\\"[machine-path]\\"]');
++  });
++});
++
++describe("client envelope allowlists", () => {
++  test("omits host inventories while retaining Claude prompts, tool correlation, artifacts and token accounting", () => {
++    const init = projectTranscriptEvent("claude", {
++      type: "system",
++      subtype: "init",
++      model: "fixture-model",
++      claude_code_version: "1",
++      plugins: [{ path: "/custom/hidden-sentinel/plugin" }],
++      apiKeySource: "unrelated-metadata",
++      skills: ["host-inventory"],
++    });
++    expect(init).toEqual({
++      type: "system",
++      subtype: "init",
++      model: "fixture-model",
++      claude_code_version: "1",
++    });
++    const input = {
++      type: "assistant",
++      parent_tool_use_id: "call-1",
++      wire_ingest_context: "omit-this",
++      message: {
++        role: "assistant",
++        model: "fixture-model",
++        diagnostics: "omit-this",
++        content: [
++          {
++            type: "tool_use",
++            id: "call-2",
++            name: "route_task",
++            input: {
++              prompt: "Fix the inclusive sum.",
++              context: "export const sum = (n) => n;",
++              file: "/tmp/hidden-sentinel/sum.ts",
++            },
++          },
++        ],
++        usage: {
++          input_tokens: 12,
++          output_tokens: 4,
++          inference_geo: "omit-this",
++        },
++      },
++    };
++    const snapshot = structuredClone(input);
++    const result: any = projectTranscriptEvent("claude", input, pathOptions);
++    expect(result.message.content[0]).toEqual({
++      type: "tool_use",
++      id: "call-2",
++      name: "route_task",
++      input: {
++        prompt: "Fix the inclusive sum.",
++        context: "export const sum = (n) => n;",
++        file: "sum.ts",
++      },
++    });
++    expect(result.message.usage).toEqual({
++      input_tokens: 12,
++      output_tokens: 4,
++    });
++    expect(result.parent_tool_use_id).toBe("call-1");
++    expect(JSON.stringify(result)).not.toContain("omit-this");
++    expect(input).toEqual(snapshot);
++    const artifact = {
++      status: "ok",
++      artifact: { kind: "answer", text: "The loop excludes the upper bound." },
++    };
++    const returned: any = projectTranscriptEvent("claude", {
++      type: "user",
++      message: {
++        role: "user",
++        content: [
++          {
++            type: "tool_result",
++            tool_use_id: "call-2",
++            content: JSON.stringify(artifact),
++          },
++        ],
++      },
++      tool_use_result: {
++        content: JSON.stringify(artifact),
++        structuredContent: artifact,
++        pluginMetadata: "omit-this",
++      },
++    });
++    expect(returned.tool_use_result.structuredContent).toEqual(artifact);
++    expect(returned.message.content[0].tool_use_id).toBe("call-2");
++    expect(JSON.stringify(returned)).not.toContain("omit-this");
++  });
++
++  test("preserves OpenCode and Codex inputs/results while normalizing nested values and path keys", () => {
++    const state = {
++      status: "completed",
++      input: { prompt: "Analyze the sum.", context: "return n;" },
++      output: {
++        answer: "Wrong for n > 2.",
++        files: { "/tmp/hidden-sentinel/sum.ts": "return n;" },
++      },
++      metadata: { hostPlugin: "omit-this" },
++    };
++    const event: any = projectTranscriptEvent(
++      "opencode",
++      {
++        type: "tool_use",
++        timestamp: 42,
++        sessionID: "omit-this",
++        part: { type: "tool", tool: "jev_route_task", callID: "call-1", state },
++      },
++      pathOptions,
++    );
++    expect(event.part.callID).toBe("call-1");
++    expect(event.part.state.input).toEqual(state.input);
++    expect(event.part.state.output.files).toEqual({ "sum.ts": "return n;" });
++    expect(JSON.stringify(event)).not.toContain("omit-this");
++    const codex: any = projectTranscriptEvent("codex", {
++      type: "item.completed",
++      item: {
++        id: "call-2",
++        type: "mcp_tool_call",
++        server: "jev",
++        tool: "route_task",
++        arguments: state.input,
++        result: { status: "unsupported", reason: "No shell capability." },
++        error: null,
++        status: "completed",
++        hostMetadata: "omit-this",
++      },
++    });
++    expect(codex.item.arguments).toEqual(state.input);
++    expect(codex.item.result).toEqual({
++      status: "unsupported",
++      reason: "No shell capability.",
++    });
++    expect(JSON.stringify(codex)).not.toContain("omit-this");
++  });
++
++  test("unknown event and content shapes stop publication rather than copying unreviewed metadata", () => {
++    expect(() =>
++      projectTranscriptEvent("codex", {
++        type: "new_host_metadata",
++        secret: "sentinel",
++      }),
++    ).toThrow("Unsupported");
++    expect(() =>
++      projectTranscriptEvent("claude", {
++        type: "assistant",
++        message: { content: [{ type: "new_block", text: "sentinel" }] },
++      }),
++    ).toThrow("Unsupported");
++  });
++});
++
++describe("benchmark publication projection", () => {
++  const withheldText = "A synthetic candidate chosen for display withholding.";
++  const manifest = [
++    { subset: "Synthetic", id: "7", sha256: hash(withheldText) },
++  ];
++  const fixture = () => ({
++    manifest: { benchmark: "synthetic" },
++    result: {
++      accuracy: 0.5,
++      public_omissions: { candidate_texts_omitted: 0 },
++      rows: [
++        {
++          subset: "Synthetic",
++          id: 7,
++          prompt: "Choose the better response.",
++          candidates: [
++            {
++              text: "A retained response.",
++              chosen: true,
++              score: 0.8,
++              probabilities: [0.2, 0.8],
++            },
++            {
++              text: withheldText,
++              chosen: false,
++              score: 0.2,
++              probabilities: [0.8, 0.2],
++            },
++          ],
++        },
++      ],
++    },
++  });
++
++  test("hash selection survives option reordering and does not change source, labels, scores or existing omission counts", () => {
++    const source = fixture();
++    source.result.rows[0].candidates.reverse();
++    const before = structuredClone(source);
++    const projected: any = projectRewardBenchDocument(source, manifest);
++    const candidate = projected.result.rows[0].candidates[0];
++    expect(candidate.text).toBe(
++      "[Candidate text withheld from this publication copy.]",
++    );
++    expect(candidate.publication_omission.sha256).toBe(manifest[0].sha256);
++    expect({
++      chosen: candidate.chosen,
++      score: candidate.score,
++      probabilities: candidate.probabilities,
++    }).toEqual({ chosen: false, score: 0.2, probabilities: [0.8, 0.2] });
++    expect(projected.result.rows[0].prompt).toBe(source.result.rows[0].prompt);
++    expect(projected.result.accuracy).toBe(0.5);
++    expect(projected.result.public_omissions).toEqual(
++      source.result.public_omissions,
++    );
++    expect(projected.result.publication_projection.withheldCandidateTexts).toBe(
++      1,
++    );
++    expect(source).toEqual(before);
++    expect(projectRewardBenchDocument(projected, manifest)).toEqual(projected);
++  });
++
++  test("stale hashes, missing rows and duplicate matches fail closed", () => {
++    const changed = fixture();
++    changed.result.rows[0].candidates[1].text += " Changed.";
++    expect(() => projectRewardBenchDocument(changed, manifest)).toThrow("hash");
++    expect(() =>
++      projectRewardBenchDocument(fixture(), [{ ...manifest[0], id: "8" }]),
++    ).toThrow("row");
++    const ambiguous = fixture();
++    ambiguous.result.rows[0].candidates.push(
++      structuredClone(ambiguous.result.rows[0].candidates[1]),
++    );
++    expect(() => projectRewardBenchDocument(ambiguous, manifest)).toThrow(
++      "ambiguous",
++    );
++  });
++});
++
++test("generated downloads are linked, source-bound, normalized and source-immutable", () => {
++  const temporary = mkdtempSync(join(tmpdir(), "jev-publication-synthetic-"));
++  try {
++    const lab = join(temporary, "jev-experiments");
++    const evidence = join(lab, "roadmap/integration/evidence");
++    const destination = join(temporary, "public");
++    const write = (path: string, value: unknown) => {
++      mkdirSync(dirname(path), { recursive: true });
++      writeFileSync(
++        path,
++        typeof value === "string" ? value : JSON.stringify(value),
++      );
++    };
++    write(join(evidence, "index.json"), {
++      orderBasis: "Chronology",
++      runs: [
++        {
++          run: "codex",
++          harness: "codex",
++          summary: "codex/summary.json",
++          transcript: "codex/stdout.jsonl",
++          audit: "codex/mcp-audit.jsonl",
++        },
++      ],
++    });
++    write(join(evidence, "codex/summary.json"), {
++      harness: "codex",
++      directory: "/custom-root/hidden-sentinel/repository",
++      command: ["codex", "run"],
++      delegationOccurred: true,
++      hostMetadata: "omit-this",
++    });
++    write(
++      join(evidence, "codex/stdout.jsonl"),
++      JSON.stringify({
++        type: "item.completed",
++        item: {
++          id: "call-1",
++          type: "command_execution",
++          status: "completed",
++          command: "cat /custom-root/hidden-sentinel/sum.ts",
++          aggregated_output: "return n;",
++          exit_code: 0,
++        },
++      }) + "\n",
++    );
++    write(
++      join(evidence, "codex/mcp-audit.jsonl"),
++      JSON.stringify({
++        event: "initialize",
++        time: "2026-01-01",
++        client: { name: "fixture", version: "1", privateMetadata: "omit-this" },
++      }) + "\n",
++    );
++    write(
++      join(evidence, "codex/host.diff"),
++      "--- a/sum.ts\n+++ b/sum.ts\n@@ -1 +1 @@\n-return n;\n+return n * (n + 1) / 2;\n",
++    );
++    write(join(evidence, "codex/tests-after.txt"), "1 pass\n");
++    const sources = [
++      "index.json",
++      ...readdirSync(join(evidence, "codex")).map((name) => `codex/${name}`),
++    ];
++    const before = sources.map((name) =>
++      hash(readFileSync(join(evidence, name), "utf8")),
++    );
++    expect(preparePublicHarnessEvidence(lab, destination)).toEqual({
++      runs: 1,
++      files: 6,
++    });
++    const index = JSON.parse(
++      readFileSync(join(destination, "index.json"), "utf8"),
++    );
++    expect(index.publication_projection.sourceSha256).toBe(before[0]);
++    expect(index.publication_projection.files).toHaveLength(5);
++    for (const file of index.publication_projection.files) {
++      const published = readFileSync(join(destination, file.path), "utf8");
++      expect(published).not.toContain("hidden-sentinel");
++      expect(published).not.toContain("omit-this");
++      expect(file.publishedSha256).toBe(hash(published));
++      expect(file.sourceSha256).toBe(
++        hash(readFileSync(join(evidence, file.path), "utf8")),
++      );
++    }
++    expect(
++      sources.map((name) => hash(readFileSync(join(evidence, name), "utf8"))),
++    ).toEqual(before);
++    expect(() => preparePublicHarnessEvidence(lab, evidence)).toThrow(
++      "separate",
++    );
++    expect(() => preparePublicHarnessEvidence(lab, lab)).toThrow("separate");
++    expect(() =>
++      preparePublicHarnessEvidence(lab, join(evidence, "nested-output")),
++    ).toThrow("separate");
++    symlinkSync(evidence, join(temporary, "source-alias"));
++    expect(() =>
++      preparePublicHarnessEvidence(lab, join(temporary, "source-alias")),
++    ).toThrow("separate");
++    expect(
++      sources.map((name) => hash(readFileSync(join(evidence, name), "utf8"))),
++    ).toEqual(before);
++    const transcript = readFileSync(
++      join(destination, index.runs[0].transcript),
++      "utf8",
++    )
++      .trim()
++      .split("\n")
++      .map((line) => JSON.parse(line));
++    expect(transcript[0].originalEventCount).toBe(1);
++    expect(transcript[1].item.command).toBe("cat sum.ts");
++    expect(transcript[1].item.aggregated_output).toBe("return n;");
++    rmSync(join(destination, "codex/host.diff"));
++    symlinkSync(
++      join(evidence, "codex/host.diff"),
++      join(destination, "codex/host.diff"),
++    );
++    expect(() => preparePublicHarnessEvidence(lab, destination)).toThrow(
++      "escapes",
++    );
++    expect(
++      sources.map((name) => hash(readFileSync(join(evidence, name), "utf8"))),
++    ).toEqual(before);
++  } finally {
++    rmSync(temporary, { recursive: true, force: true });
++  }
++});
+diff --git a/jev-experiments/capability-atlas-2026-09-22/publication-projection.ts b/jev-experiments/capability-atlas-2026-09-22/publication-projection.ts
+new file mode 100644
+index 0000000..0891f70
+--- /dev/null
++++ b/jev-experiments/capability-atlas-2026-09-22/publication-projection.ts
+@@ -0,0 +1,566 @@
++import { decodePortableRecord } from "../roadmap/integration/portable-records";
++import { createHash } from "node:crypto";
++import {
++  existsSync,
++  mkdirSync,
++  readFileSync,
++  realpathSync,
++  statSync,
++  writeFileSync,
++} from "node:fs";
++import { basename, dirname, relative, resolve, sep } from "node:path";
++
++type RecordValue = Record<string, unknown>;
++type Harness = "opencode" | "claude" | "codex";
++export type PathProjection = {
++  /** A validated retained derivative already lists its exact display edits. */
++  portableRecord?: boolean;
++  /** Only existing, reviewed repository files may be preserved by this callback. */
++  publicFileExists?: (repositoryRelativePath: string) => boolean;
++  /** Basenames grounded in the fixture's retained files, rather than arbitrary paths. */
++  fixtureFiles?: ReadonlySet<string>;
++};
++
++const sha256 = (text: string | Uint8Array) =>
++  createHash("sha256").update(text).digest("hex");
++const object = (value: unknown): RecordValue => {
++  if (!value || typeof value !== "object" || Array.isArray(value))
++    throw new Error("Expected an evidence object.");
++  return value as RecordValue;
++};
++const pick = (value: RecordValue, keys: readonly string[]) =>
++  Object.fromEntries(
++    keys
++      .filter((key) => Object.hasOwn(value, key))
++      .map((key) => [key, value[key]]),
++  );
++
++/** These are display projections, not rewritten measurements or credential filtering. */
++export function normalizeMachinePaths(
++  text: string,
++  options: PathProjection = {},
++): string {
++  const project = (path: string) => {
++    const normalized = path.replace(/^file:\/\//i, "").replaceAll("\\", "/");
++    // A standard unified-diff marker and shell device, not a machine-specific location.
++    if (normalized === "/dev/null") return normalized;
++    const marker = "/jev-experiments/";
++    const position = normalized.indexOf(marker);
++    if (position >= 0) {
++      const candidate = normalized.slice(position + 1);
++      if (
++        !candidate.split("/").some((piece) => piece === "..") &&
++        options.publicFileExists?.(candidate)
++      )
++        return candidate;
++    }
++    const basename = normalized.split("/").at(-1) ?? "";
++    if (options.fixtureFiles?.has(basename)) return basename;
++    return "[machine-path]";
++  };
++  // Match URLs first so their path portions cannot be mistaken for local files.
++  // Quoted paths consume spaces; other paths stop at shell/JSON delimiters.
++  const paths =
++    /https?:\/\/[^\s"'`<>]+|(["'`])((?:file:\/\/\/|[A-Za-z]:[\\/]|~[\\/]|\\\\|\/(?!\/))[^\r\n]*?)\1|(?<![\w:/.])(?:file:\/\/\/|[A-Za-z]:[\\/]|~[\\/]|\\\\|\/(?!\/))[^\s"'`<>|;,)\]}]+/g;
++  return text.replace(
++    paths,
++    (match, quote: string | undefined, quotedPath: string | undefined) => {
++      if (/^https?:\/\//i.test(match)) return match;
++      if (quote && quotedPath) {
++        const escapedEnd = quotedPath.endsWith("\\");
++        return `${quote}${project(escapedEnd ? quotedPath.slice(0, -1) : quotedPath)}${escapedEnd ? "\\" : ""}${quote}`;
++      }
++      // Preserve punctuation attached to paths in prose, and JSON's escaped quote.
++      const suffix = match.match(/[.:\\]+$/)?.[0] ?? "";
++      return project(suffix ? match.slice(0, -suffix.length) : match) + suffix;
++    },
++  );
++}
++
++function normalize(value: unknown, options: PathProjection): unknown {
++  if (typeof value === "string") return normalizeMachinePaths(value, options);
++  if (Array.isArray(value))
++    return value.map((item) => normalize(item, options));
++  if (value && typeof value === "object") {
++    const entries = Object.entries(value).map(
++      ([key, item]) =>
++        [
++          normalizeMachinePaths(key, options),
++          normalize(item, options),
++        ] as const,
++    );
++    if (new Set(entries.map(([key]) => key)).size !== entries.length)
++      throw new Error(
++        "Projected path keys would collide; publication needs an explicit mapping.",
++      );
++    return Object.fromEntries(entries);
++  }
++  return value;
++}
++
++// Token and cost accounting may nest, but deployment geography/service metadata is unrelated.
++function numericAccounting(value: unknown): unknown {
++  if (typeof value === "number" && Number.isFinite(value)) return value;
++  if (!value || typeof value !== "object" || Array.isArray(value))
++    return undefined;
++  return Object.fromEntries(
++    Object.entries(value).flatMap(([key, item]) => {
++      const projected = numericAccounting(item);
++      return projected === undefined ? [] : [[key, projected]];
++    }),
++  );
++}
++
++function content(value: unknown): unknown {
++  if (typeof value === "string") return value;
++  if (!Array.isArray(value)) throw new Error("Unsupported transcript content.");
++  return value.flatMap((item) => {
++    const block = object(item);
++    switch (block.type) {
++      case "text":
++        return [pick(block, ["type", "text"])];
++      case "tool_use":
++        return [pick(block, ["type", "id", "name", "input"])];
++      case "tool_result":
++        return [
++          {
++            ...pick(block, ["type", "tool_use_id", "is_error"]),
++            content: content(block.content),
++          },
++        ];
++      case "thinking":
++        return [
++          {
++            type: "publication_omission",
++            reason: "Host reasoning and signature omitted.",
++          },
++        ];
++      default:
++        throw new Error("Unsupported transcript content type.");
++    }
++  });
++}
++
++/** Allowlist host envelopes; task arguments and returned artifacts remain intact. */
++export function projectTranscriptEvent(
++  harness: Harness,
++  input: unknown,
++  options: PathProjection = {},
++): RecordValue {
++  const event = object(input);
++  let output: RecordValue;
++  if (harness === "opencode") {
++    const part = object(event.part);
++    output = pick(event, ["type", "timestamp"]);
++    switch (event.type) {
++      case "step_start":
++        output.part = pick(part, ["type"]);
++        break;
++      case "text":
++        output.part = pick(part, ["type", "text", "time"]);
++        break;
++      case "tool_use":
++        output.part = {
++          ...pick(part, ["type", "tool", "callID"]),
++          state: pick(object(part.state), [
++            "error",
++            "input",
++            "output",
++            "status",
++            "time",
++            "title",
++          ]),
++        };
++        break;
++      case "step_finish":
++        output.part = {
++          ...pick(part, ["type", "reason", "cost"]),
++          tokens: numericAccounting(part.tokens),
++        };
++        break;
++      default:
++        throw new Error("Unsupported OpenCode transcript event.");
++    }
++  } else if (harness === "claude") {
++    output = pick(event, [
++      "type",
++      "subtype",
++      "timestamp",
++      "parent_tool_use_id",
++    ]);
++    switch (event.type) {
++      case "system":
++        Object.assign(
++          output,
++          pick(event, [
++            "claude_code_version",
++            "model",
++            "permissionMode",
++            "estimated_tokens",
++            "estimated_tokens_delta",
++          ]),
++        );
++        break;
++      case "assistant":
++      case "user": {
++        const message = object(event.message);
++        output.message = {
++          ...pick(message, ["role", "model", "stop_reason", "stop_sequence"]),
++          content: content(message.content),
++        };
++        if (message.usage)
++          (output.message as RecordValue).usage = numericAccounting(
++            message.usage,
++          );
++        if (event.tool_use_result)
++          output.tool_use_result =
++            typeof event.tool_use_result === "string"
++              ? event.tool_use_result
++              : pick(object(event.tool_use_result), [
++                  "type",
++                  "file",
++                  "stdout",
++                  "stderr",
++                  "interrupted",
++                  "isImage",
++                  "noOutputExpected",
++                  "content",
++                  "structuredContent",
++                  "filePath",
++                  "oldString",
++                  "newString",
++                  "originalFile",
++                  "structuredPatch",
++                  "userModified",
++                  "replaceAll",
++                ]);
++        Object.assign(
++          output,
++          pick(event, ["error", "api_error_code", "is_api_error_message"]),
++        );
++        break;
++      }
++      case "result":
++        Object.assign(
++          output,
++          pick(event, [
++            "result",
++            "errors",
++            "is_error",
++            "stop_reason",
++            "terminal_reason",
++            "api_error_code",
++            "api_error_status",
++            "duration_ms",
++            "duration_api_ms",
++            "num_turns",
++            "total_cost_usd",
++            "permission_denials",
++            "ttft_ms",
++            "ttft_stream_ms",
++            "time_to_request_ms",
++            "first_content_frame_ms",
++          ]),
++        );
++        output.usage = numericAccounting(event.usage);
++        output.modelUsage = numericAccounting(event.modelUsage);
++        break;
++      default:
++        throw new Error("Unsupported Claude transcript event.");
++    }
++  } else {
++    output = pick(event, ["type"]);
++    switch (event.type) {
++      case "thread.started":
++      case "turn.started":
++        break;
++      case "turn.completed":
++        output.usage = numericAccounting(event.usage);
++        break;
++      case "item.started":
++      case "item.completed": {
++        const item = object(event.item);
++        const common = ["id", "type", "status"];
++        const fields: Record<string, string[]> = {
++          agent_message: ["text"],
++          command_execution: ["aggregated_output", "command", "exit_code"],
++          mcp_tool_call: ["arguments", "error", "result", "server", "tool"],
++          file_change: ["changes"],
++        };
++        if (typeof item.type !== "string" || !Object.hasOwn(fields, item.type))
++          throw new Error("Unsupported Codex item.");
++        output.item = pick(item, [...common, ...fields[item.type]]);
++        break;
++      }
++      default:
++        throw new Error("Unsupported Codex transcript event.");
++    }
++  }
++  return (options.portableRecord ? output : normalize(output, options)) as RecordValue;
++}
++
++const summaryFields = [
++  "harness",
++  "directory",
++  "command",
++  "elapsedSeconds",
++  "exitCode",
++  "timedOut",
++  "baselineTestsExitCode",
++  "independentTestsExitCode",
++  "mcpDiscovered",
++  "toolCalls",
++  "toolResults",
++  "patchedBug",
++  "analysisFileWritten",
++  "additionalTestsWritten",
++  "delegationOccurred",
++  "usableDelegatedArtifacts",
++  "cliVersion",
++  "hostModel",
++  "firstAuditTime",
++  "evidenceGate",
++  "annotationProvenance",
++  "auditChronologyOrder",
++  "invokedBeforeInterrupt",
++  "serverSawCancellation",
++  "serverSawDisconnect",
++  "cancelledToolResult",
++  "lateSuccessApplied",
++  "evidenceBoundary",
++  "hostExitedBeforeScheduledReply",
++  "clientTerminalReason",
++  "sourceUnchanged",
++  "expectedTestsFail",
++  "purpose",
++  "mcpConfigUnchanged",
++  "routerConfigUnchanged",
++  "contextComplete",
++  "observedBoundaryStatuses",
++  "noDestinationAttempts",
++  "boundaryExplanations",
++];
++
++function projectAudit(input: unknown, options: PathProjection): unknown {
++  const event = object(input);
++  if (
++    ![
++      "initialize",
++      "tools/list",
++      "tools/call",
++      "tools/result",
++      "cancelled",
++      "client-disconnected",
++    ].includes(String(event.event))
++  )
++    throw new Error("Unsupported MCP audit event.");
++  const projected = pick(event, [
++    "event",
++    "time",
++    "requestId",
++    "tool",
++    "contextBytes",
++    "status",
++    "artifactKind",
++  ]);
++  if (event.event === "initialize")
++    projected.client = pick(object(event.client), ["name", "version"]);
++  return normalize(projected, options);
++}
++
++const projectionNotice = {
++  version: "jev-public-evidence-v1",
++  note: "Publication copy: machine paths are normalized; unrelated host configuration, identifiers, diagnostics and reasoning metadata are omitted. Task messages, tool inputs/results and recorded outcomes are retained. This is not a fresh run or a byte-identical transcript.",
++};
++
++function physicalPath(path: string): string {
++  let ancestor = resolve(path);
++  const suffix: string[] = [];
++  while (!existsSync(ancestor)) {
++    suffix.unshift(basename(ancestor));
++    ancestor = dirname(ancestor);
++  }
++  return resolve(realpathSync(ancestor), ...suffix);
++}
++
++/** Generate only reviewed evidence shapes; never copy raw transcripts into public assets. */
++export function preparePublicHarnessEvidence(lab: string, destination: string) {
++  const source = resolve(lab, "roadmap/integration/evidence");
++  const sourceReal = realpathSync(source);
++  const checkedSource = (name: string) => {
++    if (
++      !/^[a-z0-9-]+\/(?:summary\.json|summary\.portable\.json|stdout\.jsonl|stdout\.portable\.json|mcp-audit\.jsonl|host\.diff|tests-after\.txt|tests-after\.portable\.json)$/.test(
++        name,
++      )
++    )
++      throw new Error("Unlisted evidence path.");
++    const path = realpathSync(resolve(source, name));
++    if (!path.startsWith(sourceReal + sep))
++      throw new Error("Evidence path escapes its source directory.");
++    return path;
++  };
++  const indexText = readFileSync(resolve(source, "index.json"), "utf8");
++  const index = object(JSON.parse(indexText));
++  if (!Array.isArray(index.runs)) throw new Error("Missing evidence runs.");
++  const files: {
++    path: string;
++    sourceSha256: string;
++    publishedSha256: string;
++    sourcePath: string;
++  }[] = [];
++  const pending = new Map<string, string>();
++  const publish = (name: string, raw: string, result: string, sourcePath = name) => {
++    if (pending.has(name)) throw new Error("Duplicate public evidence path.");
++    files.push({
++      path: name,
++      sourceSha256: sha256(raw),
++      publishedSha256: sha256(result),
++      sourcePath,
++    });
++    pending.set(name, result);
++  };
++  const labReal = realpathSync(lab);
++  for (const value of index.runs) {
++    const run = object(value);
++    if (!["opencode", "claude", "codex"].includes(String(run.harness)))
++      throw new Error("Unsupported evidence harness.");
++    if (typeof run.run !== "string" || !/^[a-z0-9-]+$/.test(run.run))
++      throw new Error("Invalid evidence run name.");
++    const harness = run.harness as Harness;
++    const fixtureFiles = new Set(["sum.ts", "sum.test.ts", "ANALYSIS.md"]);
++    // Additional test basenames are grounded in the retained host diff, not arbitrary host paths.
++    const diffPath = resolve(source, run.run, "host.diff");
++    if (existsSync(diffPath))
++      for (const line of readFileSync(
++        checkedSource(`${run.run}/host.diff`),
++        "utf8",
++      ).split("\n")) {
++        const matched = /^\+\+\+ b\/([A-Za-z0-9_.-]+\.test\.ts)$/.exec(line);
++        if (matched) fixtureFiles.add(matched[1]);
++      }
++    const options: PathProjection = {
++      fixtureFiles,
++      publicFileExists: (path) => {
++        if (!path.startsWith("jev-experiments/")) return false;
++        const resolved = resolve(lab, path.slice("jev-experiments/".length));
++        if (!existsSync(resolved) || !statSync(resolved).isFile()) return false;
++        return realpathSync(resolved).startsWith(labReal + sep);
++      },
++    };
++    for (const [field, filename] of [
++      ["summary", "summary.json"],
++      ["transcript", "stdout.jsonl"],
++      ["audit", "mcp-audit.jsonl"],
++    ] as const) {
++      const name = `${run.run}/${filename}`;
++      const portableName = field === "summary" ? `${run.run}/summary.portable.json` : field === "transcript" ? `${run.run}/stdout.portable.json` : null;
++      const sourceName = run[field];
++      if (sourceName !== name && sourceName !== portableName)
++        throw new Error("Unexpected evidence index link.");
++      const raw = readFileSync(checkedSource(String(sourceName)), "utf8");
++      const retained = sourceName !== name ? decodePortableRecord(raw, field === "summary" ? "summary" : "transcript") : null;
++      if (retained) {
++        const linkage = object(object(run.retainedRecords)[field]);
++        if (retained.harness !== harness || linkage.originalFile !== name || linkage.originalSha256 !== retained.source.sha256 || linkage.derivativeSha256 !== sha256(raw) || linkage.payloadSha256 !== retained.payloadSha256 || linkage.format !== retained.format)
++          throw new Error("Portable evidence index lineage mismatch.");
++      }
++      const metadata = { ...projectionNotice, sourceSha256: sha256(raw), ...(retained ? { retained_record_derivative: {
++        format: retained.format, originalSha256: retained.source.sha256, payloadSha256: retained.payloadSha256,
++        transformation: retained.transformation.id, note: retained.transformation.note,
++      } } : {}) };
++      if (field === "summary") {
++        const selected = pick(object(retained ? retained.payload : JSON.parse(raw)), summaryFields);
++        const result = (retained ? selected : normalize(selected, options)) as RecordValue;
++        publish(
++          name,
++          raw,
++          JSON.stringify(
++            { ...result, publication_projection: metadata },
++            null,
++            2,
++          ) + "\n",
++          String(sourceName),
++        );
++      } else {
++        const events = retained ? retained.payload : raw
++          .split(/\r?\n/)
++          .filter((line) => line.trim())
++          .map((line) => JSON.parse(line));
++        const projected = events.map((event) =>
++          field === "transcript"
++            ? projectTranscriptEvent(harness, event, retained ? { ...options, portableRecord: true } : options)
++            : projectAudit(event, options),
++        );
++        const header = {
++          type: "publication_projection",
++          ...metadata,
++          originalEventCount: events.length,
++        };
++        publish(
++          name,
++          raw,
++          [header, ...projected]
++            .map((event) => JSON.stringify(event))
++            .join("\n") + "\n",
++          String(sourceName),
++        );
++      }
++    }
++    for (const filename of ["host.diff", "tests-after.txt"]) {
++      const name = `${run.run}/${filename}`;
++      const linkage = filename === "tests-after.txt" ? (run.retainedRecords as RecordValue | undefined)?.testsAfter : undefined;
++      if (linkage) {
++        if (existsSync(resolve(source, name))) throw Error("Ambiguous original and derivative test log.");
++        const sourceName = `${run.run}/tests-after.portable.json`;
++        const raw = readFileSync(checkedSource(sourceName), "utf8");
++        const record = decodePortableRecord(raw, "text"), link = object(linkage);
++        if (record.harness !== harness || link.originalFile !== name || link.originalSha256 !== record.source.sha256 || link.derivativeSha256 !== sha256(raw) || link.payloadSha256 !== record.payloadSha256 || link.format !== record.format) throw Error("Portable test-log lineage mismatch.");
++        publish(name, raw, record.payload.text, sourceName);
++      } else {
++        if (!existsSync(resolve(source, name))) continue;
++        const raw = readFileSync(checkedSource(name), "utf8");
++        publish(name, raw, normalizeMachinePaths(raw, options));
++      }
++    }
++  }
++  const publicIndex = normalize(
++    pick(index, ["orderBasis", "runs", "retained_record_index"]),
++    {},
++  ) as RecordValue;
++  for (const value of publicIndex.runs as unknown[]) {
++    const run = object(value);
++    if (run.retainedRecords) {
++      run.summary = `${run.run}/summary.json`;
++      run.transcript = `${run.run}/stdout.jsonl`;
++    }
++  }
++  publicIndex.publication_projection = {
++    ...projectionNotice,
++    sourceSha256: sha256(indexText),
++    files,
++  };
++  pending.set("index.json", JSON.stringify(publicIndex, null, 2) + "\n");
++  // Finish validation before writing any output. The source directory is never a destination.
++  const resolvedDestination = physicalPath(destination);
++  if (
++    relative(sourceReal, resolvedDestination).split(sep)[0] !== ".." ||
++    relative(resolvedDestination, sourceReal).split(sep)[0] !== ".."
++  )
++    throw new Error("Publication must use a separate output directory.");
++  for (const name of pending.keys()) {
++    if (
++      !physicalPath(resolve(destination, name)).startsWith(
++        resolvedDestination + sep,
++      )
++    )
++      throw new Error("Publication output escapes its destination.");
++  }
++  for (const [name, output] of pending) {
++    const path = resolve(destination, name);
++    mkdirSync(dirname(path), { recursive: true });
++    writeFileSync(path, output);
++  }
++  return { runs: index.runs.length, files: pending.size };
++}
++
++export { projectRewardBenchDocument, type WithheldCandidate } from "../experience-prototypes/scripts/benchmark-publication";
+diff --git a/jev-experiments/experience-prototypes/.gitignore b/jev-experiments/experience-prototypes/.gitignore
+index 949f1e7..4e91e45 100644
+--- a/jev-experiments/experience-prototypes/.gitignore
++++ b/jev-experiments/experience-prototypes/.gitignore
+@@ -17,3 +17,6 @@ public/outcome-framing/
+ public/visual-search/
+ public/wardrobe/
+ public/icon-studio/
++
++# Generated portable integration-evidence downloads.
++public/routing-evidence/
+diff --git a/jev-experiments/experience-prototypes/scripts/prepare.ts b/jev-experiments/experience-prototypes/scripts/prepare.ts
+index 37a22cb..552fa31 100644
+--- a/jev-experiments/experience-prototypes/scripts/prepare.ts
++++ b/jev-experiments/experience-prototypes/scripts/prepare.ts
+@@ -14,12 +14,14 @@ import { projectRewardBenchDocument } from "./benchmark-publication";
+ import { enrichProvenance } from "./provenance";
+ import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
+ import { prepareLiveWorlds } from "../../live-worlds/prepare";
++import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
+ const lab = resolve(".."),
+   dest = resolve("public/data");
+ const publication: Record<string, string> = JSON.parse(
+   readFileSync("publication.json", "utf8"),
+ );
+ mkdirSync(dest, { recursive: true });
++preparePublicHarnessEvidence(lab, resolve("public/routing-evidence"));
+ const hasSources = existsSync("results") || existsSync(resolve(lab, "results"));
+ if (hasSources) {
+   prepareLiveWorlds();
+diff --git a/jev-experiments/roadmap/integration/README.md b/jev-experiments/roadmap/integration/README.md
+index 4d52df7..764084c 100644
+--- a/jev-experiments/roadmap/integration/README.md
++++ b/jev-experiments/roadmap/integration/README.md
+@@ -10,13 +10,13 @@ OpenCode, Claude Code and Codex each discovered the Jev MCP server, supplied tas
+ 
+ These durations cover each full client session, not just the delegate. They are single observations with different host models and client behavior. Do not rank clients by these times. Claude used Sonnet 4.6 as its host after Fable access was rejected; OpenCode used Fable 5.1 Global through Bedrock. Codex used its configured default model. Every successful delegate used the configured Fable 5.1 Global destination. Its identity is configured-unverified because OpenCode's returned event stream did not separately attest the provider model. Cost remains unknown.
+ 
+-The fixture starts with an off-by-one loop that sums 1 through n exclusive. The independent original test fails before the host session and passes afterward. Returned tests run on the repaired source. The server never applies the patch or runs these tests. All final host changes, MCP audit records and sanitized transcripts are retained under evidence.
++The fixture starts with an off-by-one loop that sums 1 through n exclusive. The independent original test fails before the host session and passes afterward. Returned tests run on the repaired source. The server never applies the patch or runs these tests. Final host changes, MCP audit records and retained transcript records are available under evidence; the portable client format is described below.
+ 
+ ## Observed failures and recovery
+ 
+-- [OpenCode](evidence/opencode/summary.json) first used an unexpected effective project directory despite subprocess cwd, created a new contained fixture under the investigation folder, and timed out. The corrected run supplies `--dir` explicitly. Its first repository-analysis delegation failed to return a valid artifact; a later bounded analysis request succeeded. The host preserved and discussed the failure before applying the usable patches. The [original timed-out attempt](evidence/opencode-cwd-timeout/summary.json) remains visible.
+-- [Claude Code](evidence/claude/summary.json) discovered the tools on its first run, but the configured Fable host request was rejected by the provider's retention policy. That [unavailable host attempt](evidence/claude-fable-unavailable/summary.json) did not invoke a delegate. The corrected Sonnet host session did.
+-- [Codex](evidence/codex/summary.json) initially discovered and attempted the tools, but the normal MCP approval default rejected them under a noninteractive `never` policy. Those calls did not reach the server and are not successes. The corrected isolated invocation explicitly approves only `route_task` and `decide` through the documented per-tool configuration. The filesystem sandbox stays `workspace-write`. One malformed call omitted context and returned unsupported; the host retried with complete context while preserving its required-shell restriction.
++- [OpenCode](evidence/opencode/summary.portable.json) first used an unexpected effective project directory despite subprocess cwd, created a new contained fixture under the investigation folder, and timed out. The corrected run supplies `--dir` explicitly. Its first repository-analysis delegation failed to return a valid artifact; a later bounded analysis request succeeded. The host preserved and discussed the failure before applying the usable patches. The [original timed-out attempt](evidence/opencode-cwd-timeout/summary.portable.json) remains visible.
++- [Claude Code](evidence/claude/summary.portable.json) discovered the tools on its first run, but the configured Fable host request was rejected by the provider's retention policy. That [unavailable host attempt](evidence/claude-fable-unavailable/summary.portable.json) did not invoke a delegate. The corrected Sonnet host session did.
++- [Codex](evidence/codex/summary.portable.json) initially discovered and attempted the tools, but the normal MCP approval default rejected them under a noninteractive `never` policy. Those calls did not reach the server and are not successes. The corrected isolated invocation explicitly approves only `route_task` and `decide` through the documented per-tool configuration. The filesystem sandbox stays `workspace-write`. One malformed call omitted context and returned unsupported; the host retried with complete context while preserving its required-shell restriction.
+ 
+ Every corrected client also received an actual unavailable result for a required shell tool, and an unsupported typed-question result. None loosened the required-shell restriction to obtain a route. OpenCode additionally observed malformed delegate-output recovery. Separate actual-client suites now cover active interruption and deliberate malformed destination output in all three clients, as described below.
+ 
+@@ -34,7 +34,7 @@ Reproduce a fixture with `python3 jev-experiments/roadmap/integration/run_harnes
+ 
+ ## Evidence boundaries
+ 
+-The task prompt, summaries and audit files are original experiment artifacts. No repository was fetched or copied. Host diffs and newly generated tests are kept instead of full fixture repository copies. Transcripts remove credential environment values and request/response headers before writing. The audit records context byte lengths but not private input text. These fixtures use only authored source and synthetic content.
++Task prompts and audit files remain original experiment artifacts. Retained OpenCode, Claude Code and Codex summaries and transcripts use explicitly labeled portable derivatives; their recorded outcomes remain unchanged. No repository was fetched or copied. Host diffs and newly generated tests are kept instead of full fixture repository copies. Transcripts remove credential environment values and request/response headers before writing. The audit records context byte lengths but not private input text. These fixtures use only authored source and synthetic content.
+ 
+ Supported configuration syntax was checked against [OpenCode's MCP documentation](https://opencode.ai/docs/mcp-servers/), [Claude Code's MCP documentation](https://code.claude.com/docs/en/mcp), and [Codex's MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+ 
+@@ -44,17 +44,23 @@ A second isolated suite called a deterministic delayed loopback destination thro
+ 
+ This checks interruption of a live MCP call through actual clients, using a controlled destination. It does not measure a cloud provider's billed work after cancellation or a resumed interactive session after interruption.
+ 
++## Portable client records
++
++`summary.portable.json` and `stdout.portable.json` contain versioned envelopes with predecessor SHA-256, payload SHA-256, exact edited-field hashes and location bindings. The decoder retains event order, tool arguments and results, outcome flags and accounting. Edited-field entries identify location substitutions; all other context text remains as recorded. `record://` locations are display references, not runnable filesystem paths.
++
++Original context-byte counts and source hashes refer to the historical predecessor, not the derivative serialization. Exact predecessor-byte checks require that archived source; current-tree checks validate the derivative and its lineage. The publication builder reads the derivative links explicitly and includes both identities in downloadable evidence.
++
+ ## Evidence index and historical conditions
+ 
+-The generated [evidence index](evidence/index.json) lists each run in order of its first retained audit event, with client version, configured host model, raw transcript and audit links. Every summary contains `delegationOccurred`, requiring a successful route_task result with an artifact, and a condition-specific `evidenceGate`. Tool discovery alone never satisfies the delegation gate. `evidence_index.py` derives these annotations from the retained records without changing raw transcripts or measured outcomes.
++The generated [evidence index](evidence/index.json) lists each run in order of its first retained audit event, with client version, configured host model, retained transcript and audit links. Every summary contains `delegationOccurred`, requiring a successful route_task result with an artifact, and a condition-specific `evidenceGate`. Tool discovery alone never satisfies the delegation gate. `evidence_index.py` now relinks this archive through `portable-index.ts`, preserving its existing annotations and chronology. The historical annotator refuses to regrade portable records. New conditions require their own review and index entry.
+ 
+-The three original failure variants are marked failed in their own summaries. They are historical configurations, not modes offered by the corrected reproducer: OpenCode omitted explicit `--dir`, Claude used the unavailable Fable host, and Codex used the noninteractive default approval. Each failure directory was renamed before its corrected run. Command arguments preserve the audit pathname at the time of invocation; they do not mean the retained successful audit was later overwritten. Codex's default host model was not reported, so its identity remains unknown.
++The three original failure variants are marked failed in their own summaries. They are historical configurations, not modes offered by the corrected reproducer: OpenCode omitted explicit `--dir`, Claude used the unavailable Fable host, and Codex used the noninteractive default approval. Each failure directory was renamed before its corrected run. Recorded command arguments preserve their original role and ordering. Portable location URIs identify distinct recorded locations; a renamed evidence directory does not imply that its successful audit was later overwritten. Codex's default host model was not reported, so its identity remains unknown.
+ 
+ Current OpenCode fixture permissions pin `--dir` to the generated Git worktree, deny external directories, and allow relative read/edit patterns only for `sum.ts`, `*.test.ts` and `ANALYSIS.md`. Shell permissions allow only `bun test` and `git diff`; edits use the host's file tools. The same restriction applies at global and primary-agent scope. The first absolute-pattern refinement blocked legitimate reads/writes because OpenCode checks paths relative to its worktree; that failed condition is retained. The corrected pattern follows the [actual edit implementation](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/edit.ts) and [permission documentation](https://opencode.ai/docs/permissions/).
+ 
+ ## Malformed destination checks
+ 
+-[OpenCode](evidence/malformed-opencode/summary.json), [Claude Code](evidence/malformed-claude/summary.json) and [Codex](evidence/malformed-codex/summary.json) each actually called route_task against a loopback fixture that returned deliberately invalid artifact text. Every host observed an error, wrote an explanation and left the source and tests unchanged. The original failing test intentionally still fails in this condition. These are passes for safe error handling, not successful bug fixes. Run `malformed_harness.py` to reproduce after retaining the existing evidence under another name.
++[OpenCode](evidence/malformed-opencode/summary.portable.json), [Claude Code](evidence/malformed-claude/summary.portable.json) and [Codex](evidence/malformed-codex/summary.portable.json) each actually called route_task against a loopback fixture that returned deliberately invalid artifact text. Every host observed an error, wrote an explanation and left the source and tests unchanged. The original failing test intentionally still fails in this condition. These are passes for safe error handling, not successful bug fixes. Run `malformed_harness.py` to reproduce after retaining the existing evidence under another name.
+ 
+ The interruption and malformed destinations are deterministic local fixtures; the coding clients and their host models were real. They make failure behavior repeatable without attributing synthetic destination behavior to a model.
+ 
+@@ -64,12 +70,12 @@ The [frozen boundary protocol](FAILURE-PROTOCOL.md) adds two actual route_task c
+ 
+ | Client | Retained passing condition | Complete context per call | Observed results | Source and configuration |
+ |---|---|---|---|---|
+-|OpenCode|[Relative-path fixture](evidence/boundary-opencode-relative-paths/summary.json)|368bytes|unsupported, unavailable|Unchanged|
+-|Claude Code|[Boundary fixture](evidence/boundary-claude/summary.json)|367bytes|unsupported, unavailable|Unchanged|
+-|Codex|[Boundary fixture](evidence/boundary-codex/summary.json)|382bytes|unsupported, unavailable|Unchanged|
++|OpenCode|[Relative-path fixture](evidence/boundary-opencode-relative-paths/summary.portable.json)|368bytes|unsupported, unavailable|Unchanged|
++|Claude Code|[Boundary fixture](evidence/boundary-claude/summary.portable.json)|367bytes|unsupported, unavailable|Unchanged|
++|Codex|[Boundary fixture](evidence/boundary-codex/summary.portable.json)|382bytes|unsupported, unavailable|Unchanged|
+ 
+ Each passing session made exactly two calls, returned readable explanations, recorded zero destination attempts, wrote its own ANALYSIS.md, and made no retry or reroute. Existing failing tests remained failing, as required. No delegated model or GPU ran. The clients used their authenticated host models; zero router execution cost does not include those host sessions.
+ 
+-The [first OpenCode boundary condition](evidence/boundary-opencode/summary.json) returned both expected statuses but could not write its explanation file because the absolute permission pattern did not match worktree-relative permission checks. It remains a failed gate. The corrected condition changed only fixture file permissions and kept the same task requests, empty registry and restrictions. The evidence index now contains16 sessions:12 condition passes and4 retained failures. Raw host explanations are observations, not accepted performance claims; single-call timing explanations in those files are not a measured causal result.
++The [first OpenCode boundary condition](evidence/boundary-opencode/summary.portable.json) returned both expected statuses but could not write its explanation file because the absolute permission pattern did not match worktree-relative permission checks. It remains a failed gate. The corrected condition changed only fixture file permissions and kept the same task requests, empty registry and restrictions. The evidence index now contains16 sessions:12 condition passes and4 retained failures. Raw host explanations are observations, not accepted performance claims; single-call timing explanations in those files are not a measured causal result.
+ 
+ Reproduce a new condition with `python3 jev-experiments/roadmap/integration/boundary_harness.py opencode --evidence-suffix new-condition` (or claude/codex). Existing evidence is never overwritten. The protocol and generated per-run summaries distinguish these failure-handling passes from successful delegation of a coding task.
+diff --git a/jev-experiments/roadmap/integration/evidence_index.py b/jev-experiments/roadmap/integration/evidence_index.py
+index e97f574..bed8967 100644
+--- a/jev-experiments/roadmap/integration/evidence_index.py
++++ b/jev-experiments/roadmap/integration/evidence_index.py
+@@ -16,6 +16,8 @@ def transcript_objects(value,depth=0):
+         except json.JSONDecodeError:return
+         yield from transcript_objects(parsed,depth+1)
+ def annotate(folder):
++    if (folder/'summary.portable.json').exists():
++        raise ValueError('Historical derivatives cannot be re-annotated; use portable-index.ts.')
+     path=folder/'summary.json';record=json.loads(path.read_text());audit=folder/'mcp-audit.jsonl'
+     events=[json.loads(line) for line in audit.read_text().splitlines()] if audit.exists() else []
+     artifacts=[event for event in events if event.get('event')=='tools/result' and event.get('tool')=='route_task' and event.get('status')=='ok' and event.get('artifactKind') in ['patch','answer','structured']]
+@@ -65,6 +67,10 @@ def annotate(folder):
+     path.write_text(json.dumps(record,indent=2)+'\n')
+     return record
+ if __name__=='__main__':
++    if any((HERE/'evidence').glob('*/summary.portable.json')):
++        import subprocess
++        subprocess.run(['bun', str(HERE/'portable-index.ts')], check=True)
++        raise SystemExit(0)
+     records=[(folder.name,annotate(folder)) for folder in (HERE/'evidence').iterdir() if (folder/'summary.json').exists()]
+     records.sort(key=lambda entry:entry[1].get('firstAuditTime') or '')
+     index=[]
+diff --git a/jev-experiments/roadmap/integration/portable-client-schemas.ts b/jev-experiments/roadmap/integration/portable-client-schemas.ts
+new file mode 100644
+index 0000000..262c182
+--- /dev/null
++++ b/jev-experiments/roadmap/integration/portable-client-schemas.ts
+@@ -0,0 +1,75 @@
++type Value = Record<string, any>;
++const object = (value: unknown): Value => { if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Expected a retained client object."); return value as Value; };
++const keys = (value: Value, allowed: readonly string[], required: readonly string[] = allowed) => {
++  if (Object.keys(value).some((key) => !allowed.includes(key)) || required.some((key) => !Object.hasOwn(value, key))) throw Error("Unknown or incomplete retained client fields.");
++};
++const strings = (value: Value, names: readonly string[]) => {
++  if (names.some((name) => typeof value[name] !== "string")) throw Error("Invalid retained client identity.");
++};
++function content(value: unknown): void {
++  if (typeof value === "string") return;
++  if (!Array.isArray(value)) throw Error("Invalid retained client content.");
++  for (const item of value) {
++    const block = object(item);
++    switch (block.type) {
++      case "text": keys(block, ["type", "text"]); strings(block, ["text"]); break;
++      case "thinking": keys(block, ["type", "thinking", "signature"]); strings(block, ["thinking", "signature"]); break;
++      case "tool_use": keys(block, ["type", "id", "name", "input", "caller"], ["type", "id", "name", "input"]); strings(block, ["id", "name"]); object(block.input); break;
++      case "tool_result": keys(block, ["type", "tool_use_id", "content", "is_error"], ["type", "tool_use_id", "content"]); strings(block, ["tool_use_id"]); content(block.content); break;
++      default: throw Error("Unsupported retained client content type.");
++    }
++  }
++}
++/** Validate captured host envelopes; opaque tool payloads/diagnostics remain lossless. */
++export function validateClientTranscript(harness: "opencode" | "claude", payload: unknown): void {
++  if (!Array.isArray(payload)) throw Error("Expected transcript event array.");
++  for (const value of payload) {
++    const event = object(value);
++    if (harness === "opencode") {
++      keys(event, ["type", "timestamp", "sessionID", "part"]); strings(event, ["sessionID"]);
++      if (typeof event.timestamp !== "number" || !Number.isFinite(event.timestamp)) throw Error("Invalid retained event time.");
++      const part = object(event.part), common = ["id", "messageID", "sessionID", "type"];
++      strings(part, ["id", "messageID", "sessionID"]);
++      switch (event.type) {
++        case "step_start": keys(part, common); if (part.type !== "step-start") throw Error("Invalid retained part type."); break;
++        case "text": keys(part, [...common, "text", "time"]); strings(part, ["text"]); if (part.type !== "text") throw Error("Invalid retained part type."); break;
++        case "tool_use": {
++          keys(part, [...common, "callID", "tool", "state"]); strings(part, ["callID", "tool"]);
++          if (part.type !== "tool") throw Error("Invalid retained part type.");
++          const state = object(part.state);
++          if (state.status === "error") keys(state, ["error", "input", "status", "time"]);
++          else if (state.status === "completed") keys(state, ["input", "metadata", "output", "status", "time", "title"]);
++          else throw Error("Unsupported retained tool state.");
++          object(state.input); break;
++        }
++        case "step_finish": keys(part, [...common, "cost", "reason", "tokens"]); if (part.type !== "step-finish") throw Error("Invalid retained part type."); object(part.tokens); break;
++        default: throw Error("Unsupported retained OpenCode event.");
++      }
++      continue;
++    }
++    const common = ["type", "session_id", "uuid"];
++    strings(event, ["session_id", "uuid"]);
++    switch (event.type) {
++      case "system":
++        if (event.subtype === "init") keys(event, [...common, "subtype", "agents", "analytics_disabled", "apiKeySource", "capabilities", "claude_code_version", "cwd", "fast_mode_disabled_reason", "fast_mode_state", "mcp_servers", "model", "output_style", "permissionMode", "plugins", "product_feedback_disabled", "skills", "slash_commands", "terminal_slash_commands", "tools"]);
++        else if (event.subtype === "thinking_tokens") keys(event, [...common, "subtype", "estimated_tokens", "estimated_tokens_delta"]);
++        else throw Error("Unsupported retained Claude system event.");
++        break;
++      case "assistant": {
++        keys(event, [...common, "timestamp", "parent_tool_use_id", "request_id", "message", "api_error_code", "error", "is_api_error_message", "wire_tool_inputs", "tool_use_meta", "wire_ingest_context"], [...common, "timestamp", "parent_tool_use_id", "request_id", "message"]);
++        const message = object(event.message);
++        keys(message, ["container", "content", "context_management", "diagnostics", "id", "input_transformations", "model", "role", "stop_details", "stop_reason", "stop_sequence", "type", "usage"], ["container", "content", "context_management", "diagnostics", "id", "model", "role", "stop_details", "stop_reason", "stop_sequence", "type", "usage"]);
++        strings(message, ["id", "model", "role"]); content(message.content); object(message.usage); break;
++      }
++      case "user": {
++        keys(event, [...common, "timestamp", "parent_tool_use_id", "message", "tool_use_result", "tool_result_meta"], [...common, "timestamp", "parent_tool_use_id", "message"]);
++        const message = object(event.message); keys(message, ["content", "role"]); strings(message, ["role"]); content(message.content); break;
++      }
++      case "result":
++        keys(event, [...common, "subtype", "api_error_code", "api_error_status", "duration_api_ms", "duration_ms", "errors", "fast_mode_disabled_reason", "fast_mode_state", "first_content_frame_ms", "is_error", "modelUsage", "num_turns", "permission_denials", "queued_turn_count", "result", "result_index", "stop_reason", "subagent_stats", "terminal_reason", "time_to_request_ms", "total_cost_usd", "ttft_ms", "ttft_stream_ms", "usage"], [...common, "subtype", "duration_api_ms", "duration_ms", "fast_mode_disabled_reason", "fast_mode_state", "is_error", "modelUsage", "num_turns", "permission_denials", "queued_turn_count", "result_index", "stop_reason", "subagent_stats", "terminal_reason", "total_cost_usd", "usage"]);
++        if (!["success", "error_during_execution"].includes(event.subtype)) throw Error("Unsupported retained Claude result.");
++        object(event.usage); object(event.modelUsage); break;
++      default: throw Error("Unsupported retained Claude event.");
++    }
++  }
++}
+diff --git a/jev-experiments/roadmap/integration/portable-clients.test.ts b/jev-experiments/roadmap/integration/portable-clients.test.ts
+new file mode 100644
+index 0000000..5c518ec
+--- /dev/null
++++ b/jev-experiments/roadmap/integration/portable-clients.test.ts
+@@ -0,0 +1,122 @@
++import { expect, test } from "bun:test";
++import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, unlinkSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { derivePortableRecord, decodePortableRecord, digest, type Harness } from "./portable-records";
++import { buildPortableIndex } from "./portable-index";
++import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
++const physical = "/example/fixture/sum.ts", uri = "record://fixture/sum.ts";
++const jsonl = (events: unknown[]) => events.map((event) => JSON.stringify(event)).join("\n") + "\n";
++function events(harness: "opencode" | "claude"): any[] {
++ if (harness === "opencode") return [
++  { type: "step_start", timestamp: 1, sessionID: "authored-session", part: { type: "step-start", id: "part-1", messageID: "message-1", sessionID: "authored-session" } },
++  { type: "tool_use", timestamp: 2, sessionID: "authored-session", part: { type: "tool", id: "part-2", messageID: "message-1", sessionID: "authored-session", callID: "call-1", tool: "jev_route_task", state: { status: "completed", input: { task: { context: physical } }, output: JSON.stringify({ status: "unavailable", unknown: null, attempts: [], cost: null }), metadata: { opaque: { futureValue: null } }, title: "authored task", time: { start: 1, end: 2 } } } },
++  { type: "step_finish", timestamp: 3, sessionID: "authored-session", part: { type: "step-finish", id: "part-3", messageID: "message-1", sessionID: "authored-session", cost: 0.002, reason: "stop", tokens: { input: 12, output: 3, cache: { read: 4, write: 0 } } } },
++ ];
++ return [
++  { type: "assistant", session_id: "authored-session", uuid: "event-1", timestamp: "2026-01-01T00:00:00Z", parent_tool_use_id: null, request_id: "request-1", message: { container: null, content: [{ type: "thinking", thinking: "authored reasoning", signature: "authored-signature" }, { type: "tool_use", id: "call-1", name: "mcp__jev__route_task", input: { task: { context: physical } }, caller: { type: "direct" } }], context_management: null, diagnostics: { unknown: null }, id: "message-1", model: "authored-model", role: "assistant", stop_details: null, stop_reason: null, stop_sequence: null, type: "message", usage: { input_tokens: 12, output_tokens: 3, cache_read_input_tokens: 4 } } },
++  { type: "user", session_id: "authored-session", uuid: "event-2", timestamp: "2026-01-01T00:00:01Z", parent_tool_use_id: null, message: { role: "user", content: [{ type: "tool_result", tool_use_id: "call-1", content: [{ type: "text", text: JSON.stringify({ status: "unavailable", unknown: null, attempts: [], cost: null }) }], is_error: false }] }, tool_use_result: { structuredContent: { unknown: null } } },
++ ];
++}
++function edit(harness: "opencode" | "claude") {
++ return { record: harness === "opencode" ? 1 : 0, pointer: harness === "opencode" ? "/part/state/input/task/context" : "/message/content/1/input/task/context", before: physical, after: uri, bindings: [{ source: physical, target: uri }] };
++}
++for (const harness of ["opencode", "claude"] as const) {
++ test(`${harness} location derivative retains identities, unknowns, task results and accounting`, () => {
++  const original = events(harness), raw = jsonl(original), e = edit(harness);
++  const text = derivePortableRecord(raw, "transcript", digest(raw), [e], harness), record = decodePortableRecord(text, "transcript");
++  const expected = structuredClone(original);
++  if (harness === "opencode") expected[1].part.state.input.task.context = uri; else expected[0].message.content[1].input.task.context = uri;
++  expect(record.payload).toEqual(expected); expect(record.harness).toBe(harness);
++  expect(record.source.format).toBe(`${harness}-jsonl`); expect(record.source.recordCount).toBe(original.length);
++  expect(record.source.sha256).toBe(digest(raw)); expect(record.source.bytes).toBe(Buffer.byteLength(raw));
++  expect(derivePortableRecord(raw, "transcript", digest(raw), [e], harness)).toBe(text);
++  expect(record.transformation.fields[0].originalSha256).toBe(digest(physical));
++ });
++ test(`${harness} changed source, unknown host envelope and unplanned task edits fail closed`, () => {
++  const original = events(harness), raw = jsonl(original), e = edit(harness);
++  expect(() => derivePortableRecord(raw + "\n", "transcript", digest(raw), [e], harness)).toThrow("bytes");
++  expect(() => derivePortableRecord(raw, "transcript", digest(raw), [{ ...e, after: uri + " altered task" }], harness)).toThrow("reviewed field");
++  const unknown = jsonl([{ ...original[0], unknownEnvelope: true }]);
++  expect(() => derivePortableRecord(unknown, "transcript", digest(unknown), [], harness)).toThrow("fields");
++  const unknownEvent = jsonl([{ ...original[0], type: "future.event" }]);
++  expect(() => derivePortableRecord(unknownEvent, "transcript", digest(unknownEvent), [], harness)).toThrow();
++  const record = JSON.parse(derivePortableRecord(raw, "transcript", digest(raw), [e], harness));
++  record.source.format = harness === "claude" ? "opencode-jsonl" : "claude-jsonl";
++  expect(() => decodePortableRecord(JSON.stringify(record))).toThrow("lineage");
++ });
++}
++test("client nested envelope validation and text-log locations are explicit and lossless", () => {
++ const original = events("claude"); original[0].message.content[0].type = "future-reasoning";
++ const bad = jsonl(original); expect(() => derivePortableRecord(bad, "transcript", digest(bad), [], "claude")).toThrow("content type");
++ const raw = `bun test\r\n${physical}: unchanged failure — 0 pass, 2 fail [12.34ms]\n`;
++ const after = raw.replace(physical, uri), e = { record: 0, pointer: "/text", before: raw, after, bindings: [{ source: physical, target: uri }] };
++ const result = derivePortableRecord(raw, "text", digest(raw), [e], "claude"), record = decodePortableRecord(result, "text");
++ expect(record.payload).toEqual({ text: after }); expect(record.source.bytes).toBe(Buffer.byteLength(raw)); expect(record.source.format).toBe("utf8");
++ expect(record.source.recordCount).toBe(1); expect(record.payload.text.replace(uri,physical)).toBe(raw);
++ expect(() => decodePortableRecord(result,"transcript")).toThrow("format");
++ record.payload.text += "changed"; expect(() => decodePortableRecord(JSON.stringify(record))).toThrow("hash mismatch");
++ expect(() => derivePortableRecord(raw,"text",digest(raw),[{...e,record:1}],"claude")).toThrow("pointer");
++});
++function fixture() {
++ const root = mkdtempSync(join(tmpdir(), "portable-clients-")), lab = join(root,"lab"), evidence = join(lab,"roadmap/integration/evidence");
++ mkdirSync(evidence,{recursive:true});const runs:any[]=[];
++ for (const [offset,harness] of (["opencode","claude"] as const).entries()) {
++  const folder=join(evidence,harness);mkdirSync(folder);
++  const summary={harness,command:[harness,"run"],evidenceGate:{passed:false,condition:"authored negative",unknown:null},cliVersion:"authored",hostModel:{configured:"authored-model",identityBasis:"fixture"},delegationOccurred:false,firstAuditTime:"2026-01-01T00:00:00Z",auditChronologyOrder:offset+1,elapsedSeconds:0.125,exitCode:1,timedOut:false};
++  const raw=JSON.stringify(summary)+"\n";
++  writeFileSync(join(folder,"summary.portable.json"),derivePortableRecord(raw,"summary",digest(raw),[],harness));
++  const transcript=jsonl(events(harness));
++  // One untouched transcript remains raw; mixed trees do not invent a migration.
++  if(harness==="opencode")writeFileSync(join(folder,"stdout.portable.json"),derivePortableRecord(transcript,"transcript",digest(transcript),[edit(harness)],harness));
++  else writeFileSync(join(folder,"stdout.jsonl"),transcript);
++  writeFileSync(join(folder,"mcp-audit.jsonl"),JSON.stringify({event:"tools/list",time:summary.firstAuditTime})+"\n");
++  if(harness==="opencode")for(const file of ["tests-before","tests-after"]){
++   const text=`${physical}: 0 pass, 2 fail\n`,after=text.replace(physical,uri);
++   writeFileSync(join(folder,`${file}.portable.json`),derivePortableRecord(text,"text",digest(text),[{record:0,pointer:"/text",before:text,after,bindings:[{source:physical,target:uri}]}],harness));
++  }
++  runs.push({order:offset+1,run:harness,harness,version:summary.cliVersion,hostModel:summary.hostModel,delegationOccurred:false,firstAuditTime:summary.firstAuditTime,gate:summary.evidenceGate,summary:`${harness}/summary.json`,transcript:`${harness}/stdout.jsonl`,audit:`${harness}/mcp-audit.jsonl`,unknownHistoricalField:null});
++ }
++ writeFileSync(join(evidence,"index.json"),JSON.stringify({orderBasis:"authored",runs})+"\n");
++ return{root,lab,evidence};
++}
++test("mixed client index preserves history and publishes existing text downloads with lineage",()=>{
++ const f=fixture();try{
++  expect(buildPortableIndex(f.evidence)).toEqual({runs:2,converted:2});
++  const raw=readFileSync(join(f.evidence,"index.json"),"utf8"),index=JSON.parse(raw);
++  expect(index.runs[0].transcript).toBe("opencode/stdout.portable.json");expect(index.runs[1].transcript).toBe("claude/stdout.jsonl");
++  expect(index.runs.every((r:any)=>r.gate.passed===false&&r.unknownHistoricalField===null)).toBe(true);
++  expect(index.runs[0].retainedRecords.testsBefore.originalFile).toBe("opencode/tests-before.txt");
++  expect(index.runs[0].retainedRecords.testsAfter.originalFile).toBe("opencode/tests-after.txt");
++  buildPortableIndex(f.evidence);expect(readFileSync(join(f.evidence,"index.json"),"utf8")).toBe(raw);
++  const dest=join(f.root,"public");preparePublicHarnessEvidence(f.lab,dest);
++  expect(readFileSync(join(dest,"opencode/tests-after.txt"),"utf8")).toBe(`${uri}: 0 pass, 2 fail\n`);
++  expect(existsSync(join(dest,"opencode/tests-before.txt"))).toBe(false);
++  const pub=JSON.parse(readFileSync(join(dest,"index.json"),"utf8"));
++  expect(pub.runs[0].summary).toBe("opencode/summary.json");expect(pub.runs[1].transcript).toBe("claude/stdout.jsonl");
++  expect(pub.publication_projection.files.find((p:any)=>p.path==="opencode/tests-after.txt").sourcePath).toBe("opencode/tests-after.portable.json");
++ }finally{rmSync(f.root,{recursive:true,force:true});}
++});
++test("text-log ambiguity and forged lineage reject publication before any output",()=>{
++ const f=fixture();try{
++  const path=join(f.evidence,"opencode/tests-after.txt");writeFileSync(path,"original");
++  expect(()=>buildPortableIndex(f.evidence)).toThrow("Ambiguous");unlinkSync(path);buildPortableIndex(f.evidence);
++  const index=JSON.parse(readFileSync(join(f.evidence,"index.json"),"utf8"));index.runs[0].retainedRecords.testsAfter.originalSha256="0".repeat(64);writeFileSync(join(f.evidence,"index.json"),JSON.stringify(index));
++  const dest=join(f.root,"rejected");expect(()=>preparePublicHarnessEvidence(f.lab,dest)).toThrow("lineage mismatch");expect(existsSync(dest)).toBe(false);
++  expect(()=>buildPortableIndex(f.evidence)).toThrow("source identity");
++ }finally{rmSync(f.root,{recursive:true,force:true});}
++});
++test("missing derivative and altered historical gate do not silently relink",()=>{
++ const f=fixture();try{
++  buildPortableIndex(f.evidence);const path=join(f.evidence,"opencode/tests-before.portable.json"),saved=readFileSync(path);unlinkSync(path);
++  expect(()=>buildPortableIndex(f.evidence)).toThrow("Missing retained derivative");writeFileSync(path,saved);
++  const ip=join(f.evidence,"index.json"),index=JSON.parse(readFileSync(ip,"utf8"));index.runs[0].gate.passed=true;writeFileSync(ip,JSON.stringify(index));
++  expect(()=>buildPortableIndex(f.evidence)).toThrow("historical index disagree");
++ }finally{rmSync(f.root,{recursive:true,force:true});}
++});
++test("a derivative from the wrong client cannot satisfy another client's index",()=>{
++ const f=fixture();try{
++  const path=join(f.evidence,"opencode/stdout.portable.json"),raw=jsonl(events("claude"));writeFileSync(path,derivePortableRecord(raw,"transcript",digest(raw),[edit("claude")],"claude"));
++  expect(()=>buildPortableIndex(f.evidence)).toThrow("harness");
++ }finally{rmSync(f.root,{recursive:true,force:true});}
++});
+diff --git a/jev-experiments/roadmap/integration/portable-index.ts b/jev-experiments/roadmap/integration/portable-index.ts
+new file mode 100644
+index 0000000..c0ab4fb
+--- /dev/null
++++ b/jev-experiments/roadmap/integration/portable-index.ts
+@@ -0,0 +1,53 @@
++import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
++import { resolve } from "node:path";
++import { isDeepStrictEqual } from "node:util";
++import { decodePortableRecord, digest } from "./portable-records";
++/** Relink archived records without recomputing historical gates or measurements. */
++export function buildPortableIndex(root: string) {
++ const path = resolve(root, "index.json"), raw = readFileSync(path, "utf8"), index = JSON.parse(raw);
++ if (!Array.isArray(index.runs)) throw Error("Invalid evidence index.");
++ const named = new Set(index.runs.map((run: any) => run.run));
++ if (named.size !== index.runs.length) throw Error("Duplicate retained run identity.");
++ for (const folder of readdirSync(root, { withFileTypes: true })) {
++  if (folder.isDirectory() && !named.has(folder.name) && ["summary.json", "summary.portable.json"].some((file) => existsSync(resolve(root, folder.name, file)))) throw Error("Unindexed condition requires separate review; archive relinking does not grade new runs.");
++ }
++ const originalIndexSha256 = index.retained_record_index?.originalIndexSha256 ?? digest(raw);
++ if (!/^[a-f0-9]{64}$/.test(originalIndexSha256)) throw Error("Invalid index lineage.");
++ let converted = 0;
++ for (const run of index.runs) {
++  if (!["codex", "opencode", "claude"].includes(run.harness)) throw Error("Unsupported retained harness.");
++  if (typeof run.run !== "string" || !/^[a-z0-9-]+$/.test(run.run)) throw Error("Invalid retained run.");
++  const retainedRecords: Record<string, any> = { ...run.retainedRecords };
++  for (const [field, kind, originalFile, portableFile, linked] of [
++   ["summary", "summary", "summary.json", "summary.portable.json", true],
++   ["transcript", "transcript", "stdout.jsonl", "stdout.portable.json", true],
++   ["testsBefore", "text", "tests-before.txt", "tests-before.portable.json", false],
++   ["testsAfter", "text", "tests-after.txt", "tests-after.portable.json", false],
++  ] as const) {
++   const originalName = `${run.run}/${originalFile}`, name = `${run.run}/${portableFile}`;
++   if (linked && ![originalName, name].includes(run[field])) throw Error("Unexpected retained index link.");
++   if (!existsSync(resolve(root, name))) {
++    if (retainedRecords[field] || (linked && (run[field] !== originalName || run.harness === "codex" || !existsSync(resolve(root, originalName))))) throw Error("Missing retained derivative.");
++    continue;
++   }
++   if (existsSync(resolve(root, originalName))) throw Error("Ambiguous original and derivative tree; archival migration is incomplete.");
++   const text = readFileSync(resolve(root, name), "utf8"), record = decodePortableRecord(text, kind);
++   if (record.harness !== run.harness) throw Error("Retained harness and historical index disagree.");
++   if (field === "summary") {
++    const summary = record.payload;
++    if (!isDeepStrictEqual(summary.evidenceGate, run.gate) || summary.harness !== run.harness || summary.cliVersion !== run.version || !isDeepStrictEqual(summary.hostModel, run.hostModel) || summary.delegationOccurred !== run.delegationOccurred || summary.firstAuditTime !== run.firstAuditTime || summary.auditChronologyOrder !== run.order) throw Error("Retained summary and historical index disagree.");
++   }
++   const link = { format: record.format, originalFile: originalName, originalSha256: record.source.sha256, derivativeSha256: digest(text), payloadSha256: record.payloadSha256 };
++   if (retainedRecords[field] && !isDeepStrictEqual(retainedRecords[field], link)) throw Error("Retained index source identity changed.");
++   if (linked) run[field] = name;
++   retainedRecords[field] = link;
++  }
++  if (Object.keys(retainedRecords).length) { run.retainedRecords = retainedRecords; converted++; }
++ }
++ if (!converted) throw Error("No retained records in index.");
++ index.retained_record_index = { ...index.retained_record_index, format: "jev-portable-retained-index-v1", originalIndexSha256,
++  note: "Historical outcomes are retained without regrading. Retained-record links identify portable derivatives; original bytes are identified by lineage hashes and are not present in this tree." };
++ writeFileSync(path, JSON.stringify(index, null, 2) + "\n");
++ return { runs: index.runs.length, converted };
++}
++if (import.meta.main) console.log(JSON.stringify(buildPortableIndex(resolve(import.meta.dir, "evidence"))));
+diff --git a/jev-experiments/roadmap/integration/portable-publication.test.ts b/jev-experiments/roadmap/integration/portable-publication.test.ts
+new file mode 100644
+index 0000000..73eb5be
+--- /dev/null
++++ b/jev-experiments/roadmap/integration/portable-publication.test.ts
+@@ -0,0 +1,45 @@
++import { expect, test } from "bun:test";
++import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
++import { join } from "node:path";
++import { tmpdir } from "node:os";
++import { derivePortableRecord, digest } from "./portable-records";
++import { buildPortableIndex } from "./portable-index";
++import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
++function fixture() {
++ const root = mkdtempSync(join(tmpdir(), "retained-record-test-")), lab = join(root, "lab"), evidence = join(lab, "roadmap/integration/evidence"), folder = join(evidence, "codex");
++ mkdirSync(folder, { recursive: true });
++ const summary = { harness: "codex", command: ["/usr/bin/codex", "exec"], evidenceGate: { condition: "authored", passed: false }, cliVersion: "fixture", hostModel: { configured: "authored", identityBasis: "fixture only" }, delegationOccurred: false, firstAuditTime: "2026-01-01T00:00:00Z", auditChronologyOrder: 1 };
++ const source = JSON.stringify(summary) + "\n", transcript = JSON.stringify({ type: "turn.started" }) + "\n";
++ writeFileSync(join(folder, "summary.portable.json"), derivePortableRecord(source, "summary", digest(source), []));
++ writeFileSync(join(folder, "stdout.portable.json"), derivePortableRecord(transcript, "transcript", digest(transcript), []));
++ writeFileSync(join(folder, "mcp-audit.jsonl"), JSON.stringify({ event: "tools/list", time: "2026-01-01T00:00:00Z" }) + "\n");
++ writeFileSync(join(evidence, "index.json"), JSON.stringify({ orderBasis: "Authored fixture", runs: [{ order: 1, run: "codex", harness: "codex", version: summary.cliVersion, hostModel: summary.hostModel, delegationOccurred: false, firstAuditTime: summary.firstAuditTime, gate: summary.evidenceGate, summary: "codex/summary.json", transcript: "codex/stdout.jsonl", audit: "codex/mcp-audit.jsonl" }] }) + "\n");
++ return { root, lab, evidence, folder, source };
++}
++test("active index reads derivatives explicitly while preserving historical gates and publication links", () => {
++ const f = fixture();try {
++  buildPortableIndex(f.evidence);const indexText = readFileSync(join(f.evidence, "index.json"), "utf8"), index = JSON.parse(indexText);
++  expect(index.runs[0].summary).toBe("codex/summary.portable.json");expect(index.runs[0].gate.passed).toBe(false);
++  expect(index.runs[0].retainedRecords.summary.originalSha256).toBe(digest(f.source));
++  buildPortableIndex(f.evidence);expect(readFileSync(join(f.evidence, "index.json"), "utf8")).toBe(indexText);
++  const dest = join(f.root, "public");preparePublicHarnessEvidence(f.lab, dest);
++  const publicIndex = JSON.parse(readFileSync(join(dest, "index.json"), "utf8"));
++  expect(publicIndex.runs[0].summary).toBe("codex/summary.json");expect(existsSync(join(dest, publicIndex.runs[0].transcript))).toBe(true);
++  expect(JSON.parse(readFileSync(join(dest, "codex/summary.json"), "utf8")).command[0]).toBe("/usr/bin/codex");
++  expect(JSON.parse(readFileSync(join(dest, "codex/summary.json"), "utf8")).publication_projection.retained_record_derivative.originalSha256).toBe(digest(f.source));
++ } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++test("ambiguous original trees and forged lineage fail before publishing", () => {
++ const f = fixture();try {
++  writeFileSync(join(f.folder, "summary.json"), f.source);expect(() => buildPortableIndex(f.evidence)).toThrow("Ambiguous");rmSync(join(f.folder, "summary.json"));
++  buildPortableIndex(f.evidence);const index = JSON.parse(readFileSync(join(f.evidence, "index.json"), "utf8"));index.runs[0].retainedRecords.summary.originalSha256 = "0".repeat(64);writeFileSync(join(f.evidence, "index.json"), JSON.stringify(index));
++  const dest = join(f.root, "rejected");expect(() => preparePublicHarnessEvidence(f.lab, dest)).toThrow("lineage mismatch");expect(existsSync(join(dest, "index.json"))).toBe(false);
++ } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("unreviewed new conditions cannot be silently dropped from an archive rebuild", () => {
++ const f = fixture();try {
++  mkdirSync(join(f.evidence, "codex-new"));writeFileSync(join(f.evidence, "codex-new/summary.json"), f.source);
++  expect(() => buildPortableIndex(f.evidence)).toThrow("Unindexed condition");
++ } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
+diff --git a/jev-experiments/roadmap/integration/portable-records.test.ts b/jev-experiments/roadmap/integration/portable-records.test.ts
+new file mode 100644
+index 0000000..e3127e6
+--- /dev/null
++++ b/jev-experiments/roadmap/integration/portable-records.test.ts
+@@ -0,0 +1,56 @@
++import { test, expect } from "bun:test";
++import { derivePortableRecord, decodePortableRecord, digest } from "./portable-records";
++const sourcePath = "/example/fixture/sum.ts", uri = "record://fixture/sum.ts";
++const transcript = () => [
++ { type: "thread.started", thread_id: "authored-thread" },
++ { type: "turn.started" },
++ { type: "item.completed", item: {
++   id: "call-1", type: "mcp_tool_call", status: "completed", server: "jev", tool: "route_task",
++   arguments: { task: { id: "authored", context: `File ${sourcePath}\nexport const sum = (a,b) => a+b;` } },
++   error: null,
++   result: { structuredContent: { status: "ok", attempts: [{ cost: 0.001, model: "authored-model" }], outcome: { artifact: { kind: "structured", value: { bug: null } } } } },
++ } },
++ { type: "turn.completed", usage: { input_tokens: 12, output_tokens: 3, cached_input_tokens: 4 } },
++];
++const raw = (value: unknown[]) => value.map((event) => JSON.stringify(event)).join("\n") + "\n";
++function fixture() {
++ const events = transcript(), before = events[2].item!.arguments.task.context;
++ return { events, text: raw(events), edits: [{ record: 2, pointer: "/item/arguments/task/context", before, after: before.replace(sourcePath, uri), bindings: [{ source: sourcePath, target: uri }] }] };
++}
++test("explicit context spans preserve tool identity, code, structured results and accounting", () => {
++ const { events, text, edits } = fixture();
++ const derivative = derivePortableRecord(text, "transcript", digest(text), edits), record = decodePortableRecord(derivative, "transcript");
++ expect(record.source.sha256).toBe(digest(text)); expect(record.source.bytes).toBe(Buffer.byteLength(text));
++ expect(record.payload[2].item.arguments.task.context).toBe(edits[0].after);
++ expect(record.payload[2].item.result).toEqual(events[2].item!.result); expect(record.payload[3]).toEqual(events[3]);
++ expect(record.transformation.fields[0].originalSha256).toBe(digest(edits[0].before));
++ expect(derivePortableRecord(text, "transcript", digest(text), edits)).toBe(derivative);
++});
++test("changed source bytes or field, missing pointer and unplanned mutation fail closed", () => {
++ const { text, edits } = fixture();
++ expect(() => derivePortableRecord(text + "\n", "transcript", digest(text), edits)).toThrow("bytes");
++ expect(() => derivePortableRecord(text, "transcript", digest(text), [{ ...edits[0], before: "wrong" }])).toThrow("field");
++ expect(() => derivePortableRecord(text, "transcript", digest(text), [{ ...edits[0], pointer: "/missing" }])).toThrow("field");
++ expect(() => derivePortableRecord(text, "transcript", digest(text), [{ ...edits[0], after: edits[0].after + " modified code" }])).toThrow("reviewed field");
++});
++test("unknown client events, fields and derivative envelopes are rejected", () => {
++ for (const events of [[{ type: "future.event" }], [{ type: "thread.started", thread_id: "a", unexpected: true }]]) {
++  const text = raw(events); expect(() => derivePortableRecord(text, "transcript", digest(text), [])).toThrow();
++ }
++ const { text, edits } = fixture(), record = JSON.parse(derivePortableRecord(text, "transcript", digest(text), edits));
++ expect(() => decodePortableRecord(JSON.stringify({ ...record, unknownEnvelope: true }))).toThrow("envelope");
++ record.payload[3].usage.output_tokens = 999;
++ expect(() => decodePortableRecord(JSON.stringify(record))).toThrow("hash mismatch");
++});
++test("summary outcomes stay exact and incomplete cancellation transcripts remain incomplete", () => {
++ const summary = { harness: "codex", command: ["codex", "exec"], evidenceGate: { passed: false, condition: "authored" }, exitCode: 1, timedOut: true, elapsedSeconds: 0.25 };
++ const text = JSON.stringify(summary) + "\n";
++ expect(decodePortableRecord(derivePortableRecord(text, "summary", digest(text), [])).payload).toEqual(summary);
++ const events = [{ type: "turn.started" }], incomplete = raw(events);
++ expect(decodePortableRecord(derivePortableRecord(incomplete, "transcript", digest(incomplete), [])).payload).toEqual(events);
++});
++test("location aliases cannot collapse distinct source identities", () => {
++ const events = [{ type: "item.completed", item: { id: "a", type: "agent_message", text: "/example/a /example/b" } }];
++ const text = raw(events);
++ expect(() => derivePortableRecord(text, "transcript", digest(text), [{ record: 0, pointer: "/item/text", before: "/example/a /example/b", after: "record://fixture/shared record://fixture/shared", bindings: [{ source: "/example/a", target: "record://fixture/shared" }, { source: "/example/b", target: "record://fixture/shared" }] }])).toThrow();
++});
+diff --git a/jev-experiments/roadmap/integration/portable-records.ts b/jev-experiments/roadmap/integration/portable-records.ts
+new file mode 100644
+index 0000000..7e32b45
+--- /dev/null
++++ b/jev-experiments/roadmap/integration/portable-records.ts
+@@ -0,0 +1,115 @@
++import { validateClientTranscript } from "./portable-client-schemas";
++import { createHash } from "node:crypto";
++import { isDeepStrictEqual } from "node:util";
++type Value = Record<string, any>;
++export type Kind = "summary" | "transcript" | "text";
++export type Harness = "codex" | "opencode" | "claude";
++export type FieldEdit = { record: number; pointer: string; before: string; after: string; bindings: { source: string; target: string }[] };
++export const digest = (text: string) => createHash("sha256").update(text).digest("hex");
++const object = (value: unknown): Value => { if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Expected a record object."); return value as Value; };
++const exactKeys = (value: Value, allowed: readonly string[], required: readonly string[] = allowed) => {
++ if (Object.keys(value).some((key) => !allowed.includes(key)) || required.some((key) => !Object.hasOwn(value, key))) throw Error("Unknown or incomplete retained-record envelope.");
++};
++const summaryKeys = ["additionalTestsWritten","analysisFileWritten","annotationProvenance","auditChronologyOrder","baselineTestsExitCode","boundaryExplanations","cancelledToolResult","cliVersion","clientTerminalReason","command","contextComplete","delegationOccurred","directory","elapsedSeconds","evidenceBoundary","evidenceGate","exitCode","expectedTestsFail","firstAuditTime","harness","hostExitedBeforeScheduledReply","hostModel","independentTestsExitCode","invokedBeforeInterrupt","lateSuccessApplied","mcpConfigUnchanged","mcpDiscovered","noDestinationAttempts","observedBoundaryStatuses","patchedBug","purpose","routerConfigUnchanged","serverSawCancellation","serverSawDisconnect","sourceUnchanged","timedOut","toolCalls","toolResults","usableDelegatedArtifacts"];
++function validatePayload(kind: Kind, payload: unknown, harness: Harness) {
++ if (kind === "text") { const record = object(payload); exactKeys(record, ["text"]); if (typeof record.text !== "string") throw Error("Expected retained text."); return; }
++ if (kind === "summary") {
++  const record = object(payload); exactKeys(record, summaryKeys, ["harness", "command", "evidenceGate"]);
++  if (record.harness !== harness || !Array.isArray(record.command) || !record.command.every((s: unknown) => typeof s === "string")) throw Error("Unsupported retained summary.");
++  object(record.evidenceGate); return;
++ }
++ if (harness !== "codex") { validateClientTranscript(harness, payload); return; }
++ if (!Array.isArray(payload)) throw Error("Expected transcript event array.");
++ for (const value of payload) {
++  const event = object(value);
++  switch (event.type) {
++   case "thread.started": exactKeys(event, ["type", "thread_id"]); if (typeof event.thread_id !== "string") throw Error("Invalid thread identity."); break;
++   case "turn.started": exactKeys(event, ["type"]); break;
++   case "turn.completed": {
++    exactKeys(event, ["type", "usage"]); const usage = object(event.usage);
++    exactKeys(usage, ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens"], ["input_tokens", "output_tokens"]);
++    if (!Object.values(usage).every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0)) throw Error("Invalid retained accounting."); break;
++   }
++   case "item.started": case "item.completed": {
++    exactKeys(event, ["type", "item"]); const item = object(event.item);
++    const fields: Record<string, string[]> = {
++     agent_message: ["id", "type", "text"],
++     command_execution: ["id", "type", "status", "command", "aggregated_output", "exit_code"],
++     mcp_tool_call: ["id", "type", "status", "arguments", "error", "result", "server", "tool"],
++     file_change: ["id", "type", "status", "changes"],
++    };
++    if (!fields[item.type]) throw Error("Unsupported retained Codex item.");
++    exactKeys(item, fields[item.type]);
++    if (typeof item.id !== "string") throw Error("Invalid retained item identity.");
++    if (item.type === "file_change") {
++     if (!Array.isArray(item.changes)) throw Error("Invalid retained file changes.");
++     item.changes.forEach((change: unknown) => exactKeys(object(change), ["path", "kind"]));
++    }
++    break;
++   }
++   default: throw Error("Unsupported retained Codex event.");
++  }
++ }
++}
++function field(payload: any, kind: Kind, record: number, pointer: string) {
++ if (!Number.isSafeInteger(record) || record < 0 || (kind !== "transcript" && record !== 0) || !pointer.startsWith("/") || /~(?![01])/u.test(pointer)) throw Error("Invalid retained field pointer.");
++ let parent = kind !== "transcript" ? payload : payload[record];
++ const segments = pointer.slice(1).split("/").map((s) => s.replaceAll("~1", "/").replaceAll("~0", "~"));
++ const key = segments.pop()!;
++ for (const segment of segments) { if (!parent || typeof parent !== "object" || !Object.hasOwn(parent, segment)) throw Error("Missing retained field."); parent = parent[segment]; }
++ if (!parent || typeof parent !== "object" || !Object.hasOwn(parent, key) || typeof parent[key] !== "string") throw Error("Expected retained string field.");
++ return { parent, key };
++}
++const notice = "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.";
++const hash = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
++export function decodePortableRecord(text: string, expectedKind?: Kind) {
++ const value = object(JSON.parse(text));
++ exactKeys(value, ["format", "harness", "kind", "source", "transformation", "payloadSha256", "payload"]);
++ if (value.format !== "jev-portable-retained-record-v1" || !["codex", "opencode", "claude"].includes(value.harness) || !["summary", "transcript", "text"].includes(value.kind) || (expectedKind && expectedKind !== value.kind)) throw Error("Unsupported portable record format.");
++ const source = object(value.source); exactKeys(source, ["sha256", "bytes", "format", "recordCount"]);
++ if (!hash(source.sha256) || !Number.isSafeInteger(source.bytes) || source.bytes < 0 || source.format !== (value.kind === "summary" ? "json" : value.kind === "text" ? "utf8" : `${value.harness}-jsonl`) || source.recordCount !== (value.kind !== "transcript" ? 1 : value.payload?.length)) throw Error("Invalid predecessor lineage.");
++ validatePayload(value.kind, value.payload, value.harness);
++ if (!hash(value.payloadSha256) || digest(JSON.stringify(value.payload)) !== value.payloadSha256) throw Error("Retained payload hash mismatch.");
++ const transform = object(value.transformation); exactKeys(transform, ["id", "note", "fields"]);
++ if (transform.id !== "jev-explicit-location-spans-v1" || transform.note !== notice || !Array.isArray(transform.fields)) throw Error("Unsupported retained transformation.");
++ const locations = new Set<string>(); const uriSources = new Map<string, string>();
++ for (const raw of transform.fields) {
++  const edit = object(raw); exactKeys(edit, ["record", "pointer", "originalSha256", "derivativeSha256", "bindings"]);
++  const identity = `${edit.record}:${edit.pointer}`;
++  if (locations.has(identity) || !hash(edit.originalSha256) || !hash(edit.derivativeSha256) || !Array.isArray(edit.bindings) || !edit.bindings.length) throw Error("Invalid retained field lineage.");
++  locations.add(identity); const target = field(value.payload, value.kind, edit.record, edit.pointer);
++  if (digest(target.parent[target.key]) !== edit.derivativeSha256) throw Error("Retained field hash mismatch.");
++  for (const rawBinding of edit.bindings) {
++   const binding = object(rawBinding); exactKeys(binding, ["sourcePathSha256", "uri", "occurrences"]);
++   if (!hash(binding.sourcePathSha256) || !/^record:\/\/[a-z0-9-]+\/[A-Za-z0-9_./%-]+$/.test(binding.uri) || !Number.isSafeInteger(binding.occurrences) || binding.occurrences < 1 || target.parent[target.key].split(binding.uri).length - 1 !== binding.occurrences) throw Error("Invalid retained location binding.");
++   if (uriSources.has(binding.uri) && uriSources.get(binding.uri) !== binding.sourcePathSha256) throw Error("Location aliases collide.");
++   uriSources.set(binding.uri, binding.sourcePathSha256);
++  }
++ }
++ return value;
++}
++/** Apply a private, exact-field edit plan. No recursive or pattern-based replacement occurs. */
++export function derivePortableRecord(raw: string, kind: Kind, expectedSourceSha256: string, edits: readonly FieldEdit[], harness: Harness = "codex") {
++ if (digest(raw) !== expectedSourceSha256) throw Error("Predecessor bytes changed.");
++ const payload = kind === "summary" ? JSON.parse(raw) : kind === "text" ? { text: raw } : raw.split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line));
++ validatePayload(kind, payload, harness);
++ const fields = edits.map((edit) => {
++  const selected = field(payload, kind, edit.record, edit.pointer);
++  if (selected.parent[selected.key] !== edit.before) throw Error("Predecessor field changed.");
++  let next = edit.before;
++  const bindings = edit.bindings.map(({ source, target }) => {
++   if (!source || !target || source === target || !source.startsWith("/") || source.includes("record://") || !next.includes(source)) throw Error("Invalid explicit location edit.");
++   const occurrences = next.split(source).length - 1; next = next.split(source).join(target);
++   return { sourcePathSha256: digest(source), uri: target, occurrences };
++  });
++  if (next !== edit.after || next === edit.before) throw Error("Explicit location edit does not match its reviewed field.");
++  selected.parent[selected.key] = next;
++  return { record: edit.record, pointer: edit.pointer, originalSha256: digest(edit.before), derivativeSha256: digest(next), bindings };
++ });
++ const envelope = { format: "jev-portable-retained-record-v1", harness, kind,
++  source: { sha256: expectedSourceSha256, bytes: Buffer.byteLength(raw), format: kind === "summary" ? "json" : kind === "text" ? "utf8" : `${harness}-jsonl`, recordCount: kind !== "transcript" ? 1 : payload.length },
++  transformation: { id: "jev-explicit-location-spans-v1", note: notice, fields }, payloadSha256: digest(JSON.stringify(payload)), payload };
++ const serialized = JSON.stringify(envelope, null, 2) + "\n";
++ if (!isDeepStrictEqual(decodePortableRecord(serialized, kind), envelope)) throw Error("Derivative serialization changed.");
++ return serialized;
++}

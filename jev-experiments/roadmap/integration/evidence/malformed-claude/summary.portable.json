@@ -1,0 +1,112 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "claude",
+  "kind": "summary",
+  "source": {
+    "sha256": "188b4aa0c89aceea8ec2ce61beeeff89360b6d514a6c1c9c566e65867a19ae12",
+    "bytes": 2183,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/directory",
+        "originalSha256": "e9e10a9bdab3442cfe21ebca5f9ffba7a0e167d1c2ef157e295bb5be24212e81",
+        "derivativeSha256": "f9b94384aabde92e963677877ee903c9244d11dc029189c00ef1cb6a3f91f447",
+        "bindings": [
+          {
+            "sourcePathSha256": "e9e10a9bdab3442cfe21ebca5f9ffba7a0e167d1c2ef157e295bb5be24212e81",
+            "uri": "record://location/e9e10a9bdab3442cfe21ebca",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/4",
+        "originalSha256": "daf612bfb2695ced584e8696f313cd0c7f7d584eb2a7d7950786ef4c03306c02",
+        "derivativeSha256": "7ffd832fe38a74c19c987971143417811434431d056c48cb521612b6d9a81296",
+        "bindings": [
+          {
+            "sourcePathSha256": "daf612bfb2695ced584e8696f313cd0c7f7d584eb2a7d7950786ef4c03306c02",
+            "uri": "record://location/daf612bfb2695ced584e8696",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "77f4cd909dce189d332af7c1467079b1c3063c1082e3a8f07800c380e71b2ac8",
+  "payload": {
+    "harness": "claude",
+    "directory": "record://location/e9e10a9bdab3442cfe21ebca",
+    "command": [
+      "claude",
+      "--bare",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "record://location/daf612bfb2695ced584e8696",
+      "--model",
+      "claude-sonnet-4-6",
+      "--permission-mode",
+      "acceptEdits",
+      "--allowedTools",
+      "Read,Write,Edit,Glob,Grep,Bash(bun test*),Bash(git diff*),Bash(git apply*),mcp__jev__route_task,mcp__jev__decide",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "-p"
+    ],
+    "elapsedSeconds": 53.55,
+    "exitCode": 0,
+    "timedOut": false,
+    "baselineTestsExitCode": 1,
+    "independentTestsExitCode": 1,
+    "mcpDiscovered": true,
+    "toolCalls": [
+      {
+        "time": "2026-09-21T04:44:41.585Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 2,
+        "contextBytes": 367
+      }
+    ],
+    "toolResults": [
+      {
+        "time": "2026-09-21T04:44:41.591Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 2,
+        "status": "error"
+      }
+    ],
+    "patchedBug": false,
+    "analysisFileWritten": true,
+    "additionalTestsWritten": false,
+    "sourceUnchanged": true,
+    "expectedTestsFail": true,
+    "purpose": "Actual client handling of one deterministic malformed loopback destination response.",
+    "delegationOccurred": false,
+    "usableDelegatedArtifacts": 0,
+    "cliVersion": "2.1.278",
+    "hostModel": {
+      "configured": "claude-sonnet-4-6",
+      "identityBasis": "command configuration"
+    },
+    "firstAuditTime": "2026-09-21T04:44:31.334Z",
+    "evidenceGate": {
+      "condition": "malformed-response",
+      "passed": true,
+      "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
+      "historicalFailure": false
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 11
+  }
+}

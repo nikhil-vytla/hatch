@@ -1,0 +1,662 @@
+{
+  "base": "c32e5a69012c30c882485a58c36f81612215ad00",
+  "candidate08": "acd35640945d13bc154765cef2db494026bc1b55",
+  "candidate08InventorySha256": "5a8d9c9f6d4f3e8cff8f2ad90fb547294ad5e17661167ccf4c078ca1efc9d964",
+  "selected": {
+    "jev-experiments/capability-atlas-2026-09-22/publication-projection.test.ts": {
+      "sha256": "2330dd1a2e4e5b2cb63b61b340ee58fca6a057728f44e177a9367d2936470ded",
+      "bytes": 14862,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "2330dd1a2e4e5b2cb63b61b340ee58fca6a057728f44e177a9367d2936470ded"
+    },
+    "jev-experiments/capability-atlas-2026-09-22/publication-projection.ts": {
+      "sha256": "1ff709fb1e3d030de780a2ba54c1efeb1a2884ded2c273e0bcf5f3e75ed1a85a",
+      "bytes": 20511,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "1ff709fb1e3d030de780a2ba54c1efeb1a2884ded2c273e0bcf5f3e75ed1a85a"
+    },
+    "jev-experiments/roadmap/integration/README.md": {
+      "sha256": "0d68f0aa351cc3f09928aa5c452df473ecdd2e9d0f693e0bb9f0d046e1bc0fe6",
+      "bytes": 13162,
+      "origin": "bounded-candidate08-documentation-adaptation",
+      "candidate08Sha256": "ad15643f2e1c80e24606e0cf212d1607b5c329e6d4172398a16ad043dc1aef57"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-claude/stdout.portable.json": {
+      "sha256": "21334466cd68a488c2de4f36eb7d66e82dc9965cf05b5c3ab8e0d6cbfb463d14",
+      "bytes": 82067,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "21334466cd68a488c2de4f36eb7d66e82dc9965cf05b5c3ab8e0d6cbfb463d14"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-claude/summary.portable.json": {
+      "sha256": "2619c5ff7e2c8d46d779380ff65d5aed08d398f8f6dcf5102b9520b07db84146",
+      "bytes": 4878,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "2619c5ff7e2c8d46d779380ff65d5aed08d398f8f6dcf5102b9520b07db84146"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-after.portable.json": {
+      "sha256": "ba5f8db80e1bf8b5559bafa56c16aedca622be01bc356891bc10efd439178b71",
+      "bytes": 1978,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "ba5f8db80e1bf8b5559bafa56c16aedca622be01bc356891bc10efd439178b71"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-before.portable.json": {
+      "sha256": "429d7235ddf374f1b2b92a17d2f489ea64f38f75d1c012179a4741be678f7ede",
+      "bytes": 1978,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "429d7235ddf374f1b2b92a17d2f489ea64f38f75d1c012179a4741be678f7ede"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-codex/stdout.portable.json": {
+      "sha256": "2c277f0ce6549bcde596740b88f4e073f2572fda10b63e0a56e2419e344d1004",
+      "bytes": 21792,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "2c277f0ce6549bcde596740b88f4e073f2572fda10b63e0a56e2419e344d1004"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-codex/summary.portable.json": {
+      "sha256": "de09d77cc7b1e3ddb59b2cfedd5a0f4b61808a7a8783545c9f37c27197773650",
+      "bytes": 5966,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "de09d77cc7b1e3ddb59b2cfedd5a0f4b61808a7a8783545c9f37c27197773650"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/stdout.portable.json": {
+      "sha256": "324912667d6d43420aeb39122116ba3b47346acc6798df5fbcd0d96c0e742ca1",
+      "bytes": 27099,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "324912667d6d43420aeb39122116ba3b47346acc6798df5fbcd0d96c0e742ca1"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/summary.portable.json": {
+      "sha256": "524ce93109e34fbf84fd6a464e47d198f0d0a3c1d90194b91b317ac0381ee792",
+      "bytes": 4688,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "524ce93109e34fbf84fd6a464e47d198f0d0a3c1d90194b91b317ac0381ee792"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-after.portable.json": {
+      "sha256": "e2ad7808f51bdf6b1a5e01846169467b0798bbcda3ad034c9c33f526073dfbcb",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "e2ad7808f51bdf6b1a5e01846169467b0798bbcda3ad034c9c33f526073dfbcb"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-before.portable.json": {
+      "sha256": "261f538ac30b66dc8c7fa61761579b22b1247d655734297f71f1154daceb4d6b",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "261f538ac30b66dc8c7fa61761579b22b1247d655734297f71f1154daceb4d6b"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode/stdout.portable.json": {
+      "sha256": "0350ab8bd69b0b9a3c7c9a458b1695e314393a4c1f925537746cb00aa5e8c835",
+      "bytes": 99487,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "0350ab8bd69b0b9a3c7c9a458b1695e314393a4c1f925537746cb00aa5e8c835"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode/summary.portable.json": {
+      "sha256": "c54c2cc8c264d15005f931ad7513ed826ce8fd8e4be69dc1b8e0a3532f0bef15",
+      "bytes": 4690,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "c54c2cc8c264d15005f931ad7513ed826ce8fd8e4be69dc1b8e0a3532f0bef15"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-after.portable.json": {
+      "sha256": "3da3ecd8e3b121587b8a49f4d4bdef49f9fddfab3ef0de3865088017d9de359e",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "3da3ecd8e3b121587b8a49f4d4bdef49f9fddfab3ef0de3865088017d9de359e"
+    },
+    "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-before.portable.json": {
+      "sha256": "441bf67b61cc618e4f5ba6e9f418a7abffbd008f27c9c87efd1a7cb010d74671",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "441bf67b61cc618e4f5ba6e9f418a7abffbd008f27c9c87efd1a7cb010d74671"
+    },
+    "jev-experiments/roadmap/integration/evidence/cancel-claude/stdout.portable.json": {
+      "sha256": "1d0b024f0885e78b89876c00ee311066abda89acb40b398eccd634fe5b0b7138",
+      "bytes": 15877,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "1d0b024f0885e78b89876c00ee311066abda89acb40b398eccd634fe5b0b7138"
+    },
+    "jev-experiments/roadmap/integration/evidence/cancel-claude/summary.portable.json": {
+      "sha256": "48260b7df220ab340fad7c440b7684b159217e593fb39acee8b0ebe47b50ea7c",
+      "bytes": 3109,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "48260b7df220ab340fad7c440b7684b159217e593fb39acee8b0ebe47b50ea7c"
+    },
+    "jev-experiments/roadmap/integration/evidence/cancel-codex/stdout.portable.json": {
+      "sha256": "e0db04377818a50e15d214f8d6db2d2c009ae0718201c891c8eb409eefbcaddf",
+      "bytes": 1697,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "e0db04377818a50e15d214f8d6db2d2c009ae0718201c891c8eb409eefbcaddf"
+    },
+    "jev-experiments/roadmap/integration/evidence/cancel-codex/summary.portable.json": {
+      "sha256": "7247ba78c4f531f8ff0e5a3d387668b0fb60e2964b30a0ec6948bbe40394f5e3",
+      "bytes": 4353,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "7247ba78c4f531f8ff0e5a3d387668b0fb60e2964b30a0ec6948bbe40394f5e3"
+    },
+    "jev-experiments/roadmap/integration/evidence/cancel-opencode/summary.portable.json": {
+      "sha256": "9113bac84e2ca65b9a89ba061a363a9a8e5bfc20f86b9215d45ea892315fa0f1",
+      "bytes": 2949,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "9113bac84e2ca65b9a89ba061a363a9a8e5bfc20f86b9215d45ea892315fa0f1"
+    },
+    "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/stdout.portable.json": {
+      "sha256": "294aac723dfcfaf77f1d83fd3c349428259b5a324d26620c57c5eab88f09191e",
+      "bytes": 10272,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "294aac723dfcfaf77f1d83fd3c349428259b5a324d26620c57c5eab88f09191e"
+    },
+    "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/summary.portable.json": {
+      "sha256": "180773cde9db65ebf41e7297947e3d91b64355298bcf112f66a29d2ffd15fe46",
+      "bytes": 3486,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "180773cde9db65ebf41e7297947e3d91b64355298bcf112f66a29d2ffd15fe46"
+    },
+    "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-after.portable.json": {
+      "sha256": "370b3d90d0a65f46bb4b69bc4437d530be00f7fae4e9214234c01e9fb16856bd",
+      "bytes": 1978,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "370b3d90d0a65f46bb4b69bc4437d530be00f7fae4e9214234c01e9fb16856bd"
+    },
+    "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-before.portable.json": {
+      "sha256": "947af2bea29d5223a7667cb7d688ea33a370d0278ff2b9820a54bb0a768d38e6",
+      "bytes": 1978,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "947af2bea29d5223a7667cb7d688ea33a370d0278ff2b9820a54bb0a768d38e6"
+    },
+    "jev-experiments/roadmap/integration/evidence/claude/stdout.portable.json": {
+      "sha256": "039e659fa1133840dd6dbd13eabf28b2b9f6d118c63786bb5cfd81ee4ce69671",
+      "bytes": 159433,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "039e659fa1133840dd6dbd13eabf28b2b9f6d118c63786bb5cfd81ee4ce69671"
+    },
+    "jev-experiments/roadmap/integration/evidence/claude/summary.portable.json": {
+      "sha256": "aa068f663bb43f2e6fa83929dc625232c48c586fc310bda451622279951d3609",
+      "bytes": 5375,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "aa068f663bb43f2e6fa83929dc625232c48c586fc310bda451622279951d3609"
+    },
+    "jev-experiments/roadmap/integration/evidence/claude/tests-before.portable.json": {
+      "sha256": "34f6f18e91b921bcbb5770561135c3b4e3b4bdb2c5dab31d163616bfe56f06b7",
+      "bytes": 1978,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "34f6f18e91b921bcbb5770561135c3b4e3b4bdb2c5dab31d163616bfe56f06b7"
+    },
+    "jev-experiments/roadmap/integration/evidence/codex-approval-default/stdout.portable.json": {
+      "sha256": "7e1de519235cb64200a662b9b4cc47c18a206ebad6d354f446b3ca601ef5f6d4",
+      "bytes": 52763,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "7e1de519235cb64200a662b9b4cc47c18a206ebad6d354f446b3ca601ef5f6d4"
+    },
+    "jev-experiments/roadmap/integration/evidence/codex-approval-default/summary.portable.json": {
+      "sha256": "dae29c7e6936fee56cc5d1f4ff0594e6e8c51e5f2be1c31c3c6ace604670a35d",
+      "bytes": 4532,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "dae29c7e6936fee56cc5d1f4ff0594e6e8c51e5f2be1c31c3c6ace604670a35d"
+    },
+    "jev-experiments/roadmap/integration/evidence/codex/stdout.portable.json": {
+      "sha256": "97d859d380aceb7bd89cc13cee99829e5778a3a7570176e75ec3e089dc9ec6c5",
+      "bytes": 100995,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "97d859d380aceb7bd89cc13cee99829e5778a3a7570176e75ec3e089dc9ec6c5"
+    },
+    "jev-experiments/roadmap/integration/evidence/codex/summary.portable.json": {
+      "sha256": "b06532146720d145e517bcfe3a6361cf69998a6122288313fd666904c7066fcb",
+      "bytes": 6917,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "b06532146720d145e517bcfe3a6361cf69998a6122288313fd666904c7066fcb"
+    },
+    "jev-experiments/roadmap/integration/evidence/index.json": {
+      "sha256": "07aee26c44141f41b2528794d38e6da58111448c0e580f86b18e546cd6e7e5e4",
+      "bytes": 35061,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "07aee26c44141f41b2528794d38e6da58111448c0e580f86b18e546cd6e7e5e4"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-claude/stdout.portable.json": {
+      "sha256": "43c3c440b7bb4eb39c2f06576aeaa9f59c8a6699ad6c8e0c2efa362ed33a21cd",
+      "bytes": 70950,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "43c3c440b7bb4eb39c2f06576aeaa9f59c8a6699ad6c8e0c2efa362ed33a21cd"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-claude/summary.portable.json": {
+      "sha256": "39af52d5c59d630e5ddf3557c911b7d641a21d662e5028363f879ea9ed8106be",
+      "bytes": 4084,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "39af52d5c59d630e5ddf3557c911b7d641a21d662e5028363f879ea9ed8106be"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-after.portable.json": {
+      "sha256": "292964a1e5cf0c4f2281c46d42a268767b3b633a79471966c313b4cee5de519b",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "292964a1e5cf0c4f2281c46d42a268767b3b633a79471966c313b4cee5de519b"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-before.portable.json": {
+      "sha256": "d6eefa84389c98641c9f7bcd2a867dbc624683f5910323863270d595d3f2711e",
+      "bytes": 1978,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "d6eefa84389c98641c9f7bcd2a867dbc624683f5910323863270d595d3f2711e"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-codex/stdout.portable.json": {
+      "sha256": "5130c16003fa5cb782a7c3fac04f6783e5e46a7544ba7a6209e29b66358eb6ca",
+      "bytes": 19512,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "5130c16003fa5cb782a7c3fac04f6783e5e46a7544ba7a6209e29b66358eb6ca"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-codex/summary.portable.json": {
+      "sha256": "3e7219aa532030a6b3de188d46bcd0decd95d2c433d271f395a8093e5957961f",
+      "bytes": 5174,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "3e7219aa532030a6b3de188d46bcd0decd95d2c433d271f395a8093e5957961f"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-opencode/stdout.portable.json": {
+      "sha256": "8e7cd4237e71caa1a63b4a348d3e8fe7f4014845ab54f6a7469df8e3626c3ffa",
+      "bytes": 31589,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "8e7cd4237e71caa1a63b4a348d3e8fe7f4014845ab54f6a7469df8e3626c3ffa"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-opencode/summary.portable.json": {
+      "sha256": "270899a3308bfbe7195896c24d7b6ce9c596876513781448719b073c091c99c4",
+      "bytes": 3894,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "270899a3308bfbe7195896c24d7b6ce9c596876513781448719b073c091c99c4"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-after.portable.json": {
+      "sha256": "7364975dff989757f6abb308370ac866e30e3c13aed2672668986a4aadbbbf3d",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "7364975dff989757f6abb308370ac866e30e3c13aed2672668986a4aadbbbf3d"
+    },
+    "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-before.portable.json": {
+      "sha256": "7a14bea6405e52b7f6b0ee539fd2d7c421c3372066be7ee5f1ee2e2a29c89550",
+      "bytes": 1981,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "7a14bea6405e52b7f6b0ee539fd2d7c421c3372066be7ee5f1ee2e2a29c89550"
+    },
+    "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/stdout.portable.json": {
+      "sha256": "a9ed6bbb3f79b6d4e4ed2859363775c9ba580bf7b457cb18f041e93ef5a6974c",
+      "bytes": 122229,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "a9ed6bbb3f79b6d4e4ed2859363775c9ba580bf7b457cb18f041e93ef5a6974c"
+    },
+    "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/summary.portable.json": {
+      "sha256": "8623c5980c91817d0df91a529fbd99083132b46f36c3b710ad34efd57b04cf46",
+      "bytes": 4029,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "8623c5980c91817d0df91a529fbd99083132b46f36c3b710ad34efd57b04cf46"
+    },
+    "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-after.portable.json": {
+      "sha256": "16fd94a98a3fe1126289764daea7de66e9fdeadf7958b3e2e1542a3f2caa3c7f",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "16fd94a98a3fe1126289764daea7de66e9fdeadf7958b3e2e1542a3f2caa3c7f"
+    },
+    "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-before.portable.json": {
+      "sha256": "aa042ce3155042567d9a573b91049f714d4a192516a5f565338f2b530fa6621b",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "aa042ce3155042567d9a573b91049f714d4a192516a5f565338f2b530fa6621b"
+    },
+    "jev-experiments/roadmap/integration/evidence/opencode/stdout.portable.json": {
+      "sha256": "6e9f514c83ff94da286ef0bac39c65d4691780cae75cc980b4a3ce7a78512fcb",
+      "bytes": 93420,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "6e9f514c83ff94da286ef0bac39c65d4691780cae75cc980b4a3ce7a78512fcb"
+    },
+    "jev-experiments/roadmap/integration/evidence/opencode/summary.portable.json": {
+      "sha256": "d76c4672c2b988a86f951ffebe2b4a3818fe4944089cc5afe6d664d28f4dc262",
+      "bytes": 6217,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "d76c4672c2b988a86f951ffebe2b4a3818fe4944089cc5afe6d664d28f4dc262"
+    },
+    "jev-experiments/roadmap/integration/evidence/opencode/tests-before.portable.json": {
+      "sha256": "c98c1fa32446c9d06c648679217fe9b3f342a9d25451b0170eb205ae3460ce5e",
+      "bytes": 1980,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "c98c1fa32446c9d06c648679217fe9b3f342a9d25451b0170eb205ae3460ce5e"
+    },
+    "jev-experiments/roadmap/integration/evidence_index.py": {
+      "sha256": "9c7778f2d37fbfbf8e709abd40007c9117eb6b417f27211a172c6f5ec626aa70",
+      "bytes": 8253,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "9c7778f2d37fbfbf8e709abd40007c9117eb6b417f27211a172c6f5ec626aa70"
+    },
+    "jev-experiments/roadmap/integration/portable-client-schemas.ts": {
+      "sha256": "b18d8faf1814668e6d201f76e11ae601f009a590d13512cd86851cb4225aa662",
+      "bytes": 6416,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "b18d8faf1814668e6d201f76e11ae601f009a590d13512cd86851cb4225aa662"
+    },
+    "jev-experiments/roadmap/integration/portable-clients.test.ts": {
+      "sha256": "73a438662d7281038d02a6312690e8319093aec4dab8fc6acb776057d760d3df",
+      "bytes": 11956,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "73a438662d7281038d02a6312690e8319093aec4dab8fc6acb776057d760d3df"
+    },
+    "jev-experiments/roadmap/integration/portable-index.ts": {
+      "sha256": "cf00da5228a30cb349c6b601ec93e2419d8d2dfcdc32b91dfac0069dd971bdf4",
+      "bytes": 4335,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "cf00da5228a30cb349c6b601ec93e2419d8d2dfcdc32b91dfac0069dd971bdf4"
+    },
+    "jev-experiments/roadmap/integration/portable-publication.test.ts": {
+      "sha256": "6644ecd4e79159d6f7cb5589856bf93e0cb25935c257d87d757b5b145b1b007b",
+      "bytes": 4333,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "6644ecd4e79159d6f7cb5589856bf93e0cb25935c257d87d757b5b145b1b007b"
+    },
+    "jev-experiments/roadmap/integration/portable-records.test.ts": {
+      "sha256": "2f8bcd9729479a453bdffac3d6ea3bc2aa68dab91ec05db4413ef252347da998",
+      "bytes": 4575,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "2f8bcd9729479a453bdffac3d6ea3bc2aa68dab91ec05db4413ef252347da998"
+    },
+    "jev-experiments/roadmap/integration/portable-records.ts": {
+      "sha256": "b2ca9c89ccb5cc9628c24787fe54b198bf5330950e76f5ee7e82d43173a91889",
+      "bytes": 10478,
+      "origin": "exact-candidate08",
+      "candidate08Sha256": "b2ca9c89ccb5cc9628c24787fe54b198bf5330950e76f5ee7e82d43173a91889"
+    },
+    "jev-experiments/experience-prototypes/scripts/prepare.ts": {
+      "origin": "bounded-main-adaptation",
+      "baseSha256": "3767a69dbd05e3a55e5a968f1d209efff07ba4726a1d18efda871db4acee8c75",
+      "sha256": "f9ff8ccf61d09eac91c410468928e5b1bbe6451ff0be3d54ad05edc3c2b825a4",
+      "bytes": 5902
+    },
+    "jev-experiments/experience-prototypes/.gitignore": {
+      "origin": "bounded-main-adaptation",
+      "baseSha256": "70bbf89a40d135dcd9d89464e2d99e4f25905ee5ee7d2e7b90c0b178eb2de1cd",
+      "sha256": "a140330a7c825a5ee1cd853a3d76079b878c822ef9b3c33abca3938c6880ccb9",
+      "bytes": 388
+    },
+    ".github/workflows/jev-portable-evidence.yml": {
+      "origin": "new-focused-provider-free-ci",
+      "sha256": "b5d14eea6bf91eb62b3dbb95d21a1b6cc62b6824b2608876c8892e2ee283af29",
+      "bytes": 1598
+    }
+  },
+  "removals": [
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/stdout.jsonl",
+      "predecessorSha256": "0a7cb9b8bd84d1e70ee634a58e5f8027dbdc5ebea11bd147822b7d440c4f0e9e",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-claude/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/summary.json",
+      "predecessorSha256": "c3681f864c992e4dd5b60138661e6416f84d23d66925b59cc111b93484ccaaaf",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-claude/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-after.txt",
+      "predecessorSha256": "00e11c9e4ad8fef5255d43a5f416bce6ddd25715252cd782733d4e239eb1b162",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-after.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-before.txt",
+      "predecessorSha256": "7fca82180a1fe81a3fedc81350599e1fe2e00eb240d4550fa98c9cc7d7afac3c",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/stdout.jsonl",
+      "predecessorSha256": "9430edb34ef9a129a7cc226ef83b690ba1e215682cd59014d889192391615a9a",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-codex/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/summary.json",
+      "predecessorSha256": "b0e07352418b37fc9caef2c59d7efa1293832d0666db231c745c562d68503926",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-codex/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/stdout.jsonl",
+      "predecessorSha256": "fd6e9ae3e2c2f660f240e597a8070ef76bc734c1ed56bf6645fbc66b1c66d088",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/summary.json",
+      "predecessorSha256": "60f51c16943fe04bbf890a6db92d31e20be168090498dd6fd7ce1f1dcce9efb0",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-after.txt",
+      "predecessorSha256": "23bccb5eab154ad4fa238bebaf3fa0bdf26ca687283ec6ce5f684a8de0962f90",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-after.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-before.txt",
+      "predecessorSha256": "0a9edfad2bb0685d67ecbfd5e7b2e93a24dfa131aaee20faf8701e4a0eb09c01",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/stdout.jsonl",
+      "predecessorSha256": "974c919d1431f5b6cb6310a6680733233c264ef4a48b5beac3ad65f7e01ef3bb",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/summary.json",
+      "predecessorSha256": "20f8e2bc8ec84c77aa4c9f6edcbc96c654a5d3afdfb6ea5bad8b39b41368ba78",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-after.txt",
+      "predecessorSha256": "251e640df3589c39bfac6e5607dad249eaccec84c3ca903a8e67b2f0c8c76871",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-after.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-before.txt",
+      "predecessorSha256": "86d3cd6fb8c8988fb74f9de19e5c240ef5eb2463b4c926abc567ec7e96963bd8",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/stdout.jsonl",
+      "predecessorSha256": "98185b1525949f31c27e1bafba4c00909f60b7b962e3ce2ac75e037b89db404f",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/cancel-claude/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/summary.json",
+      "predecessorSha256": "1ddfbe621b7998af8f4fc23b9cc3671e3c86945302c8de639b17de42f9de3be7",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/cancel-claude/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/stdout.jsonl",
+      "predecessorSha256": "ea97490d5c225b556fb9475215d0bc4c6613ed0606849740e2e992c839880c7f",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/cancel-codex/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/summary.json",
+      "predecessorSha256": "f322644017d80abf274162162d1f76482e1eb3f1014883feb010e0ca5247efe0",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/cancel-codex/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-opencode/summary.json",
+      "predecessorSha256": "bfc4cc3458efd0494a5876ae379fa368808c3566db3b57fcbd8dc4b13b20fe02",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/cancel-opencode/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/stdout.jsonl",
+      "predecessorSha256": "996d92fd365a437464c44ad0e0ea57eaf0c3198966428842ce7cfcc80e37be75",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/summary.json",
+      "predecessorSha256": "641e495c9a7675cddee966fea7c8a9d7c7d594ecae6f514cf48ed246e63d3a14",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-after.txt",
+      "predecessorSha256": "7e148bc6bfb82e2a5781c18c78c626f03b859adb6d373da5a1a35c576706e16f",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-after.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-before.txt",
+      "predecessorSha256": "2b84e6574f5d9a03e2e0ac0a67f2fa823bf98203dd330dec27fbd8a912e25c50",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/stdout.jsonl",
+      "predecessorSha256": "aa38d8461da8d3fc210ea7d9075ff8b41d25c373ea88d301b13e66c73ccbf15a",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/claude/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/summary.json",
+      "predecessorSha256": "4bddb6db049d61cca4ade9b4d27cc61e9b2dfcd98b7abcd6f08c2feb37cfb7be",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/claude/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/tests-before.txt",
+      "predecessorSha256": "7614cf15c47e986cc1483e06437049f2193f83977d900952309fff8bcb5775bb",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/claude/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/stdout.jsonl",
+      "predecessorSha256": "85f1f0a6ea03a53138727975dde3321121cbd0cbf0413086b87069ddc69e6218",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/codex-approval-default/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/summary.json",
+      "predecessorSha256": "be7a47019d99c9524565f590cfa40229703287a8bace2249dc8ea504d0e51c30",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/codex-approval-default/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/stdout.jsonl",
+      "predecessorSha256": "12b3261ae4e64ff9bd8026bcdc4d10e8ed273bd8a777ea5416620e284d095354",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/codex/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/summary.json",
+      "predecessorSha256": "2c6f161e318a02e2502b3edff7f883dcf5bdaad9e6de3d4c8c52bb5b7844de3e",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/codex/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/stdout.jsonl",
+      "predecessorSha256": "b58d5a94b20a4e26b70429d3abfeedc31a1cb7610e7ee90278afab5b3624e3c9",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-claude/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/summary.json",
+      "predecessorSha256": "188b4aa0c89aceea8ec2ce61beeeff89360b6d514a6c1c9c566e65867a19ae12",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-claude/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-after.txt",
+      "predecessorSha256": "d01a1092523db4f74f1d4e0a9d7f71f33dd3953659b0c9e3dc53e4c8001c3f38",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-after.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-before.txt",
+      "predecessorSha256": "5f0d3d2602e50563d564cab750283857eab70a8061688e1b2e7903669b78c5a8",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/stdout.jsonl",
+      "predecessorSha256": "e42418a6f1e568d13c1a22594cfed820afade61452b077d46600dd52e2dc5250",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-codex/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/summary.json",
+      "predecessorSha256": "eac0becac6f7948aef475a114400d3060d5b1644ed9811ea57e660180da2cd68",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-codex/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/stdout.jsonl",
+      "predecessorSha256": "634d4144b4e27dd798e57b7de45ab717379dc4de3bf120fa58a627e15094195a",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-opencode/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/summary.json",
+      "predecessorSha256": "62894a2a09556bb0e64cbbb48b9f8f7aaa338e4ed3008ce7b05e4fed782ae724",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-opencode/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-after.txt",
+      "predecessorSha256": "b1591a4c7fb5f0d6e62a325ce842b277e6877638b111022b71c042f7c9ae334b",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-after.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-before.txt",
+      "predecessorSha256": "4a483abe8bd3a27490e7518a7d09663afdab07879f88dc1bc7812049af953ffb",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/stdout.jsonl",
+      "predecessorSha256": "9de2424d85ff569816a17cee11177a3333a76c7a90849a735b0ae2b46fe16568",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/summary.json",
+      "predecessorSha256": "e90a5963022e4d15fab4efbc15e9639ff013aea90e1aa679445100133c05dba8",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-after.txt",
+      "predecessorSha256": "b794743a2dd646b97b497000a28b566187540474e4465cab751a47fe508b5fe0",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-after.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-before.txt",
+      "predecessorSha256": "0ce9e1d8d28d86b1c9e692ea6277ba96b6772ccf7faf5fb2b36aff13559b8bd3",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-before.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/stdout.jsonl",
+      "predecessorSha256": "9375285e7cad5675612e8078fb6d682d35aa68c264dc84b7ae1e7ded520b40e9",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/opencode/stdout.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/summary.json",
+      "predecessorSha256": "65cf0d1538b54c2ba847047b8142a50e706e3215879263673d72f843a0a13dc1",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/opencode/summary.portable.json",
+      "basePresent": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/tests-before.txt",
+      "predecessorSha256": "feaba7f3a8679ff39e52c30a98696b0f71398821f733022fe40a54c2c0f77485",
+      "replacedBy": "jev-experiments/roadmap/integration/evidence/opencode/tests-before.portable.json",
+      "basePresent": true
+    }
+  ],
+  "selectedCount": 61,
+  "removalCount": 47,
+  "runtimeChanges": false,
+  "uiChanges": false,
+  "dependenciesChanged": false,
+  "pushed": false
+}
