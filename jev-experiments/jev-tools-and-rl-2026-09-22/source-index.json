@@ -1,0 +1,51 @@
+{
+  "inspected_on": "2026-09-22",
+  "method": "Primary source/artifact inspection; no model execution or training",
+  "projects": [
+    {
+      "name": "Jimothy",
+      "credit": "Andrew Prifer",
+      "repository": "https://github.com/andrewprifer/jimothy",
+      "revision": "f2ad9b40b88ea913d38fda758e564eac5f12fc0b",
+      "license_observation": "MIT",
+      "analysis": "jimothy-analysis.md"
+    },
+    {
+      "name": "AutoJev",
+      "credit": "Denis Yarats",
+      "repository": "https://github.com/denis-pplx/autojev",
+      "revision": "ee63c1515980491a742f0bd0685c8dc5ca1f00c3",
+      "license_observation": "MIT code; Apache-2.0 weights plus NOTICE",
+      "analysis": "autojev-analysis.md"
+    },
+    {
+      "name": "webctl",
+      "credit": "Kyle Wild",
+      "repository": "https://github.com/dorkitude/webctl",
+      "revision": "e9bc54aacc9680e45af12a636ce5db8998c93337",
+      "license_observation": "MIT",
+      "analysis": "webctl-analysis.md"
+    },
+    {
+      "name": "Jev Workflow Builder",
+      "credit": "Chris Nicholas",
+      "repository": "https://github.com/ctnicholas/jev-workflow-builder",
+      "revision": "9a652d22216028a64ccaa7468754e45e1860618b",
+      "license_observation": "Package declares Apache-2.0; standalone LICENSE absent",
+      "analysis": "workflow-builder-analysis.md"
+    },
+    {
+      "name": "Jev Recruiter",
+      "credit": "skeptrune / skeptrunedev; upstream Browser Use",
+      "repository": "https://github.com/skeptrunedev/jev-recruiter",
+      "revision": "bed4083bf5a8351ce21089a5ebd0f90498ffdd6c",
+      "license_observation": "Retained Browser Use MIT notice",
+      "analysis": "recruiter-analysis.md"
+    }
+  ],
+  "rl_sources": [
+    "https://arxiv.org/html/2402.03300v3#S4",
+    "https://arxiv.org/html/2507.17746v2#S2",
+    "https://huggingface.co/docs/trl/grpo_trainer"
+  ]
+}

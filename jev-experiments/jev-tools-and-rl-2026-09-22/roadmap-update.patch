@@ -1,0 +1,24 @@
+diff --git a/jev-experiments/roadmap/MAP.md b/jev-experiments/roadmap/MAP.md
+--- a/jev-experiments/roadmap/MAP.md
++++ b/jev-experiments/roadmap/MAP.md
+@@ -12,6 +12,7 @@
+ - Backward compatibility is not a release goal. Refactor structure and replace weak interactions when that produces a more coherent, useful, well-crafted result.
+ - Code organization and style are first-release work: deliberate source/research/artifact boundaries, documented conventions, CI checks and removal of obsolete code. Keep these tasks visible beside the UI/UX revamp.
+ - Research Jeverative-style UI composition, JevFrame tables and marimo-pets-inspired adaptive interfaces as separate next-wave experiments. A 1–2 second first usable composition is a measurement target. Optional LLM refinement has separate timing and cost. Adding these tickets does not expand the first release.
++- Add next-wave studies for Jimothy task specialists, AutoJev calibration, webctl evidence selection, editable workflow traces, synthetic recruiting-evidence inference, and Jev rubric grading for GRPO. Reuse existing workstreams; freeze protocols before new measurements. RL grading begins with fixed rollout replay, before a separate on-policy training pilot.
+ - Extend the existing prompt-optimization experiment with the GEPA domain-adaptation study. Keep prompt/criterion optimization separate from the completed local-model readout adaptation, with its own frozen protocol and unchanged historical evidence.
+ - Keep Bun and the existing Vercel project and URL. Its root stays `jev-experiments/experience-prototypes`. Keep parent source access and committed JSONL inputs available to clean builds.
+ - Keep unfinished entry experiences out of the public catalog. Historical research remains labeled with its original protocol.
+@@ -67,6 +68,12 @@
+ | [Inspect decisions across a review table](../roadmap-additions-2026-09-21/decisions/jevframe-experiment.md) | Typed contract, Python runner boundary, artifact integrity, useful uncertainty | Next wave; training/runtime; pinned JevFrame study complete, protocol and implementation open |
+ | [Adapt a workspace without disrupting its user](../roadmap-additions-2026-09-21/decisions/adaptive-interfaces.md) | Typed contract, design direction, stable task state and context controls | Next wave; playable/design engineering; marimo-pets study complete, protocol and implementation open |
+ | [Adapt decision instructions to the task](../roadmap-additions-2026-09-21/decisions/gepa-domain-adaptation.md) | Existing GEPA adapter, immutable search evidence, task-specific labels and typed contract | Next wave; training/runtime; extend existing prompt optimization; new protocol and implementation open |
++| [When should an email specialist answer locally?](../jev-tools-and-rl-2026-09-22/decisions/jimothy-experiment.md) | Fixed-task corpus, local runtime, browser parity and review policy | Next wave; training/runtime; Jimothy study; protocol open |
++| [Decisions with a review threshold](../jev-tools-and-rl-2026-09-22/decisions/autojev-experiment.md) | Typed contract, explicit GPU runtime, calibration and held-out tasks | Next wave; training/runtime; AutoJev source/results reviewed; no default change |
++| [Select useful web evidence](../jev-tools-and-rl-2026-09-22/decisions/webctl-experiment.md) | Captured documents, provenance, routing permissions and answer labels | Next wave; routing/integration; webctl study; retrieval/answer protocol open |
++| [Can typed branches improve a workflow?](../jev-tools-and-rl-2026-09-22/decisions/workflow-builder-experiment.md) | Existing React Flow, versioned graph/run contract and independent grader | Next wave; root/design + routing; recorded single-user prototype first |
++| [Compare recruiting-evidence inference paths](../jev-tools-and-rl-2026-09-22/decisions/recruiter-experiment.md) | Synthetic criteria, human review, pinned V4.1/SGLang token conformance | Next wave; runtime/evaluation; supported non-thinking mode; scoring compatibility unmeasured |
++| [Use Jev for GRPO rubric rewards](../jev-tools-and-rl-2026-09-22/decisions/rl-rubric-grader.md) | Resettable tasks, immutable rollout groups, independent labels and reward accounting | Next wave; training/runtime; offline grader replay first; training pilot separately gated |
+ | [Selective observation resolution](decisions/selective-perception.md) | Render profiling and frozen visual labels | Next wave |
+ | [Private extension inference runtime](decisions/private-extension.md) | Local runtime and ONNX/browser measurements | Next wave |
+ | [Correct source-linked interpretations](decisions/source-annotations.md) | Café, wardrobe and paste artifact contracts | Next wave |
