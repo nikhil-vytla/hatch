@@ -1,0 +1,38 @@
+{
+  "capturedBaselineFiles": [
+    {
+      "path": "jev-experiments/roadmap/routing/classifier.ts",
+      "sha256": "40023273cdd522478eee867e8cac19302c68d392e82d0f1d29599b272cb65fed",
+      "bytes": 4438
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/hooks.ts",
+      "sha256": "3a3dc270aba5a6bf9bbd84c1a6df3fabd3482fbf0841cd9c118f2a2dd7104582",
+      "bytes": 12954
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/types.ts",
+      "sha256": "31e85862dfb5927368f48fbb145b487ab27f9726f6377967c629c18bbed1f734",
+      "bytes": 5247
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/router.ts",
+      "sha256": "de6cd947c6e4ae87b0da0537d270c34aca0780f8abfa6f88a6042c7d1ceb1392",
+      "bytes": 16266
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/configured-classifier.test.ts",
+      "sha256": "ace2fee64154bdcd136daeb1332e2f8e8e89e91008fc5a7b92af7f4b849c654a",
+      "bytes": 15131
+    },
+    {
+      "path": "jev-experiments/roadmap/routing/classifier-fixtures/local-runtime.ts",
+      "sha256": "edd602e45f88a9a1ad49dbfcfba6be37a5f1974e11238ad4daa59ac088547978",
+      "bytes": 1714
+    }
+  ],
+  "baselineBytesVerified": true,
+  "beforeSourceSha256": "e13e5ba49f4f684c4cc558c7245f700492d61b0c5d61ff8241a1cc61ce5ab704",
+  "afterSourceSha256": "aeaef7fd427813a28664b9d6429b94c917acef851ee4751636af505daa0c8fa9",
+  "sourceReconstruction": "Restore six hash-verified captured baseline files into an exact copy of the correction inventory. Added provenance test is present but not imported or executed by this independent suite. All original source/report conditions remain unchanged."
+}
