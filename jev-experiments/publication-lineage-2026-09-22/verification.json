@@ -1,0 +1,77 @@
+{
+  "sourceCommit": "01150680f6a11fb40efd324318f584da58bd8972",
+  "sourceTree": "e636681c190f8b22dfdc55efa46f8c240368a9a7",
+  "archiveSha256": "88a0f749fd7b6866d90b4089e5b8aad6f83f0bd291e546ab6678ce10b25d9c3d",
+  "overlays": false,
+  "checks": [
+    {
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "seconds": 0.648,
+      "logSha256": "80f86ddb5a9d3318e1a1d1171e7a8bea8cf911d30c4253c05f6e1d832c61188d"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "seconds": 8.728,
+      "logSha256": "e69a5ea9f698bfd7061a9e02060ec8d80077e202349e98463bfa62cf67ac670f"
+    },
+    {
+      "command": [
+        "bun",
+        "test",
+        "jev-experiments/scene-lifetimes-2026-09-22",
+        "jev-experiments/rewardbench2/publication-source.test.ts",
+        "jev-experiments/rewardbench2/publication.test.ts"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "seconds": 0.797,
+      "logSha256": "b43292defdddd7327d7a2db34eb030cf8e14dcf544d9c835f8fb005e3075f6c0"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "jev-experiments/roadmap/verification/publication.ts"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "seconds": 0.614,
+      "logSha256": "ced5aaecfb1b054cd42ebf8bd53a5f6f8942159d49a83fa8c3063f335bf0c3e7"
+    }
+  ],
+  "allPassed": true,
+  "testResult": {
+    "passed": 25,
+    "failed": 0,
+    "assertions": 113
+  },
+  "publicationResult": {
+    "count": 45,
+    "roundTripPassed": true,
+    "expectedFieldsPreserved": true,
+    "unlistedPublicFiles": 0
+  },
+  "sourcePatch": {
+    "path": "source-code.patch",
+    "bytes": 22646,
+    "sha256": "e7fa38957f3d1dd980b1ba769d0f40616b7e7d38bb6617a586facccfe4005f72",
+    "scope": "Authored TypeScript and workflow changes only; data lineage is recorded in the source manifest."
+  },
+  "limitations": [
+    "Local exact-archive verification; remote checks are separate.",
+    "No new benchmark inference or measurement.",
+    "The validator requires the pinned upstream cache to reconstruct predecessor display bytes; the clean build does not require that cache."
+  ]
+}
