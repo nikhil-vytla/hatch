@@ -1,0 +1,11 @@
+diff --git a/jev-experiments/roadmap/MAP.md b/jev-experiments/roadmap/MAP.md
+--- a/jev-experiments/roadmap/MAP.md
++++ b/jev-experiments/roadmap/MAP.md
+@@ -56,6 +56,7 @@
+ | [Select an installed local default](decisions/local-default.md) | training/runtime | Training criteria, export and mail evaluation | Resolved; validation-selected experimental Laya readout, fresh offline install passed |
+ | [Make the first release feel authored](../design-revamp-2026-09-21/ui-ux-release.md) | root / scene owners | Playable defaults, execution disclosure, research evidence | Direction and working editorial study complete; coherent app integration and sitewide review open |
+ | [Make the codebase easy to change](../roadmap-additions-2026-09-21/decisions/code-organization-and-style.md) | root / runtime and scene owners | Deployment boundary, typed contract, UI/UX direction | First-release workstream accepted; inventory, migration and conventions open |
++| [Browse an artwork archive without losing its evidence](../semantic-image-field-2026-09-21/decision.md) | root / design engineering | UI/UX direction, visual-search protocol, deployment boundary | Original field, larger-image grid, collections and provenance fixes implemented locally; application patch and checks in the [report](../semantic-image-field-2026-09-21/README.md) |
+ | [Release only supported claims](decisions/release-gate.md) | root | All first-release decisions | Local artifact acceptance recorded; public deployment open |
+ 
+ ## Later named decisions

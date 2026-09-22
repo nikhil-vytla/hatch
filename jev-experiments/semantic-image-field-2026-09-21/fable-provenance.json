@@ -1,0 +1,58 @@
+{
+  "requested_model": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+  "observed_models": [
+    {
+      "provider": "amazon-bedrock",
+      "model": "global.anthropic.claude-fable-5-1"
+    }
+  ],
+  "reviewed_on": "2026-09-21",
+  "input_files": [
+    {
+      "file": "DESIGN.md",
+      "sha256": "453665fcb60dbf845c09245556557723d00458c3509a17da7d66e2a238e56fb0"
+    },
+    {
+      "file": "visual-search.tsx",
+      "sha256": "6c5f331f5e0ae07886a91c95c205604f94a835637337ed5f97d9bf585517cf16"
+    },
+    {
+      "file": "visual-search.css",
+      "sha256": "ca8e79e396f4aa068a90773eb96d6b61788e8d7342802479fef236b7170c8654"
+    },
+    {
+      "file": "image-field.tsx",
+      "sha256": "26579c0598d41bac9edec549fd211624280210e148827ae6da059a462cb8fc54"
+    },
+    {
+      "file": "image-field.css",
+      "sha256": "64c3af81e87f8a3621e2f8bc8533623b4911fab2b9225323da9ff787d6681fdd"
+    },
+    {
+      "file": "field-layout.ts",
+      "sha256": "ab8dd1eb727a6019eb338a640a03965383f64df54410cf3016bc2acb4e8b6a00"
+    },
+    {
+      "file": "collection.ts",
+      "sha256": "e404255e1b92c159b2d6b9db04f9ff528a5beedbd19cec0220927687ef92b11e"
+    },
+    {
+      "file": "reference-analysis.md",
+      "sha256": "4c2fa53cda4de44bf2082e031f0407bdb40d4192472daa1075bb6aef130f7473"
+    },
+    {
+      "file": "desktop.webp",
+      "sha256": "128dca98352756259d09f1e88ae4d7d3f021efa2813c41c8b514b5b68a63c264"
+    },
+    {
+      "file": "mobile.webp",
+      "sha256": "53d93bfeab814bba721ad85b1e2db6a44083650f96f43386d0cf3b8d9cc00303"
+    }
+  ],
+  "prompt": "Review the integrated Jev image-search improvement against DESIGN.md and the cited\nreference analysis. Read the source and both screenshots. Evaluate taste, useful\ninteraction, accessibility risks, truthful provenance and unnecessary complexity.\nIdentify a few consequential findings with source/line or visible evidence.\nSeparate verified defects from suggestions. You may read files only and have no\nbrowser. Do not claim runtime or accessibility verification from screenshots.\nThis is a local implementation awaiting publication, not a shipped release.\nExisting museum image URLs sometimes fail; titles/source links remain available.\nDo not conflate layout improvement with retrieval accuracy. Return concise Markdown\nwithout machine-specific absolute paths. Be candid about whether it looks good.\n",
+  "prompt_sha256": "930f00eba7781c0653af81781699db70eceb6c06dc3d903083ee3c3878b1d3d5",
+  "answer_sha256": "4f2a2e56f415ac727d65f11bd8b69621f1629f333caed685def2b346876c0e0b",
+  "exit_code": 0,
+  "elapsed_seconds": 313.4,
+  "scope": "Explicit artwork-field source, design direction, source analysis and two screenshots. No browser interaction by reviewer."
+}

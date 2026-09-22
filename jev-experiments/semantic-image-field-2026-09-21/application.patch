@@ -1,0 +1,2034 @@
+diff --git a/jev-experiments/experience-prototypes/src/visual-search.tsx b/jev-experiments/experience-prototypes/src/visual-search.tsx
+--- a/jev-experiments/experience-prototypes/src/visual-search.tsx
++++ b/jev-experiments/experience-prototypes/src/visual-search.tsx
+@@ -1,76 +1,1121 @@
+ import { useEffect, useMemo, useRef, useState } from "react";
+ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+-import { Search, ArrowUpRight, ArrowUp, ArrowDown, X, SlidersHorizontal, Sparkles, ImageOff, Download, LoaderCircle, RotateCcw, ChevronDown, Check } from "lucide-react";
+-import { Button, Fold, Notice } from "./shared";
++import {
++  Search,
++  ArrowUpRight,
++  ArrowUp,
++  ArrowDown,
++  X,
++  SlidersHorizontal,
++  Sparkles,
++  ImageOff,
++  Download,
++  RotateCcw,
++  ChevronDown,
++  Check,
++  Plus,
++  LayoutGrid,
++  Orbit,
++  FolderOpen,
++  ChevronLeft,
++  ChevronRight,
++} from "lucide-react";
++import { Button, Notice } from "./shared";
+ import { download, getApiKey, run } from "./api";
+-import { PRESETS, normalizeQuery, type Artwork, type SearchMode, type SearchScores } from "../../visual-search/protocol";
+-import { rankWorks, lexicalScores, compareRankings, captionQuality, mediumFamily, type RankedArtwork } from "../../visual-search/ranking";
+-import { runSearch, SearchSession, type SearchRun } from "../../visual-search/async";
++import {
++  PRESETS,
++  normalizeQuery,
++  type Artwork,
++  type SearchScores,
++} from "../../visual-search/protocol";
++import {
++  rankWorks,
++  lexicalScores,
++  compareRankings,
++  captionQuality,
++  mediumFamily,
++  type RankedArtwork,
++} from "../../visual-search/ranking";
++import {
++  runSearch,
++  SearchSession,
++  type SearchRun,
++} from "../../visual-search/async";
++import { ArtworkField } from "../../semantic-image-field-2026-09-21/image-field";
++import {
++  MAX_COLLECTION,
++  createCollection,
++  parseCollection,
++  type CollectionItem,
++} from "../../semantic-image-field-2026-09-21/collection";
+ import "./visual-search.css";
+-const modeNames = { caption: "Jev + museum caption", metadata: "Jev · metadata only", lexical: "Keyword match" };
++const modeNames = {
++  caption: "Jev + captions",
++  metadata: "Jev · metadata",
++  lexical: "Keyword match",
++};
+ type Mode = keyof typeof modeNames;
+-const scoreText = (score: number | null, method: Mode) => score == null ? "Not scored" : method === "lexical" ? `${score.toFixed(score % 1 ? 1 : 0)} keyword points` : `${score.toFixed(2)} / 4`;
+-function ArtworkImage({ work, large = false }: { work: Artwork; large?: boolean }) {
+-  const [failed, setFailed] = useState(false), [loaded, setLoaded] = useState(false), [attempt, setAttempt] = useState(0), [museumFallback, setMuseumFallback] = useState(false);
+-  const base = !museumFallback && work.imageMirror ? work.imageMirror.image_url : work.imageUrl.replace("/600,/", large ? "/843,/" : "/600,/");
++const scoreText = (score: number | null, method: Mode) =>
++  score == null
++    ? "Not scored"
++    : method === "lexical"
++      ? `${score.toFixed(score % 1 ? 1 : 0)} keyword points`
++      : `${score.toFixed(2)} / 4`;
++function ArtworkImage({
++  work,
++  large = false,
++}: {
++  work: Artwork;
++  large?: boolean;
++}) {
++  const [failed, setFailed] = useState(false),
++    [loaded, setLoaded] = useState(false),
++    [attempt, setAttempt] = useState(0),
++    [museumFallback, setMuseumFallback] = useState(false);
++  const base =
++    !museumFallback && work.imageMirror
++      ? work.imageMirror.image_url
++      : work.imageUrl.replace("/600,/", large ? "/843,/" : "/600,/");
+   const src = `${base}${attempt ? `${base.includes("?") ? "&" : "?"}retry=${attempt}` : ""}`;
+-  return <div className={`vs-image ${loaded ? "loaded" : ""} ${failed ? "failed" : ""}`}>
+-    {!failed && <img src={src} alt={work.caption || work.title} loading={large ? "eager" : "lazy"} decoding="async" onLoad={() => setLoaded(true)} onError={() => { if (work.imageMirror && !museumFallback) { setLoaded(false); setMuseumFallback(true); } else setFailed(true); }} />}
+-    {failed && <div className="vs-image-fallback"><ImageOff size={28} /><span>Image preview unavailable</span>{large ? <button onClick={() => { setFailed(false); setLoaded(false); setMuseumFallback(false); setAttempt(n => n + 1); }}><RotateCcw size={13} /> Retry image</button> : <small>Open the artwork details</small>}</div>}
+-  </div>;
++  return (
++    <div
++      className={`vs-image ${loaded ? "loaded" : ""} ${failed ? "failed" : ""}`}
++    >
++      {!failed && (
++        <img
++          src={src}
++          alt={work.caption || work.title}
++          loading={large ? "eager" : "lazy"}
++          decoding="async"
++          onLoad={() => setLoaded(true)}
++          onError={() => {
++            if (work.imageMirror && !museumFallback) {
++              setLoaded(false);
++              setMuseumFallback(true);
++            } else setFailed(true);
++          }}
++        />
++      )}
++      {failed && (
++        <div className="vs-image-fallback">
++          <ImageOff size={28} />
++          <span>Image preview unavailable</span>
++          {large ? (
++            <button
++              onClick={() => {
++                setFailed(false);
++                setLoaded(false);
++                setMuseumFallback(false);
++                setAttempt((n) => n + 1);
++              }}
++            >
++              <RotateCcw size={13} /> Retry image
++            </button>
++          ) : (
++            <small>{work.title}</small>
++          )}
++        </div>
++      )}
++    </div>
++  );
+ }
+-function RankShift({ from, to }: { from: number | null | undefined; to: number | null | undefined }) { if (from == null || to == null || from === to) return null; const change = from - to; return <span className={`vs-shift ${change > 0 ? "up" : "down"}`} title="Rank change when the museum caption is included">{change > 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}{Math.abs(change)}</span>; }
+-function ArtworkDetails({ work, query, scores, ranks, onClose, onRefine, manifest }: { work: Artwork; query: string; scores: Record<Mode, SearchScores>; ranks: Record<Mode, RankedArtwork[]>; onClose: () => void; onRefine: (query: string) => void; manifest: any }) {
++function RankShift({
++  from,
++  to,
++}: {
++  from: number | null | undefined;
++  to: number | null | undefined;
++}) {
++  if (from == null || to == null || from === to) return null;
++  const change = from - to;
++  return (
++    <span
++      className={`vs-shift ${change > 0 ? "up" : "down"}`}
++      title="Rank change when the museum caption is included"
++    >
++      {change > 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
++      {Math.abs(change)}
++    </span>
++  );
++}
++type Inspection = {
++  query: string;
++  method: Mode;
++  scores: Record<Mode, SearchScores>;
++  ranks: Record<Mode, RankedArtwork[]>;
++  rows: RankedArtwork[];
++  evidence: CollectionItem["evidence"];
++  evidenceByMode: Record<Mode, CollectionItem["evidence"]>;
++};
++
++function ArtworkDetails({
++  work,
++  inspection,
++  onClose,
++  onRefine,
++  onMove,
++  onCollect,
++  collected,
++  count,
++  manifest,
++}: {
++  work: Artwork;
++  inspection: Inspection;
++  onClose: () => void;
++  onRefine: (query: string) => void;
++  onMove: (offset: number) => void;
++  onCollect: () => void;
++  collected: boolean;
++  count: number;
++  manifest: any;
++}) {
+   const dialog = useRef<HTMLDialogElement>(null);
+-  useEffect(() => { const d = dialog.current!; d.showModal(); return () => { if (d.open) d.close(); }; }, []);
+-  const refinements = [...new Set([...work.subjects.slice(0, 4), ...work.styles.slice(0, 2)])];
+-  return <dialog className="vs-detail" ref={dialog} onClose={onClose} onCancel={onClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }} aria-labelledby={`vs-title-${work.id}`}>
+-    <div className="vs-detail-shell"><button className="vs-detail-close" aria-label="Close artwork details" onClick={onClose} autoFocus><X size={20} /></button><div className="vs-detail-art"><ArtworkImage work={work} large /><a href={work.sourceUrl} target="_blank" rel="noreferrer">View at the Art Institute of Chicago <ArrowUpRight size={14} /></a>{work.imageMirror && <a href={work.imageMirror.commons_page} target="_blank" rel="noreferrer" title={work.imageMirror.matched_by}>Image via Wikimedia Commons · {work.imageMirror.license} <ArrowUpRight size={12} /></a>}</div><div className="vs-detail-copy"><span className="vs-eyebrow">{work.classification || "Artwork"} · Public domain</span><h2 id={`vs-title-${work.id}`}>{work.title}</h2><p className="vs-artist">{work.artist}<br /><span>{work.date}{work.origin ? ` · ${work.origin}` : ""}</span></p><p className="vs-medium">{work.medium}</p><div className="vs-caption"><span>{captionQuality(work)}</span><p>{work.caption}</p><small>Supplied by the museum. Jev ranks this text; it does not inspect the image pixels.</small></div><div className="vs-detail-rankings"><span>For “{query}”</span>{(["caption", "metadata", "lexical"] as Mode[]).map(mode => { const row = ranks[mode].find(r => r.work.id === work.id); return <div key={mode}><span>{modeNames[mode]}</span><strong>{scoreText(scores[mode][work.id] ?? null, mode)}</strong><small>{row?.rank == null ? "Unavailable" : `Rank ${row.rank}${row.tied > 1 ? ` · ${row.tied} tied works` : ""}`}</small></div>; })}</div>{refinements.length > 0 && <div className="vs-detail-refine"><span>Follow a detail</span><div>{refinements.map(term => <button key={term} onClick={() => { onRefine(term); onClose(); }}>{term} <ArrowUpRight size={11} /></button>)}</div></div>}<div className="vs-detail-links"><a href={work.apiUrl} target="_blank" rel="noreferrer">Original museum record <ArrowUpRight size={12} /></a><button onClick={() => download(`artwork-${work.id}.json`, { work, query, scores: Object.fromEntries(Object.entries(scores).map(([mode, values]) => [mode, values[work.id] ?? null])), collection_sha256: manifest?.collection_sha256 })}><Download size={12} /> Export artwork evidence</button></div></div></div>
+-  </dialog>;
++  useEffect(() => {
++    const node = dialog.current!;
++    node.showModal();
++    return () => {
++      if (node.open) node.close();
++    };
++  }, []);
++  const { query, scores, ranks, rows } = inspection;
++  const position = rows.findIndex((row) => row.work.id === work.id);
++  const refinements = [
++    ...new Set([...work.subjects.slice(0, 4), ...work.styles.slice(0, 2)]),
++  ];
++  return (
++    <dialog
++      className="vs-detail"
++      ref={dialog}
++      aria-labelledby={`vs-title-${work.id}`}
++      onClose={onClose}
++      onCancel={(event) => {
++        event.preventDefault();
++        onClose();
++      }}
++      onClick={(event) => {
++        if (event.target === event.currentTarget) onClose();
++      }}
++      onKeyDown={(event) => {
++        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
++          return;
++        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
++          event.preventDefault();
++          onMove(event.key === "ArrowLeft" ? -1 : 1);
++        }
++      }}
++    >
++      <div className="vs-detail-toolbar">
++        <div className="vs-detail-navigation">
++          <button
++            aria-label="Previous artwork"
++            disabled={position <= 0}
++            onClick={() => onMove(-1)}
++          >
++            <ChevronLeft size={18} />
++          </button>
++          <span aria-live="polite">
++            {position + 1} / {rows.length}
++          </span>
++          <button
++            aria-label="Next artwork"
++            disabled={position < 0 || position >= rows.length - 1}
++            onClick={() => onMove(1)}
++          >
++            <ChevronRight size={18} />
++          </button>
++        </div>
++        <button
++          className="vs-collect"
++          onClick={onCollect}
++          aria-pressed={collected}
++          disabled={!collected && count >= MAX_COLLECTION}
++        >
++          {collected ? <Check size={16} /> : <Plus size={16} />}
++          {collected ? "Collected" : "Collect"}
++        </button>
++        <button
++          className="vs-detail-close"
++          aria-label="Close artwork details"
++          onClick={onClose}
++          autoFocus
++        >
++          <X size={20} />
++        </button>
++      </div>
++      <div className="vs-detail-shell">
++        <div className="vs-detail-art">
++          <ArtworkImage key={work.id} work={work} large />
++          <a href={work.sourceUrl} target="_blank" rel="noreferrer">
++            View museum record <ArrowUpRight size={14} />
++          </a>
++          {work.imageMirror && (
++            <a
++              href={work.imageMirror.commons_page}
++              target="_blank"
++              rel="noreferrer"
++            >
++              Image via Wikimedia Commons · {work.imageMirror.license}{" "}
++              <ArrowUpRight size={12} />
++            </a>
++          )}
++        </div>
++        <div className="vs-detail-copy">
++          <span className="vs-eyebrow">
++            {work.classification || "Artwork"} · Public domain
++          </span>
++          <h2 id={`vs-title-${work.id}`}>{work.title}</h2>
++          <p className="vs-artist">
++            {work.artist}
++            <br />
++            <span>
++              {work.date}
++              {work.origin ? ` · ${work.origin}` : ""}
++            </span>
++          </p>
++          <p className="vs-medium">{work.medium}</p>
++          <div className="vs-caption">
++            <span>{captionQuality(work)}</span>
++            <p>{work.caption}</p>
++          </div>
++          <details className="vs-detail-evidence">
++            <summary>Compare this artwork's rankings</summary>
++            <p className="vs-detail-query">{query || "Empty query"}</p>
++            <div className="vs-detail-rankings">
++              {(["caption", "metadata", "lexical"] as Mode[]).map((mode) => {
++                const row = ranks[mode].find(
++                  (item) => item.work.id === work.id,
++                );
++                return (
++                  <div key={mode}>
++                    <span>{modeNames[mode]}</span>
++                    <strong>
++                      {scoreText(scores[mode][work.id] ?? null, mode)}
++                    </strong>
++                    <small>
++                      {row?.rank == null
++                        ? "Unscored"
++                        : `Rank ${row.rank}${row.tied > 1 ? ` · ${row.tied} tied` : ""}`}
++                    </small>
++                  </div>
++                );
++              })}
++            </div>
++            <p className="vs-small">
++              Jev scores the supplied museum text. Image pixels are not model
++              inputs.
++            </p>
++          </details>
++          {refinements.length > 0 && (
++            <div className="vs-detail-refine">
++              <span>Explore a detail</span>
++              <div>
++                {refinements.map((term) => (
++                  <button key={term} onClick={() => onRefine(term)}>
++                    {term}
++                    <ArrowUpRight size={12} />
++                  </button>
++                ))}
++              </div>
++            </div>
++          )}
++          <div className="vs-detail-links">
++            <a href={work.apiUrl} target="_blank" rel="noreferrer">
++              Original API record <ArrowUpRight size={12} />
++            </a>
++            <button
++              onClick={() =>
++                download(`artwork-${work.id}.json`, {
++                  work,
++                  query,
++                  method: inspection.method,
++                  evidence: inspection.evidenceByMode,
++                  scores: Object.fromEntries(
++                    Object.entries(scores).map(([mode, values]) => [
++                      mode,
++                      values[work.id] ?? null,
++                    ]),
++                  ),
++                  collection_sha256: manifest?.collection_sha256,
++                })
++              }
++            >
++              <Download size={14} />
++              Export evidence
++            </button>
++          </div>
++        </div>
++      </div>
++    </dialog>
++  );
+ }
+ export function VisualSearch({ result }: { result: any }) {
+-  const works: Artwork[] = result.works ?? [], presets: any[] = result.queries?.length ? result.queries : PRESETS;
+-  const first = presets[0], [query, setQuery] = useState(first?.query ?? ""), [method, setMethod] = useState<Mode>(Object.keys(first?.scores?.caption ?? {}).length ? "caption" : Object.keys(first?.scores?.metadata ?? {}).length ? "metadata" : "lexical");
+-  const [filter, setFilter] = useState("All media"), [limit, setLimit] = useState(24), [selected, setSelected] = useState<Artwork | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
+-  const [live, setLive] = useState<Record<string, SearchRun>>({}), session = useRef(new SearchSession()), action = useRef(0), reduce = useReducedMotion();
+-  const normalized = normalizeQuery(query), preset = presets.find(p => normalizeQuery(p.query) === normalized), currentLive = live[normalized], recorded = preset?.scores;
+-  const lexical = useMemo(() => lexicalScores(works, normalized), [works, normalized]);
+-  const scores: Record<Mode, SearchScores> = { lexical, metadata: currentLive?.scores.metadata ?? recorded?.metadata ?? {}, caption: currentLive?.scores.caption ?? recorded?.caption ?? {} };
+-  const ranks = useMemo(() => ({ lexical: rankWorks(works, lexical), metadata: rankWorks(works, scores.metadata), caption: rankWorks(works, scores.caption) }), [works, lexical, scores.metadata, scores.caption]);
+-  const comparison = compareRankings(ranks.metadata, ranks.caption), all = ranks[method], filtered = all.filter(r => filter === "All media" || mediumFamily(r.work) === filter), shown = filtered.slice(0, limit);
+-  const scored = all.filter(r => !r.missing).length, rankById = new Map(ranks.metadata.map(r => [r.work.id, r.rank])), completed = currentLive?.completed ?? preset?.availability?.completed ?? 0, total = works.length * 2;
++  const works: Artwork[] = result.works ?? [],
++    presets: any[] = result.queries?.length ? result.queries : PRESETS;
++  const first = presets[0],
++    [query, setQuery] = useState(first?.query ?? ""),
++    [method, setMethod] = useState<Mode>(
++      Object.keys(first?.scores?.caption ?? {}).length
++        ? "caption"
++        : Object.keys(first?.scores?.metadata ?? {}).length
++          ? "metadata"
++          : "lexical",
++    );
++  const [filter, setFilter] = useState("All media"),
++    [limit, setLimit] = useState(24),
++    [selected, setSelected] = useState<Artwork | null>(null),
++    [busy, setBusy] = useState(false),
++    [error, setError] = useState(""),
++    [notice, setNotice] = useState("");
++  const [view, setView] = useState<"field" | "grid">("grid");
++  const [collection, setCollection] = useState<CollectionItem[]>([]);
++  const [collectionOpen, setCollectionOpen] = useState(false);
++  const [preferLive, setPreferLive] = useState(false);
++  const searchInput = useRef<HTMLInputElement>(null);
++  const uploadInput = useRef<HTMLInputElement>(null);
++  const opener = useRef<HTMLButtonElement | null>(null);
++  const inspection = useRef<Inspection | null>(null);
++  const collectionRevision = useRef(0);
++  const [live, setLive] = useState<Record<string, SearchRun>>({}),
++    session = useRef(new SearchSession()),
++    action = useRef(0),
++    reduce = useReducedMotion();
++  const normalized = normalizeQuery(query),
++    preset = presets.find((p) => normalizeQuery(p.query) === normalized),
++    savedLive = live[normalized],
++    currentLive = preferLive ? savedLive : undefined,
++    recorded = preset?.scores;
++  const lexical = useMemo(
++    () => lexicalScores(works, normalized),
++    [works, normalized],
++  );
++  const scores: Record<Mode, SearchScores> = {
++    lexical,
++    metadata: currentLive?.scores.metadata ?? recorded?.metadata ?? {},
++    caption: currentLive?.scores.caption ?? recorded?.caption ?? {},
++  };
++  const ranks = useMemo(
++    () => ({
++      lexical: rankWorks(works, lexical),
++      metadata: rankWorks(works, scores.metadata),
++      caption: rankWorks(works, scores.caption),
++    }),
++    [works, lexical, scores.metadata, scores.caption],
++  );
++  const comparison = compareRankings(ranks.metadata, ranks.caption),
++    all = ranks[method],
++    filtered = all.filter(
++      (r) => filter === "All media" || mediumFamily(r.work) === filter,
++    ),
++    shown = filtered.slice(0, limit);
++  const scored = all.filter((r) => !r.missing).length,
++    rankById = new Map(ranks.metadata.map((r) => [r.work.id, r.rank])),
++    completed = currentLive?.completed ?? preset?.availability?.completed ?? 0,
++    total = works.length * 2;
+   const facets = ["All media", ...[...new Set(works.map(mediumFamily))].sort()];
+-  useEffect(() => () => session.current.cancel(), []);
+-  function changeQuery(next: string, preferSaved = false) { session.current.cancel(); action.current++; setBusy(false); setError(""); setNotice(""); setQuery(next); setLimit(24); const saved = presets.find(p => normalizeQuery(p.query) === normalizeQuery(next)); setMethod(preferSaved && Object.keys(saved?.scores?.caption ?? {}).length ? "caption" : preferSaved && Object.keys(saved?.scores?.metadata ?? {}).length ? "metadata" : "lexical"); }
++  useEffect(
++    () => () => {
++      session.current.cancel();
++      collectionRevision.current++;
++    },
++    [],
++  );
++  useEffect(() => {
++    const focusSearch = (event: KeyboardEvent) => {
++      const target = event.target as HTMLElement;
++      if (
++        event.key !== "/" ||
++        selected ||
++        event.ctrlKey ||
++        event.metaKey ||
++        event.altKey ||
++        target.isContentEditable ||
++        /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
++      )
++        return;
++      event.preventDefault();
++      searchInput.current?.focus();
++    };
++    window.addEventListener("keydown", focusSearch);
++    return () => window.removeEventListener("keydown", focusSearch);
++  }, [selected]);
++  function closeArtwork() {
++    setSelected(null);
++    requestAnimationFrame(() => {
++      const target = opener.current;
++      if (target?.isConnected) target.focus({ preventScroll: true });
++      else searchInput.current?.focus({ preventScroll: true });
++    });
++  }
++  function openArtwork(
++    work: Artwork,
++    trigger: HTMLButtonElement,
++    savedItem?: CollectionItem,
++  ) {
++    opener.current = trigger;
++    const contextQuery = savedItem?.query ?? normalized;
++    const contextMethod = savedItem?.method ?? method;
++    const contextLive = savedItem
++      ? savedItem.evidence === "live exploratory"
++        ? live[normalizeQuery(contextQuery)]
++        : undefined
++      : currentLive;
++    const contextSaved = presets.find(
++      (p) => normalizeQuery(p.query) === normalizeQuery(contextQuery),
++    )?.scores;
++    const contextScores: Record<Mode, SearchScores> = savedItem
++      ? {
++          lexical: lexicalScores(works, contextQuery),
++          metadata:
++            contextLive?.scores.metadata ?? contextSaved?.metadata ?? {},
++          caption: contextLive?.scores.caption ?? contextSaved?.caption ?? {},
++        }
++      : scores;
++    const contextRanks = savedItem
++      ? {
++          lexical: rankWorks(works, contextScores.lexical),
++          metadata: rankWorks(works, contextScores.metadata),
++          caption: rankWorks(works, contextScores.caption),
++        }
++      : ranks;
++    const evidenceByMode: Inspection["evidenceByMode"] = {
++      lexical: "deterministic lexical",
++      metadata: contextLive
++        ? "live exploratory"
++        : contextRanks.metadata.some((row) => !row.missing)
++          ? "recorded"
++          : "not run",
++      caption: contextLive
++        ? "live exploratory"
++        : contextRanks.caption.some((row) => !row.missing)
++          ? "recorded"
++          : "not run",
++    };
++    inspection.current = {
++      query: contextQuery,
++      method: contextMethod,
++      scores: {
++        lexical: { ...contextScores.lexical },
++        metadata: { ...contextScores.metadata },
++        caption: { ...contextScores.caption },
++      },
++      ranks: contextRanks,
++      rows:
++        !savedItem && filtered.some((row) => row.work.id === work.id)
++          ? filtered
++          : contextRanks[contextMethod],
++      evidence: evidenceByMode[contextMethod],
++      evidenceByMode,
++    };
++    setSelected(work);
++  }
++  function moveArtwork(offset: number) {
++    const rows = inspection.current?.rows ?? [];
++    const index = rows.findIndex((row) => row.work.id === selected?.id);
++    const next = rows[index + offset];
++    if (next) setSelected(next.work);
++  }
++  function toggleCollection(work: Artwork) {
++    collectionRevision.current++;
++    if (collection.some((item) => item.artworkId === work.id)) {
++      setCollection((items) =>
++        items.filter((item) => item.artworkId !== work.id),
++      );
++      return;
++    }
++    if (collection.length >= MAX_COLLECTION) {
++      setNotice(`A collection holds up to ${MAX_COLLECTION} artworks.`);
++      return;
++    }
++    const detail = inspection.current;
++    const row = detail?.ranks[detail.method].find(
++      (item) => item.work.id === work.id,
++    );
++    const item: CollectionItem = {
++      artworkId: work.id,
++      query: detail?.query ?? normalized,
++      method: detail?.method ?? method,
++      score: row?.score ?? null,
++      rank: row?.rank ?? null,
++      evidence: detail?.evidence ?? "deterministic lexical",
++    };
++    setCollection((items) => [...items, item]);
++  }
++  async function importCollection(file: File) {
++    const revision = ++collectionRevision.current;
++    try {
++      if (file.size > 2_000_000)
++        throw new Error("Choose a collection file smaller than 2 MB.");
++      let json: unknown;
++      try {
++        json = JSON.parse(await file.text());
++      } catch {
++        throw new Error(
++          "That file is not valid JSON. Choose a saved collection.",
++        );
++      }
++      const items = parseCollection(
++        json,
++        works,
++        result.manifest?.collection_sha256,
++      );
++      if (revision !== collectionRevision.current) return;
++      setCollection(items);
++      setCollectionOpen(true);
++      setNotice(`Opened ${items.length} collected artworks.`);
++    } catch (error) {
++      if (revision === collectionRevision.current)
++        setNotice(
++          error instanceof Error
++            ? error.message
++            : "This collection could not be opened.",
++        );
++    }
++  }
++  function changeQuery(next: string, preferSaved = false) {
++    session.current.cancel();
++    action.current++;
++    setBusy(false);
++    setError("");
++    setNotice("");
++    setQuery(next);
++    setPreferLive(false);
++    setLimit(24);
++    const saved = presets.find(
++      (p) => normalizeQuery(p.query) === normalizeQuery(next),
++    );
++    setMethod(
++      preferSaved && Object.keys(saved?.scores?.caption ?? {}).length
++        ? "caption"
++        : preferSaved && Object.keys(saved?.scores?.metadata ?? {}).length
++          ? "metadata"
++          : "lexical",
++    );
++  }
+   async function rankWithJev() {
+     if (!normalized) return;
+-    if (!getApiKey()) { setError("Connect your own gateway key using Connect live, then rank this query. The key stays in memory."); return; }
+-    const tag = ++action.current; setBusy(true); setError(""); setNotice(""); setMethod("caption");
+-    const initial = currentLive && currentLive.completed < total ? currentLive.scores : undefined;
+-    if (!initial) setLive(previous => ({ ...previous, [normalized]: { query: normalized, scores: { metadata: {}, caption: {} }, completed: 0, total, batches: 0, elapsed_ms: 0, source: "live", errors: [] } }));
++    if (!getApiKey()) {
++      setError("Use Connect live to add your gateway key, then run Jev.");
++      return;
++    }
++    const tag = ++action.current;
++    setBusy(true);
++    setPreferLive(true);
++    setError("");
++    setNotice("");
++    setMethod("caption");
++    const initial =
++      savedLive && savedLive.completed < total ? savedLive.scores : undefined;
++    if (!initial)
++      setLive((previous) => ({
++        ...previous,
++        [normalized]: {
++          query: normalized,
++          scores: { metadata: {}, caption: {} },
++          completed: 0,
++          total,
++          batches: 0,
++          elapsed_ms: 0,
++          source: "live",
++          errors: [],
++        },
++      }));
+     try {
+-      const completedRun = await runSearch({ works, query: normalized, session: session.current, initial, evaluate: (batch, signal) => run(batch.payload.state, batch.payload.questions, signal), onProgress: progress => { if (tag === action.current) { setLive(previous => ({ ...previous, [normalized]: progress })); if (progress.errors.length) setError(progress.errors.join(" ")); } } });
+-      if (tag === action.current && completedRun) { setLive(previous => ({ ...previous, [normalized]: completedRun })); if (completedRun.errors.length) setError(completedRun.errors.join(" ")); }
+-    } catch (e) { if (tag === action.current) setError(e instanceof Error ? e.message : String(e)); }
+-    finally { if (tag === action.current) setBusy(false); }
++      const completedRun = await runSearch({
++        works,
++        query: normalized,
++        session: session.current,
++        initial,
++        evaluate: (batch, signal) =>
++          run(batch.payload.state, batch.payload.questions, signal),
++        onProgress: (progress) => {
++          if (tag === action.current) {
++            setLive((previous) => ({ ...previous, [normalized]: progress }));
++            if (progress.errors.length) setError(progress.errors.join(" "));
++          }
++        },
++      });
++      if (tag === action.current && completedRun) {
++        setLive((previous) => ({ ...previous, [normalized]: completedRun }));
++        if (completedRun.errors.length) setError(completedRun.errors.join(" "));
++      }
++    } catch (e) {
++      if (tag === action.current)
++        setError(e instanceof Error ? e.message : String(e));
++    } finally {
++      if (tag === action.current) setBusy(false);
++    }
+   }
+-  function cancel() { session.current.cancel(); action.current++; setBusy(false); setNotice("Stopped. Completed scores stay available for this query; late answers cannot change the gallery."); }
+-  function exportRanking() { download("visual-search-ranking.json", { query: normalized, method, evidence: currentLive ? "live exploratory" : method === "lexical" ? "deterministic lexical" : "recorded", collection_sha256: result.manifest?.collection_sha256, protocol: result.protocol, works: all.map(r => ({ artwork_id: r.work.id, title: r.work.title, source: r.work.sourceUrl, score: r.score, rank: r.rank, tied: r.tied, unavailable: r.missing })) }); }
+-  return <div className="visual-search">
+-    <header className="vs-hero"><div className="vs-eyebrow"><span className="vs-dot" /> An open collection · {works.length} artworks</div><h2>Find a feeling.</h2><p>A place, a color, a little atmosphere.<br />Search the collection in your own words.</p><form className="vs-search-box" onSubmit={e => { e.preventDefault(); if (method !== "lexical") rankWithJev(); else setNotice("Keyword matches update as you type. Run Jev to compare the two semantic rankings."); }}><Search size={22} /><input aria-label="Describe the artwork you are looking for" value={query} onChange={e => changeQuery(e.target.value)} maxLength={800} placeholder="A quiet blue evening, reflected in water…" /><button type="button" onClick={() => changeQuery("")} aria-label="Clear search"><X size={16} /></button></form><div className="vs-presets" aria-label="Saved search queries">{presets.map(p => <button key={p.id} className={preset?.id === p.id ? "selected" : ""} onClick={() => changeQuery(p.query, true)}>{p.title}</button>)}</div></header>
+-    <div className="vs-controls"><div className="vs-methods" role="group" aria-label="Ranking method">{(["caption", "metadata", "lexical"] as Mode[]).map(mode => <button className={method === mode ? "selected" : ""} key={mode} onClick={() => { setMethod(mode); setLimit(24); }}>{mode === "caption" && <Sparkles size={13} />}{modeNames[mode]}</button>)}</div><div className="vs-controls-right"><label><SlidersHorizontal size={13} /><span className="vs-sr-only">Media filter</span><select value={filter} onChange={e => { setFilter(e.target.value); setLimit(24); }}>{facets.map(f => <option key={f}>{f}</option>)}</select></label><button className="vs-export" onClick={exportRanking} aria-label="Export the complete ranking"><Download size={15} /></button></div></div>
+-    <div className="vs-rank-note"><div><strong>{method === "lexical" ? "Words in the museum record" : method === "metadata" ? "What the catalogue tells us" : "A little more context"}</strong><span>{method === "lexical" ? "Deterministic keyword overlap across titles, tags, metadata and captions." : method === "metadata" ? "Jev sees the title, artist, medium, place and museum tags. The caption is excluded." : "Jev sees the same metadata plus the museum's alt text. This is caption-based search, not direct vision."}</span></div><div className="vs-run-control">{busy ? <button onClick={cancel}><X size={13} /> Stop ranking</button> : <button onClick={rankWithJev} disabled={!normalized}><Sparkles size={13} /> {currentLive && currentLive.completed < total ? "Continue Jev ranking" : "Rank all with Jev"}</button>}<small>{currentLive ? "Your live query" : preset?.availability?.completed ? "Recorded query" : "Use your own key"} · both Jev methods</small></div></div>
+-    {error && <Notice error>{error} {completed > 0 && `${completed}/${total} responses are preserved; unfinished works remain marked unavailable.`}</Notice>}{notice && <Notice>{notice}</Notice>}
+-    {busy && <div className="vs-progress" role="status"><div><span><LoaderCircle size={13} className="spin" /> Reading the full collection</span><b>{completed}/{total}</b></div><i><motion.span animate={{ width: `${100 * completed / total}%` }} transition={{ duration: reduce ? 0 : .25 }} /></i></div>}
+-    {preset?.refinements?.length > 0 && <div className="vs-refinements"><span>Refine the scene</span>{preset.refinements.map((refinement: string) => <button key={refinement} onClick={() => changeQuery(`${normalized.replace(/[.!?]$/, "")}, ${refinement}.`)}>+ {refinement}</button>)}</div>}
+-    <div className="vs-gallery-heading"><span>{filtered.length} works{filter !== "All media" ? ` · ${filter.toLowerCase()}` : ""}{method !== "lexical" && ` · ${scored}/${works.length} scored`}</span><div>{comparison.complete && <span>{comparison.shared}/{comparison.k} top works shared across Jev methods <span title={comparison.note}>ⓘ</span></span>}{method !== "lexical" && scored < works.length && <em>{scored ? "Partial ranking" : "No model ranking yet"}</em>}</div></div>
+-    {result.image_delivery && <p className="vs-image-delivery">{result.image_delivery.matched} Wikimedia previews · {works.length - result.image_delivery.matched} museum links. <span>Museum previews may be unavailable; source links remain in every artwork.</span></p>}
+-    {method !== "lexical" && scored === 0 && <p className="vs-empty-model">The artwork collection is ready. Choose Keyword match for an instant ranking, select a recorded query, or run all {works.length} works with your own key.</p>}
+-    <motion.div className="vs-gallery" layout={!reduce}><AnimatePresence initial={false} mode="popLayout">{shown.map(row => <motion.article key={row.work.id} className="vs-artwork" layout={reduce ? false : "position"} initial={{ opacity: reduce ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: reduce ? 1 : 0 }} transition={{ layout: { type: "spring", stiffness: 240, damping: 30 }, opacity: { duration: reduce ? 0 : .2 } }}><button className="vs-art-open" onClick={() => setSelected(row.work)} aria-label={`Open ${row.work.title} by ${row.work.artist}`}><ArtworkImage work={row.work} /><span className="vs-image-open"><ArrowUpRight size={18} /></span></button><div className="vs-art-copy"><div className="vs-art-topline"><span>{row.rank == null ? "Unscored" : `#${row.rank}`}{row.tied > 1 && <i title={`${row.tied} artworks have this exact score`}> tied</i>}</span><span>{scoreText(row.score, method)}{method === "caption" && <RankShift from={rankById.get(row.work.id)} to={row.rank} />}</span></div><button className="vs-art-title" onClick={() => setSelected(row.work)}>{row.work.title}</button><p>{row.work.artist}</p><small>{row.work.date}</small></div></motion.article>)}</AnimatePresence></motion.div>
+-    {shown.length < filtered.length && <div className="vs-more"><Button secondary onClick={() => setLimit(n => n + 24)}>Show more artworks <ChevronDown size={14} /></Button><span>{shown.length} of {filtered.length} shown. Every available score participates in the ranking.</span></div>}
+-    {!filtered.length && <div className="vs-empty-model">No works match this media filter. Choose another medium to continue.</div>}
+-    <section className="vs-about"><div><span className="vs-eyebrow">Look closer</span><h3>The picture is yours to judge.</h3><p>Compare the rankings, open an artwork, and decide whether the result fits your search. A relevance score is a model's judgment of supplied text. It is not a human relevance label or a measure of retrieval accuracy.</p></div><div className="vs-about-facts"><div><strong>{works.length}</strong><span>public-domain artworks<br />from 12 declared collection queries</span></div><div><strong>{result.caption_counts?.descriptive ?? "—"}</strong><span>descriptive museum captions<br />the rest mainly describe materials</span></div><div><strong>{result.availability?.completed ?? 0}/{result.availability?.planned ?? 2448}</strong><span>saved relevance judgments<br />availability is separate from quality</span></div></div></section>
+-    <Fold title="Collection sources, scoring rules, and complete evidence"><p>Art Institute of Chicago public API, collected from the first 18 public-domain image results for each of 12 topics, then deduplicated by artwork ID. Records require museum alt text. The 204-work set is a curated sample of the museum collection. A limited lexical content screen was applied; it is not an exhaustive content review.</p><p>Images use public-domain Wikimedia copies matched to the same artwork where available, with museum IIIF URLs as a fallback. The artwork detail links to each image source. Museum image delivery can be unavailable. Captions are existing museum alt text, not newly generated vision descriptions. Jev receives text only. Metadata-only and caption-assisted requests differ by one caption field. Every saved query covers all {works.length} works in both modes; missing scores stay visible. Tied scores share a rank and artwork ID supplies stable display order. Top-12 overlap is an agreement diagnostic, not evidence that either method retrieves better images.</p><p>The keyword baseline weights title tokens by 3, subject/style tokens by 2, caption/artist/place tokens by 1, and medium/classification tokens by 0.5. It normalizes case, accents and simple plural endings, removes a declared stop list, and does not understand negation. Jev uses a fixed five-level relevance rubric from 0 to 4. Its returned fractional score is retained.</p><div className="vs-source-links"><a href={result.documentation} target="_blank" rel="noreferrer">Museum API documentation <ArrowUpRight size={12} /></a><a href={result.collection_archive} download>Download the collection</a>{result.availability?.completed > 0 && <a href={result.archive} download>Download recorded judgments</a>}</div><pre className="vs-evidence">{JSON.stringify({ protocol: result.protocol, manifest: result.manifest, collection_sources: result.sources, availability: result.availability, image_delivery: result.image_delivery }, null, 2)}</pre></Fold>
+-    {selected && <ArtworkDetails work={selected} query={normalized} scores={scores} ranks={ranks} onClose={() => setSelected(null)} onRefine={next => changeQuery(next)} manifest={result.manifest} />}
+-  </div>;
++  function cancel() {
++    session.current.cancel();
++    action.current++;
++    setBusy(false);
++    setNotice("Ranking stopped. Completed scores are saved for this query.");
++  }
++  function exportRanking() {
++    download("visual-search-ranking.json", {
++      view: {
++        layout: view,
++        medium: filter,
++        placement: "ranked-square-rings-v1",
++      },
++      query: normalized,
++      method,
++      evidence:
++        method === "lexical"
++          ? "deterministic lexical"
++          : currentLive
++            ? "live exploratory"
++            : scored
++              ? "recorded"
++              : "not run",
++      collection_sha256: result.manifest?.collection_sha256,
++      protocol: result.protocol,
++      works: all.map((r) => ({
++        artwork_id: r.work.id,
++        title: r.work.title,
++        source: r.work.sourceUrl,
++        score: r.score,
++        rank: r.rank,
++        tied: r.tied,
++        unavailable: r.missing,
++      })),
++    });
++  }
++  const collectedIds = new Set(collection.map((item) => item.artworkId));
++  const sourceLabel =
++    method === "lexical"
++      ? "Local keyword match"
++      : currentLive
++        ? "Live Jev"
++        : scored
++          ? "Recorded Jev"
++          : "Jev · not run";
++  return (
++    <div className="visual-search">
++      <header className="vs-hero">
++        <div className="vs-archive-line">
++          <span>Art Institute of Chicago</span>
++          <span>{works.length} public-domain works</span>
++        </div>
++        <form
++          className="vs-search-box"
++          role="search"
++          onSubmit={(event) => event.preventDefault()}
++        >
++          <Search size={22} aria-hidden="true" />
++          <input
++            ref={searchInput}
++            aria-label="Describe the artwork you are looking for"
++            value={query}
++            onChange={(event) => changeQuery(event.target.value)}
++            maxLength={800}
++            placeholder="A place, a shape, a feeling…"
++          />
++          {query && (
++            <button
++              type="button"
++              onClick={() => {
++                changeQuery("");
++                searchInput.current?.focus();
++              }}
++              aria-label="Clear search"
++            >
++              <X size={18} />
++            </button>
++          )}
++        </form>
++        <div className="vs-presets" aria-label="Saved search queries">
++          {presets.map((p) => (
++            <button
++              key={p.id}
++              aria-pressed={preset?.id === p.id}
++              onClick={() => changeQuery(p.query, true)}
++            >
++              {p.title}
++            </button>
++          ))}
++        </div>
++      </header>
++      <div className="vs-controls">
++        <div className="vs-methods" role="group" aria-label="Ranking method">
++          {(["caption", "metadata", "lexical"] as Mode[]).map((mode) => (
++            <button
++              key={mode}
++              aria-pressed={method === mode}
++              onClick={() => {
++                setMethod(mode);
++                setLimit(24);
++              }}
++            >
++              {modeNames[mode]}
++            </button>
++          ))}
++        </div>
++        <div className="vs-controls-right">
++          <label className="vs-media">
++            <SlidersHorizontal size={15} aria-hidden="true" />
++            <span className="vs-sr-only">Media filter</span>
++            <select
++              value={filter}
++              onChange={(event) => {
++                setFilter(event.target.value);
++                setLimit(24);
++              }}
++            >
++              {facets.map((facet) => (
++                <option key={facet}>{facet}</option>
++              ))}
++            </select>
++          </label>
++          <div
++            className="vs-view-switch"
++            role="group"
++            aria-label="Collection layout"
++          >
++            <button
++              aria-pressed={view === "field"}
++              onClick={() => setView("field")}
++            >
++              <Orbit size={16} />
++              Field
++            </button>
++            <button
++              aria-pressed={view === "grid"}
++              onClick={() => setView("grid")}
++            >
++              <LayoutGrid size={16} />
++              Grid
++            </button>
++          </div>
++          <button
++            className="vs-collection-toggle"
++            aria-expanded={collectionOpen}
++            onClick={() => setCollectionOpen((value) => !value)}
++          >
++            <Plus size={16} />
++            Collection <span>{collection.length}</span>
++          </button>
++        </div>
++      </div>
++      <div className="vs-state-line">
++        <span>
++          <i />
++          {sourceLabel}
++          {method !== "lexical" && " · museum text"}
++        </span>
++        <div>
++          {savedLive && recorded && !busy && method !== "lexical" && (
++            <button onClick={() => setPreferLive((value) => !value)}>
++              {preferLive ? "Use recorded" : "Use live result"}
++            </button>
++          )}
++          {busy ? (
++            <button onClick={cancel}>
++              <X size={15} />
++              Stop · {completed}/{total}
++            </button>
++          ) : (
++            <button onClick={rankWithJev} disabled={!normalized}>
++              <Sparkles size={15} />
++              {savedLive && savedLive.completed < total
++                ? "Continue Jev"
++                : "Run Jev"}
++            </button>
++          )}
++          <button onClick={exportRanking} aria-label="Export complete ranking">
++            <Download size={16} />
++          </button>
++        </div>
++      </div>
++      {error && (
++        <Notice error>
++          {error}
++          {completed > 0 && ` ${completed}/${total} scores retained.`}
++        </Notice>
++      )}
++      {notice && (
++        <div className="vs-notice" role="status">
++          <span>{notice}</span>
++          <button aria-label="Dismiss message" onClick={() => setNotice("")}>
++            <X size={16} />
++          </button>
++        </div>
++      )}
++      {busy && (
++        <div
++          className="vs-progress"
++          role="progressbar"
++          aria-label="Artwork scores completed"
++          aria-valuemin={0}
++          aria-valuemax={total}
++          aria-valuenow={completed}
++        >
++          <span
++            style={{ width: `${total ? (100 * completed) / total : 0}%` }}
++          />
++        </div>
++      )}
++      {collectionOpen && (
++        <section className="vs-collection" aria-label="Collected artworks">
++          <div className="vs-collection-heading">
++            <h3>
++              Your collection{" "}
++              <span>
++                {collection.length}/{MAX_COLLECTION}
++              </span>
++            </h3>
++            <div>
++              <button onClick={() => uploadInput.current?.click()}>
++                <FolderOpen size={15} />
++                Open
++              </button>
++              <button
++                disabled={!collection.length}
++                onClick={() =>
++                  download(
++                    "jev-artwork-collection.json",
++                    createCollection(
++                      collection,
++                      works,
++                      result.manifest?.collection_sha256,
++                    ),
++                  )
++                }
++              >
++                <Download size={15} />
++                Save
++              </button>
++            </div>
++          </div>
++          <input
++            ref={uploadInput}
++            type="file"
++            accept="application/json,.json"
++            className="vs-sr-only"
++            tabIndex={-1}
++            aria-label="Open artwork collection file"
++            onChange={(event) => {
++              const file = event.target.files?.[0];
++              event.target.value = "";
++              if (file) void importCollection(file);
++            }}
++          />
++          {collection.length ? (
++            <ol className="vs-collection-list">
++              {collection.map((item) => {
++                const work = works.find((work) => work.id === item.artworkId)!;
++                return (
++                  <li key={work.id}>
++                    <button
++                      className="vs-collection-art"
++                      onClick={(event) =>
++                        openArtwork(work, event.currentTarget, item)
++                      }
++                    >
++                      <ArtworkImage work={work} />
++                      <span>{work.title}</span>
++                    </button>
++                    <button
++                      className="vs-collection-remove"
++                      aria-label={`Remove ${work.title} from collection`}
++                      onClick={() => {
++                        collectionRevision.current++;
++                        setCollection((items) =>
++                          items.filter((value) => value.artworkId !== work.id),
++                        );
++                      }}
++                    >
++                      <X size={15} />
++                    </button>
++                  </li>
++                );
++              })}
++            </ol>
++          ) : (
++            <p>Open an artwork to collect it, or open a saved collection.</p>
++          )}
++        </section>
++      )}
++      <div className="vs-gallery-heading">
++        <span>
++          {filtered.length} works
++          {filter !== "All media" ? ` · ${filter.toLowerCase()}` : ""}
++        </span>
++        <span>
++          {method !== "lexical" &&
++            (scored
++              ? `${scored}/${works.length} scored${scored < works.length ? " · partial" : ""}`
++              : "No scores for this query")}
++        </span>
++      </div>
++      {method !== "lexical" && scored === 0 && !busy && (
++        <p className="vs-empty-model">
++          Choose a saved query, use keyword match, or run Jev for this search.
++        </p>
++      )}
++      {view === "field" ? (
++        <ArtworkField
++          rows={filtered}
++          queryKey={`${normalized}:${method}:${filter}`}
++          busy={busy}
++          inspecting={!!selected}
++          onOpen={openArtwork}
++          renderImage={(work) => <ArtworkImage work={work} />}
++        />
++      ) : (
++        <>
++          <motion.div className="vs-gallery" layout={!reduce}>
++            <AnimatePresence initial={false} mode="popLayout">
++              {shown.map((row) => (
++                <motion.article
++                  key={row.work.id}
++                  className="vs-artwork"
++                  layout={reduce ? false : "position"}
++                  initial={false}
++                  animate={{ opacity: 1 }}
++                  exit={{ opacity: reduce ? 1 : 0 }}
++                  transition={{ layout: { duration: reduce ? 0 : 0.2 } }}
++                >
++                  <button
++                    className="vs-art-open"
++                    onClick={(event) =>
++                      openArtwork(row.work, event.currentTarget)
++                    }
++                    aria-label={`Open ${row.work.title} by ${row.work.artist}`}
++                  >
++                    <ArtworkImage work={row.work} />
++                    <span className="vs-art-title">{row.work.title}</span>
++                  </button>
++                  <div className="vs-art-copy">
++                    <p>{row.work.artist}</p>
++                    <div className="vs-art-topline">
++                      <span>
++                        {row.rank == null ? "Unscored" : `#${row.rank}`}
++                        {row.tied > 1 ? " tied" : ""}
++                        {collectedIds.has(row.work.id) && (
++                          <Check size={13} aria-label="Collected" />
++                        )}
++                      </span>
++                      <span>
++                        {scoreText(row.score, method)}
++                        {method === "caption" && (
++                          <RankShift
++                            from={rankById.get(row.work.id)}
++                            to={row.rank}
++                          />
++                        )}
++                      </span>
++                    </div>
++                  </div>
++                </motion.article>
++              ))}
++            </AnimatePresence>
++          </motion.div>
++          {shown.length < filtered.length && (
++            <div className="vs-more">
++              <Button secondary onClick={() => setLimit((value) => value + 24)}>
++                Show more <ChevronDown size={15} />
++              </Button>
++              <span>
++                {shown.length} of {filtered.length}
++              </span>
++            </div>
++          )}
++        </>
++      )}
++      {!filtered.length && (
++        <p className="vs-empty-model">
++          No artworks in this medium. Choose another filter.
++        </p>
++      )}
++      <details className="vs-research">
++        <summary>How the rankings work</summary>
++        <p>
++          Jev scores museum metadata, with or without the original museum
++          caption. It does not receive image pixels. Keyword match uses title,
++          subject, style and caption tokens. These are three views of the same{" "}
++          {works.length} artworks.
++        </p>
++        {comparison.complete && (
++          <p>
++            {comparison.shared} of the top {comparison.k} works appear in both
++            Jev rankings. This measures agreement, not retrieval accuracy. Equal
++            scores share a rank; artwork ID breaks display-order ties.
++          </p>
++        )}
++        <p>
++          The field places rank bands in rings around the center. Distance
++          between two artworks does not measure visual similarity. Use Grid for
++          a linear ranking, and open an artwork to compare its scores.
++        </p>
++        <p>
++          The fixed archive comes from twelve museum searches.
++          {result.caption_counts?.descriptive != null &&
++            ` ${result.caption_counts.descriptive} captions describe the image; the others mainly identify materials.`}
++          {result.image_delivery?.matched != null &&
++            ` ${result.image_delivery.matched} artworks have matched Wikimedia previews, with museum images as fallback.`}{" "}
++          Image delivery does not change the ranking.
++        </p>
++        <div className="vs-source-links">
++          <a href={result.documentation} target="_blank" rel="noreferrer">
++            Museum API <ArrowUpRight size={12} />
++          </a>
++          <a href={result.collection_archive} download>
++            Collection data
++          </a>
++          {result.availability?.completed > 0 && (
++            <a href={result.archive} download>
++              Recorded judgments
++            </a>
++          )}
++        </div>
++        <p className="vs-credit">
++          Spatial browsing inspired by{" "}
++          <a
++            href="https://huggingface.co/spaces/webml-community/semantic-image-field"
++            target="_blank"
++            rel="noreferrer"
++          >
++            Semantic Image Field
++          </a>{" "}
++          by Joshua Lochner / Xenova and webml-community, which credits Shridhar
++          Rathi's interaction work. This implementation uses the existing text
++          rankings and an original layout.
++        </p>
++        <details>
++          <summary>Protocol and provenance</summary>
++          <pre className="vs-evidence">
++            {JSON.stringify(
++              {
++                protocol: result.protocol,
++                manifest: result.manifest,
++                collection_sources: result.sources,
++                availability: result.availability,
++                image_delivery: result.image_delivery,
++              },
++              null,
++              2,
++            )}
++          </pre>
++        </details>
++      </details>
++      {selected && inspection.current && (
++        <ArtworkDetails
++          work={selected}
++          inspection={inspection.current}
++          onClose={closeArtwork}
++          onMove={moveArtwork}
++          collected={collectedIds.has(selected.id)}
++          count={collection.length}
++          onCollect={() => toggleCollection(selected)}
++          onRefine={(next) => {
++            opener.current = null;
++            changeQuery(next);
++            closeArtwork();
++          }}
++          manifest={result.manifest}
++        />
++      )}
++    </div>
++  );
+ }
+diff --git a/jev-experiments/experience-prototypes/src/visual-search.css b/jev-experiments/experience-prototypes/src/visual-search.css
+--- a/jev-experiments/experience-prototypes/src/visual-search.css
++++ b/jev-experiments/experience-prototypes/src/visual-search.css
+@@ -1,4 +1,801 @@
+-.visual-search{--vs-blue:#536ae7;display:grid;gap:20px;min-width:0}.vs-hero{text-align:center;padding:28px 0 22px;max-width:900px;margin:0 auto;width:100%}.vs-eyebrow{font:10px var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:flex;align-items:center;gap:8px}.vs-hero .vs-eyebrow{justify-content:center}.vs-dot{width:6px;height:6px;background:var(--vs-blue);border-radius:50%}.vs-hero h2{font-size:clamp(45px,7vw,78px);font-weight:500;line-height:1.08;letter-spacing:-.065em;margin:18px 0}.vs-hero>p{font-size:15px;line-height:1.7;color:var(--muted);margin:0 0 27px}.vs-search-box{background:var(--surface);border:1px solid var(--line);border-radius:17px;padding:16px 20px;display:flex;align-items:center;gap:14px;text-align:left;box-shadow:0 6px 24px #20202004}.vs-search-box>svg{color:var(--vs-blue);flex-shrink:0}.vs-search-box:focus-within{border-color:var(--vs-blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--vs-blue) 11%,transparent)}.vs-search-box input{width:100%;min-width:0;outline:none;border:0;background:transparent;color:var(--ink);font-size:15px;line-height:1.6}.vs-search-box>button{background:var(--soft);border:0;border-radius:50%;width:25px;height:25px;display:grid;place-items:center;flex-shrink:0;cursor:pointer;color:var(--muted)}.vs-presets{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:15px}.vs-presets button{font-size:11px;background:transparent;border:1px solid transparent;color:var(--muted);padding:7px 11px;border-radius:20px;cursor:pointer;transition:background .15s,color .15s}.vs-presets button:hover,.vs-presets button.selected{background:var(--soft);color:var(--ink);border-color:var(--line)}.vs-controls{display:flex;gap:12px;justify-content:space-between;align-items:center;padding-top:17px;border-top:1px solid var(--line)}.vs-methods{display:flex;gap:3px;border:1px solid var(--line);background:var(--soft);padding:4px;border-radius:10px}.vs-methods button{display:flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);border-radius:7px;padding:9px 13px;font-size:11px;cursor:pointer}.vs-methods button.selected{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px #0000000a}.vs-controls-right{display:flex;align-items:center;gap:10px}.vs-controls-right label{display:flex;align-items:center;gap:7px;color:var(--muted)}.vs-controls-right select{font-size:11px;background:transparent;color:var(--ink);border:0;max-width:150px}.vs-export{background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--ink);width:32px;height:32px;display:grid;place-items:center;cursor:pointer}.vs-rank-note{display:flex;justify-content:space-between;align-items:center;gap:22px;padding:3px 0}.vs-rank-note>div:first-child{display:grid;gap:6px;max-width:650px}.vs-rank-note strong{font-size:12px;font-weight:500}.vs-rank-note span{font-size:11px;line-height:1.7;color:var(--muted)}.vs-run-control{display:grid;gap:5px;text-align:center;flex-shrink:0}.vs-run-control>button{border:1px solid var(--line);background:var(--ink);color:var(--surface);border-radius:8px;padding:9px 13px;font-size:11px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}.vs-run-control>button:disabled{opacity:.4;cursor:default}.vs-run-control>small{color:var(--muted);font-size:9px}.vs-refinements{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.vs-refinements>span{font:9px var(--mono);text-transform:uppercase;color:var(--muted);letter-spacing:.05em;margin-right:5px}.vs-refinements button{border:1px solid var(--line);color:var(--muted);background:transparent;padding:6px 10px;border-radius:6px;font-size:10px;cursor:pointer}.vs-refinements button:hover{color:var(--ink);background:var(--soft)}.vs-gallery-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;font:10px var(--mono);color:var(--muted);margin-top:6px}.vs-gallery-heading>div{display:flex;gap:12px;align-items:center;font-family:inherit;font-size:9px}.vs-gallery-heading em{font-style:normal;color:var(--coral)}.vs-gallery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:27px 19px;position:relative}.vs-artwork{min-width:0}.vs-art-open{display:block;width:100%;border:0;padding:0;border-radius:10px;background:var(--soft);cursor:pointer;position:relative;overflow:hidden}.vs-image{aspect-ratio:4/3;overflow:hidden;position:relative;background:var(--soft);display:flex;align-items:center;justify-content:center}.vs-image img{width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .25s,transform .4s;padding:14px}.vs-image.loaded img{opacity:1}.vs-art-open:hover .vs-image img{transform:scale(1.025)}.vs-image-open{position:absolute;right:11px;bottom:11px;display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:var(--surface);color:var(--ink);opacity:0;transform:translateY(5px);transition:opacity .15s,transform .15s;box-shadow:0 2px 8px #0001}.vs-art-open:hover .vs-image-open,.vs-art-open:focus-visible .vs-image-open{opacity:1;transform:translateY(0)}.vs-image-fallback{padding:16px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;color:var(--muted);font-size:11px;line-height:1.5}.vs-image-fallback>small{font-size:9px}.vs-image-fallback button{display:flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 12px;border-radius:6px;cursor:pointer;font-size:11px}.vs-art-copy{padding:12px 1px 0}.vs-art-topline{display:flex;justify-content:space-between;gap:7px;align-items:center;font:9px var(--mono);color:var(--muted);margin-bottom:9px}.vs-art-topline>span:last-child{display:flex;gap:5px;align-items:center}.vs-art-topline i{font:8px var(--mono);font-style:normal;color:var(--muted)}.vs-art-title{display:block;text-align:left;border:0;background:transparent;color:var(--ink);padding:0;cursor:pointer;font-size:13px;font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.vs-art-title:hover{text-decoration:underline;text-underline-offset:3px}.vs-art-copy>p{font-size:11px;color:var(--muted);margin:6px 0 2px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vs-art-copy>small{font-size:10px;color:var(--muted)}.vs-shift{display:inline-flex;align-items:center;font:9px var(--mono)}.vs-shift.up{color:var(--sage)}.vs-shift.down{color:var(--coral)}.vs-more{display:grid;justify-content:center;gap:12px;text-align:center;margin:13px 0 25px}.vs-more>span{font-size:10px;color:var(--muted)}.vs-empty-model{padding:18px 20px;background:var(--soft);border:1px solid var(--line);border-radius:9px;color:var(--muted);font-size:12px;line-height:1.7;margin:0}.vs-progress{padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.vs-progress>div{display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px}.vs-progress span{display:flex;align-items:center;gap:7px;color:var(--muted)}.vs-progress b{font:10px var(--mono);font-weight:400}.vs-progress>i{display:block;height:3px;border-radius:2px;overflow:hidden;background:var(--soft)}.vs-progress>i>span{height:100%;display:block;background:var(--vs-blue)}.vs-about{display:grid;grid-template-columns:1fr 1fr;gap:50px;border-top:1px solid var(--line);padding:34px 0 12px;margin-top:20px}.vs-about h3{font-size:26px;letter-spacing:-.035em;line-height:1.25;margin:12px 0}.vs-about p{color:var(--muted);font-size:12px;line-height:1.8;max-width:450px}.vs-about-facts{display:flex;flex-direction:column;gap:20px;justify-content:center}.vs-about-facts>div{display:flex;gap:25px;align-items:center}.vs-about-facts strong{font-size:21px;font-weight:500;min-width:110px;letter-spacing:-.035em}.vs-about-facts span{color:var(--muted);font-size:11px;line-height:1.7}.vs-source-links{display:flex;gap:20px;flex-wrap:wrap;font-size:11px;text-decoration:underline}.vs-source-links a{display:flex;gap:5px;align-items:center}.vs-evidence{font:10px/1.7 var(--mono);background:var(--soft);padding:15px;border-radius:8px;max-height:330px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}.visual-search>.fold p{font-size:12px;line-height:1.8;color:var(--muted)}.vs-detail{position:fixed;inset:0;margin:auto;max-height:90vh;width:min(1120px,94vw);padding:0;border:1px solid var(--line);border-radius:15px;background:var(--surface);color:var(--ink);overflow:auto;box-shadow:0 20px 80px #0004}.vs-detail::backdrop{background:#0f1411a0;backdrop-filter:blur(4px)}.vs-detail-shell{display:grid;grid-template-columns:1.1fr 1fr;position:relative;min-width:0}.vs-detail-close{position:absolute;top:12px;right:12px;z-index:1;width:32px;height:32px;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer}.vs-detail-art{padding:28px;background:var(--soft);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;min-width:0}.vs-detail-art .vs-image{aspect-ratio:auto;min-height:300px;width:100%;flex:1;max-height:70vh}.vs-detail-art .vs-image img{padding:0;max-height:70vh;object-fit:contain;width:100%;height:auto}.vs-detail-art>a{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px;text-decoration:underline;text-underline-offset:3px}.vs-detail-copy{padding:42px 34px 32px;min-width:0}.vs-detail-copy h2{font-size:32px;letter-spacing:-.035em;line-height:1.12;font-weight:500;margin:13px 0}.vs-detail-copy .vs-artist{font-size:13px;line-height:1.6;margin:14px 0}.vs-artist span{color:var(--muted);font-size:11px}.vs-medium{color:var(--muted);font-size:11px;line-height:1.6}.vs-caption{padding:16px 0;margin:15px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.vs-caption>span,.vs-detail-rankings>span,.vs-detail-refine>span{font:9px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.vs-caption>p{font-size:13px;line-height:1.75;margin:10px 0}.vs-caption>small{color:var(--muted);font-size:10px;line-height:1.6;display:block}.vs-detail-rankings>span{display:block;text-transform:none;line-height:1.6}.vs-detail-rankings>div{display:grid;grid-template-columns:1fr auto;gap:5px;font-size:11px;padding:10px 0;border-bottom:1px solid var(--line)}.vs-detail-rankings strong{font:10px var(--mono);font-weight:400}.vs-detail-rankings small{font-size:9px;color:var(--muted);grid-column:1/-1}.vs-detail-refine{margin:21px 0}.vs-detail-refine>div{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.vs-detail-refine button{display:flex;gap:5px;align-items:center;border:1px solid var(--line);padding:6px 9px;background:var(--soft);color:var(--ink);border-radius:5px;font-size:10px;cursor:pointer}.vs-detail-links{display:flex;flex-wrap:wrap;gap:15px;align-items:center;margin-top:24px}.vs-detail-links a,.vs-detail-links button{display:flex;gap:5px;align-items:center;font-size:10px;background:transparent;color:var(--muted);border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}.visual-search button:focus-visible,.visual-search a:focus-visible,.visual-search select:focus-visible,.vs-detail button:focus-visible,.vs-detail a:focus-visible{outline:2px solid var(--vs-blue);outline-offset:3px}.vs-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}:root[data-theme="dark"] .visual-search{--vs-blue:#99a5ff}:root[data-theme="dark"] .vs-image{background:#252a26}:root[data-theme="dark"] .vs-image img{filter:brightness(.92)}@media(max-width:1100px){.vs-gallery{grid-template-columns:repeat(3,minmax(0,1fr))}.vs-about{gap:28px}.vs-about-facts strong{min-width:96px}.vs-detail-copy{padding:42px 24px 26px}}@media(max-width:760px){.vs-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 13px}.vs-controls{flex-wrap:wrap}.vs-controls-right{width:100%;justify-content:space-between}.vs-methods{width:100%}.vs-methods button{flex:1;justify-content:center;padding:8px;font-size:10px}.vs-rank-note{align-items:flex-start;gap:14px}.vs-rank-note>div:first-child{flex:1}.vs-run-control>button{padding:9px;font-size:10px}.vs-about{grid-template-columns:1fr;gap:20px}.vs-about-facts{gap:13px}.vs-about-facts strong{min-width:120px}.vs-detail-shell{grid-template-columns:1fr}.vs-detail-art{padding:25px 20px;gap:12px}.vs-detail-art .vs-image{min-height:160px;max-height:50vh}.vs-detail-art .vs-image img{max-height:50vh}.vs-detail-copy{padding:26px 22px}.vs-detail-copy h2{font-size:28px}.vs-gallery-heading{align-items:flex-start;line-height:1.7}.vs-gallery-heading>div{display:grid;gap:4px;text-align:right}.vs-hero{padding:16px 0}.vs-hero h2{font-size:56px}.vs-search-box{padding:14px;border-radius:12px}.vs-search-box input{font-size:13px}.vs-search-box>svg{width:18px}.vs-hero>p{font-size:13px}.vs-presets{gap:4px}.vs-presets button{font-size:10px;padding:7px 10px}.vs-refinements{gap:5px}.vs-refinements>span{width:100%;margin-bottom:3px}.vs-refinements button{font-size:9px}.vs-image img{padding:10px}.vs-art-topline{font-size:8px;align-items:flex-start;line-height:1.4}.vs-art-topline>span:last-child{flex-wrap:wrap;justify-content:flex-end}.vs-art-title{font-size:12px}.vs-art-copy>p{font-size:10px}.vs-art-copy>small{font-size:9px}.vs-about h3{font-size:24px}}@media(max-width:420px){.vs-methods button{font-size:9px;padding:9px 5px;gap:4px}.vs-methods button svg{width:11px}.vs-rank-note{flex-direction:column}.vs-run-control{width:100%;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:10px}.vs-run-control>button{width:150px}.vs-gallery{gap:20px 10px}.vs-gallery-heading{font-size:9px}.vs-hero h2{font-size:49px}.vs-image{aspect-ratio:1}.vs-art-topline>span:first-child{min-width:20px}.vs-detail{max-height:96vh;width:96vw}}@media(prefers-reduced-motion:reduce){.visual-search *,.vs-detail *{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+-.visual-search .vs-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 24px;max-width:none;text-align:left;padding:4px 0 10px}.visual-search .vs-hero .vs-eyebrow{grid-column:1/-1;justify-content:flex-start}.visual-search .vs-hero h2{font-size:48px;margin:10px 0 18px;grid-column:1}.visual-search .vs-hero>p{grid-column:2;grid-row:2;align-self:center;margin:0;text-align:right;font-size:13px}.visual-search .vs-search-box{grid-column:1/-1}.visual-search .vs-presets{grid-column:1/-1;justify-content:flex-start;margin-top:10px}@media(max-width:760px){.visual-search .vs-hero{grid-template-columns:1fr;gap:0}.visual-search .vs-hero h2{font-size:42px;margin-bottom:16px}.visual-search .vs-hero>p{display:none}.visual-search .vs-presets{justify-content:flex-start}.visual-search .vs-hero .vs-eyebrow{font-size:9px}}
++.visual-search {
++  --vs-paper: #f5f4ef;
++  --vs-ink: #242c27;
++  --vs-muted: #596259;
++  --vs-line: #d5d9ce;
++  --vs-accent: #24634c;
++  --vs-wash: #e9ece3;
++  --vs-focus: #a75f12;
++  color: var(--vs-ink);
++  margin: 12px 0 32px;
++}
++:root[data-theme="dark"] .visual-search {
++  --vs-paper: #171d19;
++  --vs-ink: #eceee6;
++  --vs-muted: #adb9ac;
++  --vs-line: #3c483f;
++  --vs-accent: #a0cbb2;
++  --vs-wash: #253029;
++  --vs-focus: #efb46b;
++}
++:where(.visual-search) button,
++:where(.visual-search) select {
++  font: inherit;
++}
++.visual-search button {
++  cursor: pointer;
++}
++.visual-search button:disabled {
++  cursor: default;
++  opacity: 0.45;
++}
++.visual-search :is(button, a, input, select, summary):focus-visible {
++  outline: 2px solid var(--vs-focus);
++  outline-offset: 4px;
++}
++.visual-search a {
++  color: var(--vs-accent);
++  text-underline-offset: 3px;
++}
++.vs-sr-only {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  padding: 0;
++  margin: -1px;
++  overflow: hidden;
++  clip: rect(0, 0, 0, 0);
++  white-space: nowrap;
++  border: 0;
++}
++.vs-hero {
++  margin-bottom: 22px;
++}
++.vs-archive-line {
++  display: flex;
++  gap: 16px;
++  justify-content: space-between;
++  font-size: 12px;
++  color: var(--vs-muted);
++  margin-bottom: 10px;
++}
++.vs-search-box {
++  display: flex;
++  align-items: center;
++  gap: 14px;
++  padding: 6px 14px;
++  min-height: 64px;
++  border-bottom: 1px solid var(--vs-ink);
++  background: var(--vs-paper);
++}
++.vs-search-box > svg {
++  flex: 0 0 auto;
++  color: var(--vs-accent);
++}
++.vs-search-box input {
++  width: 100%;
++  min-width: 0;
++  border: 0;
++  outline: 0;
++  background: transparent;
++  color: var(--vs-ink);
++  font:
++    24px/1.5 Georgia,
++    serif;
++}
++.vs-search-box input::placeholder {
++  color: var(--vs-muted);
++}
++.vs-search-box input:focus-visible {
++  outline-offset: 0;
++}
++.vs-search-box button {
++  display: grid;
++  place-items: center;
++  flex-shrink: 0;
++  min-width: 44px;
++  min-height: 44px;
++  padding: 10px;
++  border: 0;
++  color: var(--vs-muted);
++  background: transparent;
++}
++.vs-presets {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0 20px;
++  margin-top: 6px;
++}
++.vs-presets button {
++  min-height: 44px;
++  border: 0;
++  padding: 8px 0;
++  background: transparent;
++  color: var(--vs-muted);
++  font-size: 13px;
++  text-align: left;
++}
++.vs-presets button[aria-pressed="true"] {
++  color: var(--vs-accent);
++  text-decoration: underline;
++  text-underline-offset: 5px;
++}
++.vs-controls,
++.vs-controls-right {
++  display: flex;
++  gap: 12px;
++  align-items: center;
++  flex-wrap: wrap;
++}
++.vs-controls {
++  justify-content: space-between;
++  padding: 12px 0;
++  border-top: 1px solid var(--vs-line);
++  border-bottom: 1px solid var(--vs-line);
++}
++.vs-methods,
++.vs-view-switch {
++  display: flex;
++  align-items: stretch;
++  gap: 2px;
++}
++.vs-methods button,
++.vs-view-switch button,
++.vs-collection-toggle,
++.vs-state-line button,
++.vs-collection-heading button {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 7px;
++  border: 1px solid transparent;
++  background: transparent;
++  color: var(--vs-muted);
++  min-height: 44px;
++  padding: 9px 10px;
++  border-radius: 4px;
++  font-size: 12px;
++  white-space: nowrap;
++}
++.vs-methods button[aria-pressed="true"],
++.vs-view-switch button[aria-pressed="true"],
++.vs-collection-toggle[aria-expanded="true"] {
++  color: var(--vs-accent);
++  background: var(--vs-wash);
++}
++.vs-controls button:hover,
++.vs-state-line button:hover,
++.vs-collection-heading button:hover {
++  border-color: var(--vs-line);
++  color: var(--vs-ink);
++}
++.vs-collection-toggle > span {
++  font-variant-numeric: tabular-nums;
++}
++.vs-media {
++  display: flex;
++  gap: 6px;
++  align-items: center;
++  color: var(--vs-muted);
++}
++.vs-media select {
++  max-width: 175px;
++  min-height: 44px;
++  border: 0;
++  background: transparent;
++  color: var(--vs-ink);
++  font-size: 12px;
++  padding: 8px 0;
++}
++.vs-media option {
++  color: var(--vs-ink);
++  background: var(--vs-paper);
++}
++.vs-state-line {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  gap: 12px;
++  font-size: 12px;
++  color: var(--vs-muted);
++}
++.vs-state-line > span {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++}
++.vs-state-line i {
++  width: 6px;
++  height: 6px;
++  border-radius: 50%;
++  background: var(--vs-accent);
++  flex-shrink: 0;
++}
++.vs-state-line > div {
++  display: flex;
++  align-items: center;
++}
++.vs-state-line button:last-child {
++  min-width: 44px;
++}
++.vs-notice {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 12px;
++  background: var(--vs-wash);
++  padding: 4px 12px;
++  font-size: 14px;
++}
++.vs-notice button {
++  display: grid;
++  place-items: center;
++  width: 44px;
++  min-height: 44px;
++  background: transparent;
++  border: 0;
++  color: inherit;
++  flex-shrink: 0;
++}
++.vs-progress {
++  height: 3px;
++  background: var(--vs-line);
++}
++.vs-progress > span {
++  display: block;
++  height: 100%;
++  background: var(--vs-accent);
++}
++.vs-gallery-heading {
++  display: flex;
++  justify-content: space-between;
++  gap: 12px;
++  margin: 20px 0 12px;
++  color: var(--vs-muted);
++  font-size: 12px;
++  font-variant-numeric: tabular-nums;
++}
++.vs-image {
++  position: relative;
++  overflow: hidden;
++  display: grid;
++  place-items: center;
++  aspect-ratio: 4/5;
++  width: 100%;
++  background: var(--vs-wash);
++}
++.vs-image img {
++  width: 100%;
++  height: 100%;
++  display: block;
++  object-fit: contain;
++  padding: 12px;
++  opacity: 0;
++  transition: opacity 160ms ease;
++}
++.vs-image.loaded img {
++  opacity: 1;
++}
++.vs-image-fallback {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  gap: 10px;
++  padding: 24px;
++  color: var(--vs-muted);
++  font-size: 13px;
++  line-height: 1.5;
++  text-align: center;
++}
++.vs-image-fallback small {
++  font-size: 12px;
++}
++.vs-image-fallback button {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  min-height: 44px;
++  padding: 8px 12px;
++  background: transparent;
++  color: var(--vs-accent);
++  border: 1px solid var(--vs-line);
++  border-radius: 4px;
++}
++.vs-gallery {
++  display: grid;
++  grid-template-columns: repeat(4, minmax(0, 1fr));
++  gap: 32px 24px;
++}
++.vs-artwork {
++  min-width: 0;
++}
++.vs-art-open {
++  display: block;
++  width: 100%;
++  padding: 0;
++  border: 0;
++  background: transparent;
++  color: var(--vs-ink);
++  text-align: left;
++}
++.vs-art-title {
++  display: block;
++  margin-top: 10px;
++  font:
++    19px/1.35 Georgia,
++    serif;
++}
++.vs-art-open:hover .vs-art-title {
++  color: var(--vs-accent);
++}
++.vs-art-copy p {
++  margin: 4px 0 8px;
++  color: var(--vs-muted);
++  font-size: 12px;
++  line-height: 1.5;
++}
++.vs-art-topline {
++  display: flex;
++  justify-content: space-between;
++  gap: 10px;
++  font-size: 12px;
++  color: var(--vs-muted);
++}
++.vs-art-topline > span {
++  display: inline-flex;
++  align-items: center;
++  gap: 4px;
++}
++.vs-shift {
++  display: inline-flex;
++  gap: 2px;
++  align-items: center;
++  font-variant-numeric: tabular-nums;
++}
++.vs-shift.up {
++  color: var(--vs-accent);
++}
++.vs-more {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  gap: 16px;
++  margin: 28px 0;
++}
++.vs-more > span {
++  font-size: 12px;
++  color: var(--vs-muted);
++}
++.vs-empty-model {
++  color: var(--vs-muted);
++  font-size: 14px;
++  line-height: 1.7;
++  margin: 12px 0;
++}
++.vs-collection {
++  padding: 18px 0;
++  border-block: 1px solid var(--vs-line);
++  margin: 10px 0 24px;
++}
++.vs-collection-heading {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 16px;
++}
++.vs-collection-heading h3 {
++  margin: 0;
++  font:
++    20px/1.4 Georgia,
++    serif;
++}
++.vs-collection-heading h3 span {
++  color: var(--vs-muted);
++  margin-left: 10px;
++  font: 12px sans-serif;
++}
++.vs-collection-heading > div {
++  display: flex;
++  gap: 8px;
++}
++.vs-collection > p {
++  font-size: 14px;
++  color: var(--vs-muted);
++}
++.vs-collection-list {
++  display: flex;
++  gap: 18px;
++  overflow-x: auto;
++  list-style: none;
++  margin: 12px -4px 0;
++  padding: 4px 4px 12px;
++}
++.vs-collection-list li {
++  position: relative;
++  flex: 0 0 140px;
++}
++.vs-collection-art {
++  width: 100%;
++  border: 0;
++  padding: 0;
++  text-align: left;
++  background: transparent;
++  color: var(--vs-ink);
++}
++.vs-collection-art .vs-image {
++  aspect-ratio: 1;
++}
++.vs-collection-art > span {
++  display: block;
++  font-size: 12px;
++  line-height: 1.5;
++  margin-top: 8px;
++}
++.vs-collection-remove {
++  position: absolute;
++  top: 0;
++  right: 0;
++  display: grid;
++  place-items: center;
++  width: 44px;
++  height: 44px;
++  color: var(--vs-ink);
++  background: var(--vs-paper);
++  border: 1px solid var(--vs-line);
++  border-radius: 0 0 0 4px;
++}
++.vs-research {
++  margin: 32px 0 0;
++  padding-top: 16px;
++  border-top: 1px solid var(--vs-line);
++  font-size: 15px;
++  line-height: 1.75;
++}
++.vs-research summary,
++.vs-detail-evidence summary {
++  display: list-item;
++  cursor: pointer;
++  padding: 12px 0;
++  min-height: 44px;
++  box-sizing: border-box;
++  color: var(--vs-ink);
++}
++.vs-research p {
++  max-width: 68ch;
++}
++.vs-research .vs-credit {
++  color: var(--vs-muted);
++  font-size: 13px;
++}
++.vs-source-links {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px 24px;
++}
++.vs-source-links a {
++  display: inline-flex;
++  align-items: center;
++  gap: 4px;
++  min-height: 44px;
++  font-size: 13px;
++}
++.vs-evidence {
++  max-height: 320px;
++  overflow: auto;
++  padding: 20px;
++  background: var(--vs-wash);
++  color: var(--vs-ink);
++  font-size: 12px;
++  line-height: 1.6;
++}
++.vs-detail {
++  width: min(1120px, calc(100vw - 48px));
++  max-height: calc(100dvh - 48px);
++  padding: 0;
++  border: 1px solid var(--vs-line);
++  border-radius: 6px;
++  color: var(--vs-ink);
++  background: var(--vs-paper);
++  box-shadow: 0 24px 100px #0005;
++}
++.vs-detail::backdrop {
++  background: #111b16b8;
++}
++.vs-detail-toolbar {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  padding: 10px 16px;
++  border-bottom: 1px solid var(--vs-line);
++  position: sticky;
++  top: 0;
++  z-index: 3;
++  background: var(--vs-paper);
++}
++.vs-detail-toolbar button {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 7px;
++  min-width: 44px;
++  min-height: 44px;
++  padding: 8px;
++  border: 0;
++  background: transparent;
++  color: var(--vs-ink);
++  border-radius: 4px;
++  font-size: 14px;
++}
++.vs-detail-toolbar button:hover:not(:disabled) {
++  background: var(--vs-wash);
++}
++.vs-detail-navigation {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  margin-right: auto;
++}
++.vs-detail-navigation > span {
++  min-width: 64px;
++  font-size: 12px;
++  text-align: center;
++  color: var(--vs-muted);
++  font-variant-numeric: tabular-nums;
++}
++.vs-detail-toolbar .vs-collect {
++  color: var(--vs-accent);
++  padding-inline: 12px;
++}
++.vs-detail-toolbar .vs-collect[aria-pressed="true"] {
++  background: var(--vs-wash);
++}
++.vs-detail-shell {
++  display: grid;
++  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
++  gap: 32px;
++  padding: 28px;
++}
++.vs-detail-art .vs-image {
++  min-height: 240px;
++  max-height: 66vh;
++  aspect-ratio: 1;
++  background: transparent;
++}
++.vs-detail-art .vs-image img {
++  padding: 0;
++}
++.vs-detail-art > a {
++  display: flex;
++  align-items: center;
++  gap: 4px;
++  min-height: 44px;
++  font-size: 12px;
++  line-height: 1.6;
++}
++.vs-detail-copy {
++  min-width: 0;
++}
++.vs-eyebrow {
++  font-size: 12px;
++  color: var(--vs-muted);
++}
++.vs-detail-copy h2 {
++  margin: 12px 0;
++  font:
++    32px/1.2 Georgia,
++    serif;
++  overflow-wrap: anywhere;
++}
++.vs-artist {
++  margin: 0 0 16px;
++  font-size: 16px;
++  line-height: 1.6;
++}
++.vs-artist > span,
++.vs-medium {
++  color: var(--vs-muted);
++  font-size: 13px;
++  line-height: 1.6;
++}
++.vs-caption {
++  padding-block: 18px;
++  border-block: 1px solid var(--vs-line);
++  margin: 20px 0;
++}
++.vs-caption > span {
++  color: var(--vs-muted);
++  font-size: 12px;
++}
++.vs-caption p {
++  font-size: 16px;
++  line-height: 1.75;
++  margin: 6px 0 0;
++}
++.vs-detail-evidence {
++  font-size: 14px;
++  line-height: 1.7;
++}
++.vs-detail-query {
++  font-style: italic;
++}
++.vs-detail-rankings {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 14px;
++  border-block: 1px solid var(--vs-line);
++  padding: 14px 0;
++}
++.vs-detail-rankings > div {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++  font-size: 12px;
++}
++.vs-detail-rankings strong {
++  font-weight: 500;
++  font-variant-numeric: tabular-nums;
++}
++.vs-detail-rankings small {
++  color: var(--vs-muted);
++  font-size: 12px;
++}
++.vs-small {
++  font-size: 12px;
++  color: var(--vs-muted);
++}
++.vs-detail-refine {
++  margin: 20px 0;
++  font-size: 12px;
++  color: var(--vs-muted);
++}
++.vs-detail-refine > div {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 4px 12px;
++  margin-top: 6px;
++}
++.vs-detail-refine button,
++.vs-detail-links button {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  padding: 8px 0;
++  min-height: 44px;
++  border: 0;
++  color: var(--vs-accent);
++  background: transparent;
++  font-size: 13px;
++  text-align: left;
++}
++.vs-detail-links {
++  display: flex;
++  gap: 12px 24px;
++  flex-wrap: wrap;
++  margin-top: 20px;
++}
++.vs-detail-links a {
++  display: inline-flex;
++  align-items: center;
++  gap: 4px;
++  min-height: 44px;
++  font-size: 12px;
++}
++@media (max-width: 1050px) {
++  .vs-gallery {
++    grid-template-columns: repeat(3, minmax(0, 1fr));
++    gap: 28px 18px;
++  }
++}
++@media (max-width: 760px) {
++  .vs-search-box {
++    padding-inline: 8px;
++    gap: 10px;
++    min-height: 64px;
++  }
++  .vs-search-box input {
++    font-size: 20px;
++  }
++  .vs-archive-line {
++    font-size: 12px;
++    gap: 8px;
++    flex-wrap: wrap;
++  }
++  .vs-presets {
++    gap: 0 16px;
++  }
++  .vs-controls {
++    gap: 8px;
++  }
++  .vs-controls-right {
++    gap: 6px 10px;
++    width: 100%;
++  }
++  .vs-methods {
++    flex-wrap: wrap;
++  }
++  .vs-methods button {
++    padding-inline: 9px;
++  }
++  .vs-state-line {
++    align-items: flex-start;
++  }
++  .vs-state-line > span {
++    margin-top: 14px;
++  }
++  .vs-gallery {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++    gap: 24px 14px;
++  }
++  .vs-art-title {
++    font-size: 17px;
++  }
++  .vs-art-topline {
++    flex-wrap: wrap;
++    gap: 4px;
++  }
++  .vs-image img {
++    padding: 6px;
++  }
++  .vs-image-fallback {
++    padding: 16px;
++  }
++  .vs-image-fallback > small {
++    display: none;
++  }
++  .vs-detail {
++    width: calc(100vw - 20px);
++    max-height: calc(100dvh - 20px);
++  }
++  .vs-detail-toolbar {
++    padding: 8px;
++    gap: 4px;
++  }
++  .vs-detail-shell {
++    grid-template-columns: minmax(0, 1fr);
++    gap: 20px;
++    padding: 18px;
++  }
++  .vs-detail-art .vs-image {
++    max-height: 45vh;
++    min-height: 200px;
++  }
++  .vs-detail-copy h2 {
++    font-size: 28px;
++  }
++  .vs-detail-rankings {
++    gap: 10px;
++  }
++}
++@media (prefers-reduced-motion: reduce) {
++  .visual-search *,
++  .visual-search *::before,
++  .visual-search *::after {
++    animation: none !important;
++    transition: none !important;
++    scroll-behavior: auto !important;
++  }
++}
+ 
+-.vs-image-delivery{font:10px/1.7 var(--mono);color:var(--muted);margin:-10px 0 0}.vs-image-delivery>span{font:10px/1.7 var(--sans)}
++@media (max-width: 760px) {
++  .vs-controls-right {
++    justify-content: space-between;
++    gap: 4px;
++  }
++  .vs-view-switch button {
++    font-size: 0;
++    width: 44px;
++    gap: 0;
++    padding-inline: 8px;
++  }
++  .vs-collection-toggle {
++    padding-inline: 4px;
++    gap: 4px;
++  }
++  .vs-media select {
++    max-width: 106px;
++  }
++  .vs-field-toolbar p {
++    max-width: 42ch;
++  }
++}
+diff --git a/jev-experiments/experience-prototypes/package.json b/jev-experiments/experience-prototypes/package.json
+--- a/jev-experiments/experience-prototypes/package.json
++++ b/jev-experiments/experience-prototypes/package.json
+@@ -7,7 +7,7 @@
+     "server": "bun server/dev.ts",
+     "build": "bun scripts/prepare.ts && tsc --noEmit && vite build",
+     "deploy": "bun scripts/deploy.ts",
+-    "test": "bun ../live-worlds/prepare.ts && bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../quality-and-simulation-review/paste-transactions.test.ts ../quality-and-simulation-review/composition-stream.test.ts ../visual-search/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
++    "test": "bun ../live-worlds/prepare.ts && bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../quality-and-simulation-review/paste-transactions.test.ts ../quality-and-simulation-review/composition-stream.test.ts ../visual-search/*.test.ts ../semantic-image-field-2026-09-21/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
+     "start": "bun scripts/start.ts",
+     "record": "bun scripts/record.ts",
+     "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py"
+diff --git a/jev-experiments/experience-prototypes/tsconfig.json b/jev-experiments/experience-prototypes/tsconfig.json
+--- a/jev-experiments/experience-prototypes/tsconfig.json
++++ b/jev-experiments/experience-prototypes/tsconfig.json
+@@ -9,7 +9,13 @@
+     "skipLibCheck": true,
+     "noEmit": true,
+     "allowImportingTsExtensions": true,
+-    "types": ["vite/client", "node"]
++    "types": ["vite/client", "node"],
++    "paths": {
++      "react": ["./node_modules/@types/react"],
++      "react/*": ["./node_modules/@types/react/*"],
++      "react-dom": ["./node_modules/@types/react-dom"],
++      "react-dom/*": ["./node_modules/@types/react-dom/*"]
++    }
+   },
+   "include": ["src", "api", "server/gateway.ts", "server/compose.ts"]
+ }
+diff --git a/jev-experiments/experience-prototypes/vite.config.ts b/jev-experiments/experience-prototypes/vite.config.ts
+--- a/jev-experiments/experience-prototypes/vite.config.ts
++++ b/jev-experiments/experience-prototypes/vite.config.ts
+@@ -3,6 +3,7 @@
+ import tailwind from "@tailwindcss/vite";
+ export default defineConfig({
+   plugins: [react(), tailwind()],
++  resolve: { dedupe: ["react", "react-dom"] },
+   server: { proxy: { "/api": "http://127.0.0.1:8793" } },
+   build: { chunkSizeWarningLimit: 1100 },
+ });
