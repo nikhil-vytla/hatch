@@ -1,0 +1,88 @@
+{
+  "recordedAt": "2026-09-22T16:13:16.195686+00:00",
+  "sourceCommit": "8743d7282176e2bdbcff68ddc497c8803b55b6c0",
+  "archiveSha256": "5885028b448cc7c7d2a21df0561d60f60e1ca051479cbf4be8fe3f21b7f27423",
+  "verifierSha256": "017db82734f82620265dfb8e6a21f8e3ce3f661cb31c7188a648e6bbcbb21591",
+  "condition": "Exact Git archive; no working-tree overlay; app builds before sibling install",
+  "providerCallsRequested": false,
+  "networkIsolated": false,
+  "checks": [
+    {
+      "name": "app frozen install",
+      "cwd": "jev-experiments/experience-prototypes",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 2.32,
+      "logSha256": "76749a6327fbe0fb10db8fe3819e25e37b25837a12190d68668a1fa7da6a5074",
+      "summaries": []
+    },
+    {
+      "name": "app production build",
+      "cwd": "jev-experiments/experience-prototypes",
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 8.4,
+      "logSha256": "b222e49ab0027813f8e01141efc8c28d33ca53d6803b44b0ba97a112722146c7",
+      "summaries": []
+    },
+    {
+      "name": "decoder frozen install",
+      "cwd": "jev-experiments/adapters/typescript",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.202,
+      "logSha256": "0284390b3c0dba1e3ebe661cdd6607ca8dcb21843513c7a91ba0442a41df88dd",
+      "summaries": []
+    },
+    {
+      "name": "gateway, score, accounting and existing transport contracts",
+      "cwd": "jev-experiments/.",
+      "command": [
+        "bun",
+        "test",
+        "gateway-accounting-2026-09-22",
+        "experience-prototypes/server/byok.test.ts",
+        "experience-prototypes/server/gateway.test.ts",
+        "roadmap/runtime/existing-contract.test.ts"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.136,
+      "logSha256": "4a117ae154bf3926b0a7f9f1fe102d7b5017ada2ca319a56631efe8a533c415a",
+      "summaries": [
+        "31 pass",
+        "0 fail",
+        "948 expect() calls"
+      ]
+    },
+    {
+      "name": "publication integrity",
+      "cwd": "jev-experiments/roadmap",
+      "command": [
+        "bun",
+        "verification/publication.ts"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.536,
+      "logSha256": "ced5aaecfb1b054cd42ebf8bd53a5f6f8942159d49a83fa8c3063f335bf0c3e7",
+      "summaries": []
+    }
+  ],
+  "passed": true
+}
