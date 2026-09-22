@@ -57,7 +57,12 @@ export function createMacAdapter(config: MacRuntimeConfig): Adapter {
       maxInputBytes: 131072,
       maxQuestions: 32,
       maxOptions: 8,
+      maxOrdinalLevels: 8,
+      supportedEntryShapes: ["string"],
+      supportsBooleanCriteria: false,
+      supportsOrdinalLevels: false,
       maxTokens: 768,
+      minPromptChars: 1,
       supportedKinds: ["choice", "boolean", "ordinal"],
     },
     async decide(request, { signal } = {}) {

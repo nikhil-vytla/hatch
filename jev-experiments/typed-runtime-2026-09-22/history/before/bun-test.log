@@ -1,0 +1,110 @@
+bun test v1.3.14 (0d9b296a)
+
+../correction-boundaries.test.ts:
+72 | 
+73 | test("valid adapter and revision changes survive successful routing in declared and actual identity", async () => {
+74 |   for (const id of [identity(), identity("independent-local", "authored-revision-b"), identity("second-local", "authored-revision-a")]) {
+75 |     const {result, executions} = await route(createDecisionClassifier(adapter(id)));
+76 |     expect(executions).toBe(1); expect(result.status).toBe("ok");
+77 |     expect(result.classification.declaredExecution).toEqual({...id, source: "local"});
+                                                         ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "adapter": "independent-local",
+    "local": true,
+    "model": "authored-model",
+-   "revision": "authored-revision-a",
+    "source": "local",
+  }
+
+- Expected  - 2
++ Received  + 0
+
+      at <anonymous> (<independent-review>/correction-boundaries.test.ts:77:53)
+(fail) valid adapter and revision changes survive successful routing in declared and actual identity [2.67ms]
+62 |     accounting: result.classification.accounting, costUsd: result.classification.costUsd,
+63 |   }, totalCostUsd: result.outcome.totalCostUsd, destinationAttempts: result.attempts.length, hasArtifact: !!result.outcome.artifact});
+64 |   return {result, executions};
+65 | }
+66 | function noDestination(record: any) {
+67 |   expect(record.executions).toBe(0);
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at noDestination (<independent-review>/correction-boundaries.test.ts:67:29)
+      at <anonymous> (<independent-review>/correction-boundaries.test.ts:93:5)
+(fail) contradicted or missing reported adapter and revision fail closed without erasing observed spend [0.83ms]
+107 |     const record = await route(createDecisionClassifier({...original, async decide(request: any) {
+108 |       const result = await original.decide(request);
+109 |       return {...result, execution: {...result.execution, ...changed}};
+110 |     }}));
+111 |     noDestination(record);
+112 |     expect(record.result.classification.decisionStatus).toBe("error");
+                                                              ^
+error: expect(received).toBe(expected)
+
+Expected: "error"
+Received: undefined
+
+      at <anonymous> (<independent-review>/correction-boundaries.test.ts:112:57)
+(fail) runtime identity rejection remains structured and keeps accounting observed before validation [0.60ms]
+124 |       {code: "authored_global", message: "A request-wide explanation."},
+125 |     ];
+126 |     const expected = issues.map(({ignored, ...issue}) => structuredClone(issue));
+127 |     const record = await route(createDecisionClassifier(adapter(identity(), accounting, status, issues)));
+128 |     noDestination(record);
+129 |     expect(record.result.classification.decisionStatus).toBe(status);
+                                                              ^
+error: expect(received).toBe(expected)
+
+Expected: "unsupported"
+Received: undefined
+
+      at <anonymous> (<independent-review>/correction-boundaries.test.ts:129:57)
+(fail) unsupported and error preserve every issue field and both paid and partly unknown accounting [0.40ms]
+145 | test("malformed diagnostic question IDs fail closed while observed accounting survives", async () => {
+146 |   for (const questionIds of [null, "category", [1], [" "]]) {
+147 |     const accounting = ledger(true);
+148 |     const record = await route(createDecisionClassifier(adapter(identity(), accounting, "unsupported", [{code: "authored_limit", message: "Readable refusal.", questionIds}])));
+149 |     noDestination(record);
+150 |     expect(record.result.classification.issues).toEqual([{code: "invalid_classifier_issues", message: "Classifier refusal contained malformed issue metadata."}]);
+                                                      ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "code": "invalid_classifier_issues",
+-     "message": "Classifier refusal contained malformed issue metadata.",
+-   },
+- ]
++ undefined
+
+- Expected  - 6
++ Received  + 1
+
+      at <anonymous> (<independent-review>/correction-boundaries.test.ts:150:49)
+(fail) malformed diagnostic question IDs fail closed while observed accounting survives [0.31ms]
+162 |       throw Error("Authored failure after accounting observation.");
+163 |     }};
+164 |     const record = await route({...createDecisionClassifier(fixture), signal: controller.signal});
+165 |     expect(record.executions).toBe(0);
+166 |     expect(record.result.status).toBe(cancelled ? "cancelled" : "error");
+167 |     expect(record.result.classification.decisionStatus).toBe(cancelled ? "cancelled" : "error");
+                                                              ^
+error: expect(received).toBe(expected)
+
+Expected: "error"
+Received: undefined
+
+      at <anonymous> (<independent-review>/correction-boundaries.test.ts:167:57)
+(fail) a thrown runtime error and cancellation retain observed attempts, messages and revision [0.37ms]
+(pass) existing model contradiction and no-destination unknown-cost controls remain enforced [0.36ms]
+
+ 1 pass
+ 6 fail
+ 33 expect() calls
+Ran 7 tests across 1 file. [19.00ms]

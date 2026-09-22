@@ -8,7 +8,7 @@ import {
   type DecisionResponse,
 } from "./contract";
 const req: DecisionRequest = {
-  schemaVersion: "1",
+  schemaVersion: "2",
   requestId: "test",
   state: { message: "hello" },
   questions: [
@@ -24,7 +24,7 @@ const req: DecisionRequest = {
   ],
 };
 const answer = (): DecisionResponse => ({
-  schemaVersion: "1",
+  schemaVersion: "2",
   requestId: "test",
   status: "ok",
   decisions: [

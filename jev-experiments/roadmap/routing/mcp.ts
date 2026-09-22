@@ -2,9 +2,11 @@
 /** Dependency-free MCP stdio server. One JSON-RPC object per line; stdout is protocol only. */
 import { createInterface } from "node:readline";
 import { appendFileSync } from "node:fs";
-import { decide, routeTask, classifyEml } from "./index";
+import { decide, routeConfiguredTask, classifyEml } from "./index";
 import { createMacAdapter, classifyMacEml } from "./mac-adapter";
 import { loadConfig } from "./config";
+import { configuredClassifierInfo } from "./configured-classifier";
+import { decisionRequestSchema } from "../../packages/decision-runtime/src/request-schema";
 const objectSchema = { type: "object", additionalProperties: true };
 export const toolDefinitions = [
   {
@@ -15,9 +17,9 @@ export const toolDefinitions = [
       type: "object",
       properties: {
         request: {
-          ...objectSchema,
+          ...decisionRequestSchema,
           description:
-            "Version 1 decision request with requestId, state and questions.",
+            "Version 2 decision request with requestId, state and questions.",
         },
       },
       required: ["request"],
@@ -27,7 +29,7 @@ export const toolDefinitions = [
   {
     name: "route_task",
     description:
-      "Delegate one bounded bug fix, test-writing, repository-analysis or writing task to an eligible configured model. Include the complete relevant source and requirements in context. Returns an answer, structured result or proposed unified diff; never applies edits or executes tools. Review the artifact, apply it using your own normal permissions and independently test it. No eligible route returns an explanation.",
+      "Delegate one bounded bug fix, test-writing, repository-analysis or writing task to an eligible configured model. Include the complete relevant source and requirements in context. Classification defaults to a lexical heuristic; trusted configuration can opt into hosted Jev or an explicit local model. Returns an answer, structured result or proposed unified diff; never applies edits or executes tools. Review the artifact, apply it using your own normal permissions and independently test it. No eligible route returns an explanation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -121,7 +123,7 @@ async function handle(message: any) {
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "jev-model-routing-lab", version: "0.1.0" },
         instructions:
-          "Use route_task for bounded delegation with complete context. It returns proposed artifacts; you retain control of tools and applying changes. Default decide and classify_eml are explicitly labeled baselines.",
+          `Use route_task for bounded delegation with complete context. Task classifier: ${configuredClassifierInfo(config).description}. It returns proposed artifacts; you retain control of tools and applying changes. Default decide and classify_eml are explicitly labeled baselines.`,
       },
     });
   }
@@ -156,7 +158,7 @@ async function handle(message: any) {
               : undefined,
           })
         : params.name === "route_task"
-          ? await routeTask(args.task, config, { signal: controller.signal })
+          ? await routeConfiguredTask(args.task, config, { signal: controller.signal })
           : config.localRuntime
             ? await classifyMacEml(
                 args.eml,

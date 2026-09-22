@@ -1,0 +1,1414 @@
+{
+  "condition": "Current source-built Bun CLI/MCP; no configured destination, provider call, weights, or model inference.",
+  "provenance": {
+    "gitHead": null,
+    "sourceState": "staged-working-tree-bytes",
+    "stagedSourceSha256": {
+      "jev-experiments/experience-prototypes/server/gateway.ts": "806559e60f7c17ebb25a5020b02193e3f5947dc1ad26846b61ef1ff0604dd471",
+      "jev-experiments/packages/decision-runtime/src/native.ts": "9ae7c64e9826cbfbee0ff8c91b27fc05e440c0d1bf27ad3e073d4cb215a942cf",
+      "jev-experiments/packages/decision-runtime/src/request-schema.ts": "938a72c58249d46d75ca8bbe1a2290f69b65265731955cc361466af28c37a9b1",
+      "jev-experiments/packages/decision-runtime/src/score.ts": "0a77828dd8908cbe941c5bda9d364e2d2861ce4673fbe46ba169058fcb6db9fb",
+      "jev-experiments/roadmap/mac/models.json": "4ca8388eaec5fa94ca573be4a46ff85435802c4a57234b0a050ed42344c1a4a4",
+      "jev-experiments/roadmap/routing/artifacts.ts": "1e603beb9c2f64509598387b3297958ad89f890fbb1ed05806c7cf469d50eb07",
+      "jev-experiments/roadmap/routing/classifier.ts": "9f089f8b384ea2a6119c56c0f73da715cac74a2196790bd2329622e8f76bbe88",
+      "jev-experiments/roadmap/routing/cli.ts": "52d78b5298582aaa21064105fa19a2ce031065ea3d1983699cd2a9d941892d86",
+      "jev-experiments/roadmap/routing/config.ts": "c0747635ef865d6a220e87e52436d30966250843b280fe28fca2a5cd759261ea",
+      "jev-experiments/roadmap/routing/configured-classifier.ts": "6430e7781c2a7e3e1d49913245abac3232c0511828ab7eea2798b5b5cd3d9ec2",
+      "jev-experiments/roadmap/routing/decide.ts": "c98a24cb363e859b2dfb12c1d7a72a2766f2f1960723f8a6f6ea72df646f0215",
+      "jev-experiments/roadmap/routing/email.ts": "59eee418c94bec067fa1906b78f145f1ff812fd8a07570749be1de9f33943d53",
+      "jev-experiments/roadmap/routing/evidence-links.ts": "7de3ad0b7ed1cfa795a15e3c36d12c7ffe8d8726c77f2141e3a0f14e367d4af0",
+      "jev-experiments/roadmap/routing/execute.ts": "9fd00b0486e564ce434e27ee40db3118792d500d4f11387b3323b7017e3e848c",
+      "jev-experiments/roadmap/routing/hooks.ts": "24110d1ffc2eee4b8f75f1e655eb3932a3526440df70c1a5aeece9a0c1561807",
+      "jev-experiments/roadmap/routing/http-executor.ts": "edfbeb230f8d5a1723b1ea2ad719849f91b427d1d065c2a0a5db3c5d09d8465f",
+      "jev-experiments/roadmap/routing/index.ts": "aa638447ac100d51e5edc0ae8b47ee1b64a8ca8e5f5e82a5e9a7c40f19e0c427",
+      "jev-experiments/roadmap/routing/install.sh": "2db1ea55fef7717b96086e3156c2350c59929bb14984f5a879cde35ca2f90f0a",
+      "jev-experiments/roadmap/routing/mac-adapter.ts": "d9b316b4f483ed30a6dd407ee35d59d33a5f782d54fd6ae558333259798b74fd",
+      "jev-experiments/roadmap/routing/mcp.ts": "d63c307caff1d70c194bc0f7eee7b3529dd2e4e90d218c09f8dc7111ef0410eb",
+      "jev-experiments/roadmap/routing/policy.ts": "99c72d18408213811a72995a57d2ec8f5d783daae30f171d1ae5182c07dc430b",
+      "jev-experiments/roadmap/routing/router.ts": "1fa1afdc4c49c6d5510a82756c65f2fefabd12828a0ea8edf929fe3b420c6a87",
+      "jev-experiments/roadmap/routing/types.ts": "b41f6a5cea620644d96ac026a4e826b98887ff38b2105dbcd76b4aaf7886e745",
+      "jev-experiments/roadmap/routing/web-handler.ts": "486e720f835be542eb3c3127d4f21eb385d1adb805b2aca0c6799b6801c7abc1",
+      "jev-experiments/roadmap/routing/web-registry.ts": "5be61d37fdb0ff817d58ea1b2af1ff67040bc5f290cf9c883dd8316801934c11",
+      "jev-experiments/roadmap/runtime/accounting.ts": "119dad69a0b24a4b1968f33737b8c5dd809e3452201664b0d55e6f9f84dc77b1",
+      "jev-experiments/roadmap/runtime/contract.ts": "464edf95c9a5859125daa3384ed4d271987d1fdfcf8d8872e4713c95716a4165",
+      "jev-experiments/roadmap/runtime/execute.ts": "68845cc16a6c5c67f46f3b8e51be67986883ce74b59f2e13f711d8296b2b3038",
+      "jev-experiments/roadmap/runtime/jev.ts": "6e11a9c3d739e9e26505c9531353da7e8f52c276b8b4f17231741c88b15968e3"
+    },
+    "sourceDigest": "99e3d3f6e59abab5019dcf5e006565ada716ff5da6a0611e270c62c6aa412487",
+    "verifierSha256": "19c41078910c32f0dcbeb4614a083442c40e9cffa58c63cc7d040515eebbc9bd",
+    "historicalFreshInstallSha256": "c01a5049bd17b0633eb7a6791f9e91e3ee1e220ce74717475342449b9948d9dc"
+  },
+  "inputs": {
+    "nativeRequest": {
+      "schemaVersion": "2",
+      "requestId": "installed-native-v2",
+      "state": {
+        "fixture": [
+          "structured",
+          {
+            "count": 2,
+            "enabled": true
+          },
+          null
+        ]
+      },
+      "questions": [
+        {
+          "id": "choice",
+          "kind": "choice",
+          "prompt": {
+            "instruction": "Choose a named entry"
+          },
+          "options": [
+            {
+              "id": "first",
+              "label": "First",
+              "description": {
+                "value": [
+                  1,
+                  true
+                ]
+              }
+            },
+            {
+              "id": "second",
+              "label": "Second",
+              "description": [
+                "two",
+                null
+              ]
+            },
+            {
+              "id": "third",
+              "label": "Third",
+              "description": null
+            }
+          ]
+        },
+        {
+          "id": "noul",
+          "kind": "boolean",
+          "prompt": [
+            "Evaluate",
+            {
+              "field": "enabled"
+            }
+          ],
+          "criteria": {
+            "true": {
+              "meaning": "yes"
+            },
+            "false": [
+              "no",
+              null
+            ]
+          }
+        },
+        {
+          "id": "score",
+          "kind": "ordinal",
+          "prompt": null,
+          "min": 10,
+          "max": 30,
+          "step": 10,
+          "levels": [
+            {
+              "meaning": "low"
+            },
+            [
+              "middle",
+              20
+            ],
+            "high"
+          ]
+        }
+      ]
+    },
+    "ordinalLimitRequest": {
+      "schemaVersion": "2",
+      "requestId": "installed-limit",
+      "state": {},
+      "questions": [
+        {
+          "id": "score",
+          "kind": "ordinal",
+          "prompt": "Eleven levels",
+          "min": 0,
+          "max": 10
+        }
+      ]
+    },
+    "task": {
+      "id": "installed-no-route",
+      "prompt": "Analyze this synthetic fixture",
+      "context": "Only supplied fixture data.",
+      "outputTokens": 128
+    },
+    "mailSha256": "6ef306cc8edf5ee26fdbe6c6cf56ad1c23237592dc824bde49e42adde1f3417d",
+    "encodedMailSha256": "c4d17aad70f8d91a16847a18a69aa85c7d2e73a10df5d69e44ab8795ab00deba"
+  },
+  "checks": {
+    "stagedSourceRemovedBeforeFirstAction": true,
+    "installedCliSemantics": true,
+    "installedMcpDiscoveryAndCalls": true,
+    "allInputsUnchanged": true,
+    "documentedPrefixRemovalUninstalls": true,
+    "sourceBytesUnchanged": true,
+    "historicalReportPreserved": true
+  },
+  "bunVersion": "1.3.14",
+  "bundleBytes": 136647,
+  "bundleSha256": "ca748f8365429ca13a7480f712491902cb53e3317afbb9ba08ebee0cffd80aba",
+  "installedFiles": {
+    "bin/jev": "c43fca191270a6629bac45aee56af3013a1b0880cd8735394d5e9e6d6967efe4",
+    "lib/jev.js": "ca748f8365429ca13a7480f712491902cb53e3317afbb9ba08ebee0cffd80aba"
+  },
+  "externalImports": [
+    "child_process",
+    "fs",
+    "fs/promises",
+    "os",
+    "path",
+    "readline"
+  ],
+  "cli": {
+    "doctor": {
+      "exitCode": 0,
+      "result": {
+        "status": "ok",
+        "runtime": "bun",
+        "version": "1.3.14",
+        "configuredRoutes": [],
+        "defaultDecisionAdapter": "state-blind uniform prior; no model installed",
+        "operations": [
+          "decide",
+          "route_task",
+          "classify_eml"
+        ],
+        "taskClassifier": {
+          "kind": "heuristic",
+          "description": "Lexical heuristic; no model classification"
+        },
+        "localCloudFallback": false
+      }
+    },
+    "decide": {
+      "exitCode": 0,
+      "result": {
+        "schemaVersion": "2",
+        "requestId": "installed-native-v2",
+        "status": "ok",
+        "execution": {
+          "adapter": "state-blind-prior",
+          "model": "uniform-v1",
+          "local": true
+        },
+        "timing": {
+          "totalMs": 0.04899999999999949
+        },
+        "issues": [],
+        "decisions": [
+          {
+            "questionId": "choice",
+            "selected": "first",
+            "distribution": [
+              {
+                "value": "first",
+                "probability": 0.3333333333333333
+              },
+              {
+                "value": "second",
+                "probability": 0.3333333333333333
+              },
+              {
+                "value": "third",
+                "probability": 0.3333333333333333
+              }
+            ]
+          },
+          {
+            "questionId": "noul",
+            "selected": false,
+            "distribution": [
+              {
+                "value": false,
+                "probability": 0.5
+              },
+              {
+                "value": true,
+                "probability": 0.5
+              }
+            ],
+            "probabilityTrue": 0.5
+          },
+          {
+            "questionId": "score",
+            "selected": 10,
+            "distribution": [
+              {
+                "value": 10,
+                "probability": 0.3333333333333333
+              },
+              {
+                "value": 20,
+                "probability": 0.3333333333333333
+              },
+              {
+                "value": 30,
+                "probability": 0.3333333333333333
+              }
+            ],
+            "expected": 20
+          }
+        ]
+      }
+    },
+    "decideUnsupported": {
+      "exitCode": 2,
+      "result": {
+        "schemaVersion": "2",
+        "requestId": "installed-limit",
+        "status": "unsupported",
+        "decisions": [],
+        "execution": {
+          "adapter": "state-blind-prior",
+          "model": "uniform-v1",
+          "local": true
+        },
+        "timing": {
+          "totalMs": 0.5414579999999987
+        },
+        "issues": [
+          {
+            "code": "ordinal_limit",
+            "message": "This runtime supports at most 10 ordinal levels.",
+            "questionIds": [
+              "score"
+            ]
+          }
+        ]
+      }
+    },
+    "routeUnavailable": {
+      "exitCode": 2,
+      "result": {
+        "schemaVersion": "1",
+        "taskId": "installed-no-route",
+        "status": "unavailable",
+        "classification": {
+          "source": "heuristic",
+          "category": "repository-analysis",
+          "difficulty": 0.5,
+          "confidence": 0.5,
+          "latencyMs": 0,
+          "costUsd": 0,
+          "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+        },
+        "selection": {
+          "status": "unavailable",
+          "routeId": null,
+          "candidates": [],
+          "explanation": "No destination meets every restriction. Eligibility was not widened.",
+          "inputTokenUpperBound": 2176,
+          "outputTokens": 128
+        },
+        "attempts": [],
+        "outcome": {
+          "actualRouteId": null,
+          "actualModel": null,
+          "totalLatencyMs": 0.4214159999999989,
+          "totalCostUsd": 0,
+          "failure": "No destination meets every restriction. Eligibility was not widened."
+        }
+      }
+    },
+    "routeUnsupported": {
+      "exitCode": 2,
+      "result": {
+        "schemaVersion": "1",
+        "taskId": "",
+        "status": "unsupported",
+        "classification": {
+          "source": "heuristic",
+          "category": "other",
+          "difficulty": 0.5,
+          "confidence": 0.5,
+          "latencyMs": 0,
+          "costUsd": 0,
+          "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+        },
+        "selection": {
+          "status": "unsupported",
+          "routeId": null,
+          "candidates": [],
+          "explanation": "Task id is required.",
+          "inputTokenUpperBound": 0,
+          "outputTokens": 128
+        },
+        "attempts": [],
+        "outcome": {
+          "actualRouteId": null,
+          "actualModel": null,
+          "totalLatencyMs": 0.3864579999999993,
+          "totalCostUsd": 0,
+          "failure": "Task id is required."
+        }
+      }
+    },
+    "email": {
+      "exitCode": 0,
+      "result": {
+        "status": "ok",
+        "execution": {
+          "adapter": "email-lexical-baseline",
+          "model": "rules-v1",
+          "local": true
+        },
+        "issues": [],
+        "labels": [
+          {
+            "label": "receipt",
+            "probability": 0.625
+          },
+          {
+            "label": "action",
+            "probability": 0.125
+          },
+          {
+            "label": "newsletter",
+            "probability": 0.125
+          },
+          {
+            "label": "other",
+            "probability": 0.125
+          }
+        ],
+        "selected": "receipt",
+        "uncertainty": 0.375,
+        "calibrated": false,
+        "explanation": "Local lexical demonstration. Probabilities are normalized rule weights, not calibrated model confidence. No mailbox was read or modified."
+      }
+    },
+    "emailUnsupported": {
+      "exitCode": 2,
+      "result": {
+        "status": "unsupported",
+        "execution": {
+          "adapter": "email-lexical-baseline",
+          "model": "rules-v1",
+          "local": true
+        },
+        "issues": [
+          {
+            "code": "unsupported_email",
+            "message": "This baseline accepts unencoded text/plain messages only. MIME attachments, HTML, base64 and quoted-printable require a separate parser."
+          }
+        ],
+        "labels": [],
+        "uncertainty": null
+      }
+    }
+  },
+  "doctor": {
+    "status": "ok",
+    "runtime": "bun",
+    "version": "1.3.14",
+    "configuredRoutes": [],
+    "defaultDecisionAdapter": "state-blind uniform prior; no model installed",
+    "operations": [
+      "decide",
+      "route_task",
+      "classify_eml"
+    ],
+    "taskClassifier": {
+      "kind": "heuristic",
+      "description": "Lexical heuristic; no model classification"
+    },
+    "localCloudFallback": false
+  },
+  "mcp": {
+    "exitCode": 0,
+    "transcript": [
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "initialize",
+          "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {
+              "name": "fresh-install-v2",
+              "version": "2"
+            }
+          }
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "result": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {
+              "tools": {
+                "listChanged": false
+              }
+            },
+            "serverInfo": {
+              "name": "jev-model-routing-lab",
+              "version": "0.1.0"
+            },
+            "instructions": "Use route_task for bounded delegation with complete context. Task classifier: Lexical heuristic; no model classification. It returns proposed artifacts; you retain control of tools and applying changes. Default decide and classify_eml are explicitly labeled baselines."
+          }
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "method": "notifications/initialized"
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "method": "tools/list"
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "result": {
+            "tools": [
+              {
+                "name": "decide",
+                "description": "Answer typed choice, boolean or ordinal questions about explicitly supplied state. Default is a labeled state-blind uniform baseline, not a trained model. Returns distributions, execution identity, timing and unsupported/error states.",
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "request": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "schemaVersion",
+                        "requestId",
+                        "state",
+                        "questions"
+                      ],
+                      "properties": {
+                        "schemaVersion": {
+                          "const": "2"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "description": "Explicitly supplied JSON state. No implicit file or environment access."
+                        },
+                        "questions": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 128,
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "prompt",
+                                  "options"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "prompt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "array"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "kind": {
+                                    "const": "choice"
+                                  },
+                                  "options": {
+                                    "type": "array",
+                                    "minItems": 2,
+                                    "maxItems": 255,
+                                    "items": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "id",
+                                        "label"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "description": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "array"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "prompt"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "prompt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "array"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "kind": {
+                                    "const": "boolean"
+                                  },
+                                  "criteria": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "true",
+                                      "false"
+                                    ],
+                                    "properties": {
+                                      "true": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object"
+                                          },
+                                          {
+                                            "type": "array"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "false": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object"
+                                          },
+                                          {
+                                            "type": "array"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "prompt",
+                                  "min",
+                                  "max"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "prompt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "array"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "kind": {
+                                    "const": "ordinal"
+                                  },
+                                  "min": {
+                                    "type": "number"
+                                  },
+                                  "max": {
+                                    "type": "number"
+                                  },
+                                  "step": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0,
+                                    "default": 1
+                                  },
+                                  "levels": {
+                                    "type": "array",
+                                    "minItems": 2,
+                                    "maxItems": 10,
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "object"
+                                        },
+                                        {
+                                          "type": "array"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "description": "One description per evenly spaced value from min to max. The response separates modal selected from continuous expected."
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "description": "Version 2 decision request with requestId, state and questions."
+                    }
+                  },
+                  "required": [
+                    "request"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "name": "route_task",
+                "description": "Delegate one bounded bug fix, test-writing, repository-analysis or writing task to an eligible configured model. Include the complete relevant source and requirements in context. Classification defaults to a lexical heuristic; trusted configuration can opt into hosted Jev or an explicit local model. Returns an answer, structured result or proposed unified diff; never applies edits or executes tools. Review the artifact, apply it using your own normal permissions and independently test it. No eligible route returns an explanation.",
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "task": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "context": {
+                          "type": "string"
+                        },
+                        "requiredCapabilities": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "requiredTools": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "outputTokens": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "prompt",
+                        "context"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "task"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "name": "classify_eml",
+                "description": "Classify an explicitly supplied raw .eml message locally. The default is an uncalibrated lexical baseline; an explicitly configured localRuntime uses its installed experimental model. Labels action, receipt, newsletter or other with uncertainty. Does not access or modify a mailbox. The baseline rejects MIME attachments and encoded messages; the configured Mac runtime declares its own coverage.",
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "eml": {
+                      "type": "string",
+                      "description": "The complete raw .eml content, read only from a file explicitly supplied by the user."
+                    }
+                  },
+                  "required": [
+                    "eml"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "method": "tools/call",
+          "params": {
+            "name": "decide",
+            "arguments": {
+              "request": {
+                "schemaVersion": "2",
+                "requestId": "installed-native-v2",
+                "state": {
+                  "fixture": [
+                    "structured",
+                    {
+                      "count": 2,
+                      "enabled": true
+                    },
+                    null
+                  ]
+                },
+                "questions": [
+                  {
+                    "id": "choice",
+                    "kind": "choice",
+                    "prompt": {
+                      "instruction": "Choose a named entry"
+                    },
+                    "options": [
+                      {
+                        "id": "first",
+                        "label": "First",
+                        "description": {
+                          "value": [
+                            1,
+                            true
+                          ]
+                        }
+                      },
+                      {
+                        "id": "second",
+                        "label": "Second",
+                        "description": [
+                          "two",
+                          null
+                        ]
+                      },
+                      {
+                        "id": "third",
+                        "label": "Third",
+                        "description": null
+                      }
+                    ]
+                  },
+                  {
+                    "id": "noul",
+                    "kind": "boolean",
+                    "prompt": [
+                      "Evaluate",
+                      {
+                        "field": "enabled"
+                      }
+                    ],
+                    "criteria": {
+                      "true": {
+                        "meaning": "yes"
+                      },
+                      "false": [
+                        "no",
+                        null
+                      ]
+                    }
+                  },
+                  {
+                    "id": "score",
+                    "kind": "ordinal",
+                    "prompt": null,
+                    "min": 10,
+                    "max": 30,
+                    "step": 10,
+                    "levels": [
+                      {
+                        "meaning": "low"
+                      },
+                      [
+                        "middle",
+                        20
+                      ],
+                      "high"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schemaVersion\":\"2\",\"requestId\":\"installed-native-v2\",\"status\":\"ok\",\"execution\":{\"adapter\":\"state-blind-prior\",\"model\":\"uniform-v1\",\"local\":true},\"timing\":{\"totalMs\":0.054209000000000174},\"issues\":[],\"decisions\":[{\"questionId\":\"choice\",\"selected\":\"first\",\"distribution\":[{\"value\":\"first\",\"probability\":0.3333333333333333},{\"value\":\"second\",\"probability\":0.3333333333333333},{\"value\":\"third\",\"probability\":0.3333333333333333}]},{\"questionId\":\"noul\",\"selected\":false,\"distribution\":[{\"value\":false,\"probability\":0.5},{\"value\":true,\"probability\":0.5}],\"probabilityTrue\":0.5},{\"questionId\":\"score\",\"selected\":10,\"distribution\":[{\"value\":10,\"probability\":0.3333333333333333},{\"value\":20,\"probability\":0.3333333333333333},{\"value\":30,\"probability\":0.3333333333333333}],\"expected\":20}]}"
+              }
+            ],
+            "structuredContent": {
+              "schemaVersion": "2",
+              "requestId": "installed-native-v2",
+              "status": "ok",
+              "execution": {
+                "adapter": "state-blind-prior",
+                "model": "uniform-v1",
+                "local": true
+              },
+              "timing": {
+                "totalMs": 0.054209000000000174
+              },
+              "issues": [],
+              "decisions": [
+                {
+                  "questionId": "choice",
+                  "selected": "first",
+                  "distribution": [
+                    {
+                      "value": "first",
+                      "probability": 0.3333333333333333
+                    },
+                    {
+                      "value": "second",
+                      "probability": 0.3333333333333333
+                    },
+                    {
+                      "value": "third",
+                      "probability": 0.3333333333333333
+                    }
+                  ]
+                },
+                {
+                  "questionId": "noul",
+                  "selected": false,
+                  "distribution": [
+                    {
+                      "value": false,
+                      "probability": 0.5
+                    },
+                    {
+                      "value": true,
+                      "probability": 0.5
+                    }
+                  ],
+                  "probabilityTrue": 0.5
+                },
+                {
+                  "questionId": "score",
+                  "selected": 10,
+                  "distribution": [
+                    {
+                      "value": 10,
+                      "probability": 0.3333333333333333
+                    },
+                    {
+                      "value": 20,
+                      "probability": 0.3333333333333333
+                    },
+                    {
+                      "value": 30,
+                      "probability": 0.3333333333333333
+                    }
+                  ],
+                  "expected": 20
+                }
+              ]
+            },
+            "isError": false
+          }
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "method": "tools/call",
+          "params": {
+            "name": "decide",
+            "arguments": {
+              "request": {
+                "schemaVersion": "2",
+                "requestId": "installed-limit",
+                "state": {},
+                "questions": [
+                  {
+                    "id": "score",
+                    "kind": "ordinal",
+                    "prompt": "Eleven levels",
+                    "min": 0,
+                    "max": 10
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schemaVersion\":\"2\",\"requestId\":\"installed-limit\",\"status\":\"unsupported\",\"decisions\":[],\"execution\":{\"adapter\":\"state-blind-prior\",\"model\":\"uniform-v1\",\"local\":true},\"timing\":{\"totalMs\":0.05491699999999966},\"issues\":[{\"code\":\"ordinal_limit\",\"message\":\"This runtime supports at most 10 ordinal levels.\",\"questionIds\":[\"score\"]}]}"
+              }
+            ],
+            "structuredContent": {
+              "schemaVersion": "2",
+              "requestId": "installed-limit",
+              "status": "unsupported",
+              "decisions": [],
+              "execution": {
+                "adapter": "state-blind-prior",
+                "model": "uniform-v1",
+                "local": true
+              },
+              "timing": {
+                "totalMs": 0.05491699999999966
+              },
+              "issues": [
+                {
+                  "code": "ordinal_limit",
+                  "message": "This runtime supports at most 10 ordinal levels.",
+                  "questionIds": [
+                    "score"
+                  ]
+                }
+              ]
+            },
+            "isError": true
+          }
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "method": "tools/call",
+          "params": {
+            "name": "route_task",
+            "arguments": {
+              "task": {
+                "id": "installed-no-route",
+                "prompt": "Analyze this synthetic fixture",
+                "context": "Only supplied fixture data.",
+                "outputTokens": 128
+              }
+            }
+          }
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schemaVersion\":\"1\",\"taskId\":\"installed-no-route\",\"status\":\"unavailable\",\"classification\":{\"source\":\"heuristic\",\"category\":\"repository-analysis\",\"difficulty\":0.5,\"confidence\":0.5,\"latencyMs\":0,\"costUsd\":0,\"evidence\":\"Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior.\"},\"selection\":{\"status\":\"unavailable\",\"routeId\":null,\"candidates\":[],\"explanation\":\"No destination meets every restriction. Eligibility was not widened.\",\"inputTokenUpperBound\":2176,\"outputTokens\":128},\"attempts\":[],\"outcome\":{\"actualRouteId\":null,\"actualModel\":null,\"totalLatencyMs\":0.2819579999999995,\"totalCostUsd\":0,\"failure\":\"No destination meets every restriction. Eligibility was not widened.\"}}"
+              }
+            ],
+            "structuredContent": {
+              "schemaVersion": "1",
+              "taskId": "installed-no-route",
+              "status": "unavailable",
+              "classification": {
+                "source": "heuristic",
+                "category": "repository-analysis",
+                "difficulty": 0.5,
+                "confidence": 0.5,
+                "latencyMs": 0,
+                "costUsd": 0,
+                "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+              },
+              "selection": {
+                "status": "unavailable",
+                "routeId": null,
+                "candidates": [],
+                "explanation": "No destination meets every restriction. Eligibility was not widened.",
+                "inputTokenUpperBound": 2176,
+                "outputTokens": 128
+              },
+              "attempts": [],
+              "outcome": {
+                "actualRouteId": null,
+                "actualModel": null,
+                "totalLatencyMs": 0.2819579999999995,
+                "totalCostUsd": 0,
+                "failure": "No destination meets every restriction. Eligibility was not widened."
+              }
+            },
+            "isError": true
+          }
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "method": "tools/call",
+          "params": {
+            "name": "route_task",
+            "arguments": {
+              "task": {
+                "id": "",
+                "prompt": "Analyze this synthetic fixture",
+                "context": "Only supplied fixture data.",
+                "outputTokens": 128
+              }
+            }
+          }
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schemaVersion\":\"1\",\"taskId\":\"\",\"status\":\"unsupported\",\"classification\":{\"source\":\"heuristic\",\"category\":\"other\",\"difficulty\":0.5,\"confidence\":0.5,\"latencyMs\":0,\"costUsd\":0,\"evidence\":\"Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior.\"},\"selection\":{\"status\":\"unsupported\",\"routeId\":null,\"candidates\":[],\"explanation\":\"Task id is required.\",\"inputTokenUpperBound\":0,\"outputTokens\":128},\"attempts\":[],\"outcome\":{\"actualRouteId\":null,\"actualModel\":null,\"totalLatencyMs\":0.022207999999999117,\"totalCostUsd\":0,\"failure\":\"Task id is required.\"}}"
+              }
+            ],
+            "structuredContent": {
+              "schemaVersion": "1",
+              "taskId": "",
+              "status": "unsupported",
+              "classification": {
+                "source": "heuristic",
+                "category": "other",
+                "difficulty": 0.5,
+                "confidence": 0.5,
+                "latencyMs": 0,
+                "costUsd": 0,
+                "evidence": "Version 1 lexical baseline. Scores are uncalibrated; difficulty is a fixed prior."
+              },
+              "selection": {
+                "status": "unsupported",
+                "routeId": null,
+                "candidates": [],
+                "explanation": "Task id is required.",
+                "inputTokenUpperBound": 0,
+                "outputTokens": 128
+              },
+              "attempts": [],
+              "outcome": {
+                "actualRouteId": null,
+                "actualModel": null,
+                "totalLatencyMs": 0.022207999999999117,
+                "totalCostUsd": 0,
+                "failure": "Task id is required."
+              }
+            },
+            "isError": true
+          }
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "method": "tools/call",
+          "params": {
+            "name": "classify_eml",
+            "arguments": {
+              "eml": "Subject: Receipt\nContent-Type: text/plain\n\nPayment received. Thank you.\n"
+            }
+          }
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"status\":\"ok\",\"execution\":{\"adapter\":\"email-lexical-baseline\",\"model\":\"rules-v1\",\"local\":true},\"issues\":[],\"labels\":[{\"label\":\"receipt\",\"probability\":0.625},{\"label\":\"action\",\"probability\":0.125},{\"label\":\"newsletter\",\"probability\":0.125},{\"label\":\"other\",\"probability\":0.125}],\"selected\":\"receipt\",\"uncertainty\":0.375,\"calibrated\":false,\"explanation\":\"Local lexical demonstration. Probabilities are normalized rule weights, not calibrated model confidence. No mailbox was read or modified.\"}"
+              }
+            ],
+            "structuredContent": {
+              "status": "ok",
+              "execution": {
+                "adapter": "email-lexical-baseline",
+                "model": "rules-v1",
+                "local": true
+              },
+              "issues": [],
+              "labels": [
+                {
+                  "label": "receipt",
+                  "probability": 0.625
+                },
+                {
+                  "label": "action",
+                  "probability": 0.125
+                },
+                {
+                  "label": "newsletter",
+                  "probability": 0.125
+                },
+                {
+                  "label": "other",
+                  "probability": 0.125
+                }
+              ],
+              "selected": "receipt",
+              "uncertainty": 0.375,
+              "calibrated": false,
+              "explanation": "Local lexical demonstration. Probabilities are normalized rule weights, not calibrated model confidence. No mailbox was read or modified."
+            },
+            "isError": false
+          }
+        }
+      },
+      {
+        "direction": "client",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "method": "tools/call",
+          "params": {
+            "name": "classify_eml",
+            "arguments": {
+              "eml": "Subject: Encoded fixture\nContent-Type: text/plain\nContent-Transfer-Encoding: base64\n\nSGVsbG8=\n"
+            }
+          }
+        }
+      },
+      {
+        "direction": "server",
+        "message": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"status\":\"unsupported\",\"execution\":{\"adapter\":\"email-lexical-baseline\",\"model\":\"rules-v1\",\"local\":true},\"issues\":[{\"code\":\"unsupported_email\",\"message\":\"This baseline accepts unencoded text/plain messages only. MIME attachments, HTML, base64 and quoted-printable require a separate parser.\"}],\"labels\":[],\"uncertainty\":null}"
+              }
+            ],
+            "structuredContent": {
+              "status": "unsupported",
+              "execution": {
+                "adapter": "email-lexical-baseline",
+                "model": "rules-v1",
+                "local": true
+              },
+              "issues": [
+                {
+                  "code": "unsupported_email",
+                  "message": "This baseline accepts unencoded text/plain messages only. MIME attachments, HTML, base64 and quoted-printable require a separate parser."
+                }
+              ],
+              "labels": [],
+              "uncertainty": null
+            },
+            "isError": true
+          }
+        }
+      }
+    ],
+    "audit": [
+      {
+        "time": "2026-09-22T18:18:03.886Z",
+        "event": "initialize",
+        "client": {
+          "name": "fresh-install-v2",
+          "version": "2"
+        }
+      },
+      {
+        "time": "2026-09-22T18:18:03.887Z",
+        "event": "tools/list"
+      },
+      {
+        "time": "2026-09-22T18:18:03.888Z",
+        "event": "tools/call",
+        "tool": "decide",
+        "requestId": 3,
+        "contextBytes": null
+      },
+      {
+        "time": "2026-09-22T18:18:03.889Z",
+        "event": "tools/result",
+        "tool": "decide",
+        "requestId": 3,
+        "status": "ok"
+      },
+      {
+        "time": "2026-09-22T18:18:03.889Z",
+        "event": "tools/call",
+        "tool": "decide",
+        "requestId": 4,
+        "contextBytes": null
+      },
+      {
+        "time": "2026-09-22T18:18:03.889Z",
+        "event": "tools/result",
+        "tool": "decide",
+        "requestId": 4,
+        "status": "unsupported"
+      },
+      {
+        "time": "2026-09-22T18:18:03.890Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 5,
+        "contextBytes": 27
+      },
+      {
+        "time": "2026-09-22T18:18:03.891Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 5,
+        "status": "unavailable"
+      },
+      {
+        "time": "2026-09-22T18:18:03.891Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 6,
+        "contextBytes": 27
+      },
+      {
+        "time": "2026-09-22T18:18:03.891Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 6,
+        "status": "unsupported"
+      },
+      {
+        "time": "2026-09-22T18:18:03.891Z",
+        "event": "tools/call",
+        "tool": "classify_eml",
+        "requestId": 7,
+        "contextBytes": null
+      },
+      {
+        "time": "2026-09-22T18:18:03.892Z",
+        "event": "tools/result",
+        "tool": "classify_eml",
+        "requestId": 7,
+        "status": "ok"
+      },
+      {
+        "time": "2026-09-22T18:18:03.892Z",
+        "event": "tools/call",
+        "tool": "classify_eml",
+        "requestId": 8,
+        "contextBytes": null
+      },
+      {
+        "time": "2026-09-22T18:18:03.892Z",
+        "event": "tools/result",
+        "tool": "classify_eml",
+        "requestId": 8,
+        "status": "unsupported"
+      }
+    ]
+  },
+  "mailUnchanged": true,
+  "uninstalled": true,
+  "passed": true,
+  "elapsedSeconds": 0.709,
+  "limits": "Uniform decisions test typed arithmetic and accepted structure, not model quality. Email is an uncalibrated lexical baseline. No-route refusals do not exercise provider execution. No network sandbox or billing claim is implied."
+}

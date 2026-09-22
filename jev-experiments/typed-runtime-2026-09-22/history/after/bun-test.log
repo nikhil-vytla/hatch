@@ -1,0 +1,15 @@
+bun test v1.3.14 (0d9b296a)
+
+../correction-boundaries.test.ts:
+(pass) valid adapter and revision changes survive successful routing in declared and actual identity [2.84ms]
+(pass) contradicted or missing reported adapter and revision fail closed without erasing observed spend [2.29ms]
+(pass) runtime identity rejection remains structured and keeps accounting observed before validation [0.53ms]
+(pass) unsupported and error preserve every issue field and both paid and partly unknown accounting [0.81ms]
+(pass) malformed diagnostic question IDs fail closed while observed accounting survives [0.53ms]
+(pass) a thrown runtime error and cancellation retain observed attempts, messages and revision [0.40ms]
+(pass) existing model contradiction and no-destination unknown-cost controls remain enforced [0.27ms]
+
+ 7 pass
+ 0 fail
+ 242 expect() calls
+Ran 7 tests across 1 file. [20.00ms]
