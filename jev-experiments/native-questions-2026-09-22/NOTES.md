@@ -7,3 +7,6 @@
 - Verified the exact source archive. The app build preceded sibling installs; all eight command steps passed, including 45 public records.
 - Independent Go/Rust execution used the identical archive. All adapter tests passed and the runner reported unchanged source and global configuration.
 - Preserved the Python optional-test skip. These fixture tests establish interface behavior, not model quality or current host-client integration.
+- Independent review passed 40 retained-evidence checks but found valid Choice/Noul legends rejected in Go/Rust. Preserved the first green condition and kept the PR draft while fixing it.
+- Created a test-only Git fixture with the original implementations and new legend tests. Root's temporary official toolchains executed both suites and reproduced failure. This is separate from the owner's earlier launcher failure, which never compiled the tests.
+- The corrected source's exact archive passes all eight build/contract/publication checks and both Go/Rust suites. Rust now executes 13 tests. All source and report versions remain separate.
