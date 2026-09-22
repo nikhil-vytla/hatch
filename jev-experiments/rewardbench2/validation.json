@@ -1,10 +1,22 @@
 {
-  "checked_at": "2026-09-20T10:33:11.255Z",
+  "checked_at": "2026-09-22T15:04:28.894Z",
   "passed": true,
   "cases": 1865,
   "candidates": 8977,
   "omitted_prompts": 3,
   "omitted_candidates": 6,
+  "publication_candidate_omissions": 4,
+  "publication_source": {
+    "format": "jev-publication-source-v1",
+    "kind": "display-only-derivative",
+    "transform": "jev-public-candidate-text-v1",
+    "policy_sha256": "858ac44b9cba1e11da7392e92a74958f6e6706fbaa59e0dc5f7c0a7127c7ad12",
+    "source_format": "jev-records-v1",
+    "source_sha256": "cd4a22470cfde05ed0aa958c190bbc52e83b4aa21107eb1446f244a68bb957c8",
+    "withheld_candidate_texts": 4,
+    "note": "Display-only derivative of the identified pre-derivation Jev result record, which already includes separate content-review omissions. These bytes are not the original evaluation record or upstream dataset. Recorded labels, scores, requests and metrics are retained."
+  },
+  "predecessor_reconstructed_sha256": "cd4a22470cfde05ed0aa958c190bbc52e83b4aa21107eb1446f244a68bb957c8",
   "completed_requests": 255,
   "request_attempts": 279,
   "reported_cost_usd": 0,

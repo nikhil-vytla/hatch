@@ -2,7 +2,8 @@ import { resolve } from "node:path";
 import { readRecord } from "../experience-prototypes/scripts/records";
 import { createHash } from "node:crypto";
 import { describe, expect, test } from "bun:test";
-import { projectRewardBenchDocument } from "../experience-prototypes/scripts/benchmark-publication";
+import { projectRewardBenchDocument, withheldCandidates, withheldNotice } from "../experience-prototypes/scripts/benchmark-publication";
+import { assertPublicationSource } from "../rewardbench2/publication-source";
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 
 describe("benchmark publication projection", () => {
@@ -83,25 +84,23 @@ describe("benchmark publication projection", () => {
   });
 });
 
-test("the pinned release changes exactly four display texts and retains every other source field", () => {
+test("the pinned source derivative projects idempotently and retains its lineage and measurements", () => {
   const source = readRecord(resolve(import.meta.dir, "../rewardbench2/results.jsonl"));
   const before = hash(JSON.stringify(source));
+  const lineage = assertPublicationSource(source);
+  expect(lineage.kind).toBe("display-only-derivative");
+  expect(lineage.source_sha256).toBe("cd4a22470cfde05ed0aa958c190bbc52e83b4aa21107eb1446f244a68bb957c8");
   const projected = projectRewardBenchDocument(source);
   expect(hash(JSON.stringify(source))).toBe(before);
+  expect(projected).toEqual(source);
   expect(projected.result.publication_projection.withheldCandidateTexts).toBe(4);
-  let omissions = 0;
-  for (let row = 0; row < projected.result.rows.length; row++) {
-    for (let candidate = 0; candidate < projected.result.rows[row].candidates.length; candidate++) {
-      const value = projected.result.rows[row].candidates[candidate];
+  const omissions: { subset: string; id: string; sha256: string }[] = [];
+  for (const row of projected.result.rows) {
+    for (const value of row.candidates) {
       if (!value.publication_omission) continue;
-      const original = source.result.rows[row].candidates[candidate];
-      expect(hash(original.text)).toBe(value.publication_omission.sha256);
-      value.text = original.text;
-      delete value.publication_omission;
-      omissions++;
+      expect(value.text).toBe(withheldNotice);
+      omissions.push({ subset: row.subset, id: String(row.id), sha256: value.publication_omission.sha256 });
     }
   }
-  expect(omissions).toBe(4);
-  delete projected.result.publication_projection;
-  expect(hash(JSON.stringify(projected))).toBe(before);
+  expect(omissions).toEqual(withheldCandidates);
 });

@@ -1,13 +1,20 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readRecord } from "../experience-prototypes/scripts/records";
+import { readRecord, encodeRecord } from "../experience-prototypes/scripts/records";
 import { pack, SUBSETS } from "./protocol";
 import { completed, summarize } from "./metrics";
 import { hashText } from "./publication";
+import { assertPublicationSource } from "./publication-source";
+import { withheldCandidates, withheldNotice } from "../experience-prototypes/scripts/benchmark-publication";
 import omissions from "./content-audit/public-omissions.json";
 
 const root = import.meta.dir;
-const { manifest, result } = readRecord(resolve(root, "results.jsonl"));
+const document = readRecord(resolve(root, "results.jsonl"));
+const { manifest, result } = document;
+const publicationSource = assertPublicationSource(document);
+const predecessor = structuredClone(document);
+delete predecessor.manifest.publication_source;
+delete predecessor.result.publication_projection;
 const source = JSON.parse(
   readFileSync(resolve(root, "../.cache/rewardbench2/dataset.json"), "utf8"),
 ).map(pack);
@@ -25,8 +32,9 @@ assert(
 );
 let omittedPrompts = 0,
   omittedCandidates = 0,
+  publicationCandidates = 0,
   candidateCount = 0;
-for (const row of result.rows) {
+for (const [rowIndex, row] of result.rows.entries()) {
   const raw: any = byId.get(`${row.subset}:${row.id}`);
   assert(raw && raw.input_hash === row.input_hash, "Source input mismatch");
   assert(completed(row), "Incomplete case");
@@ -52,6 +60,7 @@ for (const row of result.rows) {
       "Label, order, or attribution changed",
     );
     assert(c.score >= 1 && c.score <= 10, "Invalid score");
+    assert(!(c.omission && c.publication_omission), "Conflicting omission policies");
     if (c.omission) {
       omittedCandidates++;
       assert(
@@ -59,13 +68,23 @@ for (const row of result.rows) {
           c.text === omissions.notice,
         "Candidate omission mismatch",
       );
+    } else if (c.publication_omission) {
+      publicationCandidates++;
+      assert(
+        withheldCandidates.some((entry) => entry.subset === row.subset && entry.id === String(row.id) && entry.sha256 === hashText(original.text)) &&
+          c.publication_omission.sha256 === hashText(original.text) && c.text === withheldNotice,
+        "Publication candidate omission mismatch",
+      );
+      predecessor.result.rows[rowIndex].candidates[i].text = original.text;
+      delete predecessor.result.rows[rowIndex].candidates[i].publication_omission;
     } else assert(original.text === c.text, "Candidate text changed");
   });
 }
 assert(
-  candidateCount === 8977 && omittedPrompts === 3 && omittedCandidates === 6,
+  candidateCount === 8977 && omittedPrompts === 3 && omittedCandidates === 6 && publicationCandidates === 4,
   "Coverage mismatch",
 );
+assert(hashText(encodeRecord(predecessor)) === publicationSource.source_sha256, "Pre-derivation record hash mismatch");
 const metrics = summarize(result.rows);
 for (const s of SUBSETS)
   assert(
@@ -74,9 +93,9 @@ for (const s of SUBSETS)
   );
 assert(metrics.macro_score === result.metrics.macro_score, "Overall mismatch");
 const prohibitedHashes = new Set(
-  omissions.omissions.flatMap((o) =>
+  [...withheldCandidates.map((entry) => entry.sha256), ...omissions.omissions.flatMap((o) =>
     [o.prompt_sha256, ...o.candidates.map((c) => c.sha256)].filter(Boolean),
-  ),
+  )],
 );
 function scan(value: any): void {
   if (typeof value === "string")
@@ -96,6 +115,9 @@ const report = {
   candidates: candidateCount,
   omitted_prompts: omittedPrompts,
   omitted_candidates: omittedCandidates,
+  publication_candidate_omissions: publicationCandidates,
+  publication_source: publicationSource,
+  predecessor_reconstructed_sha256: hashText(encodeRecord(predecessor)),
   completed_requests: successful.length,
   request_attempts: result.requests.reduce(
     (n: number, r: any) => n + r.attempts.length,
