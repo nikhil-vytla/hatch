@@ -1,0 +1,204 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "codex",
+  "kind": "summary",
+  "source": {
+    "sha256": "2c6f161e318a02e2502b3edff7f883dcf5bdaad9e6de3d4c8c52bb5b7844de3e",
+    "bytes": 3999,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/directory",
+        "originalSha256": "cce3c97224ad2c4d8338bdb2fc3ea3f503cac35e168d3c399c3ad1fd73181c88",
+        "derivativeSha256": "5ebf7ca2df0a2373f48db4a9a308c18909d605a4dcdd12175dee02c816a3a5e3",
+        "bindings": [
+          {
+            "sourcePathSha256": "cce3c97224ad2c4d8338bdb2fc3ea3f503cac35e168d3c399c3ad1fd73181c88",
+            "uri": "record://location/cce3c97224ad2c4d",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/16",
+        "originalSha256": "e0e475225673fb73a989a88d1dc2f09a98778ba1a1c43f62a2ffa4b8709e108b",
+        "derivativeSha256": "178ef3eda19d034dde8ef3ebfc15c4a9ed9a4da41915c1e218fdfe5e455aa0f9",
+        "bindings": [
+          {
+            "sourcePathSha256": "e4a655df45bf2822eea7628a5125b11fb66eb687ae397a19723440ccb32e7063",
+            "uri": "record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/routing/mcp.ts",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/18",
+        "originalSha256": "e9a754ae0aa84689420e151f82ca2c625ae8024cc3d74b6871026fd1950b2520",
+        "derivativeSha256": "ea6f7defd128f30466607e2921ffefbae8d1e8eab7f2c04dcdb77ea61cb70a4f",
+        "bindings": [
+          {
+            "sourcePathSha256": "ed90e30765641c15aca015e02f3f6a15760a8e750954e1363740dca5b0b1bed2",
+            "uri": "record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/integration/evidence/codex/mcp-audit.jsonl",
+            "occurrences": 1
+          },
+          {
+            "sourcePathSha256": "425333f2b1645de57ecac581dfe9371c922beb502ff2e5a550b625539f925d31",
+            "uri": "record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/integration/examples/router.json",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "f90c234c1b1d5fcec8b0b44a5f3000561d844e3dbb52e7f2e9e2caad51596373",
+  "payload": {
+    "harness": "codex",
+    "directory": "record://location/cce3c97224ad2c4d",
+    "command": [
+      "codex",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--json",
+      "--sandbox",
+      "workspace-write",
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "mcp_servers.jev.tools.route_task.approval_mode=\"approve\"",
+      "-c",
+      "mcp_servers.jev.tools.decide.approval_mode=\"approve\"",
+      "-c",
+      "mcp_servers.jev.command=\"bun\"",
+      "-c",
+      "mcp_servers.jev.args=[\"record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/routing/mcp.ts\"]",
+      "-c",
+      "mcp_servers.jev.env={\"JEV_ROUTER_CONFIG\" = \"record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/integration/examples/router.json\", \"JEV_MCP_AUDIT\" = \"record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/integration/evidence/codex/mcp-audit.jsonl\"}",
+      "-"
+    ],
+    "elapsedSeconds": 110.16,
+    "exitCode": 0,
+    "timedOut": false,
+    "baselineTestsExitCode": 1,
+    "independentTestsExitCode": 0,
+    "mcpDiscovered": true,
+    "toolCalls": [
+      {
+        "time": "2026-09-21T04:23:42.060Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 2,
+        "contextBytes": 1177
+      },
+      {
+        "time": "2026-09-21T04:23:48.627Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 3,
+        "contextBytes": 1177
+      },
+      {
+        "time": "2026-09-21T04:24:08.907Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 4,
+        "contextBytes": 1177
+      },
+      {
+        "time": "2026-09-21T04:24:20.693Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 5,
+        "contextBytes": null
+      },
+      {
+        "time": "2026-09-21T04:24:29.951Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 6,
+        "contextBytes": 533
+      },
+      {
+        "time": "2026-09-21T04:24:29.952Z",
+        "event": "tools/call",
+        "tool": "decide",
+        "requestId": 7,
+        "contextBytes": null
+      }
+    ],
+    "toolResults": [
+      {
+        "time": "2026-09-21T04:23:48.626Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 2,
+        "status": "ok",
+        "artifactKind": "patch"
+      },
+      {
+        "time": "2026-09-21T04:24:08.905Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 3,
+        "status": "ok",
+        "artifactKind": "patch"
+      },
+      {
+        "time": "2026-09-21T04:24:20.694Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 5,
+        "status": "unsupported"
+      },
+      {
+        "time": "2026-09-21T04:24:29.951Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 6,
+        "status": "unavailable"
+      },
+      {
+        "time": "2026-09-21T04:24:29.953Z",
+        "event": "tools/result",
+        "tool": "decide",
+        "requestId": 7,
+        "status": "unsupported"
+      },
+      {
+        "time": "2026-09-21T04:24:33.713Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 4,
+        "status": "ok",
+        "artifactKind": "structured"
+      }
+    ],
+    "patchedBug": true,
+    "analysisFileWritten": true,
+    "additionalTestsWritten": true,
+    "delegationOccurred": true,
+    "usableDelegatedArtifacts": 3,
+    "cliVersion": "0.154.0",
+    "hostModel": {
+      "configured": null,
+      "identityBasis": "not reported; configured default"
+    },
+    "firstAuditTime": "2026-09-21T04:23:23.486Z",
+    "evidenceGate": {
+      "condition": "bounded-delegation",
+      "passed": true,
+      "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
+      "historicalFailure": false
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 5
+  }
+}

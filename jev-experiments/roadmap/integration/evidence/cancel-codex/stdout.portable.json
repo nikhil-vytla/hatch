@@ -1,0 +1,54 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "codex",
+  "kind": "transcript",
+  "source": {
+    "sha256": "ea97490d5c225b556fb9475215d0bc4c6613ed0606849740e2e992c839880c7f",
+    "bytes": 615,
+    "format": "codex-jsonl",
+    "recordCount": 4
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": []
+  },
+  "payloadSha256": "a57d1fcf5a69d38485676e739f51439cdfdb97cb79afa179c6a7694026b9b70f",
+  "payload": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a0c244-fd22-7e63-8118-8403b3d87d0c"
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "I’ll call the Jev route_task tool once and wait for its result.\n"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_1",
+        "type": "mcp_tool_call",
+        "server": "jev",
+        "tool": "route_task",
+        "arguments": {
+          "task": {
+            "id": "cancel-fixture",
+            "prompt": "Return an answer about cancellation",
+            "context": "Synthetic delayed fixture, no private content",
+            "outputTokens": 128
+          }
+        },
+        "result": null,
+        "error": null,
+        "status": "in_progress"
+      }
+    }
+  ]
+}

@@ -18,9 +18,39 @@
         "reason": "Effective project cwd differed from subprocess cwd; timed out without completing host application.",
         "historicalFailure": true
       },
-      "summary": "opencode-cwd-timeout/summary.json",
-      "transcript": "opencode-cwd-timeout/stdout.jsonl",
-      "audit": "opencode-cwd-timeout/mcp-audit.jsonl"
+      "summary": "opencode-cwd-timeout/summary.portable.json",
+      "transcript": "opencode-cwd-timeout/stdout.portable.json",
+      "audit": "opencode-cwd-timeout/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "opencode-cwd-timeout/summary.json",
+          "originalSha256": "e90a5963022e4d15fab4efbc15e9639ff013aea90e1aa679445100133c05dba8",
+          "derivativeSha256": "8623c5980c91817d0df91a529fbd99083132b46f36c3b710ad34efd57b04cf46",
+          "payloadSha256": "93a3615505c28f8b658fc4257eb73756b264e3c8fd4103051216fa1ae20751cf"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "opencode-cwd-timeout/stdout.jsonl",
+          "originalSha256": "9de2424d85ff569816a17cee11177a3333a76c7a90849a735b0ae2b46fe16568",
+          "derivativeSha256": "a9ed6bbb3f79b6d4e4ed2859363775c9ba580bf7b457cb18f041e93ef5a6974c",
+          "payloadSha256": "6747898276705c6e8789fab394ea1adcec8141b888b853d4f84a4d4f615a7c6b"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "opencode-cwd-timeout/tests-before.txt",
+          "originalSha256": "0ce9e1d8d28d86b1c9e692ea6277ba96b6772ccf7faf5fb2b36aff13559b8bd3",
+          "derivativeSha256": "aa042ce3155042567d9a573b91049f714d4a192516a5f565338f2b530fa6621b",
+          "payloadSha256": "4e708edbf9a057f527335adf31dcf8cabc4313dd3c5246f5b6471bc9ade0525a"
+        },
+        "testsAfter": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "opencode-cwd-timeout/tests-after.txt",
+          "originalSha256": "b794743a2dd646b97b497000a28b566187540474e4465cab751a47fe508b5fe0",
+          "derivativeSha256": "16fd94a98a3fe1126289764daea7de66e9fdeadf7958b3e2e1542a3f2caa3c7f",
+          "payloadSha256": "9bb0fb2846c5282c3b8703749e79581b4397569549095ee41788867f891c8c70"
+        }
+      }
     },
     {
       "order": 2,
@@ -39,9 +69,39 @@
         "reason": "The host provider rejected the configured Fable request before any delegation.",
         "historicalFailure": true
       },
-      "summary": "claude-fable-unavailable/summary.json",
-      "transcript": "claude-fable-unavailable/stdout.jsonl",
-      "audit": "claude-fable-unavailable/mcp-audit.jsonl"
+      "summary": "claude-fable-unavailable/summary.portable.json",
+      "transcript": "claude-fable-unavailable/stdout.portable.json",
+      "audit": "claude-fable-unavailable/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "claude-fable-unavailable/summary.json",
+          "originalSha256": "641e495c9a7675cddee966fea7c8a9d7c7d594ecae6f514cf48ed246e63d3a14",
+          "derivativeSha256": "180773cde9db65ebf41e7297947e3d91b64355298bcf112f66a29d2ffd15fe46",
+          "payloadSha256": "5a65cce8ffd1569e0a9bb0042e1f8753026588be76b3e9cf92cb7bd8bcd6f38c"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "claude-fable-unavailable/stdout.jsonl",
+          "originalSha256": "996d92fd365a437464c44ad0e0ea57eaf0c3198966428842ce7cfcc80e37be75",
+          "derivativeSha256": "294aac723dfcfaf77f1d83fd3c349428259b5a324d26620c57c5eab88f09191e",
+          "payloadSha256": "a49d6795434faa3355359d8e1c26a2c592818f4b624acb7b2b9dedb12285b018"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "claude-fable-unavailable/tests-before.txt",
+          "originalSha256": "2b84e6574f5d9a03e2e0ac0a67f2fa823bf98203dd330dec27fbd8a912e25c50",
+          "derivativeSha256": "947af2bea29d5223a7667cb7d688ea33a370d0278ff2b9820a54bb0a768d38e6",
+          "payloadSha256": "ab5dbb48387556bdf2af23f0a1a631c8ef48fa87adf06b0f8d0d146e6e899023"
+        },
+        "testsAfter": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "claude-fable-unavailable/tests-after.txt",
+          "originalSha256": "7e148bc6bfb82e2a5781c18c78c626f03b859adb6d373da5a1a35c576706e16f",
+          "derivativeSha256": "370b3d90d0a65f46bb4b69bc4437d530be00f7fae4e9214234c01e9fb16856bd",
+          "payloadSha256": "0fc82d239e154ed65709ad36deecbf342acc906c9e90bc69fc4897e769f64c37"
+        }
+      }
     },
     {
       "order": 3,
@@ -60,9 +120,25 @@
         "reason": "Client approval rejected all MCP calls before server invocation; the host fixed the task itself.",
         "historicalFailure": true
       },
-      "summary": "codex-approval-default/summary.json",
-      "transcript": "codex-approval-default/stdout.jsonl",
-      "audit": "codex-approval-default/mcp-audit.jsonl"
+      "summary": "codex-approval-default/summary.portable.json",
+      "transcript": "codex-approval-default/stdout.portable.json",
+      "audit": "codex-approval-default/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "codex-approval-default/summary.json",
+          "originalSha256": "be7a47019d99c9524565f590cfa40229703287a8bace2249dc8ea504d0e51c30",
+          "derivativeSha256": "dae29c7e6936fee56cc5d1f4ff0594e6e8c51e5f2be1c31c3c6ace604670a35d",
+          "payloadSha256": "a717959fa72c89d7cfc4b765e7ed7eed9ec4649853d090a9383712686ec8f1fe"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "codex-approval-default/stdout.jsonl",
+          "originalSha256": "85f1f0a6ea03a53138727975dde3321121cbd0cbf0413086b87069ddc69e6218",
+          "derivativeSha256": "7e1de519235cb64200a662b9b4cc47c18a206ebad6d354f446b3ca601ef5f6d4",
+          "payloadSha256": "d3f9c082b3573f654684580727130e3e8745f175f0ba337b8fbf68d803f8958e"
+        }
+      }
     },
     {
       "order": 4,
@@ -81,9 +157,32 @@
         "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
         "historicalFailure": false
       },
-      "summary": "claude/summary.json",
-      "transcript": "claude/stdout.jsonl",
-      "audit": "claude/mcp-audit.jsonl"
+      "summary": "claude/summary.portable.json",
+      "transcript": "claude/stdout.portable.json",
+      "audit": "claude/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "claude/summary.json",
+          "originalSha256": "4bddb6db049d61cca4ade9b4d27cc61e9b2dfcd98b7abcd6f08c2feb37cfb7be",
+          "derivativeSha256": "aa068f663bb43f2e6fa83929dc625232c48c586fc310bda451622279951d3609",
+          "payloadSha256": "dee5e765608a6957067a7d2a0ea327b9291244f1af71f81496330d357c13d194"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "claude/stdout.jsonl",
+          "originalSha256": "aa38d8461da8d3fc210ea7d9075ff8b41d25c373ea88d301b13e66c73ccbf15a",
+          "derivativeSha256": "039e659fa1133840dd6dbd13eabf28b2b9f6d118c63786bb5cfd81ee4ce69671",
+          "payloadSha256": "38986b4cd25d69e30a397e99927305b291116c8ea39bfde2265784dcd4b23e25"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "claude/tests-before.txt",
+          "originalSha256": "7614cf15c47e986cc1483e06437049f2193f83977d900952309fff8bcb5775bb",
+          "derivativeSha256": "34f6f18e91b921bcbb5770561135c3b4e3b4bdb2c5dab31d163616bfe56f06b7",
+          "payloadSha256": "56bfe2d3b9942bc5c2877f44d864261bcfb854408dedbe95f8d93268a7aa4524"
+        }
+      }
     },
     {
       "order": 5,
@@ -102,9 +201,25 @@
         "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
         "historicalFailure": false
       },
-      "summary": "codex/summary.json",
-      "transcript": "codex/stdout.jsonl",
-      "audit": "codex/mcp-audit.jsonl"
+      "summary": "codex/summary.portable.json",
+      "transcript": "codex/stdout.portable.json",
+      "audit": "codex/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "codex/summary.json",
+          "originalSha256": "2c6f161e318a02e2502b3edff7f883dcf5bdaad9e6de3d4c8c52bb5b7844de3e",
+          "derivativeSha256": "b06532146720d145e517bcfe3a6361cf69998a6122288313fd666904c7066fcb",
+          "payloadSha256": "f90c234c1b1d5fcec8b0b44a5f3000561d844e3dbb52e7f2e9e2caad51596373"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "codex/stdout.jsonl",
+          "originalSha256": "12b3261ae4e64ff9bd8026bcdc4d10e8ed273bd8a777ea5416620e284d095354",
+          "derivativeSha256": "97d859d380aceb7bd89cc13cee99829e5778a3a7570176e75ec3e089dc9ec6c5",
+          "payloadSha256": "a3b5c55596161426f9058eb30c84f88a3ff46df6e6ac49188a9e2206c5b5eb81"
+        }
+      }
     },
     {
       "order": 6,
@@ -123,9 +238,32 @@
         "reason": "Requires actual bug/test/analysis artifacts, host changes, passing independent tests and no-route/unsupported handling.",
         "historicalFailure": false
       },
-      "summary": "opencode/summary.json",
-      "transcript": "opencode/stdout.jsonl",
-      "audit": "opencode/mcp-audit.jsonl"
+      "summary": "opencode/summary.portable.json",
+      "transcript": "opencode/stdout.portable.json",
+      "audit": "opencode/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "opencode/summary.json",
+          "originalSha256": "65cf0d1538b54c2ba847047b8142a50e706e3215879263673d72f843a0a13dc1",
+          "derivativeSha256": "d76c4672c2b988a86f951ffebe2b4a3818fe4944089cc5afe6d664d28f4dc262",
+          "payloadSha256": "e682fb81fa26720531bb9dd5317c18c5bf4f1caa932f15bbb3c57254dc3bcae2"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "opencode/stdout.jsonl",
+          "originalSha256": "9375285e7cad5675612e8078fb6d682d35aa68c264dc84b7ae1e7ded520b40e9",
+          "derivativeSha256": "6e9f514c83ff94da286ef0bac39c65d4691780cae75cc980b4a3ce7a78512fcb",
+          "payloadSha256": "9824f3524e346bfa0d5210d2dcbb5dfde71995b51d4e9e55a4fc03b68e25682f"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "opencode/tests-before.txt",
+          "originalSha256": "feaba7f3a8679ff39e52c30a98696b0f71398821f733022fe40a54c2c0f77485",
+          "derivativeSha256": "c98c1fa32446c9d06c648679217fe9b3f342a9d25451b0170eb205ae3460ce5e",
+          "payloadSha256": "255e84a8c46484af08be3f9b85954145e877f320b13bc5554d526f9293eeca97"
+        }
+      }
     },
     {
       "order": 7,
@@ -144,9 +282,18 @@
         "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
         "historicalFailure": false
       },
-      "summary": "cancel-opencode/summary.json",
+      "summary": "cancel-opencode/summary.portable.json",
       "transcript": "cancel-opencode/stdout.jsonl",
-      "audit": "cancel-opencode/mcp-audit.jsonl"
+      "audit": "cancel-opencode/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "cancel-opencode/summary.json",
+          "originalSha256": "bfc4cc3458efd0494a5876ae379fa368808c3566db3b57fcbd8dc4b13b20fe02",
+          "derivativeSha256": "9113bac84e2ca65b9a89ba061a363a9a8e5bfc20f86b9215d45ea892315fa0f1",
+          "payloadSha256": "f1b5ba2994f7443e3b5e4f4075be5a01155f16b42e676044b690575b40d26cb4"
+        }
+      }
     },
     {
       "order": 8,
@@ -165,9 +312,25 @@
         "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
         "historicalFailure": false
       },
-      "summary": "cancel-claude/summary.json",
-      "transcript": "cancel-claude/stdout.jsonl",
-      "audit": "cancel-claude/mcp-audit.jsonl"
+      "summary": "cancel-claude/summary.portable.json",
+      "transcript": "cancel-claude/stdout.portable.json",
+      "audit": "cancel-claude/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "cancel-claude/summary.json",
+          "originalSha256": "1ddfbe621b7998af8f4fc23b9cc3671e3c86945302c8de639b17de42f9de3be7",
+          "derivativeSha256": "48260b7df220ab340fad7c440b7684b159217e593fb39acee8b0ebe47b50ea7c",
+          "payloadSha256": "bb1e3dd4f664ee852b6f627518f767b618518ce554b926d84b29df5c0477b1a4"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "cancel-claude/stdout.jsonl",
+          "originalSha256": "98185b1525949f31c27e1bafba4c00909f60b7b962e3ce2ac75e037b89db404f",
+          "derivativeSha256": "1d0b024f0885e78b89876c00ee311066abda89acb40b398eccd634fe5b0b7138",
+          "payloadSha256": "9d568846635eabdfb152565199ff7fb89a960b83c639d81de1b7bef03682949e"
+        }
+      }
     },
     {
       "order": 9,
@@ -186,9 +349,25 @@
         "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
         "historicalFailure": false
       },
-      "summary": "cancel-codex/summary.json",
-      "transcript": "cancel-codex/stdout.jsonl",
-      "audit": "cancel-codex/mcp-audit.jsonl"
+      "summary": "cancel-codex/summary.portable.json",
+      "transcript": "cancel-codex/stdout.portable.json",
+      "audit": "cancel-codex/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "cancel-codex/summary.json",
+          "originalSha256": "f322644017d80abf274162162d1f76482e1eb3f1014883feb010e0ca5247efe0",
+          "derivativeSha256": "7247ba78c4f531f8ff0e5a3d387668b0fb60e2964b30a0ec6948bbe40394f5e3",
+          "payloadSha256": "bd9a44cd5514aac3067209c009b4b6e9d348cfa68420b06bbb7df96c5d304fb2"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "cancel-codex/stdout.jsonl",
+          "originalSha256": "ea97490d5c225b556fb9475215d0bc4c6613ed0606849740e2e992c839880c7f",
+          "derivativeSha256": "e0db04377818a50e15d214f8d6db2d2c009ae0718201c891c8eb409eefbcaddf",
+          "payloadSha256": "a57d1fcf5a69d38485676e739f51439cdfdb97cb79afa179c6a7694026b9b70f"
+        }
+      }
     },
     {
       "order": 10,
@@ -207,9 +386,39 @@
         "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
         "historicalFailure": false
       },
-      "summary": "malformed-opencode/summary.json",
-      "transcript": "malformed-opencode/stdout.jsonl",
-      "audit": "malformed-opencode/mcp-audit.jsonl"
+      "summary": "malformed-opencode/summary.portable.json",
+      "transcript": "malformed-opencode/stdout.portable.json",
+      "audit": "malformed-opencode/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-opencode/summary.json",
+          "originalSha256": "62894a2a09556bb0e64cbbb48b9f8f7aaa338e4ed3008ce7b05e4fed782ae724",
+          "derivativeSha256": "270899a3308bfbe7195896c24d7b6ce9c596876513781448719b073c091c99c4",
+          "payloadSha256": "df4008e0192c5e203c1d1adeaa3c1d1c05ebcd415c71226878ed6c84e93243ac"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-opencode/stdout.jsonl",
+          "originalSha256": "634d4144b4e27dd798e57b7de45ab717379dc4de3bf120fa58a627e15094195a",
+          "derivativeSha256": "8e7cd4237e71caa1a63b4a348d3e8fe7f4014845ab54f6a7469df8e3626c3ffa",
+          "payloadSha256": "cf5b0caf35a5d07c0f586518e021d1aa15d1250a71ccaa6f1ed3cb7ffa2ce1a7"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-opencode/tests-before.txt",
+          "originalSha256": "4a483abe8bd3a27490e7518a7d09663afdab07879f88dc1bc7812049af953ffb",
+          "derivativeSha256": "7a14bea6405e52b7f6b0ee539fd2d7c421c3372066be7ee5f1ee2e2a29c89550",
+          "payloadSha256": "c702ba8228d95707d8dff58d26f540896f981dc4506fc30c2b98be5fd6f136a9"
+        },
+        "testsAfter": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-opencode/tests-after.txt",
+          "originalSha256": "b1591a4c7fb5f0d6e62a325ce842b277e6877638b111022b71c042f7c9ae334b",
+          "derivativeSha256": "7364975dff989757f6abb308370ac866e30e3c13aed2672668986a4aadbbbf3d",
+          "payloadSha256": "3469976f52a47c2440b82620dd58476453f12ad3b05516af8e2627c9484ef9c8"
+        }
+      }
     },
     {
       "order": 11,
@@ -228,9 +437,39 @@
         "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
         "historicalFailure": false
       },
-      "summary": "malformed-claude/summary.json",
-      "transcript": "malformed-claude/stdout.jsonl",
-      "audit": "malformed-claude/mcp-audit.jsonl"
+      "summary": "malformed-claude/summary.portable.json",
+      "transcript": "malformed-claude/stdout.portable.json",
+      "audit": "malformed-claude/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-claude/summary.json",
+          "originalSha256": "188b4aa0c89aceea8ec2ce61beeeff89360b6d514a6c1c9c566e65867a19ae12",
+          "derivativeSha256": "39af52d5c59d630e5ddf3557c911b7d641a21d662e5028363f879ea9ed8106be",
+          "payloadSha256": "77f4cd909dce189d332af7c1467079b1c3063c1082e3a8f07800c380e71b2ac8"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-claude/stdout.jsonl",
+          "originalSha256": "b58d5a94b20a4e26b70429d3abfeedc31a1cb7610e7ee90278afab5b3624e3c9",
+          "derivativeSha256": "43c3c440b7bb4eb39c2f06576aeaa9f59c8a6699ad6c8e0c2efa362ed33a21cd",
+          "payloadSha256": "43d76d922498bb605d1fa40139220bc322f808eee61d927e1174d90895683273"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-claude/tests-before.txt",
+          "originalSha256": "5f0d3d2602e50563d564cab750283857eab70a8061688e1b2e7903669b78c5a8",
+          "derivativeSha256": "d6eefa84389c98641c9f7bcd2a867dbc624683f5910323863270d595d3f2711e",
+          "payloadSha256": "e72b232a0c8594f8bb263bd870fad82c8383aabb55c4e6568b7e6b4197765160"
+        },
+        "testsAfter": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-claude/tests-after.txt",
+          "originalSha256": "d01a1092523db4f74f1d4e0a9d7f71f33dd3953659b0c9e3dc53e4c8001c3f38",
+          "derivativeSha256": "292964a1e5cf0c4f2281c46d42a268767b3b633a79471966c313b4cee5de519b",
+          "payloadSha256": "bdbdff928bf803b926b4ac644a0dace698673f9e3bbb7edc64206f4eac9338c4"
+        }
+      }
     },
     {
       "order": 12,
@@ -249,9 +488,25 @@
         "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
         "historicalFailure": false
       },
-      "summary": "malformed-codex/summary.json",
-      "transcript": "malformed-codex/stdout.jsonl",
-      "audit": "malformed-codex/mcp-audit.jsonl"
+      "summary": "malformed-codex/summary.portable.json",
+      "transcript": "malformed-codex/stdout.portable.json",
+      "audit": "malformed-codex/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-codex/summary.json",
+          "originalSha256": "eac0becac6f7948aef475a114400d3060d5b1644ed9811ea57e660180da2cd68",
+          "derivativeSha256": "3e7219aa532030a6b3de188d46bcd0decd95d2c433d271f395a8093e5957961f",
+          "payloadSha256": "3c1c9ca52fc06ebb09ee93720203672ed6870ab780463f1d7943f7c4d34fea26"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "malformed-codex/stdout.jsonl",
+          "originalSha256": "e42418a6f1e568d13c1a22594cfed820afade61452b077d46600dd52e2dc5250",
+          "derivativeSha256": "5130c16003fa5cb782a7c3fac04f6783e5e46a7544ba7a6209e29b66358eb6ca",
+          "payloadSha256": "c131220d72f0734b7be82ab6bb799ab60fd8447c03e3ff21b0bba033aa9c6778"
+        }
+      }
     },
     {
       "order": 13,
@@ -270,9 +525,39 @@
         "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
         "historicalFailure": true
       },
-      "summary": "boundary-opencode/summary.json",
-      "transcript": "boundary-opencode/stdout.jsonl",
-      "audit": "boundary-opencode/mcp-audit.jsonl"
+      "summary": "boundary-opencode/summary.portable.json",
+      "transcript": "boundary-opencode/stdout.portable.json",
+      "audit": "boundary-opencode/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode/summary.json",
+          "originalSha256": "20f8e2bc8ec84c77aa4c9f6edcbc96c654a5d3afdfb6ea5bad8b39b41368ba78",
+          "derivativeSha256": "c54c2cc8c264d15005f931ad7513ed826ce8fd8e4be69dc1b8e0a3532f0bef15",
+          "payloadSha256": "ccb06bde9decc1cd7668406a3a222abcfced9bd30fafe5050ce830f62287297b"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode/stdout.jsonl",
+          "originalSha256": "974c919d1431f5b6cb6310a6680733233c264ef4a48b5beac3ad65f7e01ef3bb",
+          "derivativeSha256": "0350ab8bd69b0b9a3c7c9a458b1695e314393a4c1f925537746cb00aa5e8c835",
+          "payloadSha256": "8e97dc731bf49f2ca6fbe92f70097b6c85b12a196ffcbbd7300195911d7e4e70"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode/tests-before.txt",
+          "originalSha256": "86d3cd6fb8c8988fb74f9de19e5c240ef5eb2463b4c926abc567ec7e96963bd8",
+          "derivativeSha256": "441bf67b61cc618e4f5ba6e9f418a7abffbd008f27c9c87efd1a7cb010d74671",
+          "payloadSha256": "a14c7a3f62b7c1a2d170819606de1be02303f50b3edb6a5e974b6618355c105c"
+        },
+        "testsAfter": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode/tests-after.txt",
+          "originalSha256": "251e640df3589c39bfac6e5607dad249eaccec84c3ca903a8e67b2f0c8c76871",
+          "derivativeSha256": "3da3ecd8e3b121587b8a49f4d4bdef49f9fddfab3ef0de3865088017d9de359e",
+          "payloadSha256": "06661f84cf214c4e5e157c9e7a4e34a480a47ce5652451441d53eb62291f9fdc"
+        }
+      }
     },
     {
       "order": 14,
@@ -291,9 +576,39 @@
         "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
         "historicalFailure": false
       },
-      "summary": "boundary-claude/summary.json",
-      "transcript": "boundary-claude/stdout.jsonl",
-      "audit": "boundary-claude/mcp-audit.jsonl"
+      "summary": "boundary-claude/summary.portable.json",
+      "transcript": "boundary-claude/stdout.portable.json",
+      "audit": "boundary-claude/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-claude/summary.json",
+          "originalSha256": "c3681f864c992e4dd5b60138661e6416f84d23d66925b59cc111b93484ccaaaf",
+          "derivativeSha256": "2619c5ff7e2c8d46d779380ff65d5aed08d398f8f6dcf5102b9520b07db84146",
+          "payloadSha256": "648816618ee991ee0fe0dd4afde3dde29d24fe3e10d6afa62dd84b79dd74335c"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-claude/stdout.jsonl",
+          "originalSha256": "0a7cb9b8bd84d1e70ee634a58e5f8027dbdc5ebea11bd147822b7d440c4f0e9e",
+          "derivativeSha256": "21334466cd68a488c2de4f36eb7d66e82dc9965cf05b5c3ab8e0d6cbfb463d14",
+          "payloadSha256": "12570533d7795a276abdd0884640149381e36d5e2fa506488923fa83664f370b"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-claude/tests-before.txt",
+          "originalSha256": "7fca82180a1fe81a3fedc81350599e1fe2e00eb240d4550fa98c9cc7d7afac3c",
+          "derivativeSha256": "429d7235ddf374f1b2b92a17d2f489ea64f38f75d1c012179a4741be678f7ede",
+          "payloadSha256": "7bb7fe1958436d92a3ef6c227bd2cd11611e7af358140dec92270a6386f23084"
+        },
+        "testsAfter": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-claude/tests-after.txt",
+          "originalSha256": "00e11c9e4ad8fef5255d43a5f416bce6ddd25715252cd782733d4e239eb1b162",
+          "derivativeSha256": "ba5f8db80e1bf8b5559bafa56c16aedca622be01bc356891bc10efd439178b71",
+          "payloadSha256": "3d04d1549e6be463d2af43ea6a8796d43c8b0284edb4783b75a5114b34f98e57"
+        }
+      }
     },
     {
       "order": 15,
@@ -312,9 +627,25 @@
         "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
         "historicalFailure": false
       },
-      "summary": "boundary-codex/summary.json",
-      "transcript": "boundary-codex/stdout.jsonl",
-      "audit": "boundary-codex/mcp-audit.jsonl"
+      "summary": "boundary-codex/summary.portable.json",
+      "transcript": "boundary-codex/stdout.portable.json",
+      "audit": "boundary-codex/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-codex/summary.json",
+          "originalSha256": "b0e07352418b37fc9caef2c59d7efa1293832d0666db231c745c562d68503926",
+          "derivativeSha256": "de09d77cc7b1e3ddb59b2cfedd5a0f4b61808a7a8783545c9f37c27197773650",
+          "payloadSha256": "3e16b5b1cedcbd0305f408d4f513b981ff5136ab7f705aef26ad859aeedefa36"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-codex/stdout.jsonl",
+          "originalSha256": "9430edb34ef9a129a7cc226ef83b690ba1e215682cd59014d889192391615a9a",
+          "derivativeSha256": "2c277f0ce6549bcde596740b88f4e073f2572fda10b63e0a56e2419e344d1004",
+          "payloadSha256": "56257e06f8ed3d97d45da789f16a021d30c17cb9cd53ecc92b09000311ec01d7"
+        }
+      }
     },
     {
       "order": 16,
@@ -333,9 +664,44 @@
         "reason": "Exactly two actual route_task calls with complete authored context: deliberate empty-id task rejected as unsupported and valid task rejected as unavailable. No destination attempts, source/config edits or reroutes. Unsupported means invalid task contract in this condition, not model capability.",
         "historicalFailure": false
       },
-      "summary": "boundary-opencode-relative-paths/summary.json",
-      "transcript": "boundary-opencode-relative-paths/stdout.jsonl",
-      "audit": "boundary-opencode-relative-paths/mcp-audit.jsonl"
+      "summary": "boundary-opencode-relative-paths/summary.portable.json",
+      "transcript": "boundary-opencode-relative-paths/stdout.portable.json",
+      "audit": "boundary-opencode-relative-paths/mcp-audit.jsonl",
+      "retainedRecords": {
+        "summary": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode-relative-paths/summary.json",
+          "originalSha256": "60f51c16943fe04bbf890a6db92d31e20be168090498dd6fd7ce1f1dcce9efb0",
+          "derivativeSha256": "524ce93109e34fbf84fd6a464e47d198f0d0a3c1d90194b91b317ac0381ee792",
+          "payloadSha256": "0626c162322d143c3ca8dd3588e0fc7d2dce2204ff5b98e659ea36241a0b3e29"
+        },
+        "transcript": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode-relative-paths/stdout.jsonl",
+          "originalSha256": "fd6e9ae3e2c2f660f240e597a8070ef76bc734c1ed56bf6645fbc66b1c66d088",
+          "derivativeSha256": "324912667d6d43420aeb39122116ba3b47346acc6798df5fbcd0d96c0e742ca1",
+          "payloadSha256": "7658cf1fee4fab1f967fa495c4554b02f5d0d2380c434bebf9233e5fe946fc79"
+        },
+        "testsBefore": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode-relative-paths/tests-before.txt",
+          "originalSha256": "0a9edfad2bb0685d67ecbfd5e7b2e93a24dfa131aaee20faf8701e4a0eb09c01",
+          "derivativeSha256": "261f538ac30b66dc8c7fa61761579b22b1247d655734297f71f1154daceb4d6b",
+          "payloadSha256": "5bb0080eab4ce267db1767eff47ec28acd95794e64bede400b25ad0756ae17e8"
+        },
+        "testsAfter": {
+          "format": "jev-portable-retained-record-v1",
+          "originalFile": "boundary-opencode-relative-paths/tests-after.txt",
+          "originalSha256": "23bccb5eab154ad4fa238bebaf3fa0bdf26ca687283ec6ce5f684a8de0962f90",
+          "derivativeSha256": "e2ad7808f51bdf6b1a5e01846169467b0798bbcda3ad034c9c33f526073dfbcb",
+          "payloadSha256": "fb6f5be0fa155b5d0840b1747bb7abfa3dad8d34250d99b3e4b973b915d18799"
+        }
+      }
     }
-  ]
+  ],
+  "retained_record_index": {
+    "format": "jev-portable-retained-index-v1",
+    "originalIndexSha256": "47276c546f78b69d62a14045db82fe1c9e9b188039118309ca210654f7c03ee4",
+    "note": "Historical outcomes are retained without regrading. Retained-record links identify portable derivatives; original bytes are identified by lineage hashes and are not present in this tree."
+  }
 }
