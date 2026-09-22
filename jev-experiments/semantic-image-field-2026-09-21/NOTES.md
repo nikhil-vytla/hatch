@@ -15,3 +15,5 @@
 
 - Fable called the first field too card-heavy. Final default is the richer grid; field is optional, unframed and uncapped within the viewport. Native touch scrolling is restored, with Move field for touch pan/pinch. Page Up/Down follows rank.
 - Final browser checks observed190 overview nodes, amber zoom-compensated focus and139px native touch scrolling. A cancelled intercepted live run restored all204 recorded scores. A separate clean checkout passed frozen Bun installation and production build with only this application patch.
+
+- Re-profiled after removing the cap:190 overview nodes,89 sampled frames during60 pointer steps, p50 8.3ms/p95 10.2ms/max10.4ms on this desktop Chromium run. No new rendering infrastructure was needed.

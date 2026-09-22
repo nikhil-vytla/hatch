@@ -67,13 +67,14 @@
     "provider_requests_sent": 0
   },
   "profiling": {
-    "status": "Initial prototype only, not a final performance claim",
-    "frame_samples": 52,
+    "status": "Single final desktop Chromium sample; not a cross-device guarantee",
+    "rendered_at_start": 190,
+    "frame_samples": 89,
     "p50_ms": 8.3,
-    "p95_ms": 9,
-    "operation": "50-step desktop pointer pan",
-    "initial_render_cap": 72,
-    "final_render_cap": "none; viewport filtering only within204-work archive"
+    "p95_ms": 10.2,
+    "max_ms": 10.4,
+    "operation": "60-step pointer pan at45% overview zoom",
+    "render_cap": "none; viewport filtering only within204-work archive"
   },
   "limits": [
     "No new model-quality evaluation.",
