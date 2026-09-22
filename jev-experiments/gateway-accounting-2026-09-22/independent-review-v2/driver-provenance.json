@@ -1,0 +1,38 @@
+{
+  "historicalExecution": {
+    "driverSha256": "e52a29621868db29a8eb9793e9c8ab036bd64568ddac4ddbbc272ff7299681e0",
+    "reviewManifestSha256": "dab5300a8fd6870abb28bff084fd7528c5f75f9540e52bac55870c082672efaf",
+    "results": [
+      {
+        "path": "existing.log",
+        "sha256": "ca1ef32ee0ddde81a99452b93d0a36ae3150e8f402e9543a90f78d5dd0ba9df9"
+      },
+      {
+        "path": "observations.json",
+        "sha256": "581845782f291fd5907430bedc215e8ab77c798fd4f8f50a32ed1cb0e3d1aec2"
+      },
+      {
+        "path": "observations.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "regressions.log",
+        "sha256": "cb5f648e4dec1b58e1596e9165742d399f4e421a703644de6b4b1a6d79f7a590"
+      },
+      {
+        "path": "review-checks.json",
+        "sha256": "30203c10a854c1854c35bd4fb64c451b7044f4377116e5b607858879bb68f479"
+      }
+    ]
+  },
+  "publishedRerunner": {
+    "driverSha256": "cfad2566a70452e02b919ba57a263d5b48003342f531f7f01b37e93b43ca49b7",
+    "interface": [
+      "--archive",
+      "--output",
+      "--preflight-only"
+    ],
+    "validation": "Argument and preflight checks only; this version did not produce the historical observations or logs.",
+    "suiteExecutionPerformedForMaintenance": false
+  }
+}

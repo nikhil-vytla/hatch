@@ -1,0 +1,100 @@
+{
+  "conclusion": "success",
+  "event": "pull_request",
+  "headSha": "ed8862509fe2cdec98c4856656e845f153e61b44",
+  "jobs": [
+    {
+      "completedAt": "2026-09-22T16:16:46Z",
+      "conclusion": "success",
+      "databaseId": 106831607206,
+      "name": "gateway",
+      "startedAt": "2026-09-22T16:16:17Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-22T16:16:20Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-22T16:16:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:24Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 2,
+          "startedAt": "2026-09-22T16:16:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:25Z",
+          "conclusion": "success",
+          "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "number": 3,
+          "startedAt": "2026-09-22T16:16:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:26Z",
+          "conclusion": "success",
+          "name": "Install application",
+          "number": 4,
+          "startedAt": "2026-09-22T16:16:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:43Z",
+          "conclusion": "success",
+          "name": "Build application",
+          "number": 5,
+          "startedAt": "2026-09-22T16:16:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:43Z",
+          "conclusion": "success",
+          "name": "Install decoder test dependencies",
+          "number": 6,
+          "startedAt": "2026-09-22T16:16:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:43Z",
+          "conclusion": "success",
+          "name": "Verify native transport and accounting without provider calls",
+          "number": 7,
+          "startedAt": "2026-09-22T16:16:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:44Z",
+          "conclusion": "success",
+          "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "number": 13,
+          "startedAt": "2026-09-22T16:16:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:44Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "number": 14,
+          "startedAt": "2026-09-22T16:16:44Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-22T16:16:44Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-09-22T16:16:44Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/nikhil-vytla/hatch/actions/runs/35752990035/job/106831607206"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/nikhil-vytla/hatch/actions/runs/35752990035"
+}

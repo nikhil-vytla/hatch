@@ -1,0 +1,136 @@
+{
+  "selectedSource": "8743d7282176e2bdbcff68ddc497c8803b55b6c0",
+  "reportHead": "ed8862509fe2cdec98c4856656e845f153e61b44",
+  "disposition": "request changes: three reproduced correctness gaps",
+  "files": [
+    {
+      "path": "NOTES.md",
+      "sha256": "0cf93fb1466ae41bc66cd5fc2c3d6172575031188d459f21a698ab34297a64ee",
+      "bytes": 3201
+    },
+    {
+      "path": "README.md",
+      "sha256": "388886101c574f15173eb89cdb339a54db35efe766203fb9c680ffda82518b12",
+      "bytes": 6827
+    },
+    {
+      "path": "_summary.md",
+      "sha256": "23e8542fb310e7947fbff5d3ea89a12da35af7a11a8032031874aad5dfbe8a29",
+      "bytes": 739
+    },
+    {
+      "path": "ci-execution.json",
+      "sha256": "ba88a8ae7070b7abae779f4cf3d88cd08f58235a328f24948d156bf28e31c58c",
+      "bytes": 750
+    },
+    {
+      "path": "ci-selected-source.json",
+      "sha256": "b2fe9add6bfe041ae5e9015eb439b63bdac0b88c7991121da409f138f0b14e7a",
+      "bytes": 1961
+    },
+    {
+      "path": "dependency-condition.json",
+      "sha256": "2a9b72107c9c7a35f3130baab61492d39e7e3b4101ff2c554cca2336afcd420f",
+      "bytes": 290
+    },
+    {
+      "path": "driver-provenance.json",
+      "sha256": "8ca13aa4a49642eb13b683b7dc6d186c9b4100a2ac8788e4a25b88ada6dc706e",
+      "bytes": 1309
+    },
+    {
+      "path": "existing.log",
+      "sha256": "ca1ef32ee0ddde81a99452b93d0a36ae3150e8f402e9543a90f78d5dd0ba9df9",
+      "bytes": 2950
+    },
+    {
+      "path": "gateway-ci.json",
+      "sha256": "4a1a709fcc36eab82ac700d18d6a80ddd3c923734e82e61ebacff6e0b448f1f8",
+      "bytes": 3271
+    },
+    {
+      "path": "identity-check.json",
+      "sha256": "fa822fdbcc2f9cfebd49ce67e54687415dc2a5bfd5d569a0959afdf811218bf7",
+      "bytes": 3411
+    },
+    {
+      "path": "missed-cases.test.ts",
+      "sha256": "8513a255b1463650f169a25cd9658395a921dd1068a126634349b64cec02420e",
+      "bytes": 3990
+    },
+    {
+      "path": "observations.json",
+      "sha256": "581845782f291fd5907430bedc215e8ab77c798fd4f8f50a32ed1cb0e3d1aec2",
+      "bytes": 1453
+    },
+    {
+      "path": "observations.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "observations.ts",
+      "sha256": "f5ae7b0211b7393aabe51118560ed12cc1bc9c6cba3f17a1f65bdfc12b4e5e5d",
+      "bytes": 2031
+    },
+    {
+      "path": "regressions.log",
+      "sha256": "cb5f648e4dec1b58e1596e9165742d399f4e421a703644de6b4b1a6d79f7a590",
+      "bytes": 3682
+    },
+    {
+      "path": "remote-checks.json",
+      "sha256": "82901974d2572dd58c862ab6d69a9e9c779f48b821b8e3c08b5af0976ae7ed54",
+      "bytes": 2994
+    },
+    {
+      "path": "review-checks.json",
+      "sha256": "30203c10a854c1854c35bd4fb64c451b7044f4377116e5b607858879bb68f479",
+      "bytes": 609
+    },
+    {
+      "path": "run-review.py",
+      "sha256": "cfad2566a70452e02b919ba57a263d5b48003342f531f7f01b37e93b43ca49b7",
+      "bytes": 6312
+    }
+  ],
+  "driverProvenance": {
+    "historicalExecution": {
+      "driverSha256": "e52a29621868db29a8eb9793e9c8ab036bd64568ddac4ddbbc272ff7299681e0",
+      "reviewManifestSha256": "dab5300a8fd6870abb28bff084fd7528c5f75f9540e52bac55870c082672efaf",
+      "results": [
+        {
+          "path": "existing.log",
+          "sha256": "ca1ef32ee0ddde81a99452b93d0a36ae3150e8f402e9543a90f78d5dd0ba9df9"
+        },
+        {
+          "path": "observations.json",
+          "sha256": "581845782f291fd5907430bedc215e8ab77c798fd4f8f50a32ed1cb0e3d1aec2"
+        },
+        {
+          "path": "observations.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "regressions.log",
+          "sha256": "cb5f648e4dec1b58e1596e9165742d399f4e421a703644de6b4b1a6d79f7a590"
+        },
+        {
+          "path": "review-checks.json",
+          "sha256": "30203c10a854c1854c35bd4fb64c451b7044f4377116e5b607858879bb68f479"
+        }
+      ]
+    },
+    "publishedRerunner": {
+      "driverSha256": "cfad2566a70452e02b919ba57a263d5b48003342f531f7f01b37e93b43ca49b7",
+      "interface": [
+        "--archive",
+        "--output",
+        "--preflight-only"
+      ],
+      "validation": "Argument and preflight checks only; this version did not produce the historical observations or logs.",
+      "suiteExecutionPerformedForMaintenance": false
+    }
+  },
+  "maintenance": "Rerunner/documentation provenance updated; historical execution records and test fixtures remain unchanged."
+}

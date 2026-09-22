@@ -1,0 +1,146 @@
+{
+  "suitesExecuted": false,
+  "checks": [
+    {
+      "version": "v2",
+      "case": "help",
+      "expectedExitCode": 0,
+      "actualExitCode": 0,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "required arguments",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "existing directory refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "existing file refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "dangling output symlink refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "missing archive refused before output",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "wrong archive identity refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "archive output refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "changed selected source refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v2",
+      "case": "valid preflight creates no output",
+      "expectedExitCode": 0,
+      "actualExitCode": 0,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "help",
+      "expectedExitCode": 0,
+      "actualExitCode": 0,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "required arguments",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "existing directory refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "existing file refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "dangling output symlink refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "missing archive refused before output",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "wrong archive identity refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "archive output refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "changed selected source refused",
+      "expectedExitCode": 2,
+      "actualExitCode": 2,
+      "passed": true
+    },
+    {
+      "version": "v3",
+      "case": "valid preflight creates no output",
+      "expectedExitCode": 0,
+      "actualExitCode": 0,
+      "passed": true
+    }
+  ],
+  "passed": true
+}

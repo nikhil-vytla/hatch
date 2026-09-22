@@ -1,0 +1,55 @@
+{
+  "executedMergeCommit": "edd5f8db53ff7443fde0a1c83603e5ee43acdbb4",
+  "parents": [
+    "075fe78c65558085bf364aee1cd32d4479d508fa",
+    "ed8862509fe2cdec98c4856656e845f153e61b44"
+  ],
+  "selectedFiles": [
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "sha256": "a08c7db41dd24a62827b15b87190efa3032de56a39618d5ab635dd8e87164e50",
+      "matches": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/compose.ts",
+      "sha256": "4ec079a6fb38c1c3c469f3ce2869bdbd07d4754f0182086c2ea872f784b0eaa9",
+      "matches": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/byok.test.ts",
+      "sha256": "a7ad1300b2efce447b69b3a402dc60ef7c18b74ef9aa85a33b7cbd044587e1f7",
+      "matches": true
+    },
+    {
+      "path": "jev-experiments/packages/decision-runtime/src/score.ts",
+      "sha256": "0a77828dd8908cbe941c5bda9d364e2d2861ce4673fbe46ba169058fcb6db9fb",
+      "matches": true
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/accounting.ts",
+      "sha256": "8a09f483965d55e64e11a909524e9494ee24ebb754b6ee91bc487a24422fa5c8",
+      "matches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts",
+      "sha256": "55adada6ee45d45f1d33bdf7b0544d3312ba5a2594bef688497dac7ce0afd5a7",
+      "matches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/score.test.ts",
+      "sha256": "eeee5ec08ba9d3caf3553b33f5fda5c4848b3f7b2160008b1ad5645b6c55a52d",
+      "matches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts",
+      "sha256": "f25b3a1a5f0803cb2b7a3fa0816e53da9503dedd466008d33a12cb0b28281a07",
+      "matches": true
+    },
+    {
+      "path": ".github/workflows/jev-gateway.yml",
+      "sha256": "233931d1f07ce7c3194e31f4071691fd173df7b5e75f5b6548b7d2c73da3f7c2",
+      "matches": true
+    }
+  ],
+  "allSelectedFilesMatch": true
+}

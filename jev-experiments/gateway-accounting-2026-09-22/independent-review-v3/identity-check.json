@@ -1,0 +1,59 @@
+{
+  "source": "d93be44fde84ac83992eaa1c7ca2b1f8359aa99d",
+  "files": [
+    {
+      "path": "jev-experiments/experience-prototypes/server/gateway.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/compose.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/experience-prototypes/server/byok.test.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/packages/decision-runtime/src/score.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/roadmap/runtime/accounting.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/score.test.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": ".github/workflows/jev-gateway.yml",
+      "manifestMatches": true,
+      "gitMatches": true
+    },
+    {
+      "path": "jev-experiments/gateway-accounting-2026-09-22/observer-usage.test.ts",
+      "manifestMatches": true,
+      "gitMatches": true
+    }
+  ],
+  "archiveMatches": true,
+  "beforeAfterAssertionsByteEqual": true,
+  "assertionBodySha256": "9f43a309891371290e8043b71b834c1ad19d086e93002c5bdc3f81350e2ee11c",
+  "v2ReviewFilesUnchanged": true
+}
