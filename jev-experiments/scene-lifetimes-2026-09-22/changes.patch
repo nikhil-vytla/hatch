@@ -1,0 +1,534 @@
+diff --git a/.github/workflows/jev-scene-lifetimes.yml b/.github/workflows/jev-scene-lifetimes.yml
+new file mode 100644
+index 0000000..98f096b
+--- /dev/null
++++ b/.github/workflows/jev-scene-lifetimes.yml
+@@ -0,0 +1,33 @@
++name: Jev scene lifetimes
++
++on:
++  pull_request:
++    paths:
++      - "jev-experiments/**"
++      - ".github/workflows/jev-scene-lifetimes.yml"
++  push:
++    branches: [main]
++    paths:
++      - "jev-experiments/**"
++      - ".github/workflows/jev-scene-lifetimes.yml"
++
++permissions:
++  contents: read
++
++jobs:
++  build-and-test:
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
++        with:
++          bun-version: "1.3.14"
++      - name: Install application
++        working-directory: jev-experiments/experience-prototypes
++        run: bun install --frozen-lockfile
++      - name: Build application from committed research inputs
++        working-directory: jev-experiments/experience-prototypes
++        run: bun run build
++      - name: Verify request, timer and media lifetimes
++        run: bun test jev-experiments/scene-lifetimes-2026-09-22
+diff --git a/jev-experiments/experience-prototypes/scripts/benchmark-publication.ts b/jev-experiments/experience-prototypes/scripts/benchmark-publication.ts
+new file mode 100644
+index 0000000..a26503b
+--- /dev/null
++++ b/jev-experiments/experience-prototypes/scripts/benchmark-publication.ts
+@@ -0,0 +1,79 @@
++import { createHash } from "node:crypto";
++
++const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
++const object = (value: unknown): Record<string, unknown> => {
++  if (!value || typeof value !== "object" || Array.isArray(value))
++    throw new Error("Expected an evidence object.");
++  return value as Record<string, unknown>;
++};
++
++export type WithheldCandidate = { subset: string; id: string; sha256: string };
++const withheldCandidates: readonly WithheldCandidate[] = [
++  {
++    subset: "Safety",
++    id: "828",
++    sha256: "29bcb708a9b1768d133d90652695c657099849a3e03e0ed439a8e5255ac87519",
++  },
++  {
++    subset: "Safety",
++    id: "1151",
++    sha256: "2eda19a0a1c80b232b6c5647ec6ed8edd79fad318745b5078e9404a891a9494b",
++  },
++  {
++    subset: "Focus",
++    id: "1604",
++    sha256: "cc337b8916915eb56bcd3cdc47430f79efc0a1bd802fc9180579c82416f64991",
++  },
++  {
++    subset: "Focus",
++    id: "1734",
++    sha256: "9b39c32ca0521de3e662ac5cbb75ccd244df3751f7584aee5ec3e7eb2c19be10",
++  },
++];
++const withheldNotice = "[Candidate text withheld from this publication copy.]";
++
++/** Clone the decoded public document. Labels, scores, counts and original JSONL are unchanged. */
++export function projectRewardBenchDocument<T>(
++  input: T,
++  manifest: readonly WithheldCandidate[] = withheldCandidates,
++): T {
++  const output = structuredClone(input);
++  const document = object(output);
++  const result = object(document.result);
++  if (!Array.isArray(result.rows)) throw new Error("Missing benchmark rows.");
++  for (const entry of manifest) {
++    const rows = result.rows
++      .map(object)
++      .filter(
++        (row) => row.subset === entry.subset && String(row.id) === entry.id,
++      );
++    if (rows.length !== 1 || !Array.isArray(rows[0].candidates))
++      throw new Error("Expected publication row is missing or ambiguous.");
++    const candidates = rows[0].candidates
++      .map(object)
++      .filter(
++        (candidate) =>
++          typeof candidate.text === "string" &&
++          (sha256(candidate.text) === entry.sha256 ||
++            (candidate.text === withheldNotice &&
++              candidate.publication_omission &&
++              object(candidate.publication_omission).sha256 === entry.sha256)),
++      );
++    if (candidates.length !== 1)
++      throw new Error(
++        "Expected publication text hash is missing or ambiguous.",
++      );
++    candidates[0].text = withheldNotice;
++    candidates[0].publication_omission = {
++      sha256: entry.sha256,
++      reason:
++        "Text withheld by publication policy; recorded labels and scores retained.",
++    };
++  }
++  result.publication_projection = {
++    version: "jev-public-candidate-text-v1",
++    withheldCandidateTexts: manifest.length,
++    note: "Additional display-only text withholding. Original source records, row counts, labels, model scores and aggregate metrics are unchanged; this is separate from the benchmark's content-review omissions.",
++  };
++  return output;
++}
+diff --git a/jev-experiments/experience-prototypes/scripts/prepare.ts b/jev-experiments/experience-prototypes/scripts/prepare.ts
+index cf0249a..37a22cb 100644
+--- a/jev-experiments/experience-prototypes/scripts/prepare.ts
++++ b/jev-experiments/experience-prototypes/scripts/prepare.ts
+@@ -10,6 +10,7 @@ import {
+ import { spawnSync } from "node:child_process";
+ import { resolve } from "node:path";
+ import { readRecord } from "./records";
++import { projectRewardBenchDocument } from "./benchmark-publication";
+ import { enrichProvenance } from "./provenance";
+ import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
+ import { prepareLiveWorlds } from "../../live-worlds/prepare";
+@@ -58,11 +59,13 @@ for (const [name, source] of Object.entries(publication)) {
+         unavailable: rows.filter((row: any) => !!row.error).length,
+       };
+     }
+-    writeFileSync(target, JSON.stringify(document) + "\n");
++    writeFileSync(target, JSON.stringify(name === "rewardbench2" ? projectRewardBenchDocument(document) : document) + "\n");
+   } else if (!existsSync(target)) {
+     throw new Error(
+       `Missing prepared evidence: ${name}. Run bun run build before deployment.`,
+     );
++  } else if (name === "rewardbench2") {
++    writeFileSync(target, JSON.stringify(projectRewardBenchDocument(JSON.parse(readFileSync(target, "utf8")))) + "\n");
+   }
+ }
+ mkdirSync("public/research", { recursive: true });
+diff --git a/jev-experiments/experience-prototypes/src/arcade.tsx b/jev-experiments/experience-prototypes/src/arcade.tsx
+index a531ac1..c7ec695 100644
+--- a/jev-experiments/experience-prototypes/src/arcade.tsx
++++ b/jev-experiments/experience-prototypes/src/arcade.tsx
+@@ -348,9 +348,16 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
+     setError("");
+   }
+   useEffect(
+-    () => () => {
+-      abort.current?.abort();
+-      epoch.current++;
++    () => {
++      setBusy(false);
++      setPlaying(false);
++      return () => {
++        epoch.current++;
++        abort.current?.abort();
++        abort.current = null;
++        setBusy(false);
++        setPlaying(false);
++      };
+     },
+     [],
+   );
+@@ -385,18 +392,20 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
+       setPlaying(false);
+       return;
+     }
+-    const generation = epoch.current;
++    const generation = ++epoch.current;
+     const current = latest.current;
+     setBusy(true);
+     setError("");
+-    abort.current = new AbortController();
++    const controller = new AbortController();
++    abort.current?.abort();
++    abort.current = controller;
+     try {
+       const r = await run(
+         { policy: "Play the game described in the independent question." },
+         { action: question(current) },
+-        abort.current.signal,
++        controller.signal,
+       );
+-      if (generation !== epoch.current) return;
++      if (generation !== epoch.current || controller.signal.aborted) return;
+       const a = r.answers.action;
+       setLiveRows((rows) => {
+         setIndex(rows.length);
+@@ -413,12 +422,15 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
+       });
+       setLocal(advance(current, a.value));
+     } catch (e) {
+-      if (generation === epoch.current) {
++      if (generation === epoch.current && !controller.signal.aborted) {
+         setError(e instanceof Error ? e.message : String(e));
+         setPlaying(false);
+       }
+     } finally {
+-      if (generation === epoch.current) setBusy(false);
++      if (generation === epoch.current) {
++        setBusy(false);
++        abort.current = null;
++      }
+     }
+   }
+   useEffect(() => {
+diff --git a/jev-experiments/experience-prototypes/src/cafe-jev.tsx b/jev-experiments/experience-prototypes/src/cafe-jev.tsx
+index 90a802c..79c9b99 100644
+--- a/jev-experiments/experience-prototypes/src/cafe-jev.tsx
++++ b/jev-experiments/experience-prototypes/src/cafe-jev.tsx
+@@ -417,6 +417,7 @@ export function Beverage({ result }: { result: any }) {
+     request.current?.abort();
+     request.current = null;
+     if (timer.current) clearTimeout(timer.current);
++    timer.current = null;
+     setBusy(false);
+     setPreparing(false);
+   }
+@@ -447,9 +448,10 @@ export function Beverage({ result }: { result: any }) {
+     }
+   }, [result]);
+   useEffect(
+-    () => () => {
+-      request.current?.abort();
+-      if (timer.current) clearTimeout(timer.current);
++    () => {
++      setBusy(false);
++      setPreparing(false);
++      return () => invalidate();
+     },
+     [],
+   );
+@@ -609,7 +611,7 @@ export function Beverage({ result }: { result: any }) {
+         modelQuestions(),
+         aborter.signal,
+       );
+-      if (!isCurrent(ticket, current.current)) return;
++      if (aborter.signal.aborted || !isCurrent(ticket, current.current)) return;
+       const interpreted = interpret(response, input);
+       commit(
+         {
+diff --git a/jev-experiments/experience-prototypes/src/games.tsx b/jev-experiments/experience-prototypes/src/games.tsx
+index 0477349..170b473 100644
+--- a/jev-experiments/experience-prototypes/src/games.tsx
++++ b/jev-experiments/experience-prototypes/src/games.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useState } from "react";
++import { useEffect, useMemo, useRef, useState } from "react";
+ import { motion } from "motion/react";
+ import {
+   Play,
+@@ -84,9 +84,15 @@ export function Games({ result }: { result: any }) {
+   const trace = episode?.trace ?? [],
+     entry = trace[step],
+     state = entry?.observation ?? result.observations?.[entry?.state_id];
++  const replaySelection = useRef<string | null>(null);
+   useEffect(() => {
+-    setStep(0);
++    const selection = JSON.stringify([policy, env, seed]);
++    if (replaySelection.current !== selection) {
++      replaySelection.current = selection;
++      setStep(0);
++    }
+   }, [policy, env, seed]);
++  useEffect(() => () => setPlaying(false), []);
+   useEffect(() => {
+     if (!playing || !trace.length) return;
+     const timer = setInterval(
+diff --git a/jev-experiments/experience-prototypes/src/ghost-brush.tsx b/jev-experiments/experience-prototypes/src/ghost-brush.tsx
+index 380cc82..c154e6e 100644
+--- a/jev-experiments/experience-prototypes/src/ghost-brush.tsx
++++ b/jev-experiments/experience-prototypes/src/ghost-brush.tsx
+@@ -41,7 +41,14 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
+     const pending = inFlight.current;
+     if (pending && (pending.token.revision !== session.revision || pending.token.epoch !== session.epoch)) { pending.controller.abort(); inFlight.current = null; }
+   }, [session.revision, session.epoch]);
+-  useEffect(() => () => inFlight.current?.controller.abort(), []);
++  useEffect(() => () => {
++    const pending = inFlight.current;
++    inFlight.current = null;
++    pending?.controller.abort();
++    if (pending) dispatch({ type: "cancel" });
++    dispatch({ type: "end" });
++    setKeyboardPen(p => p.down ? { ...p, down: false } : p);
++  }, []);
+   useEffect(() => { if (!session.active) setKeyboardPen(p => p.down ? { ...p, down: false } : p); }, [session.active]);
+ 
+   function changePrompt(value: string) { setPrompt(value); setKeyError(""); dispatch({ type: "edit" }); }
+@@ -53,9 +60,9 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
+     dispatch({ type: "request", token, source, request });
+     if (source === "lexical") { dispatch({ type: "resolve", token, ranking: lexicalRank(prompt), response: { algorithm: "Exact token or tag-prefix matches; count matches; bank order breaks ties.", modelCalled: false } }); return; }
+     const controller = new AbortController(); inFlight.current = { token, controller };
+-    try { const response = await run(request.state, request.questions, controller.signal); dispatch({ type: "resolve", token, ranking: parseRanking(response), response }); }
+-    catch (error) { dispatch({ type: "fail", token, error: error instanceof Error && error.name === "AbortError" ? "Request cancelled. The current brush is unchanged." : error instanceof Error ? error.message : "Jev could not complete this request. The current brush is unchanged." }); }
+-    finally { if (inFlight.current?.token.id === token.id) inFlight.current = null; }
++    try { const response = await run(request.state, request.questions, controller.signal); if (controller.signal.aborted || inFlight.current?.token !== token) return; dispatch({ type: "resolve", token, ranking: parseRanking(response), response }); }
++    catch (error) { if (!controller.signal.aborted && inFlight.current?.token === token) dispatch({ type: "fail", token, error: error instanceof Error ? error.message : "Jev could not complete this request. The current brush is unchanged." }); }
++    finally { if (inFlight.current?.token === token) inFlight.current = null; }
+   }
+   function loadExample(example: RecordedExample) {
+     inFlight.current?.controller.abort(); setPrompt(example.prompt); setKeyError("");
+diff --git a/jev-experiments/experience-prototypes/src/icon-studio.tsx b/jev-experiments/experience-prototypes/src/icon-studio.tsx
+index d819e92..27ef518 100644
+--- a/jev-experiments/experience-prototypes/src/icon-studio.tsx
++++ b/jev-experiments/experience-prototypes/src/icon-studio.tsx
+@@ -34,11 +34,15 @@ export function IconStudio({ result }: { result: any }) {
+     const abort = new AbortController();
+     fetch("/icon-studio/collection.json", { signal: abort.signal }).then(r => { if (!r.ok) throw Error("The icon collection could not load."); return r.json(); }).then(data => {
+       if (data.sha256 !== result.library.sha256) throw Error("The recorded choices and current icon library differ. Rebuild the collection before comparing them.");
+-      setLibrary(data);
++      if (!abort.signal.aborted) setLibrary(data);
+     }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
+-    return () => { abort.abort(); controller.current?.abort(); generation.current++; };
++    return () => abort.abort();
+   }, [result.library.sha256]);
+-  function stop(message = "Stopped. A partial tournament is not presented as a final choice.") { generation.current++; controller.current?.abort(); setBusy(false); setNotice(message); }
++  useEffect(() => {
++    setBusy(false);
++    return () => { generation.current++; controller.current?.abort(); controller.current = null; setBusy(false); };
++  }, [result.library.sha256]);
++  function stop(message = "Stopped. A partial tournament is not presented as a final choice.") { generation.current++; controller.current?.abort(); controller.current = null; setBusy(false); setNotice(message); }
+   function change(nextTitle: string, nextContext: string) { stop(""); setTitle(nextTitle); setContext(nextContext); setLive(null); setSelected(""); setError(""); setProgress(0); setLimit(48); }
+   async function match() {
+     if (!getApiKey()) { setError("Connect your own Gateway key using Connect live, then find an icon. The key stays in memory."); return; }
+@@ -50,18 +54,18 @@ export function IconStudio({ result }: { result: any }) {
+       for (let start = 0; start < groups.length; start += 8) {
+         const questions = Object.fromEntries(groups.slice(start, start + 8).map((g, i) => ["shard_" + (start + i), shardQuestion(g)]));
+         const output = await run(state, questions, abort.signal);
+-        if (tag !== generation.current) return;
++        if (tag !== generation.current || abort.signal.aborted) return;
+         Object.assign(answers, output.answers); calls.push({ state, questions, output }); setProgress(Math.min(start + 8, groups.length));
+       }
+       const winners = finalists(groups, answers), questions = { icon: finalQuestion(winners) };
+       const output = winners.length ? await run(state, questions, abort.signal) : null;
+-      if (tag !== generation.current) return;
++      if (tag !== generation.current || abort.signal.aborted) return;
+       if (output) calls.push({ state, questions, output });
+       const answer = output?.answers.icon, picked = answer?.value ?? "none";
+       if (picked !== "none" && !winners.some(i => i.id === picked)) throw Error("The final answer is outside the candidate set.");
+       setLive({ title, context, status: "complete", finalists: winners.map(i => i.id), shardAnswers: answers, answer, picked, calls, elapsed_ms: performance.now() - started }); setMode("finalists");
+-    } catch (e) { if (tag === generation.current) setError(e instanceof Error ? e.message : String(e)); }
+-    finally { if (tag === generation.current) setBusy(false); }
++    } catch (e) { if (tag === generation.current && !abort.signal.aborted) setError(e instanceof Error ? e.message : String(e)); }
++    finally { if (tag === generation.current) { setBusy(false); controller.current = null; } }
+   }
+   function pin(id: string) { setPinned(items => items.includes(id) ? items.filter(i => i !== id) : [...items, id]); }
+   async function copy(kind: "svg" | "react") {
+diff --git a/jev-experiments/experience-prototypes/src/judgment-reliability.tsx b/jev-experiments/experience-prototypes/src/judgment-reliability.tsx
+index 7c0a28a..5b6ad85 100644
+--- a/jev-experiments/experience-prototypes/src/judgment-reliability.tsx
++++ b/jev-experiments/experience-prototypes/src/judgment-reliability.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useState } from "react";
++import { useEffect, useMemo, useRef, useState } from "react";
+ import { ArrowLeftRight, ChevronLeft, ChevronRight, Download, Eye, ExternalLink, Expand, ShieldAlert } from "lucide-react";
+ import { Button, Fold, Notice, Pane, Stat } from "./shared";
+ import { download } from "./api";
+@@ -18,9 +18,15 @@ export function JudgeBench({ result }: { result: any }) {
+   const [swap, setSwap] = useState(false), [opened, setOpened] = useState(false), [expanded, setExpanded] = useState(false), [revealed, setRevealed] = useState(false), [vote, setVote] = useState<any>(null), [repeat, setRepeat] = useState(0), [method, setMethod] = useState("pairwise");
+   const filtered = useMemo(() => index.filter(p => mode === "blind" || (model === "all" || p.response_model === model) && (filter === "all" || p.diagnostics[filter])), [index, mode, model, filter]);
+   const entry = index.find(p => p.pair_id === pairId), position = filtered.findIndex(p => p.pair_id === pairId), show = mode === "review" || revealed;
++  const readingSelection = useRef<string | null>(null);
+   useEffect(() => { if (filtered.length && !filtered.some(p => p.pair_id === pairId)) setPairId(filtered[0].pair_id); }, [filtered, pairId]);
+   useEffect(() => {
+-    setPair(null); setError(""); setRevealed(false); setOpened(false); setExpanded(false); setSwap(false); setVote(readVote(pairId));
++    const selection = JSON.stringify([pairId, entry?.chunk, result.chunk_base]);
++    if (readingSelection.current !== selection) {
++      readingSelection.current = selection;
++      setPair(null); setRevealed(false); setOpened(false); setExpanded(false); setSwap(false); setVote(readVote(pairId));
++    }
++    setError("");
+     if (!entry) { setError("This pair is not present in the recorded release."); return; }
+     const url = `${result.chunk_base}/${encodeURIComponent(entry.chunk ?? `${pairId}.json`)}`, controller = new AbortController();
+     if (memory.has(url)) setPair(memory.get(url)); else fetch(url, { signal: controller.signal }).then(response => { if (!response.ok) throw new Error(`Case download failed (${response.status}).`); return response.json(); }).then(data => { if (!controller.signal.aborted) { memory.set(url, data); setPair(data); } }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+diff --git a/jev-experiments/experience-prototypes/src/outcome-framing.tsx b/jev-experiments/experience-prototypes/src/outcome-framing.tsx
+index 894b8d9..d9a0e5d 100644
+--- a/jev-experiments/experience-prototypes/src/outcome-framing.tsx
++++ b/jev-experiments/experience-prototypes/src/outcome-framing.tsx
+@@ -61,12 +61,12 @@ export function DrawingFraming({result}:{result:any}){
+  const [caseId,setCaseId]=useState('crescent'),[mask,setMask]=useState(false),[selected,setSelected]=useState(119),[reveal,setReveal]=useState(SIZE*SIZE),[animating,setAnimating]=useState(false),[busy,setBusy]=useState(false),[method,setMethod]=useState<DrawingMethod>('membership'),[live,setLive]=useState<any>(null),[error,setError]=useState('');
+  const generation=useRef(0),abort=useRef<AbortController|null>(null),reduced=useReducedMotion();const c=drawingCases.find(c=>c.id===caseId)!,target=reference(c);
+  const maps=useMemo(()=>(result?.maps??[]).filter((m:any)=>m.caseId===caseId),[result,caseId]);
+- function cancel(){generation.current++;abort.current?.abort();setBusy(false);setAnimating(false);}
+- useEffect(()=>()=>{generation.current++;abort.current?.abort();},[]);
++ function cancel(){generation.current++;abort.current?.abort();abort.current=null;setBusy(false);setAnimating(false);}
++ useEffect(()=>{setBusy(false);setAnimating(false);return()=>cancel();},[]);
+  useEffect(()=>{if(!animating)return;if(reveal>=256){setAnimating(false);return;}const t=setTimeout(()=>setReveal(v=>Math.min(256,v+16)),reduced?0:85);return()=>clearTimeout(t);},[animating,reveal,reduced]);
+  async function draw(){if(!getApiKey()){setError('Connect your Gateway key above to draw a new pass. The recorded comparisons work without a key.');return;}cancel();const token=++generation.current,controller=new AbortController();abort.current=controller;setBusy(true);setError('');const values:number[]=[];const stride=method==='scanline'?SIZE:64;const decisions:any[]=[];
+-  try{for(let start=0;start<256;start+=stride){const body=drawingPayload(c,method,Array.from({length:stride},(_,i)=>start+i),values),response=await run(body.state,body.questions,controller.signal);if(token!==generation.current)return;for(let i=start;i<start+stride;i++)values.push(intensity(response.answers[`pixel_${i}`],method));decisions.push({body,response});setLive({caseId:c.id,method,values:[...values],decisions:[...decisions],complete:false});}setLive({caseId:c.id,method,values,decisions,complete:true,metrics:drawingMetrics(values,target)});}
+-  catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:String(e));}finally{if(token===generation.current)setBusy(false);}
++  try{for(let start=0;start<256;start+=stride){const body=drawingPayload(c,method,Array.from({length:stride},(_,i)=>start+i),values),response=await run(body.state,body.questions,controller.signal);if(token!==generation.current||controller.signal.aborted)return;for(let i=start;i<start+stride;i++)values.push(intensity(response.answers[`pixel_${i}`],method));decisions.push({body,response});setLive({caseId:c.id,method,values:[...values],decisions:[...decisions],complete:false});}setLive({caseId:c.id,method,values,decisions,complete:true,metrics:drawingMetrics(values,target)});}
++  catch(e){if(token===generation.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:String(e));}finally{if(token===generation.current){setBusy(false);abort.current=null;}}
+  }
+  return <div className="of-lab"><div className="of-intro"><span className="eyebrow">One canvas, different questions</span><h2>Draw the steps. Predict the shape.</h2><p>A 16 × 16 canvas makes every decision visible. Change the question without hiding the awkward results.</p></div>
+   <div className="of-controls"><Field label="Subject"><select value={caseId} onChange={e=>{cancel();setCaseId(e.target.value);setLive(null);setReveal(256);if(!drawingCases.find(c=>c.id===e.target.value)?.formula&&method==='formula')setMethod('membership');}}>{drawingCases.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></Field><label className="of-checkbox"><input type="checkbox" checked={mask} onChange={e=>setMask(e.target.checked)}/>Show thresholded mask</label><Button secondary onClick={()=>{setReveal(0);setAnimating(true);}}><Play size={15}/>Reveal pixels</Button></div>
+diff --git a/jev-experiments/experience-prototypes/src/wardrobe.tsx b/jev-experiments/experience-prototypes/src/wardrobe.tsx
+index 0b710d6..3b01c3a 100644
+--- a/jev-experiments/experience-prototypes/src/wardrobe.tsx
++++ b/jev-experiments/experience-prototypes/src/wardrobe.tsx
+@@ -143,7 +143,10 @@ export function Wardrobe({ result }: { result: any }) {
+   };
+   useEffect(() => {
+     mounted.current = true;
++    setBusy(false);
++    setListening(false);
+     const controller = new AbortController();
++    const remote = remoteVideo.current;
+     const read = (name: string) =>
+       fetch(`/wardrobe/${name}`, { signal: controller.signal })
+         .then((r) =>
+@@ -157,11 +160,10 @@ export function Wardrobe({ result }: { result: any }) {
+       read("recording.json"),
+       read("spoken-pipeline.json"),
+     ]).then(([spoken, control, evidence]) => {
+-      if (!mounted.current) return;
+-      setRecording(
+-        spoken?.status === "complete" ? { ...spoken, spoken: true } : control,
+-      );
+-      setPipeline(evidence);
++      if (controller.signal.aborted || !mounted.current) return;
++      const prepared = spoken?.status === "complete" ? { ...spoken, spoken: true } : control;
++      if (prepared) setRecording(prepared);
++      if (evidence) setPipeline(evidence);
+     });
+     const hidden = () => {
+       if (document.hidden) disconnect();
+@@ -170,17 +172,34 @@ export function Wardrobe({ result }: { result: any }) {
+     document.addEventListener("visibilitychange", hidden);
+     window.addEventListener("pagehide", leave);
+     return () => {
+-      mounted.current = false;
+       controller.abort();
+-      request.current?.abort();
++      invalidate();
+       ticket.current.session++;
+-      recognition.current?.abort();
++      const activeRecognition = recognition.current;
++      recognition.current = null;
++      if (activeRecognition) {
++        activeRecognition.onresult = null;
++        activeRecognition.onerror = null;
++        activeRecognition.onend = null;
++        activeRecognition.abort();
++      }
++      setListening(false);
++      speaking.current = false;
+       if ("speechSynthesis" in window) speechSynthesis.cancel();
++      // Activity detaches DOM refs before this passive cleanup runs.
++      remote?.pause();
++      if (remote) remote.srcObject = null;
+       disconnect();
++      mounted.current = false;
+       document.removeEventListener("visibilitychange", hidden);
+       window.removeEventListener("pagehide", leave);
+     };
+   }, []);
++  useEffect(() => {
++    // The recorded player mounts after its metadata loads.
++    const video = playback.current;
++    return () => video?.pause();
++  }, [recording?.status]);
+   useEffect(() => {
+     speaking.current = speak;
+     if (!speak && "speechSynthesis" in window) speechSynthesis.cancel();
+@@ -351,18 +370,21 @@ export function Wardrobe({ result }: { result: any }) {
+         editQuestions(outfitRef.current),
+         controller.signal,
+       );
+-      if (!mounted.current || !currentTicket(sent, ticket.current)) return;
++      if (controller.signal.aborted || !mounted.current || !currentTicket(sent, ticket.current)) return;
+       accept(response, command, "live-jev", commandSource);
+       setText("");
+     } catch (e) {
+-      if (!controller.signal.aborted && mounted.current)
++      if (!controller.signal.aborted && mounted.current && currentTicket(sent, ticket.current))
+         say(
+           e instanceof Error
+             ? e.message
+             : "Jev could not interpret that change.",
+         );
+     } finally {
+-      if (currentTicket(sent, ticket.current)) setBusy(false);
++      if (currentTicket(sent, ticket.current)) {
++        setBusy(false);
++        request.current = null;
++      }
+     }
+   };
+   const replay = () => {
+@@ -412,16 +434,22 @@ export function Wardrobe({ result }: { result: any }) {
+     r.continuous = false;
+     r.interimResults = false;
+     r.onresult = (event: any) => {
++      if (!mounted.current || recognition.current !== r) return;
+       const transcript = event.results[0][0].transcript;
+       setText(transcript);
+       setTranscriptSource("speech");
+       say("Transcript ready. Review it, then send it to Jev.");
+     };
+     r.onerror = () => {
++      if (!mounted.current || recognition.current !== r) return;
+       setListening(false);
+       say("Speech recognition stopped. You can type your command instead.");
+     };
+-    r.onend = () => setListening(false);
++    r.onend = () => {
++      if (!mounted.current || recognition.current !== r) return;
++      recognition.current = null;
++      setListening(false);
++    };
+     r.start();
+     setListening(true);
+   };
+@@ -476,7 +504,7 @@ export function Wardrobe({ result }: { result: any }) {
+           return data.token;
+         },
+         onStream: (stream) => {
+-          if (epoch !== videoEpoch.current) return;
++          if (epoch !== videoEpoch.current || !mounted.current) return;
+           if (remoteVideo.current) {
+             remoteVideo.current.srcObject = stream;
+             void remoteVideo.current.play().catch(() => {});
