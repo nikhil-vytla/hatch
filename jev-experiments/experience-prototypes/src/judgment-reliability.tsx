@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Download, Eye, ExternalLink, Expand, ShieldAlert } from "lucide-react";
 import { Button, Fold, Notice, Pane, Stat } from "./shared";
 import { download } from "./api";
@@ -18,9 +18,15 @@ export function JudgeBench({ result }: { result: any }) {
   const [swap, setSwap] = useState(false), [opened, setOpened] = useState(false), [expanded, setExpanded] = useState(false), [revealed, setRevealed] = useState(false), [vote, setVote] = useState<any>(null), [repeat, setRepeat] = useState(0), [method, setMethod] = useState("pairwise");
   const filtered = useMemo(() => index.filter(p => mode === "blind" || (model === "all" || p.response_model === model) && (filter === "all" || p.diagnostics[filter])), [index, mode, model, filter]);
   const entry = index.find(p => p.pair_id === pairId), position = filtered.findIndex(p => p.pair_id === pairId), show = mode === "review" || revealed;
+  const readingSelection = useRef<string | null>(null);
   useEffect(() => { if (filtered.length && !filtered.some(p => p.pair_id === pairId)) setPairId(filtered[0].pair_id); }, [filtered, pairId]);
   useEffect(() => {
-    setPair(null); setError(""); setRevealed(false); setOpened(false); setExpanded(false); setSwap(false); setVote(readVote(pairId));
+    const selection = JSON.stringify([pairId, entry?.chunk, result.chunk_base]);
+    if (readingSelection.current !== selection) {
+      readingSelection.current = selection;
+      setPair(null); setRevealed(false); setOpened(false); setExpanded(false); setSwap(false); setVote(readVote(pairId));
+    }
+    setError("");
     if (!entry) { setError("This pair is not present in the recorded release."); return; }
     const url = `${result.chunk_base}/${encodeURIComponent(entry.chunk ?? `${pairId}.json`)}`, controller = new AbortController();
     if (memory.has(url)) setPair(memory.get(url)); else fetch(url, { signal: controller.signal }).then(response => { if (!response.ok) throw new Error(`Case download failed (${response.status}).`); return response.json(); }).then(data => { if (!controller.signal.aborted) { memory.set(url, data); setPair(data); } }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
