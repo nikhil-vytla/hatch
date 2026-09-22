@@ -13,7 +13,7 @@ import jev_local as j
 
 class LocalTests(unittest.TestCase):
     def request(self, question):
-        return {'schemaVersion': '1', 'requestId': 'r1', 'state': 'A state', 'questions': [question]}
+        return {'schemaVersion': '2', 'requestId': 'r1', 'state': 'A state', 'questions': [question]}
 
     def test_typed_options(self):
         self.assertEqual(j.options({'kind': 'boolean'}), [(False, 'No, the statement does not hold.'), (True, 'Yes, the statement holds.')])
@@ -29,7 +29,109 @@ class LocalTests(unittest.TestCase):
         request = self.request({'id': 'q', 'kind': 'boolean', 'prompt': 'Is it true?'})
         request['state'] = 'x' * (j.LIMITS['maxStateBytes'] + 1)
         with self.assertRaises(ValueError): j.validate(request)
-        with self.assertRaises(ValueError): j.validate({'schemaVersion': '1', 'requestId': 'r1', 'questions': []})
+        with self.assertRaises(ValueError): j.validate({'schemaVersion': '2', 'requestId': 'r1', 'questions': []})
+
+    def test_native_semantics_are_unsupported_without_silent_text_conversion(self):
+        boolean = {'id': 'q', 'kind': 'boolean', 'prompt': 'Check'}
+        cases = [
+            {**boolean, 'criteria': {'true': 'Evidence present', 'false': 'No evidence'}},
+            {**boolean, 'prompt': {'question': 'Check'}},
+            {**boolean, 'prompt': ['Check']},
+            {**boolean, 'prompt': None},
+            {'id': 'q', 'kind': 'ordinal', 'prompt': 'Rate', 'min': 0, 'max': 1, 'levels': ['routine', 'severe']},
+            {'id': 'q', 'kind': 'choice', 'prompt': 'Choose', 'options': [{'id': 'a', 'label': 'A', 'description': {'meaning': 'A'}}, {'id': 'b', 'label': 'B'}]},
+        ]
+        runtime = object.__new__(j.Runtime)
+        runtime.spec, runtime.load_ms = {'model': 'fixture', 'revision': 'test'}, 0
+        for question in cases:
+            with self.subTest(question=question), patch.object(j, 'pack') as pack:
+                response = runtime.decide(self.request(question))
+                self.assertEqual(response['status'], 'unsupported')
+                self.assertEqual(response['schemaVersion'], '2')
+                self.assertEqual(response['decisions'], [])
+                pack.assert_not_called()
+
+    def test_whole_batch_is_validated_before_packing_or_inference(self):
+        request = self.request({'id': 'valid', 'kind': 'boolean', 'prompt': 'Check'})
+        request['questions'].append({'id': 'unsupported', 'kind': 'boolean', 'prompt': 'Check', 'criteria': {'true': None, 'false': None}})
+        runtime = object.__new__(j.Runtime)
+        runtime.spec, runtime.load_ms = {'model': 'fixture', 'revision': 'test'}, 0
+        with patch.object(j, 'pack') as pack:
+            response = runtime.decide(request)
+        pack.assert_not_called()
+        self.assertEqual(response['status'], 'unsupported')
+        self.assertEqual(response['decisions'], [])
+
+    def test_unsupported_cli_request_precedes_model_loading(self):
+        request = self.request({'id': 'q', 'kind': 'boolean', 'prompt': 'Check', 'criteria': {'true': 'Yes', 'false': 'No'}})
+        with patch.object(sys, 'argv', ['jev-local', 'decide', '--model', 'laya-base-experimental', '-']), patch.object(sys, 'stdin', io.StringIO(json.dumps(request))), patch.object(j, 'Runtime') as runtime, contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(j.main(), 2)
+        runtime.assert_not_called()
+        response = json.loads(output.getvalue())
+        self.assertEqual(response['status'], 'unsupported')
+        self.assertEqual(response['requestId'], request['requestId'])
+        self.assertEqual(response['issues'][0]['code'], 'unsupported_criteria')
+
+    def test_v2_primitive_summaries_preserve_modal_and_expected_values(self):
+        question = {'id': 'q', 'kind': 'ordinal', 'prompt': 'Rate', 'min': 10, 'max': 30, 'step': 10}
+        response = j.decision(question, [10, 20, 30], [.1, .2, .7])
+        self.assertEqual(response['selected'], 30)
+        self.assertEqual(response['expected'], 26)
+        boolean = j.decision({'id': 'b', 'kind': 'boolean'}, [False, True], [.65, .35])
+        self.assertIs(boolean['selected'], False)
+        self.assertEqual(boolean['probabilityTrue'], .35)
+        for probabilities in [[1], [.2, .2, .2], [float('nan'), 0, 1]]:
+            with self.assertRaises(ValueError):
+                j.decision(question, [10, 20, 30], probabilities)
+
+    def test_no_request_fields_or_json_identity_are_silently_lost(self):
+        base = self.request({'id': 'q', 'kind': 'boolean', 'prompt': 'Check'})
+        for request in [{**base, 'schemaVersion': '1'}, {**base, 'history': 'ignored'},
+                        {**base, 'state': {1: 'integer key'}}, {**base, 'state': ('tuple',)}]:
+            with self.assertRaises(j.InputError) as raised:
+                j.validate(request)
+            self.assertEqual(raised.exception.status, 'error')
+
+    def test_malformed_and_unsupported_are_distinct_before_model_loading(self):
+        base = {'id': 'q', 'kind': 'boolean', 'prompt': 'Check'}
+        cases = [
+            ({**base, 'instructions': 'Lost'}, 'error', 'invalid_question'),
+            ({**base, 'criteria': {'true': 'Only one'}}, 'error', 'invalid_criteria'),
+            ({**base, 'prompt': 3}, 'error', 'invalid_entry'),
+            ({**base, 'prompt': ''}, 'unsupported', 'unsupported_prompt'),
+            ({**base, 'prompt': {'task': 'Check'}}, 'unsupported', 'unsupported_structure'),
+            ({**base, 'criteria': {'true': None, 'false': None}}, 'unsupported', 'unsupported_criteria'),
+        ]
+        runtime = object.__new__(j.Runtime)
+        runtime.spec, runtime.load_ms = {'model': 'fixture', 'revision': 'test'}, 0
+        for question, status, code in cases:
+            with self.subTest(code=code), patch.object(j, 'pack') as pack:
+                result = runtime.decide(self.request(question))
+                self.assertEqual(result['status'], status)
+                self.assertEqual(result['issues'][0]['code'], code)
+                pack.assert_not_called()
+
+    def test_explicit_choice_description_replaces_label_even_when_empty(self):
+        question = {'kind': 'choice', 'options': [
+            {'id': 'a', 'label': 'Visible A', 'description': 'Actual criterion'},
+            {'id': 'b', 'label': 'Visible B', 'description': ''},
+            {'id': 'c', 'label': 'Visible C'},
+        ]}
+        self.assertEqual(j.options(question), [('a', 'Actual criterion'), ('b', ''), ('c', 'Visible C')])
+
+    def test_limit_accounting_is_compact_but_packing_text_is_unchanged(self):
+        state = {'items': ['x'] * 1000}
+        request = self.request({'id': 'q', 'kind': 'boolean', 'prompt': 'Check'})
+        request['state'] = state
+        limit = j.compact_bytes(state)
+        self.assertGreater(len(j.dumps(state).encode()), limit)
+        with patch.dict(j.LIMITS, {'maxStateBytes': limit}):
+            j.validate(request)
+        with patch.dict(j.LIMITS, {'maxStateBytes': limit - 1}):
+            with self.assertRaises(j.UnsupportedInput) as raised:
+                j.validate(request)
+            self.assertEqual(raised.exception.code, 'input_limit')
+        self.assertEqual(j.dumps({'a': [1, 2]}), '{"a": [1, 2]}')
 
     def test_mime_plain_text_and_no_file_changes(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -62,6 +164,11 @@ class LocalTests(unittest.TestCase):
     def test_tiny_ordinal_identity(self):
         self.assertEqual([value for value, _ in j.options({'kind': 'ordinal', 'min': 1e-11, 'max': 2e-11, 'step': 1e-11})], [1e-11, 2e-11])
 
+    def test_ordinal_values_preserve_shared_contract_float_identity(self):
+        values = [value for value, _ in j.options({'kind': 'ordinal', 'min': .1, 'max': .4, 'step': .1})]
+        self.assertEqual(values, [.1, .2, .1 + 2 * .1, .4])
+        self.assertNotEqual(values[2], .3)
+
     def test_temporary_symlink_cannot_overwrite_unrelated_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -87,6 +194,7 @@ class LocalTests(unittest.TestCase):
             response = json.loads(completed.stdout)
             self.assertEqual(response['requestId'], request['requestId'])
             self.assertEqual(response['status'], 'error')
+            self.assertEqual({item['code'] for item in response['issues']}, {'model_missing'})
             self.assertTrue({'schemaVersion', 'requestId', 'status', 'decisions', 'execution', 'timing', 'issues'} <= response.keys())
 
     def test_oversized_json_is_rejected_before_model_loading(self):

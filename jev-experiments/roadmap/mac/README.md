@@ -1,5 +1,11 @@
 # Local Mac typed decisions
 
+This source uses version 2 of the [typed decision contract](../runtime/README.md). Existing model installation, export and evaluation records below retain their original version 1 source identities. They do not verify the changed runtime. The [current provider-free checks](../../typed-runtime-2026-09-22/README.md) verify wire semantics, unsupported-input rejection and Python/TypeScript agreement using authored distributions. They do not run MLX, install weights or establish email usefulness.
+
+`selected` remains a modal option. Boolean responses separately return `probabilityTrue`, and ordinal responses return `expected`. This model accepts string prompts and string choice descriptions only. Structured entries, boolean criteria and descriptive ordinal levels are unsupported and rejected before loading weights. Version 1 requests and unknown fields return errors. An explicit choice description replaces its display label even when empty.
+
+The following installation and study narrative is retained historical context. The default model registry is unchanged in this source slice. Email remains experimental; historical successful installation is not a reliable email-triage result.
+
 This experimental toolkit reads explicit JSON or `.eml` files and runs a pinned Laya backbone with a small typed readout on Apple Silicon with MLX. The installed default was selected using validation data from the completed study and passed a fresh offline installation check. It does not access a mailbox. Inference requires installed local files and never falls back to a hosted model. The 12-message authored email check scored 7/12; its probabilities are uncalibrated for email, so the example is not a reliable email triage product.
 
 From a checkout of this repository, install the toolkit with one command:

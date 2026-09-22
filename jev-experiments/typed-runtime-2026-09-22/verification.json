@@ -1,0 +1,20 @@
+{
+  "condition": "Read-only report/source integrity inspection after exact archive checks. No additional client, provider or model invocation.",
+  "testedCommit": "1b74f0f3acfa8b3f7461390c91674f51a9a0d389",
+  "checks": {
+    "checks-01-artifact-hashes": true,
+    "checks-01-archive-sha": true,
+    "checks-01-manifest-sha": true,
+    "checks-02-artifact-hashes": true,
+    "checks-02-archive-sha": true,
+    "checks-02-manifest-sha": true,
+    "historical-artifacts-unchanged": true,
+    "reviewed-copied-source-matches-cutoff": true,
+    "only-report-folder-changed-since-tested-commit": true,
+    "operational-and-report-links-resolve": true,
+    "selected-artifacts-under-two-MB": true,
+    "selected-report-has-no-machine-home-prefix": true
+  },
+  "missingLinks": [],
+  "passed": true
+}

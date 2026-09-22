@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "commit": "1b74f0f3acfa8b3f7461390c91674f51a9a0d389",
+  "tree": "b5fff492552babf2a31491efb6ab0685f9804c38",
+  "archiveSha256": "0f0c0a2fab4090ba3426c4ef69e4302e30afd5af55285aa23a8220adfc2a7db5",
+  "condition": "Exact Git archive, empty source directory, app frozen install/build before any sibling install; authored provider-free fixtures only.",
+  "checks": [
+    {
+      "name": "bun-version",
+      "command": [
+        "bun",
+        "--version"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.259,
+      "output": "1.3.14"
+    },
+    {
+      "name": "app-frozen-install",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 12.225,
+      "output": "+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ @types/three@0.186.0\n+ @vitejs/plugin-react@5.2.0\n+ tailwindcss@4.3.3\n+ typescript@5.9.3\n+ vite@7.3.6\n+ @fal-ai/client@1.10.1\n+ @json-render/core@0.21.0\n+ @json-render/react@0.21.0\n+ @json-render/shadcn@0.21.0\n+ @msgpack/msgpack@3.1.3\n+ @tanstack/react-table@8.21.3\n+ @tonejs/midi@2.0.28\n+ @xyflow/react@12.11.6\n+ lucide-react@0.577.0\n+ motion@12.43.0\n+ react@19.2.4\n+ react-dom@19.2.4\n+ three@0.186.0\n+ tone@15.1.22\n+ zod@4.6.5\n\n216 packages installed [11.96s]"
+    },
+    {
+      "name": "app-build-before-siblings",
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 10.578,
+      "output": "dist/assets/use-reduced-motion-DtEEzZIq.js       0.14 kB \u2502 gzip:   0.14 kB\ndist/assets/arrow-down-RNpAbr60.js               0.17 kB \u2502 gzip:   0.16 kB\ndist/assets/rotate-ccw-OiA0bkiv.js               0.20 kB \u2502 gzip:   0.19 kB\ndist/assets/rotate-cw-DTGUu1CQ.js                0.20 kB \u2502 gzip:   0.19 kB\ndist/assets/volume-2-D8Vf43hy.js                 0.39 kB \u2502 gzip:   0.27 kB\ndist/assets/sliders-horizontal-DqBy4DeM.js       0.43 kB \u2502 gzip:   0.24 kB\ndist/assets/tetris-experience-zX5mSuWr.js        1.44 kB \u2502 gzip:   0.71 kB\ndist/assets/live-world-preview-DtAb2VkI.js      10.35 kB \u2502 gzip:   3.90 kB\ndist/assets/icon-studio-C7Xif8VQ.js             14.78 kB \u2502 gzip:   6.01 kB\ndist/assets/render-DVdaha4w.js                  21.50 kB \u2502 gzip:   9.04 kB\ndist/assets/judgment-reliability-ClPDUc1n.js    22.64 kB \u2502 gzip:   7.40 kB\ndist/assets/visual-search-CtMGKMXo.js           23.78 kB \u2502 gzip:   9.07 kB\ndist/assets/outcome-framing-BHa4lsi4.js         29.63 kB \u2502 gzip:  10.96 kB\ndist/assets/live-tetris-DOC7Ii9u.js             30.34 kB \u2502 gzip:  10.91 kB\ndist/assets/Midi-C3-25NK-.js                    32.74 kB \u2502 gzip:   9.94 kB\ndist/assets/music-arranger-Di9F7g6E.js          37.94 kB \u2502 gzip:  14.01 kB\ndist/assets/cafe-jev-CY1k3OuH.js                38.03 kB \u2502 gzip:  13.15 kB\ndist/assets/ghost-brush-B7aWI1Dw.js             50.58 kB \u2502 gzip:  13.61 kB\ndist/assets/wardrobe-BpuMet7I.js                63.03 kB \u2502 gzip:  21.58 kB\ndist/assets/live-crowd-CAlTv0kU.js              85.43 kB \u2502 gzip:  14.84 kB\ndist/assets/index-B4_z7ZI7.js                  340.35 kB \u2502 gzip:  81.17 kB\ndist/assets/arcade-CTgrropR.js                 569.45 kB \u2502 gzip: 145.04 kB\ndist/assets/index-C_lGUU-A.js                  853.29 kB \u2502 gzip: 271.55 kB\n\u2713 built in 2.61s",
+      "siblingDependenciesAbsent": true
+    },
+    {
+      "name": "adapter-frozen-install",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/adapters/typescript",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 1.465,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ typescript@5.9.3\n+ zod@4.6.5\n\n6 packages installed [1457.00ms]"
+    },
+    {
+      "name": "toolkit-frozen-install",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.015,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ typescript@5.9.3\n+ react@19.2.4\n+ react-dom@19.2.4\n\n11 packages installed [8.00ms]"
+    },
+    {
+      "name": "adapter-typecheck",
+      "command": [
+        "bun",
+        "x",
+        "--no-install",
+        "tsc",
+        "--noEmit"
+      ],
+      "cwd": "jev-experiments/adapters/typescript",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.695,
+      "output": ""
+    },
+    {
+      "name": "toolkit-typecheck",
+      "command": [
+        "bun",
+        "run",
+        "check"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 2.146,
+      "output": "$ tsc --noEmit"
+    },
+    {
+      "name": "native-runtime-toolkit-tests",
+      "command": [
+        "bun",
+        "test",
+        "jev-experiments/packages/decision-runtime",
+        "jev-experiments/roadmap/runtime",
+        "jev-experiments/roadmap/routing",
+        "jev-experiments/adapters/typescript/index.test.ts",
+        "jev-experiments/gateway-accounting-2026-09-22/gateway.test.ts",
+        "jev-experiments/gateway-accounting-2026-09-22/score.test.ts",
+        "jev-experiments/gateway-accounting-2026-09-22/accounting.test.ts",
+        "jev-experiments/gateway-accounting-2026-09-22/observer-usage.test.ts"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 4.337,
+      "output": "(pass) actual CLI retains failed and unknown classifier accounting without fallback [79.48ms]\n(pass) actual CLI rejects unsupported local classification and missing hosted credentials [457.77ms]\n(pass) configured classification cannot bypass locality or hard spending limits [45.87ms]\n(pass) actual CLI cancels a pending classifier and never executes a destination [419.82ms]\n(pass) real MCP exchanges route through both configured v2 classifier adapters [524.47ms]\n(pass) real MCP classifier refusals and cancellation preserve error flags and no artifact [740.58ms]\n\njev-experiments/adapters/typescript/index.test.ts:\n(pass) validates typed values while preserving distributions [2.52ms]\n(pass) rejects unsupported extraction and optional fields before transport [0.61ms]\n(pass) rejects wrong types, invalid values and malformed distributions [0.61ms]\n(pass) supports nested schema references and refuses cycles [0.15ms]\n(pass) annotations preserve structured instructions, criteria and two-level Score semantics [0.18ms]\n(pass) unknown, mismatched and excessive annotations fail before transport [0.13ms]\n(pass) native Noul probability maps must agree with the scalar [0.06ms]\n\njev-experiments/packages/decision-runtime/src/native.test.ts:\n(pass) JSON transport rejects lossy values without invoking accessors [0.11ms]\n(pass) native structure supports all entry shapes while enforcing documented Score limits [0.09ms]\n\n 141 pass\n 0 fail\n 1711 expect() calls\nRan 141 tests across 21 files. [4.33s]"
+    },
+    {
+      "name": "verifier-boundary-tests",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "jev-experiments/typed-runtime-2026-09-22",
+        "-p",
+        "test_verify.py"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.073,
+      "output": "...\n----------------------------------------------------------------------\nRan 3 tests in 0.002s\n\nOK"
+    },
+    {
+      "name": "python-local-contract-tests",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "jev-experiments/roadmap/mac",
+        "-p",
+        "test_*.py"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.142,
+      "output": "....................\n----------------------------------------------------------------------\nRan 20 tests in 0.069s\n\nOK"
+    },
+    {
+      "name": "fresh-installed-cli-mcp",
+      "command": [
+        "python3",
+        "jev-experiments/roadmap/routing/fresh_install.py",
+        "--output",
+        "<temporary-source>/installed.json"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.756,
+      "output": "{\n  \"passed\": true,\n  \"bundleBytes\": 136647,\n  \"bundleSha256\": \"ca748f8365429ca13a7480f712491902cb53e3317afbb9ba08ebee0cffd80aba\",\n  \"mailUnchanged\": true,\n  \"uninstalled\": true\n}"
+    }
+  ],
+  "limits": "No model inference, MLX installation, quality, performance, billing, GitHub CI or deployment claim. Duration is diagnostic check wall time.",
+  "sourceManifestSha256": "4308587c481412ecb3d4a981c48b531cf9677e288d5769610f6d25b8297675ff",
+  "sourceUnchanged": false,
+  "changedSourcePaths": [
+    "jev-experiments/visual-search/results.jsonl"
+  ],
+  "allowedGeneratedChanges": [
+    {
+      "path": "jev-experiments/visual-search/results.jsonl",
+      "fields": [
+        "document.manifest.prepared_at"
+      ],
+      "beforeSha256": "9ab7b35a502bcabc7e6ebeb15c9426cdc7a8db2c6df9b8f35601179452a89895",
+      "afterSha256": "e34f35d46b615679544e7f7f5f17122bb3f2141d5a249d15c343116dfab7af26",
+      "allOtherJsonlFieldsUnchanged": true
+    }
+  ],
+  "unexpectedSourceChanges": [],
+  "sourceCodeAndNonvolatileInputsUnchanged": true,
+  "passed": true,
+  "artifacts": {
+    "classifier-fixtures.jsonl": "db189ac62101e68b497db147f0d4a8a0ba3ec1f6fa5862a1a86e400f38a64cad",
+    "installed.json": "6aa8a0c3a707471d275cf60b3e4f963e337c234c5c4896ce7ebd72590af0ed88",
+    "source.json": "4308587c481412ecb3d4a981c48b531cf9677e288d5769610f6d25b8297675ff"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "condition": "Captured pre-correction bytes for six owned files plus unchanged dependencies and the unexecuted added provenance test from the correction inventory. Authored independent suite only.",
+  "sourceSha256": "e13e5ba49f4f684c4cc558c7245f700492d61b0c5d61ff8241a1cc61ce5ab704",
+  "fileCount": 52,
+  "suiteSha256": "7af046cba53ff535c0c8683ea8310fc2df271e3a6a85817846e1f0964bf36b00",
+  "driverSha256": "f8d9fee6d06686e1b1a108325e9862e45590bb1f77305c4297bd4660ef299dde",
+  "command": [
+    "bun",
+    "test",
+    "<independent-review>/correction-boundaries.test.ts"
+  ],
+  "exitCode": 1,
+  "sourceUnchanged": true,
+  "artifacts": {
+    "bun-test.log": "a8f59e6da2d1cfcdb8b3b858c2a9e80aad9b3888a0b23a88f32d204f21bd6a33",
+    "observations.json": "f640938ac63f6484543526fd57a3dba258775a0f0e131cf0d99d8362e055a6fa"
+  }
+}

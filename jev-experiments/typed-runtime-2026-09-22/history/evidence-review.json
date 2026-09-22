@@ -1,0 +1,65 @@
+{
+  "condition": "Independent read-only source and retained-evidence consistency; owner maintained suites and installation are inspected, not repeated.",
+  "passed": true,
+  "checks": {
+    "exact_current_source52": true,
+    "only_seven_declared_files_changed": true,
+    "owner_before_after_provenance": true,
+    "independent_same_assertions_and_stable_source": true,
+    "retained_real_entry_local_identity": true,
+    "retained_cli_mcp_refusals": true,
+    "same_fixture_selection_and_outcomes": true,
+    "retained_unexpected_network_guard": true,
+    "retained_maintained_checks_and_installed_source": true,
+    "comparison_policy_and_all_retained_artifacts_unchanged": true,
+    "original_wiring_evidence_unchanged": true
+  },
+  "sourceSha256": "aeaef7fd427813a28664b9d6429b94c917acef851ee4751636af505daa0c8fa9",
+  "changedFiles": [
+    "jev-experiments/roadmap/routing/classifier-fixtures/local-runtime.ts",
+    "jev-experiments/roadmap/routing/classifier-provenance.test.ts",
+    "jev-experiments/roadmap/routing/classifier.ts",
+    "jev-experiments/roadmap/routing/configured-classifier.test.ts",
+    "jev-experiments/roadmap/routing/hooks.ts",
+    "jev-experiments/roadmap/routing/router.ts",
+    "jev-experiments/roadmap/routing/types.ts"
+  ],
+  "retainedFixtureCounts": {
+    "rows": 44,
+    "cliInvocations": 17,
+    "mcpExchanges": 27,
+    "routeCalls": 25
+  },
+  "retainedInstall": {
+    "stagedFiles": 30,
+    "bundleBytes": 136647,
+    "bundleSha256": "ca748f8365429ca13a7480f712491902cb53e3317afbb9ba08ebee0cffd80aba",
+    "optInModelInferenceVerified": false
+  },
+  "historicalComparisonArtifactCount": 24,
+  "reviewedArtifactSha256": {
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/README.md": "a7dd6429d00facf12c1a4dade42318d639c0e8b2249f550cbebb72b4b5b2a113",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/NOTES.md": "0897725a22f7ab8871e268892a62c4b3f2eab3152c779c1bdac0512fb60429d8",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/source-before-checks.json": "4ff0cb2067f35c38f050f59a24d73de5e05c4c3c4b073406c88597279dc5934d",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/source-after-checks.json": "4ff0cb2067f35c38f050f59a24d73de5e05c4c3c4b073406c88597279dc5934d",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/owned-source.json": "9a419a45d296f5648255647cde212eb4a30d31e7db5a073e2496f97e22cb0897",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/baseline.json": "3e5e25974abda515b22d0dc416ea10547cdff89aba029582fc9a923bc6b0fa64",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/corrections.patch": "2f9d83346e8b0f7b98b1d51608872a9e73afc7d0f02f78f1161f7b8737019a50",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/regression-probe.ts": "862d389d1c7cdff952196a08044cabc745b21e17a2672d38b0ffa626d078fe12",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/regression-before.json": "286bd842292a4f1235525c67ff0f0491355180d1b7f9192b4d014b568558251d",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/regression-after.json": "a35edf6379c4ef9f34322041e79332943aca51e49b93bf5861d05d1ce3d4213e",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/routing-tests.json": "70a2b279a3f0501a0e4608146f72b0c50ac71b781e6cb38573f0a23cadcfd048",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/typecheck.json": "59d5a6eed3b5d8df7e7d51ef48afc9adecfebb2f70749ffbe73b4999dde8f7db",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/install-command.json": "a7df29939ec459eee08b69d340db1626149755028c62c67d97fa89680e817a15",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/fresh-install.json": "367ccb547a529c4b8bdcb6f5fb3d745350dfd09956da61cab4a33cec39adc678",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/fixture-evidence.jsonl": "09f4300f809563ea7e6382426e72295b772e10e9b8205dd7dec452ad1c7b4bd3",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-corrections/verification.json": "7149bf8d08cebf4e96171afebc687ba62dd355e25e501cf7a20f8e7cdd4eb4b4",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-wiring/README.md": "478daf82a5716cf16fe25c2ba90ae77a4aeb152c108b2e740edec393a455a5b6",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-wiring/review/README.md": "c2ab8d806dc0ec601f4be90720acd4957e343978b15e647b66642d23bfaea5d1",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-wiring/source-tested.json": "12bdb3e38c2fe5ea9b692644e80e3abade2beeb34b19de4c9d31a763ba28c5b3",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-wiring/fixture-evidence.jsonl": "95d35cea1619445170747f94c975b5958f1feb3d4368f2e734038f38944bc484",
+    "jev-experiments/release-implementation-2026-09-22/routing-classifier-wiring/fresh-install.json": "38c395deec399287208a7c03857377c665fecca28cddab23ed156a35a31fb7ac",
+    "jev-experiments/release-implementation-2026-09-22/routing-comparison-current/evidence.json": "90f2cd82849e954da489b847ade301300363759e11f43330fc703e14111c7050",
+    "jev-experiments/release-implementation-2026-09-22/routing-comparison-current/PROPOSED-CONDITION.md": "ecb355054fb67444b4604921cf8137ac8cc7da4482d7513de34fcd17b0192a1b"
+  }
+}

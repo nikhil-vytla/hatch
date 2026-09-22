@@ -71,7 +71,7 @@ test("MCP unsupported task and question return explicit errors without a provide
         name: "decide",
         arguments: {
           request: {
-            schemaVersion: "1",
+            schemaVersion: "2",
             requestId: "x",
             state: "image",
             questions: [{ id: "q", kind: "image", prompt: "inspect" }],
@@ -84,8 +84,9 @@ test("MCP unsupported task and question return explicit errors without a provide
     "unavailable",
   );
   expect(replies.find((r) => r.id === 2).result.structuredContent.status).toBe(
-    "unsupported",
+    "error",
   );
+  expect(replies.find((r) => r.id === 2).result.structuredContent.issues[0].code).toBe("invalid_question");
 });
 test("an unwritable optional audit does not kill MCP discovery or ping", async () => {
   const process = Bun.spawn(["bun", serverPath], {

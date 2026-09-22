@@ -1,4 +1,4 @@
-import type { Adapter } from "../runtime/contract";
+import type { Adapter, DecisionResponse } from "../runtime/contract";
 import { decide as checkedDecide } from "../runtime/execute";
 import type { Classification, Task, TaskCategory } from "./types";
 const categories: TaskCategory[] = [
@@ -8,11 +8,18 @@ const categories: TaskCategory[] = [
   "writing",
   "other",
 ];
+export class DecisionClassifierError extends Error {
+  constructor(public response: DecisionResponse, public source: "hosted" | "local") {
+    super(`Classifier ${response.status}: ${response.issues.map(issue => `${issue.code}: ${issue.message}`).join(" ")}`);
+  }
+}
 /** Every decision adapter uses the same questions; category and difficulty affect only soft ranking. */
 export function createDecisionClassifier(
   adapter: Adapter,
   accounting: { costUsd?: number | null; maximumCostUsd?: number } = {},
 ) {
+  if (accounting.costUsd !== undefined && accounting.costUsd !== null &&
+    (!Number.isFinite(accounting.costUsd) || accounting.costUsd < 0)) throw Error("Configured classifier cost must be a nonnegative estimate.");
   const source = adapter.identity.local
     ? ("local" as const)
     : ("hosted" as const);
@@ -21,6 +28,9 @@ export function createDecisionClassifier(
       source,
       local: adapter.identity.local,
       model: adapter.identity.model,
+      adapter: adapter.identity.adapter,
+      ...(adapter.identity.revision === undefined ? {} : {revision: adapter.identity.revision}),
+      ...(adapter.modelResolution ? {modelResolution: adapter.modelResolution} : {}),
     },
     classifierMaxCostUsd: accounting.maximumCostUsd,
     classifier: async (
@@ -30,7 +40,7 @@ export function createDecisionClassifier(
       const result = await checkedDecide(
         adapter,
         {
-          schemaVersion: "1",
+          schemaVersion: "2",
           requestId: `${task.id}-classification`,
           state: { prompt: task.prompt, context: task.context },
           questions: [
@@ -57,9 +67,7 @@ export function createDecisionClassifier(
         { signal },
       );
       if (result.status !== "ok")
-        throw Error(
-          `Classifier ${result.status}: ${result.issues.map((i) => i.code).join(", ")}`,
-        );
+        throw new DecisionClassifierError(result, source);
       const category = result.decisions.find(
           (d) => d.questionId === "category",
         )!,
@@ -69,20 +77,28 @@ export function createDecisionClassifier(
       return {
         source,
         category: category.selected as TaskCategory,
-        difficulty: Number(difficulty.selected),
+        difficulty: difficulty.expected!,
         confidence: Math.max(
           ...category.distribution.map((p) => p.probability),
         ),
         latencyMs: result.timing.totalMs,
-        costUsd: accounting.costUsd ?? null,
+        costUsd: result.costUsd ?? null,
+        ...(accounting.costUsd === undefined ? {} : {estimatedCostUsd: accounting.costUsd}),
+        ...(result.accounting ? {accounting: result.accounting} : {}),
         evidence:
-          "Version 1 shared typed category/difficulty questions. Confidence is adapter output; calibration has not been established on routing tasks.",
+          "Version 2 shared typed category/difficulty questions. Difficulty is the distribution's expected score. Confidence is maximum category probability; calibration has not been established on routing tasks.",
         execution: {
           source,
           local: adapter.identity.local,
           model: result.execution.model,
+          adapter: result.execution.adapter,
+          ...(result.execution.revision === undefined ? {} : {revision: result.execution.revision}),
+          ...(result.execution.requestedModel ? {requestedModel: result.execution.requestedModel} : {}),
+          ...(result.execution.modelSource ? {modelSource: result.execution.modelSource} : {}),
         },
         status: "ok",
+        decisionStatus: result.status,
+        issues: [],
       };
     },
   };
