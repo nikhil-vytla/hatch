@@ -1,0 +1,16 @@
+{
+  "condition": "Selected original independent correction evidence preserved byte-for-byte. These working-tree checks predate this source PR and are not a new run. The independent suite is archived here, not included in automatic test discovery.",
+  "originalDirectory": "jev-experiments/release-implementation-2026-09-22/routing-classifier-wiring-independent-review",
+  "files": {
+    "source-after.json": "bc26499ad192e9abe4363a136f1c1f230fead891b3fbbd44c36325df2548ce1e",
+    "baseline-provenance.json": "16e9537de6b8463e9ab11feb0880d030a2723689ab8bf46ddd1580d2349312ed",
+    "evidence-review.json": "4a3da968d0833da576a9cfc9092d4c1426b30ba7504d18f5b11f6008e7e04585",
+    "correction-boundaries.test.ts": "7af046cba53ff535c0c8683ea8310fc2df271e3a6a85817846e1f0964bf36b00",
+    "before/result.json": "a3fee7f8df263ccdf1fb6aa57a2264ac87ff97993a2fb4c8d8327b42ac0201e9",
+    "before/bun-test.log": "a8f59e6da2d1cfcdb8b3b858c2a9e80aad9b3888a0b23a88f32d204f21bd6a33",
+    "before/observations.json": "f640938ac63f6484543526fd57a3dba258775a0f0e131cf0d99d8362e055a6fa",
+    "after/result.json": "c8579963522041996d3a45428d2034b1e963d74f917a2060f16473bafa28eaaf",
+    "after/bun-test.log": "982aa42c2f1d180a0f57a1f34c1f6044d362c16f8f9096243682da08947bd347",
+    "after/observations.json": "36c9e5865d316926555d952b36941c5b340d1ecb6fa73fe4361e1482ee20a0e5"
+  }
+}

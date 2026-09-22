@@ -1,0 +1,1703 @@
+{
+  "condition": "Authored adapters and executor; no model inference or provider transport.",
+  "unexpectedFetch": 0,
+  "observations": [
+    {
+      "executions": 1,
+      "status": "ok",
+      "classification": {
+        "source": "local",
+        "status": "ok",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 1,
+      "hasArtifact": true
+    },
+    {
+      "executions": 1,
+      "status": "ok",
+      "classification": {
+        "source": "local",
+        "status": "ok",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-b"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-b"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 1,
+      "hasArtifact": true
+    },
+    {
+      "executions": 1,
+      "status": "ok",
+      "classification": {
+        "source": "local",
+        "status": "ok",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "second-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "second-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 1,
+      "hasArtifact": true
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "different-adapter",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": 0.25,
+              "usage": {
+                "inputTokens": 11,
+                "outputTokens": 3,
+                "totalTokens": 14
+              }
+            }
+          ],
+          "costUsd": 0.375,
+          "usage": {
+            "inputTokens": 20
+          }
+        },
+        "costUsd": 0.375
+      },
+      "totalCostUsd": 0.375,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "different-revision"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": 0.25,
+              "usage": {
+                "inputTokens": 11,
+                "outputTokens": 3,
+                "totalTokens": 14
+              }
+            }
+          ],
+          "costUsd": 0.375,
+          "usage": {
+            "inputTokens": 20
+          }
+        },
+        "costUsd": 0.375
+      },
+      "totalCostUsd": 0.375,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": 0.25,
+              "usage": {
+                "inputTokens": 11,
+                "outputTokens": 3,
+                "totalTokens": 14
+              }
+            }
+          ],
+          "costUsd": 0.375,
+          "usage": {
+            "inputTokens": 20
+          }
+        },
+        "costUsd": 0.375
+      },
+      "totalCostUsd": 0.375,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": 0.25,
+              "usage": {
+                "inputTokens": 11,
+                "outputTokens": 3,
+                "totalTokens": 14
+              }
+            }
+          ],
+          "costUsd": 0.375,
+          "usage": {
+            "inputTokens": 20
+          }
+        },
+        "costUsd": 0.375
+      },
+      "totalCostUsd": 0.375,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "different-adapter",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "different-revision"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "error",
+        "issues": [
+          {
+            "code": "identity_mismatch",
+            "message": "The returned destination does not match the configured runtime."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "error",
+        "issues": [
+          {
+            "code": "identity_mismatch",
+            "message": "The returned destination does not match the configured runtime."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "authored_limit",
+            "message": "Fixture accepts 768 units; supplied input has 769.",
+            "questionIds": [
+              "category",
+              "difficulty"
+            ]
+          },
+          {
+            "code": "authored_detail",
+            "message": "Second complete explanation.",
+            "questionIds": []
+          },
+          {
+            "code": "authored_global",
+            "message": "A request-wide explanation."
+          }
+        ],
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "authored_limit",
+            "message": "Fixture accepts 768 units; supplied input has 769.",
+            "questionIds": [
+              "category",
+              "difficulty"
+            ]
+          },
+          {
+            "code": "authored_detail",
+            "message": "Second complete explanation.",
+            "questionIds": []
+          },
+          {
+            "code": "authored_global",
+            "message": "A request-wide explanation."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": 0.25,
+              "usage": {
+                "inputTokens": 11,
+                "outputTokens": 3,
+                "totalTokens": 14
+              }
+            }
+          ],
+          "costUsd": 0.375,
+          "usage": {
+            "inputTokens": 20
+          }
+        },
+        "costUsd": 0.375
+      },
+      "totalCostUsd": 0.375,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "authored_limit",
+            "message": "Fixture accepts 768 units; supplied input has 769.",
+            "questionIds": [
+              "category",
+              "difficulty"
+            ]
+          },
+          {
+            "code": "authored_detail",
+            "message": "Second complete explanation.",
+            "questionIds": []
+          },
+          {
+            "code": "authored_global",
+            "message": "A request-wide explanation."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "error",
+        "issues": [
+          {
+            "code": "authored_limit",
+            "message": "Fixture accepts 768 units; supplied input has 769.",
+            "questionIds": [
+              "category",
+              "difficulty"
+            ]
+          },
+          {
+            "code": "authored_detail",
+            "message": "Second complete explanation.",
+            "questionIds": []
+          },
+          {
+            "code": "authored_global",
+            "message": "A request-wide explanation."
+          }
+        ],
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "error",
+        "issues": [
+          {
+            "code": "authored_limit",
+            "message": "Fixture accepts 768 units; supplied input has 769.",
+            "questionIds": [
+              "category",
+              "difficulty"
+            ]
+          },
+          {
+            "code": "authored_detail",
+            "message": "Second complete explanation.",
+            "questionIds": []
+          },
+          {
+            "code": "authored_global",
+            "message": "A request-wide explanation."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": 0.25,
+              "usage": {
+                "inputTokens": 11,
+                "outputTokens": 3,
+                "totalTokens": 14
+              }
+            }
+          ],
+          "costUsd": 0.375,
+          "usage": {
+            "inputTokens": 20
+          }
+        },
+        "costUsd": 0.375
+      },
+      "totalCostUsd": 0.375,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "error",
+        "issues": [
+          {
+            "code": "authored_limit",
+            "message": "Fixture accepts 768 units; supplied input has 769.",
+            "questionIds": [
+              "category",
+              "difficulty"
+            ]
+          },
+          {
+            "code": "authored_detail",
+            "message": "Second complete explanation.",
+            "questionIds": []
+          },
+          {
+            "code": "authored_global",
+            "message": "A request-wide explanation."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "invalid_classifier_issues",
+            "message": "Classifier refusal contained malformed issue metadata."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "invalid_classifier_issues",
+            "message": "Classifier refusal contained malformed issue metadata."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "invalid_classifier_issues",
+            "message": "Classifier refusal contained malformed issue metadata."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "invalid_classifier_issues",
+            "message": "Classifier refusal contained malformed issue metadata."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "error",
+        "issues": [
+          {
+            "code": "runtime_error",
+            "message": "Authored failure after accounting observation."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "cancelled",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "cancelled",
+        "issues": [
+          {
+            "code": "cancelled",
+            "message": "Authored failure after accounting observation."
+          }
+        ],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "unselected-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "ok",
+        "issues": [],
+        "accounting": {
+          "scope": "outbound-http-attempts",
+          "providerAttempts": "unknown",
+          "attempts": [
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 1,
+              "status": 503,
+              "costUsd": 0.125,
+              "usage": {
+                "inputTokens": 9
+              }
+            },
+            {
+              "requestMs": 2,
+              "requestedModel": "authored-model",
+              "model": "authored-model",
+              "modelSource": "configured-unverified",
+              "accountingScope": "gateway-response",
+              "providerAttempts": "unknown",
+              "issues": [],
+              "attempt": 2,
+              "status": 200,
+              "costUsd": null,
+              "usage": null
+            }
+          ],
+          "costUsd": null,
+          "usage": null
+        },
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    },
+    {
+      "executions": 0,
+      "status": "error",
+      "classification": {
+        "source": "local",
+        "status": "error",
+        "execution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "declaredExecution": {
+          "source": "local",
+          "local": true,
+          "model": "authored-model",
+          "adapter": "independent-local",
+          "revision": "authored-revision-a"
+        },
+        "decisionStatus": "unsupported",
+        "issues": [
+          {
+            "code": "authored_limit",
+            "message": "Input is unsupported."
+          }
+        ],
+        "costUsd": null
+      },
+      "totalCostUsd": null,
+      "destinationAttempts": 0,
+      "hasArtifact": false
+    }
+  ]
+}

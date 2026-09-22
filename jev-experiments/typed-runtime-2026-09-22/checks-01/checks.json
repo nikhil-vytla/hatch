@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "commit": "f567926d983f8f2704a0fca2e71e585df8cb5fee",
+  "tree": "8fe2923c060efa04bcf328952a7ef9771bb83a46",
+  "archiveSha256": "aac79fefbfeee04aaf92c2fb9a0e8ff86aea6bc156124af0349dc53d4741ccc8",
+  "condition": "Exact Git archive, empty source directory, app frozen install/build before any sibling install; authored provider-free fixtures only.",
+  "checks": [
+    {
+      "name": "bun-version",
+      "command": [
+        "bun",
+        "--version"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.266,
+      "output": "1.3.14"
+    },
+    {
+      "name": "app-frozen-install",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 209.054,
+      "output": "+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ @types/three@0.186.0\n+ @vitejs/plugin-react@5.2.0\n+ tailwindcss@4.3.3\n+ typescript@5.9.3\n+ vite@7.3.6\n+ @fal-ai/client@1.10.1\n+ @json-render/core@0.21.0\n+ @json-render/react@0.21.0\n+ @json-render/shadcn@0.21.0\n+ @msgpack/msgpack@3.1.3\n+ @tanstack/react-table@8.21.3\n+ @tonejs/midi@2.0.28\n+ @xyflow/react@12.11.6\n+ lucide-react@0.577.0\n+ motion@12.43.0\n+ react@19.2.4\n+ react-dom@19.2.4\n+ three@0.186.0\n+ tone@15.1.22\n+ zod@4.6.5\n\n216 packages installed [208.79s]"
+    },
+    {
+      "name": "app-build-before-siblings",
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "cwd": "jev-experiments/experience-prototypes",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 18.251,
+      "output": "dist/assets/use-reduced-motion-DtEEzZIq.js       0.14 kB \u2502 gzip:   0.14 kB\ndist/assets/arrow-down-RNpAbr60.js               0.17 kB \u2502 gzip:   0.16 kB\ndist/assets/rotate-ccw-OiA0bkiv.js               0.20 kB \u2502 gzip:   0.19 kB\ndist/assets/rotate-cw-DTGUu1CQ.js                0.20 kB \u2502 gzip:   0.19 kB\ndist/assets/volume-2-D8Vf43hy.js                 0.39 kB \u2502 gzip:   0.27 kB\ndist/assets/sliders-horizontal-DqBy4DeM.js       0.43 kB \u2502 gzip:   0.24 kB\ndist/assets/tetris-experience-zX5mSuWr.js        1.44 kB \u2502 gzip:   0.71 kB\ndist/assets/live-world-preview-DtAb2VkI.js      10.35 kB \u2502 gzip:   3.90 kB\ndist/assets/icon-studio-C7Xif8VQ.js             14.78 kB \u2502 gzip:   6.01 kB\ndist/assets/render-DVdaha4w.js                  21.50 kB \u2502 gzip:   9.04 kB\ndist/assets/judgment-reliability-ClPDUc1n.js    22.64 kB \u2502 gzip:   7.40 kB\ndist/assets/visual-search-CtMGKMXo.js           23.78 kB \u2502 gzip:   9.07 kB\ndist/assets/outcome-framing-BHa4lsi4.js         29.63 kB \u2502 gzip:  10.96 kB\ndist/assets/live-tetris-DOC7Ii9u.js             30.34 kB \u2502 gzip:  10.91 kB\ndist/assets/Midi-C3-25NK-.js                    32.74 kB \u2502 gzip:   9.94 kB\ndist/assets/music-arranger-Di9F7g6E.js          37.94 kB \u2502 gzip:  14.01 kB\ndist/assets/cafe-jev-CY1k3OuH.js                38.03 kB \u2502 gzip:  13.15 kB\ndist/assets/ghost-brush-B7aWI1Dw.js             50.58 kB \u2502 gzip:  13.61 kB\ndist/assets/wardrobe-BpuMet7I.js                63.03 kB \u2502 gzip:  21.58 kB\ndist/assets/live-crowd-CAlTv0kU.js              85.43 kB \u2502 gzip:  14.84 kB\ndist/assets/index-B4_z7ZI7.js                  340.35 kB \u2502 gzip:  81.17 kB\ndist/assets/arcade-CTgrropR.js                 569.45 kB \u2502 gzip: 145.04 kB\ndist/assets/index-C_lGUU-A.js                  853.29 kB \u2502 gzip: 271.55 kB\n\u2713 built in 2.38s",
+      "siblingDependenciesAbsent": true
+    },
+    {
+      "name": "adapter-frozen-install",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/adapters/typescript",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 1.431,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ typescript@5.9.3\n+ zod@4.6.5\n\n6 packages installed [1390.00ms]"
+    },
+    {
+      "name": "toolkit-frozen-install",
+      "command": [
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.015,
+      "output": "bun install v1.3.14 (0d9b296a)\n\n+ @types/bun@1.4.2\n+ @types/react@19.3.0\n+ @types/react-dom@19.3.0\n+ typescript@5.9.3\n+ react@19.2.4\n+ react-dom@19.2.4\n\n11 packages installed [8.00ms]"
+    },
+    {
+      "name": "adapter-typecheck",
+      "command": [
+        "bun",
+        "x",
+        "--no-install",
+        "tsc",
+        "--noEmit"
+      ],
+      "cwd": "jev-experiments/adapters/typescript",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 3.609,
+      "output": ""
+    },
+    {
+      "name": "toolkit-typecheck",
+      "command": [
+        "bun",
+        "run",
+        "check"
+      ],
+      "cwd": "jev-experiments/roadmap",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 1.161,
+      "output": "$ tsc --noEmit"
+    },
+    {
+      "name": "native-runtime-toolkit-tests",
+      "command": [
+        "bun",
+        "test",
+        "jev-experiments/packages/decision-runtime",
+        "jev-experiments/roadmap/runtime",
+        "jev-experiments/roadmap/routing",
+        "jev-experiments/adapters/typescript/index.test.ts",
+        "jev-experiments/gateway-accounting-2026-09-22"
+      ],
+      "cwd": ".",
+      "exitCode": 1,
+      "passed": false,
+      "timeout": false,
+      "seconds": 10.707,
+      "output": "      at /private<temporary-source>/jev-experiments/gateway-accounting-2026-09-22/independent-review-v3/correction-boundaries.test.ts:6:18\n-------------------------------\n\n\njev-experiments/adapters/typescript/index.test.ts:\n(pass) validates typed values while preserving distributions [2.30ms]\n(pass) rejects unsupported extraction and optional fields before transport [0.62ms]\n(pass) rejects wrong types, invalid values and malformed distributions [0.63ms]\n(pass) supports nested schema references and refuses cycles [0.14ms]\n(pass) annotations preserve structured instructions, criteria and two-level Score semantics [0.17ms]\n(pass) unknown, mismatched and excessive annotations fail before transport [0.12ms]\n(pass) native Noul probability maps must agree with the scalar [0.06ms]\n\njev-experiments/packages/decision-runtime/src/native.test.ts:\n(pass) JSON transport rejects lossy values without invoking accessors [0.10ms]\n(pass) native structure supports all entry shapes while enforcing documented Score limits [0.09ms]\n\n2 tests failed:\n\n 141 pass\n 2 fail\n 2 errors\n 1711 expect() calls\nRan 143 tests across 23 files. [10.69s]"
+    },
+    {
+      "name": "python-local-contract-tests",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "jev-experiments/roadmap/mac",
+        "-p",
+        "test_*.py"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.16,
+      "output": "....................\n----------------------------------------------------------------------\nRan 20 tests in 0.073s\n\nOK"
+    },
+    {
+      "name": "fresh-installed-cli-mcp",
+      "command": [
+        "python3",
+        "jev-experiments/roadmap/routing/fresh_install.py",
+        "--output",
+        "<temporary-source>/installed.json"
+      ],
+      "cwd": ".",
+      "exitCode": 0,
+      "passed": true,
+      "timeout": false,
+      "seconds": 0.756,
+      "output": "{\n  \"passed\": true,\n  \"bundleBytes\": 136647,\n  \"bundleSha256\": \"ca748f8365429ca13a7480f712491902cb53e3317afbb9ba08ebee0cffd80aba\",\n  \"mailUnchanged\": true,\n  \"uninstalled\": true\n}"
+    }
+  ],
+  "limits": "No model inference, MLX installation, quality, performance, billing, GitHub CI or deployment claim. Duration is diagnostic check wall time.",
+  "sourceManifestSha256": "56886f29b3e045434db9e3e93047f615ca6cc93320b589740b66f67b68944f03",
+  "sourceUnchanged": false,
+  "changedSourcePaths": [
+    "jev-experiments/visual-search/results.jsonl"
+  ],
+  "passed": false,
+  "artifacts": {
+    "classifier-fixtures.jsonl": "40ea62ac602b84d53a49366683575e6b77a469b91af1070346ef3cd27d1b9c26",
+    "installed.json": "a87bd177e519090dd5afe9167f873d1df18ce9e13331b2733506d87124182cf6",
+    "source.json": "56886f29b3e045434db9e3e93047f615ca6cc93320b589740b66f67b68944f03"
+  }
+}
