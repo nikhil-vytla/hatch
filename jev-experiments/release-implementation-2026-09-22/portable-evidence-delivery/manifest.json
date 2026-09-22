@@ -1,0 +1,53 @@
+{
+  "sourceCommit": "3f34e6f0eaed348ece41e41ba13727d9ec64c3c5",
+  "base": "c32e5a69012c30c882485a58c36f81612215ad00",
+  "files": {
+    "NOTES.md": {
+      "sha256": "74873390f4d19a1dec039ea799409e61afd807e684d09c50de50a89d4d66ec54",
+      "bytes": 2836
+    },
+    "README.md": {
+      "sha256": "8faebfa8e5efa92a6498ba7cc9419e80ac3a5b63659a2ced9b18a98d859ad3f3",
+      "bytes": 3143
+    },
+    "_summary.md": {
+      "sha256": "80b3b63aca20d439ea6bdd11eb314212abc4b8f01bb14712a7ed40cb6d4da8c9",
+      "bytes": 591
+    },
+    "candidate.json": {
+      "sha256": "5a3aedf0e2966d6d3af8440a79033ed6b34ad6f42cf1d87f9f87a92b7fd07fa8",
+      "bytes": 449
+    },
+    "implementation.patch": {
+      "sha256": "312ebcfb1f8bb21039712b961137bc1423b5481823b41fb2e2fb2ffcf925226d",
+      "bytes": 101419
+    },
+    "lineage.json": {
+      "sha256": "7c5bb914942ac3ad9c44cab319f144641b36cc7be25e7927aa857d9f4d9dbecc",
+      "bytes": 27466
+    },
+    "prepare_candidate.py": {
+      "sha256": "8dbdf082a1e4a2dfa8d0f4e4feecc2723314ff889d5967472840a096d25cb29e",
+      "bytes": 7914
+    },
+    "selection.json": {
+      "sha256": "403a50b1ea7bad76c09af8540a3d346dc47b65936b7796e9dcef13170f85af6b",
+      "bytes": 36426
+    },
+    "verification-first.json": {
+      "sha256": "41d79a7aa0ef41a11a00664f819712875015983544673a3c1b1cc2787f85f7b4",
+      "bytes": 27392
+    },
+    "verify_candidate.py": {
+      "sha256": "83bcaf3021d6ababf3613d8c725b12939844cffc45baf095d68a245ae17dd0aa",
+      "bytes": 7884
+    },
+    "verify_lineage.py": {
+      "sha256": "a03ae5d750465998e1ad4bdcd0bbe6af50b15972f3b6280ab262da2a2595d028",
+      "bytes": 7188
+    }
+  },
+  "aggregateSha256": "074765df1deb1572423f93d4fa5f9a1e67dc98306dc089b04ac2fead0e398e4f",
+  "scope": "Portable retained evidence delivery only; local candidate and verification, no publication",
+  "remoteChanged": false
+}
