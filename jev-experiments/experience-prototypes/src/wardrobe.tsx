@@ -143,7 +143,10 @@ export function Wardrobe({ result }: { result: any }) {
   };
   useEffect(() => {
     mounted.current = true;
+    setBusy(false);
+    setListening(false);
     const controller = new AbortController();
+    const remote = remoteVideo.current;
     const read = (name: string) =>
       fetch(`/wardrobe/${name}`, { signal: controller.signal })
         .then((r) =>
@@ -157,11 +160,10 @@ export function Wardrobe({ result }: { result: any }) {
       read("recording.json"),
       read("spoken-pipeline.json"),
     ]).then(([spoken, control, evidence]) => {
-      if (!mounted.current) return;
-      setRecording(
-        spoken?.status === "complete" ? { ...spoken, spoken: true } : control,
-      );
-      setPipeline(evidence);
+      if (controller.signal.aborted || !mounted.current) return;
+      const prepared = spoken?.status === "complete" ? { ...spoken, spoken: true } : control;
+      if (prepared) setRecording(prepared);
+      if (evidence) setPipeline(evidence);
     });
     const hidden = () => {
       if (document.hidden) disconnect();
@@ -170,17 +172,34 @@ export function Wardrobe({ result }: { result: any }) {
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("pagehide", leave);
     return () => {
-      mounted.current = false;
       controller.abort();
-      request.current?.abort();
+      invalidate();
       ticket.current.session++;
-      recognition.current?.abort();
+      const activeRecognition = recognition.current;
+      recognition.current = null;
+      if (activeRecognition) {
+        activeRecognition.onresult = null;
+        activeRecognition.onerror = null;
+        activeRecognition.onend = null;
+        activeRecognition.abort();
+      }
+      setListening(false);
+      speaking.current = false;
       if ("speechSynthesis" in window) speechSynthesis.cancel();
+      // Activity detaches DOM refs before this passive cleanup runs.
+      remote?.pause();
+      if (remote) remote.srcObject = null;
       disconnect();
+      mounted.current = false;
       document.removeEventListener("visibilitychange", hidden);
       window.removeEventListener("pagehide", leave);
     };
   }, []);
+  useEffect(() => {
+    // The recorded player mounts after its metadata loads.
+    const video = playback.current;
+    return () => video?.pause();
+  }, [recording?.status]);
   useEffect(() => {
     speaking.current = speak;
     if (!speak && "speechSynthesis" in window) speechSynthesis.cancel();
@@ -351,18 +370,21 @@ export function Wardrobe({ result }: { result: any }) {
         editQuestions(outfitRef.current),
         controller.signal,
       );
-      if (!mounted.current || !currentTicket(sent, ticket.current)) return;
+      if (controller.signal.aborted || !mounted.current || !currentTicket(sent, ticket.current)) return;
       accept(response, command, "live-jev", commandSource);
       setText("");
     } catch (e) {
-      if (!controller.signal.aborted && mounted.current)
+      if (!controller.signal.aborted && mounted.current && currentTicket(sent, ticket.current))
         say(
           e instanceof Error
             ? e.message
             : "Jev could not interpret that change.",
         );
     } finally {
-      if (currentTicket(sent, ticket.current)) setBusy(false);
+      if (currentTicket(sent, ticket.current)) {
+        setBusy(false);
+        request.current = null;
+      }
     }
   };
   const replay = () => {
@@ -412,16 +434,22 @@ export function Wardrobe({ result }: { result: any }) {
     r.continuous = false;
     r.interimResults = false;
     r.onresult = (event: any) => {
+      if (!mounted.current || recognition.current !== r) return;
       const transcript = event.results[0][0].transcript;
       setText(transcript);
       setTranscriptSource("speech");
       say("Transcript ready. Review it, then send it to Jev.");
     };
     r.onerror = () => {
+      if (!mounted.current || recognition.current !== r) return;
       setListening(false);
       say("Speech recognition stopped. You can type your command instead.");
     };
-    r.onend = () => setListening(false);
+    r.onend = () => {
+      if (!mounted.current || recognition.current !== r) return;
+      recognition.current = null;
+      setListening(false);
+    };
     r.start();
     setListening(true);
   };
@@ -476,7 +504,7 @@ export function Wardrobe({ result }: { result: any }) {
           return data.token;
         },
         onStream: (stream) => {
-          if (epoch !== videoEpoch.current) return;
+          if (epoch !== videoEpoch.current || !mounted.current) return;
           if (remoteVideo.current) {
             remoteVideo.current.srcObject = stream;
             void remoteVideo.current.play().catch(() => {});
