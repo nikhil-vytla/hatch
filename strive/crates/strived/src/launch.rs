@@ -1,8 +1,8 @@
 //! Starting or attaching to the daemon, and replacing a stale one.
 
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions, TryLockError};
 use std::os::unix::process::CommandExt;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
@@ -13,6 +13,7 @@ use crate::client::{Client, ServerError};
 use crate::paths::{Home, build_id};
 
 const START_TIMEOUT: Duration = Duration::from_secs(5);
+const RETRY: Duration = Duration::from_millis(10);
 
 /// Connects to a running daemon without starting one.
 pub async fn attach(home: &Home, client_name: &str) -> Result<Option<(Client, InitializeResult)>> {
@@ -25,33 +26,47 @@ pub async fn attach(home: &Home, client_name: &str) -> Result<Option<(Client, In
 
 /// Returns a client connected to a current daemon, starting or replacing the
 /// daemon as needed.
+///
+/// Each pass re-reads the world instead of assuming what the last one saw:
+/// the daemon we reached may be exiting (idle, or replaced by another
+/// launcher), and a daemon we spawned may stand down because another
+/// launcher's daemon won the lock. Every such case retries until the deadline.
 pub async fn ensure(home: &Home, client_name: &str) -> Result<(Client, InitializeResult)> {
     home.ensure()?;
-    match attach(home, client_name).await {
-        Ok(Some((c, init))) if init.server.build == build_id() => return Ok((c, init)),
-        Ok(Some((mut c, init))) => {
-            crate::log!(
-                "replacing stale daemon {} (pid {})",
-                init.server.build,
-                init.server.pid
-            );
-            let _ = c.request::<DaemonShutdown>(Empty {}).await;
-            wait_until_gone(home).await?;
-        }
-        Ok(None) => {}
-        Err(e) if is_protocol_mismatch(&e) => {
-            // A daemon from an incompatible release: we can't ask it nicely.
-            bail!(
-                "a daemon speaking a different protocol is running; stop it with `strive stop` from that release, or kill it"
-            );
-        }
-        Err(e) => return Err(e),
-    }
-    spawn(home)?;
     let deadline = Instant::now() + START_TIMEOUT;
+    let mut child: Option<Child> = None;
     loop {
-        if let Some(pair) = attach(home, client_name).await.ok().flatten() {
-            return Ok(pair);
+        match attach(home, client_name).await {
+            Ok(Some((c, init))) if init.server.build == build_id() => return Ok((c, init)),
+            Ok(Some((mut c, init))) => {
+                // Stale. Ask it to go; the next pass either finds it still
+                // exiting, finds a current daemon another launcher started, or
+                // finds nothing and spawns one (which waits for the lock).
+                crate::log!(
+                    "replacing stale daemon {} (pid {})",
+                    init.server.build,
+                    init.server.pid
+                );
+                let _ = c.request::<DaemonShutdown>(Empty {}).await;
+            }
+            Ok(None) => {
+                let running = child
+                    .as_mut()
+                    .is_some_and(|c| matches!(c.try_wait(), Ok(None)));
+                if !running {
+                    child = Some(spawn(home)?);
+                }
+            }
+            Err(e) if is_protocol_mismatch(&e) => {
+                // A daemon from an incompatible release: we can't ask it nicely.
+                bail!(
+                    "a daemon speaking a different protocol is running; stop it with `strive stop` from that release, or kill it"
+                );
+            }
+            Err(e) if e.downcast_ref::<ServerError>().is_some() => return Err(e),
+            // Connected, but the daemon went away mid-handshake (idle exit or
+            // shutdown). The next pass starts a fresh one.
+            Err(_) => {}
         }
         if Instant::now() > deadline {
             bail!(
@@ -60,7 +75,7 @@ pub async fn ensure(home: &Home, client_name: &str) -> Result<(Client, Initializ
                 home.log().display()
             );
         }
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(RETRY).await;
     }
 }
 
@@ -69,7 +84,7 @@ fn is_protocol_mismatch(e: &anyhow::Error) -> bool {
         .is_some_and(|s| s.0.code == RpcError::PROTOCOL_MISMATCH)
 }
 
-fn spawn(home: &Home) -> Result<()> {
+fn spawn(home: &Home) -> Result<Child> {
     let log = OpenOptions::new()
         .create(true)
         .append(true)
@@ -82,21 +97,38 @@ fn spawn(home: &Home) -> Result<()> {
         .stderr(log)
         .process_group(0) // detach from the terminal's job control and its Ctrl+C
         .spawn()
-        .context("spawning the daemon")?;
-    Ok(())
+        .context("spawning the daemon")
 }
 
-/// Waits for a daemon to release the socket after a shutdown request.
+/// Waits for a stopped daemon to finish exiting: its socket no longer answers
+/// and it has released the lock.
 pub async fn wait_until_gone(home: &Home) -> Result<()> {
     let deadline = Instant::now() + START_TIMEOUT;
-    while home.socket().exists() || Client::connect(&home.socket()).await.is_ok() {
+    while Client::connect(&home.socket()).await.is_ok() || !lock_is_free(home) {
         if Instant::now() > deadline {
             bail!(
                 "the old daemon did not exit within {}s",
                 START_TIMEOUT.as_secs()
             );
         }
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(RETRY).await;
     }
     Ok(())
+}
+
+/// True when no daemon holds the lock. Taking it for this probe is harmless: a
+/// daemon starting at the same moment waits for it (see `server::run`).
+fn lock_is_free(home: &Home) -> bool {
+    let Ok(f) = File::options()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(home.lock())
+    else {
+        return false;
+    };
+    match f.try_lock() {
+        Ok(()) => true,
+        Err(TryLockError::WouldBlock | TryLockError::Error(_)) => false,
+    }
 }

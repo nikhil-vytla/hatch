@@ -27,6 +27,9 @@ use crate::paths::{Home, build_id};
 /// Longest accepted message line. Larger messages close the connection.
 const MAX_LINE: usize = 16 * 1024 * 1024;
 
+/// How long a new daemon waits for an exiting one to release the lock.
+const LOCK_WAIT: Duration = Duration::from_secs(5);
+
 pub struct Config {
     pub home: Home,
     pub idle_exit: Duration,
@@ -57,13 +60,26 @@ pub async fn run(cfg: Config) -> Result<Started> {
         .truncate(false)
         .write(true)
         .open(cfg.home.lock())?;
-    match lock.try_lock() {
-        Ok(()) => {}
-        Err(TryLockError::WouldBlock) => return Ok(Started::AlreadyRunning),
-        Err(TryLockError::Error(e)) => return Err(e).context("locking the daemon lock file"),
+    let socket = cfg.home.socket();
+    // A held lock means either a live daemon (its socket answers) or one that
+    // is exiting (socket already unlinked, lock not yet released). Only the
+    // first is a reason to stand down; for the second, wait for the lock.
+    let deadline = Instant::now() + LOCK_WAIT;
+    loop {
+        match lock.try_lock() {
+            Ok(()) => break,
+            Err(TryLockError::WouldBlock) => {
+                if UnixStream::connect(&socket).await.is_ok() || Instant::now() > deadline {
+                    return Ok(Started::AlreadyRunning);
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Err(TryLockError::Error(e)) => {
+                return Err(e).context("locking the daemon lock file");
+            }
+        }
     }
 
-    let socket = cfg.home.socket();
     let _ = fs::remove_file(&socket); // stale from a crash; we hold the lock
     let listener =
         UnixListener::bind(&socket).with_context(|| format!("binding {}", socket.display()))?;
@@ -94,6 +110,10 @@ pub async fn run(cfg: Config) -> Result<Started> {
     let mut tick = tokio::time::interval(Duration::from_millis(500));
     loop {
         tokio::select! {
+            // Accept before anything else, so a connection already queued never
+            // loses to the idle timer. A client that arrives after the socket is
+            // unlinked below finds nothing and starts a new daemon.
+            biased;
             accepted = listener.accept() => match accepted {
                 Ok((stream, _)) => {
                     let state = state.clone();
@@ -120,7 +140,10 @@ pub async fn run(cfg: Config) -> Result<Started> {
             }
         }
     }
+    // Unlink first so no new client can reach this daemon, then release the
+    // lock so a successor (waiting in the loop above) can start.
     let _ = fs::remove_file(&socket);
+    drop(listener);
     drop(lock);
     Ok(Started::Served)
 }

@@ -186,6 +186,101 @@ fn replaces_a_stale_daemon_from_another_build() {
     );
 }
 
+/// Race: a daemon that is exiting has unlinked its socket but still holds the
+/// lock. A successor started in that window must wait for the lock, not stand
+/// down and leave the launcher with no daemon.
+#[test]
+fn stop_then_start_hands_off_cleanly() {
+    let env = Env::new();
+    for _ in 0..10 {
+        let before = pid(&env.status());
+        assert!(env.strive(&["stop"]).status.success());
+        let after = pid(&env.status());
+        assert_ne!(before, after);
+    }
+}
+
+/// Race: several launchers of a newer build find the same stale daemon at
+/// once. Each asks it to exit and races to start a replacement; all must end
+/// up on one current daemon.
+#[test]
+fn concurrent_launchers_replace_a_stale_daemon_once() {
+    let env = Env::new();
+    let old = env.home.path().join("old-strive");
+    for _ in 0..5 {
+        std::fs::copy(&env.exe, &old).unwrap();
+        let stale = env.cmd(&old, &["status", "--json"]);
+        assert!(stale.status.success());
+        let children: Vec<_> = (0..6)
+            .map(|_| {
+                Command::new(&env.exe)
+                    .args(["status", "--json"])
+                    .env("STRIVE_HOME", env.home.path())
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped())
+                    .spawn()
+                    .unwrap()
+            })
+            .collect();
+        let pids: std::collections::BTreeSet<u64> = children
+            .into_iter()
+            .map(|c| {
+                let out = c.wait_with_output().unwrap();
+                assert!(
+                    out.status.success(),
+                    "launcher failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                pid(&serde_json::from_slice(&out.stdout).unwrap())
+            })
+            .collect();
+        assert_eq!(pids.len(), 1, "expected one replacement daemon: {pids:?}");
+        std::fs::remove_file(&old).unwrap();
+    }
+}
+
+/// Race: the daemon decides to exit for idleness while a launcher is
+/// connecting. The launcher must recover by starting a new daemon.
+#[test]
+fn launches_succeed_across_idle_exits() {
+    let env = Env::new();
+    let start = Instant::now();
+    let mut pids = std::collections::BTreeSet::new();
+    while start.elapsed() < Duration::from_secs(4) {
+        let out = Command::new(&env.exe)
+            .args(["status", "--json"])
+            .env("STRIVE_HOME", env.home.path())
+            .env("STRIVE_IDLE_SECS", "1")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "launch failed near an idle exit: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        pids.insert(pid(&serde_json::from_slice(&out.stdout).unwrap()));
+        std::thread::sleep(Duration::from_millis(97));
+    }
+    // With launches ~100 ms apart the daemon never idles for 1 s, so this
+    // mostly exercises the boundary; the sleep-past-idle cases follow.
+    for _ in 0..4 {
+        std::thread::sleep(Duration::from_millis(1000));
+        let out = Command::new(&env.exe)
+            .args(["status", "--json"])
+            .env("STRIVE_HOME", env.home.path())
+            .env("STRIVE_IDLE_SECS", "1")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "launch failed at the idle boundary: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        pids.insert(pid(&serde_json::from_slice(&out.stdout).unwrap()));
+    }
+    assert!(!pids.is_empty());
+}
+
 #[test]
 fn protocol_errors() {
     let env = Env::new();

@@ -27,7 +27,11 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 
 - **Ownership:** an exclusive lock on `run/strived.lock` decides which process
   is the daemon. A leftover socket from a crash is removed by the lock holder,
-  so racing starts produce exactly one daemon.
+  so racing starts produce exactly one daemon. An exiting daemon unlinks its
+  socket before releasing the lock. A successor that finds the lock held but
+  the socket silent waits for it instead of standing down, and the launcher
+  retries every outcome (a daemon exiting mid-handshake, a lost lock race)
+  until its deadline.
 - **Staleness:** `initialize` returns a build id (version plus the binary's
   inode, size and mtime). When it differs from the caller's own, the caller
   asks the old daemon to shut down and starts a new one.
