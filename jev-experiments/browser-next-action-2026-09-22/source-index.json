@@ -1,0 +1,39 @@
+{
+  "retrieved_on": "2026-09-22",
+  "sources": [
+    {
+      "id": "composite-next-action",
+      "url": "https://research.composite.com/next-action",
+      "title": "Pushing the Capabilities of Computer Use Agents with Intent Detection",
+      "credit": "Composite Engineering Team",
+      "published_on": "2026-09-21",
+      "sha256": "542de1822eb94e0f4ce337908e9f5269f05869f4c2ee92a26dd28adff47be01b",
+      "bytes": 43644,
+      "analysis": "composite-analysis.md",
+      "reuse": "Linked and summarized; no code, weights, dataset or full article copied. No release links found in article anchors."
+    },
+    {
+      "id": "selectivenet",
+      "url": "https://proceedings.mlr.press/v97/geifman19a.html",
+      "title": "SelectiveNet: A Deep Neural Network with an Integrated Reject Option",
+      "credit": "Yonatan Geifman and Ran El-Yaniv",
+      "published_year": 2019,
+      "sha256": "fa4c768eeeb4998ca977abfd6ae7836a50f62d02675b9b5f2dda607ea2dbcb18",
+      "bytes": 14071,
+      "reuse": "Primary research reference for learned rejection; no code or paper copied."
+    },
+    {
+      "id": "mind2web",
+      "url": "https://github.com/OSU-NLP-Group/Mind2Web",
+      "inspected_url": "https://raw.githubusercontent.com/OSU-NLP-Group/Mind2Web/33bd95caeee7bba22dd08ecc935845e15c5e5dc7/README.md",
+      "title": "Mind2Web: Towards a Generalist Agent for the Web",
+      "credit": "OSU NLP Group and the Mind2Web paper authors",
+      "revision": "33bd95caeee7bba22dd08ecc935845e15c5e5dc7",
+      "sha256": "157dbd840264ea29f958c0b7383d63783845c573b3e19a1f39b773be22e0b32d",
+      "bytes": 17760,
+      "license_observation": "README states CC BY 4.0 for data and MIT for code, and asks not to redistribute unzipped test data online.",
+      "reuse": "Read-only source inspection. Any future instruction-removed evaluation needs a derivative label and separate ambiguity/abstention labels. No dataset downloaded."
+    }
+  ],
+  "hash_scope": "Hashes identify retrieved source bytes. They do not attest model quality or grant reuse rights. Remote pages may change."
+}
