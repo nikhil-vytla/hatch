@@ -99,7 +99,9 @@ def test_noul_boundaries_and_pydantic_validation():
         with pytest.raises(ValueError):
             normalize({"answers": {"x": {"type": "noul", "noul": value}}}, {"x": noul("True?")})
     answers = {
-        "area": {"type": "choice", "value": "billing"},
+        "area": {"type": "choice", "value": "billing", "probabilities": {
+            "billing": 1.0, "technical": 0.0, "account": 0.0, "other": 0.0,
+        }},
         "refund": {"type": "noul", "value": 0.5},
         "missing_context": {"type": "noul", "value": 0.2},
     }
