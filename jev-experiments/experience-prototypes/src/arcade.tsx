@@ -348,9 +348,16 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
     setError("");
   }
   useEffect(
-    () => () => {
-      abort.current?.abort();
-      epoch.current++;
+    () => {
+      setBusy(false);
+      setPlaying(false);
+      return () => {
+        epoch.current++;
+        abort.current?.abort();
+        abort.current = null;
+        setBusy(false);
+        setPlaying(false);
+      };
     },
     [],
   );
@@ -385,18 +392,20 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
       setPlaying(false);
       return;
     }
-    const generation = epoch.current;
+    const generation = ++epoch.current;
     const current = latest.current;
     setBusy(true);
     setError("");
-    abort.current = new AbortController();
+    const controller = new AbortController();
+    abort.current?.abort();
+    abort.current = controller;
     try {
       const r = await run(
         { policy: "Play the game described in the independent question." },
         { action: question(current) },
-        abort.current.signal,
+        controller.signal,
       );
-      if (generation !== epoch.current) return;
+      if (generation !== epoch.current || controller.signal.aborted) return;
       const a = r.answers.action;
       setLiveRows((rows) => {
         setIndex(rows.length);
@@ -413,12 +422,15 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
       });
       setLocal(advance(current, a.value));
     } catch (e) {
-      if (generation === epoch.current) {
+      if (generation === epoch.current && !controller.signal.aborted) {
         setError(e instanceof Error ? e.message : String(e));
         setPlaying(false);
       }
     } finally {
-      if (generation === epoch.current) setBusy(false);
+      if (generation === epoch.current) {
+        setBusy(false);
+        abort.current = null;
+      }
     }
   }
   useEffect(() => {

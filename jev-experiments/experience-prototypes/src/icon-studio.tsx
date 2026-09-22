@@ -34,11 +34,15 @@ export function IconStudio({ result }: { result: any }) {
     const abort = new AbortController();
     fetch("/icon-studio/collection.json", { signal: abort.signal }).then(r => { if (!r.ok) throw Error("The icon collection could not load."); return r.json(); }).then(data => {
       if (data.sha256 !== result.library.sha256) throw Error("The recorded choices and current icon library differ. Rebuild the collection before comparing them.");
-      setLibrary(data);
+      if (!abort.signal.aborted) setLibrary(data);
     }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
-    return () => { abort.abort(); controller.current?.abort(); generation.current++; };
+    return () => abort.abort();
   }, [result.library.sha256]);
-  function stop(message = "Stopped. A partial tournament is not presented as a final choice.") { generation.current++; controller.current?.abort(); setBusy(false); setNotice(message); }
+  useEffect(() => {
+    setBusy(false);
+    return () => { generation.current++; controller.current?.abort(); controller.current = null; setBusy(false); };
+  }, [result.library.sha256]);
+  function stop(message = "Stopped. A partial tournament is not presented as a final choice.") { generation.current++; controller.current?.abort(); controller.current = null; setBusy(false); setNotice(message); }
   function change(nextTitle: string, nextContext: string) { stop(""); setTitle(nextTitle); setContext(nextContext); setLive(null); setSelected(""); setError(""); setProgress(0); setLimit(48); }
   async function match() {
     if (!getApiKey()) { setError("Connect your own Gateway key using Connect live, then find an icon. The key stays in memory."); return; }
@@ -50,18 +54,18 @@ export function IconStudio({ result }: { result: any }) {
       for (let start = 0; start < groups.length; start += 8) {
         const questions = Object.fromEntries(groups.slice(start, start + 8).map((g, i) => ["shard_" + (start + i), shardQuestion(g)]));
         const output = await run(state, questions, abort.signal);
-        if (tag !== generation.current) return;
+        if (tag !== generation.current || abort.signal.aborted) return;
         Object.assign(answers, output.answers); calls.push({ state, questions, output }); setProgress(Math.min(start + 8, groups.length));
       }
       const winners = finalists(groups, answers), questions = { icon: finalQuestion(winners) };
       const output = winners.length ? await run(state, questions, abort.signal) : null;
-      if (tag !== generation.current) return;
+      if (tag !== generation.current || abort.signal.aborted) return;
       if (output) calls.push({ state, questions, output });
       const answer = output?.answers.icon, picked = answer?.value ?? "none";
       if (picked !== "none" && !winners.some(i => i.id === picked)) throw Error("The final answer is outside the candidate set.");
       setLive({ title, context, status: "complete", finalists: winners.map(i => i.id), shardAnswers: answers, answer, picked, calls, elapsed_ms: performance.now() - started }); setMode("finalists");
-    } catch (e) { if (tag === generation.current) setError(e instanceof Error ? e.message : String(e)); }
-    finally { if (tag === generation.current) setBusy(false); }
+    } catch (e) { if (tag === generation.current && !abort.signal.aborted) setError(e instanceof Error ? e.message : String(e)); }
+    finally { if (tag === generation.current) { setBusy(false); controller.current = null; } }
   }
   function pin(id: string) { setPinned(items => items.includes(id) ? items.filter(i => i !== id) : [...items, id]); }
   async function copy(kind: "svg" | "react") {

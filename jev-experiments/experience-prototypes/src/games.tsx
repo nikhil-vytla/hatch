@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   Play,
@@ -84,9 +84,15 @@ export function Games({ result }: { result: any }) {
   const trace = episode?.trace ?? [],
     entry = trace[step],
     state = entry?.observation ?? result.observations?.[entry?.state_id];
+  const replaySelection = useRef<string | null>(null);
   useEffect(() => {
-    setStep(0);
+    const selection = JSON.stringify([policy, env, seed]);
+    if (replaySelection.current !== selection) {
+      replaySelection.current = selection;
+      setStep(0);
+    }
   }, [policy, env, seed]);
+  useEffect(() => () => setPlaying(false), []);
   useEffect(() => {
     if (!playing || !trace.length) return;
     const timer = setInterval(
