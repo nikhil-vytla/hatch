@@ -878,7 +878,7 @@ function App() {
           <strong>jev</strong>
           <span>field notes / 002</span>
         </a>
-        <p>Original experiments. Real decisions. Plenty left to discover.</p>
+        <p>Not affiliated with or endorsed by TypeSafe AI</p>
         <a href="https://docs.typesafe.ai/introduction">TypeSafe ↗</a>
       </footer>
     </MotionConfig>
