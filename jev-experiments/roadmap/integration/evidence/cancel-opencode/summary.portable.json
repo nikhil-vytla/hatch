@@ -1,0 +1,70 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "opencode",
+  "kind": "summary",
+  "source": {
+    "sha256": "bfc4cc3458efd0494a5876ae379fa368808c3566db3b57fcbd8dc4b13b20fe02",
+    "bytes": 1589,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/command/3",
+        "originalSha256": "9ec9b48ac5920f394f1c4471c2b4b07252749308eb25ffad3d19ac46947c1c24",
+        "derivativeSha256": "5980949b134a0507a4e95ebd823ade55ee2c2f4a05c66ee4a4f439e92fee3423",
+        "bindings": [
+          {
+            "sourcePathSha256": "9ec9b48ac5920f394f1c4471c2b4b07252749308eb25ffad3d19ac46947c1c24",
+            "uri": "record://location/9ec9b48ac5920f394f1c4471",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "f1b5ba2994f7443e3b5e4f4075be5a01155f16b42e676044b690575b40d26cb4",
+  "payload": {
+    "harness": "opencode",
+    "command": [
+      "opencode",
+      "run",
+      "--dir",
+      "record://location/9ec9b48ac5920f394f1c4471",
+      "--pure",
+      "--format",
+      "json",
+      "--model",
+      "amazon-bedrock/global.anthropic.claude-fable-5-1"
+    ],
+    "invokedBeforeInterrupt": true,
+    "exitCode": -2,
+    "elapsedSeconds": 11.982958542008419,
+    "serverSawCancellation": false,
+    "serverSawDisconnect": true,
+    "cancelledToolResult": true,
+    "lateSuccessApplied": false,
+    "evidenceBoundary": "Real client interruption after actual tool invocation. Destination was a deterministic delayed loopback fixture. No file edits were permitted. Only observed protocol events are claimed.",
+    "hostExitedBeforeScheduledReply": true,
+    "delegationOccurred": false,
+    "usableDelegatedArtifacts": 0,
+    "cliVersion": "1.18.31",
+    "hostModel": {
+      "configured": "amazon-bedrock/global.anthropic.claude-fable-5-1",
+      "identityBasis": "command configuration"
+    },
+    "firstAuditTime": "2026-09-21T04:41:18.825Z",
+    "evidenceGate": {
+      "condition": "active-interruption",
+      "passed": true,
+      "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
+      "historicalFailure": false
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 7
+  }
+}

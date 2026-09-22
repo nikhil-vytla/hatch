@@ -1,0 +1,770 @@
+{
+  "base": "c32e5a69012c30c882485a58c36f81612215ad00",
+  "derivatives": [
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "claude",
+      "originalSha256": "0a7cb9b8bd84d1e70ee634a58e5f8027dbdc5ebea11bd147822b7d440c4f0e9e",
+      "derivativeSha256": "21334466cd68a488c2de4f36eb7d66e82dc9965cf05b5c3ab8e0d6cbfb463d14",
+      "recordCount": 31,
+      "editedFields": 16,
+      "unchangedScalarCounts": {
+        "numeric": 156,
+        "boolean": 9,
+        "null": 91
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/summary.portable.json",
+      "kind": "summary",
+      "harness": "claude",
+      "originalSha256": "c3681f864c992e4dd5b60138661e6416f84d23d66925b59cc111b93484ccaaaf",
+      "derivativeSha256": "2619c5ff7e2c8d46d779380ff65d5aed08d398f8f6dcf5102b9520b07db84146",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 12,
+        "boolean": 13,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-after.portable.json",
+      "kind": "text",
+      "harness": "claude",
+      "originalSha256": "00e11c9e4ad8fef5255d43a5f416bce6ddd25715252cd782733d4e239eb1b162",
+      "derivativeSha256": "ba5f8db80e1bf8b5559bafa56c16aedca622be01bc356891bc10efd439178b71",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-claude/tests-before.portable.json",
+      "kind": "text",
+      "harness": "claude",
+      "originalSha256": "7fca82180a1fe81a3fedc81350599e1fe2e00eb240d4550fa98c9cc7d7afac3c",
+      "derivativeSha256": "429d7235ddf374f1b2b92a17d2f489ea64f38f75d1c012179a4741be678f7ede",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "codex",
+      "originalSha256": "9430edb34ef9a129a7cc226ef83b690ba1e215682cd59014d889192391615a9a",
+      "derivativeSha256": "2c277f0ce6549bcde596740b88f4e073f2572fda10b63e0a56e2419e344d1004",
+      "recordCount": 17,
+      "editedFields": 5,
+      "unchangedScalarCounts": {
+        "numeric": 28,
+        "boolean": 0,
+        "null": 15
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-codex/summary.portable.json",
+      "kind": "summary",
+      "harness": "codex",
+      "originalSha256": "b0e07352418b37fc9caef2c59d7efa1293832d0666db231c745c562d68503926",
+      "derivativeSha256": "de09d77cc7b1e3ddb59b2cfedd5a0f4b61808a7a8783545c9f37c27197773650",
+      "recordCount": 1,
+      "editedFields": 3,
+      "unchangedScalarCounts": {
+        "numeric": 12,
+        "boolean": 13,
+        "null": 1
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "opencode",
+      "originalSha256": "fd6e9ae3e2c2f660f240e597a8070ef76bc734c1ed56bf6645fbc66b1c66d088",
+      "derivativeSha256": "324912667d6d43420aeb39122116ba3b47346acc6798df5fbcd0d96c0e742ca1",
+      "recordCount": 20,
+      "editedFields": 8,
+      "unchangedScalarCounts": {
+        "numeric": 83,
+        "boolean": 6,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/summary.portable.json",
+      "kind": "summary",
+      "harness": "opencode",
+      "originalSha256": "60f51c16943fe04bbf890a6db92d31e20be168090498dd6fd7ce1f1dcce9efb0",
+      "derivativeSha256": "524ce93109e34fbf84fd6a464e47d198f0d0a3c1d90194b91b317ac0381ee792",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 12,
+        "boolean": 13,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-after.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "23bccb5eab154ad4fa238bebaf3fa0bdf26ca687283ec6ce5f684a8de0962f90",
+      "derivativeSha256": "e2ad7808f51bdf6b1a5e01846169467b0798bbcda3ad034c9c33f526073dfbcb",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode-relative-paths/tests-before.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "0a9edfad2bb0685d67ecbfd5e7b2e93a24dfa131aaee20faf8701e4a0eb09c01",
+      "derivativeSha256": "261f538ac30b66dc8c7fa61761579b22b1247d655734297f71f1154daceb4d6b",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "opencode",
+      "originalSha256": "974c919d1431f5b6cb6310a6680733233c264ef4a48b5beac3ad65f7e01ef3bb",
+      "derivativeSha256": "0350ab8bd69b0b9a3c7c9a458b1695e314393a4c1f925537746cb00aa5e8c835",
+      "recordCount": 47,
+      "editedFields": 21,
+      "unchangedScalarCounts": {
+        "numeric": 181,
+        "boolean": 5,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/summary.portable.json",
+      "kind": "summary",
+      "harness": "opencode",
+      "originalSha256": "20f8e2bc8ec84c77aa4c9f6edcbc96c654a5d3afdfb6ea5bad8b39b41368ba78",
+      "derivativeSha256": "c54c2cc8c264d15005f931ad7513ed826ce8fd8e4be69dc1b8e0a3532f0bef15",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 12,
+        "boolean": 13,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-after.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "251e640df3589c39bfac6e5607dad249eaccec84c3ca903a8e67b2f0c8c76871",
+      "derivativeSha256": "3da3ecd8e3b121587b8a49f4d4bdef49f9fddfab3ef0de3865088017d9de359e",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/boundary-opencode/tests-before.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "86d3cd6fb8c8988fb74f9de19e5c240ef5eb2463b4c926abc567ec7e96963bd8",
+      "derivativeSha256": "441bf67b61cc618e4f5ba6e9f418a7abffbd008f27c9c87efd1a7cb010d74671",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "claude",
+      "originalSha256": "98185b1525949f31c27e1bafba4c00909f60b7b962e3ce2ac75e037b89db404f",
+      "derivativeSha256": "1d0b024f0885e78b89876c00ee311066abda89acb40b398eccd634fe5b0b7138",
+      "recordCount": 7,
+      "editedFields": 5,
+      "unchangedScalarCounts": {
+        "numeric": 65,
+        "boolean": 4,
+        "null": 23
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-claude/summary.portable.json",
+      "kind": "summary",
+      "harness": "claude",
+      "originalSha256": "1ddfbe621b7998af8f4fc23b9cc3671e3c86945302c8de639b17de42f9de3be7",
+      "derivativeSha256": "48260b7df220ab340fad7c440b7684b159217e593fb39acee8b0ebe47b50ea7c",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 4,
+        "boolean": 9,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "codex",
+      "originalSha256": "ea97490d5c225b556fb9475215d0bc4c6613ed0606849740e2e992c839880c7f",
+      "derivativeSha256": "e0db04377818a50e15d214f8d6db2d2c009ae0718201c891c8eb409eefbcaddf",
+      "recordCount": 4,
+      "editedFields": 0,
+      "unchangedScalarCounts": {
+        "numeric": 1,
+        "boolean": 0,
+        "null": 2
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-codex/summary.portable.json",
+      "kind": "summary",
+      "harness": "codex",
+      "originalSha256": "f322644017d80abf274162162d1f76482e1eb3f1014883feb010e0ca5247efe0",
+      "derivativeSha256": "7247ba78c4f531f8ff0e5a3d387668b0fb60e2964b30a0ec6948bbe40394f5e3",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 4,
+        "boolean": 9,
+        "null": 1
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/cancel-opencode/summary.portable.json",
+      "kind": "summary",
+      "harness": "opencode",
+      "originalSha256": "bfc4cc3458efd0494a5876ae379fa368808c3566db3b57fcbd8dc4b13b20fe02",
+      "derivativeSha256": "9113bac84e2ca65b9a89ba061a363a9a8e5bfc20f86b9215d45ea892315fa0f1",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 4,
+        "boolean": 9,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "claude",
+      "originalSha256": "996d92fd365a437464c44ad0e0ea57eaf0c3198966428842ce7cfcc80e37be75",
+      "derivativeSha256": "294aac723dfcfaf77f1d83fd3c349428259b5a324d26620c57c5eab88f09191e",
+      "recordCount": 3,
+      "editedFields": 5,
+      "unchangedScalarCounts": {
+        "numeric": 39,
+        "boolean": 4,
+        "null": 10
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/summary.portable.json",
+      "kind": "summary",
+      "harness": "claude",
+      "originalSha256": "641e495c9a7675cddee966fea7c8a9d7c7d594ecae6f514cf48ed246e63d3a14",
+      "derivativeSha256": "180773cde9db65ebf41e7297947e3d91b64355298bcf112f66a29d2ffd15fe46",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 6,
+        "boolean": 8,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-after.portable.json",
+      "kind": "text",
+      "harness": "claude",
+      "originalSha256": "7e148bc6bfb82e2a5781c18c78c626f03b859adb6d373da5a1a35c576706e16f",
+      "derivativeSha256": "370b3d90d0a65f46bb4b69bc4437d530be00f7fae4e9214234c01e9fb16856bd",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude-fable-unavailable/tests-before.portable.json",
+      "kind": "text",
+      "harness": "claude",
+      "originalSha256": "2b84e6574f5d9a03e2e0ac0a67f2fa823bf98203dd330dec27fbd8a912e25c50",
+      "derivativeSha256": "947af2bea29d5223a7667cb7d688ea33a370d0278ff2b9820a54bb0a768d38e6",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "claude",
+      "originalSha256": "aa38d8461da8d3fc210ea7d9075ff8b41d25c373ea88d301b13e66c73ccbf15a",
+      "derivativeSha256": "039e659fa1133840dd6dbd13eabf28b2b9f6d118c63786bb5cfd81ee4ce69671",
+      "recordCount": 51,
+      "editedFields": 27,
+      "unchangedScalarCounts": {
+        "numeric": 277,
+        "boolean": 30,
+        "null": 190
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/summary.portable.json",
+      "kind": "summary",
+      "harness": "claude",
+      "originalSha256": "4bddb6db049d61cca4ade9b4d27cc61e9b2dfcd98b7abcd6f08c2feb37cfb7be",
+      "derivativeSha256": "aa068f663bb43f2e6fa83929dc625232c48c586fc310bda451622279951d3609",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 20,
+        "boolean": 8,
+        "null": 1
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/claude/tests-before.portable.json",
+      "kind": "text",
+      "harness": "claude",
+      "originalSha256": "7614cf15c47e986cc1483e06437049f2193f83977d900952309fff8bcb5775bb",
+      "derivativeSha256": "34f6f18e91b921bcbb5770561135c3b4e3b4bdb2c5dab31d163616bfe56f06b7",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "codex",
+      "originalSha256": "85f1f0a6ea03a53138727975dde3321121cbd0cbf0413086b87069ddc69e6218",
+      "derivativeSha256": "7e1de519235cb64200a662b9b4cc47c18a206ebad6d354f446b3ca601ef5f6d4",
+      "recordCount": 33,
+      "editedFields": 21,
+      "unchangedScalarCounts": {
+        "numeric": 21,
+        "boolean": 0,
+        "null": 21
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex-approval-default/summary.portable.json",
+      "kind": "summary",
+      "harness": "codex",
+      "originalSha256": "be7a47019d99c9524565f590cfa40229703287a8bace2249dc8ea504d0e51c30",
+      "derivativeSha256": "dae29c7e6936fee56cc5d1f4ff0594e6e8c51e5f2be1c31c3c6ace604670a35d",
+      "recordCount": 1,
+      "editedFields": 3,
+      "unchangedScalarCounts": {
+        "numeric": 6,
+        "boolean": 8,
+        "null": 1
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "codex",
+      "originalSha256": "12b3261ae4e64ff9bd8026bcdc4d10e8ed273bd8a777ea5416620e284d095354",
+      "derivativeSha256": "97d859d380aceb7bd89cc13cee99829e5778a3a7570176e75ec3e089dc9ec6c5",
+      "recordCount": 37,
+      "editedFields": 19,
+      "unchangedScalarCounts": {
+        "numeric": 106,
+        "boolean": 5,
+        "null": 48
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/codex/summary.portable.json",
+      "kind": "summary",
+      "harness": "codex",
+      "originalSha256": "2c6f161e318a02e2502b3edff7f883dcf5bdaad9e6de3d4c8c52bb5b7844de3e",
+      "derivativeSha256": "b06532146720d145e517bcfe3a6361cf69998a6122288313fd666904c7066fcb",
+      "recordCount": 1,
+      "editedFields": 3,
+      "unchangedScalarCounts": {
+        "numeric": 22,
+        "boolean": 8,
+        "null": 3
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "claude",
+      "originalSha256": "b58d5a94b20a4e26b70429d3abfeedc31a1cb7610e7ee90278afab5b3624e3c9",
+      "derivativeSha256": "43c3c440b7bb4eb39c2f06576aeaa9f59c8a6699ad6c8e0c2efa362ed33a21cd",
+      "recordCount": 27,
+      "editedFields": 20,
+      "unchangedScalarCounts": {
+        "numeric": 150,
+        "boolean": 12,
+        "null": 98
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/summary.portable.json",
+      "kind": "summary",
+      "harness": "claude",
+      "originalSha256": "188b4aa0c89aceea8ec2ce61beeeff89360b6d514a6c1c9c566e65867a19ae12",
+      "derivativeSha256": "39af52d5c59d630e5ddf3557c911b7d641a21d662e5028363f879ea9ed8106be",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 9,
+        "boolean": 10,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-after.portable.json",
+      "kind": "text",
+      "harness": "claude",
+      "originalSha256": "d01a1092523db4f74f1d4e0a9d7f71f33dd3953659b0c9e3dc53e4c8001c3f38",
+      "derivativeSha256": "292964a1e5cf0c4f2281c46d42a268767b3b633a79471966c313b4cee5de519b",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-claude/tests-before.portable.json",
+      "kind": "text",
+      "harness": "claude",
+      "originalSha256": "5f0d3d2602e50563d564cab750283857eab70a8061688e1b2e7903669b78c5a8",
+      "derivativeSha256": "d6eefa84389c98641c9f7bcd2a867dbc624683f5910323863270d595d3f2711e",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "codex",
+      "originalSha256": "e42418a6f1e568d13c1a22594cfed820afade61452b077d46600dd52e2dc5250",
+      "derivativeSha256": "5130c16003fa5cb782a7c3fac04f6783e5e46a7544ba7a6209e29b66358eb6ca",
+      "recordCount": 13,
+      "editedFields": 4,
+      "unchangedScalarCounts": {
+        "numeric": 23,
+        "boolean": 1,
+        "null": 10
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-codex/summary.portable.json",
+      "kind": "summary",
+      "harness": "codex",
+      "originalSha256": "eac0becac6f7948aef475a114400d3060d5b1644ed9811ea57e660180da2cd68",
+      "derivativeSha256": "3e7219aa532030a6b3de188d46bcd0decd95d2c433d271f395a8093e5957961f",
+      "recordCount": 1,
+      "editedFields": 3,
+      "unchangedScalarCounts": {
+        "numeric": 9,
+        "boolean": 10,
+        "null": 1
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "opencode",
+      "originalSha256": "634d4144b4e27dd798e57b7de45ab717379dc4de3bf120fa58a627e15094195a",
+      "derivativeSha256": "8e7cd4237e71caa1a63b4a348d3e8fe7f4014845ab54f6a7469df8e3626c3ffa",
+      "recordCount": 24,
+      "editedFields": 12,
+      "unchangedScalarCounts": {
+        "numeric": 98,
+        "boolean": 7,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/summary.portable.json",
+      "kind": "summary",
+      "harness": "opencode",
+      "originalSha256": "62894a2a09556bb0e64cbbb48b9f8f7aaa338e4ed3008ce7b05e4fed782ae724",
+      "derivativeSha256": "270899a3308bfbe7195896c24d7b6ce9c596876513781448719b073c091c99c4",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 9,
+        "boolean": 10,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-after.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "b1591a4c7fb5f0d6e62a325ce842b277e6877638b111022b71c042f7c9ae334b",
+      "derivativeSha256": "7364975dff989757f6abb308370ac866e30e3c13aed2672668986a4aadbbbf3d",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/malformed-opencode/tests-before.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "4a483abe8bd3a27490e7518a7d09663afdab07879f88dc1bc7812049af953ffb",
+      "derivativeSha256": "7a14bea6405e52b7f6b0ee539fd2d7c421c3372066be7ee5f1ee2e2a29c89550",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "opencode",
+      "originalSha256": "9de2424d85ff569816a17cee11177a3333a76c7a90849a735b0ae2b46fe16568",
+      "derivativeSha256": "a9ed6bbb3f79b6d4e4ed2859363775c9ba580bf7b457cb18f041e93ef5a6974c",
+      "recordCount": 67,
+      "editedFields": 40,
+      "unchangedScalarCounts": {
+        "numeric": 289,
+        "boolean": 28,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/summary.portable.json",
+      "kind": "summary",
+      "harness": "opencode",
+      "originalSha256": "e90a5963022e4d15fab4efbc15e9639ff013aea90e1aa679445100133c05dba8",
+      "derivativeSha256": "8623c5980c91817d0df91a529fbd99083132b46f36c3b710ad34efd57b04cf46",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 16,
+        "boolean": 8,
+        "null": 1
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-after.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "b794743a2dd646b97b497000a28b566187540474e4465cab751a47fe508b5fe0",
+      "derivativeSha256": "16fd94a98a3fe1126289764daea7de66e9fdeadf7958b3e2e1542a3f2caa3c7f",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode-cwd-timeout/tests-before.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "0ce9e1d8d28d86b1c9e692ea6277ba96b6772ccf7faf5fb2b36aff13559b8bd3",
+      "derivativeSha256": "aa042ce3155042567d9a573b91049f714d4a192516a5f565338f2b530fa6621b",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/stdout.portable.json",
+      "kind": "transcript",
+      "harness": "opencode",
+      "originalSha256": "9375285e7cad5675612e8078fb6d682d35aa68c264dc84b7ae1e7ded520b40e9",
+      "derivativeSha256": "6e9f514c83ff94da286ef0bac39c65d4691780cae75cc980b4a3ce7a78512fcb",
+      "recordCount": 52,
+      "editedFields": 24,
+      "unchangedScalarCounts": {
+        "numeric": 220,
+        "boolean": 20,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/summary.portable.json",
+      "kind": "summary",
+      "harness": "opencode",
+      "originalSha256": "65cf0d1538b54c2ba847047b8142a50e706e3215879263673d72f843a0a13dc1",
+      "derivativeSha256": "d76c4672c2b988a86f951ffebe2b4a3818fe4944089cc5afe6d664d28f4dc262",
+      "recordCount": 1,
+      "editedFields": 2,
+      "unchangedScalarCounts": {
+        "numeric": 27,
+        "boolean": 8,
+        "null": 3
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    },
+    {
+      "path": "jev-experiments/roadmap/integration/evidence/opencode/tests-before.portable.json",
+      "kind": "text",
+      "harness": "opencode",
+      "originalSha256": "feaba7f3a8679ff39e52c30a98696b0f71398821f733022fe40a54c2c0f77485",
+      "derivativeSha256": "c98c1fa32446c9d06c648679217fe9b3f342a9d25451b0170eb205ae3460ce5e",
+      "recordCount": 1,
+      "editedFields": 1,
+      "unchangedScalarCounts": {
+        "numeric": 0,
+        "boolean": 0,
+        "null": 0
+      },
+      "explicitSpanOnly": true,
+      "allOtherDataEqual": true
+    }
+  ],
+  "recordCount": 47,
+  "historicalRuns": 16,
+  "checks": {
+    "allPredecessorAndFieldIdentitiesMatch": true,
+    "onlyExplicitLocationSpansDiffer": true,
+    "allNonLocationValuesEventsOutcomesAndAccountingEqual": true,
+    "historicalIndexChronologyGatesAndUnknownsEqual": true,
+    "originalAndDerivativeTreesUnambiguous": true,
+    "selectedSourceHashesMatch": true
+  },
+  "allPassed": true,
+  "originalBodiesEmitted": false,
+  "providerCalls": 0
+}

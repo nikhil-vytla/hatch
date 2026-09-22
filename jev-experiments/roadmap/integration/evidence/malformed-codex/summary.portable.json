@@ -1,0 +1,134 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "codex",
+  "kind": "summary",
+  "source": {
+    "sha256": "eac0becac6f7948aef475a114400d3060d5b1644ed9811ea57e660180da2cd68",
+    "bytes": 2485,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/directory",
+        "originalSha256": "ef45183a9bd452b67e66bf45443305774869976b7573d7fe4dbfc338313aa7a3",
+        "derivativeSha256": "c000572ead14e0ba07fe32612948f9acc24a8e04851f81ad5066b48ed3dc6ec1",
+        "bindings": [
+          {
+            "sourcePathSha256": "ef45183a9bd452b67e66bf45443305774869976b7573d7fe4dbfc338313aa7a3",
+            "uri": "record://location/ef45183a9bd452b6",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/16",
+        "originalSha256": "e0e475225673fb73a989a88d1dc2f09a98778ba1a1c43f62a2ffa4b8709e108b",
+        "derivativeSha256": "178ef3eda19d034dde8ef3ebfc15c4a9ed9a4da41915c1e218fdfe5e455aa0f9",
+        "bindings": [
+          {
+            "sourcePathSha256": "e4a655df45bf2822eea7628a5125b11fb66eb687ae397a19723440ccb32e7063",
+            "uri": "record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/routing/mcp.ts",
+            "occurrences": 1
+          }
+        ]
+      },
+      {
+        "record": 0,
+        "pointer": "/command/18",
+        "originalSha256": "85b844aef251c30bd575b4f9db53e3a0e015112ee9ab6a3fcba04672ffc9775e",
+        "derivativeSha256": "013756bd39de43b14b0bada72de541fe1b0fb8048ba0787875f43d72a39f1f27",
+        "bindings": [
+          {
+            "sourcePathSha256": "d0a69701dd44e8951176ed698200045fe836182bb02c545406277c155c761203",
+            "uri": "record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/integration/evidence/malformed-codex/mcp-audit.jsonl",
+            "occurrences": 1
+          },
+          {
+            "sourcePathSha256": "42af80edfa6a514d0704820c0322df6c69f2033b3992eed394c3ae93cb19b7b8",
+            "uri": "record://location/42af80edfa6a514d",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "3c1c9ca52fc06ebb09ee93720203672ed6870ab780463f1d7943f7c4d34fea26",
+  "payload": {
+    "harness": "codex",
+    "directory": "record://location/ef45183a9bd452b6",
+    "command": [
+      "codex",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--json",
+      "--sandbox",
+      "workspace-write",
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "mcp_servers.jev.tools.route_task.approval_mode=\"approve\"",
+      "-c",
+      "mcp_servers.jev.tools.decide.approval_mode=\"approve\"",
+      "-c",
+      "mcp_servers.jev.command=\"bun\"",
+      "-c",
+      "mcp_servers.jev.args=[\"record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/routing/mcp.ts\"]",
+      "-c",
+      "mcp_servers.jev.env={\"JEV_ROUTER_CONFIG\" = \"record://location/42af80edfa6a514d\", \"JEV_MCP_AUDIT\" = \"record://checkout/7bc62447bf6d4c2f/jev-experiments/roadmap/integration/evidence/malformed-codex/mcp-audit.jsonl\"}",
+      "-"
+    ],
+    "elapsedSeconds": 21.21,
+    "exitCode": 0,
+    "timedOut": false,
+    "baselineTestsExitCode": 1,
+    "independentTestsExitCode": 1,
+    "mcpDiscovered": true,
+    "toolCalls": [
+      {
+        "time": "2026-09-21T04:45:36.114Z",
+        "event": "tools/call",
+        "tool": "route_task",
+        "requestId": 2,
+        "contextBytes": 421
+      }
+    ],
+    "toolResults": [
+      {
+        "time": "2026-09-21T04:45:36.133Z",
+        "event": "tools/result",
+        "tool": "route_task",
+        "requestId": 2,
+        "status": "error"
+      }
+    ],
+    "patchedBug": false,
+    "analysisFileWritten": true,
+    "additionalTestsWritten": false,
+    "sourceUnchanged": true,
+    "expectedTestsFail": true,
+    "purpose": "Actual client handling of one deterministic malformed loopback destination response.",
+    "delegationOccurred": false,
+    "usableDelegatedArtifacts": 0,
+    "cliVersion": "0.154.0",
+    "hostModel": {
+      "configured": null,
+      "identityBasis": "not reported; configured default"
+    },
+    "firstAuditTime": "2026-09-21T04:45:25.917Z",
+    "evidenceGate": {
+      "condition": "malformed-response",
+      "passed": true,
+      "reason": "One actual call returned an error and no usable artifact; host source and tests remained unchanged. Existing failing tests are expected in this condition.",
+      "historicalFailure": false
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 12
+  }
+}

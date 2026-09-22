@@ -16,6 +16,8 @@ def transcript_objects(value,depth=0):
         except json.JSONDecodeError:return
         yield from transcript_objects(parsed,depth+1)
 def annotate(folder):
+    if (folder/'summary.portable.json').exists():
+        raise ValueError('Historical derivatives cannot be re-annotated; use portable-index.ts.')
     path=folder/'summary.json';record=json.loads(path.read_text());audit=folder/'mcp-audit.jsonl'
     events=[json.loads(line) for line in audit.read_text().splitlines()] if audit.exists() else []
     artifacts=[event for event in events if event.get('event')=='tools/result' and event.get('tool')=='route_task' and event.get('status')=='ok' and event.get('artifactKind') in ['patch','answer','structured']]
@@ -65,6 +67,10 @@ def annotate(folder):
     path.write_text(json.dumps(record,indent=2)+'\n')
     return record
 if __name__=='__main__':
+    if any((HERE/'evidence').glob('*/summary.portable.json')):
+        import subprocess
+        subprocess.run(['bun', str(HERE/'portable-index.ts')], check=True)
+        raise SystemExit(0)
     records=[(folder.name,annotate(folder)) for folder in (HERE/'evidence').iterdir() if (folder/'summary.json').exists()]
     records.sort(key=lambda entry:entry[1].get('firstAuditTime') or '')
     index=[]
