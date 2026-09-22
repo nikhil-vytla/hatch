@@ -1,0 +1,21 @@
+{
+  "baseCommit": "03d1b28562ea875998a8896551aa3ad9a30ac37c",
+  "path": "jev-experiments/roadmap/MAP.md",
+  "beforeSha256": "4458ea23c2e775e051481c88dfef0a0ee32ca470dca4f56e5021865eaf5e39c7",
+  "afterSha256": "23339f897f190478e6d6f9d3207ae2633a83c086f716a434e2b5ffbfc21e2845",
+  "patchSha256": "4d376049f5841e1e58dc8c108dbbcbba526284eb9e4e90c5a5402a677ac26996",
+  "prerequisites": [
+    {
+      "path": "../design-revamp-2026-09-21/roadmap-update.patch",
+      "sha256": "bc72fdf982d24f0f5426569e45e56a7ab3843f26ff6e8dffebcd94e3130535de"
+    },
+    {
+      "path": "../roadmap-additions-2026-09-21/roadmap-update.patch",
+      "sha256": "d708e69a51356daedea72cf1c9ae33a97a70048c181edb64ea6d0c1d3ab258e6"
+    },
+    {
+      "path": "../semantic-image-field-2026-09-21/roadmap-update.patch",
+      "sha256": "7ca001b9f7533a98f924c5b0ef9c3835629291385fdd8c1a29047208e05595d8"
+    }
+  ]
+}
