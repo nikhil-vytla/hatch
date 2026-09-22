@@ -65,5 +65,5 @@ async def adapters(client, quick=False):
         "latency_ms": out["latency_ms"],
         "note": "One real Jev response is decoded independently in four languages. This checks interoperability, "
         "not four independent judgments. Field descriptions are the semantic contract, not just type names. "
-        "TypeScript, Rust, and Go also support explicit ordered score rubrics; Python's adapter intentionally stays narrower.",
+        "All four adapters support explicit ordered score rubrics through x-jev-levels field metadata.",
     }

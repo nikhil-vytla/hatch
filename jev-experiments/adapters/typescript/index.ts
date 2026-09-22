@@ -1,14 +1,12 @@
 import * as z from "zod";
-export type Question = {
-  type: "choice" | "noul" | "score";
-  instructions: string;
-  criteria?: Record<string, string> | string[];
-};
+import { jsonEqual, jsonIssue, nativeQuestionIssue, type NativeQuestion, type Entry } from "../../packages/decision-runtime/src/native";
+export type Question = NativeQuestion;
 export type Answer = {
   type: "choice" | "noul" | "score";
   value: string | number;
   probabilities: Record<string, number> | null;
   confidence: number | null;
+  legend?: Record<string, Entry>;
 };
 type Schema = Record<string, any>;
 export type Transport = (
@@ -38,12 +36,25 @@ function resolve(
   };
 }
 export function compile(root: Schema): Record<string, Question> {
+  // Zod attaches non-JSON Standard Schema metadata to the root only.
+  const descriptors = Object.getOwnPropertyDescriptors(root);
+  if (descriptors["~standard"]?.enumerable === false) {
+    delete descriptors["~standard"];
+    root = Object.create(Object.getPrototypeOf(root), descriptors);
+  }
+  const issue = jsonIssue(root);
+  if (issue) throw Error(issue);
   const questions: Record<string, Question> = Object.create(null);
   const visit = (raw: Schema, path: string[], depth = 0) => {
     if (depth > 12) throw Error("Schema nesting exceeds 12 levels");
     const schema = resolve(raw, root),
       id = path.join(".");
+    for (const key of Object.keys(schema))
+      if (key.startsWith("x-jev-") && !["x-jev-instructions", "x-jev-criteria", "x-jev-levels"].includes(key))
+        throw Error(`Unknown Jev annotation: ${key}`);
     if (schema.type === "object") {
+      if (Object.keys(schema).some(key => key.startsWith("x-jev-")))
+        throw Error("Jev annotations belong on decision fields.");
       if (!schema.properties || Object.keys(schema.properties).length === 0)
         throw Error("Empty objects are not decisions");
       for (const [key, value] of Object.entries(schema.properties)) {
@@ -60,10 +71,11 @@ export function compile(root: Schema): Record<string, Question> {
     }
     if (
       !id ||
-      typeof schema.description !== "string" ||
-      !schema.description.trim()
+      (!Object.hasOwn(schema, "x-jev-instructions") &&
+        (typeof schema.description !== "string" || !schema.description.trim()))
     )
       throw Error(`A semantic description is required: ${id}`);
+    const instructions = Object.hasOwn(schema, "x-jev-instructions") ? schema["x-jev-instructions"] : schema.description;
     if (
       schema.type === "string" &&
       Array.isArray(schema.enum) &&
@@ -73,16 +85,16 @@ export function compile(root: Schema): Record<string, Question> {
     )
       questions[id] = {
         type: "choice",
-        instructions: schema.description,
-        criteria: Object.fromEntries(
+        instructions,
+        criteria: Object.hasOwn(schema, "x-jev-criteria") ? schema["x-jev-criteria"] : Object.fromEntries(
           schema.enum.map((x: string) => [x, x.replaceAll("_", " ")]),
         ),
       };
     else if (
       schema.type === "boolean" ||
-      (schema.type === "number" && schema.minimum === 0 && schema.maximum === 1)
+      (schema.type === "number" && schema.minimum === 0 && schema.maximum === 1 && !Object.hasOwn(schema, "x-jev-levels"))
     )
-      questions[id] = { type: "noul", instructions: schema.description };
+      questions[id] = { type: "noul", instructions, ...(Object.hasOwn(schema, "x-jev-criteria") ? {criteria: schema["x-jev-criteria"]} : {}) };
     else if (
       schema.type === "number" &&
       Array.isArray(schema["x-jev-levels"]) &&
@@ -92,13 +104,22 @@ export function compile(root: Schema): Record<string, Question> {
     )
       questions[id] = {
         type: "score",
-        instructions: schema.description,
+        instructions,
         criteria: schema["x-jev-levels"],
       };
     else
       throw Error(
         `Unsupported semantic type at ${id}. Use a finite enum, boolean, probability, or explicit score rubric.`,
       );
+    const q = questions[id];
+    const problem = nativeQuestionIssue(q);
+    if (problem) throw Error(`${id}: ${problem}`);
+    if (q.type === "choice" && (new Set(schema.enum).size !== schema.enum.length ||
+      Object.keys(q.criteria).length !== schema.enum.length || schema.enum.some((option: string) => !Object.hasOwn(q.criteria, option))))
+      throw Error(`Criteria must match the enum exactly: ${id}`);
+    if ((q.type !== "score" && Object.hasOwn(schema, "x-jev-levels")) ||
+      (q.type === "score" && Object.hasOwn(schema, "x-jev-criteria")))
+      throw Error(`Rubric annotation does not match the decision type: ${id}`);
   };
   visit(root, []);
   return questions;
@@ -109,23 +130,30 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
     const a = answers[id];
     if (!a || a.type !== q.type)
       throw Error(`Missing or wrong answer type: ${id}`);
-    if (q.type === "choice" && !(String(a.value) in q.criteria!))
+    if (
+      q.type === "choice" &&
+      (typeof a.value !== "string" || !Object.hasOwn(q.criteria!, a.value))
+    )
       throw Error(`Unknown option: ${id}`);
     if (
       q.type !== "choice" &&
       (typeof a.value !== "number" ||
         !Number.isFinite(a.value) ||
         a.value < 0 ||
-        a.value > (q.type === "noul" ? 1 : (q.criteria as string[]).length - 1))
+        a.value > (q.type === "noul" ? 1 : q.criteria.length - 1))
     )
       throw Error(`Out of range: ${id}`);
-    if (a.probabilities) {
+    if (q.type !== "noul" && a.probabilities == null)
+      throw Error(`Missing complete distribution: ${id}`);
+    if (a.probabilities != null) {
+      if (typeof a.probabilities !== "object" || Array.isArray(a.probabilities))
+        throw Error(`Malformed probabilities: ${id}`);
       const expected =
         q.type === "choice"
           ? Object.keys(q.criteria!)
           : q.type === "score"
-            ? (q.criteria as string[]).map((_, i) => String(i))
-            : [];
+            ? q.criteria.map((_, i) => String(i))
+            : ["false", "true"];
       const entries = Object.entries(a.probabilities);
       if (
         entries.length !== expected.length ||
@@ -133,7 +161,8 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
           ([k, v]) =>
             !expected.includes(k) || !Number.isFinite(v) || v < 0 || v > 1,
         ) ||
-        Math.abs(entries.reduce((s, [, v]) => s + v, 0) - 1) > 0.025
+        Math.abs(entries.reduce((s, [, v]) => s + v, 0) - 1) > 0.025 ||
+        (q.type === "noul" && (Math.abs(a.probabilities.true - Number(a.value)) > 1e-6 || Math.abs(a.probabilities.false - (1 - Number(a.value))) > 1e-6))
       )
         throw Error(`Malformed probabilities: ${id}`);
     }
@@ -142,6 +171,14 @@ export function decode(root: Schema, answers: Record<string, Answer>): unknown {
       (!Number.isFinite(a.confidence) || a.confidence < 0 || a.confidence > 1)
     )
       throw Error(`Invalid confidence: ${id}`);
+    if (a.legend !== undefined) {
+      const keys = q.type === "choice" ? Object.keys(q.criteria) : q.type === "score" ? q.criteria.map((_, i) => String(i)) : ["false", "true"];
+      if (!a.legend || typeof a.legend !== "object" || Array.isArray(a.legend) || jsonIssue(a.legend) ||
+        Object.keys(a.legend).length !== keys.length || keys.some(key => !Object.hasOwn(a.legend!, key)))
+        throw Error(`Invalid legend: ${id}`);
+      const requested = q.type === "score" ? Object.fromEntries(q.criteria.map((level, i) => [String(i), level])) : q.criteria;
+      if (requested !== undefined && !jsonEqual(requested, a.legend)) throw Error(`Legend disagrees with descriptions: ${id}`);
+    }
   }
   const visit = (raw: Schema, path: string[]): unknown => {
     const schema = resolve(raw, root);
