@@ -1,0 +1,13 @@
+diff --git a/jev-experiments/experience-prototypes/src/main.tsx b/jev-experiments/experience-prototypes/src/main.tsx
+index 1184019..924d57b 100644
+--- a/jev-experiments/experience-prototypes/src/main.tsx
++++ b/jev-experiments/experience-prototypes/src/main.tsx
+@@ -878,7 +878,7 @@ function App() {
+           <strong>jev</strong>
+           <span>field notes / 002</span>
+         </a>
+-        <p>Original experiments. Real decisions. Plenty left to discover.</p>
++        <p>Not affiliated with or endorsed by TypeSafe AI</p>
+         <a href="https://docs.typesafe.ai/introduction">TypeSafe ↗</a>
+       </footer>
+     </MotionConfig>

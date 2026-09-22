@@ -1,0 +1,1 @@
+The [Jev Experiments](https://jev-experiments.vercel.app) footer replaces its promotional sentence with the requested TypeSafe AI independence statement. The change is a single paragraph in the existing app and has a fresh canonical-root Bun build. The report retains the exact diff and separates local verification from subsequent production confirmation.
