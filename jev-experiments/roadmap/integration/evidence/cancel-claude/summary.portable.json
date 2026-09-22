@@ -1,0 +1,78 @@
+{
+  "format": "jev-portable-retained-record-v1",
+  "harness": "claude",
+  "kind": "summary",
+  "source": {
+    "sha256": "1ddfbe621b7998af8f4fc23b9cc3671e3c86945302c8de639b17de42f9de3be7",
+    "bytes": 1742,
+    "format": "json",
+    "recordCount": 1
+  },
+  "transformation": {
+    "id": "jev-explicit-location-spans-v1",
+    "note": "Portable retained-record derivative. Only explicitly listed physical-location spans differ; event order, task content outside those spans, returned artifacts, outcomes and accounting are retained. Original field hashes describe the historical input, not these derivative bytes. Location URIs are display references, not executable commands.",
+    "fields": [
+      {
+        "record": 0,
+        "pointer": "/command/4",
+        "originalSha256": "5094af804ea358c9e6b85feb0ae6b9543ac5d8de9dd522a1c103f0ab731a0919",
+        "derivativeSha256": "e1cd48a9f95da76feea371afec8c9cd6b5f542fc1fff87815ecb9968598c6c56",
+        "bindings": [
+          {
+            "sourcePathSha256": "5094af804ea358c9e6b85feb0ae6b9543ac5d8de9dd522a1c103f0ab731a0919",
+            "uri": "record://location/5094af804ea358c9e6b85feb",
+            "occurrences": 1
+          }
+        ]
+      }
+    ]
+  },
+  "payloadSha256": "bb1e3dd4f664ee852b6f627518f767b618518ce554b926d84b29df5c0477b1a4",
+  "payload": {
+    "harness": "claude",
+    "command": [
+      "claude",
+      "--bare",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "record://location/5094af804ea358c9e6b85feb",
+      "--model",
+      "claude-sonnet-4-6",
+      "--tools",
+      "",
+      "--allowedTools",
+      "mcp__jev__route_task",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "-p"
+    ],
+    "invokedBeforeInterrupt": true,
+    "exitCode": 0,
+    "elapsedSeconds": 6.123578667000402,
+    "serverSawCancellation": false,
+    "serverSawDisconnect": false,
+    "cancelledToolResult": false,
+    "lateSuccessApplied": false,
+    "evidenceBoundary": "Real client interruption after actual tool invocation. Destination was a deterministic delayed loopback fixture. No file edits were permitted. Only observed protocol events are claimed.",
+    "hostExitedBeforeScheduledReply": true,
+    "clientTerminalReason": "aborted_tools",
+    "delegationOccurred": false,
+    "usableDelegatedArtifacts": 0,
+    "cliVersion": "2.1.278",
+    "hostModel": {
+      "configured": "claude-sonnet-4-6",
+      "identityBasis": "command configuration"
+    },
+    "firstAuditTime": "2026-09-21T04:41:31.643Z",
+    "evidenceGate": {
+      "condition": "active-interruption",
+      "passed": true,
+      "reason": "The real client exited during an active call before the scheduled reply; no late artifact was applied. Server cancellation is only claimed where recorded.",
+      "historicalFailure": false
+    },
+    "annotationProvenance": "Derived by evidence_index.py from retained audit events, command, diff and measured summary fields. Does not reinterpret tool discovery as delegation. CLI versions were captured during this experiment session.",
+    "auditChronologyOrder": 8
+  }
+}

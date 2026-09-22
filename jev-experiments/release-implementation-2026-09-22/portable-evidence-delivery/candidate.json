@@ -1,0 +1,12 @@
+{
+  "base": "c32e5a69012c30c882485a58c36f81612215ad00",
+  "commit": "3f34e6f0eaed348ece41e41ba13727d9ec64c3c5",
+  "tree": "3997cc66d4659b9d529689d49f652368e5fb4ee4",
+  "selectedFiles": 61,
+  "removedPredecessors": 47,
+  "exactCandidate08Files": 57,
+  "boundedAdaptations": 4,
+  "implementationPatchSha256": "312ebcfb1f8bb21039712b961137bc1423b5481823b41fb2e2fb2ffcf925226d",
+  "remoteChanged": false,
+  "rootMaintainedSourceOrIndexChanged": false
+}
