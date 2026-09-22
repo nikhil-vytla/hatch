@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { assertPreserved } from "./record-integrity";
+import { assertPublicationSource } from "../../rewardbench2/publication-source";
+import { projectRewardBenchDocument } from "../../experience-prototypes/scripts/benchmark-publication";
 import {
   readRecord,
   encodeRecord,
@@ -29,16 +31,25 @@ const files = Object.entries(publication).map(([name, relative]) => {
     throw Error(`JSONL round trip changed ${name}`);
   if (!prepared || typeof prepared !== "object")
     throw Error(`Invalid public JSON: ${name}`);
-  assertPreserved(original, prepared, name);
+  // Compare the publication-source derivative in full. Its predecessor hash
+  // is lineage metadata, not a claim that committed bytes are original data.
+  const projected = name === "rewardbench2";
+  const derivation = projected ? assertPublicationSource(original) : null;
+  const expected = projected ? projectRewardBenchDocument(original) : original;
+  assertPreserved(expected, prepared, name);
   return {
     name,
     source: relative,
     sourceSha256: sha(readFileSync(source)),
     publicSha256: sha(readFileSync(output)),
     publicBytes: readFileSync(output).length,
+    comparison: projected ? "publication-source-derivative" : "original-record",
+    ...(derivation ? { sourceDerivation: derivation } : {}),
     recipe:
       name === "judgment-reliability"
         ? "prepareJudgmentReliability"
+        : projected
+          ? "readRecord + enrichProvenance + projectRewardBenchDocument"
         : "readRecord + enrichProvenance + availability",
   };
 });
@@ -47,10 +58,11 @@ const unlisted = readdirSync(resolve(app, "public/data")).filter(
 );
 if (unlisted.length) throw Error(`Unlisted output: ${unlisted.join(", ")}`);
 const report = {
-  schemaVersion: 1,
+  schemaVersion: 3,
   publicationCount: files.length,
   roundTripPassed: true,
-  originalFieldsPreserved: true,
+  expectedFieldsPreserved: true,
+  projectedPublications: files.filter((file) => file.comparison === "publication-source-derivative").map((file) => file.name),
   unlistedPublicFiles: unlisted,
   files,
 };
@@ -62,7 +74,8 @@ console.log(
   JSON.stringify({
     publicationCount: files.length,
     roundTripPassed: true,
-    originalFieldsPreserved: true,
+    expectedFieldsPreserved: true,
+    projectedPublications: report.projectedPublications,
     unlistedPublicFiles: 0,
   }),
 );
