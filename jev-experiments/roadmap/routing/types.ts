@@ -1,3 +1,5 @@
+import type { RequestAccounting } from "../runtime/accounting";
+import type { DecisionResponse, Issue } from "../runtime/contract";
 export type TaskCategory =
   "bug-fix" | "test-writing" | "repository-analysis" | "writing" | "other";
 export interface Task {
@@ -12,6 +14,11 @@ export interface ClassifierIdentity {
   source: "heuristic" | "host" | "hosted" | "local";
   local: boolean;
   model: string;
+  adapter?: string;
+  revision?: string;
+  modelResolution?: "provider";
+  requestedModel?: string;
+  modelSource?: "provider-reported" | "configured-unverified";
 }
 export interface Classification {
   source: "heuristic" | "host" | "hosted" | "local";
@@ -20,10 +27,14 @@ export interface Classification {
   confidence: number;
   latencyMs: number;
   costUsd: number | null;
+  estimatedCostUsd?: number | null;
+  accounting?: RequestAccounting;
   evidence: string;
   execution?: ClassifierIdentity;
   declaredExecution?: ClassifierIdentity;
   status?: "ok" | "error" | "not-run";
+  decisionStatus?: DecisionResponse["status"];
+  issues?: Issue[];
 }
 export interface Route {
   id: string;
@@ -180,6 +191,10 @@ export interface RoutingResult {
   };
 }
 export interface RouterConfig {
+  classifier?:
+    | { kind: "heuristic" }
+    | { kind: "hosted-jev"; apiKeyEnv: string }
+    | { kind: "local" };
   localRuntime?: import("./mac-adapter").MacRuntimeConfig;
   routes: Route[];
   policy: Policy;

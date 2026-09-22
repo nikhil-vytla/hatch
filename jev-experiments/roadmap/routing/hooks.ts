@@ -1,4 +1,5 @@
-import type { Identity } from "../runtime/contract";
+import { accountingIssue, type RequestAccounting } from "../runtime/accounting";
+import type { Identity, Issue } from "../runtime/contract";
 import type {
   ExecutionResult,
   Classification,
@@ -14,6 +15,22 @@ function object(value: unknown): Record<string, unknown> | null {
 export function nonnegativeFinite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
+function inspectedUsage(value: unknown): ExecutionResult["usage"] {
+  const usage = object(value);
+  if (
+    !usage ||
+    !nonnegativeFinite(usage.inputTokens) || !Number.isSafeInteger(usage.inputTokens) ||
+    !nonnegativeFinite(usage.outputTokens) || !Number.isSafeInteger(usage.outputTokens) ||
+    (usage.cachedInputTokens !== undefined &&
+      (!nonnegativeFinite(usage.cachedInputTokens) || !Number.isSafeInteger(usage.cachedInputTokens) ||
+        usage.cachedInputTokens > usage.inputTokens))
+  ) return null;
+  return {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    ...(usage.cachedInputTokens === undefined ? {} : { cachedInputTokens: usage.cachedInputTokens as number }),
+  };
+}
 export function declaredIdentity(value: unknown): Identity | null {
   const item = object(value);
   if (
@@ -23,7 +40,9 @@ export function declaredIdentity(value: unknown): Identity | null {
     typeof item.model !== "string" ||
     !item.model.trim() ||
     typeof item.local !== "boolean" ||
-    (item.revision !== undefined && typeof item.revision !== "string")
+    (item.revision !== undefined && typeof item.revision !== "string") ||
+    (item.requestedModel !== undefined && (typeof item.requestedModel !== "string" || !item.requestedModel.trim())) ||
+    (item.modelSource !== undefined && !["provider-reported", "configured-unverified"].includes(String(item.modelSource)))
   )
     return null;
   return {
@@ -31,6 +50,8 @@ export function declaredIdentity(value: unknown): Identity | null {
     model: item.model,
     local: item.local,
     ...(item.revision !== undefined ? { revision: item.revision } : {}),
+    ...(typeof item.requestedModel === "string" ? { requestedModel: item.requestedModel } : {}),
+    ...(item.modelSource === "provider-reported" || item.modelSource === "configured-unverified" ? {modelSource: item.modelSource} : {}),
   };
 }
 /** Retain readable evidence and a valid reported charge even when another field fails. */
@@ -92,20 +113,10 @@ export function executionIssues(value: unknown): string[] {
     issues.push("actualModel must be a nonempty string.");
   if (item.costUsd !== null && !nonnegativeFinite(item.costUsd))
     issues.push("costUsd must be null or finite and nonnegative.");
-  if (item.usage !== null) {
-    const usage = object(item.usage);
-    if (
-      !usage ||
-      !nonnegativeFinite(usage.inputTokens) ||
-      !nonnegativeFinite(usage.outputTokens) ||
-      (usage.cachedInputTokens !== undefined &&
-        (!nonnegativeFinite(usage.cachedInputTokens) ||
-          usage.cachedInputTokens > (usage.inputTokens as number)))
-    )
-      issues.push(
-        "Token usage must be null or nonnegative finite counts, with cached input bounded by total input.",
-      );
-  }
+  if (item.usage !== null && !inspectedUsage(item.usage))
+    issues.push(
+      "Token usage must be null or nonnegative safe integer counts, with cached input bounded by total input.",
+    );
   if (item.status === "ok" || item.artifact !== undefined) {
     const artifact = object(item.artifact);
     if (
@@ -143,14 +154,39 @@ export function classifierIdentity(value: unknown): ClassifierIdentity | null {
     !["heuristic", "host", "hosted", "local"].includes(item.source as string) ||
     typeof item.local !== "boolean" ||
     typeof item.model !== "string" ||
-    !item.model.trim()
+    !item.model.trim() ||
+    (item.adapter !== undefined && (typeof item.adapter !== "string" || !item.adapter.trim())) ||
+    (item.revision !== undefined && (typeof item.revision !== "string" || !item.revision.trim())) ||
+    (item.modelResolution !== undefined && item.modelResolution !== "provider") ||
+    (item.requestedModel !== undefined && (typeof item.requestedModel !== "string" || !item.requestedModel.trim())) ||
+    (item.modelSource !== undefined && !["provider-reported", "configured-unverified"].includes(String(item.modelSource)))
   )
     return null;
   return {
     source: item.source as ClassifierIdentity["source"],
     local: item.local,
     model: item.model,
+    ...(typeof item.adapter === "string" ? {adapter: item.adapter} : {}),
+    ...(typeof item.revision === "string" ? {revision: item.revision} : {}),
+    ...(item.modelResolution === "provider" ? {modelResolution: "provider" as const} : {}),
+    ...(typeof item.requestedModel === "string" ? {requestedModel: item.requestedModel} : {}),
+    ...(item.modelSource === "provider-reported" || item.modelSource === "configured-unverified" ? {modelSource: item.modelSource} : {}),
   };
+}
+/** Preserve typed diagnostics without copying arbitrary adapter response fields. */
+export function classifierIssues(value: unknown): Issue[] | null {
+  if (!Array.isArray(value)) return null;
+  const issues: Issue[] = [];
+  for (const entry of value) {
+    const item = object(entry);
+    if (!item || typeof item.code !== "string" || !item.code.trim() ||
+      typeof item.message !== "string" || !item.message.trim() ||
+      (item.questionIds !== undefined && (!Array.isArray(item.questionIds) ||
+        !item.questionIds.every(id => typeof id === "string" && id.trim())))) return null;
+    issues.push({code: item.code, message: item.message,
+      ...(item.questionIds === undefined ? {} : {questionIds: [...item.questionIds as string[]]})});
+  }
+  return issues;
 }
 export function classificationIssues(
   value: unknown,
@@ -183,10 +219,18 @@ export function classificationIssues(
     issues.push("Classifier latencyMs must be finite and nonnegative.");
   if (item.costUsd !== null && !nonnegativeFinite(item.costUsd))
     issues.push("Classifier costUsd must be null or finite and nonnegative.");
+  if (item.estimatedCostUsd !== undefined && item.estimatedCostUsd !== null && !nonnegativeFinite(item.estimatedCostUsd))
+    issues.push("Classifier estimatedCostUsd must be unknown or finite and nonnegative.");
+  if (item.accounting !== undefined && (accountingIssue(item.accounting) || item.costUsd !== (item.accounting as RequestAccounting).costUsd))
+    issues.push("Classifier accounting must preserve all outbound attempts and known totals.");
   if (typeof item.evidence !== "string" || !item.evidence.trim())
     issues.push("Classifier evidence must be a nonempty string.");
   if (item.status !== undefined && item.status !== "ok")
     issues.push("Classifier did not return successful traits.");
+  if (item.decisionStatus !== undefined && item.decisionStatus !== "ok")
+    issues.push("Classifier typed decision did not succeed.");
+  if (item.issues !== undefined && (!classifierIssues(item.issues) || (item.issues as unknown[]).length))
+    issues.push("Successful classifier traits cannot contain refusal issues.");
   if (declared && item.source !== declared.source)
     issues.push("Classifier source contradicts its declared identity.");
   if (item.execution !== undefined) {
@@ -201,7 +245,11 @@ export function classificationIssues(
         declared &&
         (reported.source !== declared.source ||
           reported.local !== declared.local ||
-          reported.model !== declared.model)
+          (declared.adapter !== undefined && reported.adapter !== declared.adapter) ||
+          (declared.revision !== undefined && reported.revision !== declared.revision) ||
+          (declared.modelResolution === "provider"
+            ? reported.requestedModel !== declared.model
+            : reported.model !== declared.model))
       )
         issues.push(
           "Classifier execution identity contradicts its declared identity.",
@@ -209,6 +257,36 @@ export function classificationIssues(
     }
   }
   return issues;
+}
+/** Inspect spend independently of whether classification traits are usable. */
+export function classifierAccounting(value: unknown): Pick<Classification, "costUsd" | "accounting" | "execution" | "estimatedCostUsd"> {
+  const item = object(value);
+  if (!item) return {costUsd: null};
+  const accounting = item.accounting !== undefined && !accountingIssue(item.accounting)
+    ? structuredClone(item.accounting as RequestAccounting) : undefined;
+  const execution = classifierIdentity(item.execution);
+  return {
+    costUsd: item.accounting !== undefined ? accounting?.costUsd ?? null : nonnegativeFinite(item.costUsd) ? item.costUsd : null,
+    ...(accounting ? {accounting} : {}),
+    ...(execution ? {execution} : {}),
+    ...(item.estimatedCostUsd === null || nonnegativeFinite(item.estimatedCostUsd) ? {estimatedCostUsd: item.estimatedCostUsd} : {}),
+  };
+}
+
+/** An unusable artifact does not erase independently valid cost, usage or reported identity. */
+export function rejectedExecution(value: unknown, configuredModel: string, issues: string[]): ExecutionResult {
+  const item = object(value);
+  const hasModel = typeof item?.actualModel === "string" && item.actualModel.trim().length > 0;
+  const usage = inspectedUsage(item?.usage);
+  const artifact = object(item?.artifact);
+  const rawOutput = typeof item?.rawOutput === "string" ? item.rawOutput : typeof artifact?.text === "string" ? artifact.text : undefined;
+  return {
+    status: "malformed", actualModel: hasModel ? item!.actualModel as string : configuredModel,
+    ...(!hasModel ? {identityBasis: "configured-unverified" as const} : item?.identityBasis === "provider-reported" || item?.identityBasis === "configured-unverified" ? {identityBasis: item.identityBasis} : {}),
+    usage, costUsd: nonnegativeFinite(item?.costUsd) ? item.costUsd : null,
+    error: `Executor returned invalid metadata: ${issues.join(" ")}`,
+    ...(rawOutput === undefined ? {} : {rawOutput: rawOutput.slice(0, 100_000)}),
+  };
 }
 /** Copy only validated fields. The declaration remains separate from reported execution. */
 export function inspectedClassification(
@@ -222,8 +300,12 @@ export function inspectedClassification(
     confidence: value.confidence,
     latencyMs: value.latencyMs,
     costUsd: value.costUsd,
+    ...(value.estimatedCostUsd === undefined ? {} : {estimatedCostUsd: value.estimatedCostUsd}),
+    ...(value.accounting ? {accounting: structuredClone(value.accounting)} : {}),
     evidence: value.evidence,
     status: "ok",
+    ...(value.decisionStatus === undefined ? {} : {decisionStatus: value.decisionStatus}),
+    ...(value.issues === undefined ? {} : {issues: classifierIssues(value.issues)!}),
     ...(value.execution
       ? { execution: classifierIdentity(value.execution)! }
       : {}),
@@ -242,8 +324,8 @@ export function enforceExecutionIdentity(
     actualModel: result.actualModel,
     ...(result.identityBasis ? { identityBasis: result.identityBasis } : {}),
     usage: result.usage,
-    costUsd: null,
-    error: `Reported model ${JSON.stringify(result.actualModel)} does not match selected model ${JSON.stringify(selectedModel)}. No alias matching is applied; charge is unknown.`,
+    costUsd: result.costUsd,
+    error: `Reported model ${JSON.stringify(result.actualModel)} does not match selected model ${JSON.stringify(selectedModel)}. No alias matching is applied; observed accounting is retained.`,
     ...(result.rawOutput !== undefined || result.artifact
       ? {
           rawOutput: (result.rawOutput ?? result.artifact!.text).slice(

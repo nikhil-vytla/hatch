@@ -1,18 +1,36 @@
 import {
   validateRequest,
   validateResponse,
+  requestRejectionStatus,
   type Adapter,
   type DecisionRequest,
   type DecisionResponse,
   type Issue,
 } from "./contract";
+import {
+  accountingIssue,
+  requestAccounting,
+  type RequestAccounting,
+} from "./accounting";
 /** A late provider result cannot turn cancellation into success. */
 export async function decide(
   adapter: Adapter,
   request: DecisionRequest,
-  options: { signal?: AbortSignal } = {},
+  options: {
+    signal?: AbortSignal;
+    onAccounting?: (accounting: RequestAccounting) => void;
+  } = {},
 ): Promise<DecisionResponse> {
   const started = performance.now();
+  let observed: RequestAccounting | undefined;
+  let observedAt = started;
+  let finished = false;
+  const onAccounting = (accounting: RequestAccounting) => {
+    if (finished || accountingIssue(accounting)) return;
+    observed = structuredClone(accounting);
+    observedAt = performance.now();
+    options.onAccounting?.(structuredClone(accounting));
+  };
   const requestId =
     typeof request?.requestId === "string" && request.requestId.trim()
       ? request.requestId
@@ -20,21 +38,52 @@ export async function decide(
   const failed = (
     status: DecisionResponse["status"],
     issues: Issue[],
-  ): DecisionResponse => ({
-    schemaVersion: "1",
-    requestId,
-    status,
-    decisions: [],
-    execution: adapter.identity,
-    timing: { totalMs: performance.now() - started },
-    issues,
-  });
+  ): DecisionResponse => {
+    const accounting =
+      observed &&
+      requestAccounting(
+        observed.attempts.map((attempt) =>
+          status === "cancelled" && attempt.status === "pending"
+            ? {
+                ...attempt,
+                status: "cancelled" as const,
+                requestMs: attempt.requestMs + performance.now() - observedAt,
+                issues: [...attempt.issues, "cancelled"],
+              }
+            : attempt,
+        ),
+      );
+    const last = accounting?.attempts.at(-1);
+    return {
+      schemaVersion: "2",
+      requestId,
+      status,
+      decisions: [],
+      execution:
+        last && adapter.modelResolution === "provider"
+          ? {
+              ...adapter.identity,
+              model: last.model,
+              requestedModel: last.requestedModel,
+              modelSource: last.modelSource,
+            }
+          : adapter.identity,
+      timing: {
+        totalMs: performance.now() - started,
+        ...(last ? { requestMs: last.requestMs } : {}),
+      },
+      issues,
+      ...(accounting
+        ? { accounting, costUsd: accounting.costUsd, usage: accounting.usage }
+        : {}),
+    };
+  };
   if (options.signal?.aborted)
     return failed("cancelled", [
       { code: "cancelled", message: "The caller cancelled this decision." },
     ]);
   const issues = validateRequest(request, adapter.limits);
-  if (issues.length) return failed("unsupported", issues);
+  if (issues.length) return failed(requestRejectionStatus(issues), issues);
   let abort: (() => void) | undefined;
   try {
     const cancelled = new Promise<DecisionResponse>((resolve) => {
@@ -51,10 +100,12 @@ export async function decide(
         options.signal.addEventListener("abort", abort, { once: true });
       }
     });
-    const pending = adapter.decide(request, options);
+    const pending = adapter.decide(request, { ...options, onAccounting });
     const result = await (options.signal
       ? Promise.race([pending, cancelled])
       : pending);
+    if (result?.accounting && !options.signal?.aborted)
+      onAccounting(result.accounting);
     if (options.signal?.aborted)
       return failed("cancelled", [
         { code: "cancelled", message: "The caller cancelled this decision." },
@@ -63,7 +114,9 @@ export async function decide(
     if (errors.length) return failed("error", errors);
     if (
       result.execution.adapter !== adapter.identity.adapter ||
-      result.execution.model !== adapter.identity.model ||
+      (adapter.modelResolution === "provider"
+        ? result.execution.requestedModel !== adapter.identity.model
+        : result.execution.model !== adapter.identity.model) ||
       result.execution.local !== adapter.identity.local ||
       (adapter.identity.revision !== undefined &&
         result.execution.revision !== adapter.identity.revision)
@@ -84,6 +137,7 @@ export async function decide(
       },
     ]);
   } finally {
+    finished = true;
     if (abort) options.signal?.removeEventListener("abort", abort);
   }
 }
