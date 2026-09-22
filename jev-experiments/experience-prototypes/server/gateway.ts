@@ -342,7 +342,16 @@ export async function evaluate(
       issues: [],
     };
     attempts.push(attempt);
-    publishAccounting();
+    try {
+      publishAccounting();
+    } catch (error) {
+      attempts.pop();
+      throw error;
+    }
+    if (options.signal?.aborted) {
+      attempts.pop();
+      throw cancelled();
+    }
     let finalized = false;
     const finish = () => {
       if (finalized) return;
@@ -419,6 +428,7 @@ export async function evaluate(
       } else {
         const answers = answersFromProvider(raw, body, attempts, attempt);
         finish();
+        if (options.signal?.aborted) throw cancelled();
         const accounting = requestAccounting(attempts);
         const usage = accounting.usage;
         return {
