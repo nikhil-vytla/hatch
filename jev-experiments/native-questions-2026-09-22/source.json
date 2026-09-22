@@ -1,0 +1,69 @@
+{
+  "base": "854657a49a89eb1d19808c9a0e0329be54f037bd",
+  "branch": "nikhil-20260922-jevNativeQuestions",
+  "files": [
+    {
+      "path": "jev-experiments/packages/decision-runtime/src/native.ts",
+      "sha256": "9ae7c64e9826cbfbee0ff8c91b27fc05e440c0d1bf27ad3e073d4cb215a942cf",
+      "bytes": 5075
+    },
+    {
+      "path": "jev-experiments/packages/decision-runtime/src/native.test.ts",
+      "sha256": "1579eb297e7a8d5e7ca30eda65eada7467ae6d52347496886b370fb0d3043010",
+      "bytes": 1546
+    },
+    {
+      "path": "jev-experiments/adapters/typescript/index.ts",
+      "sha256": "f3dd428d4329a0087a46ac938bbeb10941dd310390655230e5ab31fb5c0b3acf",
+      "bytes": 9075
+    },
+    {
+      "path": "jev-experiments/adapters/typescript/index.test.ts",
+      "sha256": "74e1fb265ab2c0f5619820fc52b7a2b7be24f91ae7e5f088392c427772b53261",
+      "bytes": 4921
+    },
+    {
+      "path": "jev-experiments/adapters/go/adapter.go",
+      "sha256": "35798e8ed5bd842eb9f3a7cb1dde9cf4478188c9d2e33bf0e002a403f64c7b3a",
+      "bytes": 11605
+    },
+    {
+      "path": "jev-experiments/adapters/go/adapter_test.go",
+      "sha256": "3ede30af81f958d53d61290007c28615eaff3ac80393c0da0febe69ba43b6f3e",
+      "bytes": 7278
+    },
+    {
+      "path": "jev-experiments/adapters/rust/src/lib.rs",
+      "sha256": "ff32ee6f2b857587d77834fd54ac451d30e9601842bfdcb1bca8e1fe4da71893",
+      "bytes": 20358
+    },
+    {
+      "path": "jev-experiments/src/jev_lab/core.py",
+      "sha256": "c472790754639186178627a2a98ed4b0a8c52bc33ea24ce3795e081dd49f9c65",
+      "bytes": 21865
+    },
+    {
+      "path": "jev-experiments/src/jev_lab/semantic.py",
+      "sha256": "ebc99a8dbe13a5239a6e8a6932df39e55c2068f993f4468c2bc0aec69d0d43a2",
+      "bytes": 5570
+    },
+    {
+      "path": "jev-experiments/src/jev_lab/adapters.py",
+      "sha256": "432c505f6d6f938fd08891ef96ce1f2725f1f36ba0a2dcf9922a92b421a318e8",
+      "bytes": 2632
+    },
+    {
+      "path": "jev-experiments/tests/test_contracts.py",
+      "sha256": "70c1d58dec673caacd118d7558cbfe20bdc9205b39ded152f43399d78b8a2555",
+      "bytes": 6670
+    },
+    {
+      "path": "jev-experiments/tests/test_native_questions.py",
+      "sha256": "53825b1b10e488107a1ad04d784f0c3ae07c435268b0c70793e24ee553c9449c",
+      "bytes": 11552
+    }
+  ],
+  "sourceCommit": "c89327f7f94a7c70551485ffa0a132ee8640c715",
+  "archiveSha256": "5c3971ee338fc5c4abe514d392afda1131c798925c20747dd97e0636739de5d1",
+  "sourcePatchSha256": "880e0c4a33ee27ac7eeeba5d4fd2f9ac4387caab4200522abe124b4ca0d87f1f"
+}
