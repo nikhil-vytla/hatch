@@ -1,6 +1,7 @@
 import { defaultPolicy, validatePolicy, validateRoute } from "./policy";
 import type { RouterConfig } from "./types";
 import { localModelIds } from "./mac-adapter";
+import { classifierConfigIssues } from "./configured-classifier";
 export async function loadConfig(
   path = process.env.JEV_ROUTER_CONFIG,
 ): Promise<RouterConfig> {
@@ -21,6 +22,7 @@ export async function loadConfig(
       "Select one decision runtime: a valid explicit localRuntime or decisionEndpoint.",
     );
   const errors = [
+    ...classifierConfigIssues(config),
     ...validatePolicy(config.policy),
     ...config.routes.flatMap(validateRoute),
   ];

@@ -7,11 +7,15 @@ import {
   validateRoute,
 } from "./policy";
 import { executeDestination } from "./execute";
+import { DecisionClassifierError } from "./classifier";
 import {
   addCosts,
   classifierIdentity,
   classificationIssues,
   inspectedClassification,
+  classifierAccounting,
+  classifierIssues,
+  rejectedExecution,
   declaredIdentity,
   executionIssues,
   enforceExecutionIdentity,
@@ -175,6 +179,7 @@ export async function routeTask(
     let classifierFailure = "Classifier invocation failed.";
     try {
       const raw = await options.classifier(task, options.signal);
+      classification = {...classification, ...classifierAccounting(raw)};
       // First validate the reported traits on their own, then compare declarations.
       // An honest reported identity is retained when it contradicts the declaration.
       const rawIssues = classificationIssues(raw);
@@ -191,13 +196,23 @@ export async function routeTask(
         classifierFailure = identityIssues.join(" ");
         throw Error(classifierFailure);
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof DecisionClassifierError) {
+        classifierFailure = error.message;
+        classification = {...classification, ...classifierAccounting({
+          costUsd: error.response.costUsd,
+          ...(error.response.accounting ? {accounting: error.response.accounting} : {}),
+          execution: {...error.response.execution, source: error.source},
+        }),
+          decisionStatus: error.response.status,
+          issues: classifierIssues(error.response.issues) ?? [{code: "invalid_classifier_issues", message: "Classifier refusal contained malformed issue metadata."}],
+        };
+      }
       classification = {
         ...classification,
         status: "error",
         latencyMs: performance.now() - started,
         evidence: [classification.evidence, classifierFailure].join(" "),
-        costUsd: null,
       };
       return {
         schemaVersion: "1",
@@ -217,7 +232,7 @@ export async function routeTask(
           actualRouteId: null,
           actualModel: null,
           totalLatencyMs: performance.now() - started,
-          totalCostUsd: null,
+          totalCostUsd: classification.costUsd,
           failure: "Classifier failed.",
         },
       };
@@ -290,14 +305,7 @@ export async function routeTask(
       });
       const issues = executionIssues(execution);
       if (issues.length)
-        execution = {
-          status: "malformed",
-          actualModel: route.model,
-          identityBasis: "configured-unverified",
-          usage: null,
-          costUsd: null,
-          error: `Executor returned invalid metadata: ${issues.join(" ")}`,
-        };
+        execution = rejectedExecution(execution, route.model, issues);
       else execution = enforceExecutionIdentity(route.model, execution);
     } catch {
       execution = {
@@ -390,15 +398,15 @@ export async function routeTask(
           execution.artifact.text,
           options.signal,
         );
+        const inspected = inspectVerification(raw);
         if (options.signal?.aborted) {
           return failVerification(
             "cancelled",
-            "Verifier result discarded after cancellation; its charge is unknown.",
-            null,
-            ["Cancelled during verification."],
+            "Verifier quality decision discarded after cancellation; independently valid accounting is retained.",
+            inspected.costUsd,
+            ["Cancelled during verification.", ...inspected.issues],
           );
         }
-        const inspected = inspectVerification(raw);
         if (!inspected.result)
           return failVerification(
             "error",

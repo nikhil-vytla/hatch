@@ -1,8 +1,10 @@
 import {
   DEFAULT_LIMITS,
+  decisionSummary,
   questionValues,
   validateRequest,
   validateResponse,
+  requestRejectionStatus,
   type Adapter,
   type DecisionRequest,
   type DecisionResponse,
@@ -16,12 +18,12 @@ export const priorAdapter: Adapter = {
     const started = performance.now();
     const issues = validateRequest(request, this.limits);
     return {
-      schemaVersion: "1",
+      schemaVersion: "2",
       requestId: request?.requestId ?? "invalid",
       status: options.signal?.aborted
         ? "cancelled"
         : issues.length
-          ? "unsupported"
+          ? requestRejectionStatus(issues)
           : "ok",
       execution: this.identity,
       timing: { totalMs: performance.now() - started },
@@ -33,13 +35,12 @@ export const priorAdapter: Adapter = {
           ? []
           : request.questions.map((q) => {
               const values = questionValues(q);
+              const distribution = values.map(value => ({value, probability: 1 / values.length}));
               return {
                 questionId: q.id,
                 selected: values[0],
-                distribution: values.map((value) => ({
-                  value,
-                  probability: 1 / values.length,
-                })),
+                distribution,
+                ...decisionSummary(q, distribution),
               };
             }),
     };
@@ -64,7 +65,7 @@ export async function decide(
     code: string,
     message: string,
   ): DecisionResponse => ({
-    schemaVersion: "1",
+    schemaVersion: "2",
     requestId: request?.requestId ?? "invalid",
     status,
     decisions: [],
@@ -75,7 +76,7 @@ export async function decide(
   const issues = validateRequest(request, adapter.limits);
   if (issues.length)
     return {
-      ...failure("unsupported", "invalid_request", "Unsupported request."),
+      ...failure(requestRejectionStatus(issues), "invalid_request", "Request was rejected before inference."),
       issues,
     };
   if (options.signal?.aborted)

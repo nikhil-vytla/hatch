@@ -13,7 +13,7 @@ import { evaluate } from "../../experience-prototypes/server/gateway";
 import { decode } from "../../adapters/typescript/index";
 
 const request: DecisionRequest = {
-  schemaVersion: "1",
+  schemaVersion: "2",
   requestId: "fixture",
   state: "fixture",
   questions: [{ id: "q", kind: "boolean", prompt: "Fixture?" }],
@@ -25,7 +25,7 @@ const identity = {
   local: true,
 };
 const response = (): DecisionResponse => ({
-  schemaVersion: "1",
+  schemaVersion: "2",
   requestId: "fixture",
   status: "ok",
   decisions: [
@@ -36,6 +36,7 @@ const response = (): DecisionResponse => ({
         { value: true, probability: 1 },
       ],
       selected: true,
+        probabilityTrue: 1,
     },
   ],
   execution: identity,
@@ -52,9 +53,9 @@ const nativeRequest = {
   questions: { q: { type: "noul" as const, instructions: "Fixture?" } },
 };
 
-test("untyped invalid requests return an explicit unsupported response", async () => {
+test("untyped invalid requests return an explicit error before inference", async () => {
   const result = await decide(adapter, null as unknown as DecisionRequest);
-  expect(result.status).toBe("unsupported");
+  expect(result.status).toBe("error");
   expect(result.decisions).toEqual([]);
   expect(result.issues[0].code).toBe("invalid_request");
 });

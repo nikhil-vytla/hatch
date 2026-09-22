@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
-import { decide, routeTask, classifyEml } from "./index";
+import { decide, routeConfiguredTask, classifyEml } from "./index";
 import { createMacAdapter, classifyMacEml } from "./mac-adapter";
 import { loadConfig } from "./config";
+import { configuredClassifierInfo } from "./configured-classifier";
 const [command, path] = process.argv.slice(2);
 try {
   if (command === "mcp") {
@@ -25,6 +26,7 @@ try {
               ? "configured contract endpoint"
               : "state-blind uniform prior; no model installed",
           operations: ["decide", "route_task", "classify_eml"],
+          taskClassifier: configuredClassifierInfo(config),
           localCloudFallback: false,
         },
         null,
@@ -59,7 +61,7 @@ try {
               ? createMacAdapter(config.localRuntime)
               : undefined,
           })
-        : await routeTask(request, config, { signal: abort.signal });
+        : await routeConfiguredTask(request, config, { signal: abort.signal });
     console.log(JSON.stringify(output, null, 2));
     if (output.status !== "ok") process.exitCode = 2;
   } else {
