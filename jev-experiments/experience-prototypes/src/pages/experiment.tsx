@@ -1,0 +1,280 @@
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { ArrowLeft, FlaskConical } from "lucide-react";
+import { experiments, lookup, type Experiment } from "../catalog";
+import { CapabilityInspector } from "../../../capability-atlas-2026-09-22/capability-inspector";
+import { Pane, Notice } from "../shared";
+import { Provenance } from "../provenance";
+import { experimentNotes } from "../notes/manifest";
+import "./experiment.css";
+
+const sceneEntries = new Set(["materials", "tetris", "crowd", "music", "routing", "visual-search"]);
+
+const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
+const SemanticTable = lazy(() => import("../new-experiments").then(m => ({ default: m.SemanticTable })));
+const UndoExperiment = lazy(() => import("../new-experiments").then(m => ({ default: m.UndoExperiment })));
+const Changes = lazy(() => import("../new-experiments").then(m => ({ default: m.Changes })));
+const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m.GeneratedUI })));
+const Worlds = lazy(() => import("../creative").then(m => ({ default: m.Worlds })));
+const Pixels = lazy(() => import("../creative").then(m => ({ default: m.Pixels })));
+const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
+const Benchmarks = lazy(() => import("../benchmarks").then(m => ({ default: m.Benchmarks })));
+const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
+const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
+const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
+const ResearchMap = lazy(() => import("../local-models").then(m => ({ default: m.ResearchMap })));
+const AgentExperiment = lazy(() => import("../agent-experiments").then(m => ({ default: m.AgentExperiment })));
+const Logos = lazy(() => import("../misc").then(m => ({ default: m.Logos })));
+const Decisions = lazy(() => import("../misc").then(m => ({ default: m.Decisions })));
+const Vision = lazy(() => import("../misc").then(m => ({ default: m.Vision })));
+const Adapters = lazy(() => import("../misc").then(m => ({ default: m.Adapters })));
+const Journeys = lazy(() => import("../journeys").then(m => ({ default: m.Journeys })));
+const Music = lazy(() => import("../music-arranger").then(m => ({ default: m.Music })));
+const JudgeBench = lazy(() => import("../judgment-reliability").then(m => ({ default: m.JudgeBench })));
+const Beverage = lazy(() => import("../cafe-jev").then(m => ({ default: m.Beverage })));
+const VisualSearch = lazy(() => import("../visual-search").then(m => ({ default: m.VisualSearch })));
+const Wardrobe = lazy(() => import("../wardrobe").then(m => ({ default: m.Wardrobe })));
+const IconStudio = lazy(() => import("../icon-studio").then(m => ({ default: m.IconStudio })));
+const TetrisExperience = lazy(() => import("../tetris-experience").then(m => ({ default: m.TetrisExperience })));
+const GhostBrush = lazy(() => import("../ghost-brush").then(m => ({ default: m.GhostBrush })));
+const LiveCrowd = lazy(() => import("../live-crowd").then(m => ({ default: m.LiveCrowd })));
+const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
+const Arcade = lazy(() => import("../arcade").then(m => ({ default: m.Arcade })));
+const ModelRoutingLab = lazy(() => import("../../../roadmap/routing/ModelRoutingLab").then(m => ({ default: m.ModelRoutingLab })));
+const MaterialsSandbox = lazy(() => import("../../../roadmap/materials/MaterialsSandbox").then(m => ({ default: m.MaterialsSandbox })));
+
+const cache = new Map<string, any>();
+async function load(name: string) {
+  if (!cache.has(name)) {
+    const response = await fetch(`/data/${name}.json`);
+    if (!response.ok) throw new Error("No recorded run is attached yet.");
+    cache.set(name, await response.json());
+  }
+  return cache.get(name);
+}
+
+function View({
+  exp,
+  result,
+  composition,
+}: {
+  exp: Experiment;
+  result: any;
+  composition: any;
+}) {
+  switch (exp.id) {
+    case "snake":
+    case "orbital":
+      return (
+        <Suspense
+          fallback={<div className="loading-stage">Opening the arena…</div>}
+        >
+          <Arcade key={exp.id} game={exp.id} result={result} />
+        </Suspense>
+      );
+    case "local-models":
+      return <LocalModels result={result} />;
+    case "benchmark-atlas":
+      return <ResearchMap result={result} />;
+    case "paste":
+      return <Paste record={result} />;
+    case "semantic-table":
+      return <SemanticTable record={result} />;
+    case "undo":
+      return <UndoExperiment record={result} />;
+    case "changes":
+      return <Changes record={result} />;
+    case "ui":
+      return <GeneratedUI record={composition} />;
+    case "worlds":
+      return <Worlds result={result} />;
+    case "pixels":
+      return <Pixels result={result} />;
+    case "music":
+      return <Music result={result} />;
+    case "games":
+      return <Games result={result} />;
+    case "logos":
+      return <Logos result={result} />;
+    case "decisions":
+      return <Decisions result={result} />;
+    case "vision":
+      return <Vision result={result} />;
+    case "adapters":
+      return <Adapters result={result} />;
+    case "beverage":
+      return <Beverage result={result} />;
+    case "journeys":
+      return <Journeys record={result} />;
+    case "judge":
+      return <JudgeBench result={result} />;
+    case "tetris":
+      return <TetrisExperience result={result} />;
+    case "drawing-framing":
+      return <DrawingFraming result={result} />;
+    case "visual-search":
+      return <VisualSearch result={result} />;
+    case "wardrobe":
+      return <Wardrobe result={result} />;
+    case "icon-studio":
+      return <IconStudio result={result} />;
+    case "ghost-brush":
+      return <GhostBrush />;
+    case "crowd":
+      return <LiveCrowd />;
+    case "routing":
+      return <ModelRoutingLab />;
+    case "materials":
+      return <MaterialsSandbox />;
+    case "classify":
+    case "robustness":
+      return <Benchmarks id={exp.id} result={result} />;
+    case "rewardbench2":
+      return <RewardBench result={result} />;
+    case "reward":
+    case "teach":
+    case "replica":
+    case "optimize":
+    case "latency":
+      return <Learning id={exp.id} result={result} />;
+    case "verify":
+    case "search":
+    case "context":
+    case "micro":
+      return <AgentExperiment id={exp.id} result={result} />;
+    default:
+      return (
+        <Pane title="Experiment unavailable">
+          <Notice>
+            This experiment does not have a view yet.{" "}
+            <a href="#/">Return to experiments</a>.
+          </Notice>
+        </Pane>
+      );
+  }
+}
+export function ExperimentPage({ id }: { id: string }) {
+  const exp = lookup(id),
+    [recordSlot, setRecordSlot] = useState<{ id: string; value: any } | null>(null),
+    [composition, setComposition] = useState<any>(null),
+    [error, setError] = useState(""),
+    [aboutOpen, setAboutOpen] = useState(false);
+  const sceneEntry = sceneEntries.has(id);
+  const record = recordSlot?.id === id ? recordSlot.value : null;
+  const loadedRecord = useRef(recordSlot);
+  loadedRecord.current = recordSlot;
+  const note = experimentNotes.find(item => item.scene === id);
+  useEffect(() => {
+    // Activity recreates effects when returning from a note. Reusing the same
+    // record keeps the existing scene mounted instead of resetting its state.
+    if (loadedRecord.current?.id === id && loadedRecord.current.value) return;
+    let alive = true;
+    const setRecord = (value: any) => setRecordSlot({ id, value });
+    setRecord(null);
+    setError("");
+    setAboutOpen(false);
+    if (id === "materials" || id === "routing") {
+      setRecord({ result: {} });
+      return () => {
+        alive = false;
+      };
+    }
+    load(exp.data)
+      .then((r) => {
+        if (alive) setRecord(r);
+      })
+      .catch((e) => {
+        if (alive) {
+          setError(e.message);
+          setRecord({ result: {} });
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  useEffect(() => {
+    // The second UI recording may still be loading when the scene is hidden.
+    // Its lifecycle must not depend on whether the main recording has arrived.
+    if (id !== "ui" || composition) return;
+    let alive = true;
+    load("composed-ui")
+      .then((r) => alive && setComposition(r.result))
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [id, composition]);
+  return (
+    <section className={`detail published-experiment${sceneEntry ? " scene-entry" : ""}`}>
+      <div className="breadcrumbs">
+        <a href="#/">
+          <ArrowLeft size={13} /> All experiments
+        </a>
+        <span>/</span>
+        <span>{exp.category}</span>
+      </div>
+      {sceneEntry ? <>
+        <header className="scene-entry-heading">
+          <h1>{exp.title}</h1>
+          <button type="button" aria-expanded={aboutOpen} aria-controls="experiment-background" onClick={() => setAboutOpen(open => !open)}>About & evidence</button>
+        </header>
+        <section id="experiment-background" className="scene-entry-background" hidden={!aboutOpen} aria-label="About this experiment">
+          <p>{exp.description}</p>
+          <p className="scene-entry-question">{exp.question}</p>
+          {note && <p><a href={`#/notes/${note.slug}`}>Read the note: {note.title} →</a></p>}
+          <CapabilityInspector key={id} id={id} />
+          {record && <Provenance result={record.result ?? {}} />}
+        </section>
+      </> : <><section className="detail-heading">
+        <div>
+          <span className="eyebrow">
+            EXPERIMENT {String(experiments.indexOf(exp) + 1).padStart(2, "0")} /{" "}
+            {exp.category.toUpperCase()}
+          </span>
+          <h1>{exp.title}</h1>
+          <p>{exp.description}</p>
+        </div>
+        <div className="experiment-question">
+          <FlaskConical size={17} />
+          <p>{exp.question}</p>
+        </div>
+      </section>
+      <CapabilityInspector key={id} id={id} />
+      {record && exp.id !== "local-models" && (
+        <Provenance result={record.result ?? {}} />
+      )}
+      </>}
+      {error && <Notice error>{error}</Notice>}
+      {record ? (
+        <Suspense
+          fallback={
+            <div className="loading-stage">
+              <span className="loader" /> Opening the experiment…
+            </div>
+          }
+        >
+          <View
+            key={id}
+            exp={exp}
+            result={record.result ?? {}}
+            composition={composition}
+          />
+        </Suspense>
+      ) : (
+        <div className="loading-stage">
+          <span className="loader" /> Opening the experiment…
+        </div>
+      )}
+      {record?.manifest && exp.id !== "local-models" && (
+        <p className="record-footer">
+          Recorded {String(record.manifest.created ?? "").slice(0, 10)} ·{" "}
+          {record.manifest.experiment ?? exp.id} ·{" "}
+          <a
+            href={`/data/${id === "ui" ? "composed-ui" : exp.data}.json`}
+            download
+          >
+            Download evidence ↓
+          </a>
+        </p>
+      )}
+    </section>
+  );
+}
