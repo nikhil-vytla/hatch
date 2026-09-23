@@ -11,10 +11,10 @@ import { boardFeatures, type Landing } from "../../../live-worlds/tetris/engine"
 import { optionCriteria, type Answer, type Contestant, type Question } from "./tetris";
 import { DECISION_INSTRUCTIONS } from "../../../live-worlds/tetris/session";
 
-export type FramingId = "landing-choice" | "spot-clean" | "spot-score";
+export type FramingId = "landing-choice" | "spot-clean" | "spot-score" | "spot-clean-cached";
 export type Wire = { state: unknown; questions: Record<string, { type: "choice" | "noul" | "score"; instructions: string; criteria?: Record<string, string> | string[] }> };
 export type WireAnswer = { value: string | number; probabilities?: Record<string, number> | null; confidence?: number | null };
-export type Send = (body: Wire) => Promise<{ answers: Record<string, WireAnswer> }>;
+export type Send = (body: Wire, signal?: AbortSignal) => Promise<{ answers: Record<string, WireAnswer> }>;
 
 const HOLES = ["no new holes", "one new hole", "two new holes", "three new holes", "many new holes"];
 const LINES = ["", "one line", "two lines", "three lines", "four lines"];
@@ -83,24 +83,58 @@ export const FRAMING_NAMES: Record<FramingId, string> = {
   "landing-choice": "Pick one landing (features as JSON)",
   "spot-clean": "Judge each spot: clean or not",
   "spot-score": "Rate each spot 0–3",
+  "spot-clean-cached": "Judge each spot, remembering past judgements",
 };
 
-/** A live contestant that asks with one framing. `record` receives every exchange. */
-export type Exchange = { framing: FramingId; pieceId: number; board: string[]; body: Wire; response?: unknown; error?: string; attempts?: { status: unknown; retryAfterMs?: number }[]; ms: number };
+const CLEAN = "After this, the stack stays clean: flat, with no new holes and no tall tower.";
+/** Picks the best-judged group; ties keep the leftmost, as in Laya. */
+function best(groups: ReturnType<typeof spots>, judged: (g: ReturnType<typeof spots>[number]) => number) {
+  let top = groups[0];
+  for (const g of groups) if (judged(g) > judged(top)) top = g;
+  const total = groups.reduce((sum, g) => sum + judged(g), 0) || 1;
+  const probabilities = Object.fromEntries(groups.flatMap((g) => g.landings.map((l) => [l.id, judged(g) / total / g.landings.length])));
+  return { choice: top.landings[0].id, probabilities };
+}
+
+/** A live contestant that asks with one framing. `record` receives every decision. */
+export type Exchange = {
+  framing: FramingId; pieceId: number; board: string[]; body?: Wire; response?: unknown; error?: string;
+  attempts?: { status: unknown; retryAfterMs?: number }[]; ms: number;
+  /** Judgement per sentence, and how many came from memory rather than a request. */
+  judged?: Record<string, number>; fromMemory?: number; choice?: string;
+};
 export function framedJev(framing: FramingId, send: Send, record?: (exchange: Exchange) => void): Contestant {
+  const memory = new Map<string, number>();
+  const failure = (q: Question, body: Wire, started: number) => (error: any): Answer => {
+    const ms = performance.now() - started;
+    record?.({ framing, pieceId: q.pieceId, board: q.state.board, body, error: String(error?.message ?? error), attempts: (error?.attempts ?? []).map((a: any) => ({ status: a.status, retryAfterMs: a.retryAfterMs })), ms });
+    return { error: String(error?.message ?? error), latencyMs: ms };
+  };
   return {
     id: `jev-${framing}`, name: `Jev · ${FRAMING_NAMES[framing]}`, source: "live",
-    ask(q): Promise<Answer> {
-      const built = buildRequest(framing, q), started = performance.now();
-      return send(built.body).then((response) => {
+    ask(q, _mode, signal): Promise<Answer> {
+      const started = performance.now();
+      if (framing === "spot-clean-cached") {
+        // Each question carries its own sentence, so a judgement can be reused wherever that sentence recurs.
+        const groups = spots(q), fresh = groups.filter((g) => !memory.has(g.sentence));
+        const body: Wire = { state: { task: "A Tetris piece is about to land. Each question describes one place it could come to rest, after code worked out the result.", piece: q.state.active.type }, questions: Object.fromEntries(fresh.map((g, i) => [`s${i}`, { type: "noul" as const, instructions: `${g.sentence} ${CLEAN}` }])) };
+        const finish = (response?: { answers: Record<string, WireAnswer> }): Answer => {
+          fresh.forEach((g, i) => memory.set(g.sentence, Number(response!.answers[`s${i}`].value)));
+          const judged = Object.fromEntries(groups.map((g) => [g.sentence, memory.get(g.sentence)!]));
+          const out = best(groups, (g) => judged[g.sentence]), ms = fresh.length ? performance.now() - started : 0;
+          record?.({ framing, pieceId: q.pieceId, board: q.state.board, body: fresh.length ? body : undefined, response, ms, judged, fromMemory: groups.length - fresh.length, choice: out.choice });
+          return { choice: out.choice, probabilities: out.probabilities, confidence: null, latencyMs: ms };
+        };
+        return fresh.length ? send(body, signal).then(finish, failure(q, body, started)) : Promise.resolve(finish());
+      }
+      const built = buildRequest(framing, q);
+      return send(built.body, signal).then((response) => {
         const ms = performance.now() - started, out = built.read(response.answers);
-        record?.({ framing, pieceId: q.pieceId, board: q.state.board, body: built.body, response, ms });
+        const groups = framing === "landing-choice" ? [] : spots(q);
+        const judged = Object.fromEntries(groups.map((g) => [g.sentence, out.judged[g.key]]));
+        record?.({ framing, pieceId: q.pieceId, board: q.state.board, body: built.body, response, ms, judged, fromMemory: 0, choice: out.choice });
         return { choice: out.choice, probabilities: out.probabilities, confidence: null, latencyMs: ms };
-      }, (error) => {
-        const ms = performance.now() - started;
-        record?.({ framing, pieceId: q.pieceId, board: q.state.board, body: built.body, error: String(error?.message ?? error), attempts: (error?.attempts ?? []).map((a: any) => ({ status: a.status, retryAfterMs: a.retryAfterMs })), ms });
-        return { error: String(error?.message ?? error), latencyMs: ms };
-      });
+      }, failure(q, built.body, started));
     },
   };
 }
