@@ -177,3 +177,20 @@ export function recordedFraming(exchanges: Exchange[], framing: FramingId): Cont
     },
   };
 }
+
+/**
+ * A code player that reads the spot sentences perfectly (no model): it bounds
+ * what the sentences themselves allow.
+ */
+export function perfectReader(): Contestant {
+  const read: Send = async (body) => {
+    const st = body.state as any;
+    return { answers: Object.fromEntries(Object.entries(body.questions).map(([key]) => {
+      const s: string = st.spots?.[key] ?? "";
+      const holes = /no new holes/.test(s) ? 0 : 1, bump = ["no bump", "a small bump", "a big bump", "a tall tower"].findIndex((b) => s.includes(b));
+      const good = /completes (one|two|three|four) line/.test(s) ? 1 : holes ? 0.05 : [0.9, 0.7, 0.3, 0.1][Math.max(0, bump)];
+      return [key, { value: good, probabilities: { true: good, false: 1 - good } }];
+    })) };
+  };
+  return { ...framedJev("spot-clean", read), id: "code-reader", name: "Perfect reader of the sentences", source: "code" };
+}

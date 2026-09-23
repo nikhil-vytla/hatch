@@ -89,7 +89,7 @@ function Header({ route }: { route: string }) {
         </a>
         <nav aria-label="Main navigation">
           <a href="#/" aria-current={!route || route === "#" || route === "#/" || route === "#collection" || route.startsWith("#experiment/") ? "page" : undefined}>Play</a>
-          <a href="#/arena" aria-current={route === "#/arena" ? "page" : undefined}>Arena</a>
+          <a href="#/arena" aria-current={route.startsWith("#/arena") ? "page" : undefined}>Arena</a>
           <a href="#/notes" aria-current={route.startsWith("#/notes") ? "page" : undefined}>Notes</a>
           <a href="#/about" aria-current={route === "#/about" ? "page" : undefined}>About</a>
           <details className="header-settings" ref={settings} onKeyDown={(event) => {
@@ -261,7 +261,7 @@ function App() {
       ? route.split("/")[2].replaceAll("-", " ")
       : route.startsWith("#/notes") ? "Notes"
       : route === "#/about" || route === "#about" ? "About"
-      : route === "#/arena" ? "Arena"
+      : route.startsWith("#/arena") ? "Arena"
       : id ? lookup(id).title : "Play";
     document.title = `${label.charAt(0).toUpperCase()}${label.slice(1)} · Jev experiments`;
   }, [route, id]);
@@ -293,7 +293,7 @@ function App() {
       )}
       {route === "#/about" || route === "#about" ? (
         <Suspense fallback={<main className="loading-stage">Opening About…</main>}><AboutPage /></Suspense>
-      ) : route === "#/arena" ? (
+      ) : route.startsWith("#/arena") ? (
         <Suspense fallback={<main className="loading-stage">Opening the arena…</main>}><ArenaPage /></Suspense>
       ) : id || route.startsWith("#/notes") ? null : <PlayPage />}
       <footer className="site-footer">
