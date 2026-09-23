@@ -13,6 +13,10 @@ import { bootstrap, bootstrapMany } from "./bootstrap";
 import { heuristic, randomPlayer, TetrisArena, type Contestant as Player } from "../tetris";
 import { perfectReader } from "../tetris-framings";
 import type { ArenaIndex, Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
+import { readRecord } from "../../../../experience-prototypes/scripts/records";
+import { CASES, comparePreferences } from "../../../../cafe-jev/cases";
+import { FIELDS, FIELD_LABELS, VALUES, candidates, constraintErrors, drinkName, interpret, type Field } from "../../../../cafe-jev/engine";
+import { keywordAnswers, priorAnswers, tokensFor } from "../cafe-baselines";
 
 const here = resolve(import.meta.dir, "../..");
 const lab = resolve(here, "../..");
@@ -245,6 +249,93 @@ async function realtimeCard(out: string): Promise<Card> {
   };
 }
 
+// ---------------------------------------------------------------- Café Jev
+/**
+ * The 102 authored café cases. Jev's recorded answers and two code baselines go
+ * through the same café engine. The reference is the authored expectation for
+ * each case, written before the calls but not independently annotated.
+ */
+export function cafeCard(out: string): Card {
+  const record = readRecord(resolve(lab, "cafe-jev/cafe.jsonl")), doc = record.result, recordedOn = String(record.manifest.created).slice(0, 10);
+  const rows: any[] = doc.rows;
+  const gold = (c: (typeof CASES)[number], f: Field) => { const e = c.expected[f]; return e.status === "unknown" || e.status === "conflicting" ? e.status : `${e.status}_${e.value}`; };
+  // A per-field prior fitted on these same cases: how often each token is the expected one.
+  const prior = Object.fromEntries(FIELDS.map((f) => {
+    const counts = Object.fromEntries(tokensFor(f).map((t) => [t, 0]));
+    for (const c of CASES) counts[gold(c, f)]++;
+    return [f, Object.fromEntries(Object.entries(counts).map(([t, n]) => [t, n / CASES.length]))];
+  })) as Record<Field, Record<string, number>>;
+  const contestants = [
+    { id: "jev", name: "Jev · recorded", short: "Jev", kind: "hosted" as const, model: "typesafe-ai/jev", policy: "seven typed preference questions plus a source turn each; code checks recipes", color: COLORS.jev },
+    { id: "code.keywords", name: "Keyword reader", short: "Keywords", kind: "code" as const, policy: "keyword and negation rules written after reading these cases and their expected answers; an optimistic ceiling for rules, not a held-out baseline; one-hot answers", color: COLORS.code },
+    { id: "code.prior", name: "Most common answer", short: "Prior", kind: "code" as const, policy: "answers each field with its most common expected token across these same cases; optimistic because it is fitted on the evaluation set", color: COLORS.code3 },
+  ];
+  const caseRows = CASES.map((c) => ({ c, row: rows.find((r) => r.id === c.id)! }));
+  if (caseRows.some((x) => !x.row)) throw new Error("A declared café case has no recorded row");
+  const answersFor = (id: string, c: (typeof CASES)[number], row: any) => id === "jev" ? row.response.answers : id === "code.keywords" ? keywordAnswers(c.input) : priorAnswers(c.input, prior);
+  type Outcome = { exact: boolean; fields: number; feasibleExact: boolean; violation: boolean; suggested: string | null; tokens: Record<string, string>; dists: number[][] };
+  const outcomes: Record<string, Outcome[]> = {};
+  for (const ct of contestants) outcomes[ct.id] = caseRows.map(({ c, row }) => {
+    const answers = answersFor(ct.id, c, row), decision = interpret({ answers } as any, c.input);
+    const cmp = comparePreferences(decision.preferences, c.expected);
+    const expectedFeasible = candidates(c.expected, c.input.inventory);
+    const same = (a: any[], b: any[]) => JSON.stringify(a.map((r) => JSON.stringify(r)).sort()) === JSON.stringify(b.map((r) => JSON.stringify(r)).sort());
+    return {
+      exact: cmp.exact, fields: FIELDS.filter((f) => cmp.perField[f]).length, feasibleExact: same(decision.feasible, expectedFeasible),
+      violation: Boolean(decision.suggested && constraintErrors(decision.suggested, c.expected, c.input.inventory).length),
+      suggested: decision.suggested ? drinkName(decision.suggested) : null,
+      tokens: Object.fromEntries(FIELDS.map((f) => [f, String(answers[f]?.value ?? "unknown")])),
+      dists: FIELDS.map((f) => { const p = answers[f]?.probabilities ?? { [String(answers[f]?.value)]: 1 }; return tokensFor(f).map((t) => Number(p[t] ?? 0)); }),
+    };
+  });
+  const metrics: MetricDef[] = [
+    { id: "exact", label: "Understood every preference", unit: "%", better: "higher", axis: "accuracy", help: "Share of cases where all seven interpreted preferences (value and strength) match the authored expectation." },
+    { id: "fields", label: "Preferences right", unit: "%", better: "higher", axis: "accuracy", help: "Share of the seven preference fields per case that match the authored expectation after the café engine interprets the answer." },
+    { id: "feasible", label: "Right set of drinks", unit: "%", better: "higher", axis: "accuracy", help: "Share of cases where the interpreted preferences allow exactly the drinks the authored expectation allows." },
+    { id: "violation", label: "Served a drink that breaks a requirement", unit: "%", better: "lower", axis: "outcome", help: "Share of cases where the suggested drink, after the café engine's own checks, still breaks a requirement in the authored expectation (for example dairy for a dairy-free customer)." },
+    { id: "ece", label: "Calibration error", unit: "", better: "lower", axis: "calibration", help: "Expected calibration error of the raw preference answers over ten confidence bins. The code baselines answer with certainty, so their error equals their miss rate." },
+    { id: "confidentWrong", label: "Confident but wrong", unit: "%", better: "lower", axis: "calibration", help: "Share of raw preference answers given with at least 70% probability that differ from the authored expectation." },
+  ];
+  const group = (c: (typeof CASES)[number]) => (c.category === "finite-partial-state" ? "templated" : "hand-written");
+  const stats = (id: string, idx: number[]) => {
+    const o = outcomes[id], n = idx.length || 1;
+    const answers = idx.flatMap((i) => FIELDS.map((f, k) => ({ prediction: o[i].dists[k].some((x) => x > 0) ? o[i].dists[k] : tokensFor(f).map(() => 1), reference: tokensFor(f).map((t) => (t === gold(CASES[i], f) ? 1 : 0)) })));
+    const card = score(answers);
+    return { exact: idx.filter((i) => o[i].exact).length / n, fields: idx.reduce((s, i) => s + o[i].fields, 0) / (n * FIELDS.length), feasible: idx.filter((i) => o[i].feasibleExact).length / n, violation: idx.filter((i) => o[i].violation).length / n, ece: card.ece, confidentWrong: card.confidentButWrong / (card.decisions || 1) };
+  };
+  const estimate = (id: string, filter: (c: (typeof CASES)[number]) => boolean) => {
+    const idx = CASES.map((c, i) => (filter(c) ? i : -1)).filter((i) => i >= 0);
+    const point = stats(id, idx), ci = bootstrapMany(idx.map((i) => [i]), (s) => stats(id, s), 1000);
+    return Object.fromEntries(Object.entries(point).map(([k, v]) => [k, { value: v, n: idx.length, ...ci[k as keyof typeof point], method: "bootstrap-case" as const }]));
+  };
+  const results = Object.fromEntries(contestants.map((ct) => [ct.id, estimate(ct.id, () => true)]));
+  const slices: Card["slices"] = { workflow: {} };
+  for (const g of ["templated", "hand-written"]) slices.workflow[g] = Object.fromEntries(contestants.map((ct) => [ct.id, estimate(ct.id, (c) => group(c) === g)]));
+  // Chunks in the typed-decisions shape, so the calibration and case views work unchanged: one row per case × field.
+  const targets = { schema: "arena.targets/1", rows: CASES.flatMap((c, ci) => FIELDS.map((f) => ({ c: ci, key: f, type: f, wf: group(c), keys: tokensFor(f), target: tokensFor(f).map((t) => (t === gold(c, f) ? 1 : 0)) }))) };
+  mkdirSync(join(out, "preds"), { recursive: true });
+  writeFileSync(join(out, "cafe.targets.json"), JSON.stringify(targets));
+  const option = (f: Field, t: string) => t === "unknown" ? "not stated" : t === "conflicting" ? "contradictory" : `${t.startsWith("required") ? "must be" : "would like"} ${VALUES[f][t.replace(/^(required|preferred)_/, "")]}`;
+  writeFileSync(join(out, "cafe.cases.json"), JSON.stringify({ schema: "arena.cases/1", cases: CASES.map((c, ci) => ({
+    id: c.id, workflow: group(c),
+    state: { customer: c.input.transcript.map((t) => t.text), suggested: Object.fromEntries(contestants.map((ct) => [ct.short, outcomes[ct.id][ci].suggested ?? "nothing"])), breaksARequirement: contestants.filter((ct) => outcomes[ct.id][ci].violation).map((ct) => ct.short) },
+    questions: FIELDS.map((f) => ({ key: f, type: FIELD_LABELS[f].toLowerCase(), instructions: FIELD_LABELS[f], keys: tokensFor(f), options: tokensFor(f).map((t) => option(f, t)) })),
+  })) }));
+  const preds: Record<string, string> = {};
+  for (const ct of contestants) { preds[ct.id] = `preds/cafe.${ct.id}.json`; writeFileSync(join(out, preds[ct.id]), JSON.stringify({ schema: "arena.preds/1", contestant: ct.id, p: outcomes[ct.id].flatMap((o) => o.dists.map((d) => d.map((x) => round(x)))) })); }
+  const rs = runSet(`${recordedOn}-cafe-jev`, "Café Jev, 102 authored cases", recordedOn, { benchmark: "cafe-jev", menu: doc.menuRevision, contract: "cafe-jev-turn-v1", cases: 102 }, ["cafe-jev/cafe.jsonl"]);
+  return {
+    id: "cafe", title: "What does the customer actually want?", question: "A customer describes a drink. Each contestant answers seven typed questions about their preferences; the café's own code then picks a legal recipe.",
+    family: "judgement-set", reference: "authored-labels", metrics, primary: "exact",
+    contestants: contestants.map((ct) => ({ ...ct, default: true, runSets: ct.id === "jev" ? [rs.id] : [] })),
+    results, slices, facetLabels: { workflow: "Cases" },
+    provenance: `Agreement with authored expectations · 102 café cases (81 templated one-sentence states, 21 hand-written requests) · expectations written before the calls, not independently annotated · typesafe-ai/jev via AI Gateway, recorded ${new Date(recordedOn).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })} · code baselines computed at build; the keyword rules were written after reading these cases and the most-common-answer baseline is fitted on them, so both are optimistic · 95% case-bootstrap intervals`,
+    chunks: { preds, targets: "cafe.targets.json", cases: "cafe.cases.json" },
+    lenses: ["bars", "scatter", "reliability", "table", "case"],
+    protocolGroups: [{ hash: rs.protocolHash, label: rs.label, runSets: [rs.id] }],
+  };
+}
+
 // ---------------------------------------------------------------- robustness
 function robustnessCard(out: string): Card {
   const doc = JSON.parse(readFileSync(join(recordings, "robustness-position-summary.json"), "utf8"));
@@ -282,7 +373,7 @@ function robustnessCard(out: string): Card {
 export async function buildArena(outDir: string) {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
-  const cards = [await turnsCard(outDir), await realtimeCard(outDir), robustnessCard(outDir), studyCard(outDir)];
+  const cards = [await turnsCard(outDir), await realtimeCard(outDir), robustnessCard(outDir), studyCard(outDir), cafeCard(outDir)];
   const runSets: RunSet[] = [
     runSet("2026-09-20-typed-decisions", "Typed Decisions test split, 10 models", "2026-09-20", {}, ["experience-prototypes/public/data/local-models.json"]),
     runSet("2026-09-22-tetris-turns-busy", "First turn attempt (provider busy)", "2026-09-22", { game: "tetris", timing: "turns" }, ["packages/arena/recordings/attempt-1-provider-busy.jsonl.gz"], { standing: "availability-only", note: "Sent three requests at once and hit provider capacity; 93 of 127 failed. Measures availability, not the designs." }),
