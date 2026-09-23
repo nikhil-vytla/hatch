@@ -338,3 +338,35 @@ pre.diff { padding: 6px 0; }
 
 .scroller::-webkit-scrollbar, .column::-webkit-scrollbar, pre::-webkit-scrollbar { width: 10px; height: 10px; }
 .scroller::-webkit-scrollbar-thumb, .column::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.08); border-radius: 5px; border: 3px solid transparent; background-clip: padding-box; }
+
+/* The changes pane: what the agent changed, since the last prompt or over the session. */
+.work { display: flex; flex: 1; min-height: 0; }
+.work > .columns { flex: 1; min-width: 0; }
+/* The pane takes the side panels' place: only the conversation's column stays. */
+.work.with-changes .column:not(:has([data-panel="transcript"])) { display: none; }
+.column:has([data-panel="transcript"]) { min-width: 380px; }
+.changes-pane { display: flex; flex-direction: column; width: min(520px, 45vw); flex: none; border-left: 1px solid var(--line); background: #0e0e10; }
+.changes-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 10px; border-bottom: 1px solid var(--line); flex: none; }
+.segmented { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--surface-2); }
+.segmented button { padding: 3px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12.5px; }
+.segmented button[aria-selected="true"] { background: var(--surface-3); color: var(--text); }
+.changes-body { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+.changes-summary { margin: 0; padding: 10px 14px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.changes-summary .plus { color: var(--good); }
+.changes-summary .minus { color: var(--bad); }
+.pad { padding: 10px 14px; margin: 0; }
+.file { border-bottom: 1px solid var(--line); }
+.file-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: 0; border-radius: 0; background: transparent; text-align: left; position: sticky; top: 0; z-index: 1; background: #0e0e10; }
+.file-head:hover { background: var(--surface); }
+.file-head .icon-chevron { width: 13px; height: 13px; color: var(--faint); transition: transform 150ms; }
+.file-head .icon-chevron.open { transform: rotate(90deg); }
+.file-head .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.file-head .status { flex: none; width: 18px; text-align: center; font: 600 11px var(--mono); border-radius: 4px; }
+.status.added { color: var(--good); }
+.status.modified { color: var(--warn); }
+.status.deleted { color: var(--bad); }
+.file pre.diff { border: 0; border-radius: 0; max-height: none; background: transparent; }
+.diff .row .num { display: inline-block; width: 34px; padding-right: 8px; text-align: right; color: var(--faint); opacity: 0.6; user-select: none; }
+.detail pre.diff .row .num { display: none; }
+.diff .row.more { color: var(--faint); padding-left: 12px; }
+.icon-button.on { background: var(--surface-3); color: var(--text); }

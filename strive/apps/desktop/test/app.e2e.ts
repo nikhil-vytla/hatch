@@ -218,6 +218,23 @@ test("a session the window has left doesn't wait on it for approvals", async () 
   agent.close();
 });
 
+test("the changes pane shows what changed since the last prompt, file by file", async () => {
+  const { page, cwd } = await openApp();
+  writeFileSync(join(cwd, "notes.ts"), "const a = 1;\n");
+  await page.getByPlaceholder("Ask strive to do anything…").fill("change things");
+  await page.keyboard.press("Enter");
+  await page.locator(".checkpoints li").first().waitFor();
+  writeFileSync(join(cwd, "notes.ts"), "const a = 2;\n");
+  writeFileSync(join(cwd, "new.txt"), "hello\n");
+  await page.getByRole("button", { name: "changes", exact: true }).click();
+  const pane = page.getByRole("complementary", { name: "changes" });
+  await pane.getByText("2 changed files").waitFor();
+  assert.deepEqual(await pane.locator(".file-head .path").allTextContents(), ["new.txt", "notes.ts"]);
+  const notes = pane.locator(".file", { hasText: "notes.ts" });
+  assert.equal(await notes.locator(".row.remove").textContent(), "1−const a = 1;");
+  assert.equal(await notes.locator(".row.add").textContent(), "1+const a = 2;");
+});
+
 test("a reloaded window shows what happened since it opened", async () => {
   const { page, cwd } = await openApp();
   const rpc = await Rpc.open();

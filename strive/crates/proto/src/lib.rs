@@ -83,6 +83,7 @@ methods! {
     SessionApprovals = "session/approvals" (SessionApprovalsParams) -> Appended;
             ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
     SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
+    SessionChanges = "session/changes" (SessionChangesParams) -> SessionChangesResult;
     HostRegister = "host/register" (SessionRef) -> AgentConfig;
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
@@ -523,6 +524,53 @@ pub struct SessionRewindResult {
     pub saved_as: u64,
     /// Nested repositories, left as they were: checkpoints don't hold them.
     pub not_saved: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionChangesParams {
+    pub id: String,
+    /// Changes since this checkpoint, to the files as they are now.
+    pub checkpoint: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionChangesResult {
+    /// Changed files, by path.
+    pub files: Vec<FileChange>,
+    /// More files changed than are listed.
+    pub more: bool,
+}
+
+/// One file's change: its text before and after, when it's text and not too
+/// large to show (checkpoints don't save ignored files or nested repositories,
+/// so those never appear).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FileChange {
+    pub path: String,
+    pub status: ChangeStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub before: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub after: Option<String>,
+    /// Binary, or too large to show; only its status is known.
+    pub opaque: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ChangeStatus {
+    Added,
+    Modified,
+    Deleted,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

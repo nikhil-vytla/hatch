@@ -26,6 +26,7 @@ use strive_proto::{
 };
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
+use strive_proto::{SessionChanges, SessionChangesParams, SessionChangesResult};
 use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
 
 /// The session a connection hosts. `Closed` once it has gone, so a
@@ -424,6 +425,29 @@ async fn prompt(state: &Arc<State>, params: Value) -> Reply {
     reply::<SessionPrompt>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
 }
 
+/// Files the changes view shows at most, and the most of each file's text.
+const CHANGES_FILES: usize = 200;
+const CHANGES_BYTES: u64 = 256 * 1024;
+
+async fn changes(state: &Arc<State>, id: &str, checkpoint: u64) -> Reply {
+    let sid = session_id(id)?;
+    let info = state.sessions.info(&sid).await.map_err(session_error)?;
+    let commit = state.sessions.checkpoint_commit(&sid, checkpoint).await.map_err(session_error)?.ok_or_else(|| {
+        RpcError::new(RpcError::INVALID_PARAMS, format!("no checkpoint {checkpoint} in this session"))
+    })?;
+    let workspace = workspace_of(&info.cwd)?;
+    let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), &workspace)
+        .ok_or_else(|| RpcError::new(RpcError::INTERNAL_ERROR, "checkpoints need git, which isn't available"))?;
+    // Not while a checkpoint or rewind of this session is under way.
+    let lock = state.sessions.checkpoint_lock(&sid);
+    let _held = lock.lock().await;
+    let (files, more) = tokio::task::spawn_blocking(move || shadow.changes(&commit, CHANGES_FILES, CHANGES_BYTES))
+        .await
+        .map_err(|e| internal(&e))?
+        .map_err(|e| internal(&e))?;
+    reply::<SessionChanges>(SessionChangesResult { files, more })
+}
+
 async fn rewind(state: &Arc<State>, params: Value) -> Reply {
     let SessionRewindParams { id, checkpoint: to } = parse::<SessionRewind>(params)?;
     let sid = session_id(&id)?;
@@ -679,6 +703,10 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         SessionRewind::NAME => {
             require_person(conn)?;
             rewind(state, params).await
+        }
+        SessionChanges::NAME => {
+            let SessionChangesParams { id, checkpoint } = parse::<SessionChanges>(params)?;
+            changes(state, &id, checkpoint).await
         }
         SessionRead::NAME => {
             let SessionRef { id } = parse::<SessionRead>(params)?;

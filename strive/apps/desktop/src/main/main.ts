@@ -25,6 +25,7 @@ const ALLOWED: ReadonlySet<MethodName> = new Set<MethodName>([
   "session/approvals",
   "session/budget",
   "session/rewind",
+  "session/changes",
   "approval/respond",
   "daemon/status",
 ]);

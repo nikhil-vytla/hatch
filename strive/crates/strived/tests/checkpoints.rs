@@ -370,3 +370,47 @@ fn rewinding_while_another_session_in_the_same_directory_is_changing_files_is_re
     running.join().unwrap();
     assert_eq!(w.read("b.txt").as_deref(), Some("b\n"));
 }
+
+/// What changed since a checkpoint, as the desktop's changes view shows it:
+/// each file's status and text, binary files by status only, ignored files
+/// not at all. Looking doesn't change what the next rewind restores.
+#[test]
+fn changes_since_a_checkpoint_are_listed_with_their_text() {
+    let mut w = Ws::new();
+    w.write(".gitignore", "cache/\n");
+    w.write("a.txt", "one\ntwo\n");
+    w.write("c.txt", "going away\n");
+    w.prompt("first");
+    w.write("a.txt", "one\nTWO\n");
+    w.write("b.txt", "new\n");
+    fs::remove_file(w.p("c.txt")).unwrap();
+    fs::write(w.p("pic.bin"), [0u8, 1, 2, 3, 0, 255]).unwrap();
+    w.write("cache/x.txt", "ignored");
+    let r = w.c.ok("session/changes", &json!({"id": w.id, "checkpoint": 1}));
+    assert_eq!(r["more"], false);
+    let files: Vec<(String, String)> = r["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f["path"].as_str().unwrap().to_string(), f["status"].as_str().unwrap().to_string()))
+        .collect();
+    assert_eq!(
+        files,
+        vec![
+            ("a.txt".into(), "modified".into()),
+            ("b.txt".into(), "added".into()),
+            ("c.txt".into(), "deleted".into()),
+            ("pic.bin".into(), "added".into()),
+        ]
+    );
+    let a = &r["files"][0];
+    assert_eq!(
+        (a["before"].as_str(), a["after"].as_str(), &a["opaque"]),
+        (Some("one\ntwo\n"), Some("one\nTWO\n"), &json!(false))
+    );
+    assert_eq!(r["files"][2]["before"], "going away\n");
+    assert_eq!(r["files"][3]["opaque"], true, "binary: status only");
+    assert!(w.rewind(1)["error"].is_null());
+    assert_eq!(w.read("a.txt").as_deref(), Some("one\ntwo\n"), "the rewind restored what it would have");
+    assert_eq!(w.read("b.txt"), None);
+}

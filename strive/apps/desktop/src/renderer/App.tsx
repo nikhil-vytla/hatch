@@ -18,11 +18,12 @@ import {
   setReverted,
   type Workspace,
 } from "@strive/workspace";
-import { type ReactNode, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import type { Bridge, Opened } from "../shared/bridge";
 import { type Item, label, summarize, type Tool } from "./conversation";
-import { diffLines } from "./diff";
+import { ChangesPane } from "./ChangesPane";
+import { Diff } from "./DiffView";
 import { Icon, type IconName } from "./icons";
 import { Markdown } from "./MarkdownView";
 import { SessionModel } from "./model";
@@ -31,6 +32,9 @@ type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promis
 
 /** Whether the sessions sidebar shows, kept across launches. */
 const SIDEBAR_KEY = "strive.sidebar";
+
+/** Whether the changes pane shows, kept across launches. */
+const CHANGES_KEY = "strive.changes";
 
 export function App({ bridge, opened, onSwitch }: Props) {
   const [model] = useState(() => new SessionModel(opened.session.id, opened.home));
@@ -83,6 +87,19 @@ export function App({ bridge, opened, onSwitch }: Props) {
     });
 
   const switchTo = (to?: string) => act(onSwitch(to));
+  const [changes, setChanges] = useState(() => localStorage.getItem(CHANGES_KEY) === "shown");
+
+  const toggleChanges = () =>
+    setChanges((open) => {
+      localStorage.setItem(CHANGES_KEY, open ? "hidden" : "shown");
+
+      return !open;
+    });
+
+  // The files may have changed: an effect finished, or a turn ended.
+  const filesVersion =
+    model.activity.filter((a) => a.outcome !== undefined).length +
+    model.conversation.items.filter((i) => i.kind === "turn").length;
 
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
@@ -94,6 +111,9 @@ export function App({ bridge, opened, onSwitch }: Props) {
       } else if (e.key === "b") {
         e.preventDefault();
         toggleSidebar();
+      } else if (e.key === "d") {
+        e.preventDefault();
+        toggleChanges();
       }
     };
 
@@ -101,6 +121,11 @@ export function App({ bridge, opened, onSwitch }: Props) {
 
     return () => window.removeEventListener("keydown", keys);
   });
+
+  const loadChanges = useCallback(
+    (checkpoint: number) => bridge.request("session/changes", { id, checkpoint }),
+    [bridge, id],
+  );
 
   const session: SessionActions = {
     prompt: (text) => act(bridge.request("session/prompt", { id, text })),
@@ -117,7 +142,14 @@ export function App({ bridge, opened, onSwitch }: Props) {
         <Sidebar bridge={bridge} opened={opened} model={model} onSwitch={switchTo} onToggle={toggleSidebar} />
       )}
       <div className="main-area">
-        <Titlebar model={model} opened={opened} sidebar={sidebar} onToggle={toggleSidebar} />
+        <Titlebar
+          model={model}
+          opened={opened}
+          sidebar={sidebar}
+          onToggle={toggleSidebar}
+          changes={changes}
+          onChanges={toggleChanges}
+        />
         {closed && (
           <div className="banner danger">
             Lost the connection to the daemon. Restart it with strive, then reopen this window.
@@ -129,17 +161,27 @@ export function App({ bridge, opened, onSwitch }: Props) {
           </button>
         )}
         {loaded && <Proposals model={model} layout={layout} onChange={edit} />}
-        <Columns
-          workspace={workspace}
-          onMove={(panel, column, before) => {
-            const r = record(layout, "person", `move ${panel}`, [{ op: "move", panel, column, before }]);
+        <div className={`work ${changes ? "with-changes" : ""}`}>
+          <Columns
+            workspace={workspace}
+            onMove={(panel, column, before) => {
+              const r = record(layout, "person", `move ${panel}`, [{ op: "move", panel, column, before }]);
 
-            if (r.ok) edit(r.history);
-          }}
-          render={(panel) => (
-            <PanelView panel={panel} model={model} opened={opened} session={session} inline={inline} />
+              if (r.ok) edit(r.history);
+            }}
+            render={(panel) => (
+              <PanelView panel={panel} model={model} opened={opened} session={session} inline={inline} />
+            )}
+          />
+          {changes && (
+            <ChangesPane
+              checkpoints={model.checkpoints.map((c) => c.n)}
+              version={filesVersion}
+              load={loadChanges}
+              onClose={toggleChanges}
+            />
           )}
-        />
+        </div>
       </div>
     </div>
   );
@@ -260,9 +302,16 @@ function basename(path: string): string {
   return path.split("/").filter(Boolean).at(-1) ?? path;
 }
 
-type TitlebarProps = { model: SessionModel; opened: Opened; sidebar: boolean; onToggle: () => void };
+type TitlebarProps = {
+  model: SessionModel;
+  opened: Opened;
+  sidebar: boolean;
+  onToggle: () => void;
+  changes: boolean;
+  onChanges: () => void;
+};
 
-function Titlebar({ model, opened, sidebar, onToggle }: TitlebarProps) {
+function Titlebar({ model, opened, sidebar, onToggle, changes, onChanges }: TitlebarProps) {
   const first = model.conversation.items.find((i) => i.kind === "user");
   const title = first?.kind === "user" ? first.text : "New session";
 
@@ -295,6 +344,16 @@ function Titlebar({ model, opened, sidebar, onToggle }: TitlebarProps) {
       ) : (
         <span className="status">Ready</span>
       )}
+      <button
+        type="button"
+        className={`icon-button ${changes ? "on" : ""}`}
+        onClick={onChanges}
+        title="Changes (⌘D)"
+        aria-label="changes"
+        aria-pressed={changes}
+      >
+        <Icon name="diff" />
+      </button>
     </header>
   );
 }
@@ -816,8 +875,8 @@ function ToolDetail({ tool, session }: { tool: Tool; session: SessionActions }) 
   return (
     <div className="detail">
       {tool.reason && <p className="danger small">{tool.reason}</p>}
-      {r.kind === "edit" && <Diff before={texts[0] ?? ""} after={texts[1] ?? ""} />}
-      {r.kind === "write" && <Diff before="" after={texts[0] ?? ""} />}
+      {r.kind === "edit" && <Diff before={texts[0] ?? ""} after={texts[1] ?? ""} path={r.path} />}
+      {r.kind === "write" && <Diff before="" after={texts[0] ?? ""} path={r.path} />}
       {r.kind !== "edit" && r.kind !== "write" && output !== undefined && <Output text={output} />}
       {tool.truncated && <p className="faint small">The output was cut to fit; the agent saw only this much.</p>}
     </div>
@@ -833,21 +892,6 @@ function Output({ text }: { text: string }) {
     <pre className="output">
       {lines.slice(0, MAX_LINES).join("\n")}
       {lines.length > MAX_LINES && `\n… ${lines.length - MAX_LINES} more lines`}
-    </pre>
-  );
-}
-
-function Diff({ before, after }: { before: string; after: string }) {
-  const rows = diffLines(before, after).slice(0, MAX_LINES);
-
-  return (
-    <pre className="diff">
-      {rows.map((row) => (
-        <div key={row.n} className={`row ${row.kind}`}>
-          <span className="sign">{row.kind === "add" ? "+" : row.kind === "remove" ? "−" : " "}</span>
-          {row.text || " "}
-        </div>
-      ))}
     </pre>
   );
 }

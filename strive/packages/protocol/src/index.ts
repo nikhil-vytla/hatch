@@ -100,6 +100,14 @@ export type * from "./generated/SessionReadResult";
 
 export type * from "./generated/SessionRef";
 
+export type * from "./generated/SessionChangesParams";
+
+export type * from "./generated/SessionChangesResult";
+
+export type * from "./generated/FileChange";
+
+export type * from "./generated/ChangeStatus";
+
 export type * from "./generated/SessionRewindParams";
 
 export type * from "./generated/SessionRewindResult";

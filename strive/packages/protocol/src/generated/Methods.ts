@@ -20,6 +20,8 @@ import type { SessionApprovalsParams } from "./SessionApprovalsParams";
 import type { SessionAttachParams } from "./SessionAttachParams";
 import type { SessionAttachResult } from "./SessionAttachResult";
 import type { SessionBudgetParams } from "./SessionBudgetParams";
+import type { SessionChangesParams } from "./SessionChangesParams";
+import type { SessionChangesResult } from "./SessionChangesResult";
 import type { SessionCreateParams } from "./SessionCreateParams";
 import type { SessionInfo } from "./SessionInfo";
 import type { SessionListParams } from "./SessionListParams";
@@ -49,6 +51,7 @@ export type Methods = {
   "session/approvals": { params: SessionApprovalsParams; result: Appended };
   "approval/respond": { params: ApprovalRespondParams; result: Empty };
   "session/rewind": { params: SessionRewindParams; result: SessionRewindResult };
+  "session/changes": { params: SessionChangesParams; result: SessionChangesResult };
   "host/register": { params: SessionRef; result: AgentConfig };
   "host/record": { params: HostRecordParams; result: Appended };
   "host/stream": { params: HostStreamParams; result: Empty };

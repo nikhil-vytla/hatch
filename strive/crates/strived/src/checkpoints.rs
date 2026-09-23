@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 
+use strive_proto::{ChangeStatus, FileChange};
+
 /// Every git process running for a checkpoint or rewind, by process group.
 /// A daemon that must exit with work unfinished kills these first, so a
 /// restore can't go on changing files after it has given up ownership.
@@ -53,13 +55,17 @@ impl Shadow {
     }
 
     fn run_raw(&self, args: &[&str]) -> io::Result<String> {
+        self.run_indexed(args, &self.git_dir.join("index"))
+    }
+
+    fn run_indexed(&self, args: &[&str], index: &Path) -> io::Result<String> {
         let mut cmd = Command::new(&self.git);
         cmd.args(["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false"])
             .args(["-c", "user.name=strive", "-c", "user.email=strive@localhost"])
             .args(args)
             .env("GIT_DIR", &self.git_dir)
             .env("GIT_WORK_TREE", &self.work_tree)
-            .env("GIT_INDEX_FILE", self.git_dir.join("index"))
+            .env("GIT_INDEX_FILE", index)
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_NOSYSTEM", "1")
             .env("GIT_TERMINAL_PROMPT", "0")
@@ -183,6 +189,61 @@ impl Shadow {
                 ancestors(path).iter().any(|a| restored.contains(a)) || restored_dirs.contains(path)
             })
             .collect())
+    }
+
+    /// What changed from `commit` to the files as they are now, as
+    /// checkpoints see them (no ignored files, no nested repositories): at
+    /// most `max_files` files, each file's text only up to `max_bytes`.
+    pub fn changes(&self, commit: &str, max_files: usize, max_bytes: u64) -> io::Result<(Vec<FileChange>, bool)> {
+        let now = self.current_tree()?;
+        let listed = self.list(&["diff", "--name-status", "-z", "--no-renames", commit, &now])?;
+        let mut files = Vec::new();
+        let (pairs, _) = listed.as_chunks::<2>();
+        for [status, path] in pairs.iter().take(max_files) {
+            let status = match status.as_str() {
+                "A" => ChangeStatus::Added,
+                "D" => ChangeStatus::Deleted,
+                _ => ChangeStatus::Modified,
+            };
+            let side = |rev: &str| -> io::Result<Option<String>> { self.text_at(rev, path, max_bytes) };
+            let before = if status == ChangeStatus::Added { None } else { side(commit)? };
+            let after = if status == ChangeStatus::Deleted { None } else { side(&now)? };
+            let opaque = (status != ChangeStatus::Added && before.is_none())
+                || (status != ChangeStatus::Deleted && after.is_none());
+            files.push(FileChange { path: path.clone(), status, before, after, opaque });
+        }
+        Ok((files, pairs.len() > max_files))
+    }
+
+    /// The workspace as a tree, staged into an index of its own so the
+    /// checkpoints' index (what the next snapshot starts from) is untouched.
+    fn current_tree(&self) -> io::Result<String> {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let index = self.git_dir.join(format!("index.changes.{}.{n}", std::process::id()));
+        // Starting from the checkpoints' index makes `add` fast: unchanged files are known.
+        if self.git_dir.join("index").exists() {
+            std::fs::copy(self.git_dir.join("index"), &index)?;
+        }
+        let nested = self.nested_repositories()?;
+        let excluded: Vec<String> = nested.iter().map(|p| format!(":(exclude,literal){p}")).collect();
+        let mut args = vec!["add", "-A", "--", "."];
+        args.extend(excluded.iter().map(String::as_str));
+        let tree = self.run_indexed(&args, &index).and_then(|_| self.run_indexed(&["write-tree"], &index));
+        let _ = std::fs::remove_file(&index); // a leftover is only a stale temporary file
+        Ok(tree?.trim().to_string())
+    }
+
+    /// A file's text in `rev`, or `None` if it's binary or longer than `max_bytes`.
+    fn text_at(&self, rev: &str, path: &str, max_bytes: u64) -> io::Result<Option<String>> {
+        let spec = format!("{rev}:{path}");
+        let size: u64 = self.run(&["cat-file", "-s", &spec])?.parse().unwrap_or(u64::MAX);
+        if size > max_bytes {
+            return Ok(None);
+        }
+        let text = self.run_raw(&["cat-file", "-p", &spec])?;
+        // Lossy decoding turns what isn't UTF-8 into U+FFFD: binary either way.
+        Ok((!text.contains('\0') && !text.contains('\u{FFFD}')).then_some(text))
     }
 
     /// Makes the workspace match `commit`: changed files are put back,
