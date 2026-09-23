@@ -32,6 +32,14 @@ impl Repo {
         let out = self.env.strive_in(&self.path(), args);
         (out.status.code().unwrap(), String::from_utf8(out.stdout).unwrap(), String::from_utf8(out.stderr).unwrap())
     }
+    fn entries(&self, id: &str) -> Vec<Value> {
+        let r = self.env.rpc().ok("session/read", &json!({"id": id}));
+        r["entries"].as_array().unwrap().clone()
+    }
+    /// The seq of the user message with this text, read from the journal.
+    fn seq_of(&self, id: &str, text: &str) -> u64 {
+        self.entries(id).iter().find(|e| e["event"]["text"] == text).unwrap()["seq"].as_u64().unwrap()
+    }
     fn tamper(&self, id: &str, from: &str, to: &str) {
         let path = self.env.session_dir(id).join("journal.jsonl");
         let text = fs::read_to_string(&path).unwrap();
@@ -56,7 +64,9 @@ fn log_shows_the_latest_session_in_this_directory() {
     assert!(entry_line(&out, 1).ends_with(&format!("  started in {}", r.path().display())), "{out}");
     assert!(entry_line(&out, 2).ends_with("  budget: $5.0000"), "new sessions get the default budget: {out}");
     assert!(entry_line(&out, 3).ends_with("  approvals: auto-edit"), "new sessions get the default approvals: {out}");
-    assert!(entry_line(&out, 4).ends_with("  you: fix the flaky test"), "{out}");
+    let prompt = r.seq_of(&id, "fix the flaky test");
+    assert!(entry_line(&out, prompt - 1).ends_with("  checkpoint 1: files saved"), "{out}");
+    assert!(entry_line(&out, prompt).ends_with("  you: fix the flaky test"), "{out}");
     assert!(!out.contains("older prompt"), "{out}");
 }
 
@@ -67,7 +77,7 @@ fn log_takes_an_explicit_session_id() {
     r.session(&["newer prompt"]);
     let (code, out, _) = r.run(&["log", &older]);
     assert_eq!(code, 0);
-    assert!(entry_line(&out, 4).ends_with("  you: older prompt"), "{out}");
+    assert!(entry_line(&out, r.seq_of(&older, "older prompt")).ends_with("  you: older prompt"), "{out}");
 }
 
 #[test]
@@ -78,7 +88,10 @@ fn log_json_is_the_verified_journal() {
     assert_eq!(code, 0);
     let v: Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["session"]["id"], id);
-    assert_eq!(v["entries"][3]["event"], json!({"type": "userMessage", "text": "hello"}));
+    assert_eq!(
+        v["entries"].as_array().unwrap().last().unwrap()["event"],
+        json!({"type": "userMessage", "text": "hello"})
+    );
     assert_eq!(v.get("problem"), None);
 }
 
@@ -94,12 +107,16 @@ fn log_without_sessions_says_how_to_start_one() {
 fn log_of_a_tampered_session_shows_what_verified_and_fails() {
     let r = Repo::new();
     let id = r.session(&["one", "two"]);
+    let (one, two) = (r.seq_of(&id, "one"), r.seq_of(&id, "two"));
     r.tamper(&id, r#""text":"two""#, r#""text":"TWO""#);
     let (code, out, _) = r.run(&["log"]);
     assert_eq!(code, 1);
-    assert!(entry_line(&out, 4).ends_with("  you: one"), "{out}");
-    assert!(!out.contains("#5 "), "{out}");
-    assert_eq!(out.lines().last().unwrap(), "journal FAILED verification: entry 5 was modified, removed or moved");
+    assert!(entry_line(&out, one).ends_with("  you: one"), "{out}");
+    assert!(!out.contains(&format!("#{two} ")), "{out}");
+    assert_eq!(
+        out.lines().last().unwrap(),
+        format!("journal FAILED verification: entry {two} was modified, removed or moved")
+    );
 }
 
 #[test]
@@ -107,15 +124,19 @@ fn verify_passes_intact_sessions_and_names_the_broken_one() {
     let r = Repo::new();
     let good = r.session(&["fine"]);
     let bad = r.session(&["about to change"]);
+    let (good_len, bad_seq) = (r.entries(&good).len(), r.seq_of(&bad, "about to change"));
     let (code, out, _) = r.run(&["verify", &good]);
-    assert_eq!((code, out.trim()), (0, format!("ok    {good}  4 entries").as_str()));
+    assert_eq!((code, out.trim()), (0, format!("ok    {good}  {good_len} entries").as_str()));
 
     r.tamper(&bad, "about to change", "changed!");
     let (code, out, _) = r.run(&["verify", "--all"]);
     assert_eq!(code, 1);
     assert_eq!(
         out.lines().collect::<Vec<_>>(),
-        vec![format!("FAIL  {bad}  entry 4 was modified, removed or moved"), format!("ok    {good}  4 entries"),]
+        vec![
+            format!("FAIL  {bad}  entry {bad_seq} was modified, removed or moved"),
+            format!("ok    {good}  {good_len} entries"),
+        ]
     );
 }
 
@@ -160,6 +181,7 @@ fn verify_all_reports_sessions_whose_journal_cannot_be_read() {
     let emptied = r.session(&["x"]);
     let garbled = r.session(&[]);
     let fine = r.session(&[]);
+    let (fine_len, emptied_len) = (r.entries(&fine).len(), r.entries(&emptied).len());
     fs::write(r.env.session_dir(&emptied).join("journal.jsonl"), b"").unwrap();
     fs::write(r.env.session_dir(&garbled).join("journal.jsonl"), b"not json\n").unwrap();
 
@@ -168,9 +190,9 @@ fn verify_all_reports_sessions_whose_journal_cannot_be_read() {
     assert_eq!(
         out.lines().collect::<Vec<_>>(),
         vec![
-            format!("ok    {fine}  3 entries"),
+            format!("ok    {fine}  {fine_len} entries"),
             format!("FAIL  {garbled}  entry 1 was modified, removed or moved"),
-            format!("FAIL  {emptied}  entries were removed from the end (0 of 4 committed entries remain)"),
+            format!("FAIL  {emptied}  entries were removed from the end (0 of {emptied_len} committed entries remain)"),
         ]
     );
     let (_, out, _) = r.run(&["sessions", "--all"]);

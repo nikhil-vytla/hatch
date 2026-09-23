@@ -394,7 +394,9 @@ impl Ledger {
                 | Event::EffectFinished { .. }
                 | Event::ApprovalModeSet { .. }
                 | Event::ApprovalRequested { .. }
-                | Event::ApprovalDecided { .. } => {}
+                | Event::ApprovalDecided { .. }
+                | Event::Checkpointed { .. }
+                | Event::Rewound { .. } => {}
             }
         }
         for r in abandoned.values() {

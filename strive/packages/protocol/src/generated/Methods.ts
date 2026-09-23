@@ -23,6 +23,8 @@ import type { SessionListResult } from "./SessionListResult";
 import type { SessionPromptParams } from "./SessionPromptParams";
 import type { SessionReadResult } from "./SessionReadResult";
 import type { SessionRef } from "./SessionRef";
+import type { SessionRewindParams } from "./SessionRewindParams";
+import type { SessionRewindResult } from "./SessionRewindResult";
 
 export type Methods = {
   "initialize": { params: InitializeParams; result: InitializeResult };
@@ -41,6 +43,7 @@ export type Methods = {
   "blob/get": { params: BlobGetParams; result: BlobGetResult };
   "session/approvals": { params: SessionApprovalsParams; result: Appended };
   "approval/respond": { params: ApprovalRespondParams; result: Empty };
+  "session/rewind": { params: SessionRewindParams; result: SessionRewindResult };
 };
 
 export type MethodName = keyof Methods;

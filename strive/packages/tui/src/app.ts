@@ -24,7 +24,8 @@ export const COMMANDS: SlashCommand[] = [
   { name: "status", description: "Show the daemon's status" },
   { name: "session", description: "Show this session's id and how to resume it" },
     { name: "budget", description: "Set this session's spending limit: /budget 10, or /budget off", argumentHint: "<dollars>|off" },
-  { name: "approvals", description: "What the agent may do without asking: ask, auto-edit or full-auto", argumentHint: "<mode>" },
+    { name: "approvals", description: "What the agent may do without asking: ask, auto-edit or full-auto", argumentHint: "<mode>" },
+  { name: "rewind", description: "List checkpoints, or put the files back to one: /rewind 2", argumentHint: "[checkpoint]" },
   { name: "help", description: "List commands and keys" },
   { name: "quit", description: "Exit strive (the daemon keeps running)" },
 ];
@@ -81,8 +82,12 @@ export function describe(entry: Entry): string {
         case "interrupted":
           return style.danger("Interrupted: the daemon stopped while this ran.");
       }
-    case "approvalModeSet":
+        case "approvalModeSet":
       return style.faint(`Approvals: ${MODE_NAMES[e.mode]}`);
+    case "checkpointed":
+      return style.faint(`Checkpoint ${e.checkpoint}`);
+    case "rewound":
+      return style.accent(`Rewound to checkpoint ${e.to}. Undo with /rewind ${e.savedAs}.`);
     case "approvalRequested":
       return style.accent(`Allow ${e.description}?`);
     case "approvalDecided":
@@ -107,8 +112,11 @@ export class App {
     private readonly footer = new Text("", 1, 0);
   /** The approval line shown while an effect waits for a decision. */
   private readonly prompt = new Text("", 1, 0);
-  /** Effects waiting for a decision, oldest first. */
+    /** Effects waiting for a decision, oldest first. */
   private readonly pending = new Map<number, string>();
+  /** Checkpoints and what each was taken before. */
+  private readonly checkpoints = new Map<number, string>();
+  private awaitingPrompt?: number;
   private readonly spend = new Spend();
   private readonly offClose: () => void;
   private session?: SessionInfo;
@@ -212,7 +220,16 @@ export class App {
     this.lastSeq = entry.seq;
     this.spend.apply(entry.event);
     const e = entry.event;
-    if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
+        if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
+    if (e.type === "checkpointed") {
+      this.checkpoints.set(e.checkpoint, "");
+      this.awaitingPrompt = e.checkpoint;
+    }
+    if (e.type === "userMessage" && this.awaitingPrompt !== undefined) {
+      this.checkpoints.set(this.awaitingPrompt, `before “${e.text}”`);
+      this.awaitingPrompt = undefined;
+    }
+    if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
     if (e.type === "approvalDecided") this.pending.delete(e.effect);
     const next = this.pending.values().next();
     this.prompt.setText(
@@ -279,6 +296,25 @@ export class App {
           return;
         }
         await this.client.request("session/approvals", { id: this.session.id, mode });
+        return;
+      }
+            case "rewind": {
+        const arg = text.slice(1).split(/\s+/)[1];
+        if (!arg) {
+          if (this.checkpoints.size === 0) {
+            this.say(style.muted("No checkpoints yet: one is taken before each prompt."));
+            return;
+          }
+          this.say([...this.checkpoints].map(([n, what]) => `${n}  ${what}`).join("\n"));
+          this.say(style.muted("Put the files back with /rewind <number>."));
+          return;
+        }
+        const checkpoint = Number(arg);
+        try {
+          await this.client.request("session/rewind", { id: this.session.id, checkpoint });
+        } catch (e) {
+          this.say(style.danger(e instanceof ServerError && e.code === -32602 ? `No checkpoint ${arg} in this session.` : (e as Error).message));
+        }
         return;
       }
       case "session":

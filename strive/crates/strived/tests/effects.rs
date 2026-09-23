@@ -283,3 +283,18 @@ fn an_effect_in_a_session_whose_directory_is_gone_says_so() {
         "nothing is journaled for an effect that couldn't begin"
     );
 }
+
+/// Effect numbers pair starts with finishes, so they never repeat in a
+/// session, within one daemon run or across restarts.
+#[test]
+fn effect_numbers_continue_across_effects_and_restarts() {
+    let mut w = Ws::new();
+    assert_eq!(w.run(json!({"kind": "write", "path": "a", "content": "1"}))["effect"], 1);
+    assert_eq!(w.run(json!({"kind": "write", "path": "b", "content": "2"}))["effect"], 2);
+    w.env.stop();
+    w.c = w.env.rpc();
+    assert_eq!(w.run(json!({"kind": "write", "path": "c", "content": "3"}))["effect"], 3);
+    let numbers: Vec<u64> =
+        w.events().iter().filter(|e| e["type"] == "effectStarted").map(|e| e["effect"].as_u64().unwrap()).collect();
+    assert_eq!(numbers, vec![1, 2, 3]);
+}

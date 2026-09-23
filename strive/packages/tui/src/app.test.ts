@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
-import { StriveClient } from "@strive/protocol";
+import { type Entry, StriveClient } from "@strive/protocol";
 import { startDaemon, type TestDaemon, VirtualTerminal } from "@strive/testkit";
 import { App, parseSessionMode, type SessionMode } from "./app";
 
@@ -29,6 +29,7 @@ async function openUi(mode: SessionMode = "new"): Promise<Ui> {
 beforeEach(() => {
   daemon = startDaemon();
   uis = [];
+  rmSync(CWD, { recursive: true, force: true });
   mkdirSync(CWD, { recursive: true });
 });
 
@@ -107,7 +108,9 @@ test("resuming a tampered session explains why and saves nothing", async () => {
   await enter(first, "original");
   await first.term.waitFor("› original");
   first.app.quit(0);
-  const id = sessions()[0]!.id;
+    const id = sessions()[0]!.id;
+  const logged = JSON.parse(daemon.strive("log", id, "--json").stdout) as { entries: Entry[] };
+  const seq = logged.entries.find((e) => e.event.type === "userMessage")!.seq;
   daemon.strive("stop");
   const journal = join(daemon.home, "sessions", id, "journal.jsonl");
   writeFileSync(journal, readFileSync(journal, "utf8").replace("original", "tampered"));
@@ -115,7 +118,7 @@ test("resuming a tampered session explains why and saves nothing", async () => {
   daemon.strive("status");
 
   const ui = await openUi({ resume: id });
-    await ui.term.waitFor("This session's journal failed verification: entry 4 was modified, removed or moved.");
+      await ui.term.waitFor(`This session's journal failed verification: entry ${seq} was modified, removed or moved.`);
   await enter(ui, "should not be saved");
   await Bun.sleep(100);
   expect(readFileSync(journal, "utf8")).toBe(before);
@@ -255,4 +258,34 @@ test("/approvals switches the mode", async () => {
   await ui.term.waitFor("Approvals: ask");
   await enter(ui, "/approvals sometimes");
   await ui.term.waitFor("Use /approvals ask, /approvals auto-edit or /approvals full-auto.");
+});
+
+test("/rewind lists checkpoints and puts the files back", async () => {
+  const ui = await openUi();
+  const file = join(CWD, "notes.txt");
+  writeFileSync(file, "v1");
+  await enter(ui, "first");
+  await ui.term.waitFor("› first");
+  writeFileSync(file, "v2");
+  await enter(ui, "second");
+  await ui.term.waitFor("› second");
+  writeFileSync(file, "v3");
+
+  await enter(ui, "/rewind");
+  await ui.term.waitFor("1  before “first”");
+  await ui.term.waitFor("2  before “second”");
+
+  await enter(ui, "/rewind 1");
+  await ui.term.waitFor("Rewound to checkpoint 1. Undo with /rewind 3.");
+  expect(readFileSync(file, "utf8")).toBe("v1");
+
+  await enter(ui, "/rewind 3");
+  await ui.term.waitFor("Rewound to checkpoint 3.");
+  expect(readFileSync(file, "utf8")).toBe("v3");
+});
+
+test("/rewind to a checkpoint that doesn't exist says so", async () => {
+  const ui = await openUi();
+  await enter(ui, "/rewind 99");
+  await ui.term.waitFor("No checkpoint 99 in this session.");
 });

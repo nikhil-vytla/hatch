@@ -3,6 +3,7 @@
 //! With no subcommand, `strive` makes sure the per-user daemon is running and
 //! current, then hands the terminal to the TUI.
 
+mod checkpoints;
 mod client;
 mod commands;
 mod credentials;

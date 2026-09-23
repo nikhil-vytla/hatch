@@ -13,7 +13,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex as StdMutex;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use strive_budget::{Ledger, Limits, Refusal, Reservation, charge, open_calls};
 use strive_journal::{Journal, Key, OpenError, Problem, Report};
@@ -86,10 +86,6 @@ impl From<SessionError> for CallError {
 }
 
 enum Cmd {
-    Append {
-        events: Vec<Event>,
-        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
-    },
     SetBudget {
         limits: Limits,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
@@ -123,6 +119,22 @@ enum Cmd {
         decision: Decision,
         by: String,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
+    /// A prompt, preceded by the checkpoint taken just before it.
+    Prompt {
+        text: String,
+        commit: Option<String>,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
+    CheckpointCommit {
+        checkpoint: u64,
+        reply: oneshot::Sender<Option<String>>,
+    },
+    /// A rewind to `to`, with the checkpoint of the files just before it.
+    Rewound {
+        to: u64,
+        saved: String,
+        reply: oneshot::Sender<io::Result<u64>>,
     },
     /// Whether a reservation would fit, without holding it.
     CheckBudget {
@@ -164,6 +176,8 @@ pub struct Sessions {
     pending: StdMutex<HashMap<(SessionId, u64), oneshot::Sender<Decision>>>,
     /// Set by shutdown: no new writers may start.
     stopping: std::sync::atomic::AtomicBool,
+    /// One checkpoint at a time per session: git can't share an index.
+    checkpointing: StdMutex<HashMap<SessionId, Arc<Mutex<()>>>>,
 }
 
 #[derive(Debug)]
@@ -190,6 +204,7 @@ impl Sessions {
             live: Mutex::new(HashMap::new()),
             pending: StdMutex::new(HashMap::new()),
             stopping: std::sync::atomic::AtomicBool::new(false),
+            checkpointing: StdMutex::new(HashMap::new()),
         })
     }
 
@@ -264,17 +279,43 @@ impl Sessions {
         Ok((info, entries, stream))
     }
 
-    pub async fn append(&self, id: &SessionId, events: Vec<Event>) -> Result<Vec<Entry>> {
-        let (_, tx) = self.writer(id).await?;
-        let (reply, rx) = oneshot::channel();
-        tx.send(Cmd::Append { events, reply }).map_err(|_| writer_gone())?;
-        Ok(rx.await.map_err(|_| writer_gone())??)
-    }
-
     pub async fn set_budget(&self, id: &SessionId, limits: Limits) -> Result<Vec<Entry>> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::SetBudget { limits, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// The session's shadow repository for checkpoints.
+    pub fn checkpoint_dir(&self, id: &SessionId) -> PathBuf {
+        self.dir(id).join("checkpoints.git")
+    }
+
+    /// Serializes checkpoint work for one session.
+    pub fn checkpoint_lock(&self, id: &SessionId) -> Arc<Mutex<()>> {
+        self.checkpointing.lock().expect("checkpoint locks").entry(id.clone()).or_default().clone()
+    }
+
+    /// Journals a prompt after the checkpoint taken for it.
+    pub async fn prompt(&self, id: &SessionId, text: String, commit: Option<String>) -> Result<Vec<Entry>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Prompt { text, commit, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    pub async fn checkpoint_commit(&self, id: &SessionId, checkpoint: u64) -> Result<Option<String>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::CheckpointCommit { checkpoint, reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())
+    }
+
+    /// Journals a rewind; returns the checkpoint number given to `saved`.
+    pub async fn record_rewind(&self, id: &SessionId, to: u64, saved: String) -> Result<u64> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Rewound { to, saved, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
@@ -485,6 +526,8 @@ struct Writer {
     next_effect: u64,
     /// Effects started and not yet finished.
     open_effects: std::collections::BTreeSet<u64>,
+    /// Checkpoint commits; checkpoint n is `checkpoints[n - 1]`.
+    checkpoints: Vec<String>,
     mode: ApprovalMode,
     subscribers: Vec<mpsc::UnboundedSender<Entry>>,
     verify: Verifier,
@@ -530,6 +573,13 @@ fn spawn_writer(
         next_call,
         next_effect,
         open_effects: std::collections::BTreeSet::new(),
+        checkpoints: events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Checkpointed { commit, .. } => Some(commit.clone()),
+                _ => None,
+            })
+            .collect(),
         mode,
         subscribers: Vec::new(),
         verify,
@@ -586,7 +636,6 @@ impl Writer {
     /// Applies one command to the writer's state and returns what to append.
     fn stage(&mut self, cmd: Cmd) -> Staged {
         let (events, done): (Vec<Event>, Done) = match cmd {
-            Cmd::Append { events, reply } => (events, Box::new(move |r, _| drop(reply.send(r)))),
             Cmd::SetMode { mode, reply } => {
                 self.mode = mode;
                 (vec![Event::ApprovalModeSet { mode }], Box::new(move |r, _| drop(reply.send(r))))
@@ -614,26 +663,7 @@ impl Writer {
                 let e = Event::BudgetSet { usd_micros: limits.usd_micros, tokens: limits.tokens };
                 (vec![e], Box::new(move |r, _| drop(reply.send(r))))
             }
-            Cmd::StartCall { start, reply } => {
-                let call = self.next_call;
-                if let Err(refusal) = self.ledger.reserve(call, start.reservation) {
-                    let _ = reply.send(Err(CallError::Refused(refusal)));
-                    return Staged::Handled;
-                }
-                self.next_call += 1;
-                let e = Event::ModelCallStarted {
-                    call,
-                    provider: start.provider,
-                    model: start.model,
-                    request: start.request,
-                    reserved_usd_micros: start.reservation.usd_micros,
-                    reserved_tokens: start.reservation.tokens,
-                };
-                let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, _| {
-                    let _ = reply.send(r.map(|_| call).map_err(|e| CallError::Session(SessionError::Io(e))));
-                });
-                (vec![e], done)
-            }
+            Cmd::StartCall { start, reply } => return self.start_call(start, reply),
             Cmd::FinishCall { call, outcome, response, duration_ms, reply } => {
                 // Already closed (say, as broken when this writer restarted):
                 // finishing it again would journal and charge it twice.
@@ -645,6 +675,30 @@ impl Writer {
                 self.ledger.settle(call, usd, tokens);
                 let e = Event::ModelCallFinished { call, outcome, response, duration_ms };
                 (vec![e], Box::new(move |r, _| drop(reply.send(r))))
+            }
+            Cmd::Prompt { text, commit, reply } => {
+                let mut events = Vec::new();
+                if let Some(commit) = commit {
+                    self.checkpoints.push(commit.clone());
+                    events.push(Event::Checkpointed { checkpoint: self.checkpoints.len() as u64, commit });
+                }
+                events.push(Event::UserMessage { text });
+                (events, Box::new(move |r, _| drop(reply.send(r))))
+            }
+            Cmd::CheckpointCommit { checkpoint, reply } => {
+                let commit = usize::try_from(checkpoint)
+                    .ok()
+                    .and_then(|n| n.checked_sub(1))
+                    .and_then(|i| self.checkpoints.get(i));
+                let _ = reply.send(commit.cloned());
+                return Staged::Handled;
+            }
+            Cmd::Rewound { to, saved, reply } => {
+                self.checkpoints.push(saved.clone());
+                let saved_as = self.checkpoints.len() as u64;
+                let events =
+                    vec![Event::Checkpointed { checkpoint: saved_as, commit: saved }, Event::Rewound { to, saved_as }];
+                (events, Box::new(move |r: io::Result<Vec<Entry>>, _| drop(reply.send(r.map(|_| saved_as)))))
             }
             Cmd::CheckBudget { reservation, reply } => {
                 let _ = reply.send(self.ledger.check(reservation));
@@ -672,6 +726,28 @@ impl Writer {
             Cmd::Attach { after_seq, reply } => return Staged::Attach(after_seq, reply),
         };
         Staged::Events(events, done)
+    }
+
+    /// Reserves a model call against the budget and stages its start.
+    fn start_call(&mut self, start: CallStart, reply: oneshot::Sender<std::result::Result<u64, CallError>>) -> Staged {
+        let call = self.next_call;
+        if let Err(refusal) = self.ledger.reserve(call, start.reservation) {
+            let _ = reply.send(Err(CallError::Refused(refusal)));
+            return Staged::Handled;
+        }
+        self.next_call += 1;
+        let e = Event::ModelCallStarted {
+            call,
+            provider: start.provider,
+            model: start.model,
+            request: start.request,
+            reserved_usd_micros: start.reservation.usd_micros,
+            reserved_tokens: start.reservation.tokens,
+        };
+        let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, _| {
+            let _ = reply.send(r.map(|_| call).map_err(|e| CallError::Session(SessionError::Io(e))));
+        });
+        Staged::Events(vec![e], done)
     }
 
     /// Commits the batch and completes its commands. Returns false, having

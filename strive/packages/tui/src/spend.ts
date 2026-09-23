@@ -40,7 +40,9 @@ export class Spend {
       case "effectFinished":
       case "approvalModeSet":
       case "approvalRequested":
-      case "approvalDecided":
+            case "approvalDecided":
+      case "checkpointed":
+      case "rewound":
         return;
     }
   }

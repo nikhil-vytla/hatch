@@ -96,6 +96,10 @@ fn describe(e: &Entry) -> String {
             EffectOutcome::Interrupted => format!("effect {effect} interrupted: the daemon stopped while it ran"),
         },
         Event::ApprovalModeSet { mode } => format!("approvals: {}", mode_name(*mode)),
+        Event::Checkpointed { checkpoint, .. } => format!("checkpoint {checkpoint}: files saved"),
+        Event::Rewound { to, saved_as } => {
+            format!("rewound to checkpoint {to}; the files before are checkpoint {saved_as}")
+        }
         Event::ApprovalRequested { effect, description } => format!("effect {effect} asks: {description}"),
         Event::ApprovalDecided { effect, decision, by } => format!(
             "effect {effect} {} by {by}",

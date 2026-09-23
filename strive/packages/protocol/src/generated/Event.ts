@@ -41,4 +41,8 @@ callId: string, record: EffectRecord, } | { "type": "effectFinished", effect: nu
 /**
  * The client that decided.
  */
-by: string, };
+by: string, } | { "type": "checkpointed", checkpoint: number, 
+/**
+ * The commit in the session's shadow repository.
+ */
+commit: string, } | { "type": "rewound", to: number, savedAs: number, };

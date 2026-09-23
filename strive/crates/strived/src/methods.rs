@@ -9,7 +9,7 @@ use strive_proto::rpc::{Message, RequestId, RpcError};
 use strive_proto::{
     Appended, AuthSet, AuthSetParams, AuthStatus, AuthStatusResult, BlobGet, BlobGetParams, BlobGetResult,
     DaemonShutdown, DaemonStatus, DaemonStatusResult, EffectOutcome, EffectRun, EffectRunParams, EffectRunResult,
-    Empty, Event, Initialize, InitializeParams, InitializeResult, Method, Notification, PROTOCOL_VERSION, ProviderAuth,
+    Empty, Initialize, InitializeParams, InitializeResult, Method, Notification, PROTOCOL_VERSION, ProviderAuth,
     SessionAttach, SessionAttachParams, SessionAttachResult, SessionBudget, SessionBudgetParams, SessionCreate,
     SessionCreateParams, SessionEntry, SessionEntryNotification, SessionGateway, SessionList, SessionListParams,
     SessionListResult, SessionPrompt, SessionPromptParams, SessionRead, SessionReadResult, SessionRef,
@@ -20,6 +20,7 @@ use tokio::task::JoinHandle;
 use crate::server::State;
 use crate::sessions::{SessionError, SessionId};
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
+use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
 
 /// Per-connection state.
 pub struct Conn {
@@ -240,12 +241,36 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         }
         SessionPrompt::NAME => {
             let SessionPromptParams { id, text } = parse::<SessionPrompt>(params)?;
-            let entries = state
-                .sessions
-                .append(&session_id(&id)?, vec![Event::UserMessage { text }])
-                .await
-                .map_err(session_error)?;
-            reply::<SessionPrompt>(Appended { seq: entries[0].seq })
+            let sid = session_id(&id)?;
+            let info = state.sessions.info(&sid).await.map_err(session_error)?;
+            let commit = checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await;
+            let entries = state.sessions.prompt(&sid, text, commit).await.map_err(session_error)?;
+            reply::<SessionPrompt>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
+        }
+        SessionRewind::NAME => {
+            let SessionRewindParams { id, checkpoint: to } = parse::<SessionRewind>(params)?;
+            let sid = session_id(&id)?;
+            let info = state.sessions.info(&sid).await.map_err(session_error)?;
+            let target = state.sessions.checkpoint_commit(&sid, to).await.map_err(session_error)?.ok_or_else(|| {
+                RpcError::new(RpcError::INVALID_PARAMS, format!("no checkpoint {to} in this session"))
+            })?;
+            let lock = state.sessions.checkpoint_lock(&sid);
+            let _held = lock.lock().await;
+            let shadow =
+                crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), std::path::Path::new(&info.cwd))
+                    .ok_or_else(|| {
+                        RpcError::new(RpcError::INTERNAL_ERROR, "checkpoints need git, which isn't available")
+                    })?;
+            let saved = tokio::task::spawn_blocking(move || {
+                let saved = shadow.snapshot(&format!("before rewinding to checkpoint {to}"))?;
+                shadow.restore(&target)?;
+                std::io::Result::Ok(saved)
+            })
+            .await
+            .map_err(|e| internal(&e))?
+            .map_err(|e| internal(&e))?;
+            let saved_as = state.sessions.record_rewind(&sid, to, saved).await.map_err(session_error)?;
+            reply::<SessionRewind>(SessionRewindResult { saved_as })
         }
         SessionRead::NAME => {
             let SessionRef { id } = parse::<SessionRead>(params)?;
@@ -324,4 +349,24 @@ fn session_error(e: SessionError) -> RpcError {
 
 fn internal(e: &dyn std::fmt::Display) -> RpcError {
     RpcError::new(RpcError::INTERNAL_ERROR, e.to_string())
+}
+
+/// Saves the workspace before a prompt. Checkpoints are best effort: without
+/// git, or if saving fails, the prompt still goes ahead, unrecorded.
+async fn checkpoint(state: &Arc<State>, sid: &SessionId, cwd: &str, message: &str) -> Option<String> {
+    let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(sid), std::path::Path::new(cwd))?;
+    let lock = state.sessions.checkpoint_lock(sid);
+    let _held = lock.lock().await;
+    let message = message.to_string();
+    match tokio::task::spawn_blocking(move || shadow.snapshot(&message)).await {
+        Ok(Ok(commit)) => Some(commit),
+        Ok(Err(e)) => {
+            crate::log!("checkpoint skipped: {e}");
+            None
+        }
+        Err(e) => {
+            crate::log!("checkpoint skipped: {e}");
+            None
+        }
+    }
 }

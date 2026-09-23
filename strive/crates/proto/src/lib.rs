@@ -80,7 +80,8 @@ methods! {
     EffectRun = "effect/run" (EffectRunParams) -> EffectRunResult;
     BlobGet = "blob/get" (BlobGetParams) -> BlobGetResult;
     SessionApprovals = "session/approvals" (SessionApprovalsParams) -> Appended;
-    ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
+        ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
+    SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -415,6 +416,22 @@ pub struct SessionApprovalsParams {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
+pub struct SessionRewindParams {
+    pub id: String,
+    pub checkpoint: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionRewindResult {
+    /// The checkpoint holding the files as they were before the rewind.
+    pub saved_as: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct ApprovalRespondParams {
     pub id: String,
     pub effect: u64,
@@ -515,6 +532,18 @@ pub enum Event {
         decision: Decision,
         /// The client that decided.
         by: String,
+    },
+    /// The workspace's files were saved (outside the user's own git).
+    Checkpointed {
+        checkpoint: u64,
+        /// The commit in the session's shadow repository.
+        commit: String,
+    },
+    /// The workspace was put back to a checkpoint; the files as they were
+    /// just before are checkpoint `saved_as`, so this can be undone.
+    Rewound {
+        to: u64,
+        saved_as: u64,
     },
 }
 
