@@ -187,9 +187,16 @@ enum Cmd {
     /// Ends the last turn if it started and didn't end: its host is gone.
     /// Decided here, against what is committed, so no write slips between
     /// the check and the end. Replies with whether it ended one.
+    /// Ends `turn` if it is still the open one.
     EndOpenTurn {
+        turn: u64,
         reason: strive_proto::TurnEnd,
         reply: oneshot::Sender<io::Result<bool>>,
+    },
+    /// A host's record, checked against the journal before it's staged.
+    HostRecord {
+        event: Event,
+        reply: oneshot::Sender<std::result::Result<io::Result<Vec<Entry>>, String>>,
     },
     /// How many people are attached (clients that aren't agent hosts).
     People {
@@ -579,12 +586,24 @@ impl Sessions {
     }
 
     /// Ends the session's open turn, if any, as failed for `error`.
-    pub async fn end_open_turn(&self, id: &SessionId, error: &str) -> Result<bool> {
+    /// Ends `turn` as failed if it is still open; whether it was.
+    pub async fn end_open_turn(&self, id: &SessionId, turn: u64, error: &str) -> Result<bool> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
         let reason = strive_proto::TurnEnd::Failed { error: error.to_string() };
-        tx.send(Cmd::EndOpenTurn { reason, reply }).map_err(|_| writer_gone())?;
+        tx.send(Cmd::EndOpenTurn { turn, reason, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// Journals a host's record, or says why it doesn't fit the journal.
+    pub async fn host_record(&self, id: &SessionId, event: Event) -> Result<std::result::Result<Vec<Entry>, String>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::HostRecord { event, reply }).map_err(|_| writer_gone())?;
+        match rx.await.map_err(|_| writer_gone())? {
+            Ok(written) => Ok(Ok(written?)),
+            Err(why) => Ok(Err(why)),
+        }
     }
 
     /// People attached to the session; an error once the daemon is stopping.
@@ -730,6 +749,9 @@ struct Writer {
     /// Checkpoint commits; checkpoint n is `checkpoints[n - 1]`.
     checkpoints: Vec<String>,
     mode: ApprovalMode,
+    /// The last turn started, and the one still open (staged ones included).
+    last_turn: u64,
+    open_turn: Option<u64>,
     /// Attached clients, and whether each is a person (not an agent host):
     /// only people can answer approvals.
     subscribers: Vec<(mpsc::UnboundedSender<Push>, bool)>,
@@ -769,9 +791,19 @@ fn spawn_writer(
             _ => None,
         })
         .unwrap_or(ApprovalMode::AutoEdit);
+    let (mut last_turn, mut open_turn) = (0, None);
+    for e in &events {
+        match e {
+            Event::TurnStarted { turn, .. } => (last_turn, open_turn) = (*turn, Some(*turn)),
+            Event::TurnEnded { turn, .. } if open_turn == Some(*turn) => open_turn = None,
+            _ => {}
+        }
+    }
     let w = Writer {
         journal,
         entries,
+        last_turn,
+        open_turn,
         ledger: Ledger::replay(&events),
         next_call,
         next_effect,
@@ -813,7 +845,10 @@ impl Writer {
             let mut stop = false;
             for cmd in batch {
                 let (events, done) = match self.stage(cmd) {
-                    Staged::Events(events, done) => (events, done),
+                    Staged::Events(events, done) => {
+                        self.track_turns(&events);
+                        (events, done)
+                    }
                     Staged::Attach(after_seq, person, reply) => {
                         attaches.push((after_seq, person, reply));
                         continue;
@@ -845,6 +880,45 @@ impl Writer {
         }
     }
 
+    fn open_turn(&self) -> Option<u64> {
+        self.open_turn
+    }
+
+    fn track_turns(&mut self, events: &[Event]) {
+        for e in events {
+            match e {
+                Event::TurnStarted { turn, .. } => (self.last_turn, self.open_turn) = (*turn, Some(*turn)),
+                Event::TurnEnded { turn, .. } if self.open_turn == Some(*turn) => self.open_turn = None,
+                _ => {}
+            }
+        }
+    }
+
+    /// Whether a host's record fits the journal: turns start one at a time
+    /// and in order, take only prompts already journaled, and end the open
+    /// turn. A later host resumes from these, so one that lies would lose or
+    /// repeat prompts.
+    fn fits(&self, event: &Event) -> std::result::Result<(), String> {
+        match event {
+            Event::TurnStarted { turn, through_seq } => {
+                if let Some(open) = self.open_turn {
+                    return Err(format!("turn {open} is still open; end it before starting another"));
+                }
+                if *turn != self.last_turn + 1 {
+                    return Err(format!("the next turn is {}, not {turn}", self.last_turn + 1));
+                }
+                if through_seq.is_some_and(|s| s >= self.journal.next_seq()) {
+                    return Err("a turn can't take prompts past the end of the journal".into());
+                }
+                Ok(())
+            }
+            Event::TurnEnded { turn, .. } if self.open_turn != Some(*turn) => {
+                Err(format!("turn {turn} isn't the open turn"))
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// Applies one command to the writer's state and returns what to append.
     #[expect(clippy::too_many_lines, reason = "one short arm per command")]
     fn stage(&mut self, cmd: Cmd) -> Staged {
@@ -862,20 +936,22 @@ impl Writer {
                 let _ = reply.send(self.mode);
                 return Staged::Handled;
             }
-            Cmd::EndOpenTurn { reason, reply } => {
-                let open = self.entries.iter().rev().find_map(|e| match e.event {
-                    Event::TurnStarted { turn, .. } => Some(Some(turn)),
-                    Event::TurnEnded { .. } => Some(None),
-                    _ => None,
-                });
-                let Some(Some(turn)) = open else {
+            Cmd::EndOpenTurn { turn, reason, reply } => {
+                if self.open_turn() != Some(turn) {
                     let _ = reply.send(Ok(false));
                     return Staged::Handled;
-                };
+                }
                 (
                     vec![Event::TurnEnded { turn, reason }],
                     Box::new(move |r: io::Result<Vec<Entry>>, _| drop(reply.send(r.map(|_| true)))),
                 )
+            }
+            Cmd::HostRecord { event, reply } => {
+                if let Err(why) = self.fits(&event) {
+                    let _ = reply.send(Err(why));
+                    return Staged::Handled;
+                }
+                (vec![event], Box::new(move |r, _| drop(reply.send(Ok(r)))))
             }
             Cmd::People { reply } => {
                 let _ = reply.send(self.subscribers.iter().filter(|(s, person)| *person && !s.is_closed()).count());

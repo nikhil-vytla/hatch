@@ -200,3 +200,60 @@ fn a_started_host_gets_no_provider_keys() {
     assert!(vars.contains("STRIVE_SOCKET="), "it is the started host's environment: {vars}");
     assert!(!vars.contains("from-the-daemon"), "no provider key reached the host: {vars}");
 }
+
+/// Turn records say which prompts a turn took; a later host resumes from
+/// them. Ones that don't fit the journal (a turn out of order, one that
+/// ends a turn never started, a cutoff past the journal's end) are refused.
+#[test]
+fn turn_records_that_dont_fit_the_journal_are_refused() {
+    let env = Env::new();
+    let id = session(&env);
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": id}));
+    let record = |host: &mut common::Rpc, event: Value| host.call("host/record", &json!({"id": id, "event": event}));
+    let refused = [
+        json!({"type": "turnEnded", "turn": 1, "reason": {"kind": "done"}}),
+        json!({"type": "turnStarted", "turn": 2}),
+        json!({"type": "turnStarted", "turn": 1, "throughSeq": 1_000_000}),
+    ];
+    for event in refused {
+        let r = record(&mut host, event.clone());
+        assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "{event} -> {r}");
+    }
+    assert!(record(&mut host, json!({"type": "turnStarted", "turn": 1}))["error"].is_null());
+    let r = record(&mut host, json!({"type": "turnStarted", "turn": 2}));
+    assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "a turn is open: {r}");
+    let r = record(&mut host, json!({"type": "turnEnded", "turn": 7, "reason": {"kind": "done"}}));
+    assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "not the open turn: {r}");
+    assert!(record(&mut host, json!({"type": "turnEnded", "turn": 1, "reason": {"kind": "done"}}))["error"].is_null());
+}
+
+/// A host whose connection ends with bytes that aren't UTF-8 is gone like
+/// any other: its turn is ended and another host may take the session.
+#[test]
+fn a_host_that_sends_invalid_utf8_is_cleaned_up() {
+    let env = Env::new();
+    let id = session(&env);
+    let mut s = UnixStream::connect(env.socket()).unwrap();
+    let init = json!({"jsonrpc": "2.0", "id": 0, "method": "initialize",
+        "params": {"protocolVersion": strive_proto::PROTOCOL_VERSION, "client": {"name": "h", "version": "0"}}});
+    let register = json!({"jsonrpc": "2.0", "id": 1, "method": "host/register", "params": {"id": id}});
+    let start = json!({"jsonrpc": "2.0", "id": 2, "method": "host/record",
+        "params": {"id": id, "event": {"type": "turnStarted", "turn": 1}}});
+    s.write_all(format!("{init}\n{register}\n{start}\n").as_bytes()).unwrap();
+    let mut r = std::io::BufReader::new(s.try_clone().unwrap());
+    for _ in 0..3 {
+        let mut line = String::new();
+        std::io::BufRead::read_line(&mut r, &mut line).unwrap();
+    }
+    s.write_all(&[0xFF, 0xFE, b'\n']).unwrap();
+    let mut reader = env.rpc();
+    common::wait_for("the turn to be ended", Duration::from_secs(5), || {
+        let r = reader.ok("session/read", &json!({"id": id}));
+        r["entries"].as_array().unwrap().iter().any(|e| e["event"]["type"] == "turnEnded")
+    });
+    common::wait_for("the session to take a new host", Duration::from_secs(5), || {
+        env.rpc().call("host/register", &json!({"id": id}))["error"].is_null()
+    });
+    drop((r, s));
+}

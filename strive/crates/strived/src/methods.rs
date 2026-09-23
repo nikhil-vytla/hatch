@@ -57,6 +57,8 @@ pub struct Conn {
     /// host/record requests still being journaled, and a signal when one ends.
     records: std::sync::atomic::AtomicUsize,
     records_done: tokio::sync::Notify,
+    /// The turn this connection's host started and hasn't ended.
+    open_turn: std::sync::Mutex<Option<u64>>,
     /// Attaches under way as a person. Counted under `host_of`'s lock, so
     /// one can't finish after a registration that didn't see it.
     attaching: std::sync::atomic::AtomicUsize,
@@ -82,6 +84,7 @@ impl Conn {
             attaching: std::sync::atomic::AtomicUsize::new(0),
             records: std::sync::atomic::AtomicUsize::new(0),
             records_done: tokio::sync::Notify::new(),
+            open_turn: std::sync::Mutex::new(None),
         }
     }
 
@@ -105,7 +108,12 @@ impl Conn {
             let (state, conn) = (state.clone(), self.clone());
             tokio::spawn(async move {
                 conn.records_settled().await;
-                if let Err(e) = state.sessions.end_open_turn(&sid, "the agent host stopped during this turn").await {
+                // Only a turn this host started: once it's gone, a new host
+                // may already have started one of its own.
+                let Some(turn) = *crate::sync::lock(&conn.open_turn) else { return };
+                if let Err(e) =
+                    state.sessions.end_open_turn(&sid, turn, "the agent host stopped during this turn").await
+                {
                     crate::log!("could not end session {}'s open turn: {e:?}", sid.as_str());
                 }
             });
@@ -380,7 +388,20 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                     "a host records only turns, assistant messages, summaries and layout proposals",
                 ));
             }
-            let entries = state.sessions.append(&session_id(&id)?, vec![event]).await.map_err(session_error)?;
+            let opened = match &event {
+                Event::TurnStarted { turn, .. } => Some(Some(*turn)),
+                Event::TurnEnded { .. } => Some(None),
+                _ => None,
+            };
+            let entries = state
+                .sessions
+                .host_record(&session_id(&id)?, event)
+                .await
+                .map_err(session_error)?
+                .map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
+            if let Some(open) = opened {
+                *crate::sync::lock(&conn.open_turn) = open;
+            }
             reply::<HostRecord>(Appended { seq: entries[0].seq })
         }
         HostStream::NAME => {

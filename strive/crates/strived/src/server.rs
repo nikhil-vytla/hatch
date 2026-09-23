@@ -237,9 +237,15 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
     let conn = Arc::new(Conn::new(&tx));
     loop {
         line.clear();
-        let n = reader.read_line(&mut line).await?;
-        if n == 0 {
-            break;
+        // Any end of the connection, a read error (bytes that aren't UTF-8,
+        // say) included, goes through the same cleanup below.
+        match reader.read_line(&mut line).await {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(e) => {
+                crate::log!("a connection ended: {e}");
+                break;
+            }
         }
         if line.len() > MAX_LINE {
             let _ = tx.send(Message::err(None, RpcError::new(RpcError::INVALID_REQUEST, "message too large")));
