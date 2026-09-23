@@ -67,6 +67,10 @@ impl Hosts {
         }
         let Ok(out) = OpenOptions::new().create(true).append(true).open(log) else { return };
         let Ok(err) = out.try_clone() else { return };
+        // The host has no keys: its model calls go through the gateway.
+        for (_, var) in crate::credentials::PROVIDERS {
+            cmd.env_remove(var);
+        }
         cmd.args(["--session", id.as_str()])
             .env("STRIVE_SOCKET", socket)
             .stdin(Stdio::null())

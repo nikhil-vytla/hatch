@@ -401,6 +401,32 @@ fn parallel_writes_to_one_file_each_land_whole() {
     assert_eq!(names, vec!["same.txt"]);
 }
 
+/// A model may return several edits to one file in a single step; the host
+/// runs them in parallel. Each must apply to what the others left, so none
+/// is lost.
+#[test]
+fn parallel_edits_to_one_file_all_land() {
+    let w = Ws::new();
+    let lines: Vec<String> = (0..24).map(|i| format!("line {i} old")).collect();
+    fs::write(w.path("many.txt"), lines.join("\n")).unwrap();
+    let editors: Vec<_> = (0..24)
+        .map(|i| {
+            let mut c = w.env.rpc();
+            let params = json!({"id": w.id, "callId": format!("call_{i}"), "request": {
+                "kind": "edit", "path": "many.txt",
+                "oldText": format!("line {i} old"), "newText": format!("line {i} new")}});
+            std::thread::spawn(move || c.ok("effect/run", &params))
+        })
+        .collect();
+    for t in editors {
+        let r = t.join().unwrap();
+        assert_eq!(r["outcome"]["kind"], "done", "{r}");
+    }
+    let text = fs::read_to_string(w.path("many.txt")).unwrap();
+    let lost: Vec<&str> = text.lines().filter(|l| l.ends_with(" old")).collect();
+    assert!(lost.is_empty(), "every edit landed; still old: {lost:?}");
+}
+
 /// Reading a device or a FIFO would never end (or never start); only
 /// regular files are read.
 #[test]

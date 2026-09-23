@@ -174,3 +174,29 @@ fn a_turn_started_just_before_the_host_disconnects_is_still_ended() {
     }
     assert!(started_seen.get(), "some turn started, so the test tested something");
 }
+
+/// The host has no keys: model calls go through the gateway. Keys in the
+/// daemon's environment stay out of the host's.
+#[test]
+fn a_started_host_gets_no_provider_keys() {
+    let scratch = tempfile::Builder::new().prefix("strv-host-env").tempdir_in("/tmp").unwrap();
+    let script = scratch.path().join("host.sh");
+    let seen = scratch.path().join("env.txt");
+    std::fs::write(&script, format!("env > {}.tmp && mv {0}.tmp {0}\n", seen.display())).unwrap();
+    let host = format!("/bin/sh {}", script.display());
+    let env = Env::with_vars(&[
+        ("STRIVE_HOST", &host),
+        ("ANTHROPIC_API_KEY", "sk-ant-from-the-daemon"),
+        ("OPENAI_API_KEY", "sk-from-the-daemon"),
+    ]);
+    let id = session(&env);
+    env.rpc().ok("session/prompt", &json!({"id": id, "text": "hi"}));
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while !seen.exists() {
+        assert!(std::time::Instant::now() < deadline, "the host never started");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let vars = std::fs::read_to_string(&seen).unwrap();
+    assert!(vars.contains("STRIVE_SOCKET="), "it is the started host's environment: {vars}");
+    assert!(!vars.contains("from-the-daemon"), "no provider key reached the host: {vars}");
+}

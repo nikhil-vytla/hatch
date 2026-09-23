@@ -569,18 +569,27 @@ async fn run_effect(
             if let Some(p) = target.path().filter(|p| !p.starts_with(&scope.workspace)) {
                 paths.push(p.to_path_buf());
             }
+            // An edit reads the file and writes it back: another one in
+            // between would be lost. Taken before the workspace, so an edit
+            // waiting its turn doesn't hold up rewinds.
+            let file = match (&request, target.path()) {
+                (EffectRequest::Edit { .. } | EffectRequest::Write { .. }, Some(p)) => {
+                    Some(state.sessions.workspaces.file(p).await)
+                }
+                _ => None,
+            };
             let files = state.sessions.workspaces.effect(paths).await;
             if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
                 // Cancelled while it waited (for approval, or for a rewind).
-                drop(files);
+                drop((files, file));
                 crate::effects::Result::Refused("interrupted before it ran".into())
             } else if let EffectRequest::Mcp { server, tool, arguments } = &request {
                 let result = call_mcp(state, &sid, server, tool, arguments.clone(), cancelled).await;
-                drop(files);
+                drop((files, file));
                 result
             } else {
                 tokio::task::spawn_blocking(move || {
-                    let _files = files;
+                    let _held = (files, file);
                     crate::effects::perform(&scope, &request, &target, &cancel)
                 })
                 .await

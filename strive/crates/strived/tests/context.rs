@@ -168,3 +168,41 @@ fn the_agent_may_read_global_skills_but_nothing_else_of_strives_state() {
     assert_eq!(read(&mut c, &env.home.path().join("skills/notes/SKILL.md")), "skill body");
     assert_eq!(read(&mut c, &env.home.path().join("keys/journal.key")), "the agent can't read strive's own state");
 }
+
+/// An instruction file is the repository's to write, and a symlink is a
+/// file: one that leads into strive's own state is skipped, not read.
+#[test]
+fn an_instruction_file_that_links_into_strives_state_is_skipped() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    env.status();
+    let secret = env.home.path().join("credentials.json");
+    write(&secret, r#"{"anthropic":"sk-ant-secret"}"#);
+    std::os::unix::fs::symlink(&secret, root.join("AGENTS.md")).unwrap();
+    let (_, config) = register(&env, &root);
+    assert_eq!(config["instructions"], json!([]), "{config}");
+}
+
+/// A FIFO where a skill file should be would never finish reading; the
+/// session must start without it.
+#[test]
+fn a_skill_file_that_is_a_fifo_does_not_hold_up_the_session() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    write(&root.join(".strive/skills/ok/SKILL.md"), "---\nname: ok\ndescription: fine\n---\n");
+    fs::create_dir_all(root.join(".strive/skills/hang")).unwrap();
+    assert!(
+        std::process::Command::new("mkfifo").arg(root.join(".strive/skills/hang/SKILL.md")).status().unwrap().success()
+    );
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut c = env.rpc();
+    std::thread::spawn(move || {
+        let id = c.ok("session/create", &json!({"cwd": root}))["id"].as_str().unwrap().to_string();
+        tx.send(c.ok("host/register", &json!({"id": id}))).unwrap();
+    });
+    let config = rx.recv_timeout(std::time::Duration::from_secs(10)).expect("registration finished");
+    let names: Vec<&str> = config["skills"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
+    assert_eq!(names, vec!["ok"]);
+}

@@ -78,10 +78,35 @@ fn truncate(s: &str, n: usize) -> &str {
     &s[..end]
 }
 
+/// A regular file's text. Opened without blocking and checked once open, so
+/// a FIFO (or a device) put where a file should be is skipped, not waited on.
+fn read_regular(path: &Path) -> Option<String> {
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut f = fs::OpenOptions::new().read(true).custom_flags(nix::fcntl::OFlag::O_NONBLOCK.bits()).open(path).ok()?;
+    if !f.metadata().ok()?.is_file() {
+        return None;
+    }
+    let mut text = String::new();
+    f.read_to_string(&mut text).ok()?;
+    Some(text)
+}
+
+/// Whether a file's real path is one the agent may be given: nothing of
+/// strive's own state (keys, credentials, journals) but the global
+/// instructions and skills, however the path leads there.
+fn allowed(real: &Path, strive_home: &Path) -> bool {
+    let home = strive_home.canonicalize().unwrap_or_else(|_| strive_home.to_path_buf());
+    !real.starts_with(&home) || real == home.join("AGENTS.md") || real.starts_with(home.join("skills"))
+}
+
 /// A file's text with its `@path` lines inlined.
 fn expand(path: &Path, strive_home: &Path, stack: &mut Vec<PathBuf>) -> Option<String> {
     let real = path.canonicalize().ok()?;
-    let text = fs::read_to_string(&real).ok()?;
+    if !allowed(&real, strive_home) {
+        return None;
+    }
+    let text = read_regular(&real)?;
     if stack.len() >= IMPORT_DEPTH {
         return Some(text);
     }
@@ -117,7 +142,9 @@ fn skills(workspace: &Path, strive_home: &Path) -> Vec<SkillInfo> {
         dirs.sort();
         for dir in dirs {
             let file = dir.join("SKILL.md");
-            let Some((name, description)) = fs::read_to_string(&file).ok().as_deref().and_then(frontmatter) else {
+            let readable = file.canonicalize().ok().filter(|real| allowed(real, strive_home));
+            let Some((name, description)) = readable.and_then(|r| read_regular(&r)).as_deref().and_then(frontmatter)
+            else {
                 continue;
             };
             if !found.iter().any(|s| s.name == name) {

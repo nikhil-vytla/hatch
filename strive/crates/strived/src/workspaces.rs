@@ -2,6 +2,8 @@
 //! across every session: sessions that share a directory (or nest one in
 //! another) share its files. A rewind can't start while an effect in an
 //! overlapping directory runs, and an effect waits for a rewind to finish.
+//! Effects that read a file and write it back take the file for themselves,
+//! so parallel edits of one file apply one after another.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -20,6 +22,8 @@ struct Busy {
     /// outside it.
     effects: Vec<Vec<PathBuf>>,
     rewinding: Vec<PathBuf>,
+    /// Files an edit or write has to itself until it finishes.
+    files: Vec<PathBuf>,
 }
 
 fn overlaps(a: &Path, b: &Path) -> bool {
@@ -30,6 +34,12 @@ fn overlaps(a: &Path, b: &Path) -> bool {
 pub struct Effect {
     owner: Arc<Workspaces>,
     paths: Vec<PathBuf>,
+}
+
+/// A file taken by one edit or write; dropping it lets the next one have it.
+pub struct File {
+    owner: Arc<Workspaces>,
+    path: PathBuf,
 }
 
 /// A rewind in progress; dropping it lets effects in its directory go ahead.
@@ -49,6 +59,21 @@ impl Workspaces {
                 if !busy.rewinding.iter().any(|r| paths.iter().any(|p| overlaps(r, p))) {
                     busy.effects.push(paths.clone());
                     return Effect { owner: self.clone(), paths };
+                }
+            }
+            changed.await;
+        }
+    }
+
+    /// Waits until no other edit or write has `path`, then takes it.
+    pub async fn file(self: &Arc<Self>, path: &Path) -> File {
+        loop {
+            let changed = self.changed.notified();
+            {
+                let mut busy = crate::sync::lock(&self.busy);
+                if !busy.files.iter().any(|f| f == path) {
+                    busy.files.push(path.to_path_buf());
+                    return File { owner: self.clone(), path: path.to_path_buf() };
                 }
             }
             changed.await;
@@ -80,6 +105,13 @@ impl Drop for Effect {
             busy.effects.swap_remove(i);
         }
         drop(busy);
+        self.owner.changed.notify_waiters();
+    }
+}
+
+impl Drop for File {
+    fn drop(&mut self) {
+        remove_one(&mut crate::sync::lock(&self.owner.busy).files, &self.path);
         self.owner.changed.notify_waiters();
     }
 }
@@ -117,6 +149,22 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         assert!(!waiting.is_finished());
         drop(rewind);
+        tokio::time::timeout(std::time::Duration::from_secs(1), waiting).await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_file_is_taken_by_one_writer_at_a_time() {
+        let w = Arc::new(Workspaces::default());
+        let first = w.file(Path::new("/repo/a.txt")).await;
+        let other = tokio::time::timeout(std::time::Duration::from_secs(1), w.file(Path::new("/repo/b.txt"))).await;
+        assert!(other.is_ok(), "another file is free");
+        let waiting = tokio::spawn({
+            let w = w.clone();
+            async move { w.file(Path::new("/repo/a.txt")).await }
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(!waiting.is_finished(), "the same file waits");
+        drop(first);
         tokio::time::timeout(std::time::Duration::from_secs(1), waiting).await.unwrap().unwrap();
     }
 
