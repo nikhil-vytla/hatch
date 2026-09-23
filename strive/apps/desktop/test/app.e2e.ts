@@ -2,6 +2,7 @@
 // under Node (`node --test`): Playwright's Electron driver needs it.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createSocket } from "node:dgram";
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { connect, type Socket } from "node:net";
@@ -256,4 +257,106 @@ test("a rejected proposal isn't offered again, even after reopening", async () =
   assert.equal(await page.getByText("The agent proposes: drop spend").count(), 0);
   assert.equal(await page.locator('[data-panel="spend"]').count(), 1);
   await again.close();
+});
+
+test("the window can act only on its own session", async () => {
+  const { app, page, cwd } = await openApp();
+  const other = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-other-")));
+  const rpc = await Rpc.open();
+  const created = await rpc.call("session/create", { cwd: other });
+  const otherId = JSON.parse(JSON.stringify(created.result)).id;
+  // What code in the window could try: the bridge, with another session's id.
+  await page.evaluate(
+    (id) =>
+      Object.getOwnPropertyDescriptor(window, "strive")?.value.request("session/approvals", { id, mode: "fullAuto" }),
+    otherId,
+  );
+  const log = JSON.parse(strive("log", otherId, "--json"));
+  const modes = log.entries.filter((e: { event: { type: string } }) => e.event.type === "approvalModeSet");
+  assert.deepEqual(
+    modes.map((e: { event: { mode: string } }) => e.event.mode),
+    ["autoEdit"],
+    "the other session is untouched",
+  );
+  const own = JSON.parse(strive("log", sessionId(cwd), "--json"));
+  assert.ok(own.entries.some((e: { event: { type: string; mode?: string } }) => e.event.mode === "fullAuto"));
+  rpc.close();
+  await app.close();
+});
+
+/** A widget that tries WebRTC against a STUN "server" at PORT, directly and from a fresh about:blank realm. */
+const rtcProbe = (port: number) => `<body><p id="out">trying</p><script>
+const out = document.getElementById("out");
+const tryFrom = (w, name) => {
+  try {
+    const pc = new w.RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:${port}" }] });
+    pc.createDataChannel("x");
+    pc.createOffer().then((o) => pc.setLocalDescription(o));
+    out.append(" " + name + ": created");
+  } catch { out.append(" " + name + ": blocked"); }
+};
+tryFrom(window, "direct");
+const f = document.createElement("iframe");
+document.body.append(f);
+if (f.contentWindow) tryFrom(f.contentWindow, "iframe"); else out.append(" iframe: none");
+setTimeout(() => out.append(" done"), 2500);
+</script></body>`;
+
+test("a widget can't reach the network through WebRTC", async () => {
+  let packets = 0;
+  const stun = createSocket("udp4", () => packets++);
+  await new Promise<void>((ok) => stun.bind(0, "127.0.0.1", () => ok()));
+  const { app, page, cwd } = await openApp();
+
+  const host = await propose(cwd, "rtc probe", [
+    {
+      op: "add",
+      panel: { id: "rtc", kind: "html", title: "RTC", html: rtcProbe(stun.address().port) },
+      column: "side",
+    },
+  ]);
+
+  await page.getByRole("button", { name: "Accept" }).click();
+  await page.frameLocator("iframe.widget").getByText("done").waitFor();
+  await new Promise((ok) => setTimeout(ok, 500));
+  assert.equal(
+    await page.frameLocator("iframe.widget").locator("#out").textContent(),
+    "trying direct: blocked iframe: blocked done",
+  );
+  assert.equal(packets, 0, "no STUN request reached the listener");
+  stun.close();
+  host.close();
+  await app.close();
+});
+
+test("a decision made in one window survives another window's save", async () => {
+  const a = await openApp();
+
+  const b = await electron.launch({
+    executablePath: electronPath,
+    args: [APP, `--user-data-dir=${a.userData}`, "--cwd", a.cwd, "--continue"],
+    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
+  });
+
+  const pageB = await b.firstWindow();
+  await pageB.getByText(`Session started in ${a.cwd}`).waitFor();
+  const host = await propose(a.cwd, "drop spend", [{ op: "remove", panel: "spend" }]);
+  await a.page.getByRole("button", { name: "Reject" }).click();
+  await a.page.getByText("The agent proposes: drop spend").waitFor({ state: "detached" });
+  // B still offers it, but a save from B (a drag) must not undo A's rejection.
+  const spend = pageB.locator('[data-panel="spend"] .handle');
+  const main = pageB.locator('[data-column="main"]');
+  const from = await spend.boundingBox();
+  const to = await main.boundingBox();
+  assert.ok(from && to);
+  await pageB.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await pageB.mouse.down();
+  await pageB.mouse.move(to.x + to.width / 2, to.y + to.height - 10, { steps: 10 });
+  await pageB.mouse.up();
+  await pageB.locator('[data-column="main"] [data-panel="spend"]').waitFor();
+  const saved = JSON.parse(readFileSync(join(a.userData, "workspace.json"), "utf8"));
+  assert.equal(saved.decided.length, 1, JSON.stringify(saved.decided));
+  host.close();
+  await b.close();
+  await a.app.close();
 });

@@ -3,10 +3,11 @@
 // to the renderer, which has no Node and no direct access to the daemon.
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describeError, type MethodName, type Methods, type SessionInfo, StriveClient } from "@strive/protocol";
 import { HistorySchema, parseJson } from "@strive/workspace";
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, session as electronSession, protocol } from "electron";
-import type { Opened } from "../shared/bridge";
+import type { Opened, StriveEvent } from "../shared/bridge";
 
 /** What the renderer may ask the daemon for: a person's actions on this session. */
 const ALLOWED: ReadonlySet<MethodName> = new Set<MethodName>([
@@ -85,6 +86,16 @@ async function main() {
   });
 
   const id = await openSession(client, args);
+  // Listening before attaching, and holding events until the page asks for
+  // the session: anything journaled meanwhile still reaches it.
+  let forward: ((event: StriveEvent) => void) | undefined;
+  const early: StriveEvent[] = [];
+
+  const deliver = (event: StriveEvent) => (forward ? forward(event) : early.push(event));
+  client.on("session/entry", (params) => deliver({ method: "session/entry", params }));
+  client.on("session/delta", (params) => deliver({ method: "session/delta", params }));
+  client.on("session/interrupt", (params) => deliver({ method: "session/interrupt", params }));
+
   const { session, entries } = await client.request("session/attach", { id });
   const opened: Opened = { init, session, entries, home: app.getPath("home") };
 
@@ -109,18 +120,35 @@ async function main() {
     },
   });
 
+  const page = pathToFileURL(join(built(), "renderer", "index.html")).href;
+
+  // The app's own page, in its main frame: not a widget, not a navigated frame.
   const fromOurPage = (e: IpcMainInvokeEvent) =>
-    e.senderFrame?.url.startsWith("file://") && e.sender === window.webContents;
+    e.sender === window.webContents && e.senderFrame === window.webContents.mainFrame && e.senderFrame.url === page;
 
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (e) => e.preventDefault());
 
-  ipcMain.handle("strive:opened", (e) => (fromOurPage(e) ? opened : undefined));
+  ipcMain.handle("strive:opened", (e) => {
+    if (!fromOurPage(e)) return undefined;
+
+    // The page listens before it asks, so what was held can go now.
+    forward = (event) => {
+      if (!window.isDestroyed()) window.webContents.send("strive:event", event);
+    };
+
+    for (const event of early.splice(0)) forward(event);
+
+    return opened;
+  });
   // The daemon parses and checks every request's params itself.
   ipcMain.handle("strive:request", async (e, method: MethodName, params: Methods[MethodName]["params"]) => {
     if (!fromOurPage(e) || !ALLOWED.has(method)) throw new Error(`${method} isn't available to the window`);
 
-    return client.request<MethodName>(method, params);
+    // The window acts on its own session only, whatever id it sends.
+    const bound = method === "daemon/status" ? params : { ...params, id: session.id };
+
+    return client.request<MethodName>(method, bound);
   });
 
   ipcMain.handle("workspace:load", (e) => {
@@ -143,15 +171,24 @@ async function main() {
 
     if (!parsed.ok) throw new Error(`not saved: ${parsed.error}`);
     const file = workspaceFile();
-    writeFileSync(`${file}.tmp`, JSON.stringify(parsed.value));
-    renameSync(`${file}.tmp`, file);
-  });
 
-  for (const method of ["session/entry", "session/delta", "session/interrupt"] as const) {
-    client.on(method, (params) => {
-      if (!window.isDestroyed()) window.webContents.send("strive:event", { method, params });
-    });
-  }
+    // Another window may have decided proposals since this one loaded; keep
+    // those. (The layout itself is the last saver's.)
+    const onDisk = (() => {
+      try {
+        const r = parseJson(HistorySchema, readFileSync(file, "utf8"));
+
+        return r.ok ? r.value.decided : [];
+      } catch {
+        return [];
+      }
+    })();
+
+    const decided = [...new Set([...onDisk, ...parsed.value.decided])];
+    const tmp = `${file}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify({ ...parsed.value, decided }));
+    renameSync(tmp, file);
+  });
 
   client.onClose(() => {
     if (!window.isDestroyed()) window.webContents.send("strive:closed");
@@ -163,16 +200,27 @@ async function main() {
 
 /** Agent widgets: pages the agent wrote, served with a policy of their own. */
 const WIDGET_POLICY =
-  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:";
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; webrtc 'block'";
 
 protocol.registerSchemesAsPrivileged([{ scheme: "strive-widget", privileges: { standard: true } }]);
+
+/**
+ * CSP doesn't stop WebRTC, and a peer connection is a way out: a STUN server
+ * named in a widget carries data to it. So WebRTC is removed from the page
+ * before the widget's own code runs. A fresh realm doesn't bring it back: the
+ * widget's origin is opaque, so even an about:blank frame inside it is
+ * cross-origin to it. (`webrtc 'block'` is in the policy too, but Chromium
+ * here doesn't enforce it; the e2e test shows the removal is what works.)
+ */
+const NO_WEBRTC = `<script>for (const k of ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel"])
+  Object.defineProperty(window, k, { value: undefined, writable: false, configurable: false });</script>`;
 
 function serveWidgets() {
   protocol.handle("strive-widget", (request) => {
     const encoded = new URL(request.url).pathname.slice(1).replace(/-/g, "+").replace(/_/g, "/");
     const html = Buffer.from(encoded, "base64").toString("utf8");
 
-    return new Response(html, {
+    return new Response(NO_WEBRTC + html, {
       headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": WIDGET_POLICY },
     });
   });
