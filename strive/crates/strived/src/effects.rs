@@ -397,7 +397,7 @@ fn bash(scope: &Scope, command: &str, timeout_ms: u64, cancelled: &AtomicBool) -
     };
     // Descendants are found while the command still runs (a finished one's
     // children belong to init), including jobs that left its process group.
-    let doomed = if matches!(ended, Ended::Exited(_)) { Vec::new() } else { descendants(root) };
+    let doomed = if matches!(ended, Ended::Exited(_)) { Vec::new() } else { freeze_tree(root) };
     let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(root), nix::sys::signal::Signal::SIGKILL);
     for pid in doomed {
         let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::Signal::SIGKILL);
@@ -415,6 +415,26 @@ fn bash(scope: &Scope, command: &str, timeout_ms: u64, cancelled: &AtomicBool) -
             timeout_ms % 1000 / 100
         )),
         Ended::Cancelled => stopped("the command was interrupted and stopped".into()),
+    }
+}
+
+/// Stops `root` and every descendant, rescanning until no new ones appear
+/// (a stopped process can't fork), and returns the descendants. Without the
+/// freeze, a job forked between the scan and the kill would escape.
+fn freeze_tree(root: i32) -> Vec<i32> {
+    use nix::sys::signal::{Signal, kill};
+    use nix::unistd::Pid;
+    let _ = kill(Pid::from_raw(root), Signal::SIGSTOP);
+    let mut frozen: Vec<i32> = Vec::new();
+    loop {
+        let new: Vec<i32> = descendants(root).into_iter().filter(|p| !frozen.contains(p)).collect();
+        if new.is_empty() {
+            return frozen;
+        }
+        for &pid in &new {
+            let _ = kill(Pid::from_raw(pid), Signal::SIGSTOP);
+        }
+        frozen.extend(new);
     }
 }
 

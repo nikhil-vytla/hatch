@@ -199,3 +199,53 @@ test("prompts waiting across a turn's end keep the order they were sent in", asy
     "assistant",
   ]);
 });
+
+test("a prompt journaled before its turn's start but not taken by it waits for the next turn", async () => {
+  const a = at({ type: "userMessage", text: "A" });
+
+  const entries = [
+    a,
+    at({ type: "userMessage", text: "B" }),
+    at({ type: "turnStarted", turn: 1, throughSeq: a.seq }),
+    assistant("answer to A"),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
+    at({ type: "turnStarted", turn: 2, throughSeq: a.seq + 1 }),
+    assistant("answer to B"),
+    at({ type: "turnEnded", turn: 2, reason: { kind: "done" } }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.map((m) => (m.role === "user" ? `user ${m.content}` : m.role))).toEqual([
+    "user A",
+    "assistant",
+    "user B",
+    "assistant",
+  ]);
+});
+
+test("the prompt of the turn that was compacted comes back after the summary", async () => {
+  const before = [
+    at({ type: "userMessage", text: "old" }),
+    at({ type: "turnStarted", turn: 1 }),
+    assistant("old answer"),
+  ];
+
+  const end = at({ type: "turnEnded", turn: 1, reason: { kind: "done" } });
+  const prompt = at({ type: "userMessage", text: "new" });
+
+  const entries = [
+    ...before,
+    end,
+    prompt,
+    at({ type: "compacted", uptoSeq: end.seq, summary: "we talked" }),
+    at({ type: "turnStarted", turn: 2, throughSeq: prompt.seq }),
+    assistant("new answer"),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.map((m) => (m.role === "user" ? `user ${m.content}` : m.role))).toEqual([
+    "user [A summary of the conversation so far]\n\nwe talked",
+    "user new",
+    "assistant",
+  ]);
+});

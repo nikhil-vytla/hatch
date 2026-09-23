@@ -100,3 +100,46 @@ test("a prompt that arrives while the host is loading the session is still answe
   expect(recorded.find((e) => e.type === "turnEnded")).toMatchObject({ reason: { kind: "done" } });
   expect(JSON.stringify(model.requests[0]?.messages.at(-1))).toContain("late");
 });
+
+test("a prompt the interrupted turn hadn't taken yet runs when the host starts again", async () => {
+  const model = new FakeAnthropic([{ text: "answered B" }]).start();
+  const recorded: Event[] = [];
+  let seq = 4;
+
+  const entries: Entry[] = [
+    { seq: 1, tsMs: 0, event: { type: "sessionStarted", format: 1, cwd: "/tmp/r", striveVersion: "x" } },
+    { seq: 2, tsMs: 0, event: { type: "userMessage", text: "A" } },
+    { seq: 3, tsMs: 0, event: { type: "userMessage", text: "B" } },
+    { seq: 4, tsMs: 0, event: { type: "turnStarted", turn: 1, throughSeq: 2 } },
+  ];
+
+  const daemon = new FakeDaemon({
+    "host/register": () => ({ result: config(model.url) }),
+    "session/attach": () => ({ result: { session: { id: ID, cwd: "/tmp/r", createdAtMs: 0 }, entries } }),
+    "host/record": (p) => {
+      recorded.push(p.event);
+
+      return { result: { seq: ++seq } };
+    },
+    "host/stream": () => ({ result: {} }),
+  });
+
+  await daemon.listen();
+  let client: StriveClient | undefined;
+  stop = () => {
+    client?.close();
+    daemon.close();
+    model.stop();
+  };
+
+  ({ client } = await runHost(daemon.socket, ID));
+  const deadline = Date.now() + 5_000;
+
+  while (recorded.filter((e) => e.type === "turnEnded").length < 2 && Date.now() < deadline) await Bun.sleep(20);
+
+  expect(recorded[0]).toMatchObject({ type: "turnEnded", turn: 1, reason: { kind: "failed" } });
+  expect(recorded[1]).toEqual({ type: "turnStarted", turn: 2, throughSeq: 3 });
+  const sent = JSON.stringify(model.requests[0]?.messages);
+  expect(sent).toContain('"A"');
+  expect(JSON.stringify(model.requests[0]?.messages.at(-1))).toContain('"B"');
+});

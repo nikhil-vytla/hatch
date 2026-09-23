@@ -100,7 +100,7 @@ fn describe(e: &Entry) -> String {
         Event::Rewound { to, saved_as } => {
             format!("rewound to checkpoint {to}; the files before are checkpoint {saved_as}")
         }
-        Event::TurnStarted { turn } => format!("turn {turn} started"),
+        Event::TurnStarted { turn, .. } => format!("turn {turn} started"),
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }

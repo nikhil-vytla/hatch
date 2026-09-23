@@ -377,3 +377,50 @@ fn only_regular_files_are_read() {
     );
     assert!(started.elapsed() < Duration::from_secs(2));
 }
+
+/// A cancel that arrives before its effect runs (the agent gave up while
+/// the effect waited its turn) stops it from running at all.
+#[test]
+fn an_effect_cancelled_before_it_runs_does_nothing() {
+    let w = Ws::new();
+    let mut c = w.env.rpc();
+    for (call, request) in [
+        ("call_w", json!({"kind": "write", "path": "made.txt", "content": "x"})),
+        ("call_b", json!({"kind": "bash", "command": "touch ran.txt"})),
+    ] {
+        c.ok("effect/cancel", &json!({"id": w.id, "callId": call}));
+        let r = c.ok("effect/run", &json!({"id": w.id, "callId": call, "request": request}));
+        assert_eq!(r["outcome"]["kind"], "refused", "{r}");
+        assert!(r["outcome"]["reason"].as_str().unwrap().starts_with("interrupted"), "{r}");
+    }
+    assert!(!w.path("made.txt").exists());
+    assert!(!w.path("ran.txt").exists());
+}
+
+/// Stopping the daemon stops the commands it is running: a successor that
+/// takes over the sessions (and may rewind them) never races one.
+#[test]
+fn stopping_the_daemon_stops_its_running_commands() {
+    let w = Ws::new();
+    let mut c = w.env.rpc();
+    let params = json!({"id": w.id, "callId": "call_1", "request": {"kind": "bash", "command": "sleep 2; echo late > late.txt"}});
+    let running = std::thread::spawn(move || c.call("effect/run", &params));
+    common::wait_for("the command to start", Duration::from_secs(5), || {
+        let r = w.env.rpc().ok("session/read", &json!({"id": w.id}));
+        r["entries"].as_array().unwrap().iter().any(|e| e["event"]["type"] == "effectStarted")
+    });
+    std::thread::sleep(Duration::from_millis(200));
+    w.env.stop();
+    let _ = running.join();
+    std::thread::sleep(Duration::from_millis(2500));
+    assert!(!w.path("late.txt").exists(), "the command was stopped with the daemon");
+    // Journaled as stopped by this daemon, not closed after the fact as a
+    // command whose end nobody saw.
+    let mut reader = w.env.rpc();
+    let r = reader.ok("session/read", &json!({"id": w.id}));
+    let finished = r["entries"].as_array().unwrap().iter().find(|e| e["event"]["type"] == "effectFinished").cloned();
+    let outcome = finished.expect("the effect's end is journaled")["event"]["outcome"].clone();
+    assert_eq!(outcome["kind"], "done", "{outcome}");
+    let text = reader.ok("blob/get", &json!({"digest": outcome["output"]}));
+    assert_eq!(text["text"], "the command was interrupted and stopped");
+}

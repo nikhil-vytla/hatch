@@ -58,11 +58,26 @@ impl Shadow {
         Ok(self.run_raw(args)?.split('\0').filter(|s| !s.is_empty()).map(str::to_string).collect())
     }
 
-    /// Nested repositories in the workspace, as paths relative to it. git
-    /// lists an untracked one as a directory entry rather than its files.
+    /// Nested repositories in the workspace, as paths relative to it: ones
+    /// git lists as an untracked directory entry rather than their files,
+    /// and pointers to them an earlier strive saved in the index.
     pub fn nested_repositories(&self) -> io::Result<Vec<String>> {
         let untracked = self.list(&["ls-files", "--others", "--exclude-standard", "-z"])?;
-        Ok(untracked.into_iter().filter_map(|p| p.strip_suffix('/').map(str::to_string)).collect())
+        let mut nested: Vec<String> =
+            untracked.into_iter().filter_map(|p| p.strip_suffix('/').map(str::to_string)).collect();
+        nested.extend(self.pointers()?);
+        nested.sort();
+        nested.dedup();
+        Ok(nested)
+    }
+
+    /// Paths the index holds as pointers to nested repositories (mode 160000).
+    fn pointers(&self) -> io::Result<Vec<String>> {
+        Ok(self
+            .list(&["ls-files", "-s", "-z"])?
+            .into_iter()
+            .filter_map(|l| l.strip_prefix("160000 ").and_then(|r| r.split_once('\t')).map(|(_, p)| p.to_string()))
+            .collect())
     }
 
     /// Saves the workspace as it is now and returns the commit.
@@ -88,14 +103,10 @@ impl Shadow {
         }
         let nested = self.nested_repositories()?;
         // Pointers saved by an earlier strive would be restored as empty
-        // directories; drop them.
-        let links: Vec<String> = self
-            .list(&["ls-files", "-s", "-z"])?
-            .into_iter()
-            .filter_map(|l| l.strip_prefix("160000 ").and_then(|r| r.split_once('\t')).map(|(_, p)| p.to_string()))
-            .collect();
+        // directories; drop them, and exclude them below with the rest.
+        let links = self.pointers()?;
         if !links.is_empty() {
-            let mut args = vec!["rm", "-r", "-q", "--cached", "--ignore-unmatch", "--"];
+            let mut args = vec!["rm", "-r", "-q", "-f", "--cached", "--ignore-unmatch", "--"];
             args.extend(links.iter().map(String::as_str));
             self.run(&args)?;
         }
@@ -107,20 +118,25 @@ impl Shadow {
         self.run(&["rev-parse", "HEAD"])
     }
 
-    /// Ignored files (or directories of them) that restoring `commit` would
-    /// overwrite or remove. Checkpoints don't save them, so they'd be lost.
-    pub fn ignored_in_the_way(&self, commit: &str) -> io::Result<Vec<String>> {
-        let ignored = self.list(&["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"])?;
+    /// What restoring `commit` would overwrite or remove that checkpoints
+    /// don't save, so it would be lost: ignored files (or directories of
+    /// them) and nested repositories. Names are compared without case,
+    /// since on a case-insensitive filesystem `CACHE` is `cache`.
+    pub fn unsaved_in_the_way(&self, commit: &str) -> io::Result<Vec<String>> {
+        let mut unsaved =
+            self.list(&["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"])?;
+        unsaved.extend(self.nested_repositories()?.into_iter().map(|p| format!("{p}/")));
         let restored: std::collections::HashSet<String> =
-            self.list(&["ls-tree", "-r", "--name-only", "-z", commit])?.into_iter().collect();
+            self.list(&["ls-tree", "-r", "--name-only", "-z", commit])?.into_iter().map(|p| p.to_lowercase()).collect();
         let ancestors = |p: &str| -> Vec<String> {
             p.match_indices('/').map(|(i, _)| p[..i].to_string()).chain(std::iter::once(p.to_string())).collect()
         };
         let restored_dirs: std::collections::HashSet<String> = restored.iter().flat_map(|p| ancestors(p)).collect();
-        Ok(ignored
+        Ok(unsaved
             .into_iter()
             .filter(|shown| {
-                let path = shown.trim_end_matches('/');
+                let path = shown.trim_end_matches('/').to_lowercase();
+                let path = path.as_str();
                 // The path itself, or a directory above it, is restored as a
                 // file; or it is a directory the restore puts files into.
                 ancestors(path).iter().any(|a| restored.contains(a)) || restored_dirs.contains(path)

@@ -177,7 +177,7 @@ fn a_rewind_that_would_overwrite_ignored_files_is_refused() {
     let message = r["error"]["message"].as_str().unwrap_or_default().to_string();
     assert_eq!(
         message,
-        "rewinding would overwrite files git ignores, which checkpoints don't save: cache/; move them aside first"
+        "rewinding would overwrite files checkpoints don't save (ignored files, nested repositories): cache/; move them aside first"
     );
     assert_eq!(w.read("cache/valuable.txt").as_deref(), Some("only copy"));
     assert!(!w.events().iter().any(|e| e["type"] == "rewound"));
@@ -262,4 +262,91 @@ fn nested_repositories_are_left_alone_and_reported() {
     assert_eq!(r["result"]["notSaved"], json!(["sub"]), "{r}");
     assert_eq!(w.read("a.txt").as_deref(), Some("a1"));
     assert_eq!(w.read("sub/work.txt").as_deref(), Some("v2"));
+}
+
+/// A nested repository isn't saved by checkpoints, so a rewind that would
+/// put a file where it stands would destroy it. It is refused.
+#[test]
+fn a_rewind_that_would_replace_a_nested_repository_is_refused() {
+    let mut w = Ws::new();
+    w.write("sub", "a file, once");
+    w.prompt("first");
+    fs::remove_file(w.p("sub")).unwrap();
+    w.prompt("second");
+    w.write("sub/work.txt", "only copy");
+    git(&w.p("sub"), &["init", "-q"]);
+    let r = w.rewind(1);
+    let message = r["error"]["message"].as_str().unwrap_or_default().to_string();
+    assert!(message.contains("sub"), "{r}");
+    assert_eq!(w.read("sub/work.txt").as_deref(), Some("only copy"));
+}
+
+/// On a case-insensitive filesystem (macOS's default) `CACHE` and `cache`
+/// are one path, so the check compares names without case.
+#[test]
+fn a_rewind_is_refused_when_ignored_files_differ_only_in_case() {
+    let mut w = Ws::new();
+    w.write("CACHE", "a file, once");
+    w.prompt("first");
+    fs::remove_file(w.p("CACHE")).unwrap();
+    w.prompt("second");
+    w.write("cache/valuable.txt", "only copy");
+    w.write(".gitignore", "cache/\n");
+    let r = w.rewind(1);
+    assert!(r["error"]["message"].as_str().unwrap_or_default().contains("cache/"), "{r}");
+    assert_eq!(w.read("cache/valuable.txt").as_deref(), Some("only copy"));
+}
+
+/// An earlier strive stored nested repositories as pointers; the next
+/// checkpoint drops them rather than carrying them on.
+#[test]
+fn nested_repository_pointers_from_an_earlier_checkpoint_are_dropped() {
+    let mut w = Ws::new();
+    w.write("sub/work.txt", "v1");
+    git(&w.p("sub"), &["init", "-q"]);
+    git(&w.p("sub"), &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "c"]);
+    w.prompt("first");
+    let head = git(&w.p("sub"), &["rev-parse", "HEAD"]);
+    let shadow = w.env.session_dir(&w.id).join("checkpoints.git");
+    let add = Command::new("git")
+        .args(["update-index", "--add", "--cacheinfo", &format!("160000,{},sub", head.trim())])
+        .env("GIT_DIR", &shadow)
+        .env("GIT_INDEX_FILE", shadow.join("index"))
+        .status()
+        .unwrap();
+    assert!(add.success());
+    w.prompt("second");
+    let r = w.rewind(1);
+    assert_eq!(r["result"]["notSaved"], json!(["sub"]), "{r}");
+    let tree = Command::new("git").args(["ls-tree", "-r", "HEAD"]).env("GIT_DIR", &shadow).output().unwrap();
+    assert!(!String::from_utf8_lossy(&tree.stdout).contains("160000"), "no pointer is saved");
+}
+
+/// Sessions sharing a directory share its files, so one session's rewind
+/// waits for no one else's command: it is refused while another runs.
+#[test]
+fn rewinding_while_another_session_in_the_same_directory_is_changing_files_is_refused() {
+    let mut w = Ws::new();
+    w.write("a.txt", "a1");
+    w.prompt("first");
+    let mut other = w.env.rpc();
+    let cwd = w.dir.path().canonicalize().unwrap();
+    let id = other.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    other.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let params =
+        json!({"id": id, "callId": "call_1", "request": {"kind": "bash", "command": "sleep 2; echo b > b.txt"}});
+    let running = std::thread::spawn(move || other.ok("effect/run", &params));
+    let mut watcher = w.env.rpc();
+    common::wait_for("the other session's command to start", std::time::Duration::from_secs(5), || {
+        let r = watcher.ok("session/read", &json!({"id": id}));
+        r["entries"].as_array().unwrap().iter().any(|e| e["event"]["type"] == "effectStarted")
+    });
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let r = w.rewind(1);
+    assert_eq!(
+        r["error"]["message"], "the agent is changing files right now; interrupt it (Esc) before rewinding",
+        "{r}"
+    );
+    running.join().unwrap();
+    assert_eq!(w.read("b.txt").as_deref(), Some("b\n"));
 }

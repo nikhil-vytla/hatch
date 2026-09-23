@@ -631,6 +631,11 @@ pub enum Event {
     /// The agent began working on the session's prompts.
     TurnStarted {
         turn: u64,
+        /// The last prompt this turn took: later ones wait for the next turn,
+        /// even if they were journaled before this entry.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        through_seq: Option<u64>,
     },
     /// The model's reply within a turn.
     AssistantMessage {

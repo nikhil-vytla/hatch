@@ -158,9 +158,7 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
         m if m.starts_with("host/") => route_host(state, conn, m, params).await,
         ApprovalRespond::NAME => {
             let ApprovalRespondParams { id, effect, decision } = parse::<ApprovalRespond>(params)?;
-            if crate::sync::lock(&conn.host_of).is_host() {
-                return Err(RpcError::new(RpcError::NOT_A_PERSON, "an agent host can't decide on approvals"));
-            }
+            require_person(conn)?;
             let by = crate::sync::lock(&conn.client).clone();
             match state.sessions.decide(&session_id(&id)?, effect, decision, by).await {
                 Ok(()) => reply::<ApprovalRespond>(Empty {}),
@@ -187,6 +185,10 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
 /// Under the connection's host lock, so it can't race `Conn::close`.
 fn claim_host(state: &State, conn: &Conn, sid: &SessionId) -> Result<bool, RpcError> {
     let mut host = crate::sync::lock(&conn.host_of);
+    // Its subscriptions would go on counting it as a person who can approve.
+    if !host.is_host() && !crate::sync::lock(&conn.subscriptions).is_empty() {
+        return Err(RpcError::new(RpcError::INVALID_REQUEST, "register as a host before attaching to the session"));
+    }
     match &*host {
         HostOf::Closed => Err(RpcError::new(RpcError::INVALID_REQUEST, "the connection is closing")),
         HostOf::Session(s) if s == sid => Ok(false),
@@ -201,11 +203,24 @@ fn claim_host(state: &State, conn: &Conn, sid: &SessionId) -> Result<bool, RpcEr
     }
 }
 
+/// Gives up a claim whose registration failed. A connection that closed
+/// meanwhile stays closed, so nothing can claim a session for it.
 fn release_host(state: &State, conn: &Conn) {
     let mut host = crate::sync::lock(&conn.host_of);
-    if let HostOf::Session(sid) = std::mem::replace(&mut *host, HostOf::None) {
-        state.hosts.release(&sid);
+    if let HostOf::Session(sid) = &*host {
+        state.hosts.release(sid);
+        *host = HostOf::None;
     }
+}
+
+/// Decisions that belong to a person: an agent host can't loosen its own
+/// limits. (The host runs as the user, so this guards against the agent's
+/// mistakes, not a hostile host; see docs/ARCHITECTURE.md.)
+fn require_person(conn: &Conn) -> Result<(), RpcError> {
+    if crate::sync::lock(&conn.host_of).is_host() {
+        return Err(RpcError::new(RpcError::NOT_A_PERSON, "only a person can do this, not the agent's host"));
+    }
+    Ok(())
 }
 
 /// Refuses agent requests from anything but the session's registered host.
@@ -338,8 +353,9 @@ async fn rewind(state: &Arc<State>, params: Value) -> Reply {
         .await
         .map_err(session_error)?
         .ok_or_else(|| RpcError::new(RpcError::INVALID_PARAMS, format!("no checkpoint {to} in this session")))?;
-    // No effect may change files while the restore runs.
-    let _files = state.sessions.workspace_lock(&sid).try_write_owned().map_err(|_| {
+    // No effect in this directory (from any session) may run during the restore.
+    let workspace = std::path::Path::new(&info.cwd).canonicalize().map_err(|e| internal(&e))?;
+    let _files = state.sessions.workspaces.rewind(&workspace).ok_or_else(|| {
         RpcError::new(
             RpcError::INVALID_REQUEST,
             "the agent is changing files right now; interrupt it (Esc) before rewinding",
@@ -355,10 +371,10 @@ async fn rewind(state: &Arc<State>, params: Value) -> Reply {
     let target_commit = target.clone();
     let (saved, nested) = tokio::task::spawn_blocking(move || {
         let saved = git.snapshot(&format!("before rewinding to checkpoint {to}"))?;
-        let in_the_way = git.ignored_in_the_way(&target)?;
+                let in_the_way = git.unsaved_in_the_way(&target)?;
         if !in_the_way.is_empty() {
             return Err(std::io::Error::other(format!(
-                "rewinding would overwrite files git ignores, which checkpoints don't save: {}; move them aside first",
+                "rewinding would overwrite files checkpoints don't save (ignored files, nested repositories): {}; move them aside first",
                 in_the_way.join(", ")
             )));
         }
@@ -400,6 +416,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
             };
             let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
+            let _running = state.sessions.begin_effect();
             let cancelled = state.sessions.cancel_flag(&sid, &call_id);
             let effect = state.sessions.start_effect(&sid, call_id.clone(), record).await.map_err(session_error);
             let result = run_effect(state, &sid, scope, request, effect, &cancelled).await;
@@ -475,9 +492,13 @@ async fn run_effect(
         let result = if let Some(why) = refusal {
             crate::effects::Result::Refused(why)
         } else {
-            // Held shared while the effect runs, so a rewind can't race it.
-            let files = state.sessions.workspace_lock(&sid).read_owned().await;
-            if let EffectRequest::Mcp { server, tool, arguments } = &request {
+            // Held while the effect runs, so no rewind of its directory races it.
+            let files = state.sessions.workspaces.effect(&scope.workspace).await;
+            if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+                // Cancelled while it waited (for approval, or for a rewind).
+                drop(files);
+                crate::effects::Result::Refused("interrupted before it ran".into())
+            } else if let EffectRequest::Mcp { server, tool, arguments } = &request {
                 let result = call_mcp(state, &sid, server, tool, arguments.clone(), cancelled).await;
                 drop(files);
                 result
@@ -542,7 +563,10 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             reply::<SessionAttach>(SessionAttachResult { session, entries })
         }
         SessionPrompt::NAME => prompt(state, params).await,
-        SessionRewind::NAME => rewind(state, params).await,
+        SessionRewind::NAME => {
+            require_person(conn)?;
+            rewind(state, params).await
+        }
         SessionRead::NAME => {
             let SessionRef { id } = parse::<SessionRead>(params)?;
             let (session, report) = state.sessions.read(&session_id(&id)?).map_err(session_error)?;
@@ -566,11 +590,13 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             reply::<SessionInterrupt>(Empty {})
         }
         SessionApprovals::NAME => {
+            require_person(conn)?;
             let SessionApprovalsParams { id, mode } = parse::<SessionApprovals>(params)?;
             let entries = state.sessions.set_mode(&session_id(&id)?, mode).await.map_err(session_error)?;
             reply::<SessionApprovals>(Appended { seq: entries[0].seq })
         }
         SessionBudget::NAME => {
+            require_person(conn)?;
             let SessionBudgetParams { id, usd_micros, tokens } = parse::<SessionBudget>(params)?;
             let limits = strive_budget::Limits { usd_micros, tokens };
             let entries = state.sessions.set_budget(&session_id(&id)?, limits).await.map_err(session_error)?;

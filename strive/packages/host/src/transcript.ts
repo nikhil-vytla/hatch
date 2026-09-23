@@ -34,9 +34,11 @@ export function summaryMessage(summary: string, timestamp: number): Message {
 }
 
 export async function rebuild(all: Entry[], blob: (digest: string) => Promise<string>): Promise<Message[]> {
-  // The latest summary replaces everything it covers.
+  // The latest summary replaces everything it covers. Entries after what it
+  // covers (the prompts of the turn that compacted) follow it.
   const compacted = all.findLast((e) => e.event.type === "compacted");
-  const entries = compacted ? all.filter((e) => e.seq > compacted.seq) : all;
+  const upto = compacted?.event.type === "compacted" ? compacted.event.uptoSeq : 0;
+  const entries = all.filter((e) => e.seq > upto);
   const records = new Map<number, { callId: string; record: EffectRecord }>();
   const results = new Map<string, { text: string; isError: boolean; ts: number }>();
 
@@ -80,22 +82,23 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
   // a turn runs is journaled mid-turn but reaches the model with the next
   // turn, together with any sent after this one ends.
   let inTurn = false;
-  let held: Message[] = [];
+  let held: { seq: number; message: Message }[] = [];
 
-  const release = () => {
+  /** Releases held prompts up to `through` (all of them without it). */
+  const release = (through = Number.POSITIVE_INFINITY) => {
     close();
-    messages.push(...held);
-    held = [];
+    messages.push(...held.filter((h) => h.seq <= through).map((h) => h.message));
+    held = held.filter((h) => h.seq > through);
   };
 
-  for (const { event: e, tsMs } of entries) {
+  for (const { event: e, tsMs, seq } of entries) {
     if (e.type === "turnStarted") {
-      release();
+      release(e.throughSeq);
       inTurn = true;
     } else if (e.type === "turnEnded") {
       inTurn = false;
     } else if (e.type === "userMessage") {
-      held.push({ role: "user", content: e.text, timestamp: tsMs });
+      held.push({ seq, message: { role: "user", content: e.text, timestamp: tsMs } });
     } else if (e.type === "assistantMessage") {
       // Without turn markers, a reply answers the prompts before it.
       if (inTurn) close();

@@ -216,8 +216,25 @@ pub struct Sessions {
     /// Cancel flags for effects by the agent's call id. A cancel can arrive
     /// before its effect does, so either side may create the flag.
     cancels: StdMutex<HashMap<(SessionId, String), Arc<std::sync::atomic::AtomicBool>>>,
-    /// See `workspace_lock`.
-    workspaces: StdMutex<HashMap<SessionId, Arc<tokio::sync::RwLock<()>>>>,
+    /// Directories effects are changing and rewinds are restoring.
+    pub workspaces: Arc<crate::workspaces::Workspaces>,
+    /// Effects running now; shutdown waits for them.
+    in_flight: Arc<std::sync::atomic::AtomicUsize>,
+    effects_done: Arc<tokio::sync::Notify>,
+}
+
+/// An effect counted as running until dropped.
+pub struct InFlight {
+    count: Arc<std::sync::atomic::AtomicUsize>,
+    done: Arc<tokio::sync::Notify>,
+}
+
+impl Drop for InFlight {
+    fn drop(&mut self) {
+        if self.count.fetch_sub(1, std::sync::atomic::Ordering::SeqCst) == 1 {
+            self.done.notify_waiters();
+        }
+    }
 }
 
 /// How an approval request ended.
@@ -255,7 +272,9 @@ impl Sessions {
             stopping: std::sync::atomic::AtomicBool::new(false),
             checkpointing: StdMutex::new(HashMap::new()),
             cancels: StdMutex::new(HashMap::new()),
-            workspaces: StdMutex::new(HashMap::new()),
+            workspaces: Arc::default(),
+            in_flight: Arc::default(),
+            effects_done: Arc::default(),
         })
     }
 
@@ -400,9 +419,28 @@ impl Sessions {
         Ok(())
     }
 
-    /// Effects that change files hold this shared; a rewind holds it alone.
-    pub fn workspace_lock(&self, id: &SessionId) -> Arc<tokio::sync::RwLock<()>> {
-        crate::sync::lock(&self.workspaces).entry(id.clone()).or_default().clone()
+    /// Counts an effect as running until the returned guard drops.
+    pub fn begin_effect(&self) -> InFlight {
+        self.in_flight.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        InFlight { count: self.in_flight.clone(), done: self.effects_done.clone() }
+    }
+
+    /// Cancels every running effect and waits (up to `wait`) for them to
+    /// finish and be journaled. Shutdown does this before stopping writers,
+    /// so no command outlives the daemon that started it.
+    pub async fn cancel_effects(&self, wait: std::time::Duration) {
+        for flag in crate::sync::lock(&self.cancels).values() {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        let deadline = tokio::time::Instant::now() + wait;
+        while self.in_flight.load(std::sync::atomic::Ordering::SeqCst) > 0 {
+            let done = self.effects_done.notified();
+            if self.in_flight.load(std::sync::atomic::Ordering::SeqCst) == 0
+                || tokio::time::timeout_at(deadline, done).await.is_err()
+            {
+                break;
+            }
+        }
     }
 
     /// Whether a call with this reservation would fit the budget now.

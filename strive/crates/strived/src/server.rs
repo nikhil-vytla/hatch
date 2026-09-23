@@ -184,6 +184,8 @@ pub async fn run(cfg: Config) -> Result<Started> {
     let _ = fs::remove_file(&socket);
     drop(listener);
     gateway_task.abort();
+    // Commands first, while their ends can still be journaled; then writers.
+    state.sessions.cancel_effects(Duration::from_secs(10)).await;
     state.sessions.shutdown().await;
     state.mcp.stop_all().await;
     drop(lock);

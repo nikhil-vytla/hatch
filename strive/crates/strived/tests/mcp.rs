@@ -49,8 +49,9 @@ impl Ws {
         let config = host.ok("host/register", &json!({"id": id}));
         Self { env, dir, id, host, config, log }
     }
-    fn mode(&mut self, mode: &str) {
-        self.host.ok("session/approvals", &json!({"id": self.id, "mode": mode}));
+    /// Set by a person, as only a person may.
+    fn mode(&self, mode: &str) {
+        self.env.rpc().ok("session/approvals", &json!({"id": self.id, "mode": mode}));
     }
     fn call(&mut self, tool: &str, arguments: &Value) -> Value {
         let request = json!({"kind": "mcp", "server": "fake", "tool": tool, "arguments": arguments});
@@ -133,8 +134,8 @@ fn a_cancelled_tool_call_is_cancelled_at_the_server_too() {
     let params = json!({"id": w.id, "callId": "call_slow",
         "request": {"kind": "mcp", "server": "fake", "tool": "slow", "arguments": {}}});
     let running = std::thread::spawn(move || agent.ok("effect/run", &params));
-    common::wait_for("the call to start", Duration::from_secs(5), || {
-        w.events().iter().any(|e| e["type"] == "effectStarted")
+    common::wait_for("the server to get the call", Duration::from_secs(5), || {
+        std::fs::read_to_string(&w.log).is_ok_and(|l| l.contains("call \"slow\""))
     });
     let started = Instant::now();
     w.host.ok("effect/cancel", &json!({"id": w.id, "callId": "call_slow"}));

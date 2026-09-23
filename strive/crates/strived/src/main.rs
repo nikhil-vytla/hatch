@@ -24,6 +24,7 @@ mod settings;
 mod sync;
 
 mod tui;
+mod workspaces;
 
 use std::process::ExitCode;
 use std::time::Duration;

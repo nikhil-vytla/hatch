@@ -229,7 +229,8 @@ const textOf = (m: AssistantMessage) => m.content.flatMap((c) => (c.type === "te
 export class Host {
   private agent!: Agent;
   private turn = 0;
-  private queued: string[] = [];
+  /** Prompts not yet sent, with their journal seqs. */
+  private queued: { text: string; seq: number }[] = [];
   private running = false;
   private timedOut = false;
 
@@ -263,9 +264,10 @@ export class Host {
       });
     }
 
-    // Prompts after the last turn began are still waiting: they are sent as
-    // the next turn, not replayed as history.
-    const since = lastStart?.seq ?? 0;
+    // Prompts the last turn didn't take are still waiting: they are sent as
+    // the next turn, not replayed as history. (Older journals don't record
+    // what a turn took; for them it took everything before its start.)
+    const since = lastStart?.event.type === "turnStarted" ? (lastStart.event.throughSeq ?? lastStart.seq) : 0;
     const waiting = entries.filter((e) => e.seq > since && e.event.type === "userMessage");
     const history = entries.filter((e) => !waiting.includes(e));
     this.agent = new Agent({
@@ -302,7 +304,7 @@ export class Host {
       }
     });
     this.lastSeq = entries.at(-1)?.seq ?? 0;
-    this.queued = waiting.flatMap((e) => (e.event.type === "userMessage" ? [e.event.text] : []));
+    this.queued = waiting.flatMap((e) => (e.event.type === "userMessage" ? [{ text: e.event.text, seq: e.seq }] : []));
     const early = this.early ?? [];
     this.early = undefined;
 
@@ -321,7 +323,7 @@ export class Host {
     this.lastSeq = entry.seq;
 
     if (entry.event.type === "userMessage") {
-      this.queued.push(entry.event.text);
+      this.queued.push({ text: entry.event.text, seq: entry.seq });
       void this.drain();
     }
   }
@@ -351,8 +353,8 @@ export class Host {
     }
   }
 
-  /** Summarizes the conversation so far if it has grown past the limit. */
-  private async compactIfLarge() {
+  /** Summarizes the conversation up to entry `upto` if it has grown past the limit. */
+  private async compactIfLarge(upto: number) {
     const messages = this.agent.state.messages;
 
     if (
@@ -360,7 +362,6 @@ export class Host {
       messages.every((m) => m.role === "system")
     )
       return;
-    const upto = this.lastSeq;
 
     const reply = await this.models.completeSimple(model(this.config), {
       systemPrompt: SUMMARIZE,
@@ -375,12 +376,13 @@ export class Host {
     this.agent.state.messages = [...system, summaryMessage(summary, Date.now())];
   }
 
-  private async runTurn(prompts: string[]) {
-    await this.compactIfLarge();
+  private async runTurn(prompts: { text: string; seq: number }[]) {
+    // Everything before this turn's first prompt is in the conversation.
+    await this.compactIfLarge((prompts[0]?.seq ?? this.lastSeq + 1) - 1);
     this.turn += 1;
     this.timedOut = false;
     this.interrupted = false;
-    await this.record({ type: "turnStarted", turn: this.turn });
+    await this.record({ type: "turnStarted", turn: this.turn, throughSeq: prompts.at(-1)?.seq });
 
     const timer = setTimeout(() => {
       this.timedOut = true;
@@ -390,7 +392,7 @@ export class Host {
     let reason: TurnEnd;
 
     try {
-      await this.agent.prompt(prompts.map((text) => ({ role: "user" as const, content: text, timestamp: Date.now() })));
+      await this.agent.prompt(prompts.map((p) => ({ role: "user" as const, content: p.text, timestamp: Date.now() })));
       const last = this.agent.state.messages.at(-1);
 
       if (this.timedOut) reason = { kind: "timedOut", seconds: this.config.turnSeconds };

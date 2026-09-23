@@ -258,3 +258,32 @@ fn a_cancelled_request_is_refused_and_cant_be_approved_later() {
     assert_eq!(late["error"]["code"], strive_proto::rpc::RpcError::APPROVAL_NOT_PENDING, "{late}");
     assert!(!w.file("made.txt").exists());
 }
+
+/// What a person decides stays theirs: the agent's host can't loosen
+/// approvals, raise the budget or rewind the files.
+#[test]
+fn an_agent_host_cannot_change_what_it_is_allowed_to_do() {
+    let w = Ws::new();
+    let mut host = w.env.rpc();
+    host.ok("host/register", &json!({"id": w.id}));
+    for (method, params) in [
+        ("session/approvals", json!({"id": w.id, "mode": "fullAuto"})),
+        ("session/budget", json!({"id": w.id, "usdMicros": 999_000_000})),
+        ("session/rewind", json!({"id": w.id, "checkpoint": 1})),
+    ] {
+        let r = host.call(method, &params);
+        assert_eq!(r["error"]["code"], strive_proto::rpc::RpcError::NOT_A_PERSON, "{method}: {r}");
+    }
+    assert!(!w.events().iter().any(|e| e["type"] == "approvalModeSet" && e["mode"] == "fullAuto"));
+}
+
+/// A connection that attached as a person and then registered as the host
+/// is no longer counted as someone who could answer.
+#[test]
+fn a_host_must_register_before_it_attaches() {
+    let w = Ws::new();
+    let mut c = w.env.rpc();
+    c.ok("session/attach", &json!({"id": w.id}));
+    let r = c.call("host/register", &json!({"id": w.id}));
+    assert_eq!(r["error"]["code"], strive_proto::rpc::RpcError::INVALID_REQUEST, "{r}");
+}

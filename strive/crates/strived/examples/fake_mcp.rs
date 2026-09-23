@@ -4,7 +4,7 @@
 //! Tools: `echo {text}`, `fail` (an error result), `slow` (answers after
 //! 30 s), `where` (its working directory and what it can see of the
 //! environment). `FAKE_MCP_PID` names a file to write its pid to, and
-//! `FAKE_MCP_LOG` a file to append the notifications it gets to. With
+//! `FAKE_MCP_LOG` a file to append the tool calls and notifications it gets to. With
 //! `FAKE_MCP_STUBBORN` it outlives its stdin closing, as some servers do.
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test fixture")]
 
@@ -26,13 +26,19 @@ fn main() {
         let Ok(line) = line else { break };
         let msg: Value = serde_json::from_str(&line).unwrap();
         let method = msg["method"].as_str().unwrap_or_default().to_string();
-        let Some(id) = msg.get("id").cloned() else {
+        let log = |line: String| {
             if let Ok(log) = std::env::var("FAKE_MCP_LOG") {
                 let mut f = std::fs::OpenOptions::new().create(true).append(true).open(log).unwrap();
-                writeln!(f, "{method} {}", msg["params"]).unwrap();
+                writeln!(f, "{line}").unwrap();
             }
+        };
+        let Some(id) = msg.get("id").cloned() else {
+            log(format!("{method} {}", msg["params"]));
             continue;
         };
+        if method == "tools/call" {
+            log(format!("call {}", msg["params"]["name"]));
+        }
         let out = out.clone();
         // Calls run on their own threads, so a slow one doesn't hold up the rest.
         std::thread::spawn(move || {

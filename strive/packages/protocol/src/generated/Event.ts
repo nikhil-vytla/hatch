@@ -49,7 +49,12 @@ by: string, } | { "type": "checkpointed", checkpoint: number,
 /**
  * The commit in the session's shadow repository.
  */
-commit: string, } | { "type": "rewound", to: number, savedAs: number, } | { "type": "turnStarted", turn: number, } | { "type": "assistantMessage", turn: number, 
+commit: string, } | { "type": "rewound", to: number, savedAs: number, } | { "type": "turnStarted", turn: number, 
+/**
+ * The last prompt this turn took: later ones wait for the next turn,
+ * even if they were journaled before this entry.
+ */
+throughSeq?: number, } | { "type": "assistantMessage", turn: number, 
 /**
  * The reply's text, for showing.
  */
