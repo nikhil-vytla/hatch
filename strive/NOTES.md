@@ -374,3 +374,65 @@ On the tests:
 - The first MCP stall test failed for a harness reason: the fake went deaf
   before the second `tools/list` page was requested. So did the next run:
   the test client's 5s read timeout was shorter than the ~10s stall.
+
+## 2026-09-23: Fourth review, M5 desktop, M6 headless
+
+**Fourth review.** Codex found 9 issues, 4 high. It judged the descriptor,
+fail-closed sandbox, attach and admission fixes sound. All 9 were
+addressed.
+- **MCP:**
+  - Every failure path now goes through one terminate path: mark dead,
+    kill the group, wait for exit, then fail the calls. A server that
+    closed its output but kept writing files was the real gap; the new
+    test shows the old code let its write through.
+  - Process groups are tracked from spawn, so shutdown kills servers
+    still starting.
+  - The outbox is bounded.
+  - Registering a request and marking the server dead share one lock.
+  - Tool names are allocated against the final set.
+- **Compaction:** the cutoff is the conversation's acknowledged journal
+  seq, not the notification cursor.
+- **Forced exit:** it kills the daemon's own process group, taking a
+  rewind's git with it.
+- **x32 syscalls:** refused on x86-64. Untested locally, since podman here
+  is aarch64.
+- **Documented:** strive stops a server that stays silent about a
+  cancelled call, although MCP allows the silence.
+
+**M5, the desktop app.**
+- Electron app, React renderer, Playwright e2e under Node. Under Bun,
+  Playwright's Electron launch hangs and its CDP connect fails on
+  WebSockets.
+- Bugs found on the way:
+  - Bun's bundler bakes `__dirname` at the source file.
+  - A function returned across `contextBridge` isn't callable.
+  - Chromium's `scrollIntoView` now returns a Promise, which React took
+    as an effect's cleanup.
+- Widgets are served from a `strive-widget:` scheme with their own CSP,
+  because a `srcdoc` iframe inherits the app's policy. A probe widget finds
+  the parent, the bridge, storage and the network all blocked.
+- Streaming over ~1000 transcript lines holds 120 fps (p95 10 ms), so
+  there is no virtualization yet.
+- Packaged unsigned with electron-builder; `install.sh` installs it.
+
+**M6, headless.**
+- `strive run` attaches as an observer, so approvals don't wait on nobody.
+  Attached as a person, the test hangs.
+- The CLI client now buffers notifications and reads cancel-safely.
+- `"sandbox": "off"` is for task containers.
+- **Harbor:**
+  - The first hello-world trial failed because the bare ubuntu image has
+    no CA certificates, so the daemon couldn't build its HTTP client. It
+    now falls back to built-in Mozilla roots.
+  - Terminal-Bench images are amd64, emulated on this Mac, so binaries are
+    built per architecture: a static musl strive and Bun's baseline x64.
+  - Results with Haiku 4.5: hello-world scored 1.0 ($0.0035). Terminal-Bench
+    2.0 `fix-git` scored 1.0 in 40s: 11 calls, $0.036, via reflog, merge
+    and conflict resolution.
+  - There is no prompt caching yet (0 cache tokens), a cheap future win.
+
+**Process slips worth remembering.**
+- My exact-edit helper reindents the first line of a replacement, which
+  broke Python twice. `check.sh` now compiles the Harbor agent.
+- `podman pull` once printed a Canva SSO "Opening browser" prompt. Later
+  pulls didn't.
