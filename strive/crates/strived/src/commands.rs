@@ -126,7 +126,8 @@ pub fn describe(e: &Entry) -> String {
         Event::AssistantMessage { text, tool_calls, .. } => {
             let calls: Vec<&str> = tool_calls.iter().map(|c| c.name.as_str()).collect();
             match (text.trim().is_empty(), calls.is_empty()) {
-                (_, true) => format!("agent: {}", text.trim()),
+                (true, true) => "agent replied with nothing".to_string(),
+                (false, true) => format!("agent: {}", text.trim()),
                 (true, false) => format!("agent calls {}", calls.join(", ")),
                 (false, false) => format!("agent: {} (calls {})", text.trim(), calls.join(", ")),
             }

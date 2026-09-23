@@ -171,7 +171,14 @@ async fn run(cli: Cli) -> Result<ExitCode> {
                 _ => strive_proto::ApprovalMode::FullAuto,
             });
             let (mut c, _) = launch::ensure(&home, "strive-run").await?;
-            run::run(&mut c, run::Options { task: task.trim().to_string(), json, approvals, budget_usd: budget }).await
+            let opts = run::Options {
+                home: home.root.clone(),
+                task: task.trim().to_string(),
+                json,
+                approvals,
+                budget_usd: budget,
+            };
+            run::run(&mut c, opts).await
         }
         Some(Cmd::App { continue_latest, resume }) => {
             launch::ensure(&home, "strive-app").await?;

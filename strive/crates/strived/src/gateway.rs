@@ -52,10 +52,24 @@ pub struct Gateway {
 impl Gateway {
     pub async fn bind() -> anyhow::Result<(Self, tokio::net::TcpListener)> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let http = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
+        let builder = || {
+            reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(10))
+                .redirect(reqwest::redirect::Policy::none())
+        };
+        // The system's roots where it has them. A bare container (a benchmark
+        // task on ubuntu with no ca-certificates) has none, and then Mozilla's,
+        // built in, are used instead.
+        let http = match builder().build() {
+            Ok(c) => c,
+            Err(system) => {
+                let roots = webpki_root_certs::TLS_SERVER_ROOT_CERTS
+                    .iter()
+                    .filter_map(|der| reqwest::Certificate::from_der(der).ok());
+                crate::log!("no usable system CA certificates ({system}); using the built-in roots");
+                builder().tls_certs_only(roots).build()?
+            }
+        };
         Ok((Self { addr: listener.local_addr()?, tokens: Mutex::new(HashMap::new()), http }, listener))
     }
 

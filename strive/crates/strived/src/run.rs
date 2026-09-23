@@ -16,6 +16,8 @@ use strive_proto::{
 use crate::client::Client;
 
 pub struct Options {
+    /// strive's home, where the session's host log is.
+    pub home: std::path::PathBuf,
     pub task: String,
     pub json: bool,
     pub approvals: Option<ApprovalMode>,
@@ -75,8 +77,17 @@ pub async fn run(c: &mut Client, opts: Options) -> Result<ExitCode> {
                 c.request::<SessionInterrupt>(SessionRef { id: id.clone() }).await?;
                 continue;
             }
-            () = tokio::time::sleep_until(started + START_TIMEOUT), if turn.is_none() => {
-                bail!("the agent didn't start within {}s; see `strive doctor`", START_TIMEOUT.as_secs());
+                        () = tokio::time::sleep_until(started + START_TIMEOUT), if turn.is_none() => {
+                let log = opts.home.join("sessions").join(&id).join("host.log");
+                let tail = std::fs::read_to_string(&log).unwrap_or_default();
+                let lines: Vec<&str> = tail.lines().collect();
+                let last = lines.get(lines.len().saturating_sub(8)..).unwrap_or_default();
+                bail!(
+                    "the agent didn't start within {}s (see `strive doctor`); {} ends:\n{}",
+                    START_TIMEOUT.as_secs(),
+                    log.display(),
+                    if last.is_empty() { "(nothing: the host may not have started at all)".to_string() } else { last.join("\n") }
+                );
             }
         };
         if note.method.as_deref() != Some("session/entry") {
