@@ -331,3 +331,46 @@ gaps, 8 of them high. All 12 were addressed; the macOS one only in the docs.
   - The journal holds `echo: strive`. `strive verify` passes on 18
     entries. The cost was $0.0069.
   - The run showed approvals displayed twice; that is fixed.
+
+## 2026-09-23: Codex's third review
+
+The third review covered `0e88806..fa637ec`. It found 15 issues, 10 of them
+high, and judged 6 earlier fixes sound. All 15 were addressed; two only in
+the docs, since they are known limits of the current design:
+- the host isn't sandboxed, so a hostile host could open a second
+  connection;
+- MCP descendants that `setsid` out of their group survive.
+
+What was fixed:
+- **Seccomp filter:**
+  - The pipe was inherited by concurrent commands, letting one command
+    weaken another's filter. It is now close-on-exec and mapped to fd 3 of
+    its own child.
+  - `io_uring` could create sockets without the `socket` syscall.
+  - Datagram `socketpair` could `sendto` a socket by path. A Linux mutant
+    without that rule reaches an outside socket.
+- **Fail-open sandbox:** the gate and the execution each built the
+  sandbox. The gate now records its decision, and execution refuses if it
+  can't honor it.
+- **MCP:**
+  - writes could block the reader or a call; they now go through a writer
+    task, and a stall kills the server;
+  - a cancelled tool could keep changing files; a server that ignores a
+    cancellation is killed after 2s;
+  - dead servers took calls; they restart lazily now;
+  - startup held a global lock with no overall bound;
+  - tool names could alias.
+- **Shutdown:** admission now closes, the cancel sweep repeats, and rewinds
+  are counted. If work hasn't settled, the daemon exits rather than
+  releasing its lock.
+- **Destinations:** writes outside the workspace now lock their destination.
+- **Attach race:** attaching while registering is serialized.
+- **Compaction replay:** fixed for Codex's interleaving.
+
+On the tests:
+- The attach and registration race didn't trigger in 20 pipelined tries,
+  because registration always won. The test guards the invariant, and the
+  fix is structural.
+- The first MCP stall test failed for a harness reason: the fake went deaf
+  before the second `tools/list` page was requested. So did the next run:
+  the test client's 5s read timeout was shorter than the ~10s stall.
