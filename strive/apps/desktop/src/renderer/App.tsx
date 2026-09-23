@@ -23,6 +23,7 @@ import { useStickToBottom } from "use-stick-to-bottom";
 import type { Bridge, Opened } from "../shared/bridge";
 import { type Item, label, summarize, type Tool } from "./conversation";
 import { ChangesPane } from "./ChangesPane";
+import { Palette } from "./Palette";
 import { Diff } from "./DiffView";
 import { Icon, type IconName } from "./icons";
 import { Markdown } from "./MarkdownView";
@@ -88,6 +89,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
 
   const switchTo = (to?: string) => act(onSwitch(to));
   const [changes, setChanges] = useState(() => localStorage.getItem(CHANGES_KEY) === "shown");
+  const [palette, setPalette] = useState(false);
 
   const toggleChanges = () =>
     setChanges((open) => {
@@ -114,6 +116,9 @@ export function App({ bridge, opened, onSwitch }: Props) {
       } else if (e.key === "d") {
         e.preventDefault();
         toggleChanges();
+      } else if (e.key === "k") {
+        e.preventDefault();
+        setPalette((open) => !open);
       }
     };
 
@@ -161,6 +166,24 @@ export function App({ bridge, opened, onSwitch }: Props) {
           </button>
         )}
         {loaded && <Proposals model={model} layout={layout} onChange={edit} />}
+        <Palette
+          open={palette}
+          onOpenChange={setPalette}
+          actions={[
+            { id: "new", label: "New session", keys: "⌘N", run: () => switchTo() },
+            { id: "sidebar", label: sidebar ? "Hide sessions" : "Show sessions", keys: "⌘B", run: toggleSidebar },
+            { id: "changes", label: changes ? "Hide changes" : "Show changes", keys: "⌘D", run: toggleChanges },
+            ...(model.working
+              ? [{ id: "interrupt", label: "Interrupt the agent", keys: "Esc", run: session.interrupt }]
+              : []),
+          ]}
+          modes={{ current: model.mode, set: session.setMode }}
+          checkpoints={model.checkpoints}
+          onRewind={session.rewind}
+          sessions={bridge.sessions}
+          currentSession={opened.session.id}
+          onSwitch={(to) => switchTo(to)}
+        />
         <div className={`work ${changes ? "with-changes" : ""}`}>
           <Columns
             workspace={workspace}

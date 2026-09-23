@@ -235,6 +235,19 @@ test("the changes pane shows what changed since the last prompt, file by file", 
   assert.equal(await notes.locator(".row.add").textContent(), "1+const a = 2;");
 });
 
+test("the command palette finds an action by a few letters and runs it", async () => {
+  const { page, cwd } = await openApp();
+  await page.keyboard.press("Meta+k");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await palette.waitFor();
+  await page.keyboard.type("full-a");
+  await page.keyboard.press("Enter");
+  await palette.waitFor({ state: "detached" });
+  const log = JSON.parse(strive("log", sessionId(cwd), "--json"));
+  const modes = log.entries.filter((e: { event: { type: string } }) => e.event.type === "approvalModeSet");
+  assert.equal(modes.at(-1)?.event.mode, "fullAuto");
+});
+
 test("a reloaded window shows what happened since it opened", async () => {
   const { page, cwd } = await openApp();
   const rpc = await Rpc.open();
