@@ -109,6 +109,11 @@ pub async fn run(c: &mut Client, opts: Options) -> Result<ExitCode> {
                 if through_seq.is_none_or(|s| s >= prompt) && turn.is_none() =>
             {
                 turn = Some(*n);
+                // An interrupt reaches only a host that is listening: one sent
+                // before the turn began may have found none, so send it again.
+                if interrupted {
+                    c.request::<SessionInterrupt>(SessionRef { id: id.clone() }).await?;
+                }
             }
             Event::TurnEnded { turn: n, reason } if Some(*n) == turn => return Ok(exit_code(reason)),
             _ => {}

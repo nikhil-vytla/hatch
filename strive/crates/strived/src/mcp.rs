@@ -43,8 +43,12 @@ const MAX_LINE: u64 = 16 * 1024 * 1024;
 /// Messages waiting to be written to one server; a server that lets more
 /// pile up has stopped reading.
 const OUTBOX: usize = 256;
-/// How long a killed server has to exit before it is given up on.
-const EXIT_WAIT: Duration = Duration::from_secs(2);
+/// How long a killed server has to exit before it is given up on. SIGKILL
+/// ends a process unless it is stuck in the kernel (a hung filesystem);
+/// nothing can stop that one, and it is logged.
+const EXIT_WAIT: Duration = Duration::from_secs(10);
+/// A request id from a server longer than this is not a real one.
+const MAX_ID: usize = 256;
 
 /// Every session's servers, started when its agent first registers.
 #[derive(Default)]
@@ -207,7 +211,14 @@ impl Process {
     async fn terminate(&self) {
         crate::sync::lock(&self.state).dead = true;
         kill_group(self.pgid);
-        let _ = tokio::time::timeout(EXIT_WAIT, async { self.child.lock().await.wait().await }).await;
+        let exited = tokio::time::timeout(EXIT_WAIT, async { self.child.lock().await.wait().await }).await;
+        if !matches!(exited, Ok(Ok(_))) {
+            crate::log!(
+                "MCP server process group {} didn't exit after SIGKILL within {}s",
+                self.pgid,
+                EXIT_WAIT.as_secs()
+            );
+        }
         crate::sync::lock(&self.running.groups).remove(&self.pgid);
         // Dropping the senders fails the calls.
         crate::sync::lock(&self.state).pending.clear();
@@ -479,6 +490,12 @@ async fn read_replies(stdout: ChildStdout, outbox: mpsc::Sender<Value>, process:
                 let _ = waiting.send(reply); // the caller may have given up
             }
             (Some(id), Some(_)) => {
+                // Refusals echo the id; one that isn't a plausible id would
+                // make each refusal as big as it is.
+                let plausible = id.is_u64() || id.is_i64() || id.as_str().is_some_and(|s| s.len() <= MAX_ID);
+                if !plausible {
+                    break;
+                }
                 let refusal =
                     json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "not supported"}});
                 // A full outbox means the server isn't reading what it asked for.

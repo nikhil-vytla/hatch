@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 
 from harbor.agents.base import BaseAgent
+from harbor.agents.installed.base import NonZeroAgentExitCodeError
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
@@ -68,31 +69,52 @@ class Strive(BaseAgent):
         logs = self.environment_logs_dir
         # The key must be in the environment before the daemon starts: it
         # reads keys when it does, and `strive run` starts it.
-        await environment.exec(
+        result = await environment.exec(
             command=f"strive run --json --approvals full-auto - < /tmp/strive-task.txt > {logs}/strive.jsonl 2> {logs}/strive.err",
             env={"ANTHROPIC_API_KEY": os.environ["ANTHROPIC_API_KEY"]},
             timeout_sec=TURN_SECONDS + 120,
         )
-        self._count(context)
+        # Read through the container: not every backend mounts the logs.
+        journal = await environment.exec(command=f"cat {logs}/strive.jsonl")
+        self._count(journal.stdout or "", context)
+        code = result.return_code
+        if code != 0:
+            err = await environment.exec(command=f"tail -c 2000 {logs}/strive.err")
+            # 1 failed, 3 timed out, 4 interrupted: the turn's end says why.
+            # Anything else is strive itself, on stderr.
+            why = _turn_end(journal.stdout or "") or (err.stdout or "").strip()[-500:]
+            context.metadata = {"strive_exit": code, "why": why}
+            raise NonZeroAgentExitCodeError(f"strive run exited {code}: {why}")
 
-    def _count(self, context: AgentContext) -> None:
-        """Tokens and cost from the model calls the journal records."""
-        path = self.logs_dir / "strive.jsonl"
-        if not path.is_file():
-            return
+    def _count(self, journal: str, context: AgentContext) -> None:
+        """Tokens and cost from the model calls the journal records. Harbor's
+        input tokens include cached ones; its cache tokens are the reads."""
         inputs = outputs = cached = cost = 0
-        for line in path.read_text().splitlines():
+        for line in journal.splitlines():
             event = json.loads(line)["event"]
             if event["type"] != "modelCallFinished":
                 continue
             outcome = event["outcome"]
             if outcome["kind"] == "complete":
                 usage = outcome["usage"]
-                inputs += usage["input"]
+                read = usage.get("cacheRead", 0)
+                written = usage.get("cacheWrite", 0) + usage.get("cacheWriteLong", 0)
+                inputs += usage["input"] + read + written
                 outputs += usage["output"]
-                cached += usage.get("cacheRead", 0)
+                cached += read
             cost += outcome.get("costUsdMicros", 0)
         context.n_input_tokens = inputs
         context.n_output_tokens = outputs
         context.n_cache_tokens = cached
         context.cost_usd = cost / 1_000_000
+
+
+def _turn_end(journal: str) -> str:
+    """Why the last turn ended, from the journal."""
+    reason = ""
+    for line in journal.splitlines():
+        event = json.loads(line)["event"]
+        if event["type"] == "turnEnded":
+            r = event["reason"]
+            reason = r.get("error") or r["kind"]
+    return reason

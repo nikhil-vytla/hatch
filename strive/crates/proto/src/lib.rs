@@ -668,6 +668,10 @@ pub enum Event {
     /// The agent proposed a change to the desktop workspace's layout. It
     /// changes nothing until a person accepts it in the desktop app.
     LayoutProposed {
+        /// The agent's tool call that made the proposal, whose result it is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        call_id: Option<String>,
         label: String,
         /// The workspace ops, as the agent gave them; the app parses them.
         #[ts(type = "unknown")]

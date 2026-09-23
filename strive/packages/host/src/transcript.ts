@@ -5,6 +5,9 @@
 import type { AssistantMessage, Message, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { EffectOutcome, EffectRecord, Entry } from "@strive/protocol";
 
+/** What propose_layout tells the model, live and on resume. */
+export const PROPOSED = "Proposed. The person will accept or reject it in the desktop app.";
+
 export type ToolResultText = { text: string; isError: boolean };
 
 /** How an effect's outcome reads to the model. */
@@ -53,6 +56,10 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
 
   for (const { event: e, tsMs } of entries) {
     if (e.type === "effectStarted") records.set(e.effect, { callId: e.callId, record: e.record });
+
+    // A tool that runs no effect: its journaled entry is its result.
+    if (e.type === "layoutProposed" && e.callId !== undefined)
+      results.set(e.callId, { text: PROPOSED, isError: false, ts: tsMs });
 
     if (e.type === "effectFinished") {
       const started = records.get(e.effect);

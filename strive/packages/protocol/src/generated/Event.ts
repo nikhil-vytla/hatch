@@ -70,7 +70,11 @@ message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | 
 /**
  * MCP servers from settings, and how each started.
  */
-mcp: Array<McpStatus>, } | { "type": "layoutProposed", label: string, 
+mcp: Array<McpStatus>, } | { "type": "layoutProposed", 
+/**
+ * The agent's tool call that made the proposal, whose result it is.
+ */
+callId?: string, label: string, 
 /**
  * The workspace ops, as the agent gave them; the app parses them.
  */

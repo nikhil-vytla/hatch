@@ -67,6 +67,8 @@ fn main() {
         // Deaf after the last page of tools (the one asked for with a cursor).
         let deaf =
             method == "tools/list" && !msg["params"]["cursor"].is_null() && std::env::var("FAKE_MCP_DEAF").is_ok();
+        let big_id =
+            method == "tools/list" && !msg["params"]["cursor"].is_null() && std::env::var("FAKE_MCP_BIG_ID").is_ok();
         let out = out.clone();
         // Calls run on their own threads, so a slow one doesn't hold up the rest.
         std::thread::spawn(move || {
@@ -86,6 +88,11 @@ fn main() {
                 }
             };
             writeln!(out.lock().unwrap(), "{}", json!({"jsonrpc": "2.0", "id": id, "result": result})).unwrap();
+            // A request of its own with an absurd id, once it has listed its tools.
+            if big_id {
+                let request = json!({"jsonrpc": "2.0", "id": "x".repeat(1024 * 1024), "method": "roots/list"});
+                writeln!(out.lock().unwrap(), "{request}").unwrap();
+            }
         });
         if deaf {
             std::thread::sleep(std::time::Duration::from_secs(60));

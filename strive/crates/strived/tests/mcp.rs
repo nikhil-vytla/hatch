@@ -266,6 +266,20 @@ fn stopping_the_daemon_stops_servers_still_starting() {
     common::wait_for("the starting server to be stopped", Duration::from_secs(5), || !alive(&pid));
 }
 
+/// Refusing a server's request echoes its id, so a huge one would make every
+/// refusal huge; a server that sends one is stopped. (Restarted for the next
+/// call, this one does it again, and the call fails rather than hangs.)
+#[test]
+fn a_server_that_sends_an_absurd_request_id_is_stopped() {
+    let mut w = Ws::with_env(&[("FAKE_MCP_BIG_ID", "1")]);
+    w.mode("fullAuto");
+    let pid = w.server_pid();
+    common::wait_for("the server to be stopped", Duration::from_secs(5), || !alive(&pid));
+    let started = Instant::now();
+    assert_eq!(w.call("echo", &json!({"text": "again"}))["outcome"]["kind"], "refused");
+    assert!(started.elapsed() < Duration::from_secs(5));
+}
+
 #[test]
 fn a_server_runs_in_the_session_directory_without_provider_keys() {
     let mut w = Ws::new(&[("ANTHROPIC_API_KEY", "sk-must-not-leak")]);

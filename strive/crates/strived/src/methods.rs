@@ -91,10 +91,17 @@ impl Conn {
 
     /// Stops forwarding session entries and gives up any host registration;
     /// called when the connection closes.
-    pub fn close(&self, state: &State) {
+    pub fn close(&self, state: &Arc<State>) {
         let was = std::mem::replace(&mut *crate::sync::lock(&self.host_of), HostOf::Closed);
         if let HostOf::Session(sid) = was {
             state.hosts.release(&sid);
+            // A turn its host was running can't end now unless it's ended here.
+            let state = state.clone();
+            tokio::spawn(async move {
+                if let Err(e) = end_open_turn(&state, &sid).await {
+                    crate::log!("could not end session {}'s open turn: {e:?}", sid.as_str());
+                }
+            });
         }
         for t in crate::sync::lock(&self.subscriptions).drain(..) {
             t.abort();
@@ -217,6 +224,24 @@ fn claim_host(state: &State, conn: &Conn, sid: &SessionId) -> Result<bool, RpcEr
         }
         HostOf::None => Err(RpcError::new(RpcError::HOST_EXISTS, "another agent host is running this session")),
     }
+}
+
+/// Journals a failed end for a turn that started and didn't end.
+async fn end_open_turn(state: &State, sid: &SessionId) -> Result<(), SessionError> {
+    let (_, report) = state.sessions.read(sid)?;
+    let mut open = None;
+    for e in &report.entries {
+        match e.event {
+            Event::TurnStarted { turn, .. } => open = Some(turn),
+            Event::TurnEnded { .. } => open = None,
+            _ => {}
+        }
+    }
+    if let Some(turn) = open {
+        let reason = strive_proto::TurnEnd::Failed { error: "the agent host stopped during this turn".into() };
+        state.sessions.append(sid, vec![Event::TurnEnded { turn, reason }]).await?;
+    }
+    Ok(())
 }
 
 /// Gives up a claim whose registration failed. A connection that closed

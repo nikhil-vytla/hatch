@@ -217,6 +217,8 @@ and a tool call that never ran gets an explicit result.
   still runs if the host restarts first.
 - Interrupting a turn (Esc, or its time limit) cancels its effects with
   `effect/cancel`.
+- If a host's connection closes mid-turn, the daemon ends that turn as
+  failed, so anyone waiting on it (`strive run`) finds out.
 
 ## The desktop app
 
@@ -224,8 +226,11 @@ and a tool call that never ran gets an explicit result.
 - **Main process:** connects as a person's client. It forwards only a
   whitelist of person-level requests from the renderer, after checking the
   sender frame.
-- **Renderer:** sandboxed, with no Node, a strict CSP, no navigation and
-  no network.
+- **Requests:** the main process puts the window's own session id on every
+  request, so the window can't act on another session.
+- **Renderer:** sandboxed, with no Node and a strict CSP. `will-navigate`
+  blocks navigating the main frame, new windows are denied, and HTTP(S)
+  requests are cancelled.
 - **Layout:** the renderer lays out the workspace document
   (`@strive/workspace`), a history of ID-addressed edits to a base. Dragging
   a panel records a person's edit.
@@ -233,8 +238,11 @@ and a tool call that never ran gets an explicit result.
   proposal, which the app offers with Accept, Reject and, once applied,
   Undo.
 - **Agent widgets:** `html` panels are iframes sandboxed to scripts only,
-  served from a `strive-widget:` scheme with their own CSP, so they reach
-  neither the app nor the network.
+  served from a `strive-widget:` scheme with their own CSP. WebRTC is
+  removed from their page before their code runs, since CSP doesn't cover
+  it. They reach neither the app nor the network.
+- **Several windows:** they share one layout file. Decided proposals merge
+  on save; the layout itself is the last saver's.
 
 ## Effects
 
@@ -285,7 +293,12 @@ server, so they are coordinated by the session's directory alone.
     every x32 syscall. The x32 part is untested here: the local Linux VM
     is aarch64.
   - `scripts/test-linux.sh` runs these tests in a container.
-- Where there is no sandbox, every command asks first.
+  - Where there is no sandbox, every command asks first.
+  - `"sandbox": "off"` runs commands unconfined, for a disposable container
+    that is itself the sandbox (a Harbor task). The container protects the
+    machine, not strive: inside it, a command can reach the daemon's socket
+    and environment, other sessions, and the network outside the gateway's
+    budget.
 
 ## Approvals and checkpoints
 

@@ -343,6 +343,7 @@ test("the model can propose a layout change, which is journaled and changes noth
   const e = await waitFor(client, id, turnsEnded(1));
   expect(e.find((x) => x.type === "layoutProposed")).toEqual({
     type: "layoutProposed",
+    callId: "toolu_1",
     label: "spend next to the chat",
     ops,
   });

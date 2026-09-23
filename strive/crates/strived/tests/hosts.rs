@@ -97,3 +97,43 @@ fn a_host_that_attaches_while_registering_is_never_counted_as_a_person() {
         assert!(r["outcome"]["reason"].as_str().unwrap().contains("no client is attached"), "{r}");
     }
 }
+
+/// A host that goes away mid-turn can't end the turn, so the daemon does:
+/// anyone waiting on it (strive run, say) learns it failed.
+#[test]
+fn a_turn_whose_host_disconnects_is_ended_as_failed() {
+    let env = Env::new();
+    let id = session(&env);
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": id}));
+    host.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
+    drop(host);
+    let mut reader = env.rpc();
+    common::wait_for("the turn to be ended", Duration::from_secs(5), || {
+        let r = reader.ok("session/read", &json!({"id": id}));
+        r["entries"].as_array().unwrap().iter().any(|e| e["event"]["type"] == "turnEnded")
+    });
+    let r = reader.ok("session/read", &json!({"id": id}));
+    let ended =
+        r["entries"].as_array().unwrap().iter().find(|e| e["event"]["type"] == "turnEnded").unwrap()["event"].clone();
+    assert_eq!(
+        ended,
+        json!({"type": "turnEnded", "turn": 1, "reason": {"kind": "failed", "error": "the agent host stopped during this turn"}})
+    );
+}
+
+/// A host that leaves between turns leaves nothing to end.
+#[test]
+fn a_host_that_disconnects_between_turns_ends_nothing() {
+    let env = Env::new();
+    let id = session(&env);
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": id}));
+    host.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
+    host.ok("host/record", &json!({"id": id, "event": {"type": "turnEnded", "turn": 1, "reason": {"kind": "done"}}}));
+    drop(host);
+    std::thread::sleep(Duration::from_millis(500));
+    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let ends = r["entries"].as_array().unwrap().iter().filter(|e| e["event"]["type"] == "turnEnded").count();
+    assert_eq!(ends, 1);
+}

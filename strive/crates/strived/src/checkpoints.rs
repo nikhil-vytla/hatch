@@ -5,9 +5,34 @@
 //! `.gitignore` excludes are neither saved nor restored, and neither are
 //! nested repositories (git would store only a pointer to their HEAD).
 
+use std::collections::HashSet;
 use std::io;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
+
+/// Every git process running for a checkpoint or rewind, by process group.
+/// A daemon that must exit with work unfinished kills these first, so a
+/// restore can't go on changing files after it has given up ownership.
+static RUNNING: Mutex<Option<HashSet<i32>>> = Mutex::new(None);
+
+/// Kills every checkpoint or rewind git still running.
+pub fn kill_running() {
+    for pgid in crate::sync::lock(&RUNNING).iter().flatten() {
+        let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(*pgid), nix::sys::signal::Signal::SIGKILL);
+    }
+}
+
+/// Runs a git command in its own process group, registered while it runs.
+fn output(cmd: &mut Command) -> io::Result<std::process::Output> {
+    let child = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).process_group(0).spawn()?;
+    let pgid = i32::try_from(child.id()).unwrap_or(i32::MAX);
+    crate::sync::lock(&RUNNING).get_or_insert_default().insert(pgid);
+    let out = child.wait_with_output();
+    crate::sync::lock(&RUNNING).get_or_insert_default().remove(&pgid);
+    out
+}
 
 pub struct Shadow {
     git: PathBuf,
@@ -28,8 +53,8 @@ impl Shadow {
     }
 
     fn run_raw(&self, args: &[&str]) -> io::Result<String> {
-        let out = Command::new(&self.git)
-            .args(["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false"])
+        let mut cmd = Command::new(&self.git);
+        cmd.args(["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false"])
             .args(["-c", "user.name=strive", "-c", "user.email=strive@localhost"])
             .args(args)
             .env("GIT_DIR", &self.git_dir)
@@ -41,8 +66,8 @@ impl Shadow {
             .env_remove("GIT_OBJECT_DIRECTORY")
             .env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES")
             .current_dir(&self.work_tree)
-            .stdin(Stdio::null())
-            .output()?;
+            .stdin(Stdio::null());
+        let out = output(&mut cmd)?;
         if !out.status.success() {
             return Err(io::Error::other(format!(
                 "git {} failed: {}",

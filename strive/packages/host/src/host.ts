@@ -23,7 +23,7 @@ import {
   type StriveClient,
   type TurnEnd,
 } from "@strive/protocol";
-import { rebuild, resultText, summaryMessage } from "./transcript";
+import { PROPOSED, rebuild, resultText, summaryMessage } from "./transcript";
 
 export function systemPrompt(config: AgentConfig): string {
   const parts = [base(config.cwd)];
@@ -231,14 +231,14 @@ function proposeLayout(client: StriveClient, sessionId: string): AgentTool<typeo
       "Nothing changes until the person accepts it in the desktop app.",
     ].join(" "),
     parameters: LayoutProposal,
-    execute: async (_id, params) => {
+    execute: async (callId, params) => {
       await client.request("host/record", {
         id: sessionId,
-        event: { type: "layoutProposed", label: params.label, ops: params.ops },
+        event: { type: "layoutProposed", callId, label: params.label, ops: params.ops },
       });
 
       return {
-        content: [{ type: "text", text: "Proposed. The person will accept or reject it in the desktop app." }],
+        content: [{ type: "text", text: PROPOSED }],
         details: undefined,
       };
     },

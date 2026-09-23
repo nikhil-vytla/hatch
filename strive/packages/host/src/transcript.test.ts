@@ -276,3 +276,19 @@ test("a prompt sent during the turn before a compaction comes back after the sum
     "assistant",
   ]);
 });
+
+test("a layout proposal the agent made comes back as that tool call's result", async () => {
+  const entries = [
+    at({ type: "userMessage", text: "tidy the layout" }),
+    at({ type: "turnStarted", turn: 1 }),
+    assistant("", [{ id: "t9", name: "propose_layout" }]),
+    at({ type: "layoutProposed", callId: "t9", label: "spend by the chat", ops: [] }),
+    assistant("Proposed."),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  const result = messages.find((m) => m.role === "toolResult");
+  expect(result).toMatchObject({ toolCallId: "t9", isError: false });
+  expect(JSON.stringify(result)).toContain("Proposed");
+});
