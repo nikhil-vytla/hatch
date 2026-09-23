@@ -8,7 +8,28 @@ import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import type { AgentConfig, EffectRequest, Entry, StriveClient, TurnEnd } from "@strive/protocol";
 import { rebuild, resultText } from "./transcript";
 
-export function systemPrompt(cwd: string): string {
+export function systemPrompt(config: AgentConfig): string {
+  const parts = [base(config.cwd)];
+  if (config.instructions.length > 0) {
+    parts.push(
+      "# Project instructions\n\nFollow these; later files are more specific than earlier ones.",
+      ...config.instructions.map((f) => `## ${f.path}\n\n${f.text.trim()}`),
+    );
+  }
+  if (config.skills.length > 0) {
+    parts.push(
+      [
+        "# Skills",
+        "",
+        "When a task matches a skill, read its SKILL.md first and follow it.",
+        ...config.skills.map((s) => `- ${s.name}: ${s.description} (${s.path})`),
+      ].join("\n"),
+    );
+  }
+  return parts.join("\n\n");
+}
+
+function base(cwd: string): string {
   return [
     `You are strive, a coding agent working in ${cwd}.`,
     "You act only through tools: read files, write files, edit files (replace text that appears exactly once), and run shell commands.",
@@ -154,7 +175,7 @@ export class Host {
     const history = entries.filter((e) => !waiting.includes(e));
     this.agent = new Agent({
       initialState: {
-        systemPrompt: systemPrompt(this.config.cwd),
+        systemPrompt: systemPrompt(this.config),
         model: model(this.config),
         tools: tools(this.client, this.sessionId),
         messages: await rebuild(history, blob),

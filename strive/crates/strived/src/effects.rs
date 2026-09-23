@@ -115,7 +115,9 @@ fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
     let Some(real) = real_path(&absolute(scope, path)) else {
         return Access::Denied(format!("can't resolve {path}"));
     };
-    if real.starts_with(&scope.strive_home) {
+    // Global skills are the one part of strive's home the agent may read.
+    let skill = !writing && real.starts_with(scope.strive_home.join("skills"));
+    if real.starts_with(&scope.strive_home) && !skill {
         return Access::Denied("the agent can't read strive's own state".into());
     }
     if writing && !real.starts_with(&scope.workspace) {
@@ -258,7 +260,8 @@ fn sandboxed_command(scope: &Scope, command: &str) -> Option<Command> {
   (subpath "{tmp}")
   (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty")
   (regex #"^/dev/fd/") (regex #"^/dev/ttys"))
-(deny file-read* file-write* (subpath "{home}"))"#,
+(deny file-read* file-write* (subpath "{home}"))
+(allow file-read* (subpath "{home}/skills"))"#,
             tmp = tmp.display()
         );
         let mut c = Command::new("/usr/bin/sandbox-exec");

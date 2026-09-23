@@ -435,6 +435,9 @@ pub struct AgentConfig {
     pub context_window: u64,
     pub max_output: u64,
     pub turn_seconds: u64,
+    /// Instruction files (AGENTS.md, CLAUDE.md), outermost first.
+    pub instructions: Vec<InstructionFile>,
+    pub skills: Vec<SkillInfo>,
 }
 
 /// An event the host records: only turn and assistant events are accepted.
@@ -624,6 +627,39 @@ pub enum Event {
         turn: u64,
         reason: TurnEnd,
     },
+    /// The project context an agent host was given when it started.
+    ContextLoaded {
+        instructions: Vec<ContextFile>,
+        skills: Vec<String>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ContextFile {
+    pub path: String,
+    /// The text as given to the agent (imports inlined), in the content store.
+    pub digest: Digest,
+    pub bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct InstructionFile {
+    pub path: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SkillInfo {
+    pub name: String,
+    pub description: String,
+    /// Its SKILL.md, which the agent reads when the skill applies.
+    pub path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

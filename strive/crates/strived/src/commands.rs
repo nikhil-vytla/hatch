@@ -101,6 +101,16 @@ fn describe(e: &Entry) -> String {
             format!("rewound to checkpoint {to}; the files before are checkpoint {saved_as}")
         }
         Event::TurnStarted { turn } => format!("turn {turn} started"),
+        Event::ContextLoaded { instructions, skills } => {
+            let files: Vec<&str> = instructions.iter().map(|f| f.path.as_str()).collect();
+            format!(
+                "agent context: {} instruction file(s){}, {} skill(s){}",
+                files.len(),
+                if files.is_empty() { String::new() } else { format!(" ({})", files.join(", ")) },
+                skills.len(),
+                if skills.is_empty() { String::new() } else { format!(" ({})", skills.join(", ")) }
+            )
+        }
         Event::AssistantMessage { text, tool_calls, .. } => {
             let calls: Vec<&str> = tool_calls.iter().map(|c| c.name.as_str()).collect();
             match (text.trim().is_empty(), calls.is_empty()) {

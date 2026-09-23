@@ -110,6 +110,7 @@ export function describe(entry: Entry): string {
     case "rewound":
       return style.accent(`Rewound to checkpoint ${e.to}. Undo with /rewind ${e.savedAs}.`);
     case "turnStarted":
+    case "contextLoaded":
       return "";
     case "assistantMessage":
       return e.text.trim();

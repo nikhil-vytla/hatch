@@ -71,6 +71,7 @@ test("a prompt runs a turn in which the model writes a file and answers", async 
   const kinds = e.map((x) => x.type).slice(e.findIndex((x) => x.type === "userMessage"));
   expect(kinds).toEqual([
     "userMessage",
+    "contextLoaded",
     "turnStarted",
     "modelCallStarted",
     "modelCallFinished",
@@ -156,4 +157,25 @@ test("a command nobody can approve reaches the model as an error it can act on",
   const result = fake!.requests[1].messages.at(-1).content[0];
   expect(result).toMatchObject({ type: "tool_result", tool_use_id: "toolu_b", is_error: true });
   expect(JSON.stringify(result.content)).toContain("run: ls needs approval, but no client is attached");
+});
+
+test("the model is given the project's instructions and the skills it can load", async () => {
+  fake = new FakeAnthropic([{ text: "ok" }]).start();
+  daemon = startDaemon({ STRIVE_UPSTREAM_ANTHROPIC: fake.url, ANTHROPIC_API_KEY: "sk-test-key", STRIVE_HOST: HOST });
+  const cwd = realpathSync(mkdtempSync("/tmp/strv-agent-"));
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  writeFileSync(join(cwd, "AGENTS.md"), "Always write tests first.");
+  mkdirSync(join(cwd, ".strive/skills/release"), { recursive: true });
+  writeFileSync(
+    join(cwd, ".strive/skills/release/SKILL.md"),
+    "---\nname: release\ndescription: Cut a release.\n---\nSteps",
+  );
+  const client = await connect();
+  const { id } = await client.request("session/create", { cwd });
+  await client.request("session/prompt", { id, text: "hi" });
+  await waitFor(client, id, turnsEnded(1));
+  const system = JSON.stringify(fake!.requests[0].system);
+  expect(system).toContain(`${join(cwd, "AGENTS.md")}`);
+  expect(system).toContain("Always write tests first.");
+  expect(system).toContain(`release: Cut a release. (${join(cwd, ".strive/skills/release/SKILL.md")})`);
 });

@@ -632,7 +632,13 @@ fn a_call_is_finished_and_charged_once_even_across_a_writer_restart() {
             r.bytes().await.unwrap().len()
         })
     });
-    common::wait_for("the call to start", Duration::from_secs(5), || s.count("modelCallStarted") == 1);
+    // Committed, not just written: the head must include the start before
+    // the directory turns read-only, or the start itself fails to commit.
+    common::wait_for("the call's start to be committed", Duration::from_secs(5), || {
+        let r = s.env.rpc().ok("session/read", &json!({"id": s.id}));
+        let n = r["entries"].as_array().unwrap().len() as u64;
+        s.count("modelCallStarted") == 1 && r["committed"] == n
+    });
     let dir = s.env.session_dir(&s.id);
     std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
     let failed = s.env.rpc().call("session/prompt", &json!({"id": s.id, "text": "breaks the writer"}));

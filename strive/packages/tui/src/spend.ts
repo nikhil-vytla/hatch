@@ -46,6 +46,7 @@ export class Spend {
       case "turnStarted":
       case "assistantMessage":
       case "turnEnded":
+      case "contextLoaded":
         return;
     }
   }

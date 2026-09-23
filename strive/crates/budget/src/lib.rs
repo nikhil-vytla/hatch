@@ -399,7 +399,8 @@ impl Ledger {
                 | Event::Rewound { .. }
                 | Event::TurnStarted { .. }
                 | Event::AssistantMessage { .. }
-                | Event::TurnEnded { .. } => {}
+                | Event::TurnEnded { .. }
+                | Event::ContextLoaded { .. } => {}
             }
         }
         for r in abandoned.values() {

@@ -6,6 +6,7 @@
 mod checkpoints;
 mod client;
 mod commands;
+mod context;
 mod credentials;
 mod doctor;
 mod effects;

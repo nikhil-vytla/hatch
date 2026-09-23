@@ -179,6 +179,28 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             })?;
             let provider = if model_id.starts_with("claude") { "anthropic" } else { "openai" };
             let urls = state.gateway.info(&sid).map_err(|e| internal(&e))?;
+            let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
+            let workspace = std::path::PathBuf::from(&info.cwd);
+            let ctx = tokio::task::spawn_blocking(move || crate::context::load(&workspace, &home))
+                .await
+                .map_err(|e| internal(&e))?;
+            let files = ctx
+                .instructions
+                .iter()
+                .map(|f| {
+                    Ok(strive_proto::ContextFile {
+                        path: f.path.clone(),
+                        digest: state.cas.put(f.text.as_bytes())?,
+                        bytes: f.text.len() as u64,
+                    })
+                })
+                .collect::<std::io::Result<Vec<_>>>()
+                .map_err(|e| internal(&e))?;
+            let loaded = Event::ContextLoaded {
+                instructions: files,
+                skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
+            };
+            state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
             {
                 let mut host = conn.host_of.lock().expect("host registration");
                 if host.is_none() {
@@ -194,6 +216,8 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                 context_window: model.context_window,
                 max_output: model.max_output.min(state.settings.agent_max_output),
                 turn_seconds: state.settings.turn_seconds,
+                instructions: ctx.instructions,
+                skills: ctx.skills,
             })
         }
         HostRecord::NAME => {
