@@ -1,7 +1,7 @@
 // The agent loop end to end: real daemon, real host (started by the daemon),
 // real gateway and effects, and a scripted model at the network boundary.
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
-import { mkdtempSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type Entry, type Event, StriveClient } from "@strive/protocol";
 import { FakeAnthropic, type ScriptedReply, startDaemon, type TestDaemon } from "@strive/testkit";
@@ -11,7 +11,7 @@ type TurnEnded = Extract<Event, { type: "turnEnded" }>;
 const lastTurnEnd = (events: Event[]) => events.findLast((x): x is TurnEnded => x.type === "turnEnded");
 
 /** The parts of ~/.strive/settings.json these tests set. */
-type SettingsFile = { compactAtTokens?: number };
+type SettingsFile = { compactAtTokens?: number; turnSeconds?: number };
 
 const HOST = `bun ${resolve(import.meta.dir, "main.ts")}`;
 
@@ -264,4 +264,40 @@ test("a short conversation is not summarized", async () => {
   const e = await waitFor(client, id, turnsEnded(2));
   expect(e.some((x) => x.type === "compacted")).toBe(false);
   expect(fake!.requests.length).toBe(2);
+});
+
+/** A turn whose model asks to run a command that then waits for approval. */
+async function waitingOnApproval(settings: SettingsFile) {
+  const s = await setupWith(settings, [
+    { toolCalls: [{ id: "toolu_1", name: "bash", input: { command: "touch made.txt" } }] },
+    { text: "never reached" },
+  ]);
+
+  await s.client.request("session/approvals", { id: s.id, mode: "ask" });
+  await s.client.request("session/attach", { id: s.id }); // a person, so the request waits
+  await s.client.request("session/prompt", { id: s.id, text: "make a file" });
+  await waitFor(s.client, s.id, (e) => e.some((x) => x.type === "approvalRequested"));
+
+  return s;
+}
+
+const effectOutcome = (e: Event[]) => e.findLast((x) => x.type === "effectFinished");
+
+test("interrupting a turn cancels the command waiting for approval, and ends the turn", async () => {
+  const { client, id, cwd } = await waitingOnApproval({});
+  await client.request("session/interrupt", { id });
+  const e = await waitFor(client, id, turnsEnded(1), 5_000);
+  expect(lastTurnEnd(e)?.reason).toEqual({ kind: "interrupted" });
+  expect(effectOutcome(e)).toMatchObject({ outcome: { kind: "refused", reason: "interrupted: run: touch made.txt" } });
+  const late = await client.request("approval/respond", { id, effect: 1, decision: "allow" }).catch((err) => err);
+  expect(late).toBeInstanceOf(Error);
+  expect(existsSync(join(cwd, "made.txt"))).toBe(false);
+});
+
+test("a turn's time limit also stops a command waiting for approval", async () => {
+  const { client, id, cwd } = await waitingOnApproval({ turnSeconds: 2 });
+  const e = await waitFor(client, id, turnsEnded(1), 8_000);
+  expect(lastTurnEnd(e)?.reason).toEqual({ kind: "timedOut", seconds: 2 });
+  expect(effectOutcome(e)).toMatchObject({ outcome: { kind: "refused", reason: "interrupted: run: touch made.txt" } });
+  expect(existsSync(join(cwd, "made.txt"))).toBe(false);
 });

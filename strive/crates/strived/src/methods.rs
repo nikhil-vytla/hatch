@@ -19,12 +19,13 @@ use tokio::task::JoinHandle;
 
 use crate::server::State;
 use crate::sessions::Push;
-use crate::sessions::{SessionError, SessionId};
+use crate::sessions::{Answer, SessionError, SessionId};
 use strive_proto::{
     AgentConfig, Event, HostRecord, HostRecordParams, HostRegister, HostStream, HostStreamParams, SessionDelta,
     SessionDeltaNotification, SessionInterrupt, SessionInterruptNotification, SessionInterruptRequested,
 };
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
+use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
 use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
 
 /// Per-connection state.
@@ -305,40 +306,67 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
             };
             let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
-            let effect = state.sessions.start_effect(&sid, call_id, record).await.map_err(session_error)?;
-            let started = std::time::Instant::now();
-            let mode = state.sessions.mode(&sid).await.map_err(session_error)?;
-            let refusal = match crate::effects::gate(&scope, &request, mode) {
-                crate::effects::Gate::Allow => None,
-                crate::effects::Gate::Deny(why) => Some(why),
-                crate::effects::Gate::Ask(what) => {
-                    match state.sessions.ask(&sid, effect, what.clone()).await.map_err(session_error)? {
-                        None => Some(format!(
-                            "{what} needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
-                        )),
-                        Some(Decision::Deny) => Some(format!("declined: {what}")),
-                        Some(Decision::Allow | Decision::AllowSession) => None,
-                    }
-                }
-            };
-            let result = match refusal {
-                Some(why) => crate::effects::Result::Refused(why),
-                None => tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request))
-                    .await
-                    .map_err(|e| internal(&e))?,
-            };
-            let (outcome, text) = match result {
-                crate::effects::Result::Done { text, exit_code, truncated } => {
-                    let output = state.cas.put(text.as_bytes()).map_err(|e| internal(&e))?;
-                    (EffectOutcome::Done { output, exit_code, truncated }, text)
-                }
-                crate::effects::Result::Refused(reason) => (EffectOutcome::Refused { reason: reason.clone() }, reason),
-            };
-            let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
-            state.sessions.finish_effect(&sid, effect, outcome.clone(), ms).await.map_err(session_error)?;
-            reply::<EffectRun>(EffectRunResult { effect, outcome, text })
+            let cancelled = state.sessions.cancel_flag(&sid, &call_id);
+            let effect = state.sessions.start_effect(&sid, call_id.clone(), record).await.map_err(session_error);
+            let result = run_effect(state, &sid, scope, request, effect, &cancelled).await;
+            state.sessions.forget_cancel(&sid, &call_id);
+            result
+        }
+        EffectCancel::NAME => {
+            let EffectCancelParams { id, call_id } = parse::<EffectCancel>(params)?;
+            let flag = state.sessions.cancel_flag(&session_id(&id)?, &call_id);
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            reply::<EffectCancel>(Empty {})
         }
         other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
+    }
+}
+
+/// Gates, performs and journals one effect the session has started.
+async fn run_effect(
+    state: &Arc<State>,
+    sid: &SessionId,
+    scope: crate::effects::Scope,
+    request: EffectRequest,
+    effect: std::result::Result<u64, RpcError>,
+    cancelled: &Arc<std::sync::atomic::AtomicBool>,
+) -> Reply {
+    let effect = effect?;
+    let sid = sid.clone();
+    {
+        let started = std::time::Instant::now();
+        let mode = state.sessions.mode(&sid).await.map_err(session_error)?;
+        let cancel = cancelled.clone();
+        let refusal = match crate::effects::gate(&scope, &request, mode) {
+            crate::effects::Gate::Allow => None,
+            crate::effects::Gate::Deny(why) => Some(why),
+            crate::effects::Gate::Ask(what) => {
+                match state.sessions.ask(&sid, effect, what.clone(), cancelled).await.map_err(session_error)? {
+                    Answer::NoOne => Some(format!(
+                        "{what} needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
+                    )),
+                    Answer::Cancelled => Some(format!("interrupted: {what}")),
+                    Answer::Decided(Decision::Deny) => Some(format!("declined: {what}")),
+                    Answer::Decided(Decision::Allow | Decision::AllowSession) => None,
+                }
+            }
+        };
+        let result = match refusal {
+            Some(why) => crate::effects::Result::Refused(why),
+            None => tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request, &cancel))
+                .await
+                .map_err(|e| internal(&e))?,
+        };
+        let (outcome, text) = match result {
+            crate::effects::Result::Done { text, exit_code, truncated } => {
+                let output = state.cas.put(text.as_bytes()).map_err(|e| internal(&e))?;
+                (EffectOutcome::Done { output, exit_code, truncated }, text)
+            }
+            crate::effects::Result::Refused(reason) => (EffectOutcome::Refused { reason: reason.clone() }, reason),
+        };
+        let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        state.sessions.finish_effect(&sid, effect, outcome.clone(), ms).await.map_err(session_error)?;
+        reply::<EffectRun>(EffectRunResult { effect, outcome, text })
     }
 }
 

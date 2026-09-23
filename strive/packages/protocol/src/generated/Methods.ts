@@ -7,6 +7,7 @@ import type { AuthStatusResult } from "./AuthStatusResult";
 import type { BlobGetParams } from "./BlobGetParams";
 import type { BlobGetResult } from "./BlobGetResult";
 import type { DaemonStatusResult } from "./DaemonStatusResult";
+import type { EffectCancelParams } from "./EffectCancelParams";
 import type { EffectRunParams } from "./EffectRunParams";
 import type { EffectRunResult } from "./EffectRunResult";
 import type { Empty } from "./Empty";
@@ -43,6 +44,7 @@ export type Methods = {
   "auth/set": { params: AuthSetParams; result: Empty };
   "auth/status": { params: Empty; result: AuthStatusResult };
   "effect/run": { params: EffectRunParams; result: EffectRunResult };
+  "effect/cancel": { params: EffectCancelParams; result: Empty };
   "blob/get": { params: BlobGetParams; result: BlobGetResult };
   "session/approvals": { params: SessionApprovalsParams; result: Appended };
   "approval/respond": { params: ApprovalRespondParams; result: Empty };

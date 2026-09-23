@@ -208,6 +208,18 @@ pub struct Sessions {
     stopping: std::sync::atomic::AtomicBool,
     /// One checkpoint at a time per session: git can't share an index.
     checkpointing: StdMutex<HashMap<SessionId, Arc<Mutex<()>>>>,
+    /// Cancel flags for effects by the agent's call id. A cancel can arrive
+    /// before its effect does, so either side may create the flag.
+    cancels: StdMutex<HashMap<(SessionId, String), Arc<std::sync::atomic::AtomicBool>>>,
+}
+
+/// How an approval request ended.
+pub enum Answer {
+    Decided(Decision),
+    /// No person was (or is still) attached to decide.
+    NoOne,
+    /// The agent cancelled the effect.
+    Cancelled,
 }
 
 #[derive(Debug)]
@@ -235,6 +247,7 @@ impl Sessions {
             pending: StdMutex::new(HashMap::new()),
             stopping: std::sync::atomic::AtomicBool::new(false),
             checkpointing: StdMutex::new(HashMap::new()),
+            cancels: StdMutex::new(HashMap::new()),
         })
     }
 
@@ -428,30 +441,52 @@ impl Sessions {
 
     /// Asks attached clients to decide on an effect and waits for the answer.
     /// `None` when no client is attached to answer.
-    /// `None` too once no person is left to answer, or the daemon is stopping.
-    pub async fn ask(&self, id: &SessionId, effect: u64, description: String) -> Result<Option<Decision>> {
+    /// `NoOne` too once no person is left to answer, or the daemon is stopping.
+    pub async fn ask(
+        &self,
+        id: &SessionId,
+        effect: u64,
+        description: String,
+        cancelled: &std::sync::atomic::AtomicBool,
+    ) -> Result<Answer> {
         let key = (id.clone(), effect);
         let (decided, mut answer) = oneshot::channel();
         crate::sync::lock(&self.pending).insert(key.clone(), decided);
         let delivered = self.request_approval(id, effect, description).await;
         if !matches!(delivered, Ok(n) if n > 0) {
             crate::sync::lock(&self.pending).remove(&key);
-            return delivered.map(|_| None);
+            return delivered.map(|_| Answer::NoOne);
         }
         let mut check = tokio::time::interval(std::time::Duration::from_millis(250));
         loop {
             tokio::select! {
-                decision = &mut answer => return Ok(Some(decision.unwrap_or(Decision::Deny))),
+                                decision = &mut answer => return Ok(Answer::Decided(decision.unwrap_or(Decision::Deny))),
                 _ = check.tick() => {
-                    let left = self.people(id).await.unwrap_or(0);
+                    let gave_up = if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+                        Answer::Cancelled
+                    } else if self.people(id).await.unwrap_or(0) == 0 {
+                        Answer::NoOne
+                    } else {
+                        continue;
+                    };
                     // Removing the entry settles a race with `decide`: whoever
                     // removes it owns the outcome.
-                    if left == 0 && crate::sync::lock(&self.pending).remove(&key).is_some() {
-                        return Ok(None);
+                    if crate::sync::lock(&self.pending).remove(&key).is_some() {
+                        return Ok(gave_up);
                     }
                 }
             }
         }
+    }
+
+    /// The cancel flag for an effect, created if this is the first to ask.
+    pub fn cancel_flag(&self, id: &SessionId, call_id: &str) -> Arc<std::sync::atomic::AtomicBool> {
+        crate::sync::lock(&self.cancels).entry((id.clone(), call_id.to_string())).or_default().clone()
+    }
+
+    /// Forgets an effect's cancel flag once it has finished.
+    pub fn forget_cancel(&self, id: &SessionId, call_id: &str) {
+        crate::sync::lock(&self.cancels).remove(&(id.clone(), call_id.to_string()));
     }
 
     /// Journals the request; how many people it reached. The writer's sender

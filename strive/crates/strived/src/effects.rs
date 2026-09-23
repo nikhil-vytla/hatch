@@ -15,6 +15,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use strive_proto::{ApprovalMode, EffectRequest};
@@ -84,7 +85,8 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> Gate 
 }
 
 /// Performs an effect the gate allowed (or a person approved).
-pub fn perform(scope: &Scope, request: &EffectRequest) -> Result {
+/// Performs an effect. `cancelled` stops a running command early.
+pub fn perform(scope: &Scope, request: &EffectRequest, cancelled: &AtomicBool) -> Result {
     match request {
         EffectRequest::Read { path, offset, limit } => match resolve(scope, path, false) {
             Access::Allowed(p) | Access::Ask(p) => read(&p, path, *offset, *limit),
@@ -99,7 +101,7 @@ pub fn perform(scope: &Scope, request: &EffectRequest) -> Result {
             Access::Denied(why) => Result::Refused(why),
         },
         EffectRequest::Bash { command, timeout_ms } => {
-            bash(scope, command, timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS))
+            bash(scope, command, timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS), cancelled)
         }
     }
 }
@@ -270,10 +272,13 @@ fn sandboxed_command(scope: &Scope, command: &str) -> Option<Command> {
     }
     let bwrap = which("bwrap")?;
     let mut c = Command::new(bwrap);
-    c.args(["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--bind", "/tmp", "/tmp"]);
+    // A private /tmp and /run: the host's hold sockets (the user's D-Bus and
+    // systemd, X11, Docker) that can start processes outside the sandbox.
+    c.args(["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp", "--tmpfs", "/run"]);
     c.args(["--bind"]).arg(&scope.workspace).arg(&scope.workspace);
     c.args(["--tmpfs"]).arg(&scope.strive_home);
-    c.args(["--unshare-net", "--die-with-parent", "--", "/bin/bash", "-c", command]);
+    // Its own PID namespace: every process the command starts dies with it.
+    c.args(["--unshare-net", "--unshare-pid", "--die-with-parent", "--", "/bin/bash", "-c", command]);
     Some(c)
 }
 
@@ -281,13 +286,23 @@ fn which(bin: &str) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|p| std::env::split_paths(&p).map(|d| d.join(bin)).find(|p| p.is_file()))
 }
 
-/// Environment variables a command never sees: strive's own, and the
-/// provider keys only the gateway may use.
+/// Environment variables a command never sees: strive's own, the provider
+/// keys only the gateway may use, and addresses of session buses that could
+/// start processes outside the sandbox.
 fn scrubbed(name: &str) -> bool {
-    name.starts_with("STRIVE_") || name == "ANTHROPIC_API_KEY" || name == "OPENAI_API_KEY"
+    name.starts_with("STRIVE_")
+        || name == "ANTHROPIC_API_KEY"
+        || name == "OPENAI_API_KEY"
+        || name == "DBUS_SESSION_BUS_ADDRESS"
 }
 
-fn bash(scope: &Scope, command: &str, timeout_ms: u64) -> Result {
+enum Ended {
+    Exited(std::process::ExitStatus),
+    TimedOut,
+    Cancelled,
+}
+
+fn bash(scope: &Scope, command: &str, timeout_ms: u64, cancelled: &AtomicBool) -> Result {
     // Without a sandbox the gate always asks, so reaching here unconfined
     // means a person approved exactly that.
     let mut cmd = sandboxed_command(scope, command).unwrap_or_else(|| {
@@ -311,33 +326,64 @@ fn bash(scope: &Scope, command: &str, timeout_ms: u64) -> Result {
         Err(e) => return Result::Refused(format!("can't run the command: {e}")),
     };
     drop(cmd);
-    let collector = std::thread::spawn(move || capture(&mut reader));
+    let (captured, output) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = captured.send(capture(&mut reader));
+    });
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
-    let pgid = nix::unistd::Pid::from_raw(i32::try_from(child.id()).unwrap_or(i32::MAX));
-    let status = loop {
+    let root = i32::try_from(child.id()).unwrap_or(i32::MAX);
+    let ended = loop {
         match child.try_wait() {
-            Ok(Some(s)) => break Some(s),
-            Ok(None) if Instant::now() >= deadline => break None,
+            Ok(Some(s)) => break Ended::Exited(s),
+            Ok(None) if cancelled.load(Ordering::SeqCst) => break Ended::Cancelled,
+            Ok(None) if Instant::now() >= deadline => break Ended::TimedOut,
             Ok(None) => std::thread::sleep(Duration::from_millis(10)),
             Err(e) => return Result::Refused(format!("can't wait for the command: {e}")),
         }
     };
-    // The whole group goes, so background children don't outlive the command.
-    let _ = nix::sys::signal::killpg(pgid, nix::sys::signal::Signal::SIGKILL);
-    let _ = child.wait();
-    let (text, truncated) = collector.join().unwrap_or_default();
-    match status {
-        Some(s) => Result::Done { text, exit_code: s.code(), truncated },
-        None => Result::Done {
-            text: format!(
-                "the command timed out after {}.{}s and was stopped",
-                timeout_ms / 1000,
-                timeout_ms % 1000 / 100
-            ),
-            exit_code: None,
-            truncated,
-        },
+    // Descendants are found while the command still runs (a finished one's
+    // children belong to init), including jobs that left its process group.
+    let doomed = if matches!(ended, Ended::Exited(_)) { Vec::new() } else { descendants(root) };
+    let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(root), nix::sys::signal::Signal::SIGKILL);
+    for pid in doomed {
+        let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::Signal::SIGKILL);
     }
+    let _ = child.wait();
+    // A process that escaped every kill (it daemonized) may hold the output
+    // pipe open; don't wait on it.
+    let (text, truncated) = output.recv_timeout(Duration::from_secs(1)).unwrap_or_default();
+    let stopped = |why: String| Result::Done { text: why, exit_code: None, truncated };
+    match ended {
+        Ended::Exited(s) => Result::Done { text, exit_code: s.code(), truncated },
+        Ended::TimedOut => stopped(format!(
+            "the command timed out after {}.{}s and was stopped",
+            timeout_ms / 1000,
+            timeout_ms % 1000 / 100
+        )),
+        Ended::Cancelled => stopped("the command was interrupted and stopped".into()),
+    }
+}
+
+/// Every process descended from `root`, by walking parent links from `ps`.
+fn descendants(root: i32) -> Vec<i32> {
+    let Ok(out) = Command::new("/bin/ps").args(["-A", "-o", "pid=", "-o", "ppid="]).output() else {
+        return Vec::new();
+    };
+    let pairs: Vec<(i32, i32)> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace().map(str::parse::<i32>);
+            Some((it.next()?.ok()?, it.next()?.ok()?))
+        })
+        .collect();
+    let mut found = vec![root];
+    let mut i = 0;
+    while i < found.len() {
+        let parent = found[i];
+        found.extend(pairs.iter().filter(|(_, ppid)| *ppid == parent).map(|(pid, _)| *pid));
+        i += 1;
+    }
+    found.split_off(1)
 }
 
 /// Reads a command's output, keeping the start and the end when it is long.

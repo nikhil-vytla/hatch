@@ -164,6 +164,42 @@ fn bash_runs_in_the_workspace_and_reports_its_exit_status() {
     assert_eq!(r["text"], format!("{}\nout\nerr\n", w.path("").to_str().unwrap().trim_end_matches('/')));
 }
 
+/// `set -m` puts a background job in its own process group, out of reach of
+/// a group kill; it (and the output pipe it holds) must not outlive the timeout.
+#[test]
+fn a_child_in_its_own_process_group_is_killed_at_the_timeout_too() {
+    let mut w = Ws::new();
+    let marker = w.path("late.txt");
+    let started = std::time::Instant::now();
+    let r = w.run(json!({"kind": "bash", "command": "set -m; (sleep 1; touch late.txt) & wait", "timeoutMs": 300}));
+    assert!(started.elapsed() < Duration::from_secs(4), "returned after {:?}", started.elapsed());
+    assert_eq!(r["text"], "the command timed out after 0.3s and was stopped");
+    std::thread::sleep(Duration::from_millis(1500));
+    assert!(!marker.exists(), "the job in its own process group was killed too");
+}
+
+/// Cancelling a running command stops it (and its children) at once.
+#[test]
+fn a_cancelled_command_is_stopped() {
+    let w = Ws::new();
+    let marker = w.path("late.txt");
+    let mut c = w.env.rpc();
+    let params = json!({"id": w.id, "callId": "call_7", "request": {"kind": "bash", "command": "(sleep 1; touch late.txt) & sleep 30"}});
+    let running = std::thread::spawn(move || c.ok("effect/run", &params));
+    common::wait_for("the command to start", Duration::from_secs(5), || {
+        let r = w.env.rpc().ok("session/read", &json!({"id": w.id}));
+        r["entries"].as_array().unwrap().iter().any(|e| e["event"]["type"] == "effectStarted")
+    });
+    std::thread::sleep(Duration::from_millis(200));
+    let started = std::time::Instant::now();
+    w.env.rpc().ok("effect/cancel", &json!({"id": w.id, "callId": "call_7"}));
+    let r = running.join().unwrap();
+    assert!(started.elapsed() < Duration::from_secs(2), "stopped after {:?}", started.elapsed());
+    assert_eq!(r["text"], "the command was interrupted and stopped");
+    std::thread::sleep(Duration::from_millis(1500));
+    assert!(!marker.exists(), "its background child was killed too");
+}
+
 #[test]
 fn bash_is_killed_at_its_timeout_with_its_children() {
     let mut w = Ws::new();

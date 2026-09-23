@@ -242,3 +242,19 @@ fn the_daemon_stops_while_a_request_waits_for_approval() {
     assert!(started.elapsed() < Duration::from_secs(5), "stopped after {:?}", started.elapsed());
     assert!(!w.file("made.txt").exists());
 }
+
+/// The agent gives up on a request (the person pressed Esc, or the turn ran
+/// out of time): it is refused, and approving it later does nothing.
+#[test]
+fn a_cancelled_request_is_refused_and_cant_be_approved_later() {
+    let w = Ws::new();
+    let mut ui = w.attached();
+    let pending = w.spawn_effect(json!({"kind": "bash", "command": "touch made.txt"}));
+    next_request(&mut ui);
+    w.env.rpc().ok("effect/cancel", &json!({"id": w.id, "callId": "call_9"}));
+    let r = pending.join().unwrap();
+    assert_eq!(r["outcome"], json!({"kind": "refused", "reason": "interrupted: run: touch made.txt"}));
+    let late = ui.call("approval/respond", &json!({"id": w.id, "effect": 1, "decision": "allow"}));
+    assert_eq!(late["error"]["code"], strive_proto::rpc::RpcError::APPROVAL_NOT_PENDING, "{late}");
+    assert!(!w.file("made.txt").exists());
+}

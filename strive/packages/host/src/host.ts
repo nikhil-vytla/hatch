@@ -139,9 +139,19 @@ function tool(
     label: name,
     description,
     parameters,
-    execute: async (toolCallId, params) => {
+    execute: async (toolCallId, params, signal) => {
       const request = toRequest(params);
-      const r = await client.request("effect/run", { id: sessionId, callId: toolCallId, request });
+      // Aborting (Esc, or the turn's time limit) cancels the effect in the
+      // daemon: one waiting for approval is refused, a running command is
+      // killed. The run still answers, so its outcome is journaled.
+      const cancel = () => void client.request("effect/cancel", { id: sessionId, callId: toolCallId }).catch(() => {});
+
+      if (signal?.aborted) cancel();
+      signal?.addEventListener("abort", cancel, { once: true });
+
+      const r = await client
+        .request("effect/run", { id: sessionId, callId: toolCallId, request })
+        .finally(() => signal?.removeEventListener("abort", cancel));
 
       const record =
         request.kind === "bash"
@@ -202,6 +212,8 @@ export class Host {
   private queued: string[] = [];
   private running = false;
   private timedOut = false;
+
+  private interrupted = false;
   private lastSeq = 0;
   private readonly models: ReturnType<typeof createStriveModels>;
 
@@ -283,6 +295,8 @@ export class Host {
   }
 
   interrupt() {
+    if (!this.running) return;
+    this.interrupted = true;
     this.agent?.abort();
   }
 
@@ -333,6 +347,7 @@ export class Host {
     await this.compactIfLarge();
     this.turn += 1;
     this.timedOut = false;
+    this.interrupted = false;
     await this.record({ type: "turnStarted", turn: this.turn });
 
     const timer = setTimeout(() => {
@@ -347,12 +362,16 @@ export class Host {
       const last = this.agent.state.messages.at(-1);
 
       if (this.timedOut) reason = { kind: "timedOut", seconds: this.config.turnSeconds };
-      else if (last?.role === "assistant" && last.stopReason === "aborted") reason = { kind: "interrupted" };
+      else if (this.interrupted || (last?.role === "assistant" && last.stopReason === "aborted"))
+        reason = { kind: "interrupted" };
       else if (last?.role === "assistant" && last.stopReason === "error")
         reason = { kind: "failed", error: last.errorMessage ?? "the model call failed" };
       else reason = { kind: "done" };
     } catch (e) {
-      reason = { kind: "failed", error: describeError(e) };
+      // An abort can surface as a thrown error; it is still the abort.
+      if (this.timedOut) reason = { kind: "timedOut", seconds: this.config.turnSeconds };
+      else if (this.interrupted) reason = { kind: "interrupted" };
+      else reason = { kind: "failed", error: describeError(e) };
     } finally {
       clearTimeout(timer);
     }

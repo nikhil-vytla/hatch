@@ -77,11 +77,12 @@ methods! {
     SessionBudget = "session/budget" (SessionBudgetParams) -> Appended;
     AuthSet = "auth/set" (AuthSetParams) -> Empty;
     AuthStatus = "auth/status" (Empty) -> AuthStatusResult;
-    EffectRun = "effect/run" (EffectRunParams) -> EffectRunResult;
+        EffectRun = "effect/run" (EffectRunParams) -> EffectRunResult;
+    EffectCancel = "effect/cancel" (EffectCancelParams) -> Empty;
     BlobGet = "blob/get" (BlobGetParams) -> BlobGetResult;
     SessionApprovals = "session/approvals" (SessionApprovalsParams) -> Appended;
-        ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
-        SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
+            ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
+    SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
     HostRegister = "host/register" (SessionRef) -> AgentConfig;
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
@@ -400,6 +401,17 @@ pub struct EffectRunParams {
     pub id: String,
     pub call_id: String,
     pub request: EffectRequest,
+}
+
+/// Stops an effect the agent no longer wants: one waiting for approval is
+/// refused, and a running command is killed. Cancelling one that has already
+/// finished (or not yet started) is not an error.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EffectCancelParams {
+    pub id: String,
+    pub call_id: String,
 }
 
 /// The effect's journal number and outcome, with the output text inline.

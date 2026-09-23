@@ -28,6 +28,8 @@ export type * from "./generated/Decision";
 
 export type * from "./generated/Digest";
 
+export type * from "./generated/EffectCancelParams";
+
 export type * from "./generated/EffectOutcome";
 
 export type * from "./generated/EffectRecord";
