@@ -271,6 +271,55 @@ pub struct SessionEntryNotification {
     pub entry: Entry,
 }
 
+/// The SHA-256 of a blob in the content store, written `sha256:<64 lowercase hex>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, TS)]
+#[ts(export, type = "string")]
+pub struct Digest([u8; 32]);
+
+impl Digest {
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        let hex = s.strip_prefix("sha256:")?;
+        if hex.len() != 64 || hex.bytes().any(|b| b.is_ascii_uppercase()) {
+            return None;
+        }
+        let mut out = [0u8; 32];
+        hex::decode_to_slice(hex, &mut out).ok()?;
+        Some(Self(out))
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// The 64-character lowercase hex form, without the `sha256:` prefix.
+    pub fn hex(&self) -> String {
+        hex::encode(self.0)
+    }
+}
+
+impl std::fmt::Display for Digest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "sha256:{}", self.hex())
+    }
+}
+
+impl Serialize for Digest {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for Digest {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        Digest::parse(&s).ok_or_else(|| serde::de::Error::custom(format!("not a sha256 digest: {s:?}")))
+    }
+}
+
 /// Something that happened in a session. Journaled in order; never edited.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
@@ -324,6 +373,34 @@ mod tests {
         names.sort_unstable();
         names.dedup();
         assert_eq!(names.len(), METHOD_NAMES.len());
+    }
+
+    /// The well-known SHA-256 of "hello".
+    const HELLO_HEX: &str = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+
+    #[test]
+    fn digests_round_trip_through_their_string_form() {
+        let s = format!("sha256:{HELLO_HEX}");
+        let d = Digest::parse(&s).unwrap();
+        assert_eq!(d.hex(), HELLO_HEX);
+        assert_eq!(d.to_string(), s);
+        assert_eq!(serde_json::to_string(&d).unwrap(), format!("\"{s}\""));
+        assert_eq!(serde_json::from_str::<Digest>(&format!("\"{s}\"")).unwrap(), d);
+    }
+
+    #[test]
+    fn digests_parse_only_their_own_format() {
+        for bad in [
+            format!("md5:{HELLO_HEX}"),
+            "sha256:2cf24dba".to_string(),
+            format!("sha256:{HELLO_HEX}00"),
+            format!("sha256:zz{}", &HELLO_HEX[2..]),
+            HELLO_HEX.to_string(),
+            format!("sha256:{}", HELLO_HEX.to_uppercase()),
+        ] {
+            assert_eq!(Digest::parse(&bad), None, "{bad} should not parse");
+        }
+        assert!(serde_json::from_str::<Digest>("\"sha256:nope\"").is_err());
     }
 
     #[test]

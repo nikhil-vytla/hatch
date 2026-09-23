@@ -10,6 +10,7 @@ license.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ts-rs.workspace = true
+hex = "0.4.3"
 
 [lints]
 workspace = true

@@ -1,4 +1,4 @@
-//! Append-only, authenticated session journals.
+//! Append-only, authenticated session journals, and the content store.
 //!
 //! A session directory holds `journal.jsonl`, one entry per line, and
 //! `head.json`, the last committed entry. Each line ends with a MAC over the
@@ -11,6 +11,8 @@
 //! replaces the head. A crash between the two leaves valid entries past the
 //! head, which [`Journal::open`] adopts. A crash mid-line leaves a torn tail,
 //! which `open` discards and records as an [`Event::Recovered`] entry.
+
+pub mod cas;
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
