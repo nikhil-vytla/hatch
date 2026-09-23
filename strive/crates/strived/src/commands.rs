@@ -3,8 +3,9 @@
 use std::process::ExitCode;
 
 use anyhow::{Result, anyhow};
+use strive_budget::format_usd;
 use strive_proto::{
-    Entry, Event, SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef,
+    CallOutcome, Entry, Event, SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef,
 };
 
 use crate::client::Client;
@@ -45,6 +46,30 @@ fn describe(e: &Entry) -> String {
         Event::Recovered { discarded_bytes } => {
             format!("recovered after a crash: discarded a partial entry ({discarded_bytes} bytes)")
         }
+        Event::BudgetSet { usd_micros, tokens } => match (usd_micros, tokens) {
+            (None, None) => "budget: unlimited".into(),
+            (Some(u), None) => format!("budget: {}", format_usd(*u)),
+            (None, Some(t)) => format!("budget: {t} tokens"),
+            (Some(u), Some(t)) => format!("budget: {} and {t} tokens", format_usd(*u)),
+        },
+        Event::ModelCallStarted { call, provider, model, reserved_usd_micros, .. } => {
+            format!("model call {call}: {provider} {model}, holding up to {}", format_usd(*reserved_usd_micros))
+        }
+        Event::ModelCallFinished { call, outcome, duration_ms, .. } => match outcome {
+            CallOutcome::Complete { usage, cost_usd_micros, .. } => format!(
+                "model call {call} done in {}.{}s: {} in, {} out, {} cached · {}",
+                duration_ms / 1000,
+                duration_ms % 1000 / 100,
+                usage.input,
+                usage.output,
+                usage.cache_read + usage.cache_write,
+                format_usd(*cost_usd_micros)
+            ),
+            CallOutcome::Rejected { status } => format!("model call {call} refused by the provider (HTTP {status})"),
+            CallOutcome::Broken { reason, cost_usd_micros, .. } => {
+                format!("model call {call} broke ({reason}); charged its full hold of {}", format_usd(*cost_usd_micros))
+            }
+        },
     }
 }
 

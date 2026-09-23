@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/proto", "crates/journal", "crates/strived"]
+members = ["crates/proto", "crates/journal", "crates/budget", "crates/strived"]
 
 [workspace.package]
 version = "0.3.0-dev"
@@ -11,6 +11,7 @@ license = "MIT"
 [workspace.dependencies]
 strive-proto = { path = "crates/proto" }
 strive-journal = { path = "crates/journal" }
+strive-budget = { path = "crates/budget" }
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 serde = { version = "1.0.229", features = ["derive"] }

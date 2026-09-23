@@ -44,7 +44,35 @@ export function describe(entry: Entry): string {
       return `${style.accent("›")} ${e.text}`;
     case "recovered":
       return style.danger(`Recovered after a crash: discarded a partial entry (${e.discardedBytes} bytes).`);
+    case "budgetSet":
+      return style.faint(`Budget: ${budgetText(e.usdMicros, e.tokens)}`);
+    case "modelCallStarted":
+      return style.faint(`${e.provider} ${e.model} …`);
+    case "modelCallFinished":
+      switch (e.outcome.kind) {
+        case "complete":
+          return style.faint(
+            `${e.outcome.usage.input} in · ${e.outcome.usage.output} out · ${formatUsd(e.outcome.costUsdMicros)}`,
+          );
+        case "rejected":
+          return style.danger(`The provider refused the call (HTTP ${e.outcome.status}).`);
+        case "broken":
+          return style.danger(`The call broke (${e.outcome.reason}); charged its full hold of ${formatUsd(e.outcome.costUsdMicros)}.`);
+      }
   }
+}
+
+/** `$D.DDDD`, rounded up so a nonzero cost never shows as zero. Matches the daemon's format. */
+export function formatUsd(micros: number): string {
+  const units = Math.ceil(micros / 100);
+  return `$${Math.floor(units / 10_000)}.${String(units % 10_000).padStart(4, "0")}`;
+}
+
+function budgetText(usd?: number, tokens?: number): string {
+  if (usd === undefined && tokens === undefined) return "unlimited";
+  return [usd === undefined ? null : formatUsd(usd), tokens === undefined ? null : `${tokens} tokens`]
+    .filter(Boolean)
+    .join(" and ");
 }
 
 export class App {

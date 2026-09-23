@@ -339,6 +339,68 @@ pub enum Event {
     Recovered {
         discarded_bytes: u64,
     },
+    /// The session's spending limits from here on. `None` means unlimited.
+    BudgetSet {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        usd_micros: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        tokens: Option<u64>,
+    },
+    /// A model request was admitted against the budget and sent upstream.
+    /// Written before sending, so a crash mid-call still counts it.
+    ModelCallStarted {
+        /// Numbers this session's calls; pairs with `ModelCallFinished`.
+        call: u64,
+        provider: String,
+        model: String,
+        /// The exact request body sent upstream.
+        request: Digest,
+        /// The most this call can cost, held until it finishes.
+        reserved_usd_micros: u64,
+        reserved_tokens: u64,
+    },
+    ModelCallFinished {
+        call: u64,
+        outcome: CallOutcome,
+        /// The exact response bytes received, when any were.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        response: Option<Digest>,
+        duration_ms: u64,
+    },
+}
+
+/// How a model call ended, and what it cost.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum CallOutcome {
+    /// The provider reported usage; the cost is exact.
+    Complete { status: u16, usage: Usage, cost_usd_micros: u64 },
+    /// The provider refused the request before doing work (an error status).
+    Rejected { status: u16 },
+    /// The call broke after it may have been billed. It is charged the full
+    /// reservation, since the real cost is unknown.
+    Broken { reason: String, cost_usd_micros: u64, tokens: u64 },
+}
+
+/// Tokens a call used, as the provider reported them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Usage {
+    pub input: u64,
+    pub output: u64,
+    pub cache_write: u64,
+    pub cache_read: u64,
+}
+
+impl Usage {
+    pub fn total(&self) -> u64 {
+        self.input + self.output + self.cache_write + self.cache_read
+    }
 }
 
 /// A journaled event with its position and time.

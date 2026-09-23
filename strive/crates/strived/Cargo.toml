@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 strive-proto.workspace = true
 strive-journal.workspace = true
+strive-budget.workspace = true
 ulid = "3.0.0"
 jiff = "0.2.37"
 anyhow.workspace = true
