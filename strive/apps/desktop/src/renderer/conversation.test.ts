@@ -112,3 +112,20 @@ test("only calls that went wrong and events without a place of their own become 
     "Rewound to checkpoint 1. Undo with /rewind 2.",
   ]);
 });
+
+test("an approval cancelled with its command (an interrupt) stops waiting, though nobody decided it", () => {
+  const c = fold([
+    bash(1, "sleep 100"),
+    { type: "approvalRequested", effect: 1, description: "run: sleep 100" },
+    {
+      type: "effectFinished",
+      effect: 1,
+      outcome: { kind: "refused", reason: "interrupted: run: sleep 100" },
+      durationMs: 1,
+    },
+  ]);
+
+  expect(c.waiting()).toEqual([]);
+  const tools = c.items[0];
+  expect(tools?.kind === "tools" && tools.tools[0]?.status).toBe("refused");
+});

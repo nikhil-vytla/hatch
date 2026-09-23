@@ -34,6 +34,9 @@ export function App({ bridge, opened }: Props) {
   const [closed, setClosed] = useState(false);
   const [error, setError] = useState<string>();
   const [layout, setLayout] = useState<History>(() => newHistory(DEFAULT_WORKSPACE));
+  // Until the saved layout is in, an edit would be made to (and saved over it
+  // from) the default one.
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     for (const e of opened.entries) model.apply(e);
@@ -49,13 +52,17 @@ export function App({ bridge, opened }: Props) {
     });
 
     bridge.onClosed(() => setClosed(true));
-    bridge.loadWorkspace().then((saved) => saved && setLayout(saved));
+    bridge
+      .loadWorkspace()
+      .then((saved) => saved && setLayout(saved))
+      .finally(() => setLoaded(true));
   }, [bridge, model, opened]);
 
   const act = (p: Promise<unknown>) => p.catch((e: Error) => setError(e.message));
   const id = opened.session.id;
 
   const edit = (next: History) => {
+    if (!loaded) return;
     setLayout(next);
     act(bridge.saveWorkspace(next));
   };
@@ -85,7 +92,7 @@ export function App({ bridge, opened }: Props) {
           {error}
         </button>
       )}
-      <Proposals model={model} layout={layout} onChange={edit} />
+      {loaded && <Proposals model={model} layout={layout} onChange={edit} />}
       <Columns
         workspace={workspace}
         onMove={(panel, column, before) => {

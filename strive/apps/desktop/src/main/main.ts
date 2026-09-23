@@ -98,9 +98,17 @@ async function main() {
   // The blobs the window may read: ones its own session's journal names.
   // The content store holds every session's, found by digest alone.
   const readable = new Set<Digest>();
+  // What the page gets when it asks for the session, kept up to date.
+  let opened: Opened | undefined;
   const deliver = (event: StriveEvent) => (forward ? forward(event) : early.push(event));
   client.on("session/entry", (params) => {
-    if (params.sessionId === id) for (const d of digestsOf(params.entry.event)) readable.add(d);
+    if (params.sessionId === id) {
+      for (const d of digestsOf(params.entry.event)) readable.add(d);
+
+      // A page that reloads asks for the session again; it gets all of it.
+      if (opened && params.entry.seq > (opened.entries.at(-1)?.seq ?? 0)) opened.entries.push(params.entry);
+    }
+
     deliver({ method: "session/entry", params });
   });
   client.on("session/delta", (params) => deliver({ method: "session/delta", params }));
@@ -109,7 +117,16 @@ async function main() {
   const { session, entries } = await client.request("session/attach", { id });
 
   for (const entry of entries) for (const d of digestsOf(entry.event)) readable.add(d);
-  const opened: Opened = { init, session, entries, home: app.getPath("home"), platform: process.platform };
+  opened = { init, session, entries, home: app.getPath("home"), platform: process.platform };
+  const snapshot = opened;
+
+  // Entries notified while the attach was on its way are held in `early`;
+  // the snapshot gets them too.
+  for (const event of early) {
+    if (event.method !== "session/entry" || event.params.sessionId !== id) continue;
+
+    if (event.params.entry.seq > (snapshot.entries.at(-1)?.seq ?? 0)) snapshot.entries.push(event.params.entry);
+  }
 
   await app.whenReady();
   serveWidgets();
@@ -119,6 +136,15 @@ async function main() {
     cb({ cancel: true }),
   );
   await refuseProxiedTraffic();
+  // No name lookups at all: the app needs none, and a lookup is itself a way
+  // out (WebRTC resolves a TURN server's hostname before any proxy is
+  // involved, so data could ride in the name). Secure DNS through a server
+  // that isn't there makes every lookup fail without sending anything.
+  app.configureHostResolver({
+    enableBuiltInResolver: true,
+    secureDnsMode: "secure",
+    secureDnsServers: ["https://127.0.0.1:9/dns-query"],
+  });
 
   const window = new BrowserWindow({
     width: 1280,
@@ -158,7 +184,7 @@ async function main() {
 
     for (const event of early.splice(0)) forward(event);
 
-    return opened;
+    return snapshot;
   });
   // The daemon parses and checks every request's params itself.
   ipcMain.handle("strive:request", async (e, method: MethodName, params: Methods[MethodName]["params"]) => {

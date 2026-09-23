@@ -18,14 +18,12 @@ test("checkpoints are labelled with the prompt they came before, and rewinds wit
   ]);
 });
 
-test("an approval waits until it is decided, and an entry seen twice counts once", () => {
+test("an entry seen twice counts once", () => {
   const m = new SessionModel("s1");
-  const asked = at({ type: "approvalRequested", effect: 3, description: "run: ls" });
-  m.apply(asked);
-  expect(m.apply(asked)).toBe(false);
-  expect([...m.pending]).toEqual([[3, "run: ls"]]);
-  m.apply(at({ type: "approvalDecided", effect: 3, decision: "deny", by: "me" }));
-  expect(m.pending.size).toBe(0);
+  const said = at({ type: "userMessage", text: "hi" });
+  m.apply(said);
+  expect(m.apply(said)).toBe(false);
+  expect(m.conversation.items).toHaveLength(1);
 });
 
 test("activity shows each effect and how it ended", () => {

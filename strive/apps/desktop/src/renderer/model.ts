@@ -1,5 +1,5 @@
 // A session as the desktop app shows it, folded from its journal entries:
-// the transcript, spend, approvals waiting, checkpoints and recent activity.
+// the conversation, spend, checkpoints and recent activity.
 import type { ApprovalMode, EffectRecord, Entry } from "@strive/protocol";
 import { Spend } from "@strive/view";
 import { Conversation, label } from "./conversation";
@@ -16,8 +16,6 @@ export class SessionModel {
   /** Reply text still streaming in, not yet journaled. */
   live = "";
   readonly spend = new Spend();
-  /** Effects waiting for a person, by effect number. */
-  readonly pending = new Map<number, string>();
   readonly checkpoints: { n: number; label: string }[] = [];
   readonly activity: Activity[] = [];
   readonly proposals: Proposal[] = [];
@@ -43,12 +41,6 @@ export class SessionModel {
     this.conversation.apply(entry);
 
     switch (e.type) {
-      case "approvalRequested":
-        this.pending.set(e.effect, e.description);
-        break;
-      case "approvalDecided":
-        this.pending.delete(e.effect);
-        break;
       case "approvalModeSet":
         this.mode = e.mode;
         break;

@@ -144,6 +144,16 @@ test("a prompt typed in the window is journaled and shown", async () => {
   await app.close();
 });
 
+test("a reloaded window shows what happened since it opened", async () => {
+  const { page, cwd } = await openApp();
+  const rpc = await Rpc.open();
+  await rpc.call("session/prompt", { id: sessionId(cwd), text: "sent after the window opened" });
+  await page.locator(".msg.user", { hasText: "sent after the window opened" }).waitFor();
+  await page.reload();
+  await page.locator(".msg.user", { hasText: "sent after the window opened" }).waitFor({ timeout: 5000 });
+  rpc.close();
+});
+
 test("an approval waits in the conversation and Allow lets the command run", async () => {
   const { app, page, cwd } = await openApp();
   const agent = await Rpc.open();
