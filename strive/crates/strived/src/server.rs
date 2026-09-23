@@ -52,6 +52,15 @@ pub struct State {
     pub credentials: Credentials,
     pub cas: strive_journal::cas::Cas,
     pub gateway: Gateway,
+    /// Model calls in flight. They count as activity, like connected clients.
+    pub gateway_calls: AtomicU32,
+}
+
+impl State {
+    /// Marks activity now: the idle timer starts over.
+    pub async fn touch(&self) {
+        *self.idle_since.lock().await = Instant::now();
+    }
 }
 
 /// Outcome of trying to become the daemon.
@@ -110,6 +119,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
         settings,
         models,
         gateway,
+        gateway_calls: AtomicU32::new(0),
     });
     let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
     log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);
@@ -145,7 +155,8 @@ pub async fn run(cfg: Config) -> Result<Started> {
                 Err(e) => log!("accept failed: {e}"),
             },
             _ = tick.tick() => {
-                if state.clients.load(Ordering::SeqCst) == 0 && state.idle_since.lock().await.elapsed() >= state.idle_exit {
+                                let busy = state.clients.load(Ordering::SeqCst) + state.gateway_calls.load(Ordering::SeqCst) > 0;
+                if !busy && state.idle_since.lock().await.elapsed() >= state.idle_exit {
                     log!("idle for {}s with no clients, exiting", state.idle_exit.as_secs());
                     break;
                 }

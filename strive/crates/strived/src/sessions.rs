@@ -124,6 +124,11 @@ enum Cmd {
         by: String,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
+    /// Whether a reservation would fit, without holding it.
+    CheckBudget {
+        reservation: Reservation,
+        reply: oneshot::Sender<std::result::Result<(), Refusal>>,
+    },
     StartEffect {
         call_id: String,
         record: EffectRecord,
@@ -157,6 +162,8 @@ pub struct Sessions {
     live: Mutex<HashMap<SessionId, Live>>,
     /// Effects waiting for a person's decision.
     pending: StdMutex<HashMap<(SessionId, u64), oneshot::Sender<Decision>>>,
+    /// Set by shutdown: no new writers may start.
+    stopping: std::sync::atomic::AtomicBool,
 }
 
 #[derive(Debug)]
@@ -182,6 +189,7 @@ impl Sessions {
             ids: StdMutex::new(ulid::Generator::new()),
             live: Mutex::new(HashMap::new()),
             pending: StdMutex::new(HashMap::new()),
+            stopping: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -208,10 +216,11 @@ impl Sessions {
         // writer rather than open a second one.
         let mut live = self.live.lock().await;
         let (journal, entries) = tokio::task::spawn_blocking(move || {
-            let mut j = Journal::create(&dir, sid.as_str(), &key, ts, first.clone())?;
-            let mut entries = vec![Entry { seq: 1, ts_ms: ts, event: first }];
-            entries.extend(j.append(ts, &[budget, Event::ApprovalModeSet { mode }])?);
-            j.commit()?;
+            // Committed together: a session never exists without its budget
+            // and approval mode.
+            let first = [first, budget, Event::ApprovalModeSet { mode }];
+            let j = Journal::create(&dir, sid.as_str(), &key, ts, &first)?;
+            let entries = first.into_iter().zip(1..).map(|(event, seq)| Entry { seq, ts_ms: ts, event }).collect();
             io::Result::Ok((j, entries))
         })
         .await
@@ -267,6 +276,14 @@ impl Sessions {
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::SetBudget { limits, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// Whether a call with this reservation would fit the budget now.
+    pub async fn check_budget(&self, id: &SessionId, reservation: Reservation) -> std::result::Result<(), CallError> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::CheckBudget { reservation, reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())?.map_err(CallError::Refused)
     }
 
     /// Reserves the call against the budget and journals it as started.
@@ -399,6 +416,9 @@ impl Sessions {
     /// callers can never start two writers for one journal.
     async fn writer(&self, id: &SessionId) -> Result<(SessionInfo, mpsc::UnboundedSender<Cmd>)> {
         let mut live = self.live.lock().await;
+        if self.stopping.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(SessionError::Io(io::Error::other("the daemon is stopping")));
+        }
         if let Some(l) = live.get(id).filter(|l| !l.tx.is_closed()) {
             return Ok((l.info.clone(), l.tx.clone()));
         }
@@ -418,7 +438,12 @@ impl Sessions {
     /// this before releasing its ownership lock, so a successor never opens a
     /// journal an old writer is still writing.
     pub async fn shutdown(&self) {
-        let live: Vec<Live> = self.live.lock().await.drain().map(|(_, l)| l).collect();
+        let live: Vec<Live> = {
+            let mut map = self.live.lock().await;
+            // Under the map lock, so no writer can start after the drain.
+            self.stopping.store(true, std::sync::atomic::Ordering::SeqCst);
+            map.drain().map(|(_, l)| l).collect()
+        };
         for l in live {
             drop(l.tx);
             let _ = tokio::task::spawn_blocking(move || l.thread.join()).await;
@@ -458,6 +483,8 @@ struct Writer {
     ledger: Ledger,
     next_call: u64,
     next_effect: u64,
+    /// Effects started and not yet finished.
+    open_effects: std::collections::BTreeSet<u64>,
     mode: ApprovalMode,
     subscribers: Vec<mpsc::UnboundedSender<Entry>>,
     verify: Verifier,
@@ -502,6 +529,7 @@ fn spawn_writer(
         ledger: Ledger::replay(&events),
         next_call,
         next_effect,
+        open_effects: std::collections::BTreeSet::new(),
         mode,
         subscribers: Vec::new(),
         verify,
@@ -607,23 +635,40 @@ impl Writer {
                 (vec![e], done)
             }
             Cmd::FinishCall { call, outcome, response, duration_ms, reply } => {
+                // Already closed (say, as broken when this writer restarted):
+                // finishing it again would journal and charge it twice.
+                if !self.ledger.is_open(call) {
+                    let _ = reply.send(Ok(Vec::new()));
+                    return Staged::Handled;
+                }
                 let (usd, tokens) = charge(&outcome);
                 self.ledger.settle(call, usd, tokens);
                 let e = Event::ModelCallFinished { call, outcome, response, duration_ms };
                 (vec![e], Box::new(move |r, _| drop(reply.send(r))))
             }
+            Cmd::CheckBudget { reservation, reply } => {
+                let _ = reply.send(self.ledger.check(reservation));
+                return Staged::Handled;
+            }
             Cmd::StartEffect { call_id, record, reply } => {
                 let effect = self.next_effect;
                 self.next_effect += 1;
+                self.open_effects.insert(effect);
                 let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, _| {
                     let _ = reply.send(r.map(|_| effect));
                 });
                 (vec![Event::EffectStarted { effect, call_id, record }], done)
             }
-            Cmd::FinishEffect { effect, outcome, duration_ms, reply } => (
-                vec![Event::EffectFinished { effect, outcome, duration_ms }],
-                Box::new(move |r, _| drop(reply.send(r))),
-            ),
+            Cmd::FinishEffect { effect, outcome, duration_ms, reply } => {
+                if !self.open_effects.remove(&effect) {
+                    let _ = reply.send(Ok(Vec::new()));
+                    return Staged::Handled;
+                }
+                (
+                    vec![Event::EffectFinished { effect, outcome, duration_ms }],
+                    Box::new(move |r, _| drop(reply.send(r))),
+                )
+            }
             Cmd::Attach { after_seq, reply } => return Staged::Attach(after_seq, reply),
         };
         Staged::Events(events, done)

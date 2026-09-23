@@ -22,6 +22,26 @@ pub struct Settings {
     /// What new sessions may do without asking.
     #[serde(default = "default_approvals")]
     pub approvals: strive_proto::ApprovalMode,
+    #[serde(default)]
+    pub gateway: GatewaySetting,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GatewaySetting {
+    /// A provider silent this long mid-response is cut off.
+    #[serde(default = "default_stream_idle")]
+    pub stream_idle_secs: u64,
+}
+
+fn default_stream_idle() -> u64 {
+    600
+}
+
+impl Default for GatewaySetting {
+    fn default() -> Self {
+        Self { stream_idle_secs: default_stream_idle() }
+    }
 }
 
 fn default_approvals() -> strive_proto::ApprovalMode {

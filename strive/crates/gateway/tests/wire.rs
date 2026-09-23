@@ -282,3 +282,23 @@ fn an_oversized_stream_event_has_unknown_usage() {
     m.feed(b"\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":15}}\n\n");
     assert_eq!(m.finish(), None);
 }
+
+/// Real responses can be megabytes (long outputs, big tool arguments); the
+/// meter must read them, and give up only past its limit.
+#[test]
+fn large_responses_are_metered_and_only_absurd_ones_are_not() {
+    let text = "y".repeat(2 * 1024 * 1024);
+    let body =
+        format!(r#"{{"content":[{{"type":"text","text":"{text}"}}],"usage":{{"input_tokens":9,"output_tokens":8}}}}"#);
+    assert_eq!(metered(Api::AnthropicMessages, false, &body), Some(usage(9, 8, 0, 0)));
+
+    let sse = ANTHROPIC_SSE.replace("\"text\":\"Hello\"", &format!("\"text\":\"{text}\""));
+    assert_eq!(metered(Api::AnthropicMessages, true, &sse), Some(usage(25, 15, 0, 1000)));
+
+    let huge = "z".repeat(17 * 1024 * 1024);
+    let body =
+        format!(r#"{{"content":[{{"type":"text","text":"{huge}"}}],"usage":{{"input_tokens":9,"output_tokens":8}}}}"#);
+    let mut m = UsageMeter::new(Api::AnthropicMessages, false);
+    m.feed(body.as_bytes());
+    assert_eq!(m.finish(), None, "a body past the meter's limit has unknown usage");
+}

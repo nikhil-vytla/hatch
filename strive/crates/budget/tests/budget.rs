@@ -72,6 +72,8 @@ fn configured_prices_override_and_extend_the_builtins() {
     let opus = m.get("claude-opus-5-5").unwrap();
     assert_eq!((opus.price.cache_read, opus.context_window, opus.max_output), (500_000, 1_000_000, 128_000));
     assert_eq!(m.get("claude-haiku-4-5").unwrap().max_output, 200_000, "max output defaults to the context window");
+    let p = m.get("claude-haiku-4-5").unwrap().price;
+    assert_eq!((p.cache_write, p.cache_write_long), (2_500_000, 4_000_000), "unset writes cost 1.25x and 2x input");
     assert_eq!(
         m.get("claude-haiku-4-5").unwrap().price.cache_read,
         2_000_000,

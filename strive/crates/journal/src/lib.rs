@@ -146,12 +146,16 @@ pub struct Journal {
 }
 
 impl Journal {
-    /// Creates a new session journal whose first entry is `first`. The
+    /// Creates a new session journal starting with `first` (at least one
+    /// event), all committed together. The
     /// directory (absent or empty beforehand) is filled only once the first
     /// entry and head are durable: it is built under a staging name and
     /// renamed into place, so a crash leaves at most a staging directory,
     /// which the next create replaces.
-    pub fn create(dir: &Path, session_id: &str, key: &Key, ts_ms: u64, first: Event) -> io::Result<Self> {
+    pub fn create(dir: &Path, session_id: &str, key: &Key, ts_ms: u64, first: &[Event]) -> io::Result<Self> {
+        if first.is_empty() {
+            return Err(io::Error::other("a journal starts with at least one event"));
+        }
         if fs::read_dir(dir).is_ok_and(|mut d| d.next().is_some()) {
             return Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{} is not empty", dir.display())));
         }
@@ -171,7 +175,7 @@ impl Journal {
             last_mac: key.genesis(session_id),
             failed: false,
         };
-        j.append(ts_ms, &[first])?;
+        j.append(ts_ms, first)?;
         j.commit()?;
         fs::rename(&staging, dir)?;
         File::open(parent)?.sync_all()?;

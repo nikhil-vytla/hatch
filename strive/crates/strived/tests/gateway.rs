@@ -32,6 +32,8 @@ enum Reply {
     /// Events, a delay before each, and whether the stream ends before the last one.
     Sse(Vec<String>, u64, bool),
     Hang,
+    /// A 307 to this URL.
+    Redirect(String),
 }
 
 #[derive(Clone, Debug)]
@@ -114,6 +116,7 @@ async fn respond(reply: Reply) -> Response {
             tokio::time::sleep(Duration::from_secs(3600)).await;
             Response::builder().status(StatusCode::OK).body(Body::empty()).unwrap()
         }
+        Reply::Redirect(to) => Response::builder().status(307).header("location", to).body(Body::empty()).unwrap(),
     }
 }
 
@@ -520,4 +523,134 @@ fn gateway_urls_are_only_issued_for_real_sessions() {
     let s = setup(Reply::Json(200, ANTHROPIC_JSON.into()), &[("ANTHROPIC_API_KEY", "k")]);
     let r = s.env.rpc().call("session/gateway", &json!({"id": "01J8ZZZZZZZZZZZZZZZZZZZZZZ"}));
     assert_eq!(r["error"]["code"], -32010);
+}
+
+fn blob_count(env: &Env) -> usize {
+    let root = env.home.path().join("cas/sha256");
+    std::fs::read_dir(&root)
+        .map_or(0, |d| d.map(|e| std::fs::read_dir(e.unwrap().path()).map_or(0, std::iter::Iterator::count)).sum())
+}
+
+#[test]
+fn a_call_refused_for_budget_stores_nothing() {
+    let s = setup(Reply::Json(200, ANTHROPIC_JSON.into()), &[("ANTHROPIC_API_KEY", "k")]);
+    s.env.rpc().ok("session/budget", &json!({"id": s.id, "usdMicros": 1}));
+    let before = blob_count(&s.env);
+    assert_eq!(s.messages(&BODY.replace("hi", "a distinct body")).0, 402);
+    assert_eq!(blob_count(&s.env), before);
+}
+
+/// A redirect would resend the request, with the daemon's key, to wherever
+/// the provider points; the gateway never follows one.
+#[test]
+fn redirects_are_not_followed() {
+    let elsewhere = Upstream::start(Reply::Json(200, ANTHROPIC_JSON.into()));
+    let target = format!("{}/v1/messages", elsewhere.url());
+    let s = setup(Reply::Redirect(target), &[("ANTHROPIC_API_KEY", "sk-must-stay-home")]);
+    let (status, _) = s.messages(BODY);
+    assert_eq!(status, 307);
+    assert_eq!(elsewhere.seen().len(), 0, "the redirect target never saw the request or the key");
+    assert_eq!(s.last("modelCallFinished")["outcome"], json!({"kind": "rejected", "status": 307}));
+}
+
+#[test]
+fn a_response_past_the_size_limit_is_cut_off_and_charged_its_hold() {
+    let chunk = format!(": {}\n\n", "p".repeat(1024 * 1024));
+    let events: Vec<String> = std::iter::repeat_n(chunk, 66).collect();
+    let s = setup(Reply::Sse(events, 0, false), &[("ANTHROPIC_API_KEY", "k")]);
+    let (status, body) = s.messages(&BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"));
+    assert_eq!(status, 200);
+    assert!(body.len() <= 65 * 1024 * 1024, "{}", body.len());
+    let outcome = s.last("modelCallFinished")["outcome"].clone();
+    assert_eq!(
+        outcome,
+        json!({"kind": "broken", "reason": "the response exceeded 64 MiB", "costUsdMicros": 603, "tokens": 203})
+    );
+}
+
+#[test]
+fn a_client_that_leaves_before_the_response_starts_closes_the_call() {
+    let s = setup(Reply::Hang, &[("ANTHROPIC_API_KEY", "k")]);
+    let url = format!("{}/v1/messages", s.base);
+    s.rt.block_on(async {
+        let send = reqwest::Client::new().post(url).body(BODY).send();
+        let _ = tokio::time::timeout(Duration::from_millis(300), send).await;
+    });
+    common::wait_for("the call to be closed", Duration::from_secs(5), || s.count("modelCallFinished") == 1);
+    assert_eq!(s.last("modelCallFinished")["outcome"]["reason"], "the client disconnected before the response began");
+}
+
+#[test]
+fn a_client_that_leaves_while_the_provider_stalls_closes_the_call() {
+    let events = vec![SSE[0].to_string(), SSE[1].to_string()];
+    let s = setup(Reply::Sse(events, 20_000, false), &[("ANTHROPIC_API_KEY", "k")]);
+    s.rt.block_on(async {
+        let r = reqwest::Client::new()
+            .post(format!("{}/v1/messages", s.base))
+            .body(BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"))
+            .send();
+        let _ = tokio::time::timeout(Duration::from_millis(300), r).await;
+    });
+    common::wait_for("the call to be closed", Duration::from_secs(5), || s.count("modelCallFinished") == 1);
+    let reason = s.last("modelCallFinished")["outcome"]["reason"].clone();
+    assert!(
+        reason == "the client disconnected before the response began"
+            || reason == "the client disconnected mid-response",
+        "{reason}"
+    );
+}
+
+#[test]
+fn a_provider_that_goes_quiet_is_cut_off() {
+    let events = vec![SSE[0].to_string(), SSE[1].to_string()];
+    let s = setup(Reply::Sse(events, 5_000, false), &[("ANTHROPIC_API_KEY", "k")]);
+    std::fs::write(s.env.home.path().join("settings.json"), r#"{"gateway": {"streamIdleSecs": 1}}"#).unwrap();
+    s.env.stop();
+    let base = s.env.rpc().ok("session/gateway", &json!({"id": s.id}))["anthropic"].as_str().unwrap().to_string();
+    let started = std::time::Instant::now();
+    let (status, _) = s.post(
+        &format!("{base}/v1/messages"),
+        &BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"),
+    );
+    assert_eq!(status, 200);
+    assert!(started.elapsed() < Duration::from_secs(4), "cut off after 1 s of silence, not after the 5 s wait");
+    assert_eq!(s.last("modelCallFinished")["outcome"]["reason"], "the provider sent nothing for 1s");
+}
+
+/// A finish that arrives after the call was already closed (say, by a
+/// writer restart) must not journal or charge it a second time.
+#[test]
+fn a_call_is_finished_and_charged_once_even_across_a_writer_restart() {
+    use std::os::unix::fs::PermissionsExt;
+    let s =
+        setup(Reply::Sse(SSE.iter().map(|e| (*e).to_string()).collect(), 600, false), &[("ANTHROPIC_API_KEY", "k")]);
+    let url = format!("{}/v1/messages", s.base);
+    let body = BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true");
+    let call = std::thread::spawn(move || {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let r = reqwest::Client::new().post(url).body(body).send().await.unwrap();
+            r.bytes().await.unwrap().len()
+        })
+    });
+    common::wait_for("the call to start", Duration::from_secs(5), || s.count("modelCallStarted") == 1);
+    let dir = s.env.session_dir(&s.id);
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let failed = s.env.rpc().call("session/prompt", &json!({"id": s.id, "text": "breaks the writer"}));
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(failed.get("error").is_some(), "{failed}");
+    assert!(call.join().unwrap() > 0);
+    common::wait_for("the call to be closed", Duration::from_secs(5), || s.count("modelCallFinished") >= 1);
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(s.count("modelCallFinished"), 1, "{:?}", s.entries());
+}
+
+/// Model calls are activity: the daemon doesn't idle out under an agent
+/// that only talks to the gateway.
+#[test]
+fn gateway_traffic_keeps_the_daemon_alive() {
+    let events: Vec<String> = SSE.iter().map(|e| (*e).to_string()).collect();
+    let s = setup(Reply::Sse(events, 700, false), &[("ANTHROPIC_API_KEY", "k"), ("STRIVE_IDLE_SECS", "1")]);
+    let (status, _) = s.messages(&BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"));
+    assert_eq!(status, 200, "a 2.8 s call through a daemon that idles out after 1 s");
+    assert_eq!(s.count("modelCallFinished"), 1);
 }

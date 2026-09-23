@@ -1,20 +1,25 @@
 //! The model gateway: a loopback HTTP proxy every model call goes through.
 //!
 //! A session's agent gets base URLs containing a secret token for that
-//! session. For each request the gateway reads what it asks for, refuses it
-//! if its worst-case cost doesn't fit the budget (or the model has no known
-//! price), stores the exact request bytes, journals the call as started,
-//! forwards it with the provider key only the daemon holds, streams the
-//! response back while metering it, stores the response bytes and journals
-//! how the call ended. Every started call is finished exactly once, whatever
-//! happens: a completed response, a provider refusal, a broken stream or a
-//! client that went away.
+//! session. For each request the gateway reads what it asks for and refuses
+//! it if its worst-case cost can't be bounded or doesn't fit the budget.
+//! Otherwise it stores the exact request bytes, journals the call as
+//! started, and forwards it with the provider key only the daemon holds
+//! (never following redirects, which would carry the key elsewhere). It
+//! streams the response back while metering it, stores the response bytes
+//! and journals how the call ended before the client's response ends.
+//!
+//! Forwarding runs in its own task, so a client that goes away (before or
+//! during the response) can't leave a call open, and every started call is
+//! finished exactly once: complete, rejected by the provider, or broken
+//! (stream cut, provider silent, response too large, client gone).
 
 use std::collections::HashMap;
 use std::io::Read;
 use std::net::SocketAddr;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -26,13 +31,15 @@ use futures_util::StreamExt;
 use serde_json::json;
 use strive_budget::{Reservation, cost};
 use strive_gateway::{Api, UsageMeter, prepare_request};
-use strive_proto::{CallOutcome, GatewayInfo};
-use tokio::sync::mpsc;
+use strive_proto::{CallOutcome, Digest, GatewayInfo};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::server::State;
 use crate::sessions::{CallError, CallStart, SessionId};
 
 const MAX_BODY: usize = 64 * 1024 * 1024;
+/// The largest response the gateway relays and stores.
+const MAX_RESPONSE: usize = 64 * 1024 * 1024;
 const FORWARDED_REQUEST_HEADERS: &[&str] =
     &["content-type", "accept", "anthropic-version", "anthropic-beta", "openai-beta"];
 
@@ -45,15 +52,19 @@ pub struct Gateway {
 impl Gateway {
     pub async fn bind() -> anyhow::Result<(Self, tokio::net::TcpListener)> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let http = reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(10)).build()?;
+        let http = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
         Ok((Self { addr: listener.local_addr()?, tokens: Mutex::new(HashMap::new()), http }, listener))
     }
 
     /// Base URLs for a session's agent, minting its token on first use.
     pub fn info(&self, id: &SessionId) -> std::io::Result<GatewayInfo> {
         let mut tokens = self.tokens.lock().expect("token map");
-        let token = if let Some((t, _)) = tokens.iter().find(|(_, s)| *s == id) {
-            t.clone()
+        let existing = tokens.iter().find(|(_, s)| *s == id).map(|(t, _)| t.clone());
+        let token = if let Some(t) = existing {
+            t
         } else {
             let mut bytes = [0u8; 32];
             std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
@@ -111,8 +122,8 @@ struct Admitted {
     finish: Finish,
 }
 
-/// Everything that can refuse a call happens here, before anything is sent;
-/// the last step journals the call as started.
+/// Everything that can refuse a call happens here, before anything is sent
+/// or stored; the last step journals the call as started.
 #[allow(clippy::result_large_err, reason = "the refusal is the HTTP response, built at most once per call")]
 async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body: &[u8]) -> Result<Admitted, Response> {
     let session = state
@@ -123,6 +134,7 @@ async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body
         refuse(None, StatusCode::NOT_FOUND, "not_found_error", &format!("the gateway doesn't handle {provider} {path}"))
     })?;
     let bad = |status, kind, why: &str| refuse(Some(api), status, kind, why);
+    let session_failed = |e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &format!("{e:?}"));
     let (info, sent) =
         prepare_request(api, body).map_err(|why| bad(StatusCode::BAD_REQUEST, "invalid_request_error", why))?;
     let model = state.models.get(&info.model).copied().ok_or_else(|| {
@@ -137,14 +149,16 @@ async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body
         bad(StatusCode::UNAUTHORIZED, "authentication_error", &why)
     })?;
     let reservation = Reservation::for_call(&model, sent.len() as u64, info.max_output, info.choices, info.input_rate);
+    let refused = |e| match e {
+        CallError::Refused(r) => bad(StatusCode::PAYMENT_REQUIRED, "budget_exceeded", &r.to_string()),
+        CallError::Session(e) => session_failed(e),
+    };
+    // Checked before storing, so refused requests can't fill the store.
+    state.sessions.check_budget(&session, reservation).await.map_err(refused)?;
     let request =
         state.cas.put(&sent).map_err(|e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &e.to_string()))?;
     let start = CallStart { provider: provider.to_string(), model: info.model.clone(), request, reservation };
-    let call = state.sessions.start_call(&session, start).await.map_err(|e| match e {
-        CallError::Refused(r) => bad(StatusCode::PAYMENT_REQUIRED, "budget_exceeded", &r.to_string()),
-        CallError::Session(e) => bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &format!("{e:?}")),
-    })?;
-    let finish = Finish { state: state.clone(), session, call, reservation, started: Instant::now() };
+    let call = state.sessions.start_call(&session, start).await.map_err(refused)?;
     Ok(Admitted {
         api,
         provider: provider.to_string(),
@@ -153,71 +167,127 @@ async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body
         sent,
         key,
         price: model.price,
-        finish,
+        finish: Finish::new(state.clone(), session, call, reservation),
     })
 }
 
-/// Sends an admitted call upstream and streams the response back, metering
-/// it. A spawned pump finishes the call however the response ends, and ends
-/// the client's response only after the call's end is journaled.
+type Head = Result<(StatusCode, HeaderMap), String>;
+
+/// Hands the call to a forwarding task and answers with its response. The
+/// task owns the call: if this handler is dropped because the client left,
+/// the task notices and finishes the call anyway.
 async fn forward(state: Arc<State>, a: Admitted, headers: &HeaderMap) -> Response {
-    let Admitted { api, provider, path, stream, sent, key, price, finish } = a;
-    let reservation = finish.reservation;
-    let mut req = state.gateway.http.post(format!("{}{path}", state.settings.upstream(&provider))).body(sent);
+    let api = a.api;
+    let mut req = state.gateway.http.post(format!("{}{}", state.settings.upstream(&a.provider), a.path)).body(a.sent);
     for name in FORWARDED_REQUEST_HEADERS {
         if let Some(v) = headers.get(*name) {
             req = req.header(*name, v);
         }
     }
     req = match api {
-        Api::AnthropicMessages => req.header("x-api-key", key),
-        Api::OpenAiChat | Api::OpenAiResponses => req.bearer_auth(key),
+        Api::AnthropicMessages => req.header("x-api-key", &a.key),
+        Api::OpenAiChat | Api::OpenAiResponses => req.bearer_auth(&a.key),
     };
-    let upstream = match req.send().await {
-        Ok(r) => r,
-        Err(e) => {
-            let outcome = if e.is_connect() {
-                CallOutcome::Rejected { status: 502 }
-            } else {
-                broken(&reservation, format!("the request to {provider} failed: {e}"))
-            };
-            finish.done(outcome, None).await;
-            return refuse(
-                Some(api),
-                StatusCode::BAD_GATEWAY,
-                "api_error",
-                &format!("could not reach {provider}: {e}"),
-            );
-        }
-    };
-
-    let status = upstream.status();
-    let mut response = Response::builder().status(status.as_u16());
-    for (name, value) in upstream.headers() {
-        if forward_response_header(name) {
-            response = response.header(name.clone(), value.clone());
-        }
-    }
+    let (head_tx, head_rx) = oneshot::channel::<Head>();
     let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(32);
-    tokio::spawn(async move {
+    let idle = Duration::from_secs(state.settings.gateway.stream_idle_secs);
+    let pump = Pump { api, stream: a.stream, provider: a.provider, price: a.price, finish: a.finish, idle };
+    tokio::spawn(pump.run(req, head_tx, tx));
+    match head_rx.await {
+        Ok(Ok((status, upstream_headers))) => {
+            let mut response = Response::builder().status(status.as_u16());
+            for (name, value) in &upstream_headers {
+                if forward_response_header(name) {
+                    response = response.header(name.clone(), value.clone());
+                }
+            }
+            response
+                .body(Body::from_stream(tokio_stream::wrappers::ReceiverStream::new(rx)))
+                .unwrap_or_else(|e| refuse(Some(api), StatusCode::INTERNAL_SERVER_ERROR, "api_error", &e.to_string()))
+        }
+        Ok(Err(why)) => refuse(Some(api), StatusCode::BAD_GATEWAY, "api_error", &why),
+        Err(_) => refuse(Some(api), StatusCode::BAD_GATEWAY, "api_error", "the call ended before it began"),
+    }
+}
+
+struct Pump {
+    api: Api,
+    stream: bool,
+    provider: String,
+    price: strive_budget::Price,
+    finish: Finish,
+    idle: Duration,
+}
+
+impl Pump {
+    async fn run(
+        self,
+        req: reqwest::RequestBuilder,
+        head_tx: oneshot::Sender<Head>,
+        tx: mpsc::Sender<Result<Bytes, std::io::Error>>,
+    ) {
+        let Pump { api, stream, provider, price, finish, idle } = self;
+        let reservation = finish.reservation;
+        let mut head_tx = head_tx;
+        let upstream = tokio::select! {
+            r = req.send() => r,
+            () = head_tx.closed() => {
+                finish.done(broken(&reservation, "the client disconnected before the response began".into()), None).await;
+                return;
+            }
+        };
+        let upstream = match upstream {
+            Ok(r) => r,
+            Err(e) => {
+                let outcome = if e.is_connect() {
+                    CallOutcome::Rejected { status: 502 }
+                } else {
+                    broken(&reservation, format!("the request to {provider} failed: {e}"))
+                };
+                finish.done(outcome, None).await;
+                let _ = head_tx.send(Err(format!("could not reach {provider}: {e}")));
+                return;
+            }
+        };
+        let status = upstream.status();
+        if head_tx.send(Ok((status, upstream.headers().clone()))).is_err() {
+            finish.done(broken(&reservation, "the client disconnected before the response began".into()), None).await;
+            return;
+        }
         let mut meter = UsageMeter::new(api, stream);
         let mut all = Vec::new();
         let mut interrupted = None;
         let mut body = upstream.bytes_stream();
-        while let Some(chunk) = body.next().await {
-            match chunk {
-                Ok(bytes) => {
+        loop {
+            let next = tokio::select! {
+                n = tokio::time::timeout(idle, body.next()) => n,
+                () = tx.closed() => {
+                    interrupted = Some("the client disconnected mid-response".to_string());
+                    break;
+                }
+            };
+            match next {
+                Err(_) => {
+                    interrupted = Some(format!("the provider sent nothing for {}s", idle.as_secs()));
+                    break;
+                }
+                Ok(None) => break,
+                Ok(Some(Err(e))) => {
+                    interrupted = Some(format!("the response from {provider} broke off: {e}"));
+                    let _ = tx.send(Err(std::io::Error::other(e.to_string()))).await;
+                    break;
+                }
+                Ok(Some(Ok(bytes))) => {
+                    if all.len() + bytes.len() > MAX_RESPONSE {
+                        interrupted = Some("the response exceeded 64 MiB".to_string());
+                        break;
+                    }
                     meter.feed(&bytes);
                     all.extend_from_slice(&bytes);
                     if tx.send(Ok(bytes)).await.is_err() {
                         interrupted = Some("the client disconnected mid-response".to_string());
                         break;
                     }
-                }
-                Err(e) => {
-                    interrupted = Some(format!("the response from {provider} broke off: {e}"));
-                    let _ = tx.send(Err(std::io::Error::other(e.to_string()))).await;
-                    break;
                 }
             }
         }
@@ -230,15 +300,22 @@ async fn forward(state: Arc<State>, a: Admitted, headers: &HeaderMap) -> Respons
                 broken(&reservation, reason.unwrap_or_else(|| "the response ended without reporting usage".into()))
             }
         };
-        let response = finish.state.cas.put(&all).ok();
-        finish.done(outcome, response).await;
+        let response = match finish.state.cas.put(&all) {
+            Ok(d) => Some(d),
+            Err(e) => {
+                crate::log!("could not store the response of call {}: {e}", finish.call);
+                None
+            }
+        };
+        if !finish.done(outcome, response).await {
+            // The client must not see a clean end for a call the journal
+            // doesn't record as finished.
+            let _ = tx.send(Err(std::io::Error::other("strive could not record the end of this call"))).await;
+        }
         // Closing the client's stream only now means that once a client sees
         // a response end, the journal already records how the call ended.
         drop(tx);
-    });
-    response
-        .body(Body::from_stream(tokio_stream::wrappers::ReceiverStream::new(rx)))
-        .unwrap_or_else(|e| refuse(Some(api), StatusCode::INTERNAL_SERVER_ERROR, "api_error", &e.to_string()))
+    }
 }
 
 /// A call whose real cost is unknown is charged everything it reserved.
@@ -255,23 +332,53 @@ fn forward_response_header(name: &HeaderName) -> bool {
         || n.starts_with("x-ratelimit")
 }
 
+/// A started call's obligation to be finished. Counts as daemon activity
+/// while it lives; if dropped unfinished (a panic, a cancelled task), it
+/// finishes the call as broken on its own.
 struct Finish {
     state: Arc<State>,
     session: SessionId,
     call: u64,
     reservation: Reservation,
     started: Instant,
+    finished: bool,
 }
 
 impl Finish {
-    async fn done(self, outcome: CallOutcome, response: Option<strive_proto::Digest>) {
+    fn new(state: Arc<State>, session: SessionId, call: u64, reservation: Reservation) -> Self {
+        state.gateway_calls.fetch_add(1, Ordering::SeqCst);
+        Self { state, session, call, reservation, started: Instant::now(), finished: false }
+    }
+
+    /// Journals how the call ended; false if that couldn't be recorded.
+    async fn done(mut self, outcome: CallOutcome, response: Option<Digest>) -> bool {
+        self.finished = true;
         let ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
-        if let Err(e) = self.state.sessions.finish_call(&self.session, self.call, outcome, response, ms).await {
+        let recorded = self.state.sessions.finish_call(&self.session, self.call, outcome, response, ms).await;
+        if let Err(e) = &recorded {
             crate::log!(
                 "could not journal the end of call {} (reserved {}): {e:?}",
                 self.call,
                 strive_budget::format_usd(self.reservation.usd_micros)
             );
+        }
+        recorded.is_ok()
+    }
+}
+
+impl Drop for Finish {
+    fn drop(&mut self) {
+        let state = self.state.clone();
+        if !self.finished {
+            let (session, call, r) = (self.session.clone(), self.call, self.reservation);
+            let reason = "the gateway dropped the call unexpectedly".to_string();
+            tokio::spawn(async move {
+                let _ = state.sessions.finish_call(&session, call, broken(&r, reason), None, 0).await;
+            });
+        }
+        let state = self.state.clone();
+        if state.gateway_calls.fetch_sub(1, Ordering::SeqCst) == 1 {
+            tokio::spawn(async move { state.touch().await });
         }
     }
 }

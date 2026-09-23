@@ -25,7 +25,7 @@ fn entry(seq: u64, ts_ms: u64, event: Event) -> Entry {
 
 /// A session with entries 1 (started), 2 ("a") and 3 ("b"), committed.
 fn three(dir: &Path) {
-    let mut j = Journal::create(dir, SESSION, &key(), 1000, started()).unwrap();
+    let mut j = Journal::create(dir, SESSION, &key(), 1000, &[started()]).unwrap();
     j.append(2000, &[msg("a"), msg("b")]).unwrap();
     j.commit().unwrap();
 }
@@ -54,7 +54,7 @@ fn entries_round_trip_through_disk() {
 #[test]
 fn first_line_matches_the_golden_format() {
     let dir = tempfile::tempdir().unwrap();
-    Journal::create(dir.path(), SESSION, &key(), 1000, started()).unwrap();
+    Journal::create(dir.path(), SESSION, &key(), 1000, &[started()]).unwrap();
     assert_eq!(
         lines(dir.path())[0],
         concat!(
@@ -164,7 +164,7 @@ fn opening_recovers_a_torn_line_once() {
 #[test]
 fn entries_written_after_the_last_head_update_are_adopted() {
     let dir = tempfile::tempdir().unwrap();
-    let mut j = Journal::create(dir.path(), SESSION, &key(), 1000, started()).unwrap();
+    let mut j = Journal::create(dir.path(), SESSION, &key(), 1000, &[started()]).unwrap();
     let old_head = fs::read(dir.path().join("head.json")).unwrap();
     j.append(2000, &[msg("a")]).unwrap();
     j.commit().unwrap();
@@ -226,7 +226,7 @@ fn a_forged_head_after_truncation_is_rejected() {
 #[test]
 fn a_head_from_a_different_history_is_rejected() {
     let other = tempfile::tempdir().unwrap();
-    let mut j = Journal::create(other.path(), SESSION, &key(), 1000, started()).unwrap();
+    let mut j = Journal::create(other.path(), SESSION, &key(), 1000, &[started()]).unwrap();
     j.append(2000, &[msg("different")]).unwrap();
     j.commit().unwrap();
 
@@ -261,7 +261,7 @@ fn committing_does_not_follow_a_planted_temp_symlink() {
     let dir = tempfile::tempdir().unwrap();
     let victim = dir.path().join("victim");
     fs::write(&victim, b"precious").unwrap();
-    let mut j = Journal::create(&dir.path().join("s"), SESSION, &key(), 1000, started()).unwrap();
+    let mut j = Journal::create(&dir.path().join("s"), SESSION, &key(), 1000, &[started()]).unwrap();
     std::os::unix::fs::symlink(&victim, dir.path().join("s/head.json.tmp")).unwrap();
     j.append(2000, &[msg("a")]).unwrap();
     j.commit().unwrap();
@@ -278,7 +278,7 @@ fn create_leaves_no_half_made_session() {
     let leftover = dir.path().join(".s.creating");
     fs::create_dir_all(&leftover).unwrap();
     fs::write(leftover.join("journal.jsonl"), b"{\"seq\":1}\n").unwrap();
-    Journal::create(&target, SESSION, &key(), 1000, started()).unwrap();
+    Journal::create(&target, SESSION, &key(), 1000, &[started()]).unwrap();
     let report = read(&target, SESSION, &key()).unwrap();
     assert_eq!((report.problem, report.committed), (None, 1));
     let names: Vec<String> =
@@ -294,7 +294,7 @@ fn a_failed_commit_refuses_further_appends_until_reopened() {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     let s = dir.path().join("s");
-    let mut j = Journal::create(&s, SESSION, &key(), 1000, started()).unwrap();
+    let mut j = Journal::create(&s, SESSION, &key(), 1000, &[started()]).unwrap();
     fs::set_permissions(&s, fs::Permissions::from_mode(0o500)).unwrap();
     j.append(2000, &[msg("a")]).unwrap();
     let failed = j.commit();
@@ -310,4 +310,13 @@ fn a_failed_commit_refuses_further_appends_until_reopened() {
     assert_eq!(entries.iter().map(|e| e.seq).collect::<Vec<_>>(), vec![1, 2]);
     let report = read(&s, SESSION, &key()).unwrap();
     assert_eq!((report.problem, report.committed), (None, 2));
+}
+
+#[test]
+fn a_journal_can_start_with_several_entries_committed_together() {
+    let dir = tempfile::tempdir().unwrap();
+    Journal::create(dir.path(), SESSION, &key(), 1000, &[started(), msg("a"), msg("b")]).unwrap();
+    let report = read(dir.path(), SESSION, &key()).unwrap();
+    assert_eq!((report.problem, report.committed, report.entries.len()), (None, 3, 3));
+    assert!(Journal::create(tempfile::tempdir().unwrap().path(), SESSION, &key(), 1000, &[]).is_err());
 }

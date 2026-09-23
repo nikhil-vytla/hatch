@@ -332,7 +332,8 @@ impl Ledger {
         self.open.values().fold(self.spent_tokens, |a, r| a.saturating_add(r.tokens))
     }
 
-    pub fn reserve(&mut self, call: u64, r: Reservation) -> Result<(), Refusal> {
+    /// Whether `r` fits in what is left, without holding anything.
+    pub fn check(&self, r: Reservation) -> Result<(), Refusal> {
         if let Some(limit) = self.limits.usd_micros {
             let committed = self.committed_usd();
             if committed.saturating_add(r.usd_micros) > limit {
@@ -345,6 +346,16 @@ impl Ledger {
                 return Err(Refusal::Tokens { limit, committed, wanted: r.tokens });
             }
         }
+        Ok(())
+    }
+
+    /// Whether `call` holds a reservation that hasn't been settled.
+    pub fn is_open(&self, call: u64) -> bool {
+        self.open.contains_key(&call)
+    }
+
+    pub fn reserve(&mut self, call: u64, r: Reservation) -> Result<(), Refusal> {
+        self.check(r)?;
         self.open.insert(call, r);
         Ok(())
     }
