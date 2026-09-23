@@ -4,9 +4,17 @@
 import { type AddressInfo, createServer } from "node:net";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { describeError, type MethodName, type Methods, type SessionInfo, StriveClient } from "@strive/protocol";
+import {
+  type Digest,
+  describeError,
+  type Event,
+  type MethodName,
+  type Methods,
+  type SessionInfo,
+  StriveClient,
+} from "@strive/protocol";
 import { HistorySchema, parseJson } from "@strive/workspace";
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, session as electronSession, protocol } from "electron";
+import { app, BrowserWindow, session as electronSession, type IpcMainInvokeEvent, ipcMain, protocol } from "electron";
 import type { Opened, StriveEvent } from "../shared/bridge";
 import { loadWorkspace, saveWorkspace } from "./store";
 
@@ -87,13 +95,21 @@ async function main() {
   let forward: ((event: StriveEvent) => void) | undefined;
   const early: StriveEvent[] = [];
 
+  // The blobs the window may read: ones its own session's journal names.
+  // The content store holds every session's, found by digest alone.
+  const readable = new Set<Digest>();
   const deliver = (event: StriveEvent) => (forward ? forward(event) : early.push(event));
-  client.on("session/entry", (params) => deliver({ method: "session/entry", params }));
+  client.on("session/entry", (params) => {
+    if (params.sessionId === id) for (const d of digestsOf(params.entry.event)) readable.add(d);
+    deliver({ method: "session/entry", params });
+  });
   client.on("session/delta", (params) => deliver({ method: "session/delta", params }));
   client.on("session/interrupt", (params) => deliver({ method: "session/interrupt", params }));
 
   const { session, entries } = await client.request("session/attach", { id });
-  const opened: Opened = { init, session, entries, home: app.getPath("home") };
+
+  for (const entry of entries) for (const d of digestsOf(entry.event)) readable.add(d);
+  const opened: Opened = { init, session, entries, home: app.getPath("home"), platform: process.platform };
 
   await app.whenReady();
   serveWidgets();
@@ -107,8 +123,11 @@ async function main() {
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
+    minWidth: 720,
+    minHeight: 480,
     title: `strive · ${session.cwd}`,
-    backgroundColor: "#15171a",
+    backgroundColor: "#141218",
+    ...(process.platform === "darwin" && { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 17 } }),
     webPreferences: {
       preload: join(built(), "preload.cjs"),
       contextIsolation: true,
@@ -151,6 +170,12 @@ async function main() {
     return client.request<MethodName>(method, bound);
   });
 
+  ipcMain.handle("strive:blob", async (e, digest: Digest) => {
+    if (!fromOurPage(e) || !readable.has(digest)) throw new Error("that output isn't this session's");
+
+    return (await client.request("blob/get", { digest })).text;
+  });
+
   ipcMain.handle("workspace:load", (e) => (fromOurPage(e) ? loadWorkspace(app.getPath("userData")) : undefined));
 
   ipcMain.handle("workspace:save", (e, text: string) => {
@@ -174,6 +199,28 @@ async function main() {
 /** A TCP listener's address: a string only for a pipe, null before it listens. */
 function isInet(a: AddressInfo | string | null): a is AddressInfo {
   return a !== null && typeof a === "object";
+}
+
+/** The content-store blobs an event names that the window shows: tool inputs and outputs. */
+function digestsOf(event: Event): Digest[] {
+  switch (event.type) {
+    case "effectStarted": {
+      const r = event.record;
+
+      return r.kind === "write"
+        ? [r.content]
+        : r.kind === "edit"
+          ? [r.oldText, r.newText]
+          : r.kind === "mcp"
+            ? [r.arguments]
+            : [];
+    }
+
+    case "effectFinished":
+      return event.outcome.kind === "done" ? [event.outcome.output] : [];
+    default:
+      return [];
+  }
 }
 
 /**

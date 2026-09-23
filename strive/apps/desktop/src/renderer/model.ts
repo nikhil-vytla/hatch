@@ -1,9 +1,8 @@
 // A session as the desktop app shows it, folded from its journal entries:
 // the transcript, spend, approvals waiting, checkpoints and recent activity.
-import type { ApprovalMode, Entry } from "@strive/protocol";
-import { describe, type Line, Spend } from "@strive/view";
-
-export type TranscriptLine = Line & { seq: number };
+import type { ApprovalMode, EffectRecord, Entry } from "@strive/protocol";
+import { Spend } from "@strive/view";
+import { Conversation, label } from "./conversation";
 
 export type Activity = { effect: number; what: string; outcome?: "done" | "failed" | "refused" };
 
@@ -11,7 +10,9 @@ export type Activity = { effect: number; what: string; outcome?: "done" | "faile
 export type Proposal = { key: string; label: string; json: string };
 
 export class SessionModel {
-  lines: TranscriptLine[] = [];
+  readonly conversation: Conversation;
+  /** The model the agent last called. */
+  modelName?: string;
   /** Reply text still streaming in, not yet journaled. */
   live = "";
   readonly spend = new Spend();
@@ -27,8 +28,10 @@ export class SessionModel {
 
   constructor(
     private readonly sessionId: string,
-    private readonly home?: string,
-  ) {}
+    home?: string,
+  ) {
+    this.conversation = new Conversation(home);
+  }
 
   /** Folds an entry in; false for one already seen. */
   apply(entry: Entry): boolean {
@@ -37,7 +40,7 @@ export class SessionModel {
     this.spend.apply(entry.event);
     const e = entry.event;
 
-    for (const line of describe(entry, { home: this.home })) this.lines.push({ ...line, seq: entry.seq });
+    this.conversation.apply(entry);
 
     switch (e.type) {
       case "approvalRequested":
@@ -78,7 +81,10 @@ export class SessionModel {
         this.live = "";
         break;
       case "effectStarted":
-        this.activity.push({ effect: e.effect, what: this.lines.at(-1)?.text ?? "" });
+        this.activity.push({ effect: e.effect, what: activity(e.record) });
+        break;
+      case "modelCallStarted":
+        this.modelName = e.model;
         break;
       case "effectFinished": {
         const a = this.activity.find((x) => x.effect === e.effect);
@@ -99,4 +105,8 @@ export class SessionModel {
 
     if (c) c.label = label;
   }
+}
+
+function activity(r: EffectRecord): string {
+  return r.kind === "bash" ? `$ ${r.command}` : `${r.kind} ${label(r)}`;
 }

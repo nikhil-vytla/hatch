@@ -9,7 +9,7 @@ import { type AddressInfo, connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, afterEach, before, test } from "node:test";
-import { _electron as electron, type ElectronApplication, type Page } from "playwright";
+import { type ElectronApplication, _electron as electron, type Page } from "playwright";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 
@@ -136,15 +136,15 @@ function sessionId(cwd: string): string {
 
 test("a prompt typed in the window is journaled and shown", async () => {
   const { app, page, cwd } = await openApp();
-  await page.getByPlaceholder("What should the agent do?").fill("tidy the readme");
+  await page.getByPlaceholder("Ask strive to do anything…").fill("tidy the readme");
   await page.keyboard.press("Enter");
-  await page.getByText("› tidy the readme").waitFor();
+  await page.locator(".msg.user", { hasText: "tidy the readme" }).waitFor();
   const log = JSON.parse(strive("log", sessionId(cwd), "--json"));
   assert.ok(log.entries.some((e: { event: { type: string; text?: string } }) => e.event.text === "tidy the readme"));
   await app.close();
 });
 
-test("an approval waits in its panel and Allow lets the command run", async () => {
+test("an approval waits in the conversation and Allow lets the command run", async () => {
   const { app, page, cwd } = await openApp();
   const agent = await Rpc.open();
   const id = sessionId(cwd);
@@ -153,7 +153,10 @@ test("an approval waits in its panel and Allow lets the command run", async () =
   await page.getByRole("button", { name: "Allow", exact: true }).click();
   const r = await run;
   assert.deepEqual({ text: "allowed\n" }, { text: JSON.parse(JSON.stringify(r.result)).text });
-  await page.getByText("Allowed by strive-desktop").waitFor();
+  await page.locator(".tool .badge", { hasText: "Allowed" }).waitFor();
+  const log = JSON.parse(strive("log", id, "--json"));
+  const decided = log.entries.find((e: { event: { type: string } }) => e.event.type === "approvalDecided");
+  assert.deepEqual([decided?.event.decision, decided?.event.by], ["allow", "strive-desktop"]);
   agent.close();
   await app.close();
 });
@@ -161,9 +164,9 @@ test("an approval waits in its panel and Allow lets the command run", async () =
 test("Rewind in the checkpoints panel puts the files back", async () => {
   const { app, page, cwd } = await openApp();
   writeFileSync(join(cwd, "notes.txt"), "v1");
-  await page.getByPlaceholder("What should the agent do?").fill("first");
+  await page.getByPlaceholder("Ask strive to do anything…").fill("first");
   await page.keyboard.press("Enter");
-  await page.getByText("1 before “first”").waitFor();
+  await page.locator(".checkpoints li", { hasText: "before “first”" }).waitFor();
   writeFileSync(join(cwd, "notes.txt"), "v2");
   await page.locator(".checkpoints li", { hasText: "before “first”" }).getByRole("button", { name: "Rewind" }).click();
   await page.getByText("Rewound to checkpoint 1.").waitFor();
@@ -207,7 +210,7 @@ test("the window has no Node, only the app's bridge", async () => {
   assert.deepEqual(seen, {
     require: false,
     process: false,
-    bridge: ["loadWorkspace", "onClosed", "onEvent", "opened", "request", "saveWorkspace"],
+    bridge: ["blob", "loadWorkspace", "onClosed", "onEvent", "opened", "request", "saveWorkspace"],
   });
   await app.close();
 });
@@ -292,6 +295,52 @@ test("the window can act only on its own session", async () => {
   );
   const own = JSON.parse(strive("log", sessionId(cwd), "--json"));
   assert.ok(own.entries.some((e: { event: { type: string; mode?: string } }) => e.event.mode === "fullAuto"));
+  rpc.close();
+  await app.close();
+});
+
+/** Writes `content` to a file in the session as its host would; the write's content digest. */
+async function written(id: string, content: string): Promise<string> {
+  const host = await Rpc.open();
+  await host.call("host/register", { id });
+  const r = await host.call("effect/run", { id, callId: "w1", request: { kind: "write", path: "w.txt", content } });
+  assert.equal(r.error, undefined, JSON.stringify(r));
+  host.close();
+  const log = JSON.parse(strive("log", id, "--json"));
+  const started = log.entries.find((e: { event: { type: string } }) => e.event.type === "effectStarted");
+
+  return started.event.record.content;
+}
+
+test("the window reads tool output its own session names, and no other session's", async () => {
+  const { app, page, cwd } = await openApp();
+  const rpc = await Rpc.open();
+
+  const other = await rpc.call("session/create", {
+    cwd: realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-other-"))),
+  });
+
+  const theirs = await written(JSON.parse(JSON.stringify(other.result)).id, "the other session's secret");
+  const ours = await written(sessionId(cwd), "ours");
+  await page.locator(".tools-head", { hasText: "Edited 1 file" }).click(); // the window has seen the entry
+  await page.locator(".tool .label", { hasText: "w.txt" }).waitFor();
+
+  // What code in the window could try: the bridge, with any digest.
+  const blob = (digest: string) =>
+    page.evaluate(
+      (d) =>
+        Object.getOwnPropertyDescriptor(window, "strive")
+          ?.value.blob(d)
+          .then(
+            (text: string) => ({ text }),
+            (e: Error) => ({ error: e.message }),
+          ),
+      digest,
+    );
+
+  assert.deepEqual(await blob(ours), { text: "ours" });
+  const refused = await blob(theirs);
+  assert.ok("error" in refused && /isn't this session's/.test(refused.error), JSON.stringify(refused));
   rpc.close();
   await app.close();
 });

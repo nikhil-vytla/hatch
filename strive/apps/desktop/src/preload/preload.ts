@@ -7,6 +7,7 @@ import type { Bridge, StriveEvent } from "../shared/bridge";
 const bridge: Bridge = {
   opened: () => ipcRenderer.invoke("strive:opened"),
   request: (method, params) => ipcRenderer.invoke("strive:request", method, params),
+  blob: (digest) => ipcRenderer.invoke("strive:blob", digest),
   onEvent: (listener) => {
     ipcRenderer.on("strive:event", (_, event: StriveEvent) => listener(event));
   },

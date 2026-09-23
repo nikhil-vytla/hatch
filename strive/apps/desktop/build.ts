@@ -1,7 +1,8 @@
 // Builds the app into out/: the main process and preload script (CommonJS,
 // as Electron loads them) with Bun, and the renderer with Vite.
-import { build as vite } from "vite";
+
 import react from "@vitejs/plugin-react";
+import { build as vite } from "vite";
 
 const here = import.meta.dir;
 

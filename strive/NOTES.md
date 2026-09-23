@@ -524,3 +524,27 @@ Stop-gate review of `884a994`:
 - **What's left:** the failure has to line up with another process's save that
   read the layout before this one's rename. That needs a cross-process lock,
   which isn't worth adding for a UI preference file.
+
+## 2026-09-23: Desktop redesign
+
+The window was a flat log with raw markdown and a per-call cost line after
+every model call. It's now modeled on Zeron (`zeronsh/comet`).
+- **The transcript** is folded from the journal (`renderer/conversation.ts`),
+  not from the TUI's text lines:
+  - prompts are bubbles, and replies are markdown (`markdown.ts`, parsed into
+    React elements, never HTML);
+  - each step's tools collapse into one line ("Ran 1 command · read 1 file")
+    that opens into rows with command output and line diffs for edits;
+  - approvals are answered inline, where the agent asked; the approvals panel
+    lists what's waiting when the conversation is on screen;
+  - each turn ends with "Worked for 4.2s · $0.0188".
+- **Chrome:** the titlebar is merged into the window on macOS, the composer is
+  a floating card with the approval mode and the model inside it, and the
+  palette is dark with a violet tint.
+- **Scoped `blob/get`:** tool output comes from the content store, which is
+  shared by all sessions and addressed by digest alone. The window gets a
+  `blob` bridge call that main allows only for digests named in its own
+  session's journal. A new e2e test reads its own session's blob and is
+  refused another session's; it fails with the check removed.
+- Screenshots came from a scripted session with the real host and a fake
+  model (harness in /tmp/strive-shot, not committed).
