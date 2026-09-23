@@ -5,12 +5,12 @@ one you can review, measure and undo. Proposed changes to its memory and
 skills are gated against the current version before they're kept. Budgets,
 a verifiable session log and an OS sandbox are on by default.
 
-> **Status: early.** Milestones M0 to M3 are done: strive runs a coding
+> **Status: early.** Milestones M0 to M4 are done. strive runs a coding
 > agent in any repository, with a verifiable session journal, budgets,
-> approvals, a sandbox and checkpoints. Project context (AGENTS.md, skills,
-> MCP) arrives in M4. See [ROADMAP.md](docs/ROADMAP.md). See
-> [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation is
-> at git tag `strive-py-final`.
+> approvals, a sandbox and checkpoints. It also reads the project's
+> AGENTS.md and skills and uses MCP servers. The desktop app is next; see
+> [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation
+> is at git tag `strive-py-final`.
 
 ## Install
 
@@ -54,17 +54,28 @@ or for new sessions in `~/.strive/settings.json`:
   "budget": { "usd": 10 },
   "models": {
     "claude-opus-5-5": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000 }
+  },
+  "mcpServers": {
+    "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "..." } }
   }
 }
 ```
 
 Prices are dollars per million tokens. A model without a known price is
-refused rather than guessed.
+refused rather than guessed. `mcpServers` takes the same shape as Claude
+Code's (stdio servers). Each tool call asks first unless approvals are
+full-auto.
+
+The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
+knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or
+`~/.strive/skills`). Long conversations are summarized before they
+outgrow the model's context.
 
 ## Develop
 
 ```sh
-./scripts/check.sh                        # fmt, clippy, tests, protocol drift, tsc, bun test
+./scripts/check.sh                        # fmt, clippy, tests, protocol drift, Biome, Oxlint, tsc, bun test
+./scripts/test-linux.sh                   # the Linux sandbox tests, in a container (podman or docker)
 ./scripts/mutants.sh                      # mutation testing: every surviving mutant is an untested defect
 STRIVE_TUI="bun packages/tui/src/main.ts" cargo run   # run the TUI from source
 ```

@@ -27,4 +27,5 @@ Each feature file has an H1 and one paragraph on the user-visible behavior, then
 - [Daemon lifecycle](./daemon-lifecycle.md) covers `strive status`, `strive stop`, `strive doctor` and automatic daemon start.
 - [Sessions](./sessions.md) covers new, continued and resumed sessions, `strive log`, `strive verify`, `strive sessions` and tamper detection.
 - [The agent](./agent.md) covers turns, tool activity, approvals, interrupting, resuming and rewinding.
+- [MCP servers](./mcp.md) covers the agent's MCP tools, approving calls, servers that fail to start, and what the log shows.
 - [Gateway and budgets](./gateway-and-budgets.md) covers `strive gateway`, live model calls through the gateway, budget refusals, the TUI spend footer, `/budget` and `strive auth`.

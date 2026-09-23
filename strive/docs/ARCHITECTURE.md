@@ -155,11 +155,36 @@ session's budget.
 **Hosts.** When a prompt arrives and no host is registered for the
 session, the daemon starts one: `strive-tui host --session ID`, one binary
 with one runtime. A host registers with `host/register`, which returns the
-agent config (model, gateway URL, limits), then attaches to the session.
-Hosts don't count as clients for idle exit.
+agent config (model, gateway URL, limits, project context, MCP tools), then
+attaches to the session. Hosts don't count as clients for idle exit.
+- One host per session: registration is exclusive.
+- A host must register before it attaches.
+- Only the session's host may record turns or stream text for it.
+- A host can't answer approvals, change approval modes or budgets, or rewind.
 
-**The loop.** The host runs pi-agent-core with four tools: read, write,
-edit and bash.
+**Trust.** The daemon enforces what the agent may *ask* for: every file
+change, command and model call goes through it. The host itself still
+runs as the user, unsandboxed. The host-only restrictions above guard
+against the agent loop's mistakes. They don't stop a hostile host (say, a
+compromised dependency), which could act without the daemon. Confining the
+host process to the daemon's socket and gateway is planned.
+
+**Context.** Registration loads the project's context:
+- **Instructions:** `AGENTS.md` (or `CLAUDE.md`) from the repository root
+  down to the workspace, after `~/.strive/AGENTS.md`.
+- **Skills:** SKILL.md files from `.strive/skills`, `.claude/skills` and
+  `~/.strive/skills`.
+- **MCP servers:** the stdio servers in `mcpServers` in settings.
+  - They are started for the session in its directory, without strive's
+    variables or provider keys.
+  - Each server's process group is killed when the daemon stops.
+- `contextLoaded` journals what was loaded and how each server started.
+- Before a turn, a conversation past `compactAtTokens` is summarized. The
+  summary is journaled as `compacted` and replaces what it covers on
+  resume.
+
+**The loop.** The host runs pi-agent-core with read, write, edit and bash,
+plus each MCP tool as `mcp__server__tool`.
 - Every tool call is an `effect/run` performed by the daemon, in the
   sandbox and subject to approvals.
 - Every model call goes through the session's gateway, with a placeholder
@@ -175,6 +200,54 @@ and a tool call that never ran gets an explicit result.
 - A turn cut off by a host crash is closed as failed.
 - Live reply text travels as `session/delta` and is not journaled.
 - Only people, never hosts, can answer approvals.
+- `turnStarted` records the last prompt the turn took (`throughSeq`). A
+  prompt sent while a turn runs is rebuilt after that turn's reply, and
+  still runs if the host restarts first.
+- Interrupting a turn (Esc, or its time limit) cancels its effects with
+  `effect/cancel`.
+
+## Effects
+
+**Exact paths.** The gate checks a file effect's path with every symlink
+resolved, and the effect acts on that path. It walks the path one
+component at a time with `openat(O_NOFOLLOW)` (`pinned.rs`), so a
+directory swapped for a symlink mid-effect fails it rather than
+redirecting it. Reads open only regular files and stream what they return.
+Writes replace files atomically, each through its own temporary file.
+
+**Cancelling.** `effect/cancel` stops an effect by the agent's call id:
+- one waiting for approval is refused, and approving it later does nothing;
+- a running command's process tree is frozen with SIGSTOP, rescanned until
+  no new process appears, then killed;
+- an MCP call is cancelled at the server too;
+- one not yet running doesn't run.
+
+Shutdown cancels every running effect, and waits for their ends to be
+journaled, before it stops the session writers and releases ownership. No
+command outlives its daemon.
+
+**Workspaces.** Effects and rewinds are coordinated by directory across
+sessions: sessions sharing a directory, or nesting one in another, share
+its files. A rewind is refused while an effect in an overlapping directory
+runs, and effects wait for a rewind to finish.
+
+**The sandbox.**
+- **macOS (Seatbelt):**
+  - Commands may write only in the workspace and temp directories.
+  - strive's home is hidden.
+  - There is no network, and that includes Unix sockets.
+  - Without PID namespaces, a background job that leaves the command's
+    process group and detaches can outlive a command that exits normally.
+    Timeouts and cancels kill the whole tree.
+- **Linux (bubblewrap):**
+  - Commands get their own PID namespace, so every process dies with the
+    command.
+  - `/tmp` and `/run` are private, which keeps the user's D-Bus, systemd,
+    X11 and Docker sockets out of reach.
+  - There is no network.
+  - A seccomp filter refuses `socket(AF_UNIX)`, matching macOS.
+  - `scripts/test-linux.sh` runs these tests in a container.
+- Where there is no sandbox, every command asks first.
 
 ## Approvals and checkpoints
 
@@ -190,5 +263,10 @@ one attached, the request is refused at once.
 
 **Checkpoints** snapshot the workspace before each prompt, into a shadow
 git repository in the session's directory. The user's own repository,
-config and hooks never take part. A rewind first saves the current files,
-so it can be undone.
+config and hooks never take part.
+- **What they skip:** ignored files and nested repositories. A rewind that
+  would overwrite either is refused, with names compared without case. A
+  rewind leaves nested repositories alone and reports them.
+- **Undo:** a rewind first saves the current files as a checkpoint, and
+  journals it before restoring. Even a restore that fails partway can be
+  undone with `/rewind N`.
