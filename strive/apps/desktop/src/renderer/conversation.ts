@@ -191,15 +191,24 @@ export function summarize(tools: readonly Tool[]): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** One tool in a few words, for its row. */
-export function label(record: EffectRecord): string {
+/** A path inside the workspace written from it; others as they are. */
+export function relative(path: string, workspace?: string): string {
+  if (!workspace) return path;
+
+  const root = workspace.endsWith("/") ? workspace : `${workspace}/`;
+
+  return path.startsWith(root) ? path.slice(root.length) : path === workspace ? "." : path;
+}
+
+/** One tool in a few words, for its row. Paths, and commands' mentions of the workspace, are relative to it. */
+export function label(record: EffectRecord, workspace?: string): string {
   switch (record.kind) {
     case "bash":
-      return record.command;
+      return workspace ? record.command.replaceAll(`${workspace}/`, "") : record.command;
     case "read":
     case "edit":
     case "write":
-      return record.path;
+      return relative(record.path, workspace);
     case "mcp":
       return `${record.server} · ${record.tool}`;
     default:

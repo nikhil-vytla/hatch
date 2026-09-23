@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Entry, Event } from "@strive/protocol";
-import { Conversation, summarize } from "./conversation";
+import { Conversation, label, summarize } from "./conversation";
 
 const digest = "sha256:00";
 
@@ -128,4 +128,14 @@ test("an approval cancelled with its command (an interrupt) stops waiting, thoug
   expect(c.waiting()).toEqual([]);
   const tools = c.items[0];
   expect(tools?.kind === "tools" && tools.tools[0]?.status).toBe("refused");
+});
+
+test("paths in the workspace are shown from it, and others as they are", () => {
+  const ws = "/private/tmp/ws";
+  expect(label({ kind: "read", path: "/private/tmp/ws/src/a.ts" }, ws)).toBe("src/a.ts");
+  expect(label({ kind: "read", path: "/etc/hosts" }, ws)).toBe("/etc/hosts");
+  expect(label({ kind: "read", path: "/private/tmp/wsx/a.ts" }, ws)).toBe("/private/tmp/wsx/a.ts");
+  expect(label({ kind: "bash", command: "cd /private/tmp/ws/src && bun test", timeoutMs: 1 }, ws)).toBe(
+    "cd src && bun test",
+  );
 });

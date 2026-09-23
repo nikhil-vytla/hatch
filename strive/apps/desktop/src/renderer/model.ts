@@ -13,6 +13,8 @@ export class SessionModel {
   readonly conversation: Conversation;
   /** The model the agent last called. */
   modelName?: string;
+  /** The session's directory, which paths are shown from. */
+  workspace?: string;
   /** Reply text still streaming in, not yet journaled. */
   live = "";
   readonly spend = new Spend();
@@ -72,8 +74,11 @@ export class SessionModel {
       case "assistantMessage":
         this.live = "";
         break;
+      case "sessionStarted":
+        this.workspace = e.cwd;
+        break;
       case "effectStarted":
-        this.activity.push({ effect: e.effect, what: activity(e.record) });
+        this.activity.push({ effect: e.effect, what: activity(e.record, this.workspace) });
         break;
       case "modelCallStarted":
         this.modelName = e.model;
@@ -99,6 +104,6 @@ export class SessionModel {
   }
 }
 
-function activity(r: EffectRecord): string {
-  return r.kind === "bash" ? `$ ${r.command}` : `${r.kind} ${label(r)}`;
+function activity(r: EffectRecord, workspace?: string): string {
+  return r.kind === "bash" ? `$ ${label(r, workspace)}` : `${r.kind} ${label(r, workspace)}`;
 }

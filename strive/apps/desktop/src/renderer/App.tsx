@@ -139,6 +139,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
     rewind: (checkpoint) => act(bridge.request("session/rewind", { id, checkpoint })),
     setMode: (mode) => act(bridge.request("session/approvals", { id, mode })),
     blob: (digest) => bridge.blob(digest),
+    workspace: opened.session.cwd,
   };
 
   return (
@@ -309,6 +310,8 @@ type SessionActions = {
   rewind: (checkpoint: number) => void;
   setMode: (mode: ApprovalMode) => void;
   blob: (digest: Digest) => Promise<string>;
+  /** The session's directory, which paths are shown from. */
+  workspace: string;
 };
 
 /** Dollars as people read them: cents from a dollar up, four places below. */
@@ -896,7 +899,7 @@ function ToolRow({ tool, session }: { tool: Tool; session: SessionActions }) {
     <div className={`tool ${tool.status}`} data-effect={tool.effect}>
       <button type="button" className="tool-head" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Icon name={KIND_ICON[tool.record.kind]} />
-        <span className="mono label">{label(tool.record)}</span>
+        <span className="mono label">{label(tool.record, session.workspace)}</span>
         {tool.approval?.decided && <span className="badge">{DECIDED[tool.approval.decided]}</span>}
         {tool.status === "failed" && tool.exitCode !== undefined && (
           <span className="badge bad">exit {tool.exitCode}</span>
