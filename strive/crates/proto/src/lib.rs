@@ -79,6 +79,8 @@ methods! {
     AuthStatus = "auth/status" (Empty) -> AuthStatusResult;
     EffectRun = "effect/run" (EffectRunParams) -> EffectRunResult;
     BlobGet = "blob/get" (BlobGetParams) -> BlobGetResult;
+    SessionApprovals = "session/approvals" (SessionApprovalsParams) -> Appended;
+    ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -405,6 +407,23 @@ pub struct EffectRunResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
+pub struct SessionApprovalsParams {
+    pub id: String,
+    pub mode: ApprovalMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ApprovalRespondParams {
+    pub id: String,
+    pub effect: u64,
+    pub decision: Decision,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct BlobGetParams {
     pub digest: Digest,
 }
@@ -482,6 +501,45 @@ pub enum Event {
         outcome: EffectOutcome,
         duration_ms: u64,
     },
+    /// What the agent may do without asking, from here on.
+    ApprovalModeSet {
+        mode: ApprovalMode,
+    },
+    /// An effect waits for a person to allow or decline it.
+    ApprovalRequested {
+        effect: u64,
+        description: String,
+    },
+    ApprovalDecided {
+        effect: u64,
+        decision: Decision,
+        /// The client that decided.
+        by: String,
+    },
+}
+
+/// What the agent may do without asking. Writes outside the workspace
+/// always ask; strive's own state is never allowed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ApprovalMode {
+    /// Reading is free; every change and command asks.
+    Ask,
+    /// Changes inside the workspace are free; commands ask.
+    AutoEdit,
+    /// Everything inside the workspace and the sandbox is free.
+    FullAuto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Decision {
+    Allow,
+    /// Allow this and switch the session to full-auto.
+    AllowSession,
+    Deny,
 }
 
 /// What the agent asked the daemon to do, as the protocol carries it.

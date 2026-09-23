@@ -28,6 +28,8 @@ impl Ws {
         let mut c = env.rpc();
         let cwd = dir.path().canonicalize().unwrap();
         let id = c.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+        // These tests are about effects themselves; approvals have their own.
+        c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
         Self { env, dir, id, c }
     }
     fn path(&self, rel: &str) -> PathBuf {
@@ -120,7 +122,13 @@ fn writes_outside_the_workspace_are_refused() {
     let target = outside.path().join("x.txt");
     let (kind, text) = w.kind(json!({"kind": "write", "path": target, "content": "no"}));
     assert_eq!(kind, "refused");
-    assert!(text.starts_with("writing outside the workspace needs approval"), "{text}");
+    assert!(text.starts_with("write outside the workspace: "), "{text}");
+    assert!(
+        text.ends_with(
+            "needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
+        ),
+        "{text}"
+    );
     assert!(!target.exists());
     let (kind, _) = w.kind(json!({"kind": "write", "path": "../escape.txt", "content": "no"}));
     assert_eq!(kind, "refused");
@@ -254,4 +262,24 @@ fn the_sandbox_blocks_the_network() {
     let mut w = Ws::new();
     let cmd = format!("(exec 3<>/dev/tcp/127.0.0.1/{port}) 2>/dev/null; echo status=$?");
     assert_eq!(w.text(json!({"kind": "bash", "command": cmd})), "status=1\n");
+}
+
+#[test]
+fn an_effect_in_a_session_whose_directory_is_gone_says_so() {
+    let env = Env::new();
+    let gone = tempfile::tempdir().unwrap();
+    let cwd = gone.path().canonicalize().unwrap();
+    let mut c = env.rpc();
+    let id = c.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    drop(gone);
+    let r = c.call("effect/run", &json!({"id": id, "callId": "c", "request": {"kind": "read", "path": "a"}}));
+    assert_eq!(
+        r["error"]["message"],
+        format!("the session's directory {} is missing: No such file or directory (os error 2)", cwd.display())
+    );
+    let entries = c.ok("session/read", &json!({"id": id}))["entries"].clone();
+    assert!(
+        !entries.as_array().unwrap().iter().any(|e| e["event"]["type"] == "effectStarted"),
+        "nothing is journaled for an effect that couldn't begin"
+    );
 }

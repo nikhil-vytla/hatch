@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
 import { StriveClient } from "@strive/protocol";
@@ -29,6 +29,7 @@ async function openUi(mode: SessionMode = "new"): Promise<Ui> {
 beforeEach(() => {
   daemon = startDaemon();
   uis = [];
+  mkdirSync(CWD, { recursive: true });
 });
 
 afterEach(() => {
@@ -62,7 +63,7 @@ test("a prompt is shown from the journal and is in `strive log`", async () => {
   await ui.term.waitFor("› fix the flaky test");
   await ui.term.waitFor("Saved to this session. No agent is connected yet");
   const log = daemon.strive("log", sessions()[0]!.id);
-  expect(log.stdout).toMatch(/\n#3 \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
+    expect(log.stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
 });
 
 test("the missing-agent note appears once, not per prompt", async () => {
@@ -114,7 +115,7 @@ test("resuming a tampered session explains why and saves nothing", async () => {
   daemon.strive("status");
 
   const ui = await openUi({ resume: id });
-  await ui.term.waitFor("This session's journal failed verification: entry 3 was modified, removed or moved.");
+    await ui.term.waitFor("This session's journal failed verification: entry 4 was modified, removed or moved.");
   await enter(ui, "should not be saved");
   await Bun.sleep(100);
   expect(readFileSync(journal, "utf8")).toBe(before);
@@ -191,7 +192,7 @@ test("/budget changes the session's limit, in the journal too", async () => {
   await enter(ui, "/budget 2.5");
   await ui.term.waitFor("$0.0000 of $2.5000");
   expect(await footer(ui)).toBe("$0.0000 of $2.5000");
-  expect(daemon.strive("log", sessions()[0]!.id).stdout).toMatch(/\n#3 \d\d:\d\d:\d\d {2}budget: \$2\.5000\n/);
+    expect(daemon.strive("log", sessions()[0]!.id).stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}budget: \$2\.5000\n/);
   await enter(ui, "/budget off");
   await ui.term.waitFor("$0.0000 spent · no budget");
 });
@@ -200,4 +201,58 @@ test("/budget explains its arguments", async () => {
   const ui = await openUi();
   await enter(ui, "/budget lots");
   await ui.term.waitFor("Use /budget <dollars>, for example /budget 10, or /budget off.");
+});
+
+/** Starts an effect for the session from another client, as the agent would. */
+async function agentRuns(request: Record<string, unknown>) {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
+  const id = sessions()[0]!.id;
+  const done = client.request("effect/run", { id, callId: "call_1", request: request as never });
+  return { done, close: () => client.close() };
+}
+
+test("a command waiting for approval is shown and y allows it", async () => {
+  const ui = await openUi();
+  const agent = await agentRuns({ kind: "bash", command: "echo approved" });
+  await ui.term.waitFor("Allow run: echo approved?  y yes · a yes for this session · n no");
+  ui.term.type("y");
+  const r = await agent.done;
+  expect(r.text).toBe("approved\n");
+  await ui.term.waitFor("Allowed by tui-test");
+  const screen = await ui.term.screen();
+  expect(screen.some((l) => l.includes("y yes · a yes for this session"))).toBe(false);
+  agent.close();
+});
+
+test("n declines a command, which then doesn't run", async () => {
+  const ui = await openUi();
+  const agent = await agentRuns({ kind: "bash", command: "touch nope.txt" });
+  await ui.term.waitFor("Allow run: touch nope.txt?");
+  ui.term.type("n");
+  const r = await agent.done;
+  expect(r.outcome).toEqual({ kind: "refused", reason: "declined: run: touch nope.txt" });
+  await ui.term.waitFor("Declined by tui-test");
+  agent.close();
+});
+
+test("a allows for the rest of the session", async () => {
+  const ui = await openUi();
+  const first = await agentRuns({ kind: "bash", command: "echo one" });
+  await ui.term.waitFor("Allow run: echo one?");
+  ui.term.type("a");
+  expect((await first.done).text).toBe("one\n");
+  await ui.term.waitFor("Approvals: full-auto");
+  const second = await agentRuns({ kind: "bash", command: "echo two" });
+  expect((await second.done).text).toBe("two\n");
+  first.close();
+  second.close();
+});
+
+test("/approvals switches the mode", async () => {
+  const ui = await openUi();
+  await ui.term.waitFor("Approvals: auto-edit");
+  await enter(ui, "/approvals ask");
+  await ui.term.waitFor("Approvals: ask");
+  await enter(ui, "/approvals sometimes");
+  await ui.term.waitFor("Use /approvals ask, /approvals auto-edit or /approvals full-auto.");
 });

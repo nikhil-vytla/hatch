@@ -37,6 +37,9 @@ export class Spend {
       case "recovered":
       case "effectStarted":
       case "effectFinished":
+      case "approvalModeSet":
+      case "approvalRequested":
+      case "approvalDecided":
         return;
     }
   }

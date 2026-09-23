@@ -23,10 +23,13 @@ export { formatUsd };
 export const COMMANDS: SlashCommand[] = [
   { name: "status", description: "Show the daemon's status" },
   { name: "session", description: "Show this session's id and how to resume it" },
-  { name: "budget", description: "Set this session's spending limit: /budget 10, or /budget off", argumentHint: "<dollars>|off" },
+    { name: "budget", description: "Set this session's spending limit: /budget 10, or /budget off", argumentHint: "<dollars>|off" },
+  { name: "approvals", description: "What the agent may do without asking: ask, auto-edit or full-auto", argumentHint: "<mode>" },
   { name: "help", description: "List commands and keys" },
   { name: "quit", description: "Exit strive (the daemon keeps running)" },
 ];
+
+export const MODE_NAMES = { ask: "ask", autoEdit: "auto-edit", fullAuto: "full-auto" } as const;
 
 /** Which session to open: `new`, `continue` (latest in this directory), or an id. */
 export type SessionMode = "new" | "continue" | { resume: string };
@@ -78,6 +81,14 @@ export function describe(entry: Entry): string {
         case "interrupted":
           return style.danger("Interrupted: the daemon stopped while this ran.");
       }
+    case "approvalModeSet":
+      return style.faint(`Approvals: ${MODE_NAMES[e.mode]}`);
+    case "approvalRequested":
+      return style.accent(`Allow ${e.description}?`);
+    case "approvalDecided":
+      return style.faint(
+        `${e.decision === "deny" ? "Declined" : e.decision === "allowSession" ? "Allowed for this session" : "Allowed"} by ${e.by}`,
+      );
   }
 }
 
@@ -93,7 +104,11 @@ export class App {
   readonly transcript = new Container();
   readonly editor: Editor;
   private readonly header = new Text("", 1, 0);
-  private readonly footer = new Text("", 1, 0);
+    private readonly footer = new Text("", 1, 0);
+  /** The approval line shown while an effect waits for a decision. */
+  private readonly prompt = new Text("", 1, 0);
+  /** Effects waiting for a decision, oldest first. */
+  private readonly pending = new Map<number, string>();
   private readonly spend = new Spend();
   private readonly offClose: () => void;
   private session?: SessionInfo;
@@ -119,14 +134,23 @@ export class App {
 
     tui.addChild(this.header);
     tui.addChild(new Spacer(1));
-    tui.addChild(this.transcript);
+        tui.addChild(this.transcript);
+    tui.addChild(this.prompt);
     tui.addChild(this.editor);
     tui.addChild(this.footer);
     tui.setFocus(this.editor);
 
     tui.addInputListener((data) => {
-      if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
+            if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
         this.quit(0);
+        return { consume: true };
+      }
+      const decision = { y: "allow", a: "allowSession", n: "deny" }[data];
+      const oldest = this.pending.keys().next();
+      if (decision && !oldest.done && this.session) {
+        this.client
+          .request("approval/respond", { id: this.session.id, effect: oldest.value, decision: decision as never })
+          .catch((e) => this.say(style.danger((e as Error).message)));
         return { consume: true };
       }
       return undefined;
@@ -183,10 +207,17 @@ export class App {
     this.tui.requestRender();
   }
 
-  private show(entry: Entry) {
+    private show(entry: Entry) {
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
     this.spend.apply(entry.event);
+    const e = entry.event;
+    if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
+    if (e.type === "approvalDecided") this.pending.delete(e.effect);
+    const next = this.pending.values().next();
+    this.prompt.setText(
+      next.done ? "" : `${style.accent(`Allow ${next.value}?`)}  ${style.muted("y yes · a yes for this session · n no")}`,
+    );
     this.footer.setText(style.muted(this.spend.summary()));
     this.say(describe(entry));
   }
@@ -238,6 +269,16 @@ export class App {
         }
         const usdMicros = dollars === undefined ? undefined : Math.round(dollars * 1_000_000);
         await this.client.request("session/budget", { id: this.session.id, usdMicros, tokens: this.spend.tokenLimit });
+        return;
+      }
+            case "approvals": {
+        const arg = text.slice(1).split(/\s+/)[1] ?? "";
+        const mode = ({ ask: "ask", "auto-edit": "autoEdit", "full-auto": "fullAuto" } as const)[arg as "ask"];
+        if (!mode) {
+          this.say(style.danger("Use /approvals ask, /approvals auto-edit or /approvals full-auto."));
+          return;
+        }
+        await this.client.request("session/approvals", { id: this.session.id, mode });
         return;
       }
       case "session":

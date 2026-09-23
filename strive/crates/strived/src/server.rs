@@ -180,7 +180,7 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
 
     let mut reader = BufReader::new(read);
     let mut line = String::new();
-    let mut conn = Conn::new(tx.clone());
+    let conn = Arc::new(Conn::new(&tx));
     loop {
         line.clear();
         let n = reader.read_line(&mut line).await?;
@@ -194,21 +194,32 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
         if line.trim().is_empty() {
             continue;
         }
-        let reply = match serde_json::from_str::<Message>(&line) {
-            Err(e) => Some(Message::err(None, RpcError::new(RpcError::PARSE_ERROR, e.to_string()))),
-            Ok(msg) => match (msg.id, msg.method) {
-                (Some(id), Some(method)) => Some(methods::dispatch(state, &mut conn, id, &method, msg.params).await),
-                // Client notifications and responses to server requests: none defined yet.
-                _ => None,
-            },
-        };
-        if let Some(reply) = reply {
-            let _ = tx.send(reply);
+        match serde_json::from_str::<Message>(&line) {
+            Err(e) => {
+                let _ = tx.send(Message::err(None, RpcError::new(RpcError::PARSE_ERROR, e.to_string())));
+            }
+            Ok(Message { id: Some(id), method: Some(method), params, .. }) => {
+                // The handshake runs in order; after it, requests run
+                // concurrently, so one waiting for approval (or a long
+                // command) never holds up the rest.
+                if conn.initialized() {
+                    let (state, conn) = (state.clone(), conn.clone());
+                    tokio::spawn(async move {
+                        let reply = methods::dispatch(&state, &conn, id, &method, params).await;
+                        conn.send(reply);
+                    });
+                } else {
+                    let reply = methods::dispatch(state, &conn, id, &method, params).await;
+                    let _ = tx.send(reply);
+                }
+            }
+            // Client notifications and responses to server requests: none defined yet.
+            Ok(_) => {}
         }
     }
-    // The writer ends when every sender is gone; `conn` and its session
-    // subscriptions hold some.
-    drop(conn);
+    // The writer ends when the last strong sender, `tx`, is gone; `conn`
+    // and everything it spawned hold only weak ones.
+    conn.close();
     drop(tx);
     let _ = writer.await;
     Ok(())

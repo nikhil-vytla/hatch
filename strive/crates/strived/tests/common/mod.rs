@@ -102,8 +102,15 @@ impl Rpc {
     }
     /// Sends one line and returns the next response, keeping notifications.
     pub fn send_raw(&mut self, line: &str) -> Value {
+        self.send_line(line);
+        self.next_response()
+    }
+    pub fn send_line(&mut self, line: &str) {
         self.w.write_all(line.as_bytes()).unwrap();
         self.w.write_all(b"\n").unwrap();
+    }
+    /// The next response on this connection, keeping notifications.
+    pub fn next_response(&mut self) -> Value {
         loop {
             let v = self.read();
             if v.get("method").is_some() && v.get("id").is_none() {

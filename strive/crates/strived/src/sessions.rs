@@ -17,7 +17,9 @@ use std::sync::Mutex as StdMutex;
 
 use strive_budget::{Ledger, Limits, Refusal, Reservation, charge, open_calls};
 use strive_journal::{Journal, Key, OpenError, Problem, Report};
-use strive_proto::{CallOutcome, Digest, EffectOutcome, EffectRecord, Entry, Event, SessionInfo};
+use strive_proto::{
+    ApprovalMode, CallOutcome, Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, SessionInfo,
+};
 use tokio::sync::{Mutex, mpsc, oneshot};
 
 use crate::server::epoch_ms;
@@ -103,6 +105,25 @@ enum Cmd {
         duration_ms: u64,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
+    SetMode {
+        mode: ApprovalMode,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
+    GetMode {
+        reply: oneshot::Sender<ApprovalMode>,
+    },
+    /// Journals an approval request; replies with how many attached clients received it.
+    Ask {
+        effect: u64,
+        description: String,
+        reply: oneshot::Sender<io::Result<usize>>,
+    },
+    Decide {
+        effect: u64,
+        decision: Decision,
+        by: String,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
     StartEffect {
         call_id: String,
         record: EffectRecord,
@@ -134,6 +155,21 @@ pub struct Sessions {
     key: Key,
     ids: StdMutex<ulid::Generator>,
     live: Mutex<HashMap<SessionId, Live>>,
+    /// Effects waiting for a person's decision.
+    pending: StdMutex<HashMap<(SessionId, u64), oneshot::Sender<Decision>>>,
+}
+
+#[derive(Debug)]
+pub enum DecideError {
+    /// No approval is pending for that effect: unknown, or already decided.
+    NotPending,
+    Session(SessionError),
+}
+
+impl From<SessionError> for DecideError {
+    fn from(e: SessionError) -> Self {
+        DecideError::Session(e)
+    }
 }
 
 impl Sessions {
@@ -145,6 +181,7 @@ impl Sessions {
             root,
             ids: StdMutex::new(ulid::Generator::new()),
             live: Mutex::new(HashMap::new()),
+            pending: StdMutex::new(HashMap::new()),
         })
     }
 
@@ -152,8 +189,8 @@ impl Sessions {
         self.root.join(id.as_str())
     }
 
-    /// Creates a session whose budget starts at `limits`.
-    pub async fn create(&self, cwd: String, limits: Limits) -> Result<SessionInfo> {
+    /// Creates a session whose budget starts at `limits` and approvals at `mode`.
+    pub async fn create(&self, cwd: String, limits: Limits, mode: ApprovalMode) -> Result<SessionInfo> {
         let id = {
             let mut g = self.ids.lock().expect("id generator lock");
             SessionId(g.generate().map_err(|e| io::Error::other(e.to_string()))?.to_string())
@@ -173,7 +210,7 @@ impl Sessions {
         let (journal, entries) = tokio::task::spawn_blocking(move || {
             let mut j = Journal::create(&dir, sid.as_str(), &key, ts, first.clone())?;
             let mut entries = vec![Entry { seq: 1, ts_ms: ts, event: first }];
-            entries.extend(j.append(ts, &[budget])?);
+            entries.extend(j.append(ts, &[budget, Event::ApprovalModeSet { mode }])?);
             j.commit()?;
             io::Result::Ok((j, entries))
         })
@@ -266,6 +303,58 @@ impl Sessions {
         Ok(self.writer(id).await?.0)
     }
 
+    pub async fn set_mode(&self, id: &SessionId, mode: ApprovalMode) -> Result<Vec<Entry>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::SetMode { mode, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    pub async fn mode(&self, id: &SessionId) -> Result<ApprovalMode> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::GetMode { reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())
+    }
+
+    /// Asks attached clients to decide on an effect and waits for the answer.
+    /// `None` when no client is attached to answer.
+    pub async fn ask(&self, id: &SessionId, effect: u64, description: String) -> Result<Option<Decision>> {
+        let (decided, answer) = oneshot::channel();
+        self.pending.lock().expect("pending approvals").insert((id.clone(), effect), decided);
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Ask { effect, description, reply }).map_err(|_| writer_gone())?;
+        let delivered = rx.await.map_err(|_| writer_gone())??;
+        if delivered == 0 {
+            self.pending.lock().expect("pending approvals").remove(&(id.clone(), effect));
+            return Ok(None);
+        }
+        Ok(Some(answer.await.unwrap_or(Decision::Deny)))
+    }
+
+    /// Records a person's decision and lets the waiting effect go on.
+    pub async fn decide(
+        &self,
+        id: &SessionId,
+        effect: u64,
+        decision: Decision,
+        by: String,
+    ) -> std::result::Result<(), DecideError> {
+        let waiting = self
+            .pending
+            .lock()
+            .expect("pending approvals")
+            .remove(&(id.clone(), effect))
+            .ok_or(DecideError::NotPending)?;
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Decide { effect, decision, by, reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())?.map_err(SessionError::Io)?;
+        let _ = waiting.send(decision);
+        Ok(())
+    }
+
     /// Journals an effect as started and returns its number.
     pub async fn start_effect(&self, id: &SessionId, call_id: String, record: EffectRecord) -> Result<u64> {
         let (_, tx) = self.writer(id).await?;
@@ -350,7 +439,18 @@ fn writer_gone() -> SessionError {
 type Verifier = Box<dyn Fn() -> io::Result<Report> + Send>;
 
 /// Runs after the batch commits, with the entries its command appended.
-type Done = Box<dyn FnOnce(io::Result<Vec<Entry>>) + Send>;
+/// Given the entries and how many attached clients received the last one.
+type Done = Box<dyn FnOnce(io::Result<Vec<Entry>>, usize) + Send>;
+
+/// What a command asks of the writer.
+enum Staged {
+    /// Entries to append, and what to do once they are committed.
+    Events(Vec<Event>, Done),
+    /// A new subscriber, answered after the batch commits.
+    Attach(u64, AttachReply),
+    /// Answered already; nothing to append.
+    Handled,
+}
 
 struct Writer {
     journal: Journal,
@@ -358,6 +458,7 @@ struct Writer {
     ledger: Ledger,
     next_call: u64,
     next_effect: u64,
+    mode: ApprovalMode,
     subscribers: Vec<mpsc::UnboundedSender<Entry>>,
     verify: Verifier,
 }
@@ -387,12 +488,21 @@ fn spawn_writer(
         .max()
         .unwrap_or(0)
         + 1;
+    let mode = events
+        .iter()
+        .rev()
+        .find_map(|e| match e {
+            Event::ApprovalModeSet { mode } => Some(*mode),
+            _ => None,
+        })
+        .unwrap_or(ApprovalMode::AutoEdit);
     let w = Writer {
         journal,
         entries,
         ledger: Ledger::replay(&events),
         next_call,
         next_effect,
+        mode,
         subscribers: Vec::new(),
         verify,
     };
@@ -420,60 +530,18 @@ impl Writer {
             let mut attaches = Vec::new();
             let mut failed = false;
             for cmd in batch {
-                let (events, done): (Vec<Event>, Done) = match cmd {
-                    Cmd::Append { events, reply } => (events, Box::new(move |r| drop(reply.send(r)))),
-                    Cmd::SetBudget { limits, reply } => {
-                        self.ledger.set_limits(limits);
-                        let e = Event::BudgetSet { usd_micros: limits.usd_micros, tokens: limits.tokens };
-                        (vec![e], Box::new(move |r| drop(reply.send(r))))
-                    }
-                    Cmd::StartCall { start, reply } => {
-                        let call = self.next_call;
-                        if let Err(refusal) = self.ledger.reserve(call, start.reservation) {
-                            let _ = reply.send(Err(CallError::Refused(refusal)));
-                            continue;
-                        }
-                        self.next_call += 1;
-                        let e = Event::ModelCallStarted {
-                            call,
-                            provider: start.provider,
-                            model: start.model,
-                            request: start.request,
-                            reserved_usd_micros: start.reservation.usd_micros,
-                            reserved_tokens: start.reservation.tokens,
-                        };
-                        let done: Done = Box::new(move |r: io::Result<Vec<Entry>>| {
-                            let _ = reply.send(r.map(|_| call).map_err(|e| CallError::Session(SessionError::Io(e))));
-                        });
-                        (vec![e], done)
-                    }
-                    Cmd::FinishCall { call, outcome, response, duration_ms, reply } => {
-                        let (usd, tokens) = charge(&outcome);
-                        self.ledger.settle(call, usd, tokens);
-                        let e = Event::ModelCallFinished { call, outcome, response, duration_ms };
-                        (vec![e], Box::new(move |r| drop(reply.send(r))))
-                    }
-                    Cmd::StartEffect { call_id, record, reply } => {
-                        let effect = self.next_effect;
-                        self.next_effect += 1;
-                        let done: Done = Box::new(move |r: io::Result<Vec<Entry>>| {
-                            let _ = reply.send(r.map(|_| effect));
-                        });
-                        (vec![Event::EffectStarted { effect, call_id, record }], done)
-                    }
-                    Cmd::FinishEffect { effect, outcome, duration_ms, reply } => (
-                        vec![Event::EffectFinished { effect, outcome, duration_ms }],
-                        Box::new(move |r| drop(reply.send(r))),
-                    ),
-                    Cmd::Attach { after_seq, reply } => {
+                let (events, done) = match self.stage(cmd) {
+                    Staged::Events(events, done) => (events, done),
+                    Staged::Attach(after_seq, reply) => {
                         attaches.push((after_seq, reply));
                         continue;
                     }
+                    Staged::Handled => continue,
                 };
                 match self.journal.append(ts, &events) {
                     Ok(es) => staged.push((done, es)),
                     Err(e) => {
-                        done(Err(e));
+                        done(Err(e), 0);
                         failed = true;
                     }
                 }
@@ -485,6 +553,80 @@ impl Writer {
                 return;
             }
         }
+    }
+
+    /// Applies one command to the writer's state and returns what to append.
+    fn stage(&mut self, cmd: Cmd) -> Staged {
+        let (events, done): (Vec<Event>, Done) = match cmd {
+            Cmd::Append { events, reply } => (events, Box::new(move |r, _| drop(reply.send(r)))),
+            Cmd::SetMode { mode, reply } => {
+                self.mode = mode;
+                (vec![Event::ApprovalModeSet { mode }], Box::new(move |r, _| drop(reply.send(r))))
+            }
+            Cmd::GetMode { reply } => {
+                let _ = reply.send(self.mode);
+                return Staged::Handled;
+            }
+            Cmd::Ask { effect, description, reply } => {
+                let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, delivered| {
+                    let _ = reply.send(r.map(|_| delivered));
+                });
+                (vec![Event::ApprovalRequested { effect, description }], done)
+            }
+            Cmd::Decide { effect, decision, by, reply } => {
+                let mut events = vec![Event::ApprovalDecided { effect, decision, by }];
+                if decision == Decision::AllowSession {
+                    self.mode = ApprovalMode::FullAuto;
+                    events.push(Event::ApprovalModeSet { mode: ApprovalMode::FullAuto });
+                }
+                (events, Box::new(move |r, _| drop(reply.send(r))))
+            }
+            Cmd::SetBudget { limits, reply } => {
+                self.ledger.set_limits(limits);
+                let e = Event::BudgetSet { usd_micros: limits.usd_micros, tokens: limits.tokens };
+                (vec![e], Box::new(move |r, _| drop(reply.send(r))))
+            }
+            Cmd::StartCall { start, reply } => {
+                let call = self.next_call;
+                if let Err(refusal) = self.ledger.reserve(call, start.reservation) {
+                    let _ = reply.send(Err(CallError::Refused(refusal)));
+                    return Staged::Handled;
+                }
+                self.next_call += 1;
+                let e = Event::ModelCallStarted {
+                    call,
+                    provider: start.provider,
+                    model: start.model,
+                    request: start.request,
+                    reserved_usd_micros: start.reservation.usd_micros,
+                    reserved_tokens: start.reservation.tokens,
+                };
+                let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, _| {
+                    let _ = reply.send(r.map(|_| call).map_err(|e| CallError::Session(SessionError::Io(e))));
+                });
+                (vec![e], done)
+            }
+            Cmd::FinishCall { call, outcome, response, duration_ms, reply } => {
+                let (usd, tokens) = charge(&outcome);
+                self.ledger.settle(call, usd, tokens);
+                let e = Event::ModelCallFinished { call, outcome, response, duration_ms };
+                (vec![e], Box::new(move |r, _| drop(reply.send(r))))
+            }
+            Cmd::StartEffect { call_id, record, reply } => {
+                let effect = self.next_effect;
+                self.next_effect += 1;
+                let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, _| {
+                    let _ = reply.send(r.map(|_| effect));
+                });
+                (vec![Event::EffectStarted { effect, call_id, record }], done)
+            }
+            Cmd::FinishEffect { effect, outcome, duration_ms, reply } => (
+                vec![Event::EffectFinished { effect, outcome, duration_ms }],
+                Box::new(move |r, _| drop(reply.send(r))),
+            ),
+            Cmd::Attach { after_seq, reply } => return Staged::Attach(after_seq, reply),
+        };
+        Staged::Events(events, done)
     }
 
     /// Commits the batch and completes its commands. Returns false, having
@@ -501,7 +643,7 @@ impl Writer {
             crate::log!("journal write failed, stopping this session's writer: {e}");
             rx.close();
             for (done, _) in staged {
-                done(Err(io_copy(&e)));
+                done(Err(io_copy(&e)), 0);
             }
             return false;
         }
@@ -509,8 +651,9 @@ impl Writer {
             for e in &es {
                 self.subscribers.retain(|s| s.send(e.clone()).is_ok());
             }
+            let delivered = self.subscribers.len();
             self.entries.extend(es.iter().cloned());
-            done(Ok(es));
+            done(Ok(es), delivered);
         }
         true
     }

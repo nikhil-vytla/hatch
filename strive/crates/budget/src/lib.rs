@@ -276,7 +276,10 @@ impl Ledger {
                 | Event::UserMessage { .. }
                 | Event::Recovered { .. }
                 | Event::EffectStarted { .. }
-                | Event::EffectFinished { .. } => {}
+                | Event::EffectFinished { .. }
+                | Event::ApprovalModeSet { .. }
+                | Event::ApprovalRequested { .. }
+                | Event::ApprovalDecided { .. } => {}
             }
         }
         for r in abandoned.values() {

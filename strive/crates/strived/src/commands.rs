@@ -5,8 +5,8 @@ use std::process::ExitCode;
 use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
-    CallOutcome, EffectOutcome, EffectRecord, Entry, Event, SessionInfo, SessionList, SessionListParams, SessionRead,
-    SessionReadResult, SessionRef,
+    ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, SessionInfo, SessionList,
+    SessionListParams, SessionRead, SessionReadResult, SessionRef,
 };
 
 use crate::client::{Client, ServerError};
@@ -95,6 +95,16 @@ fn describe(e: &Entry) -> String {
             EffectOutcome::Refused { reason } => format!("effect {effect} refused: {reason}"),
             EffectOutcome::Interrupted => format!("effect {effect} interrupted: the daemon stopped while it ran"),
         },
+        Event::ApprovalModeSet { mode } => format!("approvals: {}", mode_name(*mode)),
+        Event::ApprovalRequested { effect, description } => format!("effect {effect} asks: {description}"),
+        Event::ApprovalDecided { effect, decision, by } => format!(
+            "effect {effect} {} by {by}",
+            match decision {
+                Decision::Allow => "allowed",
+                Decision::AllowSession => "allowed for the rest of the session",
+                Decision::Deny => "declined",
+            }
+        ),
     }
 }
 
@@ -203,5 +213,13 @@ fn describe_effect(r: &EffectRecord) -> String {
         EffectRecord::Write { path, bytes, .. } => format!("write {path} ({bytes} bytes)"),
         EffectRecord::Edit { path, .. } => format!("edit {path}"),
         EffectRecord::Bash { command, .. } => format!("bash: {command}"),
+    }
+}
+
+pub fn mode_name(m: ApprovalMode) -> &'static str {
+    match m {
+        ApprovalMode::Ask => "ask",
+        ApprovalMode::AutoEdit => "auto-edit",
+        ApprovalMode::FullAuto => "full-auto",
     }
 }

@@ -163,6 +163,13 @@ impl Setup {
         assert_eq!(r.get("problem"), None, "{r}");
         r["entries"].as_array().unwrap().iter().map(|e| e["event"].clone()).collect()
     }
+    /// The most recent entry of a type (`modelCallStarted`, ...).
+    fn last(&self, kind: &str) -> Value {
+        self.entries().into_iter().rev().find(|e| e["type"] == kind).unwrap_or_else(|| panic!("no {kind} entry"))
+    }
+    fn count(&self, kind: &str) -> usize {
+        self.entries().iter().filter(|e| e["type"] == kind).count()
+    }
     fn blob(&self, digest: &Value) -> Vec<u8> {
         let hex = digest.as_str().unwrap().strip_prefix("sha256:").unwrap();
         std::fs::read(self.env.home.path().join("cas/sha256").join(&hex[..2]).join(&hex[2..])).unwrap()
@@ -191,14 +198,14 @@ fn a_call_is_forwarded_with_the_real_key_metered_and_journaled() {
     assert_eq!(seen[0].headers["anthropic-version"], "2023-06-01");
     assert_eq!(seen[0].body, BODY.as_bytes());
 
-    let e = s.entries();
-    assert_eq!(e.len(), 4);
+    assert_eq!((s.count("modelCallStarted"), s.count("modelCallFinished")), (1, 1));
+    let started = s.last("modelCallStarted");
     assert_eq!(
-        e[2],
+        started,
         json!({"type": "modelCallStarted", "call": 1, "provider": "anthropic", "model": "claude-haiku-4-5",
                "request": sha(BODY.as_bytes()), "reservedUsdMicros": 589, "reservedTokens": 189})
     );
-    let mut finished = e[3].clone();
+    let mut finished = s.last("modelCallFinished");
     assert!(finished["durationMs"].as_u64().is_some());
     finished.as_object_mut().unwrap().remove("durationMs");
     assert_eq!(
@@ -208,8 +215,12 @@ fn a_call_is_forwarded_with_the_real_key_metered_and_journaled() {
                            "usage": {"input": 12, "output": 7, "cacheWrite": 100, "cacheRead": 2000},
                            "costUsdMicros": 12 + 35 + 125 + 200}})
     );
-    assert_eq!(s.blob(&e[2]["request"]), BODY.as_bytes(), "the exact request bytes are stored");
-    assert_eq!(s.blob(&e[3]["response"]), ANTHROPIC_JSON.as_bytes(), "the exact response bytes are stored");
+    assert_eq!(s.blob(&started["request"]), BODY.as_bytes(), "the exact request bytes are stored");
+    assert_eq!(
+        s.blob(&s.last("modelCallFinished")["response"]),
+        ANTHROPIC_JSON.as_bytes(),
+        "the exact response bytes are stored"
+    );
 }
 
 #[test]
@@ -217,13 +228,13 @@ fn a_stream_passes_through_unchanged_and_is_metered() {
     let s = setup(Reply::Sse(SSE.iter().map(|e| (*e).to_string()).collect(), 5, false), &[("ANTHROPIC_API_KEY", "k")]);
     let (status, body) = s.messages(&BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"));
     assert_eq!((status, String::from_utf8(body).unwrap()), (200, SSE.concat()));
-    let e = s.entries();
+    let finished = s.last("modelCallFinished");
     assert_eq!(
-        e[3]["outcome"],
+        finished["outcome"],
         json!({"kind": "complete", "status": 200, "usage": {"input": 25, "output": 15, "cacheWrite": 0, "cacheRead": 1000},
                "costUsdMicros": 25 + 75 + 100})
     );
-    assert_eq!(s.blob(&e[3]["response"]), SSE.concat().as_bytes());
+    assert_eq!(s.blob(&finished["response"]), SSE.concat().as_bytes());
 }
 
 #[test]
@@ -291,7 +302,7 @@ fn a_provider_error_is_passed_through_and_costs_nothing() {
     let s = setup(Reply::Json(429, err.into()), &[("ANTHROPIC_API_KEY", "k")]);
     let (status, body) = s.messages(BODY);
     assert_eq!((status, body.as_slice()), (429, err.as_bytes()));
-    assert_eq!(s.entries()[3]["outcome"], json!({"kind": "rejected", "status": 429}));
+    assert_eq!(s.last("modelCallFinished")["outcome"], json!({"kind": "rejected", "status": 429}));
 }
 
 #[test]
@@ -301,7 +312,7 @@ fn a_stream_that_ends_before_its_usage_is_charged_its_hold() {
     let (status, body) = s.messages(&BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"));
     assert_eq!((status, String::from_utf8(body).unwrap()), (200, SSE[..2].concat()));
     assert_eq!(
-        s.entries()[3]["outcome"],
+        s.last("modelCallFinished")["outcome"],
         json!({"kind": "broken", "reason": "the response ended without reporting usage", "costUsdMicros": 603, "tokens": 203})
     );
 }
@@ -321,8 +332,8 @@ fn a_client_that_leaves_mid_stream_is_charged_its_hold() {
         let first = r.chunk().await.unwrap().unwrap();
         assert!(first.starts_with(b"event: content_block_delta"));
     });
-    common::wait_for("the call to be closed", Duration::from_secs(10), || s.entries().len() == 4);
-    let outcome = &s.entries()[3]["outcome"];
+    common::wait_for("the call to be closed", Duration::from_secs(10), || s.count("modelCallFinished") == 1);
+    let outcome = &s.last("modelCallFinished")["outcome"];
     assert_eq!(outcome["kind"], "broken");
     assert_eq!(outcome["reason"], "the client disconnected mid-response");
 }
@@ -336,7 +347,7 @@ fn a_call_cut_off_by_a_daemon_crash_is_closed_and_charged_on_restart() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _ = rt.block_on(reqwest::Client::new().post(url).body(body).send());
     });
-    common::wait_for("the call to start", Duration::from_secs(5), || s.entries().len() == 3);
+    common::wait_for("the call to start", Duration::from_secs(5), || s.count("modelCallStarted") == 1);
     let pid = common::pid(&s.env.status());
     assert!(std::process::Command::new("kill").args(["-9", &pid.to_string()]).status().unwrap().success());
     common::wait_for("the daemon to die", Duration::from_secs(5), || {
@@ -344,10 +355,9 @@ fn a_call_cut_off_by_a_daemon_crash_is_closed_and_charged_on_restart() {
     });
 
     s.env.rpc().ok("session/attach", &json!({"id": s.id}));
-    let e = s.entries();
-    assert_eq!(e.len(), 4);
+    assert_eq!(s.count("modelCallFinished"), 1);
     assert_eq!(
-        e[3]["outcome"],
+        s.last("modelCallFinished")["outcome"],
         json!({"kind": "broken", "reason": "the daemon stopped during this call", "costUsdMicros": 589, "tokens": 189})
     );
 }
@@ -398,7 +408,10 @@ fn streaming_openai_chat_is_made_to_report_usage() {
     assert_eq!(seen.headers.get("x-api-key"), None);
     let sent: Value = serde_json::from_slice(&seen.body).unwrap();
     assert_eq!(sent["stream_options"], json!({"include_usage": true}));
-    assert_eq!(s.entries()[3]["outcome"]["usage"], json!({"input": 50, "output": 9, "cacheWrite": 0, "cacheRead": 0}));
+    assert_eq!(
+        s.last("modelCallFinished")["outcome"]["usage"],
+        json!({"input": 50, "output": 9, "cacheWrite": 0, "cacheRead": 0})
+    );
 }
 
 #[test]
@@ -452,9 +465,10 @@ fn each_session_gets_its_own_gateway_token() {
     );
 
     assert_eq!(s.post(&format!("{other_base}/v1/messages"), BODY).0, 200);
-    assert_eq!(s.entries().len(), 2, "nothing was journaled in the first session");
+    assert_eq!(s.count("modelCallStarted"), 0, "nothing was journaled in the first session");
     let r = c.ok("session/read", &json!({"id": other}));
-    assert_eq!(r["entries"].as_array().unwrap().len(), 4);
+    let calls = r["entries"].as_array().unwrap().iter().filter(|e| e["event"]["type"] == "modelCallFinished").count();
+    assert_eq!(calls, 1);
 }
 
 /// Provider metadata an SDK uses (request ids, rate limits) reaches the

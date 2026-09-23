@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use strive_budget::{Limits, PriceSetting};
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
     #[serde(default)]
@@ -19,6 +19,13 @@ pub struct Settings {
     pub models: BTreeMap<String, PriceSetting>,
     #[serde(default)]
     pub providers: BTreeMap<String, ProviderSetting>,
+    /// What new sessions may do without asking.
+    #[serde(default = "default_approvals")]
+    pub approvals: strive_proto::ApprovalMode,
+}
+
+fn default_approvals() -> strive_proto::ApprovalMode {
+    strive_proto::ApprovalMode::AutoEdit
 }
 
 /// The limits new sessions start with. `null` means unlimited.
@@ -62,7 +69,7 @@ impl Settings {
         let path = home.join("settings.json");
         let s: Settings = match std::fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes).with_context(|| format!("reading {}", path.display()))?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Settings::default(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::from_str("{}").expect("defaults parse"),
             Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
         };
         if s.budget.usd.is_some_and(|d| !d.is_finite() || d < 0.0) {

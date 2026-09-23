@@ -5,8 +5,8 @@
 //! writes outside the workspace need approval. Commands run in the OS
 //! sandbox (Seatbelt on macOS, bubblewrap on Linux): writes are confined to
 //! the workspace and temp directories, strive's state is hidden, and the
-//! network is off. Where no sandbox is available, commands are refused
-//! rather than run unconfined.
+//! network is off. Where no sandbox is available, every command asks first,
+//! and runs unconfined only if a person allows it.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -17,7 +17,7 @@ use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use strive_proto::EffectRequest;
+use strive_proto::{ApprovalMode, EffectRequest};
 
 /// Where an effect runs.
 pub struct Scope {
@@ -43,24 +43,60 @@ const OUTPUT_KEEP: usize = 100 * 1024;
 /// A policy decision about a path.
 enum Access {
     Allowed(PathBuf),
-    /// Needs approval; the reason says why.
-    Ask(String),
+    /// Outside the workspace: allowed only with approval.
+    Ask(PathBuf),
     Denied(String),
 }
 
+/// Whether an effect may run now, must be asked about, or is refused.
+pub enum Gate {
+    Allow,
+    /// Needs a person's approval; the text describes the effect for them.
+    Ask(String),
+    Deny(String),
+}
+
+/// Applies the policy and the session's approval mode to a request.
+pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> Gate {
+    let change = |verb: &str, path: &str| match resolve(scope, path, true) {
+        Access::Denied(why) => Gate::Deny(why),
+        Access::Ask(real) => Gate::Ask(format!("{verb} outside the workspace: {}", real.display())),
+        Access::Allowed(_) if mode == ApprovalMode::Ask => Gate::Ask(format!("{verb} {path}")),
+        Access::Allowed(_) => Gate::Allow,
+    };
+    match request {
+        EffectRequest::Read { path, .. } => match resolve(scope, path, false) {
+            Access::Denied(why) => Gate::Deny(why),
+            Access::Allowed(_) | Access::Ask(_) => Gate::Allow,
+        },
+        EffectRequest::Write { path, .. } => change("write", path),
+        EffectRequest::Edit { path, .. } => change("edit", path),
+        EffectRequest::Bash { command, .. } => {
+            if sandboxed_command(scope, command).is_none() {
+                Gate::Ask(format!("run without a sandbox: {command}"))
+            } else if mode == ApprovalMode::FullAuto {
+                Gate::Allow
+            } else {
+                Gate::Ask(format!("run: {command}"))
+            }
+        }
+    }
+}
+
+/// Performs an effect the gate allowed (or a person approved).
 pub fn perform(scope: &Scope, request: &EffectRequest) -> Result {
     match request {
         EffectRequest::Read { path, offset, limit } => match resolve(scope, path, false) {
-            Access::Allowed(p) => read(&p, path, *offset, *limit),
-            Access::Ask(why) | Access::Denied(why) => Result::Refused(why),
+            Access::Allowed(p) | Access::Ask(p) => read(&p, path, *offset, *limit),
+            Access::Denied(why) => Result::Refused(why),
         },
         EffectRequest::Write { path, content } => match resolve(scope, path, true) {
-            Access::Allowed(p) => write(&p, path, content.as_bytes()),
-            Access::Ask(why) | Access::Denied(why) => Result::Refused(why),
+            Access::Allowed(p) | Access::Ask(p) => write(&p, path, content.as_bytes()),
+            Access::Denied(why) => Result::Refused(why),
         },
         EffectRequest::Edit { path, old_text, new_text } => match resolve(scope, path, true) {
-            Access::Allowed(p) => edit(&p, path, old_text, new_text),
-            Access::Ask(why) | Access::Denied(why) => Result::Refused(why),
+            Access::Allowed(p) | Access::Ask(p) => edit(&p, path, old_text, new_text),
+            Access::Denied(why) => Result::Refused(why),
         },
         EffectRequest::Bash { command, timeout_ms } => {
             bash(scope, command, timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS))
@@ -68,19 +104,22 @@ pub fn perform(scope: &Scope, request: &EffectRequest) -> Result {
     }
 }
 
+fn absolute(scope: &Scope, path: &str) -> PathBuf {
+    let raw = Path::new(path);
+    if raw.is_absolute() { raw.to_path_buf() } else { scope.workspace.join(raw) }
+}
+
 /// The path an effect would touch, after following every symlink that
 /// exists, and whether the policy allows it.
 fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
-    let raw = Path::new(path);
-    let joined = if raw.is_absolute() { raw.to_path_buf() } else { scope.workspace.join(raw) };
-    let Some(real) = real_path(&joined) else {
+    let Some(real) = real_path(&absolute(scope, path)) else {
         return Access::Denied(format!("can't resolve {path}"));
     };
     if real.starts_with(&scope.strive_home) {
         return Access::Denied("the agent can't read strive's own state".into());
     }
     if writing && !real.starts_with(&scope.workspace) {
-        return Access::Ask(format!("writing outside the workspace needs approval: {}", real.display()));
+        return Access::Ask(real);
     }
     Access::Allowed(real)
 }
@@ -246,11 +285,13 @@ fn scrubbed(name: &str) -> bool {
 }
 
 fn bash(scope: &Scope, command: &str, timeout_ms: u64) -> Result {
-    let Some(mut cmd) = sandboxed_command(scope, command) else {
-        return Result::Refused(
-            "commands run only in a sandbox, and none is available here (install bubblewrap)".into(),
-        );
-    };
+    // Without a sandbox the gate always asks, so reaching here unconfined
+    // means a person approved exactly that.
+    let mut cmd = sandboxed_command(scope, command).unwrap_or_else(|| {
+        let mut c = Command::new("/bin/bash");
+        c.args(["-c", command]);
+        c
+    });
     let (mut reader, writer) = match io::pipe() {
         Ok(p) => p,
         Err(e) => return Result::Refused(format!("can't run the command: {e}")),

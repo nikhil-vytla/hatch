@@ -55,7 +55,8 @@ fn log_shows_the_latest_session_in_this_directory() {
     assert_eq!(out.lines().next().unwrap(), format!("session {id}  {}", r.path().display()));
     assert!(entry_line(&out, 1).ends_with(&format!("  started in {}", r.path().display())), "{out}");
     assert!(entry_line(&out, 2).ends_with("  budget: $5.0000"), "new sessions get the default budget: {out}");
-    assert!(entry_line(&out, 3).ends_with("  you: fix the flaky test"), "{out}");
+    assert!(entry_line(&out, 3).ends_with("  approvals: auto-edit"), "new sessions get the default approvals: {out}");
+    assert!(entry_line(&out, 4).ends_with("  you: fix the flaky test"), "{out}");
     assert!(!out.contains("older prompt"), "{out}");
 }
 
@@ -66,7 +67,7 @@ fn log_takes_an_explicit_session_id() {
     r.session(&["newer prompt"]);
     let (code, out, _) = r.run(&["log", &older]);
     assert_eq!(code, 0);
-    assert!(entry_line(&out, 3).ends_with("  you: older prompt"), "{out}");
+    assert!(entry_line(&out, 4).ends_with("  you: older prompt"), "{out}");
 }
 
 #[test]
@@ -77,7 +78,7 @@ fn log_json_is_the_verified_journal() {
     assert_eq!(code, 0);
     let v: Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["session"]["id"], id);
-    assert_eq!(v["entries"][2]["event"], json!({"type": "userMessage", "text": "hello"}));
+    assert_eq!(v["entries"][3]["event"], json!({"type": "userMessage", "text": "hello"}));
     assert_eq!(v.get("problem"), None);
 }
 
@@ -96,9 +97,9 @@ fn log_of_a_tampered_session_shows_what_verified_and_fails() {
     r.tamper(&id, r#""text":"two""#, r#""text":"TWO""#);
     let (code, out, _) = r.run(&["log"]);
     assert_eq!(code, 1);
-    assert!(entry_line(&out, 3).ends_with("  you: one"), "{out}");
-    assert!(!out.contains("#4 "), "{out}");
-    assert_eq!(out.lines().last().unwrap(), "journal FAILED verification: entry 4 was modified, removed or moved");
+    assert!(entry_line(&out, 4).ends_with("  you: one"), "{out}");
+    assert!(!out.contains("#5 "), "{out}");
+    assert_eq!(out.lines().last().unwrap(), "journal FAILED verification: entry 5 was modified, removed or moved");
 }
 
 #[test]
@@ -107,14 +108,14 @@ fn verify_passes_intact_sessions_and_names_the_broken_one() {
     let good = r.session(&["fine"]);
     let bad = r.session(&["about to change"]);
     let (code, out, _) = r.run(&["verify", &good]);
-    assert_eq!((code, out.trim()), (0, format!("ok    {good}  3 entries").as_str()));
+    assert_eq!((code, out.trim()), (0, format!("ok    {good}  4 entries").as_str()));
 
     r.tamper(&bad, "about to change", "changed!");
     let (code, out, _) = r.run(&["verify", "--all"]);
     assert_eq!(code, 1);
     assert_eq!(
         out.lines().collect::<Vec<_>>(),
-        vec![format!("FAIL  {bad}  entry 3 was modified, removed or moved"), format!("ok    {good}  3 entries"),]
+        vec![format!("FAIL  {bad}  entry 4 was modified, removed or moved"), format!("ok    {good}  4 entries"),]
     );
 }
 
@@ -123,7 +124,7 @@ fn verify_without_an_id_checks_the_latest_session_here() {
     let r = Repo::new();
     let id = r.session(&[]);
     let (code, out, _) = r.run(&["verify"]);
-    assert_eq!((code, out.trim()), (0, format!("ok    {id}  2 entries").as_str()));
+    assert_eq!((code, out.trim()), (0, format!("ok    {id}  3 entries").as_str()));
 }
 
 #[test]
@@ -167,9 +168,9 @@ fn verify_all_reports_sessions_whose_journal_cannot_be_read() {
     assert_eq!(
         out.lines().collect::<Vec<_>>(),
         vec![
-            format!("ok    {fine}  2 entries"),
+            format!("ok    {fine}  3 entries"),
             format!("FAIL  {garbled}  entry 1 was modified, removed or moved"),
-            format!("FAIL  {emptied}  entries were removed from the end (0 of 3 committed entries remain)"),
+            format!("FAIL  {emptied}  entries were removed from the end (0 of 4 committed entries remain)"),
         ]
     );
     let (_, out, _) = r.run(&["sessions", "--all"]);

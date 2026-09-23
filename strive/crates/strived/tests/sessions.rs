@@ -33,19 +33,20 @@ fn a_prompt_is_journaled_and_read_back() {
     assert_eq!(id.len(), 26, "ULID: {id}");
 
     let p = c.ok("session/prompt", &json!({"id": id, "text": "hello"}));
-    assert_eq!(p, json!({"seq": 3}));
+    assert_eq!(p, json!({"seq": 4}));
 
     let r = c.ok("session/read", &json!({"id": id}));
     assert_eq!(r["session"], s);
-    assert_eq!(r["committed"], 3);
+    assert_eq!(r["committed"], 4);
     assert_eq!(r["tornBytes"], 0);
     assert_eq!(r.get("problem"), None);
-    assert_eq!(seqs(&r["entries"]), vec![1, 2, 3]);
+    assert_eq!(seqs(&r["entries"]), vec![1, 2, 3, 4]);
     assert_eq!(
         events(&r["entries"]),
         vec![
             json!({"type": "sessionStarted", "format": 1, "cwd": "/tmp/repo", "striveVersion": env!("CARGO_PKG_VERSION")}),
             json!({"type": "budgetSet", "usdMicros": 5_000_000}),
+            json!({"type": "approvalModeSet", "mode": "autoEdit"}),
             json!({"type": "userMessage", "text": "hello"}),
         ]
     );
@@ -63,13 +64,13 @@ fn every_attached_client_receives_new_entries() {
     let mut a = env.rpc();
     let mut b = env.rpc();
     let attached = a.ok("session/attach", &json!({"id": id}));
-    assert_eq!(seqs(&attached["entries"]), vec![1, 2]);
+    assert_eq!(seqs(&attached["entries"]), vec![1, 2, 3]);
     b.ok("session/attach", &json!({"id": id}));
 
     b.ok("session/prompt", &json!({"id": id, "text": "hi"}));
     let expected = json!({
         "sessionId": id,
-        "entry": {"seq": 3, "event": {"type": "userMessage", "text": "hi"}},
+        "entry": {"seq": 4, "event": {"type": "userMessage", "text": "hi"}},
     });
     for client in [&mut a, &mut b] {
         let mut n = client.notification();
@@ -87,8 +88,8 @@ fn attach_after_seq_returns_only_later_entries() {
     for t in ["one", "two", "three"] {
         c.ok("session/prompt", &json!({"id": id, "text": t}));
     }
-    let r = c.ok("session/attach", &json!({"id": id, "afterSeq": 3}));
-    assert_eq!(seqs(&r["entries"]), vec![4, 5]);
+    let r = c.ok("session/attach", &json!({"id": id, "afterSeq": 4}));
+    assert_eq!(seqs(&r["entries"]), vec![5, 6]);
 }
 
 #[test]
@@ -113,7 +114,7 @@ fn sessions_survive_a_daemon_restart() {
     env.rpc().ok("session/prompt", &json!({"id": id, "text": "keep me"}));
     env.stop();
     let r = env.rpc().ok("session/attach", &json!({"id": id}));
-    assert_eq!(events(&r["entries"])[2], json!({"type": "userMessage", "text": "keep me"}));
+    assert_eq!(events(&r["entries"])[3], json!({"type": "userMessage", "text": "keep me"}));
 }
 
 #[test]
@@ -129,10 +130,10 @@ fn a_tampered_journal_is_refused_and_explained() {
     let mut c = env.rpc();
     let err = c.call("session/attach", &json!({"id": id}));
     assert_eq!(err["error"]["code"], -32011);
-    assert_eq!(err["error"]["data"]["problem"], "entry 3 was modified, removed or moved");
+    assert_eq!(err["error"]["data"]["problem"], "entry 4 was modified, removed or moved");
     let r = c.ok("session/read", &json!({"id": id}));
-    assert_eq!(r["problem"], "entry 3 was modified, removed or moved");
-    assert_eq!(seqs(&r["entries"]), vec![1, 2]);
+    assert_eq!(r["problem"], "entry 4 was modified, removed or moved");
+    assert_eq!(seqs(&r["entries"]), vec![1, 2, 3]);
     let p = c.call("session/prompt", &json!({"id": id, "text": "more"}));
     assert_eq!(p["error"]["code"], -32011, "no appends to an invalid journal");
     assert_eq!(fs::read_to_string(&path).unwrap(), text.replace("original", "edited!!"));
@@ -144,15 +145,15 @@ fn a_crash_torn_line_is_recovered_on_attach() {
     let id = create(&env, "/tmp/repo");
     env.stop();
     let mut f = fs::OpenOptions::new().append(true).open(env.session_dir(&id).join("journal.jsonl")).unwrap();
-    f.write_all(br#"{"seq":3,"ts"#).unwrap();
+    f.write_all(br#"{"seq":4,"ts"#).unwrap();
 
     let mut c = env.rpc();
     let before = c.ok("session/read", &json!({"id": id}));
     assert_eq!((before["tornBytes"].as_u64(), before.get("problem")), (Some(12), None));
     let r = c.ok("session/attach", &json!({"id": id}));
-    assert_eq!(events(&r["entries"])[2], json!({"type": "recovered", "discardedBytes": 12}));
+    assert_eq!(events(&r["entries"])[3], json!({"type": "recovered", "discardedBytes": 12}));
     let after = c.ok("session/read", &json!({"id": id}));
-    assert_eq!((after["tornBytes"].as_u64(), after["committed"].as_u64()), (Some(0), Some(3)));
+    assert_eq!((after["tornBytes"].as_u64(), after["committed"].as_u64()), (Some(0), Some(4)));
 }
 
 #[test]
@@ -173,12 +174,12 @@ fn concurrent_prompts_get_distinct_consecutive_seqs() {
         })
         .collect();
     let got: BTreeSet<u64> = threads.into_iter().flat_map(|t| t.join().unwrap()).collect();
-    assert_eq!(got, (3..=52).collect::<BTreeSet<u64>>());
+    assert_eq!(got, (4..=53).collect::<BTreeSet<u64>>());
 
     let r = env.rpc().ok("session/read", &json!({"id": id}));
-    assert_eq!((r["committed"].as_u64(), r.get("problem")), (Some(52), None));
+    assert_eq!((r["committed"].as_u64(), r.get("problem")), (Some(53), None));
     let texts: BTreeSet<String> =
-        events(&r["entries"])[2..].iter().map(|e| e["text"].as_str().unwrap().to_string()).collect();
+        events(&r["entries"])[3..].iter().map(|e| e["text"].as_str().unwrap().to_string()).collect();
     assert_eq!(texts.len(), 50, "every prompt was journaled once");
 }
 
@@ -261,7 +262,7 @@ fn attach_verifies_a_journal_tampered_while_the_daemon_ran() {
 
     let err = c.call("session/attach", &json!({"id": id}));
     assert_eq!(err["error"]["code"], -32011, "{err}");
-    assert_eq!(err["error"]["data"]["problem"], "entry 3 was modified, removed or moved");
+    assert_eq!(err["error"]["data"]["problem"], "entry 4 was modified, removed or moved");
     let p = c.call("session/prompt", &json!({"id": id, "text": "more"}));
     assert_eq!(p["error"]["code"], -32011, "{p}");
     assert_eq!(fs::read_to_string(&path).unwrap(), tampered);
@@ -285,9 +286,9 @@ fn a_session_recovers_after_a_failed_write() {
     let r = c.ok("session/read", &json!({"id": id}));
     assert_eq!(r.get("problem"), None);
     let texts: Vec<&str> =
-        r["entries"].as_array().unwrap()[2..].iter().map(|e| e["event"]["text"].as_str().unwrap()).collect();
+        r["entries"].as_array().unwrap()[3..].iter().map(|e| e["event"]["text"].as_str().unwrap()).collect();
     assert_eq!(texts, vec!["a", "b"], "the unconfirmed prompt was synced before the failure, so it is adopted");
-    assert_eq!(ok["seq"], 4);
+    assert_eq!(ok["seq"], 5);
 }
 
 /// Attaching to a session the instant it appears in a listing must not open

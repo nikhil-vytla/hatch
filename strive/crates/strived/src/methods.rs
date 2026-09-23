@@ -19,26 +19,42 @@ use tokio::task::JoinHandle;
 
 use crate::server::State;
 use crate::sessions::{SessionError, SessionId};
+use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 
 /// Per-connection state.
 pub struct Conn {
-    initialized: bool,
-    out: mpsc::UnboundedSender<Message>,
-    /// Tasks forwarding session entries to this connection. Each holds a
-    /// sender to the connection's outbound queue, so they must be aborted
-    /// for the connection to finish closing.
-    subscriptions: Vec<JoinHandle<()>>,
+    initialized: std::sync::atomic::AtomicBool,
+    /// The client's name from `initialize`, recorded with its decisions.
+    client: std::sync::Mutex<String>,
+    /// Weak, so neither requests in flight nor subscriptions keep a closed
+    /// connection's outbound queue alive.
+    out: mpsc::WeakUnboundedSender<Message>,
+    /// Tasks forwarding session entries to this connection.
+    subscriptions: std::sync::Mutex<Vec<JoinHandle<()>>>,
 }
 
 impl Conn {
-    pub fn new(out: mpsc::UnboundedSender<Message>) -> Self {
-        Self { initialized: false, out, subscriptions: Vec::new() }
+    pub fn new(out: &mpsc::UnboundedSender<Message>) -> Self {
+        Self {
+            initialized: std::sync::atomic::AtomicBool::new(false),
+            client: std::sync::Mutex::new(String::new()),
+            out: out.downgrade(),
+            subscriptions: std::sync::Mutex::new(Vec::new()),
+        }
     }
-}
 
-impl Drop for Conn {
-    fn drop(&mut self) {
-        for t in &self.subscriptions {
+    pub fn initialized(&self) -> bool {
+        self.initialized.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Sends a message if the connection is still open.
+    pub fn send(&self, msg: Message) -> bool {
+        self.out.upgrade().is_some_and(|out| out.send(msg).is_ok())
+    }
+
+    /// Stops forwarding session entries; called when the connection closes.
+    pub fn close(&self) {
+        for t in self.subscriptions.lock().expect("subscriptions").drain(..) {
             t.abort();
         }
     }
@@ -48,13 +64,13 @@ type Reply = Result<Value, RpcError>;
 
 pub async fn dispatch(
     state: &Arc<State>,
-    conn: &mut Conn,
+    conn: &Arc<Conn>,
     id: RequestId,
     method: &str,
     params: Option<Value>,
 ) -> Message {
     let params = params.unwrap_or_else(|| json!({}));
-    let result = if method != Initialize::NAME && !conn.initialized {
+    let result = if method != Initialize::NAME && !conn.initialized() {
         Err(RpcError::new(RpcError::NOT_INITIALIZED, "send initialize first"))
     } else {
         route(state, conn, method, params).await
@@ -65,7 +81,7 @@ pub async fn dispatch(
     }
 }
 
-async fn route(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value) -> Reply {
+async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
     match method {
         Initialize::NAME => initialize(state, conn, &parse::<Initialize>(params)?),
         DaemonStatus::NAME => {
@@ -110,6 +126,18 @@ async fn route(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value)
             reply::<AuthStatus>(AuthStatusResult { providers })
         }
         m if m.starts_with("effect/") => route_effect(state, m, params).await,
+        ApprovalRespond::NAME => {
+            let ApprovalRespondParams { id, effect, decision } = parse::<ApprovalRespond>(params)?;
+            let by = conn.client.lock().expect("client name").clone();
+            match state.sessions.decide(&session_id(&id)?, effect, decision, by).await {
+                Ok(()) => reply::<ApprovalRespond>(Empty {}),
+                Err(crate::sessions::DecideError::NotPending) => Err(RpcError::new(
+                    RpcError::APPROVAL_NOT_PENDING,
+                    format!("effect {effect} is not waiting for approval"),
+                )),
+                Err(crate::sessions::DecideError::Session(e)) => Err(session_error(e)),
+            }
+        }
         BlobGet::NAME => {
             let BlobGetParams { digest } = parse::<BlobGet>(params)?;
             let bytes = state.cas.get(&digest).map_err(|e| internal(&e))?;
@@ -128,16 +156,38 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
             let EffectRunParams { id, call_id, request } = parse::<EffectRun>(params)?;
             let sid = session_id(&id)?;
             let info = state.sessions.info(&sid).await.map_err(session_error)?;
-            let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
-            let effect = state.sessions.start_effect(&sid, call_id, record).await.map_err(session_error)?;
             let scope = crate::effects::Scope {
-                workspace: std::path::Path::new(&info.cwd).canonicalize().map_err(|e| internal(&e))?,
+                workspace: std::path::Path::new(&info.cwd).canonicalize().map_err(|e| {
+                    RpcError::new(
+                        RpcError::INTERNAL_ERROR,
+                        format!("the session's directory {} is missing: {e}", info.cwd),
+                    )
+                })?,
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
             };
+            let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
+            let effect = state.sessions.start_effect(&sid, call_id, record).await.map_err(session_error)?;
             let started = std::time::Instant::now();
-            let result = tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request))
-                .await
-                .map_err(|e| internal(&e))?;
+            let mode = state.sessions.mode(&sid).await.map_err(session_error)?;
+            let refusal = match crate::effects::gate(&scope, &request, mode) {
+                crate::effects::Gate::Allow => None,
+                crate::effects::Gate::Deny(why) => Some(why),
+                crate::effects::Gate::Ask(what) => {
+                    match state.sessions.ask(&sid, effect, what.clone()).await.map_err(session_error)? {
+                        None => Some(format!(
+                            "{what} needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
+                        )),
+                        Some(Decision::Deny) => Some(format!("declined: {what}")),
+                        Some(Decision::Allow | Decision::AllowSession) => None,
+                    }
+                }
+            };
+            let result = match refusal {
+                Some(why) => crate::effects::Result::Refused(why),
+                None => tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request))
+                    .await
+                    .map_err(|e| internal(&e))?,
+            };
             let (outcome, text) = match result {
                 crate::effects::Result::Done { text, exit_code, truncated } => {
                     let output = state.cas.put(text.as_bytes()).map_err(|e| internal(&e))?;
@@ -153,12 +203,16 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
     }
 }
 
-async fn route_session(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value) -> Reply {
+async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
     match method {
         SessionCreate::NAME => {
             let SessionCreateParams { cwd } = parse::<SessionCreate>(params)?;
             reply::<SessionCreate>(
-                state.sessions.create(cwd, state.settings.budget.limits()).await.map_err(session_error)?,
+                state
+                    .sessions
+                    .create(cwd, state.settings.budget.limits(), state.settings.approvals)
+                    .await
+                    .map_err(session_error)?,
             )
         }
         SessionList::NAME => {
@@ -171,16 +225,17 @@ async fn route_session(state: &Arc<State>, conn: &mut Conn, method: &str, params
             let sid = session_id(&id)?;
             let (session, entries, mut stream) =
                 state.sessions.attach(&sid, after_seq.unwrap_or(0)).await.map_err(session_error)?;
-            let out = conn.out.clone();
-            conn.subscriptions.push(tokio::spawn(async move {
+            let weak = conn.out.clone();
+            let forward = tokio::spawn(async move {
                 while let Some(entry) = stream.recv().await {
                     let n = SessionEntryNotification { session_id: id.clone(), entry };
                     let msg = Message::notification(SessionEntry::NAME, serde_json::to_value(n).expect("serializes"));
-                    if out.send(msg).is_err() {
+                    if weak.upgrade().is_none_or(|out| out.send(msg).is_err()) {
                         break;
                     }
                 }
-            }));
+            });
+            conn.subscriptions.lock().expect("subscriptions").push(forward);
             reply::<SessionAttach>(SessionAttachResult { session, entries })
         }
         SessionPrompt::NAME => {
@@ -209,6 +264,11 @@ async fn route_session(state: &Arc<State>, conn: &mut Conn, method: &str, params
             state.sessions.check(&sid).await.map_err(session_error)?;
             reply::<SessionGateway>(state.gateway.info(&sid).map_err(|e| internal(&e))?)
         }
+        SessionApprovals::NAME => {
+            let SessionApprovalsParams { id, mode } = parse::<SessionApprovals>(params)?;
+            let entries = state.sessions.set_mode(&session_id(&id)?, mode).await.map_err(session_error)?;
+            reply::<SessionApprovals>(Appended { seq: entries[0].seq })
+        }
         SessionBudget::NAME => {
             let SessionBudgetParams { id, usd_micros, tokens } = parse::<SessionBudget>(params)?;
             let limits = strive_budget::Limits { usd_micros, tokens };
@@ -219,7 +279,7 @@ async fn route_session(state: &Arc<State>, conn: &mut Conn, method: &str, params
     }
 }
 
-fn initialize(state: &Arc<State>, conn: &mut Conn, p: &InitializeParams) -> Reply {
+fn initialize(state: &Arc<State>, conn: &Arc<Conn>, p: &InitializeParams) -> Reply {
     if p.protocol_version != PROTOCOL_VERSION {
         let mut e = RpcError::new(
             RpcError::PROTOCOL_MISMATCH,
@@ -228,7 +288,8 @@ fn initialize(state: &Arc<State>, conn: &mut Conn, p: &InitializeParams) -> Repl
         e.data = Some(json!({ "protocolVersion": PROTOCOL_VERSION }));
         return Err(e);
     }
-    conn.initialized = true;
+    conn.client.lock().expect("client name").clone_from(&p.client.name);
+    conn.initialized.store(true, std::sync::atomic::Ordering::SeqCst);
     reply::<Initialize>(InitializeResult {
         protocol_version: PROTOCOL_VERSION,
         server: state.info.clone(),

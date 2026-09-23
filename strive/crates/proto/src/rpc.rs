@@ -71,6 +71,8 @@ impl RpcError {
     pub const SESSION_NOT_FOUND: i32 = -32010;
     /// The session's journal failed verification; `data.problem` says why.
     pub const JOURNAL_INVALID: i32 = -32011;
+    /// No approval is pending for that effect (unknown, or already decided).
+    pub const APPROVAL_NOT_PENDING: i32 = -32012;
 
     pub fn new(code: i32, message: impl Into<String>) -> Self {
         Self { code, message: message.into(), data: None }
