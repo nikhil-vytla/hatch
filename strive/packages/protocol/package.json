@@ -3,5 +3,10 @@
   "version": "0.3.0-dev",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@strive/testkit": "workspace:*"
+  }
 }

@@ -25,6 +25,7 @@ const tilde = (p: string) => (p.startsWith(homedir()) ? `~${p.slice(homedir().le
 export class App {
   readonly transcript = new Container();
   readonly editor: Editor;
+  private readonly offClose: () => void;
 
   constructor(
     private readonly tui: TUI,
@@ -48,15 +49,21 @@ export class App {
 
     tui.addInputListener((data) => {
       if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
-        this.exit(0);
+        this.quit(0);
         return { consume: true };
       }
       return undefined;
     });
-    client.onClose((err) => {
+    this.offClose = client.onClose((err) => {
       this.say(style.danger(`Lost the connection to the daemon${err ? `: ${err.message}` : ""}.`));
       this.exit(1);
     });
+  }
+
+  quit(code: number) {
+    this.offClose();
+    this.client.close();
+    this.exit(code);
   }
 
   say(text: string) {
@@ -87,7 +94,7 @@ export class App {
         return;
       case "quit":
       case "exit":
-        this.exit(0);
+        this.quit(0);
         return;
       default:
         this.say(style.danger(`Unknown command /${cmd}. Type /help.`));

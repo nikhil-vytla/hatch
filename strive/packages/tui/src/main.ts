@@ -21,7 +21,6 @@ try {
 const tui = new TuiMainScreen(new ProcessTerminal());
 const exit = (code: number) => {
   tui.stop();
-  connected.client.close();
   process.exit(code);
 };
 new App(tui, connected.client, connected.init, exit);

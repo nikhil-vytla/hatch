@@ -1,46 +1,43 @@
-// Cross-language test: the TS client against the real Rust daemon binary.
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { startDaemon, type TestDaemon } from "@strive/testkit";
 import { PROTOCOL_VERSION, ServerError, StriveClient } from "./index";
 
-const exe = resolve(import.meta.dir, "../../../target/debug/strive");
-const home = mkdtempSync("/tmp/strv-ts-");
-const env = { ...process.env, STRIVE_HOME: home };
-const socket = join(home, "run/strived.sock");
 const info = { name: "protocol-test", version: "0" };
+let daemon: TestDaemon;
 
 beforeAll(() => {
-  const r = Bun.spawnSync([exe, "status", "--json"], { env });
-  if (r.exitCode !== 0) throw new Error(`daemon did not start: ${r.stderr}`);
+  daemon = startDaemon();
 });
-afterAll(() => {
-  Bun.spawnSync([exe, "stop"], { env });
-  rmSync(home, { recursive: true, force: true });
-});
+afterAll(() => daemon.dispose());
 
-test("handshake and typed requests", async () => {
-  const { client, init } = await StriveClient.connect(socket, info);
+test("handshake reports the daemon's home and pid", async () => {
+  const { client, init } = await StriveClient.connect(daemon.socket, info);
   expect(init.protocolVersion).toBe(PROTOCOL_VERSION);
-  expect(init.home).toBe(home);
-  const [a, b] = await Promise.all([client.request("daemon/status", {}), client.request("daemon/status", {})]);
-  expect(a.server.pid).toBe(init.server.pid);
-  expect(b.clients).toBeGreaterThanOrEqual(1);
+  expect(init.home).toBe(daemon.home);
+  expect(init.server.pid).toBe(daemon.pid());
   client.close();
 });
 
-test("server errors carry codes", async () => {
-  const { client } = await StriveClient.connect(socket, info);
+test("concurrent requests on one connection each get their own response", async () => {
+  const { client, init } = await StriveClient.connect(daemon.socket, info);
+  const [a, b] = await Promise.all([client.request("daemon/status", {}), client.request("daemon/status", {})]);
+  expect(a.server.pid).toBe(init.server.pid);
+  expect(b.clients).toBe(1);
+  client.close();
+});
+
+test("server errors carry the JSON-RPC code", async () => {
+  const { client } = await StriveClient.connect(daemon.socket, info);
   const err = await client.request("initialize", { protocolVersion: 999, client: info }).catch((e) => e);
-  expect(err).toBeInstanceOf(ServerError);
   expect((err as ServerError).code).toBe(-32003);
+  expect((err as ServerError).message).toBe("initialize: client speaks protocol 999, daemon speaks 1 (-32003)");
   client.close();
 });
 
 test("pending requests reject when the daemon goes away", async () => {
-  const { client } = await StriveClient.connect(socket, info);
+  const { client } = await StriveClient.connect(daemon.socket, info);
   const closed = new Promise<void>((r) => client.onClose(() => r()));
   await client.request("daemon/shutdown", {});
   await closed;
-  await expect(client.request("daemon/status", {})).rejects.toThrow("connection closed");
+  await expect(client.request("daemon/status", {})).rejects.toThrow("daemon/status: connection closed");
 });

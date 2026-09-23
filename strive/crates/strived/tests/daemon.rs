@@ -32,6 +32,7 @@ impl Env {
             .args(args)
             .env("STRIVE_HOME", self.home.path())
             .env_remove("STRIVE_IDLE_SECS")
+            .env_remove("STRIVE_TUI")
             .output()
             .unwrap()
     }
@@ -240,46 +241,52 @@ fn concurrent_launchers_replace_a_stale_daemon_once() {
     }
 }
 
+fn status_with_idle(env: &Env, idle_secs: &str) -> Output {
+    Command::new(&env.exe)
+        .args(["status", "--json"])
+        .env("STRIVE_HOME", env.home.path())
+        .env("STRIVE_IDLE_SECS", idle_secs)
+        .output()
+        .unwrap()
+}
+
 /// Race: the daemon decides to exit for idleness while a launcher is
-/// connecting. The launcher must recover by starting a new daemon.
+/// connecting. Launches ~100 ms apart keep the daemon at the edge of its
+/// idle window; every one must still succeed.
 #[test]
-fn launches_succeed_across_idle_exits() {
+fn launches_succeed_near_idle_exits() {
     let env = Env::new();
     let start = Instant::now();
-    let mut pids = std::collections::BTreeSet::new();
-    while start.elapsed() < Duration::from_secs(4) {
-        let out = Command::new(&env.exe)
-            .args(["status", "--json"])
-            .env("STRIVE_HOME", env.home.path())
-            .env("STRIVE_IDLE_SECS", "1")
-            .output()
-            .unwrap();
+    while start.elapsed() < Duration::from_secs(3) {
+        let out = status_with_idle(&env, "1");
         assert!(
             out.status.success(),
             "launch failed near an idle exit: {}",
             String::from_utf8_lossy(&out.stderr)
         );
-        pids.insert(pid(&serde_json::from_slice(&out.stdout).unwrap()));
         std::thread::sleep(Duration::from_millis(97));
     }
-    // With launches ~100 ms apart the daemon never idles for 1 s, so this
-    // mostly exercises the boundary; the sleep-past-idle cases follow.
-    for _ in 0..4 {
-        std::thread::sleep(Duration::from_millis(1000));
-        let out = Command::new(&env.exe)
-            .args(["status", "--json"])
-            .env("STRIVE_HOME", env.home.path())
-            .env("STRIVE_IDLE_SECS", "1")
-            .output()
-            .unwrap();
+}
+
+/// After an observed idle exit, the next launch starts a new daemon.
+#[test]
+fn a_launch_after_idle_exit_starts_a_new_daemon() {
+    let env = Env::new();
+    let mut previous = pid(&serde_json::from_slice(&status_with_idle(&env, "1").stdout).unwrap());
+    for _ in 0..3 {
+        wait_for("idle exit", Duration::from_secs(5), || {
+            !env.socket().exists()
+        });
+        let out = status_with_idle(&env, "1");
         assert!(
             out.status.success(),
-            "launch failed at the idle boundary: {}",
+            "{}",
             String::from_utf8_lossy(&out.stderr)
         );
-        pids.insert(pid(&serde_json::from_slice(&out.stdout).unwrap()));
+        let next = pid(&serde_json::from_slice(&out.stdout).unwrap());
+        assert_ne!(next, previous, "the idle daemon should have been replaced");
+        previous = next;
     }
-    assert!(!pids.is_empty());
 }
 
 /// Starts threads that connect and disconnect as fast as they can, until the
@@ -373,20 +380,44 @@ fn protocol_errors() {
         c.call(4, "initialize", &json!({"protocolVersion": "x"}))["error"]["code"],
         -32602
     );
-    let s = c.call(5, "daemon/status", &json!({}));
-    assert_eq!(s["id"], 5);
-    assert!(s["result"]["clients"].as_u64().unwrap() >= 1);
+    // The `strive status` that started the daemon has disconnected by now,
+    // but the daemon may not have observed it yet.
+    let mut id = 5;
+    wait_for("only this client connected", Duration::from_secs(2), || {
+        id += 1;
+        let s = c.call(id, "daemon/status", &json!({}));
+        assert_eq!(s["id"], id);
+        s["result"]["clients"] == 1
+    });
 }
 
 #[test]
-fn doctor_reports() {
+fn doctor_fails_without_a_tui_and_passes_with_one() {
     let env = Env::new();
     let out = env.strive(&["doctor"]);
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("daemon"), "{text}");
+    assert_eq!(out.status.code(), Some(1), "{text}");
+    let tui = text.lines().find(|l| l.contains(" tui ")).unwrap();
+    assert!(tui.starts_with("FAIL"), "{tui}");
+    assert!(tui.contains("strive-tui not found"), "{tui}");
+
+    let out = Command::new(&env.exe)
+        .arg("doctor")
+        .env("STRIVE_HOME", env.home.path())
+        .env("STRIVE_TUI", "/bin/echo tui")
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(0), "{text}");
+    let daemon = text.lines().find(|l| l.contains(" daemon ")).unwrap();
     assert!(
-        text.lines()
-            .any(|l| l.starts_with("ok") && l.contains("daemon")),
-        "{text}"
+        daemon.starts_with("ok")
+            && daemon.contains(&format!("pid {}, protocol 1", pid(&env.status()))),
+        "{daemon}"
+    );
+    let tui = text.lines().find(|l| l.contains(" tui ")).unwrap();
+    assert!(
+        tui.starts_with("ok") && tui.ends_with("/bin/echo tui"),
+        "{tui}"
     );
 }
