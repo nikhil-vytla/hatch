@@ -35,6 +35,8 @@ export type Contestant = {
   id: string; name: string; source: Source;
   /** Real time only: may hold a question until a recorded send time. */
   readyToAsk?(lane: number, clockMs: number): boolean;
+  /** Re-ask about a piece every interval even after an answer was used (the original live protocol). */
+  reask?: boolean;
   ask(question: Question, mode: TimingMode): Reply;
 };
 
@@ -53,6 +55,7 @@ export type Lane = {
   stats: { applied: number; stale: number; failed: number; missing: number; latencyMs: number[] };
   recordingEnded: number | null;
   missingPiece: number | null;
+  answeredPiece: number | null;
 };
 
 const RULES = "10 columns, 20 rows; gravity continues while you decide; choose one option. Every candidate landing is reachable in the observed state. Code executes a chosen landing route. Intent delegates landing search to a code planner.";
@@ -73,13 +76,18 @@ export class TetrisArena {
   private serial = 0;
   private remainder = 0;
   private started = false;
-  constructor(public seed: number, contestants: Contestant[], public mode: TimingMode = "realtime") {
+  /** Lanes stop placing pieces at this count, so every lane is compared over the same game length. */
+  pieceLimit = Infinity;
+  constructor(public seed: number, contestants: Contestant[], public mode: TimingMode = "realtime", options: { pieceLimit?: number } = {}) {
+    if (options.pieceLimit) this.pieceLimit = options.pieceLimit;
     this.lanes = contestants.map((contestant) => {
       const game = createGame(seed);
-      return { contestant, game, plan: null, pending: null, nextRequestAt: 0, trackedPieceId: game.pieceId, pieceStartedAt: 0, revision: 0, stats: { applied: 0, stale: 0, failed: 0, missing: 0, latencyMs: [] }, recordingEnded: null, missingPiece: null };
+      return { contestant, game, plan: null, pending: null, nextRequestAt: 0, trackedPieceId: game.pieceId, pieceStartedAt: 0, revision: 0, stats: { applied: 0, stale: 0, failed: 0, missing: 0, latencyMs: [] }, recordingEnded: null, missingPiece: null, answeredPiece: null };
     });
   }
-  get over() { return this.lanes.every((l) => l.game.status === "over"); }
+  /** A lane stops at game over, at the piece limit, or where its recording ends (no loss is invented past the data). */
+  finished(lane: Lane) { return lane.game.status === "over" || lane.game.pieces >= this.pieceLimit || lane.recordingEnded !== null; }
+  get over() { return this.lanes.every((l) => this.finished(l)); }
 
   private question(index: number): Question | null {
     const lane = this.lanes[index], g = lane.game, options = landings(g);
@@ -128,7 +136,7 @@ export class TetrisArena {
   private stepLane(i: number) {
     const lane = this.lanes[i], g = lane.game, now = this.clockMs;
     this.track(lane);
-    if (g.status === "over") return;
+    if (this.finished(lane)) return;
     if (lane.plan && (lane.plan.pieceId !== g.pieceId || lane.plan.expires < now)) lane.plan = null;
     const p = lane.plan;
     if (p && now >= p.nextAt) {
@@ -142,7 +150,8 @@ export class TetrisArena {
   }
   private maybeAsk(i: number) {
     const lane = this.lanes[i];
-    if (lane.pending || lane.game.status !== "playing" || this.clockMs < lane.nextRequestAt) return;
+    if (lane.pending || this.finished(lane) || this.clockMs < lane.nextRequestAt) return;
+    if (!lane.contestant.reask && lane.answeredPiece === lane.game.pieceId) return;
     // A contestant without an answer for this piece is asked again only for the next piece.
     if (lane.missingPiece === lane.game.pieceId) return;
     if (lane.contestant.readyToAsk && !lane.contestant.readyToAsk(i, this.clockMs)) return;
@@ -177,6 +186,7 @@ export class TetrisArena {
     const target = landings(lane.game).find((o) => o.id === a.choice);
     if (!target) return this.resolve(lane, p.entry, "stale", { ...common, reason: "The chosen landing is no longer reachable" });
     lane.plan = { pieceId: q.pieceId, target: target.id, expires: this.clockMs + PLAN_MS, nextAt: this.clockMs };
+    lane.answeredPiece = q.pieceId;
     this.resolve(lane, p.entry, "applied", common);
   }
   /** Ends a run the way the recorder did: in-flight questions become cancelled. */
@@ -189,7 +199,7 @@ export class TetrisArena {
   async turn(): Promise<void> {
     if (this.mode !== "turns") return;
     const asks = this.lanes.map(async (lane, i) => {
-      if (lane.game.status !== "playing") return;
+      if (this.finished(lane)) return;
       const q = this.question(i);
       if (!q) return;
       const entry = this.record(i, q);
@@ -265,7 +275,7 @@ export function recorded(events: RecordedEvent[], name = "Jev · recorded", id =
     return { choice: e.answer, probabilities: d?.probabilities, confidence: d?.confidence ?? null, latencyMs: e.latencyMs };
   };
   return {
-    id, name, source: "recorded",
+    id, name, source: "recorded", reask: true,
     readyToAsk(_lane, clockMs) {
       const next = queue.find((e) => e.sentAt >= clockMs);
       return next ? next.sentAt === clockMs : true;
