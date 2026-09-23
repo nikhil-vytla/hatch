@@ -220,7 +220,10 @@ async function agentRuns(request: EffectRequest) {
 test("a command waiting for approval is shown and y allows it", async () => {
   const ui = await openUi();
   const agent = await agentRuns({ kind: "bash", command: "echo approved" });
-  await ui.term.waitFor("Allow run: echo approved?  y yes · a yes for this session · n no");
+  await ui.term.waitFor("Allow the agent to run: echo approved?  y yes · a yes for this session · n no");
+  const asked = await ui.term.screen();
+  expect(asked.filter((l) => l.includes("Allow the agent to")).length).toBe(1); // asked once, not twice
+  expect(asked.some((l) => l.includes("The agent asked to run: echo approved"))).toBe(true);
   ui.term.type("y");
   const r = await agent.done;
   expect(r.text).toBe("approved\n");
@@ -233,7 +236,7 @@ test("a command waiting for approval is shown and y allows it", async () => {
 test("n declines a command, which then doesn't run", async () => {
   const ui = await openUi();
   const agent = await agentRuns({ kind: "bash", command: "touch nope.txt" });
-  await ui.term.waitFor("Allow run: touch nope.txt?");
+  await ui.term.waitFor("Allow the agent to run: touch nope.txt?");
   ui.term.type("n");
   const r = await agent.done;
   expect(r.outcome).toEqual({ kind: "refused", reason: "declined: run: touch nope.txt" });
@@ -244,7 +247,7 @@ test("n declines a command, which then doesn't run", async () => {
 test("a allows for the rest of the session", async () => {
   const ui = await openUi();
   const first = await agentRuns({ kind: "bash", command: "echo one" });
-  await ui.term.waitFor("Allow run: echo one?");
+  await ui.term.waitFor("Allow the agent to run: echo one?");
   ui.term.type("a");
   expect((await first.done).text).toBe("one\n");
   await ui.term.waitFor("Approvals: full-auto");

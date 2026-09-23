@@ -175,7 +175,7 @@ export function describe(entry: Entry): string {
       }
 
     case "approvalRequested":
-      return style.accent(`Allow ${e.description}?`);
+      return style.muted(`The agent asked to ${e.description}`);
     case "approvalDecided":
       return style.faint(
         `${e.decision === "deny" ? "Declined" : e.decision === "allowSession" ? "Allowed for this session" : "Allowed"} by ${e.by}`,
@@ -370,7 +370,7 @@ export class App {
     this.prompt.setText(
       next.done
         ? ""
-        : `${style.accent(`Allow ${next.value}?`)}  ${style.muted("y yes · a yes for this session · n no")}`,
+        : `${style.accent(`Allow the agent to ${next.value}?`)}  ${style.muted("y yes · a yes for this session · n no")}`,
     );
     this.renderFooter();
     const text = describe(entry);

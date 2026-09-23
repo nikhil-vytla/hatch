@@ -6,7 +6,7 @@ A prompt starts a turn: the daemon starts an agent host for the session if none 
 
 - `agent-turn` a prompt runs a turn to a reply; the footer shows `working… Esc to interrupt` meanwhile, then only spend.
 - `agent-tools` reads, writes (`write PATH (N bytes)`), edits (`edit PATH`) and commands (`$ COMMAND`) appear as they happen.
-- `agent-approve` a command asks `Allow run: COMMAND?`; `y`, `a` or `n` answer it.
+- `agent-approve` a command asks `Allow the agent to run: COMMAND?`; `y`, `a` or `n` answer it.
 - `agent-interrupt` Esc stops the turn: `Interrupted.`
 - `agent-resume` `strive -c` continues with the whole conversation.
 - `agent-rewind` `/rewind` lists checkpoints; `/rewind N` puts the files back.
