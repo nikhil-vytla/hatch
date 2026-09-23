@@ -662,3 +662,54 @@ wrong turn.
     components) and AI Elements (structure only; it needs Tailwind and the
     AI SDK).
   - Skip: Streamdown (Tailwind, and it parses model HTML) and assistant-ui.
+
+## 2026-09-23: Desktop pass 2
+
+Built from the Zeron study and the library survey, in five commits:
+- **Scrolling and the trailer:**
+  - use-stick-to-bottom, with a "Jump to latest" pill.
+  - A trailer says what the agent is doing (working, writing, waiting for
+    you) and for how long.
+- **Tool groups:** open while live, closed once the agent moves on, unless
+  clicked. Failures are counted in the summary line.
+- **Code:**
+  - Shiki highlighting with the JavaScript regex engine, since the CSP
+    blocks WASM. An e2e test checks the colours in the real window.
+  - Code blocks have Copy; streamed markdown is repaired with remend.
+  - The palette is near-black neutral.
+- **Sessions sidebar:**
+  - `session/list` now reports a title and last activity.
+  - Switching opens a new connection and closes the old one, so the
+    session left behind stops counting the window as a person.
+  - A test fails if the old connection stays open.
+- **Changes pane (⌘D):**
+  - `session/changes` compares a checkpoint with the live tree, staged
+    into a temporary index so the checkpoints are untouched.
+  - The pane shows highlighted diffs with line numbers, and takes the side
+    panels' place while open.
+- **⌘K palette (cmdk):** actions, the approval mode, rewinds and sessions.
+- **Smaller pieces:**
+  - notifications when the window is unfocused
+  - a prompt rail
+  - long prompts fold
+  - Copy on replies
+  - workspace paths shown relative to it
+
+A real Haiku run through the app fixed the demo bug in 12.9s for $0.0334.
+The streaming, trailer and highlighting looked right.
+
+A correction: `a_cancelled_command_is_stopped`'s child now waits for a
+go-file instead of sleeping 1s. Under load the test could take over a
+second to cancel, so the child wrote its marker legitimately. That is the
+likelier cause of its earlier failures, not only the fork race; the group
+re-kill stays anyway. A mutant that removes the freeze and the group kills
+fails the test.
+
+**Not built yet, from Zeron's list:**
+- **Attachments and `@` mentions:** these need a workspace file-search
+  method and image input.
+- **A queue of prompts sent while working:** prompts journaled mid-turn
+  already wait for the next turn, but there's no queue UI. The journal
+  can't un-send one.
+- **A context-usage ring:** needs the context window in the renderer.
+- **Bundled Geist fonts.**
