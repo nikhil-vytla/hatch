@@ -548,3 +548,117 @@ every model call. It's now modeled on Zeron (`zeronsh/comet`).
   refused another session's; it fails with the check removed.
 - Screenshots came from a scripted session with the real host and a fake
   model (harness in /tmp/strive-shot, not committed).
+
+## 2026-09-23: Final Stage 1 review, all areas
+
+Codex (GPT-6 Astra) reviewed Stage 1 in five areas. Its boundary review
+was refused twice by OpenAI's cybersecurity filter, so fresh Opus
+subagents covered the boundary, plus money and the journal again.
+Other second opinions were unavailable:
+- GPT-6 Sol and Luna via opencode: blocked by a gateway after a few
+  requests;
+- Fable 5.1: needs data retention enabled.
+
+Reports are in /tmp/strive-review/out. Where two reviewers overlapped,
+they agreed: the symlinked AGENTS.md, keys in the host's environment,
+cache_control, remote inputs, the premium tier, and cleanup ending the
+wrong turn.
+
+**Fixed, each with a test that fails first unless noted:**
+- **Data:**
+  - parallel edits of one file were lost; edits and writes now take the file
+  - a rewind deleted a nested repository whose directory an older
+    checkpoint had saved
+  - accepting a proposal before the saved layout loaded overwrote it (untested)
+  - a reloaded desktop window lost everything since launch
+- **Money:**
+  - `cache_control` in an OpenAI tool schema held $0
+  - fetched or kept inputs (URLs, file ids, `item_reference`, stored
+    prompts) are refused
+  - a priority tier or a `context-1m` beta is refused
+  - a final stream delta repriced one-hour cache writes as five-minute ones
+  - a stream's last event is held back until the call's end is journaled
+- **Boundary:**
+  - hosts got the daemon's keys in their environment
+  - a symlinked AGENTS.md put credentials in the prompt
+  - a FIFO skill file blocked registration
+  - a session directory swapped for a symlink was followed
+  - the macOS sandbox profile could be injected through a path
+  - the app now resolves no names (the TURN DNS leak: source-traced, untested)
+- **Lifecycle:**
+  - turn records are checked against the journal
+  - cleanup ends only the departing host's own turn
+  - a read error (invalid UTF-8) skipped cleanup
+  - summarizing was outside the turn, with no limit and no interrupt
+- **Display:** the TUI ran control sequences from replies; a bad
+  assistant record crashed every later host's replay.
+- **Flaky tests explained:**
+  - A child forked while its command was being killed escaped the kill.
+    The fix is a real one: the group is killed again after reaping.
+  - Two fixtures raced: the UTF-8 host test's requests, and the fake MCP
+    server's absurd id.
+
+**Deferred, with why:**
+- **Writer recovery after a failed journal write:**
+  - it records running effects as interrupted
+  - it drops subscribers
+  Both need a disk failure. The fix is to fail those connections rather
+  than resume quietly.
+- **Journal edits:** a torn tail appended by another process while live.
+  That needs an external edit.
+- **Daemon lifecycle:**
+  - idle exit ignores running effects
+  - its timestamp isn't reset when the last person leaves a host behind
+  - the launcher handshake has no timeout
+  - `strive stop` gives up before a slow stand-down finishes
+  - stopping doesn't wait for model calls in flight, so they're charged
+    their full hold
+  All real, all P2. They belong together in one lifecycle pass.
+- **Commands outliving their owner:**
+  - a command whose host disconnects keeps running after its turn ends
+  - on macOS, a command outlives a SIGKILLed daemon
+  The first needs effects tied to their host's connection. The second has
+  no `--die-with-parent` equivalent in Seatbelt.
+- **"Allow for this session":**
+  - It still means full-auto; the buttons now say so.
+  - Per-command and per-tool rules are a design change.
+- **Minor (P3):**
+  - reused tool-call ids across turns (replay keys results by call id)
+  - a reused callId's cancel flag
+  - a non-integer `n`
+  - the output cap is forwarded unclamped
+  - a failed response store still reports the call complete
+  - `GetMode` and `CheckBudget` answer from staged state
+
+## 2026-09-23: Zeron, hands on, and UI libraries
+
+- **Zeron, installed and used:**
+  - Zeron (github.com/zeronsh/comet) v0.2.84, the notarized macOS app, ran
+    from /tmp and was driven with CGEvent clicks and its own `zeron mcp`
+    server.
+  - Screenshots are in /tmp/zeron-shots/live.
+- **Zeron's code, studied** (/tmp/zeron-study.md):
+  - The UI talks to its engine over a localhost JSON WebSocket.
+  - It drives Claude through stream-json, Codex through app-server, and
+    others through ACP.
+  - Its default theme is near-black neutral with a `#8b7cf6` accent.
+  - It has no approvals, costs, exit codes or rewind, where strive is ahead.
+- **Worth taking, in order:**
+  1. stick-to-bottom with a jump pill
+  2. a working trailer with elapsed time, and tool groups that open while
+     live and close after
+  3. code blocks with copy and highlighting
+  4. a session sidebar with status dots and titles
+  5. a turn or branch diff pane with comments
+  6. a message queue while working
+  7. a ⌘K palette
+  8. attachments and `@` mentions
+  9. a prompt rail
+  10. notifications
+- **Libraries** (/tmp/ui-libraries-study.md):
+  - Adopt: use-stick-to-bottom, Shiki (JavaScript regex engine, since our
+    CSP blocks WASM), cmdk and remend.
+  - Adapt from: Meta's Astryx (`facebook/astryx`: CSP-clean chat
+    components) and AI Elements (structure only; it needs Tailwind and the
+    AI SDK).
+  - Skip: Streamdown (Tailwind, and it parses model HTML) and assistant-ui.
