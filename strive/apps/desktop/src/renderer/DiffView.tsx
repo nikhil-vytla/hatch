@@ -3,7 +3,7 @@
 // multi-line constructs colour right) and each row takes its line's tokens.
 import { useEffect, useState } from "react";
 import type { ThemedToken } from "shiki/core";
-import { diffLines, hunks } from "./diff";
+import { diffLines, drawn, hunks } from "./diff";
 import { grammarFor, tokens } from "./highlight";
 
 /** The most rows drawn for one file, however it is folded: a huge new file would stall the window. */
@@ -34,12 +34,13 @@ export function Diff({ before, after, path }: { before: string; after: string; p
   }, [before, after, lang]);
 
   const [opened, setOpened] = useState<ReadonlySet<number>>(new Set());
+  const rows = diffLines(before, after);
   // Line numbers over every row first, so they stay right on both sides of a fold.
   let old = 0;
   let now = 0;
 
   const numbered = new Map(
-    diffLines(before, after).map((row) => {
+    rows.map((row) => {
       const line = row.kind === "remove" ? coloured.before?.[old] : coloured.after?.[now];
 
       const numbers = {
@@ -55,50 +56,41 @@ export function Diff({ before, after, path }: { before: string; after: string; p
     }),
   );
 
-  const parts = hunks(diffLines(before, after));
-  let budget = MAX_ROWS;
-  let cut = 0;
+  const { items, cut } = drawn(hunks(rows), opened, MAX_ROWS);
 
   return (
     <pre className="diff">
-      {parts.map((part, i) => {
-        const first = part.rows[0]?.n ?? i;
-
-        if (part.kind === "gap" && !opened.has(first))
+      {items.map((item) => {
+        if (item.kind === "gap")
           return (
             <button
               type="button"
-              key={`gap-${first}`}
+              key={`gap-${item.first}`}
               className="row gap"
-              onClick={() => setOpened(new Set([...opened, first]))}
+              onClick={() => setOpened(new Set([...opened, item.first]))}
             >
-              ⋯ {part.rows.length} unchanged {part.rows.length === 1 ? "line" : "lines"}
+              ⋯ {item.count} unchanged {item.count === 1 ? "line" : "lines"}
             </button>
           );
 
-        const rows = part.rows.slice(0, Math.max(0, budget));
-        budget -= rows.length;
-        cut += part.rows.length - rows.length;
+        const { row } = item;
+        const { line, numbers } = numbered.get(row.n) ?? { line: undefined, numbers: {} };
 
-        return rows.map((row) => {
-          const { line, numbers } = numbered.get(row.n) ?? { line: undefined, numbers: {} };
-
-          return (
-            <div key={row.n} className={`row ${row.kind}`}>
-              <span className="num">{numbers.old ?? ""}</span>
-              <span className="num">{numbers.now ?? ""}</span>
-              <span className="sign">{row.kind === "add" ? "+" : row.kind === "remove" ? "−" : " "}</span>
-              {line
-                ? line.map((t, j) => (
-                    // Tokens have no identity beyond their place in the line.
-                    <span key={`t${j}`} style={{ color: t.color }}>
-                      {t.content}
-                    </span>
-                  ))
-                : row.text || " "}
-            </div>
-          );
-        });
+        return (
+          <div key={row.n} className={`row ${row.kind}`}>
+            <span className="num">{numbers.old ?? ""}</span>
+            <span className="num">{numbers.now ?? ""}</span>
+            <span className="sign">{row.kind === "add" ? "+" : row.kind === "remove" ? "−" : " "}</span>
+            {line
+              ? line.map((t, j) => (
+                  // Tokens have no identity beyond their place in the line.
+                  <span key={`t${j}`} style={{ color: t.color }}>
+                    {t.content}
+                  </span>
+                ))
+              : row.text || " "}
+          </div>
+        );
       })}
       {cut > 0 && <div className="row more">… {cut} more lines not shown</div>}
     </pre>

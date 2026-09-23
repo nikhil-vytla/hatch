@@ -299,6 +299,23 @@ test("a change deep in a long file shows in the pane, with the unchanged lines f
   await pane.locator(".row.keep", { hasText: "line 1" }).first().waitFor();
 });
 
+test("a change at line 2,000 stays in view when the lines above it are opened", async () => {
+  const { page, cwd } = await openApp();
+  const lines = Array.from({ length: 3000 }, (_, i) => `line ${i + 1}`);
+  writeFileSync(join(cwd, "big.txt"), `${lines.join("\n")}\n`);
+  await page.getByPlaceholder("Ask strive to do anything…").fill("first");
+  await page.keyboard.press("Enter");
+  await page.locator(".checkpoints li").first().waitFor();
+  lines[1999] = "LINE 2000";
+  writeFileSync(join(cwd, "big.txt"), `${lines.join("\n")}\n`);
+  await page.getByRole("button", { name: "changes", exact: true }).click();
+  const pane = page.getByRole("complementary", { name: "changes" });
+  await pane.locator(".row.add", { hasText: "LINE 2000" }).waitFor();
+  await pane.getByRole("button", { name: "⋯ 1996 unchanged lines" }).click();
+  await pane.locator(".row.keep", { hasText: "line 1996" }).waitFor();
+  assert.equal(await pane.locator(".row.add", { hasText: "LINE 2000" }).count(), 1, "the change is still drawn");
+});
+
 test("a reloaded window shows what happened since it opened", async () => {
   const { page, cwd } = await openApp();
   const rpc = await Rpc.open();
