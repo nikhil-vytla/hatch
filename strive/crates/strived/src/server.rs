@@ -19,6 +19,7 @@ use strive_proto::{
 };
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{Mutex, Notify, mpsc};
 
 use crate::log;
@@ -106,14 +107,21 @@ pub async fn run(cfg: Config) -> Result<Started> {
         state.info.pid
     );
 
-    let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let mut term = signal(SignalKind::terminate())?;
+    let mut int = signal(SignalKind::interrupt())?;
     let mut tick = tokio::time::interval(Duration::from_millis(500));
     loop {
         tokio::select! {
-            // Accept before anything else, so a connection already queued never
-            // loses to the idle timer. A client that arrives after the socket is
-            // unlinked below finds nothing and starts a new daemon.
+            // Polled in order. Shutdown and signals come first, so a steady
+            // stream of connections (a launcher retrying every 10 ms, say) can't
+            // starve them. Accept comes before the idle timer, so a connection
+            // already queued never loses to an idle exit. A client that connects
+            // after the socket is unlinked below finds nothing and starts a new
+            // daemon.
             biased;
+            () = state.shutdown.notified() => { log!("shutdown requested"); break; }
+            _ = term.recv() => { log!("SIGTERM"); break; }
+            _ = int.recv() => { log!("SIGINT"); break; }
             accepted = listener.accept() => match accepted {
                 Ok((stream, _)) => {
                     let state = state.clone();
@@ -129,9 +137,6 @@ pub async fn run(cfg: Config) -> Result<Started> {
                 }
                 Err(e) => log!("accept failed: {e}"),
             },
-            () = state.shutdown.notified() => { log!("shutdown requested"); break; }
-            _ = term.recv() => { log!("SIGTERM"); break; }
-            _ = tokio::signal::ctrl_c() => { log!("SIGINT"); break; }
             _ = tick.tick() => {
                 if state.clients.load(Ordering::SeqCst) == 0 && state.idle_since.lock().await.elapsed() >= state.idle_exit {
                     log!("idle for {}s with no clients, exiting", state.idle_exit.as_secs());

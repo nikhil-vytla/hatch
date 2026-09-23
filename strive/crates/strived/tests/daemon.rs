@@ -5,6 +5,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
@@ -279,6 +280,67 @@ fn launches_succeed_across_idle_exits() {
         pids.insert(pid(&serde_json::from_slice(&out.stdout).unwrap()));
     }
     assert!(!pids.is_empty());
+}
+
+/// Starts threads that connect and disconnect as fast as they can, until the
+/// returned flag is set.
+fn flood(
+    socket: &Path,
+) -> (
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+    Vec<std::thread::JoinHandle<()>>,
+) {
+    let done = std::sync::Arc::new(AtomicBool::new(false));
+    let threads = (0..4)
+        .map(|_| {
+            let (done, socket) = (done.clone(), socket.to_path_buf());
+            std::thread::spawn(move || {
+                while !done.load(Ordering::Relaxed) {
+                    let _ = UnixStream::connect(&socket);
+                }
+            })
+        })
+        .collect();
+    (done, threads)
+}
+
+/// A steady stream of connections must not starve shutdown requests or
+/// signals (accept must not outrank them).
+#[test]
+fn shutdown_is_not_starved_by_connection_floods() {
+    let env = Env::new();
+
+    env.status();
+    let (done, threads) = flood(&env.socket());
+    std::thread::sleep(Duration::from_millis(100));
+    let out = env.strive(&["stop"]);
+    assert!(
+        out.status.success(),
+        "stop under load failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    done.store(true, Ordering::Relaxed);
+    for t in threads {
+        t.join().unwrap();
+    }
+
+    let daemon = pid(&env.status());
+    let (done, threads) = flood(&env.socket());
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(
+        Command::new("kill")
+            .arg(daemon.to_string())
+            .status()
+            .unwrap()
+            .success()
+    );
+    wait_for("SIGTERM under load", Duration::from_secs(3), || {
+        !env.socket().exists()
+    });
+    done.store(true, Ordering::Relaxed);
+    for t in threads {
+        t.join().unwrap();
+    }
 }
 
 #[test]
