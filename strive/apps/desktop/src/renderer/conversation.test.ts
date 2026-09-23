@@ -50,7 +50,7 @@ test("a step's tools are one group, and a reply starts the next", () => {
   expect(c.items.map((i) => i.kind)).toEqual(["user", "reply", "tools", "reply", "tools"]);
   const first = c.items[2];
   expect(first?.kind === "tools" && first.tools.map((t) => t.status)).toEqual(["done", "failed"]);
-  expect(first?.kind === "tools" && summarize(first.tools)).toBe("Ran 1 command · read 1 file");
+  expect(first?.kind === "tools" && summarize(first.tools)).toBe("Ran 1 command · read 1 file · 1 failed");
 });
 
 test("a tool waits while its approval is open, and remembers the decision", () => {

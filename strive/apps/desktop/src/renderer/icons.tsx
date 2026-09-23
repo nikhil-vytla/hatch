@@ -17,6 +17,7 @@ const PATHS = {
   arrow: "M8 13V3.5M4 7.5l4-4 4 4",
   stop: "M5 5h6v6H5z",
   spinner: "M8 2.5a5.5 5.5 0 1 1-5.5 5.5",
+  copy: "M5.5 5.5V3.5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M3.5 5.5h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z",
 } as const;
 
 export type IconName = keyof typeof PATHS;

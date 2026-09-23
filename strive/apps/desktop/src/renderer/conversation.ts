@@ -155,6 +155,11 @@ export class Conversation {
     }
   }
 
+  /** When the running turn started, while one runs. */
+  get turnStartedMs(): number | undefined {
+    return this.turn?.startedMs;
+  }
+
   /** Waiting approvals, oldest first. */
   waiting(): Tool[] {
     return [...this.tools.values()].filter((t) => t.status === "waiting");
@@ -178,6 +183,9 @@ export function summarize(tools: readonly Tool[]): string {
     count("mcp") && `called ${plural(count("mcp"), "tool", "tools")}`,
   ].filter((p): p is string => typeof p === "string");
 
+  const failed = tools.filter((t) => t.status === "failed" || t.status === "refused").length;
+
+  if (failed > 0) parts.push(`${failed} failed`);
   const text = parts.join(" · ");
 
   return text.charAt(0).toUpperCase() + text.slice(1);

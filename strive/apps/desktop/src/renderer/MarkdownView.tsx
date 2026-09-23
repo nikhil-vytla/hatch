@@ -1,19 +1,38 @@
 // A reply's markdown, drawn from the parsed blocks.
-import { Fragment } from "react";
+import { Fragment, memo, useEffect, useState } from "react";
+import remend from "remend";
+import type { ThemedToken } from "shiki/core";
+import { tokens } from "./highlight";
+import { Icon } from "./icons";
 import { type Block, type Inline, parseBlocks } from "./markdown";
 
-export function Markdown({ text }: { text: string }) {
+/**
+ * `streaming`: the text is still arriving, so markdown cut off mid-way (an
+ * unclosed `**`, a fence) is completed first, and code isn't highlighted
+ * until the block is done.
+ */
+export function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  const blocks = parseBlocks(streaming ? remend(text) : text);
+
   return (
     <div className="md">
-      {parseBlocks(text).map((b, i) => (
+      {blocks.map((b, i) => (
         // Blocks have no identity beyond their place in the text.
-        <BlockView key={`${b.kind}-${i}`} block={b} />
+        <MemoBlock key={`${b.kind}-${i}`} block={b} settled={!streaming || i < blocks.length - 1} />
       ))}
     </div>
   );
 }
 
-function BlockView({ block }: { block: Block }) {
+/** A settled block draws the same every time: re-rendering it for each streamed token would be waste. */
+const MemoBlock = memo(
+  function MemoBlock({ block, settled }: { block: Block; settled: boolean }) {
+    return <BlockView block={block} settled={settled} />;
+  },
+  (a, b) => a.settled && b.settled && JSON.stringify(a.block) === JSON.stringify(b.block),
+);
+
+function BlockView({ block, settled }: { block: Block; settled: boolean }) {
   switch (block.kind) {
     case "paragraph":
       return (
@@ -32,11 +51,7 @@ function BlockView({ block }: { block: Block }) {
     }
 
     case "code":
-      return (
-        <pre className="code" data-lang={block.lang || undefined}>
-          <code>{block.text}</code>
-        </pre>
-      );
+      return <CodeBlock code={block.text} lang={block.lang} highlight={settled} />;
     case "list": {
       const L = block.ordered ? "ol" : "ul";
 
@@ -102,4 +117,54 @@ function InlineView({ run }: { run: Inline }) {
     default:
       return run satisfies never;
   }
+}
+
+function CodeBlock({ code, lang, highlight }: { code: string; lang: string; highlight: boolean }) {
+  const [lines, setLines] = useState<ThemedToken[][]>();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+
+    if (highlight && lang) void tokens(code, lang).then((t) => live && setLines(t));
+
+    return () => {
+      live = false;
+    };
+  }, [code, lang, highlight]);
+
+  const copy = () => {
+    void navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    });
+  };
+
+  return (
+    <div className="code-block">
+      <div className="code-head">
+        <span className="lang">{lang || "text"}</span>
+        <button type="button" className="quiet copy" onClick={copy} aria-label="copy code">
+          <Icon name={copied ? "check" : "copy"} /> {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre className="code">
+        <code>
+          {lines
+            ? lines.map((line, i) => (
+                // Lines have no identity beyond their place.
+                <Fragment key={`l${i}`}>
+                  {line.map((t, j) => (
+                    <span key={`t${j}`} style={{ color: t.color }}>
+                      {t.content}
+                    </span>
+                  ))}
+                  {i < lines.length - 1 && "\n"}
+                </Fragment>
+              ))
+            : code}
+        </code>
+      </pre>
+    </div>
+  );
 }

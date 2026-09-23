@@ -19,6 +19,7 @@ import {
   type Workspace,
 } from "@strive/workspace";
 import { type ReactNode, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { useStickToBottom } from "use-stick-to-bottom";
 import type { Bridge, Opened } from "../shared/bridge";
 import { type Item, label, summarize, type Tool } from "./conversation";
 import { diffLines } from "./diff";
@@ -410,57 +411,86 @@ function duration(ms: number): string {
 }
 
 function Transcript({ model, opened, session }: { model: SessionModel; opened: Opened; session: SessionActions }) {
-  const scroller = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
-  const items = model.conversation.items;
-
-  // Follows new output while the view is at the bottom; leaves it be once the person scrolls up.
-  useLayoutEffect(() => {
-    const el = scroller.current;
-
-    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+  // Follows new output while the view is at the bottom; a scroll up (wheel,
+  // keys, drag) lets go, and the pill or a new prompt takes it back.
+  const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom({
+    initial: "instant",
+    resize: "smooth",
   });
+
+  const items = model.conversation.items;
+  const lastTools = items.findLastIndex((i) => i.kind === "tools");
 
   return (
     <div className="transcript">
-      <div
-        className="scroller"
-        ref={scroller}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-        }}
-      >
-        <div className="thread">
+      <div className="scroller" ref={scrollRef}>
+        <div className="thread" ref={contentRef}>
           {!items.some((i) => i.kind === "user") && <Empty opened={opened} />}
-          {items.map((item) => (
-            <ItemView key={`${item.kind}-${item.seq}`} item={item} session={session} />
+          {items.map((item, i) => (
+            <ItemView
+              key={`${item.kind}-${item.seq}`}
+              item={item}
+              session={session}
+              live={model.working && i === lastTools && i === items.length - 1}
+            />
           ))}
           {model.live && (
             <div className="msg reply live">
-              <Markdown text={model.live} />
+              <Markdown text={model.live} streaming />
             </div>
           )}
-          {model.working && !model.live && (
-            <div className="thinking">
-              <span className="pulse" /> {model.conversation.waiting().length > 0 ? "Waiting for you…" : "Working…"}
-            </div>
-          )}
+          {model.working && <Trailer model={model} />}
         </div>
       </div>
+      {!isAtBottom && (
+        <button type="button" className="jump" onClick={() => scrollToBottom()}>
+          <Icon name="arrow" className="down" /> Jump to latest
+        </button>
+      )}
       <Composer
         model={model}
         opened={opened}
         session={{
           ...session,
           prompt: (text) => {
-            pinned.current = true; // a new prompt: follow what comes of it
             session.prompt(text);
+            void scrollToBottom(); // a new prompt: follow what comes of it
           },
         }}
       />
     </div>
   );
+}
+
+/** What the agent is doing now, and for how long. */
+function Trailer({ model }: { model: SessionModel }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+
+    return () => clearInterval(tick);
+  }, []);
+
+  const started = model.conversation.turnStartedMs;
+  const waiting = model.conversation.waiting().length > 0;
+  const elapsed = started === undefined ? "" : ` ${clock(now - started)}`;
+
+  return (
+    <div className={`thinking ${waiting ? "waiting" : ""}`}>
+      <span className="pulse" />
+      <span>{waiting ? "Waiting for you" : model.live ? "Writing" : "Working"}</span>
+      <span className="faint">{elapsed}</span>
+      {!waiting && <span className="faint hint">Esc to interrupt</span>}
+    </div>
+  );
+}
+
+/** Elapsed time as a clock reads it: 42s, 3m 05s. */
+function clock(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 }
 
 function Empty({ opened }: { opened: Opened }) {
@@ -478,7 +508,7 @@ function Empty({ opened }: { opened: Opened }) {
   );
 }
 
-function ItemView({ item, session }: { item: Item; session: SessionActions }) {
+function ItemView({ item, session, live }: { item: Item; session: SessionActions; live: boolean }) {
   switch (item.kind) {
     case "user":
       return (
@@ -493,7 +523,7 @@ function ItemView({ item, session }: { item: Item; session: SessionActions }) {
         </div>
       );
     case "tools":
-      return <ToolGroup tools={item.tools} session={session} />;
+      return <ToolGroup tools={item.tools} session={session} live={live} />;
     case "turn": {
       const cost = item.costUsdMicros > 0 ? ` · ${formatUsd(item.costUsdMicros)}` : "";
 
@@ -514,36 +544,24 @@ function ItemView({ item, session }: { item: Item; session: SessionActions }) {
   }
 }
 
-const GROUP_ICON: Record<Tool["status"], IconName> = {
-  running: "spinner",
-  waiting: "hand",
-  done: "check",
-  failed: "x",
-  refused: "x",
-  interrupted: "x",
-};
-
-function groupStatus(tools: readonly Tool[]): Tool["status"] {
-  const order: Tool["status"][] = ["waiting", "running", "refused", "interrupted", "failed"];
-
-  return order.find((s) => tools.some((t) => t.status === s)) ?? "done";
-}
-
-function ToolGroup({ tools, session }: { tools: Tool[]; session: SessionActions }) {
-  const status = groupStatus(tools);
-  const [open, setOpen] = useState(status === "waiting");
-
-  // A question for a person opens the group, and it stays open once answered.
-  useEffect(() => {
-    if (status === "waiting") setOpen(true);
-  }, [status]);
+function ToolGroup({ tools, session, live }: { tools: Tool[]; session: SessionActions; live: boolean }) {
+  const active = tools.some((t) => t.status === "running" || t.status === "waiting");
+  // Open while the agent is at it, closed once it has moved on, unless the
+  // person has said otherwise by clicking.
+  const [chosen, setChosen] = useState<boolean>();
+  const open = chosen ?? (live || active);
+  const waiting = tools.some((t) => t.status === "waiting");
 
   return (
-    <div className={`tools ${status}`}>
-      <button type="button" className="tools-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <div className="tools">
+      <button type="button" className="tools-head" aria-expanded={open} onClick={() => setChosen(!open)}>
         <Icon name="chevron" className={open ? "open" : ""} />
         <span>{summarize(tools)}</span>
-        {status !== "done" && <Icon name={GROUP_ICON[status]} className={`state ${status}`} />}
+        {waiting ? (
+          <Icon name="hand" className="state waiting" />
+        ) : (
+          active && <Icon name="spinner" className="state running" />
+        )}
       </button>
       {open && (
         <div className="tool-list">

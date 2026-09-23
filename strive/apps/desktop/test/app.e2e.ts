@@ -144,6 +144,28 @@ test("a prompt typed in the window is journaled and shown", async () => {
   await app.close();
 });
 
+test("code in a reply is highlighted in the window, under its CSP", async () => {
+  const { page, cwd } = await openApp();
+  const host = await Rpc.open();
+  const id = sessionId(cwd);
+  await host.call("host/register", { id });
+  const text = "Here:\n\n```ts\nconst answer: number = 42;\n```";
+  await host.call("host/record", {
+    id,
+    event: { type: "assistantMessage", turn: 1, text, toolCalls: [], message: {} },
+  });
+  const code = page.locator(".code-block pre.code code");
+  await code.getByText("42").waitFor();
+  await page.waitForFunction(() => document.querySelectorAll(".code-block pre.code code span[style]").length > 3);
+
+  const colours = await code
+    .locator("span[style]")
+    .evaluateAll((spans) => new Set(spans.map((s) => getComputedStyle(s).color)).size);
+
+  assert.ok(colours >= 3, `tokens in ${colours} colours`);
+  host.close();
+});
+
 test("a reloaded window shows what happened since it opened", async () => {
   const { page, cwd } = await openApp();
   const rpc = await Rpc.open();
@@ -163,6 +185,8 @@ test("an approval waits in the conversation and Allow lets the command run", asy
   await page.getByRole("button", { name: "Allow", exact: true }).click();
   const r = await run;
   assert.deepEqual({ text: "allowed\n" }, { text: JSON.parse(JSON.stringify(r.result)).text });
+  // Done, the group closes; opening it shows how it was decided.
+  await page.locator(".tools-head", { hasText: "Ran 1 command" }).click();
   await page.locator(".tool .badge", { hasText: "Allowed" }).waitFor();
   const log = JSON.parse(strive("log", id, "--json"));
   const decided = log.entries.find((e: { event: { type: string } }) => e.event.type === "approvalDecided");
