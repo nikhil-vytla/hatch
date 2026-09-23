@@ -272,7 +272,11 @@ impl Ledger {
                     l.spent_usd += usd;
                     l.spent_tokens += tokens;
                 }
-                Event::SessionStarted { .. } | Event::UserMessage { .. } | Event::Recovered { .. } => {}
+                Event::SessionStarted { .. }
+                | Event::UserMessage { .. }
+                | Event::Recovered { .. }
+                | Event::EffectStarted { .. }
+                | Event::EffectFinished { .. } => {}
             }
         }
         for r in abandoned.values() {

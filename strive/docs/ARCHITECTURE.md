@@ -20,6 +20,8 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | --- | --- |
 | `crates/proto` | Protocol: JSON-RPC envelopes, method and notification declarations, events, TS export |
 | `crates/journal` | Authenticated session journals: format, verification, crash recovery |
+| `crates/budget` | Prices, costs, reservations and the ledger rebuilt from journal events |
+| `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client |
@@ -101,3 +103,48 @@ and truncate the journal to match. The result verifies. Detecting this
 rollback needs a counter the attacker can't roll back, which a local file
 can't provide. The agent's sandbox denies `~/.strive` entirely, so an agent
 can't do this. A person with the user's file access can.
+
+## The model gateway
+
+Model calls go through a loopback HTTP proxy in the daemon, never straight
+to a provider. `session/gateway` (or `strive gateway`) returns base URLs
+holding a secret token for one session, so any Anthropic or OpenAI SDK works
+by changing its base URL.
+
+**Per call:**
+1. **Admit.** The gateway refuses a call before sending anything when:
+   - the token is unknown;
+   - the API or model isn't supported, or the model has no known price;
+   - there is no key;
+   - its worst-case cost doesn't fit what the session has left.
+
+   The worst case bounds input by the request's bytes and the context
+   window, and output by the request's cap or the model's maximum, all at
+   full input price. Refusals come back in the calling SDK's own error
+   format.
+2. **Record the start.** The exact request bytes go into the content
+   store. The reservation and a `modelCallStarted` entry are then written in
+   one step on the session's writer.
+3. **Forward.** The provider key comes from `~/.strive/credentials.json`
+   (0600, set by `strive auth`) or the daemon's environment at start. The
+   agent's own credential headers are dropped.
+4. **Stream back and meter.** Bytes pass through unchanged while usage is
+   read from the body or stream. For streaming Chat Completions, the
+   gateway asks for usage.
+5. **Record the end.** The exact response bytes are stored and
+   `modelCallFinished` is written. Only then does the client's response
+   end, so a finished response implies a journaled cost.
+
+**What each outcome costs:**
+
+| Outcome | Charged |
+| --- | --- |
+| Complete | Its usage at the model's prices |
+| Rejected (a provider error status) | Nothing |
+| Broken (stream cut, client gone, request failed after sending) | The full reservation |
+| Started but never finished (daemon crash) | The full reservation, closed explicitly as broken on the next open |
+
+**Budget records.** A session's limits are a `budgetSet` entry written at
+creation from settings, $5 by default, and changed with `session/budget`
+(`/budget` in the TUI). Editing settings later never changes an existing
+session's budget.

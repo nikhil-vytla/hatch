@@ -35,6 +35,8 @@ export class Spend {
       case "sessionStarted":
       case "userMessage":
       case "recovered":
+      case "effectStarted":
+      case "effectFinished":
         return;
     }
   }

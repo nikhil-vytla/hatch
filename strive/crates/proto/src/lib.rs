@@ -77,6 +77,8 @@ methods! {
     SessionBudget = "session/budget" (SessionBudgetParams) -> Appended;
     AuthSet = "auth/set" (AuthSetParams) -> Empty;
     AuthStatus = "auth/status" (Empty) -> AuthStatusResult;
+    EffectRun = "effect/run" (EffectRunParams) -> EffectRunResult;
+    BlobGet = "blob/get" (BlobGetParams) -> BlobGetResult;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -380,6 +382,42 @@ impl<'de> Deserialize<'de> for Digest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EffectRunParams {
+    pub id: String,
+    pub call_id: String,
+    pub request: EffectRequest,
+}
+
+/// The effect's journal number and outcome, with the output text inline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EffectRunResult {
+    pub effect: u64,
+    pub outcome: EffectOutcome,
+    /// The output (for `done`) or the reason (for `refused`), as the agent sees it.
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BlobGetParams {
+    pub digest: Digest,
+}
+
+/// A blob as UTF-8 text (lossily converted if it isn't).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BlobGetResult {
+    pub text: String,
+    pub bytes: u64,
+}
+
 /// Something that happened in a session. Journaled in order; never edited.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
@@ -430,8 +468,101 @@ pub enum Event {
         response: Option<Digest>,
         duration_ms: u64,
     },
+    /// The daemon is about to perform a change or command for the agent.
+    /// Written first, so an effect cut off by a crash is still on record.
+    EffectStarted {
+        /// Numbers this session's effects; pairs with `EffectFinished`.
+        effect: u64,
+        /// The model's tool call this effect serves.
+        call_id: String,
+        record: EffectRecord,
+    },
+    EffectFinished {
+        effect: u64,
+        outcome: EffectOutcome,
+        duration_ms: u64,
+    },
 }
 
+/// What the agent asked the daemon to do, as the protocol carries it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum EffectRequest {
+    /// Lines `offset..offset+limit` of a text file (1-based; defaults to the start).
+    Read {
+        path: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        offset: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        limit: Option<u64>,
+    },
+    /// Replaces the whole file, creating it and its directories if needed.
+    Write { path: String, content: String },
+    /// Replaces the one occurrence of `old_text` with `new_text`.
+    Edit { path: String, old_text: String, new_text: String },
+    /// Runs a shell command in the session's directory, in the sandbox.
+    Bash {
+        command: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        timeout_ms: Option<u64>,
+    },
+}
+
+/// An effect as the journal records it: large payloads live in the content
+/// store and are named by digest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum EffectRecord {
+    Read {
+        path: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        offset: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        limit: Option<u64>,
+    },
+    Write {
+        path: String,
+        content: Digest,
+        bytes: u64,
+    },
+    Edit {
+        path: String,
+        old_text: Digest,
+        new_text: Digest,
+    },
+    Bash {
+        command: String,
+        timeout_ms: u64,
+    },
+}
+
+/// How an effect ended. `output` is what the agent is shown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum EffectOutcome {
+    /// It ran. For bash, `exit_code` is the command's status (absent if it
+    /// was killed by the timeout).
+    Done {
+        output: Digest,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        exit_code: Option<i32>,
+        /// The output was cut to fit; the full output isn't kept.
+        truncated: bool,
+    },
+    /// It was not allowed, or could not be done; `reason` says why.
+    Refused { reason: String },
+    /// The daemon stopped while it ran; whatever it changed stays changed.
+    Interrupted,
+}
 /// How a model call ended, and what it cost.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]

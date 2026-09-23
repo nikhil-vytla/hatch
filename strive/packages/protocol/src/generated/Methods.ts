@@ -2,7 +2,11 @@
 import type { Appended } from "./Appended";
 import type { AuthSetParams } from "./AuthSetParams";
 import type { AuthStatusResult } from "./AuthStatusResult";
+import type { BlobGetParams } from "./BlobGetParams";
+import type { BlobGetResult } from "./BlobGetResult";
 import type { DaemonStatusResult } from "./DaemonStatusResult";
+import type { EffectRunParams } from "./EffectRunParams";
+import type { EffectRunResult } from "./EffectRunResult";
 import type { Empty } from "./Empty";
 import type { GatewayInfo } from "./GatewayInfo";
 import type { InitializeParams } from "./InitializeParams";
@@ -31,6 +35,8 @@ export type Methods = {
   "session/budget": { params: SessionBudgetParams; result: Appended };
   "auth/set": { params: AuthSetParams; result: Empty };
   "auth/status": { params: Empty; result: AuthStatusResult };
+  "effect/run": { params: EffectRunParams; result: EffectRunResult };
+  "blob/get": { params: BlobGetParams; result: BlobGetResult };
 };
 
 export type MethodName = keyof Methods;

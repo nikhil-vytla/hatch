@@ -1,0 +1,347 @@
+//! Effects: what the daemon does to the machine on the agent's behalf.
+//!
+//! Every path is resolved against the session's directory and checked
+//! against one policy: strive's own state is never readable or writable, and
+//! writes outside the workspace need approval. Commands run in the OS
+//! sandbox (Seatbelt on macOS, bubblewrap on Linux): writes are confined to
+//! the workspace and temp directories, strive's state is hidden, and the
+//! network is off. Where no sandbox is available, commands are refused
+//! rather than run unconfined.
+
+use std::fmt::Write as _;
+use std::fs;
+use std::io::{self, Read, Write};
+use std::os::unix::fs::PermissionsExt;
+use std::os::unix::process::CommandExt;
+use std::path::{Component, Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+use strive_proto::EffectRequest;
+
+/// Where an effect runs.
+pub struct Scope {
+    /// The session's directory, canonical.
+    pub workspace: PathBuf,
+    /// strive's home, canonical: never readable or writable by an effect.
+    pub strive_home: PathBuf,
+}
+
+/// What an effect produced, before it is journaled.
+pub enum Result {
+    Done { text: String, exit_code: Option<i32>, truncated: bool },
+    Refused(String),
+}
+
+pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
+const MAX_TIMEOUT_MS: u64 = 600_000;
+const READ_LINES: u64 = 2000;
+const READ_BYTES: usize = 256 * 1024;
+/// Command output kept from each end when it is too long.
+const OUTPUT_KEEP: usize = 100 * 1024;
+
+/// A policy decision about a path.
+enum Access {
+    Allowed(PathBuf),
+    /// Needs approval; the reason says why.
+    Ask(String),
+    Denied(String),
+}
+
+pub fn perform(scope: &Scope, request: &EffectRequest) -> Result {
+    match request {
+        EffectRequest::Read { path, offset, limit } => match resolve(scope, path, false) {
+            Access::Allowed(p) => read(&p, path, *offset, *limit),
+            Access::Ask(why) | Access::Denied(why) => Result::Refused(why),
+        },
+        EffectRequest::Write { path, content } => match resolve(scope, path, true) {
+            Access::Allowed(p) => write(&p, path, content.as_bytes()),
+            Access::Ask(why) | Access::Denied(why) => Result::Refused(why),
+        },
+        EffectRequest::Edit { path, old_text, new_text } => match resolve(scope, path, true) {
+            Access::Allowed(p) => edit(&p, path, old_text, new_text),
+            Access::Ask(why) | Access::Denied(why) => Result::Refused(why),
+        },
+        EffectRequest::Bash { command, timeout_ms } => {
+            bash(scope, command, timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS))
+        }
+    }
+}
+
+/// The path an effect would touch, after following every symlink that
+/// exists, and whether the policy allows it.
+fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
+    let raw = Path::new(path);
+    let joined = if raw.is_absolute() { raw.to_path_buf() } else { scope.workspace.join(raw) };
+    let Some(real) = real_path(&joined) else {
+        return Access::Denied(format!("can't resolve {path}"));
+    };
+    if real.starts_with(&scope.strive_home) {
+        return Access::Denied("the agent can't read strive's own state".into());
+    }
+    if writing && !real.starts_with(&scope.workspace) {
+        return Access::Ask(format!("writing outside the workspace needs approval: {}", real.display()));
+    }
+    Access::Allowed(real)
+}
+
+/// Canonicalizes the longest existing prefix and appends the rest, with `..`
+/// resolved lexically only after symlinks in the existing part are followed.
+fn real_path(p: &Path) -> Option<PathBuf> {
+    let mut existing = p.to_path_buf();
+    let mut rest = Vec::new();
+    while fs::symlink_metadata(&existing).is_err() {
+        rest.push(existing.file_name()?.to_os_string());
+        existing = existing.parent()?.to_path_buf();
+    }
+    let mut out = existing.canonicalize().ok()?;
+    for part in rest.iter().rev() {
+        match Path::new(part).components().next() {
+            Some(Component::ParentDir) => {
+                out.pop();
+            }
+            Some(Component::CurDir) | None => {}
+            Some(_) => out.push(part),
+        }
+    }
+    Some(out)
+}
+
+fn read(p: &Path, shown: &str, offset: Option<u64>, limit: Option<u64>) -> Result {
+    let bytes = match fs::read(p) {
+        Ok(b) => b,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Result::Refused(format!("no such file: {shown}")),
+        Err(e) if e.kind() == io::ErrorKind::IsADirectory => {
+            return Result::Refused(format!("{shown} is a directory; use bash to list it"));
+        }
+        Err(e) => return Result::Refused(format!("can't read {shown}: {e}")),
+    };
+    if bytes[..bytes.len().min(8192)].contains(&0) {
+        return Result::Done {
+            text: format!("{shown} is a binary file ({} bytes)", bytes.len()),
+            exit_code: None,
+            truncated: false,
+        };
+    }
+    let text = String::from_utf8_lossy(&bytes);
+    let start = offset.unwrap_or(1).max(1);
+    let limit = limit.unwrap_or(READ_LINES).min(READ_LINES);
+    let mut out = String::new();
+    let mut shown_lines = 0;
+    let mut truncated = false;
+    for (i, line) in text.split_inclusive('\n').enumerate() {
+        let n = i as u64 + 1;
+        if n < start {
+            continue;
+        }
+        if shown_lines == limit || out.len() + line.len() > READ_BYTES {
+            truncated = true;
+            let _ = writeln!(out, "[... more lines; read with offset {n} to continue]");
+            break;
+        }
+        out.push_str(line);
+        shown_lines += 1;
+    }
+    Result::Done { text: out, exit_code: None, truncated }
+}
+
+/// Replaces a file atomically, keeping an existing file's permissions.
+fn replace_file(p: &Path, bytes: &[u8]) -> io::Result<()> {
+    let dir = p.parent().ok_or_else(|| io::Error::other("no parent directory"))?;
+    fs::create_dir_all(dir)?;
+    let mode = fs::metadata(p).ok().map(|m| m.permissions().mode());
+    let tmp =
+        dir.join(format!(".{}.strive-{}", p.file_name().and_then(|n| n.to_str()).unwrap_or("f"), std::process::id()));
+    let _ = fs::remove_file(&tmp);
+    let mut f = fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+    f.write_all(bytes)?;
+    f.sync_all()?;
+    if let Some(mode) = mode {
+        fs::set_permissions(&tmp, fs::Permissions::from_mode(mode))?;
+    }
+    fs::rename(&tmp, p)
+}
+
+fn write(p: &Path, shown: &str, bytes: &[u8]) -> Result {
+    match replace_file(p, bytes) {
+        Ok(()) => {
+            Result::Done { text: format!("wrote {shown} ({} bytes)", bytes.len()), exit_code: None, truncated: false }
+        }
+        Err(e) => Result::Refused(format!("can't write {shown}: {e}")),
+    }
+}
+
+fn quoted(s: &str) -> String {
+    let short: String = s.chars().take(60).collect();
+    if short.len() < s.len() { format!("\"{short}…\"") } else { format!("\"{s}\"") }
+}
+
+fn edit(p: &Path, shown: &str, old: &str, new: &str) -> Result {
+    let text = match fs::read_to_string(p) {
+        Ok(t) => t,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Result::Refused(format!("no such file: {shown}")),
+        Err(e) => return Result::Refused(format!("can't read {shown}: {e}")),
+    };
+    if old.is_empty() {
+        return Result::Refused("the text to replace is empty; use write to create a file".into());
+    }
+    match text.matches(old).count() {
+        0 => Result::Refused(format!("{} does not appear in {shown}", quoted(old))),
+        1 => match replace_file(p, text.replacen(old, new, 1).as_bytes()) {
+            Ok(()) => Result::Done { text: format!("edited {shown}"), exit_code: None, truncated: false },
+            Err(e) => Result::Refused(format!("can't write {shown}: {e}")),
+        },
+        n => Result::Refused(format!(
+            "{} appears {n} times in {shown}; include more surrounding text so it matches once",
+            quoted(old)
+        )),
+    }
+}
+
+/// The command that runs `bash -c command` in the sandbox, or `None` where
+/// there is no sandbox.
+fn sandboxed_command(scope: &Scope, command: &str) -> Option<Command> {
+    let ws = scope.workspace.display();
+    let home = scope.strive_home.display();
+    if cfg!(target_os = "macos") {
+        if !Path::new("/usr/bin/sandbox-exec").exists() {
+            return None;
+        }
+        let tmp = std::env::temp_dir().canonicalize().unwrap_or_else(|_| PathBuf::from("/private/tmp"));
+        let profile = format!(
+            r#"(version 1)
+(allow default)
+(deny network*)
+(deny file-write*)
+(allow file-write*
+  (subpath "{ws}")
+  (subpath "/private/tmp")
+  (subpath "{tmp}")
+  (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty")
+  (regex #"^/dev/fd/") (regex #"^/dev/ttys"))
+(deny file-read* file-write* (subpath "{home}"))"#,
+            tmp = tmp.display()
+        );
+        let mut c = Command::new("/usr/bin/sandbox-exec");
+        c.args(["-p", &profile, "/bin/bash", "-c", command]);
+        return Some(c);
+    }
+    let bwrap = which("bwrap")?;
+    let mut c = Command::new(bwrap);
+    c.args(["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--bind", "/tmp", "/tmp"]);
+    c.args(["--bind"]).arg(&scope.workspace).arg(&scope.workspace);
+    c.args(["--tmpfs"]).arg(&scope.strive_home);
+    c.args(["--unshare-net", "--die-with-parent", "--", "/bin/bash", "-c", command]);
+    Some(c)
+}
+
+fn which(bin: &str) -> Option<PathBuf> {
+    std::env::var_os("PATH").and_then(|p| std::env::split_paths(&p).map(|d| d.join(bin)).find(|p| p.is_file()))
+}
+
+/// Environment variables a command never sees: strive's own, and the
+/// provider keys only the gateway may use.
+fn scrubbed(name: &str) -> bool {
+    name.starts_with("STRIVE_") || name == "ANTHROPIC_API_KEY" || name == "OPENAI_API_KEY"
+}
+
+fn bash(scope: &Scope, command: &str, timeout_ms: u64) -> Result {
+    let Some(mut cmd) = sandboxed_command(scope, command) else {
+        return Result::Refused(
+            "commands run only in a sandbox, and none is available here (install bubblewrap)".into(),
+        );
+    };
+    let (mut reader, writer) = match io::pipe() {
+        Ok(p) => p,
+        Err(e) => return Result::Refused(format!("can't run the command: {e}")),
+    };
+    let Ok(writer2) = writer.try_clone() else { return Result::Refused("can't run the command".into()) };
+    for (k, _) in std::env::vars_os() {
+        if k.to_str().is_some_and(scrubbed) {
+            cmd.env_remove(&k);
+        }
+    }
+    cmd.current_dir(&scope.workspace).stdin(Stdio::null()).stdout(writer).stderr(writer2).process_group(0);
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => return Result::Refused(format!("can't run the command: {e}")),
+    };
+    drop(cmd);
+    let collector = std::thread::spawn(move || capture(&mut reader));
+    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    let pgid = nix::unistd::Pid::from_raw(i32::try_from(child.id()).unwrap_or(i32::MAX));
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(s)) => break Some(s),
+            Ok(None) if Instant::now() >= deadline => break None,
+            Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+            Err(e) => return Result::Refused(format!("can't wait for the command: {e}")),
+        }
+    };
+    // The whole group goes, so background children don't outlive the command.
+    let _ = nix::sys::signal::killpg(pgid, nix::sys::signal::Signal::SIGKILL);
+    let _ = child.wait();
+    let (text, truncated) = collector.join().unwrap_or_default();
+    match status {
+        Some(s) => Result::Done { text, exit_code: s.code(), truncated },
+        None => Result::Done {
+            text: format!(
+                "the command timed out after {}.{}s and was stopped",
+                timeout_ms / 1000,
+                timeout_ms % 1000 / 100
+            ),
+            exit_code: None,
+            truncated,
+        },
+    }
+}
+
+/// Reads a command's output, keeping the start and the end when it is long.
+fn capture(r: &mut io::PipeReader) -> (String, bool) {
+    let mut head = Vec::new();
+    let mut tail = std::collections::VecDeque::new();
+    let mut dropped = 0usize;
+    let mut buf = [0u8; 16 * 1024];
+    while let Ok(n) = r.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+        for &b in &buf[..n] {
+            if head.len() < OUTPUT_KEEP {
+                head.push(b);
+            } else {
+                tail.push_back(b);
+                if tail.len() > OUTPUT_KEEP {
+                    tail.pop_front();
+                    dropped += 1;
+                }
+            }
+        }
+    }
+    let mut out = String::from_utf8_lossy(&head).into_owned();
+    if dropped > 0 {
+        let _ = write!(out, "\n[... output cut: {dropped} bytes ...]\n");
+    }
+    out.push_str(&String::from_utf8_lossy(&tail.into_iter().collect::<Vec<u8>>()));
+    (out, dropped > 0)
+}
+
+/// The journal's record of a request: payloads go to the content store.
+pub fn record(cas: &strive_journal::cas::Cas, request: &EffectRequest) -> io::Result<strive_proto::EffectRecord> {
+    use strive_proto::EffectRecord as R;
+    Ok(match request {
+        EffectRequest::Read { path, offset, limit } => R::Read { path: path.clone(), offset: *offset, limit: *limit },
+        EffectRequest::Write { path, content } => {
+            R::Write { path: path.clone(), content: cas.put(content.as_bytes())?, bytes: content.len() as u64 }
+        }
+        EffectRequest::Edit { path, old_text, new_text } => R::Edit {
+            path: path.clone(),
+            old_text: cas.put(old_text.as_bytes())?,
+            new_text: cas.put(new_text.as_bytes())?,
+        },
+        EffectRequest::Bash { command, timeout_ms } => R::Bash {
+            command: command.clone(),
+            timeout_ms: timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS),
+        },
+    })
+}

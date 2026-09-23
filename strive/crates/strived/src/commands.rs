@@ -5,7 +5,8 @@ use std::process::ExitCode;
 use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
-    CallOutcome, Entry, Event, SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef,
+    CallOutcome, EffectOutcome, EffectRecord, Entry, Event, SessionInfo, SessionList, SessionListParams, SessionRead,
+    SessionReadResult, SessionRef,
 };
 
 use crate::client::{Client, ServerError};
@@ -82,6 +83,17 @@ fn describe(e: &Entry) -> String {
             CallOutcome::Broken { reason, cost_usd_micros, .. } => {
                 format!("model call {call} broke ({reason}); charged its full hold of {}", format_usd(*cost_usd_micros))
             }
+        },
+        Event::EffectStarted { effect, record, .. } => format!("effect {effect}: {}", describe_effect(record)),
+        Event::EffectFinished { effect, outcome, duration_ms } => match outcome {
+            EffectOutcome::Done { exit_code: Some(code), .. } => {
+                format!("effect {effect} done in {}.{}s, exit {code}", duration_ms / 1000, duration_ms % 1000 / 100)
+            }
+            EffectOutcome::Done { .. } => {
+                format!("effect {effect} done in {}.{}s", duration_ms / 1000, duration_ms % 1000 / 100)
+            }
+            EffectOutcome::Refused { reason } => format!("effect {effect} refused: {reason}"),
+            EffectOutcome::Interrupted => format!("effect {effect} interrupted: the daemon stopped while it ran"),
         },
     }
 }
@@ -175,4 +187,21 @@ pub async fn auth(c: &mut Client, provider: Option<String>) -> Result<ExitCode> 
         .await?;
     println!("saved the {provider} key; new model calls use it");
     Ok(ExitCode::SUCCESS)
+}
+
+pub async fn gateway(c: &mut Client, id: Option<String>) -> Result<ExitCode> {
+    let id = resolve(c, id).await?;
+    let g = c.request::<strive_proto::SessionGateway>(SessionRef { id }).await?;
+    println!("ANTHROPIC_BASE_URL={}", g.anthropic);
+    println!("OPENAI_BASE_URL={}", g.openai);
+    Ok(ExitCode::SUCCESS)
+}
+
+fn describe_effect(r: &EffectRecord) -> String {
+    match r {
+        EffectRecord::Read { path, .. } => format!("read {path}"),
+        EffectRecord::Write { path, bytes, .. } => format!("write {path} ({bytes} bytes)"),
+        EffectRecord::Edit { path, .. } => format!("edit {path}"),
+        EffectRecord::Bash { command, .. } => format!("bash: {command}"),
+    }
 }

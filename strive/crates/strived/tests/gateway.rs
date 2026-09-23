@@ -71,6 +71,7 @@ impl Upstream {
                         respond(reply).await
                     }
                 });
+                let app = app.layer(axum::extract::DefaultBodyLimit::disable());
                 axum::serve(listener, app).await.unwrap();
             });
         });
@@ -90,6 +91,11 @@ async fn respond(reply: Reply) -> Response {
             .status(status)
             .header("content-type", "application/json")
             .header("request-id", "req_fake")
+            .header("anthropic-ratelimit-requests-remaining", "49")
+            .header("openai-processing-ms", "12")
+            .header("x-ratelimit-limit-requests", "50")
+            .header("set-cookie", "session=upstream-secret")
+            .header("x-internal-trace", "upstream-detail")
             .body(Body::from(body))
             .unwrap(),
         Reply::Sse(events, delay_ms, cut) => {
@@ -417,4 +423,85 @@ fn test_daemons_hold_no_keys_from_the_developers_shell() {
         status["providers"],
         json!([{"provider": "anthropic", "source": "none"}, {"provider": "openai", "source": "none"}])
     );
+}
+
+/// A full large-context request is several megabytes (a million-token
+/// context is roughly 4 MB); the gateway must forward it, not refuse it.
+#[test]
+fn a_multi_megabyte_request_is_forwarded() {
+    let s = setup(Reply::Json(200, ANTHROPIC_JSON.into()), &[("ANTHROPIC_API_KEY", "k")]);
+    let big = "x".repeat(5 * 1024 * 1024);
+    let body = BODY.replace("\"content\":\"hi\"", &format!("\"content\":\"{big}\""));
+    let (status, _) = s.messages(&body);
+    assert_eq!(status, 200);
+    assert_eq!(s.upstream.seen()[0].body.len(), body.len());
+}
+
+/// Each session's calls are billed and journaled in that session only.
+#[test]
+fn each_session_gets_its_own_gateway_token() {
+    let s = setup(Reply::Json(200, ANTHROPIC_JSON.into()), &[("ANTHROPIC_API_KEY", "k")]);
+    let mut c = s.env.rpc();
+    let other = c.ok("session/create", &json!({"cwd": "/tmp/other"}))["id"].as_str().unwrap().to_string();
+    let other_base = c.ok("session/gateway", &json!({"id": other}))["anthropic"].as_str().unwrap().to_string();
+    assert_ne!(other_base, s.base);
+    assert_eq!(
+        c.ok("session/gateway", &json!({"id": s.id}))["anthropic"].as_str().unwrap(),
+        s.base,
+        "stable per session"
+    );
+
+    assert_eq!(s.post(&format!("{other_base}/v1/messages"), BODY).0, 200);
+    assert_eq!(s.entries().len(), 2, "nothing was journaled in the first session");
+    let r = c.ok("session/read", &json!({"id": other}));
+    assert_eq!(r["entries"].as_array().unwrap().len(), 4);
+}
+
+/// Provider metadata an SDK uses (request ids, rate limits) reaches the
+/// client; anything else from upstream (cookies, internal headers) doesn't.
+#[test]
+fn only_provider_metadata_headers_are_passed_back() {
+    let s = setup(Reply::Json(200, ANTHROPIC_JSON.into()), &[("ANTHROPIC_API_KEY", "k")]);
+    let url = format!("{}/v1/messages", s.base);
+    let headers = s.rt.block_on(async {
+        let r = reqwest::Client::new().post(url).body(BODY).send().await.unwrap();
+        r.headers().clone()
+    });
+    let get = |k: &str| headers.get(k).map(|v| v.to_str().unwrap().to_string());
+    assert_eq!(get("content-type").as_deref(), Some("application/json"));
+    assert_eq!(get("request-id").as_deref(), Some("req_fake"));
+    assert_eq!(get("anthropic-ratelimit-requests-remaining").as_deref(), Some("49"));
+    assert_eq!(get("openai-processing-ms").as_deref(), Some("12"));
+    assert_eq!(get("x-ratelimit-limit-requests").as_deref(), Some("50"));
+    assert_eq!(get("set-cookie"), None);
+    assert_eq!(get("x-internal-trace"), None);
+}
+
+/// Call numbers pair starts with finishes, so they must never repeat in a
+/// session, within one daemon run or across restarts.
+#[test]
+fn call_numbers_continue_across_calls_and_restarts() {
+    let s = setup(Reply::Json(200, ANTHROPIC_JSON.into()), &[("ANTHROPIC_API_KEY", "k")]);
+    assert_eq!(s.messages(BODY).0, 200);
+    assert_eq!(s.messages(BODY).0, 200);
+    s.env.stop();
+    let base = s.env.rpc().ok("session/gateway", &json!({"id": s.id}))["anthropic"].as_str().unwrap().to_string();
+    assert_eq!(s.post(&format!("{base}/v1/messages"), BODY).0, 200);
+    let calls: Vec<(String, u64)> = s
+        .entries()
+        .iter()
+        .filter_map(|e| e.get("call").map(|c| (e["type"].as_str().unwrap().to_string(), c.as_u64().unwrap())))
+        .collect();
+    let expected: Vec<(String, u64)> = [1, 2, 3]
+        .iter()
+        .flat_map(|&n| [("modelCallStarted".to_string(), n), ("modelCallFinished".to_string(), n)])
+        .collect();
+    assert_eq!(calls, expected);
+}
+
+#[test]
+fn gateway_urls_are_only_issued_for_real_sessions() {
+    let s = setup(Reply::Json(200, ANTHROPIC_JSON.into()), &[("ANTHROPIC_API_KEY", "k")]);
+    let r = s.env.rpc().call("session/gateway", &json!({"id": "01J8ZZZZZZZZZZZZZZZZZZZZZZ"}));
+    assert_eq!(r["error"]["code"], -32010);
 }

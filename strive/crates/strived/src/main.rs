@@ -7,6 +7,7 @@ mod client;
 mod commands;
 mod credentials;
 mod doctor;
+mod effects;
 mod gateway;
 mod launch;
 mod log;
@@ -63,6 +64,9 @@ enum Cmd {
         #[arg(long, conflicts_with = "id")]
         all: bool,
     },
+    /// Print a session's model gateway URLs as `ANTHROPIC_BASE_URL` and
+    /// `OPENAI_BASE_URL`, so any SDK-based tool runs under its budget and journal.
+    Gateway { id: Option<String> },
     /// Store a provider API key, or with no provider, show which keys are set.
     Auth {
         #[arg(value_parser = ["anthropic", "openai"])]
@@ -114,6 +118,7 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         Some(Cmd::Verify { id, all }) => {
             commands::verify(&mut launch::ensure(&home, "strive-verify").await?.0, id, all).await
         }
+        Some(Cmd::Gateway { id }) => commands::gateway(&mut launch::ensure(&home, "strive-gateway").await?.0, id).await,
         Some(Cmd::Auth { provider }) => {
             commands::auth(&mut launch::ensure(&home, "strive-auth").await?.0, provider).await
         }

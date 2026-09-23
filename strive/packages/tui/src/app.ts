@@ -64,6 +64,20 @@ export function describe(entry: Entry): string {
         case "broken":
           return style.danger(`The call broke (${e.outcome.reason}); charged its full hold of ${formatUsd(e.outcome.costUsdMicros)}.`);
       }
+    case "effectStarted": {
+      const r = e.record;
+      const what = r.kind === "bash" ? `$ ${r.command}` : r.kind === "write" ? `write ${r.path} (${r.bytes} bytes)` : `${r.kind} ${r.path}`;
+      return style.muted(what);
+    }
+    case "effectFinished":
+      switch (e.outcome.kind) {
+        case "done":
+          return style.faint(e.outcome.exitCode === undefined ? "done" : `exit ${e.outcome.exitCode}`);
+        case "refused":
+          return style.danger(`Refused: ${e.outcome.reason}`);
+        case "interrupted":
+          return style.danger("Interrupted: the daemon stopped while this ran.");
+      }
   }
 }
 

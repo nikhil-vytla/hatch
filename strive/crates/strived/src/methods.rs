@@ -7,7 +7,8 @@ use std::sync::atomic::Ordering;
 use serde_json::{Value, json};
 use strive_proto::rpc::{Message, RequestId, RpcError};
 use strive_proto::{
-    Appended, AuthSet, AuthSetParams, AuthStatus, AuthStatusResult, DaemonShutdown, DaemonStatus, DaemonStatusResult,
+    Appended, AuthSet, AuthSetParams, AuthStatus, AuthStatusResult, BlobGet, BlobGetParams, BlobGetResult,
+    DaemonShutdown, DaemonStatus, DaemonStatusResult, EffectOutcome, EffectRun, EffectRunParams, EffectRunResult,
     Empty, Event, Initialize, InitializeParams, InitializeResult, Method, Notification, PROTOCOL_VERSION, ProviderAuth,
     SessionAttach, SessionAttachParams, SessionAttachResult, SessionBudget, SessionBudgetParams, SessionCreate,
     SessionCreateParams, SessionEntry, SessionEntryNotification, SessionGateway, SessionList, SessionListParams,
@@ -107,6 +108,46 @@ async fn route(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value)
                 })
                 .collect();
             reply::<AuthStatus>(AuthStatusResult { providers })
+        }
+        m if m.starts_with("effect/") => route_effect(state, m, params).await,
+        BlobGet::NAME => {
+            let BlobGetParams { digest } = parse::<BlobGet>(params)?;
+            let bytes = state.cas.get(&digest).map_err(|e| internal(&e))?;
+            reply::<BlobGet>(BlobGetResult {
+                text: String::from_utf8_lossy(&bytes).into_owned(),
+                bytes: bytes.len() as u64,
+            })
+        }
+        other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
+    }
+}
+
+async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply {
+    match method {
+        EffectRun::NAME => {
+            let EffectRunParams { id, call_id, request } = parse::<EffectRun>(params)?;
+            let sid = session_id(&id)?;
+            let info = state.sessions.info(&sid).await.map_err(session_error)?;
+            let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
+            let effect = state.sessions.start_effect(&sid, call_id, record).await.map_err(session_error)?;
+            let scope = crate::effects::Scope {
+                workspace: std::path::Path::new(&info.cwd).canonicalize().map_err(|e| internal(&e))?,
+                strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
+            };
+            let started = std::time::Instant::now();
+            let result = tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request))
+                .await
+                .map_err(|e| internal(&e))?;
+            let (outcome, text) = match result {
+                crate::effects::Result::Done { text, exit_code, truncated } => {
+                    let output = state.cas.put(text.as_bytes()).map_err(|e| internal(&e))?;
+                    (EffectOutcome::Done { output, exit_code, truncated }, text)
+                }
+                crate::effects::Result::Refused(reason) => (EffectOutcome::Refused { reason: reason.clone() }, reason),
+            };
+            let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+            state.sessions.finish_effect(&sid, effect, outcome.clone(), ms).await.map_err(session_error)?;
+            reply::<EffectRun>(EffectRunResult { effect, outcome, text })
         }
         other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
     }

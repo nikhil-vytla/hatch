@@ -174,6 +174,11 @@ fn verify_all_reports_sessions_whose_journal_cannot_be_read() {
     );
     let (_, out, _) = r.run(&["sessions", "--all"]);
     assert!(out.lines().any(|l| l == format!("{garbled}  unreadable journal")), "{out}");
+    let (_, out, _) = r.run(&["sessions"]);
+    assert!(
+        !out.contains("unreadable"),
+        "a directory's listing can't claim sessions whose directory is unknown: {out}"
+    );
     let (code, _, err) = r.run(&["log", &garbled]);
     assert_eq!(code, 1);
     assert_eq!(err.trim(), "strive: the session journal failed verification: entry 1 was modified, removed or moved");
@@ -217,4 +222,33 @@ fn doctor_reports_the_daemons_credentials() {
     let (_, out, _) = r.run(&["doctor"]);
     let line = out.lines().find(|l| l.contains("credentials")).unwrap();
     assert_eq!(line, "ok    credentials    openai (strive auth)");
+}
+
+#[test]
+fn gateway_prints_the_sessions_base_urls_as_environment() {
+    let r = Repo::new();
+    let id = r.session(&[]);
+    let (code, out, _) = r.run(&["gateway"]);
+    assert_eq!(code, 0);
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines.len(), 2, "{out}");
+    let anthropic = lines[0].strip_prefix("ANTHROPIC_BASE_URL=http://127.0.0.1:").unwrap();
+    assert!(anthropic.ends_with("/anthropic") && anthropic.contains("/g/"), "{out}");
+    let openai = lines[1].strip_prefix("OPENAI_BASE_URL=http://127.0.0.1:").unwrap();
+    assert!(openai.ends_with("/openai/v1"), "{out}");
+    let via_rpc = r.env.rpc().ok("session/gateway", &json!({"id": id}));
+    assert_eq!(lines[0], format!("ANTHROPIC_BASE_URL={}", via_rpc["anthropic"].as_str().unwrap()));
+}
+
+/// A first entry that parses but fails its MAC names a directory no one can
+/// vouch for, so log refuses it rather than show it.
+#[test]
+fn log_refuses_a_journal_whose_first_entry_fails_verification() {
+    let r = Repo::new();
+    let id = r.session(&["x"]);
+    let path = r.path().display().to_string();
+    r.tamper(&id, &format!(r#""cwd":"{path}""#), r#""cwd":"/somewhere/else""#);
+    let (code, out, err) = r.run(&["log", &id]);
+    assert_eq!((code, out.as_str()), (1, ""));
+    assert_eq!(err.trim(), "strive: the session journal failed verification: entry 1 was modified, removed or moved");
 }

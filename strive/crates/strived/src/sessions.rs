@@ -17,7 +17,7 @@ use std::sync::Mutex as StdMutex;
 
 use strive_budget::{Ledger, Limits, Refusal, Reservation, charge, open_calls};
 use strive_journal::{Journal, Key, OpenError, Problem, Report};
-use strive_proto::{CallOutcome, Digest, Entry, Event, SessionInfo};
+use strive_proto::{CallOutcome, Digest, EffectOutcome, EffectRecord, Entry, Event, SessionInfo};
 use tokio::sync::{Mutex, mpsc, oneshot};
 
 use crate::server::epoch_ms;
@@ -100,6 +100,17 @@ enum Cmd {
         call: u64,
         outcome: CallOutcome,
         response: Option<Digest>,
+        duration_ms: u64,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
+    StartEffect {
+        call_id: String,
+        record: EffectRecord,
+        reply: oneshot::Sender<io::Result<u64>>,
+    },
+    FinishEffect {
+        effect: u64,
+        outcome: EffectOutcome,
         duration_ms: u64,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
@@ -251,6 +262,32 @@ impl Sessions {
         self.writer(id).await.map(|_| ())
     }
 
+    pub async fn info(&self, id: &SessionId) -> Result<SessionInfo> {
+        Ok(self.writer(id).await?.0)
+    }
+
+    /// Journals an effect as started and returns its number.
+    pub async fn start_effect(&self, id: &SessionId, call_id: String, record: EffectRecord) -> Result<u64> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::StartEffect { call_id, record, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    pub async fn finish_effect(
+        &self,
+        id: &SessionId,
+        effect: u64,
+        outcome: EffectOutcome,
+        duration_ms: u64,
+    ) -> Result<()> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::FinishEffect { effect, outcome, duration_ms, reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())??;
+        Ok(())
+    }
+
     /// The journal as it is on disk, verified, without repairing anything.
     /// A journal too damaged to name its session is an error, not a report.
     pub fn read(&self, id: &SessionId) -> Result<(SessionInfo, Report)> {
@@ -320,6 +357,7 @@ struct Writer {
     entries: Vec<Entry>,
     ledger: Ledger,
     next_call: u64,
+    next_effect: u64,
     subscribers: Vec<mpsc::UnboundedSender<Entry>>,
     verify: Verifier,
 }
@@ -340,7 +378,24 @@ fn spawn_writer(
         .max()
         .unwrap_or(0)
         + 1;
-    let w = Writer { journal, entries, ledger: Ledger::replay(&events), next_call, subscribers: Vec::new(), verify };
+    let next_effect = events
+        .iter()
+        .filter_map(|e| match e {
+            Event::EffectStarted { effect, .. } => Some(*effect),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0)
+        + 1;
+    let w = Writer {
+        journal,
+        entries,
+        ledger: Ledger::replay(&events),
+        next_call,
+        next_effect,
+        subscribers: Vec::new(),
+        verify,
+    };
     (tx, std::thread::spawn(move || w.run(rx)))
 }
 
@@ -398,6 +453,18 @@ impl Writer {
                         let e = Event::ModelCallFinished { call, outcome, response, duration_ms };
                         (vec![e], Box::new(move |r| drop(reply.send(r))))
                     }
+                    Cmd::StartEffect { call_id, record, reply } => {
+                        let effect = self.next_effect;
+                        self.next_effect += 1;
+                        let done: Done = Box::new(move |r: io::Result<Vec<Entry>>| {
+                            let _ = reply.send(r.map(|_| effect));
+                        });
+                        (vec![Event::EffectStarted { effect, call_id, record }], done)
+                    }
+                    Cmd::FinishEffect { effect, outcome, duration_ms, reply } => (
+                        vec![Event::EffectFinished { effect, outcome, duration_ms }],
+                        Box::new(move |r| drop(reply.send(r))),
+                    ),
                     Cmd::Attach { after_seq, reply } => {
                         attaches.push((after_seq, reply));
                         continue;
@@ -484,9 +551,26 @@ impl Writer {
     fn close_abandoned_calls(&mut self) -> io::Result<()> {
         let events: Vec<Event> = self.entries.iter().map(|e| e.event.clone()).collect();
         let open = open_calls(&events);
-        if open.is_empty() {
+        let mut effects_open = std::collections::BTreeSet::new();
+        for e in &events {
+            match e {
+                Event::EffectStarted { effect, .. } => {
+                    effects_open.insert(*effect);
+                }
+                Event::EffectFinished { effect, .. } => {
+                    effects_open.remove(effect);
+                }
+                _ => {}
+            }
+        }
+        if open.is_empty() && effects_open.is_empty() {
             return Ok(());
         }
+        let interrupted = effects_open.into_iter().map(|effect| Event::EffectFinished {
+            effect,
+            outcome: EffectOutcome::Interrupted,
+            duration_ms: 0,
+        });
         let closing: Vec<Event> = open
             .into_iter()
             .map(|(call, r)| Event::ModelCallFinished {
@@ -499,6 +583,7 @@ impl Writer {
                 response: None,
                 duration_ms: 0,
             })
+            .chain(interrupted)
             .collect();
         let appended = self.journal.append(epoch_ms(), &closing)?;
         self.journal.commit()?;
@@ -537,12 +622,12 @@ fn load_or_create_key(dir: &Path) -> io::Result<Key> {
         let mut f = OpenOptions::new().write(true).create_new(true).mode(0o600).open(&tmp)?;
         f.write_all(&bytes)?;
         f.sync_all()?;
+        // Only the daemon holding the ownership lock gets here, so nothing
+        // else can create the key between the check and the link.
         let linked = fs::hard_link(&tmp, &path);
         fs::remove_file(&tmp)?;
-        match linked {
-            Err(e) if e.kind() != io::ErrorKind::AlreadyExists => return Err(e),
-            _ => fs::File::open(dir)?.sync_all()?,
-        }
+        linked?;
+        fs::File::open(dir)?.sync_all()?;
     }
     let bytes: [u8; 32] = fs::read(&path)?
         .try_into()
