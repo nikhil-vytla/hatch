@@ -52,7 +52,7 @@ export type CardContestant = Contestant & { default: boolean; runSets: Id[] };
 export type Card = {
   id: Id; title: string; question: string; family: "game" | "judgement-set" | "robustness";
   /** What "right" means, so copy never says accuracy when it means agreement. */
-  reference: "world-outcome" | "soft-teacher" | "self-consistency";
+  reference: "world-outcome" | "soft-teacher" | "authored-labels" | "self-consistency";
   metrics: MetricDef[];
   /** The metric a card ranks by unless the reader changes it. */
   primary: Id;
@@ -62,6 +62,8 @@ export type Card = {
   /** facet → value → contestant → metric → estimate (e.g. workflow, question type) */
   slices?: Record<string, Record<string, Record<Id, Record<Id, Estimate>>>>;
   items?: { id: string; label: string }[];
+  /** Display names for slice facets, e.g. { workflow: "Cases" }. */
+  facetLabels?: Record<string, string>;
   /** Generated from the data: metric · protocol · items · dates · coverage. */
   provenance: string;
   notes?: string;

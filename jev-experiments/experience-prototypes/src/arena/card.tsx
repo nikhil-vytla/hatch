@@ -207,7 +207,9 @@ export function useCardModel(card: Card, view: View) {
   }, [card, view.wf, view.qt]);
   const resultIds = ids.filter((id) => results[id]);
   const scatterAxes = card.id === "typed-decisions" ? ["ece", "agreement"] : card.id === "tetris-realtime" ? ["gameTime", "lines"] : card.id === "spot-robustness" ? ["meanChange", "sameChoice"] : ["decisionMs", "lines"];
-  const [xM, yM] = scatterAxes.map((id) => card.metrics.find((m) => m.id === id)!);
+  const axes = card.id === "cafe" ? ["violation", "exact"] : scatterAxes;
+  // Fall back to the first two metrics when a card lacks the preferred axes.
+  const [xM, yM] = axes.map((id, k) => card.metrics.find((m) => m.id === id) ?? card.metrics[Math.min(k, card.metrics.length - 1)]);
   // Winner tiles rank models; code players are references. Ties name everyone tied.
   const models = resultIds.filter((id) => card.contestants.find((c) => c.id === id)?.kind !== "code");
   const tilePool = models.length ? models : resultIds;
@@ -224,7 +226,7 @@ export function useCardModel(card: Card, view: View) {
 }
 export type CardModel = ReturnType<typeof useCardModel>;
 export const KIND = (card: Card) => card.family === "game" ? "Game" : card.family === "robustness" ? "Robustness" : "Judgement set";
-export const REFERENCE = (card: Card) => card.reference === "world-outcome" ? "measured in the world" : card.reference === "soft-teacher" ? "agreement with a soft reference" : "self-consistency";
+export const REFERENCE = (card: Card) => card.reference === "world-outcome" ? "measured in the world" : card.reference === "soft-teacher" ? "agreement with a soft reference" : card.reference === "authored-labels" ? "agreement with authored expectations" : "self-consistency";
 export { better, spread, LENS_LABEL };
 
 export function Tiles({ model: m }: { model: CardModel }) {
@@ -251,8 +253,8 @@ export function Toolbar({ model: m }: { model: CardModel }) {
       <div className="arena-tabs" role="tablist">{card.lenses.map((l) => <button key={l} role="tab" aria-selected={l === lens} onClick={() => set({ lens: l })}>{LENS_LABEL[l]}</button>)}</div>
       {["bars", "per-item"].includes(lens) && <label>Metric <select value={metric.id} onChange={(e) => set({ m: e.target.value })}>{card.metrics.map((mm) => <option key={mm.id} value={mm.id}>{mm.label}</option>)}</select></label>}
       {card.slices && ["bars", "scatter", "table", "reliability", "case"].includes(lens) && <>
-        <label>Workflow <select value={view.wf ?? ""} onChange={(e) => set({ wf: e.target.value || undefined, qt: undefined })}><option value="">All</option>{Object.keys(card.slices.workflow ?? {}).map((w) => <option key={w} value={w}>{w.replaceAll("_", " ")}</option>)}</select></label>
-        {lens !== "case" && <label>Question type <select value={view.qt ?? ""} onChange={(e) => set({ qt: e.target.value || undefined, wf: undefined })}><option value="">All</option>{Object.keys(card.slices.type ?? {}).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>}
+        <label>{card.facetLabels?.workflow ?? "Workflow"} <select value={view.wf ?? ""} onChange={(e) => set({ wf: e.target.value || undefined, qt: undefined })}><option value="">All</option>{Object.keys(card.slices.workflow ?? {}).map((w) => <option key={w} value={w}>{w.replaceAll("_", " ")}</option>)}</select></label>
+        {lens !== "case" && Object.keys(card.slices.type ?? {}).length > 0 && <label>{card.facetLabels?.type ?? "Question type"} <select value={view.qt ?? ""} onChange={(e) => set({ qt: e.target.value || undefined, wf: undefined })}><option value="">All</option>{Object.keys(card.slices.type ?? {}).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>}
       </>}
     </div>
     {["bars", "per-item"].includes(lens) && <p className="arena-subtitle">{metric.help} <b>{metric.better === "higher" ? "Higher" : "Lower"} is better.</b></p>}
