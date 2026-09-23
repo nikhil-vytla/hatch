@@ -402,7 +402,8 @@ pre.diff { padding: 6px 0; }
 .msg.user .bubble.folded::after { content: ""; position: absolute; inset: auto 0 0 0; height: 3em; background: linear-gradient(transparent, #1f1f22); pointer-events: none; }
 .msg.user .bubble .more { position: relative; z-index: 1; display: block; margin: 6px 0 0 auto; padding: 2px 8px; font-size: 12px; background: var(--surface-2); }
 .msg.user .bubble.folded .more { position: absolute; right: 10px; bottom: 8px; }
-.msg-actions { display: flex; gap: 4px; margin-top: 4px; opacity: 0; transition: opacity 120ms; }
+.msg.reply { position: relative; }
+.msg-actions { position: absolute; right: 0; bottom: -28px; display: flex; gap: 4px; opacity: 0; transition: opacity 120ms; }
 .msg.reply:hover .msg-actions, .msg-actions:focus-within { opacity: 1; }
 .msg-actions .copy { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; font-size: 12px; }
 .msg-actions .icon { width: 13px; height: 13px; }
