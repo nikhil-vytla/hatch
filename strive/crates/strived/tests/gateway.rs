@@ -33,6 +33,8 @@ enum Reply {
     /// Events, a delay before each, and whether the stream ends before the last one.
     Sse(Vec<String>, u64, bool),
     Hang,
+    /// Events at once, then the stream stays open this long before it ends.
+    SseThenStall(Vec<String>, u64),
     /// A 307 to this URL.
     Redirect(String),
 }
@@ -107,6 +109,18 @@ async fn respond(reply: Reply) -> Response {
                 tokio::time::sleep(Duration::from_millis(delay_ms)).await;
                 Ok::<_, std::io::Error>(Bytes::from(e))
             });
+            Response::builder()
+                .status(200)
+                .header("content-type", "text/event-stream")
+                .body(Body::from_stream(stream))
+                .unwrap()
+        }
+        Reply::SseThenStall(events, stall_ms) => {
+            let stall = futures_util::stream::once(async move {
+                tokio::time::sleep(Duration::from_millis(stall_ms)).await;
+                Ok::<_, std::io::Error>(Bytes::new())
+            });
+            let stream = futures_util::stream::iter(events.into_iter().map(|e| Ok(Bytes::from(e)))).chain(stall);
             Response::builder()
                 .status(200)
                 .header("content-type", "text/event-stream")
@@ -670,4 +684,44 @@ fn gateway_traffic_keeps_the_daemon_alive() {
     let (status, _) = s.messages(&BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"));
     assert_eq!(status, 200, "a 2.8 s call through a daemon that idles out after 1 s");
     assert_eq!(s.count("modelCallFinished"), 1);
+}
+
+/// SDKs stop at a stream's last event (`[DONE]`, `message_stop`) without
+/// waiting for the connection to close. So that event reaches the client
+/// only once the journal records how the call ended.
+#[test]
+fn a_streams_last_event_arrives_only_after_the_call_is_journaled() {
+    let openai = vec![
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n".to_string(),
+        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":9}}\n\n".to_string(),
+        "data: [DONE]\n\n".to_string(),
+    ];
+    let cases = [
+        (
+            "openai",
+            "/chat/completions",
+            r#"{"model":"gpt-4.1-mini","stream":true,"max_tokens":50,"messages":[]}"#,
+            openai,
+            "data: [DONE]",
+        ),
+        ("anthropic", "/v1/messages", "", SSE.iter().map(|e| (*e).to_string()).collect(), "event: message_stop"),
+    ];
+    for (provider, path, body, events, last) in cases {
+        let s = setup(Reply::SseThenStall(events, 1500), &[("OPENAI_API_KEY", "k"), ("ANTHROPIC_API_KEY", "k")]);
+        let base = s.env.rpc().ok("session/gateway", &json!({"id": s.id}))[provider].as_str().unwrap().to_string();
+        let body = if body.is_empty() {
+            BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true")
+        } else {
+            body.to_string()
+        };
+        s.rt.block_on(async {
+            let mut r = reqwest::Client::new().post(format!("{base}{path}")).body(body).send().await.unwrap();
+            let mut got = Vec::new();
+            while !String::from_utf8_lossy(&got).contains(last) {
+                got.extend_from_slice(&r.chunk().await.unwrap().expect("the stream ended before its last event"));
+            }
+        });
+        assert_eq!(s.count("modelCallFinished"), 1, "{provider}: journaled before the client saw {last}");
+        assert_eq!(s.last("modelCallFinished")["outcome"]["kind"], "complete", "{provider}");
+    }
 }

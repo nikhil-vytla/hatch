@@ -269,6 +269,7 @@ impl Pump {
             return;
         }
         let mut meter = UsageMeter::new(api, stream);
+        let mut holdback = strive_gateway::Holdback::default();
         let mut all = Vec::new();
         let mut interrupted = None;
         let mut body = upstream.bytes_stream();
@@ -298,7 +299,8 @@ impl Pump {
                     }
                     meter.feed(&bytes);
                     all.extend_from_slice(&bytes);
-                    if tx.send(Ok(bytes)).await.is_err() {
+                    let now = if stream { Bytes::from(holdback.feed(&bytes)) } else { bytes };
+                    if !now.is_empty() && tx.send(Ok(now)).await.is_err() {
                         interrupted = Some("the client disconnected mid-response".to_string());
                         break;
                     }
@@ -321,7 +323,13 @@ impl Pump {
                 None
             }
         };
-        if !finish.done(outcome, response).await {
+        if finish.done(outcome, response).await {
+            // The stream's last event, held until now (see `Holdback`).
+            let rest = holdback.rest();
+            if !rest.is_empty() {
+                let _ = tx.send(Ok(Bytes::from(rest))).await;
+            }
+        } else {
             // The client must not see a clean end for a call the journal
             // doesn't record as finished.
             let _ = tx.send(Err(std::io::Error::other("strive could not record the end of this call"))).await;

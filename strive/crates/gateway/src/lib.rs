@@ -41,6 +41,11 @@ pub struct RequestInfo {
 }
 
 const SERVER_STATE: &str = "the request relies on conversation state kept by the provider, whose cost can't be bounded from the request; send the full history instead";
+const REMOTE_INPUT: &str = "the request includes an image or file the provider fetches or keeps, whose cost can't be bounded from the request; send it inline instead";
+const PREMIUM_TIER: &str =
+    "the request asks for a service tier priced above the standard rates strive knows; leave service_tier unset";
+/// Service tiers billed at (or below) the standard rates.
+const STANDARD_TIERS: &[&str] = &["auto", "default", "flex", "standard_only"];
 const SERVER_TOOLS: &str = "the request enables tools the provider runs and bills separately, which strive can't bound; use tools the agent runs itself";
 /// Anthropic tools the provider runs itself (and bills per use). Other
 /// Anthropic-defined tools (bash, text editor, computer) run on the client.
@@ -69,7 +74,16 @@ pub fn prepare_request(api: Api, body: &[u8]) -> Result<(RequestInfo, Vec<u8>), 
     if uses_server_tools(api, obj) {
         return Err(SERVER_TOOLS);
     }
-    let input_rate = cache_rate(&Value::Object(obj.clone()));
+    if obj.get("service_tier").is_some_and(|t| !t.as_str().is_some_and(|t| STANDARD_TIERS.contains(&t))) {
+        return Err(PREMIUM_TIER);
+    }
+    if names_remote_input(&Value::Object(obj.clone())) {
+        return Err(REMOTE_INPUT);
+    }
+    // `cache_control` means a cache write only to Anthropic; elsewhere it's
+    // just a name, in a tool's schema say.
+    let input_rate =
+        if api == Api::AnthropicMessages { cache_rate(&Value::Object(obj.clone())) } else { InputRate::Plain };
     let info = RequestInfo { model, max_output, stream, choices, input_rate };
     if api == Api::OpenAiChat && stream {
         let opts = obj.entry("stream_options").or_insert_with(|| Value::Object(Map::new()));
@@ -97,6 +111,39 @@ fn uses_server_tools(api: Api, obj: &Map<String, Value>) -> bool {
     }
 }
 
+/// Whether the request's content names an image or file the provider
+/// fetches by URL or keeps by id: its tokens don't show in the body. Inline
+/// data does. Only content blocks count: a tool's schema or a tool call's
+/// arguments may use the same names for their own things.
+fn names_remote_input(v: &Value) -> bool {
+    match v {
+        Value::Object(o) => {
+            let remote = |u: Option<&Value>| u.and_then(Value::as_str).is_some_and(|u| !u.starts_with("data:"));
+            let source = o.get("source").and_then(|s| s.get("type")).and_then(Value::as_str);
+            let fetched = match o.get("type").and_then(Value::as_str) {
+                // Anthropic: the block's source says where its content is.
+                Some("image" | "document") => matches!(source, Some("url" | "file")),
+                // OpenAI Chat: an image by URL, or a file by id.
+                Some("image_url") => remote(o.get("image_url").and_then(|i| i.get("url"))),
+                Some("file") => o.get("file").is_some_and(|f| f.get("file_id").is_some()),
+                // OpenAI Responses: an image or file by URL or id.
+                Some("input_image" | "input_file") => {
+                    remote(o.get("image_url")) || remote(o.get("file_url")) || o.contains_key("file_id")
+                }
+                _ => false,
+            };
+            let own_args = o.get("type").and_then(Value::as_str) == Some("tool_use");
+            fetched
+                || o.iter()
+                    .filter(|(k, _)| !matches!(k.as_str(), "tools" | "input_schema" | "parameters"))
+                    .filter(|(k, _)| !(own_args && k.as_str() == "input"))
+                    .any(|(_, v)| names_remote_input(v))
+        }
+        Value::Array(a) => a.iter().any(names_remote_input),
+        _ => false,
+    }
+}
+
 /// Anthropic bills cache writes above the input rate, and one-hour writes
 /// above that; a request asks for them with `cache_control` blocks.
 fn cache_rate(v: &Value) -> InputRate {
@@ -120,6 +167,74 @@ fn cache_rate(v: &Value) -> InputRate {
     let mut rate = InputRate::Plain;
     walk(v, &mut rate);
     rate
+}
+
+/// Holds back a stream's last event until the call is settled. SDKs stop at
+/// that event (`[DONE]`, `message_stop`, `response.completed`) without
+/// waiting for the connection to close, so letting it through first would
+/// let a client finish before the journal records how the call ended. Only
+/// whole lines pass, so a marker split across chunks is still caught.
+#[derive(Default)]
+pub struct Holdback {
+    partial: Vec<u8>,
+    held: Vec<u8>,
+    holding: bool,
+}
+
+const LAST_EVENTS: &[&str] = &["message_stop", "response.completed", "response.incomplete", "response.failed"];
+
+fn is_last_event(line: &[u8]) -> bool {
+    let line = String::from_utf8_lossy(line);
+    let line = line.trim_end();
+    if line == "data: [DONE]" || line == "data:[DONE]" {
+        return true;
+    }
+    if let Some(name) = line.strip_prefix("event:") {
+        return LAST_EVENTS.contains(&name.trim());
+    }
+    line.strip_prefix("data:").is_some_and(|data| {
+        serde_json::from_str::<Value>(data.trim())
+            .ok()
+            .and_then(|v| v.get("type").and_then(Value::as_str).map(|t| LAST_EVENTS.contains(&t)))
+            .unwrap_or(false)
+    })
+}
+
+impl Holdback {
+    /// What may go to the client now.
+    pub fn feed(&mut self, bytes: &[u8]) -> Vec<u8> {
+        if self.holding {
+            self.held.extend_from_slice(bytes);
+            return Vec::new();
+        }
+        self.partial.extend_from_slice(bytes);
+        let Some(end) = self.partial.iter().rposition(|&b| b == b'\n') else { return Vec::new() };
+        let rest = self.partial.split_off(end + 1);
+        let whole = std::mem::replace(&mut self.partial, rest);
+        let mut out = Vec::new();
+        let mut lines = whole.split_inclusive(|&b| b == b'\n');
+        for line in lines.by_ref() {
+            if is_last_event(line) {
+                self.holding = true;
+                self.held.extend_from_slice(line);
+                break;
+            }
+            out.extend_from_slice(line);
+        }
+        for line in lines {
+            self.held.extend_from_slice(line);
+        }
+        if self.holding {
+            self.held.append(&mut self.partial);
+        }
+        out
+    }
+
+    /// Everything not yet sent, for once the call is settled.
+    pub fn rest(mut self) -> Vec<u8> {
+        self.held.append(&mut self.partial);
+        self.held
+    }
 }
 
 /// The largest response (or single stream event) the meter reads. Real
@@ -212,8 +327,18 @@ impl UsageMeter {
                 let (Some(u), Some(delta)) = (self.usage.as_mut(), v.get("usage")) else { return };
                 let Some(output) = delta.get("output_tokens").and_then(Value::as_u64) else { return };
                 u.output = output;
-                if let Some(latest) = anthropic_counts(delta) {
-                    (u.input, u.cache_write, u.cache_write_long, u.cache_read) = latest;
+                if let Some((input, write, write_long, read)) = anthropic_counts(delta) {
+                    (u.input, u.cache_read) = (input, read);
+                    if delta.get("cache_creation").is_some() {
+                        (u.cache_write, u.cache_write_long) = (write, write_long);
+                    } else {
+                        // Only the total: the writes known to be five-minute
+                        // ones stay so, and the rest is priced at the dearer
+                        // one-hour rate.
+                        let total = write;
+                        u.cache_write = u.cache_write.min(total);
+                        u.cache_write_long = total - u.cache_write;
+                    }
                 }
                 self.anthropic_final = true;
             }

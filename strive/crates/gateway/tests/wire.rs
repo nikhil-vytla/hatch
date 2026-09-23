@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 use serde_json::{Value, json};
-use strive_gateway::{Api, RequestInfo, UsageMeter, prepare_request};
+use strive_gateway::{Api, Holdback, RequestInfo, UsageMeter, prepare_request};
 use strive_proto::Usage;
 
 fn usage(input: u64, output: u64, cache_write: u64, cache_read: u64) -> Usage {
@@ -302,4 +302,110 @@ fn large_responses_are_metered_and_only_absurd_ones_are_not() {
     let mut m = UsageMeter::new(Api::AnthropicMessages, false);
     m.feed(body.as_bytes());
     assert_eq!(m.finish(), None, "a body past the meter's limit has unknown usage");
+}
+
+/// `cache_control` is Anthropic's; in an OpenAI request it's only a name (a
+/// tool's parameter, say), and OpenAI has no cache-write rate to reserve at.
+#[test]
+fn only_anthropic_requests_are_bounded_at_a_cache_write_rate() {
+    use strive_budget::InputRate;
+    let body = json!({"model": "gpt-4.1", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}],
+        "tools": [{"type": "function", "function": {"name": "f", "parameters": {"type": "object",
+            "properties": {"cache_control": {"type": "string"}}}}}]});
+    assert_eq!(prepared(Api::OpenAiChat, &body).unwrap().input_rate, InputRate::Plain);
+}
+
+/// An image or file the provider fetches (or keeps) costs tokens the body
+/// doesn't show; one sent inline is bounded by its bytes.
+#[test]
+fn inputs_the_provider_fetches_are_refused_and_inline_ones_are_not() {
+    let why = "the request includes an image or file the provider fetches or keeps, whose cost can't be bounded from the request; send it inline instead";
+    let refused = [
+        (
+            Api::AnthropicMessages,
+            json!({"model": "claude-haiku-4-5", "max_tokens": 1, "messages": [{"role": "user", "content": [
+            {"type": "image", "source": {"type": "url", "url": "https://example.com/a.png"}}]}]}),
+        ),
+        (
+            Api::AnthropicMessages,
+            json!({"model": "claude-haiku-4-5", "max_tokens": 1, "messages": [{"role": "user", "content": [
+            {"type": "document", "source": {"type": "file", "file_id": "file_1"}}]}]}),
+        ),
+        (
+            Api::OpenAiChat,
+            json!({"model": "gpt-4.1", "messages": [{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": "https://example.com/a.png"}}]}]}),
+        ),
+        (
+            Api::OpenAiResponses,
+            json!({"model": "gpt-5", "input": [{"role": "user", "content": [
+            {"type": "input_file", "file_id": "file_1"}]}]}),
+        ),
+    ];
+    for (api, body) in refused {
+        assert_eq!(prepared(api, &body), Err(why), "{body}");
+    }
+    let inline = json!({"model": "gpt-4.1", "messages": [{"role": "user", "content": [
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="}}]}]});
+    assert!(prepared(Api::OpenAiChat, &inline).is_ok());
+    // The same names in a tool's schema or a tool call's arguments are the tool's own.
+    let tool_names = json!({"model": "claude-haiku-4-5", "max_tokens": 1,
+        "tools": [{"name": "open", "input_schema": {"type": "object", "properties": {"file_id": {"type": "string"}}}}],
+        "messages": [{"role": "assistant", "content": [{"type": "tool_use", "id": "t", "name": "open",
+            "input": {"file_id": "f1", "source": {"type": "url"}, "type": "image"}}]}]});
+    assert!(prepared(Api::AnthropicMessages, &tool_names).is_ok());
+}
+
+/// Priority processing costs more than the prices strive knows.
+#[test]
+fn a_premium_service_tier_is_refused() {
+    let why =
+        "the request asks for a service tier priced above the standard rates strive knows; leave service_tier unset";
+    assert_eq!(prepared(Api::OpenAiResponses, &json!({"model": "gpt-5", "service_tier": "priority"})), Err(why));
+    assert_eq!(
+        prepared(
+            Api::AnthropicMessages,
+            &json!({"model": "claude-haiku-4-5", "max_tokens": 1, "service_tier": "priority"})
+        ),
+        Err(why)
+    );
+    for tier in ["auto", "default", "flex", "standard_only"] {
+        assert!(prepared(Api::OpenAiChat, &json!({"model": "gpt-4.1", "service_tier": tier})).is_ok(), "{tier}");
+    }
+}
+
+/// A stream's last delta may repeat the cache counts without saying which
+/// were one-hour writes; they stay one-hour writes.
+#[test]
+fn a_final_delta_without_the_cache_breakdown_keeps_one_hour_writes() {
+    let sse = "event: message_start\n\
+data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"cache_creation_input_tokens\":10000,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":10000},\"output_tokens\":1}}}\n\n\
+event: message_delta\n\
+data: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":5,\"cache_creation_input_tokens\":10000,\"cache_read_input_tokens\":0,\"output_tokens\":40}}\n\n";
+    assert_eq!(
+        metered(Api::AnthropicMessages, true, sse),
+        Some(Usage { input: 5, output: 40, cache_write: 0, cache_write_long: 10000, cache_read: 0 })
+    );
+}
+
+/// Everything before a stream's last event passes at once (whole lines);
+/// the last event and what follows wait, however the bytes are split.
+#[test]
+fn a_streams_last_event_is_held_back_however_it_is_split() {
+    for (stream, last) in [
+        (CHAT_SSE, "data: [DONE]"),
+        (ANTHROPIC_SSE, "event: message_stop"),
+        (RESPONSES_SSE, "event: response.completed"),
+    ] {
+        let at = stream.find(last).unwrap();
+        for chunk in [1, 7, stream.len()] {
+            let mut h = Holdback::default();
+            let mut sent = Vec::new();
+            for piece in stream.as_bytes().chunks(chunk) {
+                sent.extend(h.feed(piece));
+            }
+            assert_eq!(String::from_utf8(sent).unwrap(), stream[..at], "{last}, chunks of {chunk}");
+            assert_eq!(String::from_utf8(h.rest()).unwrap(), stream[at..], "{last}, chunks of {chunk}");
+        }
+    }
 }
