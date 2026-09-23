@@ -37,7 +37,8 @@ export type Contestant = {
   readyToAsk?(lane: number, clockMs: number): boolean;
   /** Re-ask about a piece every interval even after an answer was used (the original live protocol). */
   reask?: boolean;
-  ask(question: Question, mode: TimingMode): Reply;
+  /** The signal aborts a live request whose answer can no longer be used. */
+  ask(question: Question, mode: TimingMode, signal?: AbortSignal): Reply;
 };
 
 export type DecisionStatus = "pending" | "applied" | "stale" | "failed" | "missing" | "cancelled";
@@ -48,7 +49,7 @@ export type LogEntry = {
 };
 
 type Plan = { pieceId: number; target: string; expires: number; nextAt: number };
-type Pending = { question: Question; entry: LogEntry; receiveAt?: number; answer?: Answer };
+type Pending = { question: Question; entry: LogEntry; receiveAt?: number; answer?: Answer; abort?: AbortController };
 export type Lane = {
   contestant: Contestant; game: Game; plan: Plan | null; pending: Pending | null;
   nextRequestAt: number; trackedPieceId: number; pieceStartedAt: number; revision: number;
@@ -59,7 +60,7 @@ export type Lane = {
 };
 
 const RULES = "10 columns, 20 rows; gravity continues while you decide; choose one option. Every candidate landing is reachable in the observed state. Code executes a chosen landing route. Intent delegates landing search to a code planner.";
-const INTERVAL_MS = 900, DEADLINE_MS = 5000, PLAN_MS = 5000, MOVE_MS = 80;
+const INTERVAL_MS = 900, DEADLINE_MS = 5000, PLAN_MS = 5000, MOVE_MS = 80, RETRY_MS = 400;
 
 export function optionCriteria(options: Landing[]) {
   return Object.fromEntries(options.map((o) => [o.id, JSON.stringify({ cells: o.id, clears: o.features.lines, buriedEmptyCells: o.features.holes, highestColumn: o.features.height, totalColumnHeight: o.features.aggregateHeight, unevenness: o.features.bumpiness, topOut: o.features.topOut, inputCount: o.path.length })]));
@@ -108,7 +109,8 @@ export class TetrisArena {
     else if (status === "stale") lane.stats.stale++;
     else if (status === "failed") lane.stats.failed++;
     else if (status === "missing") lane.stats.missing++;
-    if (extra.latencyMs !== undefined && status !== "missing") lane.stats.latencyMs.push(extra.latencyMs);
+    // Median answer time counts answers that were used, not failed attempts.
+    if (extra.latencyMs !== undefined && status === "applied") lane.stats.latencyMs.push(extra.latencyMs);
   }
 
   // ---------- real time ----------
@@ -147,6 +149,20 @@ export class TetrisArena {
     }
     advanceGame(g, STEP_MS);
     this.track(lane);
+    this.supersede(lane);
+  }
+  /**
+   * An answer for a piece that has already locked can never be used. Drop it
+   * now so the lane can ask about the new piece at once, rather than wait for
+   * a reply that no longer matters. (The original live protocol waited; lanes
+   * replaying it keep that behaviour.)
+   */
+  private supersede(lane: Lane) {
+    const p = lane.pending;
+    if (!p || lane.contestant.reask || p.question.pieceId === lane.game.pieceId) return;
+    p.abort?.abort();
+    lane.pending = null; lane.revision++; lane.nextRequestAt = this.clockMs;
+    this.resolve(lane, p.entry, "stale", { reason: "The piece locked before the answer arrived" });
   }
   private maybeAsk(i: number) {
     const lane = this.lanes[i];
@@ -159,9 +175,9 @@ export class TetrisArena {
     if (!q) return;
     const entry = this.record(i, q);
     lane.nextRequestAt = this.clockMs + INTERVAL_MS;
-    const pending: Pending = { question: q, entry };
+    const pending: Pending = { question: q, entry, abort: new AbortController() };
     lane.pending = pending;
-    const reply = lane.contestant.ask(q, "realtime");
+    const reply = lane.contestant.ask(q, "realtime", pending.abort!.signal);
     if (reply instanceof Promise) {
       const revision = lane.revision;
       reply.then((answer) => { if (lane.pending === pending && lane.revision === revision) { pending.answer = answer; pending.receiveAt = this.clockMs; this.receive(lane, pending); } },
@@ -178,7 +194,11 @@ export class TetrisArena {
   private receive(lane: Lane, p: Pending) {
     lane.pending = null;
     const a = p.answer!, q = p.question, latencyMs = a.latencyMs ?? this.clockMs - q.sentAt;
-    if ("error" in a) return this.resolve(lane, p.entry, "failed", { reason: a.error, latencyMs });
+    if ("error" in a) {
+      // Try again soon; a lane never stops asking because one request failed.
+      if (!lane.contestant.reask) lane.nextRequestAt = this.clockMs + RETRY_MS;
+      return this.resolve(lane, p.entry, "failed", { reason: a.error, latencyMs });
+    }
     const common = { choice: a.choice, probabilities: a.probabilities, confidence: a.confidence, latencyMs };
     if (!q.options.some((o) => o.id === a.choice)) return this.resolve(lane, p.entry, "failed", { ...common, reason: "Answer is not one of the offered landings" });
     if (lane.game.status !== "playing" || lane.game.pieceId !== q.pieceId) return this.resolve(lane, p.entry, "stale", { ...common, reason: "The piece locked before the answer arrived" });
@@ -191,7 +211,7 @@ export class TetrisArena {
   }
   /** Ends a run the way the recorder did: in-flight questions become cancelled. */
   stop() {
-    for (const lane of this.lanes) if (lane.pending) { this.resolve(lane, lane.pending.entry, "cancelled", { reason: "Run stopped" }); lane.pending = null; lane.revision++; }
+    for (const lane of this.lanes) if (lane.pending) { lane.pending.abort?.abort(); this.resolve(lane, lane.pending.entry, "cancelled", { reason: "Run stopped" }); lane.pending = null; lane.revision++; }
   }
 
   // ---------- turns ----------
@@ -301,9 +321,32 @@ export function recorded(events: RecordedEvent[], name = "Jev · recorded", id =
 export function live(name: string, id: string, send: (request: Question["request"], signal?: AbortSignal) => Promise<{ answers: { decision: { value: string; probabilities?: Probabilities; confidence?: number } } }>): Contestant {
   return {
     id, name, source: "live",
-    ask(q) {
+    ask(q, _mode, signal) {
       const started = performance.now();
-      return send(q.request).then((r) => ({ choice: r.answers.decision.value, probabilities: r.answers.decision.probabilities, confidence: r.answers.decision.confidence ?? null, latencyMs: performance.now() - started }));
+      return send(q.request, signal).then((r) => ({ choice: r.answers.decision.value, probabilities: r.answers.decision.probabilities, confidence: r.answers.decision.confidence ?? null, latencyMs: performance.now() - started }));
+    },
+  };
+}
+
+/** One recorded real-time decision, with world times. */
+export type TimedEvent = { sentAt: number; pieceId: number; board: string[]; receivedAt?: number; choice?: string; probabilities?: Probabilities; error?: string; latencyMs?: number };
+
+/**
+ * Replays a real-time recording made with ask-once lanes: each question goes
+ * out at its recorded world time and its answer lands at its recorded time.
+ */
+export function timedReplay(events: TimedEvent[], name: string, id: string): Contestant {
+  const queue = [...events].sort((a, b) => a.sentAt - b.sentAt);
+  return {
+    id, name, source: "recorded",
+    readyToAsk(_lane, clockMs) { const next = queue.find((e) => e.sentAt >= clockMs); return next ? next.sentAt === clockMs : true; },
+    ask(q) {
+      const e = queue.find((x) => x.sentAt === q.sentAt && x.pieceId === q.pieceId && JSON.stringify(x.board) === JSON.stringify(q.state.board));
+      if (!e) return { missing: "The recording has no answer for this moment" };
+      const receiveAt = e.receivedAt ?? Number.POSITIVE_INFINITY;
+      if (e.error) return { receiveAt, answer: { error: e.error, latencyMs: e.latencyMs } };
+      if (e.choice === undefined) return { receiveAt, answer: { error: "Superseded before it arrived" } };
+      return { receiveAt, answer: { choice: e.choice, probabilities: e.probabilities, confidence: null, latencyMs: e.latencyMs } };
     },
   };
 }

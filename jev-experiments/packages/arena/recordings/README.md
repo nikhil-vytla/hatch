@@ -19,4 +19,18 @@ Files:
 - `tetris-framings-summary.json`: per-lane results.
 - `attempt-1-provider-busy.*`: the first attempt, which sent three requests at once and hit provider capacity (93 of 127 failed). It measures availability, not the designs, and is kept as recorded.
 
-Record a new run with `bun jev-experiments/packages/arena/scripts/record-framings.ts` after moving these files; the recorder refuses to overwrite them.
+## Real time
+
+The same designs in real time: gravity never waits, one game per design, one request in flight, 40 pieces. Transport follows the real-time demos: at most two attempts within 4 s, an answer for a locked piece is dropped at once, and a failed request is re-asked 400 ms later. Lines cleared on seeds 7, 19 and 42:
+
+| Design | Lines | Game time for 40 pieces | Requests | Rate-limited (429) |
+|---|---|---|---|---|
+| Pick one landing | 5, 6, 7 (two games topped out near 40) | 47–74 s | 261 | 143 |
+| Judge each spot | 13, 13, 13 | 78–87 s | 367 | 247 |
+| Judge each spot, remembering past judgements | 10, 6, 9 | 40–42 s | 148 | 28 |
+
+Successful requests took about 300 ms at the median for every design. Almost every failure was a 429 rate limit, even with one request in flight: re-asking after 400 ms keeps hitting the limit. Remembering judgements avoided most requests (about 1,285 spot judgements came from memory), so it hit the limit least and played fastest, but it cleared fewer lines. Its questions carry one sentence with no other spots for comparison, and a first judgement is reused for the rest of the game.
+
+Files: `realtime.replay.json` (every decision with world send and arrival times; replays exactly) and `realtime.jsonl.gz` (every request and reply).
+
+Record new runs with `bun jev-experiments/packages/arena/scripts/record-framings.ts` or `record-realtime.ts` after moving these files; the recorders refuse to overwrite them.
