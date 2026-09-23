@@ -429,7 +429,10 @@ addressed.
   - Results with Haiku 4.5: hello-world scored 1.0 ($0.0035). Terminal-Bench
     2.0 `fix-git` scored 1.0 in 40s: 11 calls, $0.036, via reflog, merge
     and conflict resolution.
-  - There is no prompt caching yet (0 cache tokens), a cheap future win.
+  - The run reported 0 cache tokens. That is not missing support: pi-ai
+    adds `cache_control` by default. The likely cause, unverified, is that
+    these prompts (~2.6-3.5k tokens) are under the minimum Anthropic
+    caches for Haiku 4.5, which I believe is 4,096 tokens.
 
 **Process slips worth remembering.**
 - My exact-edit helper reindents the first line of a replacement, which
