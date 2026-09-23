@@ -184,3 +184,46 @@ again (146 files).
   - Warm `strive status`: 3.1 ms.
   - Binaries: `strive` 1.5 MB; `strive-tui` 64 MB, mostly the embedded Bun
     runtime. The agent host should share that binary.
+
+## 2026-09-23: Lint and agent guidance
+
+- **anti-slop** (dmmulroy/anti-slop at c44ef22) is vendored in
+  `tools/oxlint/anti-slop` and runs under oxlint 1.85.0 in `check.sh`.
+  - It found 282 spacing issues, which the autofix handled, and 48 semantic
+    ones.
+  - The useful semantic findings:
+    - RPC envelopes had been read through `any`.
+    - `(e as Error).message` appeared 8 times; `describeError` replaces it.
+    - pi-ai messages were cast where narrowing on `role` or `type` works.
+  - Typing `FakeDaemon` handlers by the protocol's `Methods` map caught
+    fixtures whose event `type` was widened to `string`.
+  - `no-runtime-typeof` uses its `allowInTypeGuards` option, so type guards
+    remain the way to parse.
+- **Rust agent guidance.** Surveyed zed, uv, ruff, codex-rs, tokio,
+  rust-analyzer, jj, helix, biome, turso and tikv.
+  - Adopted the lint-enforceable parts:
+    - `unwrap_used`, `expect_used`, `panic`, `todo` and `dbg_macro` are denied
+      outside tests (codex, uv, ruff).
+    - `allow_attributes` is denied, which forces `#[expect]` (biome).
+    - `await_holding_lock` is denied (codex).
+  - `await_holding_invalid_type` for tokio guards is not adopted.
+    `Sessions::writer` holds the map lock across the journal open on purpose,
+    so two writers can never open one journal.
+  - The rest went into `AGENTS.md` as traps rather than a map, following
+    Zed's rules-hygiene advice.
+  - Integration-test crates get a crate-level `#![allow]` for panics.
+    `allow_attributes` exempts inner attributes, and clippy's
+    `allow-unwrap-in-tests` doesn't reach helpers outside `#[test]` functions.
+- **Flaky writer-restart test, second cause.** The test made the session
+  directory read-only once the call's start was visible on disk. The journal
+  renames `head.json` into place before it fsyncs the directory. If the chmod
+  lands in between, the sync fails and the commit is reported failed even
+  though the head is visible.
+  - The gateway then correctly refuses the call with a 500, and the start
+    stays open until the session reopens. This is the documented
+    conservative overcharge.
+  - The test now waits for response headers, which arrive only after the
+    start's commit was reported. The suite passed 18 runs in a row.
+  - Diagnosis came from adding the client's status and body to the failure
+    output. The daemon log alone showed no call ending, which pointed at a
+    refusal after the start.
