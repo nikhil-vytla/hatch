@@ -61,7 +61,11 @@ pub async fn run(home: &Home) -> Result<bool> {
         Err(e) => r.line(&Level::Fail, "tui", &format!("{e:#}")),
     }
 
-    if cfg!(target_os = "macos") {
+    let off =
+        crate::settings::Settings::load(&home.root).is_ok_and(|s| s.sandbox == crate::settings::SandboxSetting::Off);
+    if off {
+        r.line(&Level::Warn, "sandbox", "off in settings: commands run unconfined (only for a disposable container)");
+    } else if cfg!(target_os = "macos") {
         let p = Path::new("/usr/bin/sandbox-exec");
         if p.exists() {
             r.line(&Level::Ok, "sandbox", "sandbox-exec (Seatbelt)");

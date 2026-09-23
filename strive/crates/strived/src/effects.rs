@@ -25,6 +25,8 @@ pub struct Scope {
     pub workspace: PathBuf,
     /// strive's home, canonical: never readable or writable by an effect.
     pub strive_home: PathBuf,
+    /// Settings chose to run commands unconfined (in a disposable container).
+    pub unconfined: bool,
 }
 
 /// What an effect produced, before it is journaled.
@@ -102,8 +104,8 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
             (gate, NOTHING)
         }
         EffectRequest::Bash { command, .. } => {
-            let sandboxed = sandbox_available();
-            let gate = if !sandboxed {
+            let sandboxed = !scope.unconfined && sandbox_available();
+            let gate = if !sandboxed && !scope.unconfined {
                 Gate::Ask(format!("run without a sandbox: {command}"))
             } else if mode == ApprovalMode::FullAuto {
                 Gate::Allow

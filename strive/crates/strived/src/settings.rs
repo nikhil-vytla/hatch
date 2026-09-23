@@ -38,10 +38,24 @@ pub struct Settings {
     /// tokens. 0 means 80% of the model's context window.
     #[serde(default)]
     pub compact_at_tokens: u64,
+    /// `off` runs commands unconfined, gated by the approval mode as
+    /// sandboxed ones are: only for a disposable container (a benchmark
+    /// task) that is itself the sandbox. `auto`, the default, uses the OS
+    /// sandbox where there is one.
+    #[serde(default)]
+    pub sandbox: SandboxSetting,
     /// MCP servers whose tools the agent may call, by name: the same shape
     /// as Claude Code's `mcpServers`.
     #[serde(default)]
     pub mcp_servers: BTreeMap<String, McpServerSetting>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SandboxSetting {
+    #[default]
+    Auto,
+    Off,
 }
 
 /// A stdio MCP server: the daemon starts it in the session's directory.

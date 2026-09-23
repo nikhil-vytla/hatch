@@ -434,6 +434,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                     )
                 })?,
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
+                unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
             };
             let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
             let Some(_running) = state.sessions.begin_effect() else {

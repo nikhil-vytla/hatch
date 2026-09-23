@@ -465,3 +465,30 @@ fn stopping_the_daemon_stops_its_running_commands() {
     let text = reader.ok("blob/get", &json!({"digest": outcome["output"]}));
     assert_eq!(text["text"], "the command was interrupted and stopped");
 }
+
+/// Inside a disposable container (a benchmark's task, say) the container is
+/// the sandbox: with `"sandbox": "off"` commands run unconfined, gated by
+/// the approval mode as sandboxed ones are.
+#[test]
+fn with_the_sandbox_off_commands_run_unconfined_under_the_approval_mode() {
+    let env = Env::new();
+    std::fs::write(env.home.path().join("settings.json"), r#"{"sandbox": "off"}"#).unwrap();
+    let dir = tempfile::Builder::new().prefix("strv-ws").tempdir_in("/tmp").unwrap();
+    let outside = tempfile::Builder::new().prefix("strv-out").tempdir_in("/tmp").unwrap();
+    let mut c = env.rpc();
+    let id =
+        c.ok("session/create", &json!({"cwd": dir.path().canonicalize().unwrap()}))["id"].as_str().unwrap().to_string();
+    c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let target = outside.path().join("made.txt");
+    let command = format!("echo unconfined > {}", target.display());
+    let r = c.ok("effect/run", &json!({"id": id, "callId": "c", "request": {"kind": "bash", "command": command}}));
+    assert_eq!(r["outcome"]["kind"], "done", "{r}");
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "unconfined\n");
+    // In ask mode it asks as for any command, not as for one without a sandbox.
+    c.ok("session/approvals", &json!({"id": id, "mode": "ask"}));
+    let r = c.ok("effect/run", &json!({"id": id, "callId": "d", "request": {"kind": "bash", "command": "true"}}));
+    assert_eq!(
+        r["outcome"]["reason"],
+        "run: true needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
+    );
+}
