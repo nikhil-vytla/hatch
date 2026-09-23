@@ -266,3 +266,15 @@ fn doctor_fails_without_a_tui_and_passes_with_one() {
     let tui = text.lines().find(|l| l.contains(" tui ")).unwrap();
     assert!(tui.starts_with("ok") && tui.ends_with("/bin/echo tui"), "{tui}");
 }
+
+/// A daemon nobody can reach anymore (its home was deleted, say) exits
+/// instead of idling on.
+#[test]
+fn the_daemon_exits_when_its_socket_is_removed() {
+    let env = Env::new();
+    let pid = common::pid(&env.status()).to_string();
+    let alive = || std::process::Command::new("kill").args(["-0", &pid]).status().unwrap().success();
+    assert!(alive());
+    std::fs::remove_file(env.socket()).unwrap();
+    common::wait_for("the daemon to exit", Duration::from_secs(5), || !alive());
+}

@@ -5,7 +5,7 @@
 //! win, and a socket left behind by a crash is safely replaced.
 
 use std::fs::{self, File, TryLockError};
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -97,6 +97,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
     let _ = fs::remove_file(&socket); // stale from a crash; we hold the lock
     let listener = UnixListener::bind(&socket).with_context(|| format!("binding {}", socket.display()))?;
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600))?;
+    let socket_inode = fs::metadata(&socket)?.ino();
 
     let settings = Settings::load(&cfg.home.root)?;
     let models = strive_budget::Models::builtin().with_overrides(&settings.models);
@@ -156,8 +157,14 @@ pub async fn run(cfg: Config) -> Result<Started> {
                 }
                 Err(e) => log!("accept failed: {e}"),
             },
-            _ = tick.tick() => {
-                                                // Hosts don't count: they exist to serve clients, and exit with the daemon.
+                        _ = tick.tick() => {
+                // No client can reach a daemon whose socket is gone (its home
+                // was deleted, say), so it would idle on for nothing.
+                if fs::metadata(&socket).map(|m| m.ino()) .ok() != Some(socket_inode) {
+                    log!("{} is gone, exiting", socket.display());
+                    break;
+                }
+                // Hosts don't count: they exist to serve clients, and exit with the daemon.
                 let people = state.clients.load(Ordering::SeqCst).saturating_sub(state.hosts.count());
                 let busy = people + state.gateway_calls.load(Ordering::SeqCst) > 0;
                 if !busy && state.idle_since.lock().await.elapsed() >= state.idle_exit {
