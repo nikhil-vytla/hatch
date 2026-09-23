@@ -84,3 +84,19 @@ describe("slow live answers", () => {
     expect(arena.log.filter((e) => e.status === "stale").length).toBeGreaterThan(0);
   });
 });
+
+describe("more seeds", () => {
+  const read = (name: string) => require("node:fs").readFileSync(new URL(`../recordings/${name}`, import.meta.url), "utf8");
+  const exchanges = read("turns-more-seeds.replay.jsonl").trim().split("\n").map((l: string) => JSON.parse(l));
+  const summary = JSON.parse(read("turns-more-seeds-summary.json"));
+  for (const game of summary.games) {
+    test(`replays seed ${game.seed} exactly in turns`, async () => {
+      const { recordedFraming } = await import("./tetris-framings");
+      const { heuristic } = await import("./tetris");
+      const mine = exchanges.filter((x: any) => x.seed === game.seed);
+      const arena = new TetrisArena(game.seed, [recordedFraming(mine, "landing-choice"), recordedFraming(mine, "spot-clean"), heuristic(0, "Code planner")], "turns", { pieceLimit: 40 });
+      for (let i = 0; i < 40 && !arena.over; i++) await arena.turn();
+      expect(arena.lanes.map((l) => [l.game.pieces, l.game.lines, l.game.score])).toEqual(game.lanes.map((l: any) => [l.pieces, l.lines, l.score]));
+    });
+  }
+});

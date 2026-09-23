@@ -19,6 +19,31 @@ Files:
 - `tetris-framings-summary.json`: per-lane results.
 - `attempt-1-provider-busy.*`: the first attempt, which sent three requests at once and hit provider capacity (93 of 127 failed). It measures availability, not the designs, and is kept as recorded.
 
+## Robustness of "judge each spot"
+
+**Position and batching.** 30 boards from the recorded turn-based games (seeds 7, 19, 42; pieces 1, 5, …, 37), 296 spot judgements, each asked four ways. No request failed.
+
+| Comparison with the original order | Mean change in P(clean) | Judgements moved by more than 0.2 | Same chosen spot |
+|---|---|---|---|
+| Asked again, same order | 0.008 | 0 | 30 of 30 |
+| Reversed order, labels reassigned | 0.027 | 7 | 30 of 30 |
+| Each sentence in its own request | 0.049 | 22 | 28 of 30 |
+
+Jev gives nearly the same answer when asked twice. Reversing the order moves judgements a little more than chance but never changed which spot code chose. Asking about spots one at a time moves them most and changed the choice on 2 of 30 boards, so seeing the other spots matters somewhat; batching is also one request instead of about ten.
+
+**More seeds.** Turn-based 40-piece games on four new seeds, one lane per design in the same arena. Lines cleared:
+
+| Seed | Pick one landing | Judge each spot | Code planner |
+|---|---|---|---|
+| 3 | 3 (topped out at 30 pieces) | 12 | 14 |
+| 11 | 1 (topped out at 23 pieces) | 14 | 15 |
+| 23 | 11 | 8 | 14 |
+| 31 | 7 | 11 | 13 |
+
+Across all seven seeds, judging each spot averaged 12.0 lines, picking one landing 5.4 (four of seven games topped out early) and the code planner 13.9. Judging each spot lost to picking one landing on seed 23.
+
+Files: `robustness-position-summary.json` and `.jsonl.gz`; `turns-more-seeds-summary.json`, `.replay.jsonl` and `.jsonl.gz`.
+
 ## Real time
 
 The same designs in real time: gravity never waits, one game per design, one request in flight, 40 pieces. Transport follows the real-time demos: at most two attempts within 4 s, an answer for a locked piece is dropped at once, and a failed request is re-asked 400 ms later. Lines cleared on seeds 7, 19 and 42:
