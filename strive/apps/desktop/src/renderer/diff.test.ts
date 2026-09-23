@@ -72,3 +72,18 @@ test("opening the context before a change never hides the change", () => {
   expect(texts).toContain("a LINE 2000");
   expect(texts).toContain("r line 2000");
 });
+
+test("a large replacement is diffed in linear time, removals first", () => {
+  const ends = Array.from({ length: 3000 }, (_, i) => `k${i}`);
+  const middle = Array.from({ length: 80_000 }, (_, i) => `m${i}`);
+  const before = [...ends, ...middle, ...ends.map((k) => `${k}e`)].join("\n");
+  const after = [...ends, "one", ...ends.map((k) => `${k}e`)].join("\n");
+  const started = performance.now();
+  const rows = diffLines(before, after);
+  // Generous: it takes a few milliseconds; the quadratic reordering took most of a second here.
+  expect(performance.now() - started).toBeLessThan(250);
+  const changed = rows.filter((r) => r.kind !== "keep");
+  expect(changed.length).toBe(80_001);
+  expect(changed.at(-1)).toMatchObject({ kind: "add", text: "one" });
+  expect(changed.slice(0, -1).every((r) => r.kind === "remove")).toBe(true);
+});

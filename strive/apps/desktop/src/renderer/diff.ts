@@ -65,20 +65,38 @@ function middle(a: string[], b: string[]): Omit<DiffRow, "n">[] {
     }
   }
 
-  // Removals read before the additions that replace them.
-  for (let k = 1; k < rows.length; k++) {
-    const prev = rows[k - 1];
-    const cur = rows[k];
+  return removalsFirst(rows);
+}
 
-    if (prev?.kind === "add" && cur?.kind === "remove") {
-      let start = k - 1;
+/**
+ * Removals read before the additions that replace them: in each run of
+ * changed lines, its removals, then its additions, each in order. One pass,
+ * however long the run.
+ */
+function removalsFirst(rows: Omit<DiffRow, "n">[]): Omit<DiffRow, "n">[] {
+  const out: Omit<DiffRow, "n">[] = [];
+  let removed: Omit<DiffRow, "n">[] = [];
+  let added: Omit<DiffRow, "n">[] = [];
 
-      while (start > 0 && rows[start - 1]?.kind === "add") start--;
-      rows.splice(start, 0, ...rows.splice(k, 1));
-    }
+  const flush = () => {
+    for (const r of removed) out.push(r);
+
+    for (const r of added) out.push(r);
+    removed = [];
+    added = [];
+  };
+
+  for (const r of rows) {
+    if (r.kind === "keep") {
+      flush();
+      out.push(r);
+    } else if (r.kind === "remove") removed.push(r);
+    else added.push(r);
   }
 
-  return rows;
+  flush();
+
+  return out;
 }
 
 /** Unchanged lines kept on each side of a change. */
