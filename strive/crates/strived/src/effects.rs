@@ -59,21 +59,29 @@ pub enum Gate {
 /// Applies the policy and the session's approval mode to a request.
 /// The file a gated effect acts on: the path the gate checked, with every
 /// symlink resolved. `perform` reaches exactly it, or fails.
-pub struct Target(Option<PathBuf>);
+pub struct Target {
+    path: Option<PathBuf>,
+    /// A command the gate judged sandboxed must run sandboxed, or not at all.
+    sandboxed: bool,
+}
+
+const fn file(path: PathBuf) -> Target {
+    Target { path: Some(path), sandboxed: false }
+}
+
+const NOTHING: Target = Target { path: None, sandboxed: false };
 
 pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate, Target) {
     let change = |verb: &str, path: &str| match resolve(scope, path, true) {
-        Access::Denied(why) => (Gate::Deny(why), Target(None)),
-        Access::Ask(real) => {
-            (Gate::Ask(format!("{verb} outside the workspace: {}", real.display())), Target(Some(real)))
-        }
-        Access::Allowed(real) if mode == ApprovalMode::Ask => (Gate::Ask(format!("{verb} {path}")), Target(Some(real))),
-        Access::Allowed(real) => (Gate::Allow, Target(Some(real))),
+        Access::Denied(why) => (Gate::Deny(why), NOTHING),
+        Access::Ask(real) => (Gate::Ask(format!("{verb} outside the workspace: {}", real.display())), file(real)),
+        Access::Allowed(real) if mode == ApprovalMode::Ask => (Gate::Ask(format!("{verb} {path}")), file(real)),
+        Access::Allowed(real) => (Gate::Allow, file(real)),
     };
     match request {
         EffectRequest::Read { path, .. } => match resolve(scope, path, false) {
-            Access::Denied(why) => (Gate::Deny(why), Target(None)),
-            Access::Allowed(real) | Access::Ask(real) => (Gate::Allow, Target(Some(real))),
+            Access::Denied(why) => (Gate::Deny(why), NOTHING),
+            Access::Allowed(real) | Access::Ask(real) => (Gate::Allow, file(real)),
         },
         EffectRequest::Write { path, .. } => change("write", path),
         EffectRequest::Edit { path, .. } => change("edit", path),
@@ -84,17 +92,18 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
             } else {
                 Gate::Ask(format!("use {server}'s {tool} tool"))
             };
-            (gate, Target(None))
+            (gate, NOTHING)
         }
         EffectRequest::Bash { command, .. } => {
-            let gate = if sandboxed_command(scope, command).is_none() {
+            let sandboxed = sandbox_available();
+            let gate = if !sandboxed {
                 Gate::Ask(format!("run without a sandbox: {command}"))
             } else if mode == ApprovalMode::FullAuto {
                 Gate::Allow
             } else {
                 Gate::Ask(format!("run: {command}"))
             };
-            (gate, Target(None))
+            (gate, Target { path: None, sandboxed })
         }
     }
 }
@@ -102,7 +111,11 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
 /// Performs an effect the gate allowed (or a person approved), on the
 /// target the gate checked. `cancelled` stops a running command early.
 pub fn perform(scope: &Scope, request: &EffectRequest, target: &Target, cancelled: &AtomicBool) -> Result {
-    let file = || target.0.as_deref().ok_or_else(|| Result::Refused("the effect has no checked path".into()));
+    // Cancelled while it waited to run (for a worker, say).
+    if cancelled.load(Ordering::SeqCst) {
+        return Result::Refused("interrupted before it ran".into());
+    }
+    let file = || target.path.as_deref().ok_or_else(|| Result::Refused("the effect has no checked path".into()));
     match request {
         EffectRequest::Read { path, offset, limit } => match file() {
             Ok(p) => read(p, path, *offset, *limit),
@@ -117,7 +130,8 @@ pub fn perform(scope: &Scope, request: &EffectRequest, target: &Target, cancelle
             Err(r) => r,
         },
         EffectRequest::Bash { command, timeout_ms } => {
-            bash(scope, command, timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS), cancelled)
+            let timeout = timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS);
+            bash(scope, command, timeout, target.sandboxed, cancelled)
         }
         // Tool calls are async and go to the session's server (see methods.rs).
         EffectRequest::Mcp { .. } => Result::Refused("an MCP tool call can't run as a file or command effect".into()),
@@ -295,22 +309,16 @@ fn edit(p: &Path, shown: &str, old: &str, new: &str) -> Result {
     }
 }
 
-/// A sandboxed command, with any descriptors it needs kept open until it is
-/// spawned.
-struct Sandboxed {
-    cmd: Command,
-    keep: Option<std::os::fd::OwnedFd>,
+/// Whether commands can run sandboxed here.
+fn sandbox_available() -> bool {
+    if cfg!(target_os = "macos") { Path::new("/usr/bin/sandbox-exec").exists() } else { which("bwrap").is_some() }
 }
 
-/// The command that runs `bash -c command` in the sandbox, or `None` where
-/// there is no sandbox.
-fn sandboxed_command(scope: &Scope, command: &str) -> Option<Sandboxed> {
+/// The command that runs `bash -c command` in the sandbox.
+fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
     let ws = scope.workspace.display();
     let home = scope.strive_home.display();
     if cfg!(target_os = "macos") {
-        if !Path::new("/usr/bin/sandbox-exec").exists() {
-            return None;
-        }
         let tmp = std::env::temp_dir().canonicalize().unwrap_or_else(|_| PathBuf::from("/private/tmp"));
         let profile = format!(
             r#"(version 1)
@@ -329,10 +337,9 @@ fn sandboxed_command(scope: &Scope, command: &str) -> Option<Sandboxed> {
         );
         let mut c = Command::new("/usr/bin/sandbox-exec");
         c.args(["-p", &profile, "/bin/bash", "-c", command]);
-        return Some(Sandboxed { cmd: c, keep: None });
+        return Ok(c);
     }
-    let bwrap = which("bwrap")?;
-    let filter = no_unix_sockets()?;
+    let bwrap = which("bwrap").ok_or_else(|| io::Error::other("bwrap is gone"))?;
     let mut c = Command::new(bwrap);
     // A private /tmp and /run: the host's hold sockets (the user's D-Bus and
     // systemd, X11, Docker) that can start processes outside the sandbox.
@@ -341,44 +348,63 @@ fn sandboxed_command(scope: &Scope, command: &str) -> Option<Sandboxed> {
     c.args(["--tmpfs"]).arg(&scope.strive_home);
     // As on macOS, no Unix sockets: one elsewhere (a Docker daemon under the
     // user's home, say) could start processes outside the sandbox.
-    c.arg("--seccomp").arg(std::os::fd::AsRawFd::as_raw_fd(&filter).to_string());
+    give_seccomp_filter(&mut c)?;
     // Its own PID namespace: every process the command starts dies with it.
     c.args(["--unshare-net", "--unshare-pid", "--die-with-parent", "--", "/bin/bash", "-c", command]);
-    Some(Sandboxed { cmd: c, keep: Some(filter) })
+    Ok(c)
 }
 
-/// A seccomp program for bubblewrap in which creating a Unix socket fails
-/// with EPERM (`socketpair`, which reaches nothing outside, still works), as
-/// the read end of a pipe holding it. `None` if it can't be built, so the
-/// command runs unsandboxed only with a person's approval.
+/// The descriptor bubblewrap reads its seccomp program from, in the child.
 #[cfg(target_os = "linux")]
-fn no_unix_sockets() -> Option<std::os::fd::OwnedFd> {
+const SECCOMP_FD: i32 = 3;
+
+/// Hands bubblewrap a seccomp program (on fd 3 of that child alone: the
+/// pipe is close-on-exec here, so no other command inherits it) in which,
+/// with EPERM:
+/// - creating a Unix socket fails;
+/// - so does a Unix datagram `socketpair`, which could `sendto` a socket by
+///   path (stream pairs stay: runtimes use them to talk to their children);
+/// - so does `io_uring_setup`, whose ops create sockets without the syscall.
+#[cfg(target_os = "linux")]
+fn give_seccomp_filter(c: &mut Command) -> io::Result<()> {
+    use command_fds::{CommandFdExt, FdMapping};
     use seccompiler::{
         BpfProgram, SeccompAction, SeccompCmpArgLen, SeccompCmpOp, SeccompCondition, SeccompFilter, SeccompRule,
     };
     use std::io::Write as _;
-    let arch = std::env::consts::ARCH.try_into().ok()?;
-    let unix = SeccompCondition::new(0, SeccompCmpArgLen::Dword, SeccompCmpOp::Eq, libc::AF_UNIX as u64).ok()?;
-    let rules = [(libc::SYS_socket, vec![SeccompRule::new(vec![unix]).ok()?])].into_iter().collect();
-    let filter =
-        SeccompFilter::new(rules, SeccompAction::Allow, SeccompAction::Errno(libc::EPERM as u32), arch).ok()?;
-    let program: BpfProgram = filter.try_into().ok()?;
+    let bad = |e: &dyn std::fmt::Display| io::Error::other(format!("the seccomp filter: {e}"));
+    let arch = std::env::consts::ARCH.try_into().map_err(|e| bad(&e))?;
+    let arg = |index, op, value| SeccompCondition::new(index, SeccompCmpArgLen::Dword, op, value).map_err(|e| bad(&e));
+    let unix = || arg(0, SeccompCmpOp::Eq, libc::AF_UNIX as u64);
+    let dgram = arg(1, SeccompCmpOp::MaskedEq(0xf), libc::SOCK_DGRAM as u64)?;
+    let rules = [
+        (libc::SYS_socket, vec![SeccompRule::new(vec![unix()?]).map_err(|e| bad(&e))?]),
+        (libc::SYS_socketpair, vec![SeccompRule::new(vec![unix()?, dgram]).map_err(|e| bad(&e))?]),
+        (libc::SYS_io_uring_setup, vec![]),
+    ]
+    .into_iter()
+    .collect();
+    let filter = SeccompFilter::new(rules, SeccompAction::Allow, SeccompAction::Errno(libc::EPERM as u32), arch)
+        .map_err(|e| bad(&e))?;
+    let program: BpfProgram = filter.try_into().map_err(|e| bad(&e))?;
     let mut bytes = Vec::with_capacity(program.len() * 8);
     for f in &program {
         bytes.extend(f.code.to_ne_bytes());
         bytes.extend([f.jt, f.jf]);
         bytes.extend(f.k.to_ne_bytes());
     }
-    // Inherited by bubblewrap (pipe(2) doesn't set close-on-exec), which reads
-    // it to the end; the program is far smaller than a pipe's buffer.
-    let (read, write) = nix::unistd::pipe().ok()?;
-    std::fs::File::from(write).write_all(&bytes).ok()?;
-    Some(read)
+    // The program is far smaller than a pipe's buffer, so this doesn't block.
+    let (read, write) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC).map_err(io::Error::from)?;
+    std::fs::File::from(write).write_all(&bytes)?;
+    c.fd_mappings(vec![FdMapping { parent_fd: read, child_fd: SECCOMP_FD }]).map_err(|e| bad(&format!("{e:?}")))?;
+    c.arg("--seccomp").arg(SECCOMP_FD.to_string());
+    Ok(())
 }
 
 #[cfg(not(target_os = "linux"))]
-fn no_unix_sockets() -> Option<std::os::fd::OwnedFd> {
-    None
+#[expect(clippy::unnecessary_wraps, reason = "the same signature as the Linux version")]
+fn give_seccomp_filter(_: &mut Command) -> io::Result<()> {
+    Ok(())
 }
 
 fn which(bin: &str) -> Option<PathBuf> {
@@ -401,15 +427,19 @@ enum Ended {
     Cancelled,
 }
 
-fn bash(scope: &Scope, command: &str, timeout_ms: u64, cancelled: &AtomicBool) -> Result {
+fn bash(scope: &Scope, command: &str, timeout_ms: u64, sandboxed: bool, cancelled: &AtomicBool) -> Result {
     // Without a sandbox the gate always asks, so reaching here unconfined
     // means a person approved exactly that.
-    let (mut cmd, keep) = if let Some(Sandboxed { cmd, keep }) = sandboxed_command(scope, command) {
-        (cmd, keep)
+    let mut cmd = if sandboxed {
+        match sandboxed_command(scope, command) {
+            Ok(c) => c,
+            // Never fall back to running it unconfined: that wasn't approved.
+            Err(e) => return Result::Refused(format!("the sandbox couldn't be set up: {e}")),
+        }
     } else {
         let mut c = Command::new("/bin/bash");
         c.args(["-c", command]);
-        (c, None)
+        c
     };
     let (mut reader, writer) = match io::pipe() {
         Ok(p) => p,
@@ -427,7 +457,6 @@ fn bash(scope: &Scope, command: &str, timeout_ms: u64, cancelled: &AtomicBool) -
         Err(e) => return Result::Refused(format!("can't run the command: {e}")),
     };
     drop(cmd);
-    drop(keep);
     let (captured, output) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let _ = captured.send(capture(&mut reader));

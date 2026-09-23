@@ -43,5 +43,6 @@ strive-proto.workspace = true
 workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
+command-fds = "0.3.3"
 libc = "0.2.189"
 seccompiler = "0.5.0"

@@ -307,6 +307,27 @@ fn the_sandbox_blocks_unix_sockets_outside_it() {
     assert!(probe.is_file(), "{} is missing: `cargo test` builds it, or `cargo build --examples`", probe.display());
     let text = w.text(json!({"kind": "bash", "command": format!("{} {}", probe.display(), path.display())}));
     assert!(text.starts_with("refused"), "{text}");
+    // A datagram socket from socketpair can still address a socket by path.
+    let dgram_path = outside.path().join("datagrams.sock");
+    let service = std::os::unix::net::UnixDatagram::bind(&dgram_path).unwrap();
+    service.set_nonblocking(true).unwrap();
+    let text =
+        w.text(json!({"kind": "bash", "command": format!("{} --dgram {}", probe.display(), dgram_path.display())}));
+    assert!(text.starts_with("refused"), "{text}");
+    assert!(service.recv(&mut [0; 16]).is_err(), "nothing arrived");
+}
+
+/// A sandboxed command has only its standard descriptors: nothing strive
+/// hands the sandbox (its seccomp program) or other commands leaks in.
+#[test]
+fn a_sandboxed_command_sees_only_its_standard_descriptors() {
+    if !sandboxed() || !cfg!(target_os = "linux") {
+        return;
+    }
+    let mut w = Ws::new();
+    // ls's own descriptor for the directory it lists is the fourth.
+    let text = w.text(json!({"kind": "bash", "command": "ls /proc/self/fd"}));
+    assert_eq!(text.split_whitespace().count(), 4, "{text}");
 }
 
 #[test]
