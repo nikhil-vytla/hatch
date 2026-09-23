@@ -5,11 +5,11 @@ one you can review, measure and undo. Proposed changes to its memory and
 skills are gated against the current version before they're kept. Budgets,
 a verifiable session log and an OS sandbox are on by default.
 
-> **Status: early.** Milestones M0 to M4 are done. strive runs a coding
+> **Status: early.** Milestones M0 to M5 are done. strive runs a coding
 > agent in any repository, with a verifiable session journal, budgets,
-> approvals, a sandbox and checkpoints. It also reads the project's
-> AGENTS.md and skills and uses MCP servers. The desktop app is next; see
-> [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation
+> approvals, a sandbox and checkpoints. It reads the project's AGENTS.md
+> and skills, uses MCP servers, and has a terminal UI and a desktop app.
+> Headless runs are next; see [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation
 > is at git tag `strive-py-final`.
 
 ## Install
@@ -17,7 +17,7 @@ a verifiable session log and an OS sandbox are on by default.
 From this directory, with [Rust](https://rustup.rs) and [Bun](https://bun.sh):
 
 ```sh
-./install.sh          # installs strive and strive-tui to ~/.local/bin
+./install.sh          # installs strive, strive-tui and the desktop app (STRIVE_NO_DESKTOP=1 skips it)
 ```
 
 ## Use
@@ -35,6 +35,7 @@ strive gateway        # base URLs that run any Anthropic/OpenAI SDK under this s
 strive doctor         # checks sandbox, git, credentials and the daemon
 strive status         # daemon pid, uptime, clients
 strive stop           # stop the daemon (it also exits when idle)
+strive app            # the desktop app on a new session here (-c and -r as for strive)
 ```
 
 In the TUI, type what you want done. The agent reads and changes files in

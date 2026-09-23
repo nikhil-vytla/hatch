@@ -218,6 +218,24 @@ and a tool call that never ran gets an explicit result.
 - Interrupting a turn (Esc, or its time limit) cancels its effects with
   `effect/cancel`.
 
+## The desktop app
+
+`strive app` opens an Electron app on the session (`apps/desktop`).
+- **Main process:** connects as a person's client. It forwards only a
+  whitelist of person-level requests from the renderer, after checking the
+  sender frame.
+- **Renderer:** sandboxed, with no Node, a strict CSP, no navigation and
+  no network.
+- **Layout:** the renderer lays out the workspace document
+  (`@strive/workspace`), a history of ID-addressed edits to a base. Dragging
+  a panel records a person's edit.
+- **Agent proposals:** the agent's `propose_layout` tool journals a
+  proposal, which the app offers with Accept, Reject and, once applied,
+  Undo.
+- **Agent widgets:** `html` panels are iframes sandboxed to scripts only,
+  served from a `strive-widget:` scheme with their own CSP, so they reach
+  neither the app nor the network.
+
 ## Effects
 
 **Exact paths.** The gate checks a file effect's path with every symlink

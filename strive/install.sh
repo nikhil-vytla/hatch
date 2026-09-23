@@ -22,6 +22,22 @@ for f in strive strive-tui; do
 done
 echo "installed strive and strive-tui to $BIN"
 
+# The desktop app (strive app). STRIVE_NO_DESKTOP=1 skips it.
+if [ -z "${STRIVE_NO_DESKTOP:-}" ]; then
+  echo "building the desktop app..."
+  SHARE="${STRIVE_SHARE:-$HOME/.local/share/strive}"
+  (cd apps/desktop && bun run build.ts >/dev/null && bunx electron-builder --dir >/dev/null 2>&1)
+  case "$(uname)" in
+    Darwin) built=$(ls -d apps/desktop/dist/mac*/strive.app) app="strive.app" exe="strive.app/Contents/MacOS/strive" ;;
+    *) built=apps/desktop/dist/linux-unpacked app="desktop" exe="desktop/strive-desktop" ;;
+  esac
+  mkdir -p "$SHARE"
+  rm -rf "$SHARE/.$app.new" && cp -R "$built" "$SHARE/.$app.new" && rm -rf "${SHARE:?}/$app" && mv "$SHARE/.$app.new" "$SHARE/$app"
+  printf '#!/bin/sh\nexec "%s/%s" "$@"\n' "$SHARE" "$exe" > "$BIN/.strive-desktop.new"
+  chmod +x "$BIN/.strive-desktop.new" && mv -f "$BIN/.strive-desktop.new" "$BIN/strive-desktop"
+  echo "installed the desktop app to $SHARE (strive app opens it)"
+fi
+
 case ":$PATH:" in
   *":$BIN:"*) ;;
   *) echo "add $BIN to your PATH, for example: echo 'export PATH=\"$BIN:\$PATH\"' >> ~/.zshrc" ;;

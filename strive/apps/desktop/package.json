@@ -8,22 +8,43 @@
     "build": "bun run build.ts",
     "start": "bun run build.ts && electron ."
   },
-  "dependencies": {
+  "devDependencies": {
     "@dnd-kit/core": "6.3.1",
     "@dnd-kit/sortable": "10.0.0",
     "@strive/protocol": "workspace:*",
+    "@strive/testkit": "workspace:*",
     "@strive/view": "workspace:*",
     "@strive/workspace": "workspace:*",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
-  },
-  "devDependencies": {
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "electron": "44.4.5",
+    "electron-builder": "26.15.3",
     "playwright": "1.63.0",
-    "vite": "8.3.0",
-    "@strive/testkit": "workspace:*"
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "8.3.0"
+  },
+  "description": "strive's desktop app",
+  "build": {
+    "appId": "dev.strive.desktop",
+    "productName": "strive",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "target": "dir",
+      "identity": null,
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": "dir",
+      "executableName": "strive-desktop"
+    }
   }
 }
