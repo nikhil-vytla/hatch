@@ -36,6 +36,8 @@ strive doctor         # checks sandbox, git, credentials and the daemon
 strive status         # daemon pid, uptime, clients
 strive stop           # stop the daemon (it also exits when idle)
 strive app            # the desktop app on a new session here (-c and -r as for strive)
+strive run "fix the failing test" --approvals full-auto --json
+                      # one task, headless; exits 0 done, 1 failed, 3 timed out, 4 interrupted
 ```
 
 In the TUI, type what you want done. The agent reads and changes files in

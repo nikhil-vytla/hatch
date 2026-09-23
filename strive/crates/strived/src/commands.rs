@@ -53,7 +53,7 @@ fn clock(ms: u64) -> String {
     )
 }
 
-fn describe(e: &Entry) -> String {
+pub fn describe(e: &Entry) -> String {
     match &e.event {
         Event::SessionStarted { cwd, .. } => format!("started in {cwd}"),
         Event::UserMessage { text } => format!("you: {text}"),

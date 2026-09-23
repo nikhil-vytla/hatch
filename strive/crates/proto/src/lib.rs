@@ -241,6 +241,11 @@ pub struct SessionAttachParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub after_seq: Option<u64>,
+    /// Watching, not someone who can approve (a headless run): approval
+    /// requests don't wait for this client.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub observer: Option<bool>,
 }
 
 /// History up to now. Later entries arrive as `session/entry` notifications.

@@ -574,11 +574,11 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             reply::<SessionList>(SessionListResult { sessions, unreadable })
         }
         SessionAttach::NAME => {
-            let SessionAttachParams { id, after_seq } = parse::<SessionAttach>(params)?;
+            let SessionAttachParams { id, after_seq, observer } = parse::<SessionAttach>(params)?;
             let sid = session_id(&id)?;
             let (person, _attaching) = {
                 let host = crate::sync::lock(&conn.host_of);
-                if host.is_host() {
+                if host.is_host() || observer == Some(true) {
                     (false, None)
                 } else {
                     conn.attaching.fetch_add(1, std::sync::atomic::Ordering::SeqCst);

@@ -20,6 +20,8 @@ mod mcp;
 mod methods;
 mod paths;
 mod pinned;
+mod run;
+
 mod server;
 mod sessions;
 mod settings;
@@ -52,6 +54,22 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Run one task headless in a new session here, and exit with how it ended
+    /// (0 done, 1 failed, 3 timed out, 4 interrupted).
+    Run {
+        /// The task; read from stdin if omitted or `-`.
+        task: Option<String>,
+        /// Print each journal entry as a JSON line.
+        #[arg(long)]
+        json: bool,
+        /// What the agent may do without asking: ask, auto-edit or full-auto.
+        /// No one is there to approve, so unattended runs want full-auto.
+        #[arg(long, value_parser = ["ask", "auto-edit", "full-auto"])]
+        approvals: Option<String>,
+        /// The session's spending limit, in dollars.
+        #[arg(long, value_name = "USD")]
+        budget: Option<f64>,
+    },
     /// Open the desktop app on a new session in this directory.
     App {
         /// Continue the latest session in this directory.
@@ -138,6 +156,22 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             };
             tui::exec(&home, &session)?;
             unreachable!("exec returns only on error")
+        }
+        Some(Cmd::Run { task, json, approvals, budget }) => {
+            let task = match task.as_deref() {
+                None | Some("-") => std::io::read_to_string(std::io::stdin())?,
+                Some(t) => t.to_string(),
+            };
+            if task.trim().is_empty() {
+                anyhow::bail!("no task: give it as an argument or on stdin");
+            }
+            let approvals = approvals.map(|a| match a.as_str() {
+                "ask" => strive_proto::ApprovalMode::Ask,
+                "auto-edit" => strive_proto::ApprovalMode::AutoEdit,
+                _ => strive_proto::ApprovalMode::FullAuto,
+            });
+            let (mut c, _) = launch::ensure(&home, "strive-run").await?;
+            run::run(&mut c, run::Options { task: task.trim().to_string(), json, approvals, budget_usd: budget }).await
         }
         Some(Cmd::App { continue_latest, resume }) => {
             launch::ensure(&home, "strive-app").await?;

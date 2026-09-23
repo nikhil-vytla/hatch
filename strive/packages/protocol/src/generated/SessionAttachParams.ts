@@ -4,4 +4,9 @@ export type SessionAttachParams = { id: string,
 /**
  * Return only entries after this seq (for catching up after a reconnect).
  */
-afterSeq?: number, };
+afterSeq?: number, 
+/**
+ * Watching, not someone who can approve (a headless run): approval
+ * requests don't wait for this client.
+ */
+observer?: boolean, };
