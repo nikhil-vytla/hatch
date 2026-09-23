@@ -626,19 +626,20 @@ fn a_call_is_finished_and_charged_once_even_across_a_writer_restart() {
         setup(Reply::Sse(SSE.iter().map(|e| (*e).to_string()).collect(), 600, false), &[("ANTHROPIC_API_KEY", "k")]);
     let url = format!("{}/v1/messages", s.base);
     let body = BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true");
+    let (in_flight, streaming) = std::sync::mpsc::channel();
     let call = std::thread::spawn(move || {
         tokio::runtime::Runtime::new().unwrap().block_on(async {
             let r = reqwest::Client::new().post(url).body(body).send().await.unwrap();
+            in_flight.send(r.status()).unwrap();
             r.bytes().await.unwrap().len()
         })
     });
-    // Committed, not just written: the head must include the start before
-    // the directory turns read-only, or the start itself fails to commit.
-    common::wait_for("the call's start to be committed", Duration::from_secs(5), || {
-        let r = s.env.rpc().ok("session/read", &json!({"id": s.id}));
-        let n = r["entries"].as_array().unwrap().len() as u64;
-        s.count("modelCallStarted") == 1 && r["committed"] == n
-    });
+    // Response headers mean the start's commit finished and was reported.
+    // Seeing it on disk isn't enough: the head is renamed into place before
+    // the directory is synced, and a sync that fails reports the commit
+    // failed, which (correctly) refuses the call.
+    let status = streaming.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert_eq!(status, 200);
     let dir = s.env.session_dir(&s.id);
     std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
     let failed = s.env.rpc().call("session/prompt", &json!({"id": s.id, "text": "breaks the writer"}));
