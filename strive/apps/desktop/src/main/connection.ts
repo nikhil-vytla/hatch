@@ -2,7 +2,7 @@
 // shows and may act on. Switching sessions opens a new connection and
 // closes this one, so the session left behind no longer counts the window
 // as a person who can answer its approvals.
-import { type Digest, type Event, StriveClient } from "@strive/protocol";
+import { type Digest, type Entry, type Event, StriveClient } from "@strive/protocol";
 import type { Opened, StriveEvent } from "../shared/bridge";
 
 export class Connection {
@@ -16,6 +16,8 @@ export class Connection {
    */
   readonly readable = new Set<Digest>();
   private forward?: (event: StriveEvent) => void;
+  /** Called for each entry journaled after the attach. */
+  onEntry?: (entry: Entry) => void;
   private readonly early: StriveEvent[] = [];
   private closing = false;
 
@@ -56,8 +58,10 @@ export class Connection {
       this.note(event.params.entry.event);
 
       // A page that reloads asks for the session again; it gets all of it.
-      if (event.params.entry.seq > (this.snapshot.entries.at(-1)?.seq ?? 0))
+      if (event.params.entry.seq > (this.snapshot.entries.at(-1)?.seq ?? 0)) {
         this.snapshot.entries.push(event.params.entry);
+        this.onEntry?.(event.params.entry);
+      }
     }
 
     if (this.forward) this.forward(event);

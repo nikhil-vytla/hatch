@@ -13,9 +13,18 @@ import {
   type StriveClient,
 } from "@strive/protocol";
 import { HistorySchema, parseJson } from "@strive/workspace";
-import { app, BrowserWindow, session as electronSession, type IpcMainInvokeEvent, ipcMain, protocol } from "electron";
+import {
+  app,
+  BrowserWindow,
+  session as electronSession,
+  type IpcMainInvokeEvent,
+  ipcMain,
+  Notification,
+  protocol,
+} from "electron";
 import type { StriveEvent } from "../shared/bridge";
 import { Connection } from "./connection";
+import { noticeFor } from "./notify";
 import { loadWorkspace, saveWorkspace } from "./store";
 
 /** What the renderer may ask the daemon for: a person's actions on this session. */
@@ -142,10 +151,26 @@ async function main() {
     if (!window.isDestroyed()) window.webContents.send("strive:event", event);
   };
 
-  const watch = (c: Connection) =>
+  const watch = (c: Connection) => {
     c.onLost(() => {
       if (!window.isDestroyed() && c === current) window.webContents.send("strive:closed");
     });
+    // A person not looking at the window hears when the agent needs them or stops.
+    c.onEntry = (entry) => {
+      if (window.isDestroyed() || window.isFocused() || !Notification.isSupported()) return;
+
+      const notice = noticeFor(entry.event, sessionName(c));
+
+      if (!notice) return;
+
+      const note = new Notification({ title: notice.title, body: notice.body });
+      note.on("click", () => {
+        window.show();
+        window.focus();
+      });
+      note.show();
+    };
+  };
 
   watch(current);
 
@@ -215,6 +240,14 @@ async function main() {
 
   window.on("closed", () => current.close());
   await window.loadFile(join(built(), "renderer", "index.html"));
+}
+
+/** What a notice calls a session: its first prompt, or its directory. */
+function sessionName(c: Connection): string {
+  const first = c.snapshot.entries.find((e) => e.event.type === "userMessage")?.event;
+  const text = first?.type === "userMessage" ? first.text : (c.snapshot.session.cwd.split("/").at(-1) ?? "strive");
+
+  return text.length > 60 ? `${text.slice(0, 57)}…` : text;
 }
 
 /** A TCP listener's address: a string only for a pipe, null before it listens. */

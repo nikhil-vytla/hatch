@@ -248,6 +248,23 @@ test("the command palette finds an action by a few letters and runs it", async (
   assert.equal(modes.at(-1)?.event.mode, "fullAuto");
 });
 
+test("a long prompt folds, and each prompt has a tick on the rail, named by it", async () => {
+  const { page } = await openApp();
+  const composer = page.getByPlaceholder("Ask strive to do anything…");
+  const long = Array.from({ length: 30 }, (_, i) => `line ${i} of a long prompt`).join("\n");
+  await composer.fill(long);
+  await page.keyboard.press("Enter");
+  await composer.fill("a short second prompt");
+  await page.keyboard.press("Enter");
+  await page.locator(".msg.user", { hasText: "a short second prompt" }).waitFor();
+  const folded = page.locator(".bubble.folded");
+  await folded.getByRole("button", { name: "Show more" }).click();
+  await folded.waitFor({ state: "detached" });
+  const ticks = page.getByRole("navigation", { name: "prompts" }).getByRole("button");
+  assert.equal(await ticks.count(), 2);
+  assert.equal(await ticks.nth(1).getAttribute("aria-label"), "a short second prompt");
+});
+
 test("a reloaded window shows what happened since it opened", async () => {
   const { page, cwd } = await openApp();
   const rpc = await Rpc.open();

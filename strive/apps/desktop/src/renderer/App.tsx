@@ -650,6 +650,7 @@ function Transcript({ model, opened, session }: { model: SessionModel; opened: O
 
   return (
     <div className="transcript">
+      <PromptRail prompts={items.flatMap((i) => (i.kind === "user" ? [{ seq: i.seq, text: i.text }] : []))} />
       <div className="scroller" ref={scrollRef}>
         <div className="thread" ref={contentRef}>
           {!items.some((i) => i.kind === "user") && <Empty opened={opened} />}
@@ -686,6 +687,80 @@ function Transcript({ model, opened, session }: { model: SessionModel; opened: O
         }}
       />
     </div>
+  );
+}
+
+/** Past this, a prompt shows folded, with "Show more". */
+const LONG_PROMPT = { chars: 700, lines: 12 };
+
+function UserMessage({ id, text }: { id: string; text: string }) {
+  const long = text.length > LONG_PROMPT.chars || text.split("\n").length > LONG_PROMPT.lines;
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="msg user" id={id}>
+      <div className={`bubble ${long && !open ? "folded" : ""}`}>
+        {text}
+        {long && (
+          <button type="button" className="more" onClick={() => setOpen(!open)}>
+            {open ? "Show less" : "Show more"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      type="button"
+      className="quiet copy"
+      aria-label={label}
+      onClick={() =>
+        void navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        })
+      }
+    >
+      <Icon name={copied ? "check" : "copy"} /> {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+/** The most ticks the prompt rail shows; past that, ticks stand for evenly spaced prompts. */
+const RAIL_TICKS = 12;
+
+/** One tick per prompt, at the conversation's left: hover to see it, click to go there. */
+function PromptRail({ prompts }: { prompts: { seq: number; text: string }[] }) {
+  if (prompts.length < 2) return null;
+
+  const step = Math.max(1, prompts.length / RAIL_TICKS);
+
+  const shown = Array.from(
+    { length: Math.min(prompts.length, RAIL_TICKS) },
+    (_, i) => prompts[Math.floor(i * step)],
+  ).filter((p): p is { seq: number; text: string } => p !== undefined);
+
+  return (
+    <nav className="rail" aria-label="prompts">
+      {shown.map((p) => (
+        <button
+          type="button"
+          key={p.seq}
+          className="tick"
+          aria-label={p.text}
+          onClick={() =>
+            document.getElementById(`msg-${p.seq}`)?.scrollIntoView({ block: "start", behavior: "smooth" })
+          }
+        >
+          <span className="card">{p.text.length > 120 ? `${p.text.slice(0, 117)}…` : p.text}</span>
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -738,15 +813,14 @@ function Empty({ opened }: { opened: Opened }) {
 function ItemView({ item, session, live }: { item: Item; session: SessionActions; live: boolean }) {
   switch (item.kind) {
     case "user":
-      return (
-        <div className="msg user">
-          <div className="bubble">{item.text}</div>
-        </div>
-      );
+      return <UserMessage id={`msg-${item.seq}`} text={item.text} />;
     case "reply":
       return (
         <div className="msg reply">
           <Markdown text={item.text} />
+          <div className="msg-actions">
+            <CopyButton text={item.text} label="copy reply" />
+          </div>
         </div>
       );
     case "tools":
