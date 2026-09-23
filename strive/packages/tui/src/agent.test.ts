@@ -8,11 +8,15 @@ import { FakeAnthropic, type ScriptedReply, startDaemon, type TestDaemon, Virtua
 import { App } from "./app";
 
 setDefaultTimeout(30_000);
+
 const HOST = `bun ${resolve(import.meta.dir, "../../host/src/main.ts")}`;
 
 let daemon: TestDaemon | undefined;
+
 let fake: FakeAnthropic | undefined;
+
 let stop: (() => void) | undefined;
+
 afterEach(() => {
   stop?.();
   daemon?.dispose();
@@ -30,11 +34,13 @@ async function open(script: ScriptedReply[]) {
   tui.start();
   await app.open("new");
   stop = () => (tui.stop(), client.close());
+
   const type = async (text: string) => {
     term.type(text);
     await Bun.sleep(20);
     term.type("\r");
   };
+
   return { term, cwd, type };
 }
 
@@ -43,6 +49,7 @@ test("the agent's reply and its file changes show in the transcript", async () =
     { toolCalls: [{ id: "toolu_1", name: "write", input: { path: "hello.txt", content: "hi" } }] },
     { text: "Wrote hello.txt with a greeting." },
   ]);
+
   await type("make hello.txt");
   const screen = await term.waitFor("Wrote hello.txt with a greeting.", 15_000);
   expect(screen.some((l) => l.includes("write hello.txt (2 bytes)"))).toBe(true);

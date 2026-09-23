@@ -33,13 +33,16 @@ export class FakeDaemon {
     conn.on("data", (chunk: string) => {
       buffer += chunk;
       let nl: number;
+
       while ((nl = buffer.indexOf("\n")) >= 0) {
         const msg = JSON.parse(buffer.slice(0, nl));
         buffer = buffer.slice(nl + 1);
         this.calls.push({ method: msg.method, params: msg.params });
         const out: string[] = [];
+
         const notify = (method: string, params: unknown) =>
           out.push(JSON.stringify({ jsonrpc: "2.0", method, params }));
+
         const reply: FakeReply =
           msg.method === "initialize"
             ? {
@@ -52,6 +55,7 @@ export class FakeDaemon {
             : (this.handlers[msg.method]?.(msg.params, notify) ?? {
                 error: { code: -32601, message: "unknown method" },
               });
+
         out.push(JSON.stringify({ jsonrpc: "2.0", id: msg.id, ...reply }));
         conn.write(`${out.join("\n")}\n`);
       }

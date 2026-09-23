@@ -16,13 +16,16 @@ export class Spend {
       case "budgetSet":
         this.usdLimit = e.usdMicros;
         this.tokenLimit = e.tokens;
+
         return;
       case "modelCallStarted":
         this.held.set(e.call, e.reservedUsdMicros);
+
         return;
       case "modelCallFinished": {
         this.held.delete(e.call);
         const o = e.outcome;
+
         if (o.kind === "complete") {
           this.spentUsd += o.costUsdMicros;
           const u = o.usage;
@@ -31,8 +34,10 @@ export class Spend {
           this.spentUsd += o.costUsdMicros;
           this.spentTokens += o.tokens;
         }
+
         return;
       }
+
       case "sessionStarted":
       case "userMessage":
       case "recovered":
@@ -58,9 +63,12 @@ export class Spend {
         ? `${formatUsd(this.spentUsd)} spent · no budget`
         : `${formatUsd(this.spentUsd)} of ${formatUsd(this.usdLimit)}`,
     ];
+
     if (this.tokenLimit !== undefined) parts.push(`${this.spentTokens} of ${this.tokenLimit} tokens`);
     const holding = [...this.held.values()].reduce((a, b) => a + b, 0);
+
     if (holding > 0) parts.push(`holding ${formatUsd(holding)}`);
+
     return parts.join(" · ");
   }
 }

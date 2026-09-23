@@ -14,6 +14,7 @@ export type TestDaemon = {
 
 export function startDaemon(extra: Record<string, string> = {}): TestDaemon {
   const home = mkdtempSync("/tmp/strv-ts-");
+
   // Real keys and upstreams must never reach a test daemon.
   const env = {
     ...process.env,
@@ -27,12 +28,17 @@ export function startDaemon(extra: Record<string, string> = {}): TestDaemon {
     STRIVE_HOST: "none",
     ...extra,
   };
+
   const strive = (...args: string[]) => {
     const r = Bun.spawnSync([STRIVE_EXE, ...args], { env });
+
     return { exitCode: r.exitCode, stdout: r.stdout.toString(), stderr: r.stderr.toString() };
   };
+
   const status = strive("status", "--json");
+
   if (status.exitCode !== 0) throw new Error(`daemon did not start: ${status.stderr}`);
+
   return {
     home,
     socket: join(home, "run/strived.sock"),

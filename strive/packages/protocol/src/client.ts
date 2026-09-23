@@ -46,14 +46,17 @@ export class StriveClient {
       s.once("connect", () => resolve(s));
       s.once("error", reject);
     });
+
     const c = new StriveClient(socket);
     const init = await c.request("initialize", { protocolVersion: PROTOCOL_VERSION, client });
+
     return { client: c, init };
   }
 
   request<M extends MethodName>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]> {
     if (this.closed) return Promise.reject(new Error(`${method}: connection closed`));
     const id = this.nextId++;
+
     return new Promise((resolve, reject) => {
       this.pending.set(id, { method, resolve, reject });
       this.socket.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
@@ -64,11 +67,13 @@ export class StriveClient {
     const set = this.listeners.get(method) ?? new Set();
     this.listeners.set(method, set);
     set.add(fn);
+
     return () => set.delete(fn);
   }
 
   onClose(fn: (err?: Error) => void): () => void {
     this.closeListeners.add(fn);
+
     return () => this.closeListeners.delete(fn);
   }
 
@@ -79,27 +84,35 @@ export class StriveClient {
   private onData(chunk: string) {
     this.buffer += chunk;
     let nl: number;
+
     while ((nl = this.buffer.indexOf("\n")) >= 0) {
       const line = this.buffer.slice(0, nl);
       this.buffer = this.buffer.slice(nl + 1);
+
       if (line.trim()) this.onMessage(line);
     }
   }
 
   private onMessage(line: string) {
     let msg: any;
+
     try {
       msg = JSON.parse(line);
     } catch {
       return this.shutdown(new Error("daemon sent invalid JSON"));
     }
+
     if (typeof msg.method === "string" && msg.id === undefined) {
       for (const fn of this.listeners.get(msg.method) ?? []) fn(msg.params);
+
       return;
     }
+
     const p = typeof msg.id === "number" ? this.pending.get(msg.id) : undefined;
+
     if (!p) return;
     this.pending.delete(msg.id);
+
     if (msg.error) p.reject(new ServerError(p.method, msg.error));
     else p.resolve(msg.result);
   }
@@ -107,8 +120,10 @@ export class StriveClient {
   private shutdown(err?: Error) {
     if (this.closed) return;
     this.closed = true;
+
     for (const p of this.pending.values()) p.reject(err ?? new Error(`${p.method}: connection closed`));
     this.pending.clear();
+
     for (const fn of this.closeListeners) fn(err);
   }
 }

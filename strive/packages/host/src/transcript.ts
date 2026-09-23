@@ -15,8 +15,10 @@ export function resultText(
     case "done": {
       const exit = record.kind === "bash" && outcome.exitCode !== undefined && outcome.exitCode !== 0;
       const sep = output === "" || output.endsWith("\n") ? "" : "\n";
+
       return { text: exit ? `${output}${sep}[exit code ${outcome.exitCode}]` : output, isError: false };
     }
+
     case "refused":
       return { text: outcome.reason, isError: true };
     case "interrupted":
@@ -39,10 +41,13 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
   const entries = compacted ? all.filter((e) => e.seq > compacted.seq) : all;
   const records = new Map<number, { callId: string; record: EffectRecord }>();
   const results = new Map<string, { text: string; isError: boolean; ts: number }>();
+
   for (const { event: e, tsMs } of entries) {
     if (e.type === "effectStarted") records.set(e.effect, { callId: e.callId, record: e.record });
+
     if (e.type === "effectFinished") {
       const started = records.get(e.effect);
+
       if (!started) continue;
       const output = e.outcome.kind === "done" ? await blob(e.outcome.output) : "";
       results.set(started.callId, { ...resultText(started.record, e.outcome, output), ts: tsMs });
@@ -51,10 +56,13 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
 
   const messages: Message[] =
     compacted?.event.type === "compacted" ? [summaryMessage(compacted.event.summary, compacted.tsMs)] : [];
+
   let open: { id: string; name: string; ts: number }[] = [];
+
   const close = () => {
     for (const call of open) {
       const r = results.get(call.id) ?? { text: NOT_RUN, isError: true, ts: call.ts };
+
       const result: ToolResultMessage = {
         role: "toolResult",
         toolCallId: call.id,
@@ -63,10 +71,13 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
         isError: r.isError,
         timestamp: r.ts,
       };
+
       messages.push(result);
     }
+
     open = [];
   };
+
   for (const { event: e, tsMs } of entries) {
     if (e.type === "userMessage") {
       close();
@@ -77,6 +88,8 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
       open = e.toolCalls.map((c) => ({ ...c, ts: tsMs }));
     }
   }
+
   close();
+
   return messages;
 }

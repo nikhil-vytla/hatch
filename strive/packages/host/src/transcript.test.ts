@@ -3,7 +3,9 @@ import type { Entry, Event } from "@strive/protocol";
 import { rebuild } from "./transcript";
 
 let seq = 0;
+
 const at = (event: Event): Entry => ({ seq: ++seq, tsMs: 1000 + seq, event });
+
 const assistant = (text: string, calls: { id: string; name: string }[] = []) =>
   at({
     type: "assistantMessage",
@@ -12,6 +14,7 @@ const assistant = (text: string, calls: { id: string; name: string }[] = []) =>
     toolCalls: calls,
     message: { role: "assistant", content: [{ type: "text", text }], stopReason: calls.length ? "toolUse" : "stop" },
   });
+
 const effect = (n: number, callId: string, kind: "read" | "bash") =>
   at({
     type: "effectStarted",
@@ -19,7 +22,9 @@ const effect = (n: number, callId: string, kind: "read" | "bash") =>
     callId,
     record: kind === "bash" ? { kind: "bash", command: "false", timeoutMs: 1000 } : { kind: "read", path: "a.txt" },
   });
+
 const blobs: Record<string, string> = { "sha256:out1": "file text", "sha256:out2": "some output\n" };
+
 const blob = async (d: string) => blobs[d]!;
 
 test("prompts and replies come back in order, and other events are skipped", async () => {
@@ -32,6 +37,7 @@ test("prompts and replies come back in order, and other events are skipped", asy
     assistant("hi there"),
     at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
   ];
+
   const messages = await rebuild(entries, blob);
   expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
   expect(messages[0]).toMatchObject({ role: "user", content: "hello" });
@@ -60,6 +66,7 @@ test("each tool call gets the daemon's result, in call order", async () => {
       durationMs: 1,
     }),
   ];
+
   const [, , first, second] = await rebuild(entries, blob);
   expect(first).toMatchObject({
     role: "toolResult",
@@ -93,6 +100,7 @@ test("refused and interrupted effects are errors the model can read", async () =
     effect(2, "b", "read"),
     at({ type: "effectFinished", effect: 2, outcome: { kind: "interrupted" }, durationMs: 0 }),
   ];
+
   const results = (await rebuild(entries, blob)).slice(1);
   expect(results).toMatchObject([
     { toolCallId: "a", isError: true, content: [{ type: "text", text: "declined: run: false" }] },
@@ -110,6 +118,7 @@ test("a tool call that never ran still gets a result, so the transcript stays va
     at({ type: "turnEnded", turn: 1, reason: { kind: "interrupted" } }),
     at({ type: "userMessage", text: "go on" }),
   ];
+
   const messages = await rebuild(entries, blob);
   expect(messages.map((m) => m.role)).toEqual(["assistant", "toolResult", "user"]);
   expect(messages[1]).toMatchObject({

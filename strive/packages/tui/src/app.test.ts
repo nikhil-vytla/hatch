@@ -11,6 +11,7 @@ const CWD = "/tmp/some-repo";
 type Ui = { term: VirtualTerminal; exits: number[]; app: App; stop(): void };
 
 let daemon: TestDaemon;
+
 let uis: Ui[];
 
 async function openUi(mode: SessionMode = "new"): Promise<Ui> {
@@ -23,6 +24,7 @@ async function openUi(mode: SessionMode = "new"): Promise<Ui> {
   await app.open(mode);
   const ui = { term, exits, app, stop: () => (tui.stop(), client.close()) };
   uis.push(ui);
+
   return ui;
 }
 
@@ -46,6 +48,7 @@ const enter = async (ui: Ui, text: string) => {
 };
 
 const sessions = () => JSON.parse(daemon.strive("sessions", "--all", "--json").stdout) as { id: string; cwd: string }[];
+
 const daemonClients = () => JSON.parse(daemon.strive("status", "--json").stdout).clients as number;
 
 test("a new session is created in the working directory and named in the header", async () => {
@@ -200,6 +203,7 @@ async function agentRuns(request: Record<string, unknown>) {
   const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
   const id = sessions()[0]!.id;
   const done = client.request("effect/run", { id, callId: "call_1", request: request as never });
+
   return { done, close: () => client.close() };
 }
 

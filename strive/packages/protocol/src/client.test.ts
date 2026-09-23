@@ -3,11 +3,13 @@ import { startDaemon, type TestDaemon } from "@strive/testkit";
 import { PROTOCOL_VERSION, ServerError, StriveClient } from "./index";
 
 const info = { name: "protocol-test", version: "0" };
+
 let daemon: TestDaemon;
 
 beforeAll(() => {
   daemon = startDaemon();
 });
+
 afterAll(() => daemon.dispose());
 
 test("handshake reports the daemon's home and pid", async () => {

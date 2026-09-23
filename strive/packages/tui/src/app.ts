@@ -49,15 +49,19 @@ export type SessionMode = "new" | "continue" | { resume: string };
 
 export function parseSessionMode(raw: string | undefined): SessionMode {
   if (!raw || raw === "new") return "new";
+
   if (raw === "continue") return "continue";
+
   return { resume: raw };
 }
 
 const tilde = (p: string) => (p.startsWith(homedir()) ? `~${p.slice(homedir().length)}` : p);
+
 const shortId = (id: string) => `…${id.slice(-6)}`;
 
 export function describe(entry: Entry): string {
   const e = entry.event;
+
   switch (e.type) {
     case "sessionStarted":
       return style.faint(`Session started in ${tilde(e.cwd)}`);
@@ -82,16 +86,20 @@ export function describe(entry: Entry): string {
             `The call broke (${e.outcome.reason}); charged its full hold of ${formatUsd(e.outcome.costUsdMicros)}.`,
           );
       }
+
     case "effectStarted": {
       const r = e.record;
+
       const what =
         r.kind === "bash"
           ? `$ ${r.command}`
           : r.kind === "write"
             ? `write ${r.path} (${r.bytes} bytes)`
             : `${r.kind} ${r.path}`;
+
       return style.muted(what);
     }
+
     case "effectFinished":
       switch (e.outcome.kind) {
         case "done":
@@ -103,6 +111,7 @@ export function describe(entry: Entry): string {
         case "interrupted":
           return style.danger("Interrupted: the daemon stopped while this ran.");
       }
+
     case "approvalModeSet":
       return style.faint(`Approvals: ${MODE_NAMES[e.mode]}`);
     case "checkpointed":
@@ -127,6 +136,7 @@ export function describe(entry: Entry): string {
         case "failed":
           return style.danger(`The agent stopped: ${e.reason.error}`);
       }
+
     case "approvalRequested":
       return style.accent(`Allow ${e.description}?`);
     case "approvalDecided":
@@ -138,6 +148,7 @@ export function describe(entry: Entry): string {
 
 function budgetText(usd?: number, tokens?: number): string {
   if (usd === undefined && tokens === undefined) return "unlimited";
+
   return [usd === undefined ? null : formatUsd(usd), tokens === undefined ? null : `${tokens} tokens`]
     .filter(Boolean)
     .join(" and ");
@@ -178,6 +189,7 @@ export class App {
     this.editor.onSubmit = (text) => {
       this.submit(text.trim()).catch((e) => this.say(style.danger((e as Error).message)));
     };
+
     this.editor.disableSubmit = true;
     this.renderHeader();
 
@@ -193,20 +205,27 @@ export class App {
     tui.addInputListener((data) => {
       if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
         this.quit(0);
+
         return { consume: true };
       }
+
       if (matchesKey(data, "escape") && this.working !== undefined && this.pending.size === 0 && this.session) {
         this.client.request("session/interrupt", { id: this.session.id }).catch(() => {});
+
         return { consume: true };
       }
+
       const decision = { y: "allow", a: "allowSession", n: "deny" }[data];
       const oldest = this.pending.keys().next();
+
       if (decision && !oldest.done && this.session) {
         this.client
           .request("approval/respond", { id: this.session.id, effect: oldest.value, decision: decision as never })
           .catch((e) => this.say(style.danger((e as Error).message)));
+
         return { consume: true };
       }
+
       return undefined;
     });
     this.offClose = client.onClose((err) => {
@@ -232,6 +251,7 @@ export class App {
       this.session = session;
       const early = this.early.filter((n) => n.sessionId === session.id).map((n) => n.entry);
       this.early = [];
+
       for (const e of [...entries, ...early].sort((a, b) => a.seq - b.seq)) this.show(e);
       this.editor.disableSubmit = false;
       this.renderHeader();
@@ -243,20 +263,27 @@ export class App {
 
   private async chooseSession(mode: SessionMode): Promise<string> {
     if (typeof mode === "object") return mode.resume;
+
     if (mode === "continue") {
       const { sessions } = await this.client.request("session/list", { cwd: this.cwd });
+
       if (sessions[0]) return sessions[0].id;
     }
+
     return (await this.client.request("session/create", { cwd: this.cwd })).id;
   }
 
   private explainOpenError(e: unknown, mode: SessionMode): string {
     const id = typeof mode === "object" ? mode.resume : "this session";
+
     if (e instanceof ServerError && e.code === -32010) return `No session ${id}.`;
+
     if (e instanceof ServerError && e.code === -32011) {
       return `This session's journal failed verification: ${(e.data as { problem: string }).problem}.`;
     }
+
     if (e instanceof ServerError && e.code === -32602) return `${id} is not a session id.`;
+
     return `Could not open the session: ${(e as Error).message}`;
   }
 
@@ -278,19 +305,27 @@ export class App {
     this.lastSeq = entry.seq;
     this.spend.apply(entry.event);
     const e = entry.event;
+
     if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
+
     if (e.type === "checkpointed") {
       this.checkpoints.set(e.checkpoint, "");
       this.awaitingPrompt = e.checkpoint;
     }
+
     if (e.type === "userMessage" && this.awaitingPrompt !== undefined) {
       this.checkpoints.set(this.awaitingPrompt, `before “${e.text}”`);
       this.awaitingPrompt = undefined;
     }
+
     if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
+
     if (e.type === "turnStarted") this.working = e.turn;
+
     if (e.type === "turnEnded") this.working = undefined;
+
     if (e.type === "assistantMessage" || e.type === "turnEnded") this.live.setText("");
+
     if (e.type === "approvalDecided") this.pending.delete(e.effect);
     const next = this.pending.values().next();
     this.prompt.setText(
@@ -300,6 +335,7 @@ export class App {
     );
     this.renderFooter();
     const text = describe(entry);
+
     if (text) this.say(text);
     // Entries that add no line (a finished turn) still change the footer.
     this.tui.requestRender();
@@ -319,6 +355,7 @@ export class App {
   async submit(text: string) {
     if (!text || !this.session) return;
     this.editor.setText("");
+
     if (!text.startsWith("/")) {
       try {
         await this.client.request("session/prompt", { id: this.session.id, text });
@@ -327,50 +364,71 @@ export class App {
         const why = e instanceof ServerError ? e.detail : (e as Error).message;
         this.say(style.danger(`Couldn't confirm your message was saved: ${why}`));
       }
+
       return;
     }
+
     const [cmd] = text.slice(1).split(/\s+/);
+
     switch (cmd) {
       case "status": {
         const s = await this.client.request("daemon/status", {});
         this.say(
           `${style.muted("daemon")} pid ${s.server.pid} · up ${Math.round(s.uptimeMs / 1000)}s · ${s.clients} client${s.clients === 1 ? "" : "s"}`,
         );
+
         return;
       }
+
       case "budget": {
         const arg = text.slice(1).split(/\s+/)[1];
         const dollars = arg === "off" ? undefined : Number(arg);
+
         if (arg !== "off" && !(Number.isFinite(dollars) && (dollars as number) >= 0)) {
           this.say(style.danger("Use /budget <dollars>, for example /budget 10, or /budget off."));
+
           return;
         }
+
         const usdMicros = dollars === undefined ? undefined : Math.round(dollars * 1_000_000);
         await this.client.request("session/budget", { id: this.session.id, usdMicros, tokens: this.spend.tokenLimit });
+
         return;
       }
+
       case "approvals": {
         const arg = text.slice(1).split(/\s+/)[1] ?? "";
         const mode = ({ ask: "ask", "auto-edit": "autoEdit", "full-auto": "fullAuto" } as const)[arg as "ask"];
+
         if (!mode) {
           this.say(style.danger("Use /approvals ask, /approvals auto-edit or /approvals full-auto."));
+
           return;
         }
+
         await this.client.request("session/approvals", { id: this.session.id, mode });
+
         return;
       }
+
       case "rewind": {
         const arg = text.slice(1).split(/\s+/)[1];
+
         if (!arg) {
           if (this.checkpoints.size === 0) {
             this.say(style.muted("No checkpoints yet: one is taken before each prompt."));
+
             return;
           }
+
           this.say([...this.checkpoints].map(([n, what]) => `${n}  ${what}`).join("\n"));
           this.say(style.muted("Put the files back with /rewind <number>."));
+
           return;
         }
+
         const checkpoint = Number(arg);
+
         try {
           await this.client.request("session/rewind", { id: this.session.id, checkpoint });
         } catch (e) {
@@ -382,20 +440,25 @@ export class App {
             ),
           );
         }
+
         return;
       }
+
       case "session":
         this.say(
           `${style.muted("session")} ${this.session.id} · resume with ${style.accent(`strive -r ${this.session.id}`)}`,
         );
+
         return;
       case "help":
         this.say(COMMANDS.map((c) => `${style.accent(`/${c.name}`)}  ${style.muted(c.description ?? "")}`).join("\n"));
         this.say(style.muted("Enter sends · Alt+Enter new line · Tab completes · Ctrl+C exits"));
+
         return;
       case "quit":
       case "exit":
         this.quit(0);
+
         return;
       default:
         this.say(style.danger(`Unknown command /${cmd}. Type /help.`));

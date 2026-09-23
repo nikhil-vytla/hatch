@@ -14,6 +14,7 @@ const started = (call: number, usd: number): Event => ({
 
 test("spend follows the ledger's rules for each outcome", () => {
   const s = new Spend();
+
   for (const e of [
     { type: "budgetSet", usdMicros: 5_000_000 },
     started(1, 900),

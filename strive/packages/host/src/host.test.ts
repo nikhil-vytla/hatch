@@ -7,11 +7,15 @@ import { type Entry, type Event, StriveClient } from "@strive/protocol";
 import { FakeAnthropic, type ScriptedReply, startDaemon, type TestDaemon } from "@strive/testkit";
 
 const HOST = `bun ${resolve(import.meta.dir, "main.ts")}`;
+
 setDefaultTimeout(30_000);
 
 let daemon: TestDaemon | undefined;
+
 let fake: FakeAnthropic | undefined;
+
 let clients: StriveClient[] = [];
+
 afterEach(() => {
   for (const c of clients) c.close();
   clients = [];
@@ -25,12 +29,14 @@ async function setup(script: ScriptedReply[]) {
   const cwd = realpathSync(mkdtempSync("/tmp/strv-agent-"));
   const client = await connect();
   const { id } = await client.request("session/create", { cwd });
+
   return { client, id, cwd };
 }
 
 async function connect() {
   const { client } = await StriveClient.connect(daemon!.socket, { name: "test", version: "0" });
   clients.push(client);
+
   return client;
 }
 
@@ -40,9 +46,12 @@ async function events(client: StriveClient, id: string): Promise<Event[]> {
 
 async function waitFor(client: StriveClient, id: string, done: (e: Event[]) => boolean, ms = 15_000): Promise<Event[]> {
   const deadline = Date.now() + ms;
+
   for (;;) {
     const e = await events(client, id);
+
     if (done(e)) return e;
+
     if (Date.now() > deadline) {
       const log = (() => {
         try {
@@ -51,8 +60,10 @@ async function waitFor(client: StriveClient, id: string, done: (e: Event[]) => b
           return "(no host log)";
         }
       })();
+
       throw new Error(`timed out; journal: ${JSON.stringify(e.map((x) => x.type))}\nhost log:\n${log}`);
     }
+
     await Bun.sleep(50);
   }
 }
@@ -64,6 +75,7 @@ test("a prompt runs a turn in which the model writes a file and answers", async 
     { toolCalls: [{ id: "toolu_1", name: "write", input: { path: "hello.txt", content: "hi" } }] },
     { text: "Wrote hello.txt." },
   ]);
+
   await client.request("session/prompt", { id, text: "make hello.txt" });
   const e = await waitFor(client, id, turnsEnded(1));
 
@@ -152,6 +164,7 @@ test("a command nobody can approve reaches the model as an error it can act on",
     { toolCalls: [{ id: "toolu_b", name: "bash", input: { command: "ls" } }] },
     { text: "I could not run ls." },
   ]);
+
   await client.request("session/prompt", { id, text: "list files" });
   await waitFor(client, id, turnsEnded(1));
   const result = fake!.requests[1].messages.at(-1).content[0];
@@ -190,6 +203,7 @@ async function setupWith(settings: object, script: ScriptedReply[]) {
   const cwd = realpathSync(mkdtempSync("/tmp/strv-agent-"));
   const client = await connect();
   const { id } = await client.request("session/create", { cwd });
+
   return { client, id, cwd };
 }
 
@@ -201,6 +215,7 @@ test("a long conversation is summarized before the next turn, and resumes from t
     { text: "SUMMARY-2, which carries SUMMARY-1 forward." },
     { text: "third answer" },
   ]);
+
   await client.request("session/prompt", { id, text: "first question" });
   await waitFor(client, id, turnsEnded(1));
   await client.request("session/prompt", { id, text: "second question" });
@@ -224,10 +239,12 @@ test("a long conversation is summarized before the next turn, and resumes from t
   const again = await connect();
   await again.request("session/prompt", { id, text: "third question" });
   await waitFor(again, id, turnsEnded(3));
+
   const resumed = fake!.requests
     .at(-1)
     .messages.map((m: any) => JSON.stringify(m.content))
     .join("");
+
   expect(resumed).toContain("SUMMARY-1");
   expect(resumed).not.toContain("first question");
 });

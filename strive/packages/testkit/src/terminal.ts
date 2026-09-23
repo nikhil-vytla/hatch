@@ -58,16 +58,22 @@ export class VirtualTerminal implements Terminal {
     await this.pending;
     const buf = this.term.buffer.active;
     const lines: string[] = [];
+
     for (let i = 0; i < buf.length; i++) lines.push(buf.getLine(i)?.translateToString(true) ?? "");
+
     while (lines.length && lines[lines.length - 1] === "") lines.pop();
+
     return lines;
   }
 
   async waitFor(text: string, timeoutMs = 2000): Promise<string[]> {
     const deadline = Date.now() + timeoutMs;
+
     for (;;) {
       const s = await this.screen();
+
       if (s.some((l) => l.includes(text))) return s;
+
       if (Date.now() > deadline) throw new Error(`screen never showed ${JSON.stringify(text)}:\n${s.join("\n")}`);
       await Bun.sleep(10);
     }
