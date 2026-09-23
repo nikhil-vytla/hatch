@@ -18,6 +18,8 @@ if ! git diff --quiet -- "$gen" || [ -n "$(git ls-files --others --exclude-stand
 fi
 
 bun install --frozen-lockfile --silent
+# The Harbor agent has no tests of its own here; it must at least parse.
+python3 -m py_compile harbor/strive_agent.py
 bunx biome format packages apps
 bunx oxlint --deny-warnings packages apps
 bunx tsc -p tsconfig.json

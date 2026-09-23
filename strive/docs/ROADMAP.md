@@ -10,7 +10,7 @@
 | M3 Agent | pi-agent-core loop; read/write/edit/bash run by the daemon; approval modes; sandbox; checkpoints + `/rewind`; turn time limits | Done. A real Haiku run fixed a bug in a scratch repo for $0.0124 |
 | M4 Context | AGENTS.md, SKILL.md, MCP, compaction, settings. Exit: daily use on this repo | Done. A real Haiku run on this repo answered from AGENTS.md, listed its skill and called an MCP tool after approval, for $0.0069 |
 | M5 Desktop | Electron client on the workspace document; drag-and-drop; agent layout edits as proposals | Done. `strive app`; Playwright drives it against a real daemon. Signing and notarization are tracked, not blocking |
-| M6 Headless | `strive run --headless --json`; Harbor Terminal-Bench smoke run | |
+| M6 Headless | `strive run --headless --json`; Harbor Terminal-Bench smoke run | Done. `strive run`; `harbor/strive_agent.py`. Terminal-Bench 2.0 `fix-git` with Haiku 4.5: reward 1.0, 11 model calls, $0.036 |
 
 ## Later stages
 

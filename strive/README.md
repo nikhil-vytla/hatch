@@ -74,6 +74,20 @@ knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or
 `~/.strive/skills`). Long conversations are summarized before they
 outgrow the model's context.
 
+## Benchmarks
+
+`harbor/strive_agent.py` runs strive as a [Harbor](https://github.com/harbor-framework/harbor)
+agent: Terminal-Bench 2.0 and the other Harbor datasets.
+
+```sh
+./scripts/build-linux.sh x86_64    # Linux binaries for the task containers (and aarch64 for native ones)
+PYTHONPATH=harbor harbor run -d terminal-bench@2.0 -a strive_agent:Strive -m anthropic/claude-haiku-4-5 -l 5
+```
+
+Each task container is the sandbox, so the agent runs with `"sandbox": "off"` and full-auto
+approvals. `STRIVE_BUDGET_USD` (default 1) and `STRIVE_TURN_SECONDS` limit each task, and the
+session's journal lands in the trial's `agent/strive.jsonl`.
+
 ## Develop
 
 ```sh

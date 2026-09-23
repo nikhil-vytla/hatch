@@ -38,7 +38,7 @@ class Strive(BaseAgent):
             raise ValueError("strive's Harbor agent takes -m anthropic/<model>")
         return self.model_name.removeprefix("anthropic/")
 
-        async def setup(self, environment: BaseEnvironment) -> None:
+    async def setup(self, environment: BaseEnvironment) -> None:
         # The container's architecture, which can differ from this machine's
         # (Terminal-Bench images are amd64; on an arm64 Mac they are emulated).
         uname = await environment.exec(command="uname -m")
