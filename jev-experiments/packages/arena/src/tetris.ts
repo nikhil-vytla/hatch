@@ -16,7 +16,7 @@ import { DECISION_INSTRUCTIONS } from "../../../live-worlds/tetris/session";
 export type TimingMode = "realtime" | "turns";
 export type Source = "recorded" | "live" | "code";
 export type Probabilities = Record<string, number>;
-export type Answer = { choice: string; probabilities?: Probabilities; confidence?: number | null; latencyMs?: number } | { error: string; latencyMs?: number };
+export type Answer = { choice: string; probabilities?: Probabilities; confidence?: number | null; latencyMs?: number } | { error: string; latencyMs?: number; retryAfterMs?: number };
 
 export type Question = {
   id: string; lane: number; pieceId: number; sentAt: number;
@@ -37,6 +37,8 @@ export type Contestant = {
   readyToAsk?(lane: number, clockMs: number): boolean;
   /** Re-ask about a piece every interval even after an answer was used (the original live protocol). */
   reask?: boolean;
+  /** After a failure: "backoff" (default) doubles the wait up to 4 s; "fixed" re-asks after 400 ms, as the first real-time recordings did. */
+  retryPolicy?: "backoff" | "fixed";
   /** The signal aborts a live request whose answer can no longer be used. */
   ask(question: Question, mode: TimingMode, signal?: AbortSignal): Reply;
 };
@@ -57,10 +59,12 @@ export type Lane = {
   recordingEnded: number | null;
   missingPiece: number | null;
   answeredPiece: number | null;
+  /** Consecutive failed requests, for backing off. */
+  failures: number;
 };
 
 const RULES = "10 columns, 20 rows; gravity continues while you decide; choose one option. Every candidate landing is reachable in the observed state. Code executes a chosen landing route. Intent delegates landing search to a code planner.";
-const INTERVAL_MS = 900, DEADLINE_MS = 5000, PLAN_MS = 5000, MOVE_MS = 80, RETRY_MS = 400;
+const INTERVAL_MS = 900, DEADLINE_MS = 5000, PLAN_MS = 5000, MOVE_MS = 80, RETRY_MS = 400, RETRY_CAP_MS = 4000;
 
 export function optionCriteria(options: Landing[]) {
   return Object.fromEntries(options.map((o) => [o.id, JSON.stringify({ cells: o.id, clears: o.features.lines, buriedEmptyCells: o.features.holes, highestColumn: o.features.height, totalColumnHeight: o.features.aggregateHeight, unevenness: o.features.bumpiness, topOut: o.features.topOut, inputCount: o.path.length })]));
@@ -83,7 +87,7 @@ export class TetrisArena {
     if (options.pieceLimit) this.pieceLimit = options.pieceLimit;
     this.lanes = contestants.map((contestant) => {
       const game = createGame(seed);
-      return { contestant, game, plan: null, pending: null, nextRequestAt: 0, trackedPieceId: game.pieceId, pieceStartedAt: 0, revision: 0, stats: { applied: 0, stale: 0, failed: 0, missing: 0, latencyMs: [] }, recordingEnded: null, missingPiece: null, answeredPiece: null };
+      return { contestant, game, plan: null, pending: null, nextRequestAt: 0, trackedPieceId: game.pieceId, pieceStartedAt: 0, revision: 0, stats: { applied: 0, stale: 0, failed: 0, missing: 0, latencyMs: [] }, recordingEnded: null, missingPiece: null, answeredPiece: null, failures: 0 };
     });
   }
   /** A lane stops at game over, at the piece limit, or where its recording ends (no loss is invented past the data). */
@@ -195,10 +199,17 @@ export class TetrisArena {
     lane.pending = null;
     const a = p.answer!, q = p.question, latencyMs = a.latencyMs ?? this.clockMs - q.sentAt;
     if ("error" in a) {
-      // Try again soon; a lane never stops asking because one request failed.
-      if (!lane.contestant.reask) lane.nextRequestAt = this.clockMs + RETRY_MS;
+      // Back off 0.4, 0.8, 1.6, 3.2, then 4 s, and never stop asking. Rate limits often
+      // suggest waiting 60 s; that would freeze the game, so a suggestion is used only when short.
+      if (!lane.contestant.reask) {
+        const backoff = lane.contestant.retryPolicy === "fixed" ? RETRY_MS : Math.min(RETRY_CAP_MS, RETRY_MS * 2 ** lane.failures);
+        const suggested = lane.contestant.retryPolicy !== "fixed" && a.retryAfterMs && a.retryAfterMs <= RETRY_CAP_MS ? a.retryAfterMs : 0;
+        lane.nextRequestAt = this.clockMs + Math.max(backoff, suggested);
+        lane.failures++;
+      }
       return this.resolve(lane, p.entry, "failed", { reason: a.error, latencyMs });
     }
+    lane.failures = 0;
     const common = { choice: a.choice, probabilities: a.probabilities, confidence: a.confidence, latencyMs };
     if (!q.options.some((o) => o.id === a.choice)) return this.resolve(lane, p.entry, "failed", { ...common, reason: "Answer is not one of the offered landings" });
     if (lane.game.status !== "playing" || lane.game.pieceId !== q.pieceId) return this.resolve(lane, p.entry, "stale", { ...common, reason: "The piece locked before the answer arrived" });
@@ -335,10 +346,10 @@ export type TimedEvent = { sentAt: number; pieceId: number; board: string[]; rec
  * Replays a real-time recording made with ask-once lanes: each question goes
  * out at its recorded world time and its answer lands at its recorded time.
  */
-export function timedReplay(events: TimedEvent[], name: string, id: string): Contestant {
+export function timedReplay(events: TimedEvent[], name: string, id: string, retryPolicy: "backoff" | "fixed" = "backoff"): Contestant {
   const queue = [...events].sort((a, b) => a.sentAt - b.sentAt);
   return {
-    id, name, source: "recorded",
+    id, name, source: "recorded", retryPolicy,
     readyToAsk(_lane, clockMs) { const next = queue.find((e) => e.sentAt >= clockMs); return next ? next.sentAt === clockMs : true; },
     ask(q) {
       const e = queue.find((x) => x.sentAt === q.sentAt && x.pieceId === q.pieceId && JSON.stringify(x.board) === JSON.stringify(q.state.board));

@@ -31,6 +31,18 @@ The same designs in real time: gravity never waits, one game per design, one req
 
 Successful requests took about 300 ms at the median for every design. Almost every failure was a 429 rate limit, even with one request in flight: re-asking after 400 ms keeps hitting the limit. Remembering judgements avoided most requests (about 1,285 spot judgements came from memory), so it hit the limit least and played fastest, but it cleared fewer lines. Its questions carry one sentence with no other spots for comparison, and a first judgement is reused for the rest of the game.
 
+### Run 2: backing off, and remembering only confident judgements
+
+Run 1 re-asked failed requests after a fixed 400 ms. Rate limits usually suggest waiting 60 s, which would freeze the game, so run 2 backs off instead: 0.4, 0.8, 1.6, 3.2, then 4 s, resetting after a success, using a suggested wait only when it is 4 s or less. It also adds a fourth design: remember a judgement only when it is at least 0.3 from 0.5, and ask again about unsure or new sentences with every spot in view.
+
+| Design | Lines | Game time for 40 pieces | Failed requests (run 1 → run 2) |
+|---|---|---|---|
+| Judge each spot | 13, 14, 12 | 68–88 s | 247 → 135 |
+| Remember every judgement | 11, 9, 8 | 38–44 s | 28 → 15 |
+| Remember only confident judgements | 12, 11, 10 | 40–51 s | 43 (new) |
+
+Files for run 2: `realtime-2.replay.json` and `realtime-2.jsonl.gz`. Every game in both runs replays exactly under the retry policy it was recorded with.
+
 Files: `realtime.replay.json` (every decision with world send and arrival times; replays exactly) and `realtime.jsonl.gz` (every request and reply).
 
 Record new runs with `bun jev-experiments/packages/arena/scripts/record-framings.ts` or `record-realtime.ts` after moving these files; the recorders refuse to overwrite them.
