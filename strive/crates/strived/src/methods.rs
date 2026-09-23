@@ -142,6 +142,9 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
         m if m.starts_with("host/") => route_host(state, conn, m, params).await,
         ApprovalRespond::NAME => {
             let ApprovalRespondParams { id, effect, decision } = parse::<ApprovalRespond>(params)?;
+            if crate::sync::lock(&conn.host_of).is_some() {
+                return Err(RpcError::new(RpcError::NOT_A_PERSON, "an agent host can't decide on approvals"));
+            }
             let by = crate::sync::lock(&conn.client).clone();
             match state.sessions.decide(&session_id(&id)?, effect, decision, by).await {
                 Ok(()) => reply::<ApprovalRespond>(Empty {}),

@@ -179,6 +179,13 @@ enum Cmd {
         person: bool,
         reply: AttachReply,
     },
+    /// How many people are attached (clients that aren't agent hosts).
+    People {
+        reply: oneshot::Sender<usize>,
+    },
+    /// Finish the batch this arrives in, then exit. Shutdown can't wait for
+    /// every sender to drop: a request waiting on a person holds one.
+    Stop,
 }
 
 /// History for a new subscriber, and its stream of later entries.
@@ -421,18 +428,47 @@ impl Sessions {
 
     /// Asks attached clients to decide on an effect and waits for the answer.
     /// `None` when no client is attached to answer.
+    /// `None` too once no person is left to answer, or the daemon is stopping.
     pub async fn ask(&self, id: &SessionId, effect: u64, description: String) -> Result<Option<Decision>> {
-        let (decided, answer) = oneshot::channel();
-        crate::sync::lock(&self.pending).insert((id.clone(), effect), decided);
+        let key = (id.clone(), effect);
+        let (decided, mut answer) = oneshot::channel();
+        crate::sync::lock(&self.pending).insert(key.clone(), decided);
+        let delivered = self.request_approval(id, effect, description).await;
+        if !matches!(delivered, Ok(n) if n > 0) {
+            crate::sync::lock(&self.pending).remove(&key);
+            return delivered.map(|_| None);
+        }
+        let mut check = tokio::time::interval(std::time::Duration::from_millis(250));
+        loop {
+            tokio::select! {
+                decision = &mut answer => return Ok(Some(decision.unwrap_or(Decision::Deny))),
+                _ = check.tick() => {
+                    let left = self.people(id).await.unwrap_or(0);
+                    // Removing the entry settles a race with `decide`: whoever
+                    // removes it owns the outcome.
+                    if left == 0 && crate::sync::lock(&self.pending).remove(&key).is_some() {
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Journals the request; how many people it reached. The writer's sender
+    /// is dropped before returning, so a long wait doesn't keep the writer up.
+    async fn request_approval(&self, id: &SessionId, effect: u64, description: String) -> Result<usize> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::Ask { effect, description, reply }).map_err(|_| writer_gone())?;
-        let delivered = rx.await.map_err(|_| writer_gone())??;
-        if delivered == 0 {
-            crate::sync::lock(&self.pending).remove(&(id.clone(), effect));
-            return Ok(None);
-        }
-        Ok(Some(answer.await.unwrap_or(Decision::Deny)))
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// People attached to the session; an error once the daemon is stopping.
+    async fn people(&self, id: &SessionId) -> Result<usize> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::People { reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())
     }
 
     /// Records a person's decision and lets the waiting effect go on.
@@ -525,6 +561,7 @@ impl Sessions {
             map.drain().map(|(_, l)| l).collect()
         };
         for l in live {
+            let _ = l.tx.send(Cmd::Stop); // fails only if the writer already stopped
             drop(l.tx);
             let _ = tokio::task::spawn_blocking(move || l.thread.join()).await;
         }
@@ -555,6 +592,7 @@ enum Staged {
     Attach(u64, bool, AttachReply),
     /// Answered already; nothing to append.
     Handled,
+    Stop,
 }
 
 struct Writer {
@@ -648,6 +686,7 @@ impl Writer {
             let mut staged: Vec<(Done, Vec<Entry>)> = Vec::new();
             let mut attaches = Vec::new();
             let mut failed = false;
+            let mut stop = false;
             for cmd in batch {
                 let (events, done) = match self.stage(cmd) {
                     Staged::Events(events, done) => (events, done),
@@ -656,6 +695,10 @@ impl Writer {
                         continue;
                     }
                     Staged::Handled => continue,
+                    Staged::Stop => {
+                        stop = true;
+                        continue;
+                    }
                 };
                 match self.journal.append(ts, &events) {
                     Ok(es) => staged.push((done, es)),
@@ -669,6 +712,10 @@ impl Writer {
                 return;
             }
             if !attaches.is_empty() && !self.attach(attaches, &mut rx) {
+                return;
+            }
+            if stop {
+                rx.close();
                 return;
             }
         }
@@ -690,6 +737,11 @@ impl Writer {
                 let _ = reply.send(self.mode);
                 return Staged::Handled;
             }
+            Cmd::People { reply } => {
+                let _ = reply.send(self.subscribers.iter().filter(|(s, person)| *person && !s.is_closed()).count());
+                return Staged::Handled;
+            }
+            Cmd::Stop => return Staged::Stop,
             Cmd::Ask { effect, description, reply } => {
                 let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, delivered| {
                     let _ = reply.send(r.map(|_| delivered));

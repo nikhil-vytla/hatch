@@ -73,6 +73,8 @@ impl RpcError {
     pub const JOURNAL_INVALID: i32 = -32011;
     /// No approval is pending for that effect (unknown, or already decided).
     pub const APPROVAL_NOT_PENDING: i32 = -32012;
+    /// Only a person decides on approvals; an agent host can't.
+    pub const NOT_A_PERSON: i32 = -32013;
 
     pub fn new(code: i32, message: impl Into<String>) -> Self {
         Self { code, message: message.into(), data: None }

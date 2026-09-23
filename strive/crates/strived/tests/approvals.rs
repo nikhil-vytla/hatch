@@ -195,3 +195,50 @@ fn deciding_an_unknown_or_settled_request_is_an_error() {
     let again = ui.call("approval/respond", &json!({"id": w.id, "effect": 1, "decision": "deny"}));
     assert_eq!(again["error"]["code"], -32012);
 }
+
+/// The agent asks; only a person decides. A host that sees the request
+/// (it sees every entry) can't answer it, even for itself.
+#[test]
+fn an_agent_host_cannot_approve_its_own_request() {
+    let w = Ws::new();
+    let mut host = w.env.rpc();
+    host.ok("host/register", &json!({"id": w.id}));
+    host.ok("session/attach", &json!({"id": w.id}));
+    let mut ui = w.attached();
+    let pending = w.spawn_effect(json!({"kind": "bash", "command": "touch made.txt"}));
+    next_request(&mut ui);
+    let refused = host.call("approval/respond", &json!({"id": w.id, "effect": 1, "decision": "allowSession"}));
+    assert_eq!(refused["error"]["code"], strive_proto::rpc::RpcError::NOT_A_PERSON, "{refused}");
+    assert!(!w.file("made.txt").exists());
+    ui.ok("approval/respond", &json!({"id": w.id, "effect": 1, "decision": "deny"}));
+    assert_eq!(pending.join().unwrap()["outcome"]["kind"], "refused");
+    assert!(!w.events().iter().any(|e| e["type"] == "approvalModeSet" && e["mode"] == "fullAuto"));
+}
+
+/// A request no one is left to answer is refused, not left waiting forever.
+#[test]
+fn a_request_is_refused_when_the_last_person_detaches() {
+    let w = Ws::new();
+    let mut ui = w.attached();
+    let pending = w.spawn_effect(json!({"kind": "bash", "command": "touch made.txt"}));
+    next_request(&mut ui);
+    drop(ui);
+    let started = std::time::Instant::now();
+    let r = pending.join().unwrap();
+    assert!(started.elapsed() < Duration::from_secs(3), "refused {:?} after the person left", started.elapsed());
+    assert_eq!(r["outcome"]["kind"], "refused", "{r}");
+    assert!(!w.file("made.txt").exists());
+}
+
+/// Stopping the daemon doesn't wait on a decision that may never come.
+#[test]
+fn the_daemon_stops_while_a_request_waits_for_approval() {
+    let w = Ws::new();
+    let mut ui = w.attached();
+    let _pending = w.spawn_effect(json!({"kind": "bash", "command": "touch made.txt"}));
+    next_request(&mut ui);
+    let started = std::time::Instant::now();
+    w.env.stop(); // returns once the daemon is gone
+    assert!(started.elapsed() < Duration::from_secs(5), "stopped after {:?}", started.elapsed());
+    assert!(!w.file("made.txt").exists());
+}
