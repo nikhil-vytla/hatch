@@ -227,3 +227,63 @@ again (146 files).
   - Diagnosis came from adding the client's status and body to the failure
     output. The daemon log alone showed no call ending, which pointed at a
     refusal after the start.
+
+## 2026-09-23: M3 review (Codex), triaged and fixed
+
+Codex returned 18 findings: 12 high and 6 medium. Codex reproduced four
+host defects dynamically; it reasoned out the rest statically. Every one
+held up. Each fix has a test that fails without it: a mutant, a stash of
+the fix, or a run before the fix.
+
+- **Approvals.**
+  - A registered host could approve its own effects. It is now refused
+    with -32013.
+  - An approval could wait forever once its person left, and it held a
+    writer sender, so shutdown never finished.
+    - That is also why test daemons were found still running hours later.
+      A `sample` of one showed shutdown stuck in `pthread_join` on a
+      writer thread.
+    - Writers now get an explicit `Stop`.
+    - Approvals poll whether people are attached and whether the daemon
+      is stopping.
+    - A daemon whose socket is gone now exits.
+- **Interrupts.** The host ignored the abort signal while a tool ran.
+  - New `effect/cancel`: a waiting approval is refused, and a running
+    command is killed.
+  - The host calls it when its abort signal fires.
+  - A thrown abort is recorded as interrupted or timed out.
+- **Process containment.**
+  - `set -m` jobs escaped the process-group kill. The whole process tree
+    is now killed, found with `ps` while the command still runs.
+  - The output collector is waited on for at most 1s.
+  - Linux gets `--unshare-pid`, private `/tmp` and `/run` (for D-Bus,
+    systemd, X11 and Docker sockets), and a scrubbed
+    `DBUS_SESSION_BUS_ADDRESS`. CI now installs bubblewrap; this is
+    unverified until CI runs.
+  - macOS `launchctl submit` from inside the Seatbelt profile did not
+    escape when tried. LaunchServices (`open`) was not probed, because it
+    would open windows on the desktop.
+- **Files.**
+  - Effects act on the exact path the gate checked. `pinned.rs` walks it
+    with `openat(O_NOFOLLOW)`.
+  - Reads accept only regular files and stream them.
+  - Each write gets its own temporary file.
+- **Hosts.**
+  - Registration is exclusive (-32014), and only the registered host may
+    record or stream (-32015).
+  - Registering and closing a connection are serialized, so there are no
+    phantom hosts.
+- **Transcript.**
+  - Prompts are held until their turn starts.
+  - Aborted or failed replies get no synthesized tool results.
+  - Entries that arrive during startup are replayed.
+- **Checkpoints.**
+  - A rewind that would overwrite ignored files is refused.
+  - Nested repositories are excluded and reported. Codex's finding led to
+    a worse one: a nested repository with no commits made every
+    checkpoint fail silently.
+  - Effects and rewinds share a workspace lock.
+  - The undo checkpoint is journaled before restoring.
+- **A lesson from the harness.** The first run of the approval tests hung,
+  because the tests reproduced the bugs. Test runs are now wrapped in
+  `perl -e 'alarm N; exec @ARGV'`, since macOS has no `timeout`.
