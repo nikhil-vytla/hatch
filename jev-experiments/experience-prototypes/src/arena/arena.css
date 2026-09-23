@@ -1,0 +1,59 @@
+/* Working draft: deliberately plain until the identity prototypes land. */
+.arena-page { max-width: 1180px; margin: 0 auto; padding: 32px 20px 80px; --arena-cell: var(--soft); --arena-stack: color-mix(in srgb, var(--ink) 55%, var(--surface)); --arena-active: var(--sage); --arena-ghost: color-mix(in srgb, var(--ink) 35%, transparent); --arena-target: var(--coral); }
+.arena-intro { margin-bottom: 28px; max-width: 64ch; }
+.arena-intro h1 { font: 500 clamp(32px, 5vw, 48px)/1.05 var(--serif, Georgia, serif); margin: 6px 0 10px; }
+.arena-kicker { font: 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.arena-section { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 32px; }
+.arena-section-head h2 { font: 500 26px/1.2 var(--serif, Georgia, serif); margin: 0 0 6px; }
+.arena-section-head p { max-width: 70ch; color: var(--muted); margin: 0 0 14px; }
+.arena-controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 14px; font-size: 14px; }
+.arena-controls button, .arena-case-head button { font: inherit; font-size: 14px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; cursor: pointer; }
+.arena-controls button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.arena-controls button:disabled { opacity: .45; cursor: default; }
+.arena-controls select { font: inherit; font-size: 14px; min-height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+.arena-controls label { display: inline-flex; gap: 6px; align-items: center; }
+.arena-check { display: inline-flex; gap: 6px; align-items: center; min-height: 32px; }
+.arena-clock { font: 13px var(--mono); color: var(--muted); margin-left: auto; }
+.arena-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.arena-lane { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface); min-width: 0; }
+.arena-lane header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.arena-lane h3 { font-size: 15px; margin: 0; }
+.arena-source { font: 11px var(--mono); text-transform: uppercase; letter-spacing: .05em; padding: 2px 6px; border-radius: 4px; background: var(--soft); color: var(--muted); }
+.arena-source.recorded { color: var(--blue); } .arena-source.live { color: var(--sage); }
+.arena-board { display: block; width: 100%; max-width: 168px; height: auto; margin: 0 auto; border-radius: 6px; image-rendering: pixelated; }
+.arena-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin: 10px 0 6px; font-size: 13px; }
+.arena-stats div { display: flex; justify-content: space-between; } .arena-stats dt { color: var(--muted); } .arena-stats dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.arena-decisions, .arena-status { font-size: 12.5px; color: var(--muted); margin: 2px 0; }
+.arena-marker { font-size: 12.5px; background: color-mix(in srgb, var(--gold) 16%, transparent); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
+.arena-top { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; }
+.arena-top li { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: center; margin-bottom: 4px; }
+.arena-top li span { grid-column: 1 / -1; height: 5px; background: var(--line); border-radius: 3px; }
+.arena-top li.chosen span { background: var(--sage); }
+.arena-top code { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-muted { color: var(--muted); font-size: 13px; }
+.arena-note { font-size: 13px; color: var(--muted); max-width: 80ch; margin: 14px 0; }
+.arena-log { margin-top: 10px; font-size: 13px; } .arena-log summary { cursor: pointer; min-height: 32px; }
+.arena-log table, .arena-scoreboard { width: 100%; border-collapse: collapse; font-size: 13px; }
+.arena-log th, .arena-log td, .arena-scoreboard th, .arena-scoreboard td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.arena-log thead th, .arena-scoreboard thead th { font: 11px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 400; }
+.arena-scoreboard td { font-variant-numeric: tabular-nums; }
+.arena-scoreboard th small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.arena-status-pill { font: 11px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--soft); }
+.arena-status-pill.applied { color: var(--sage); } .arena-status-pill.stale, .arena-status-pill.failed { color: var(--coral); } .arena-status-pill.missing { color: var(--gold); }
+.arena-reliability { width: 64px; height: 64px; } .arena-reliability rect { fill: var(--sage); } .arena-reliability .diag { stroke: var(--muted); stroke-dasharray: 3 3; }
+.arena-picker { position: relative; } .arena-picker summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.arena-picker[open] > label { display: flex; } .arena-picker > label { padding: 2px 10px; }
+.arena-picker[open] { background: var(--surface); }
+.arena-case { margin-top: 22px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface); }
+.arena-case-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .arena-case-head h3 { margin: 0 auto 0 0; font-size: 16px; text-transform: capitalize; }
+.arena-case pre { font-size: 12px; overflow: auto; max-height: 220px; background: var(--soft); padding: 10px; border-radius: 8px; }
+.arena-question { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.arena-answer-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.arena-answer-row figure { margin: 0; width: 120px; } .arena-answer-row figure.wrong .arena-bars { outline: 2px solid var(--coral); outline-offset: 2px; border-radius: 4px; }
+.arena-answer-row figcaption { font-size: 12px; margin-top: 4px; } .arena-answer-row figcaption span { color: var(--muted); }
+.arena-bars { display: flex; gap: 3px; align-items: flex-end; height: 56px; }
+.arena-bars div { flex: 1; height: 100%; display: flex; align-items: flex-end; background: var(--soft); border-radius: 2px; }
+.arena-bars span { display: block; width: 100%; background: color-mix(in srgb, var(--ink) 30%, var(--surface)); border-radius: 2px; }
+.arena-bars .top span { background: var(--sage); }
+.arena-options { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+@media (max-width: 640px) { .arena-clock { margin-left: 0; width: 100%; } .arena-scoreboard { display: block; overflow-x: auto; } }

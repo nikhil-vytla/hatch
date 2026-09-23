@@ -12,6 +12,7 @@ import "./pages/reading-workspace.css";
 
 const ExperimentPage = lazy(() => import("./pages/experiment").then(m => ({ default: m.ExperimentPage })));
 const AboutPage = lazy(() => import("./pages/about").then(m => ({ default: m.AboutPage })));
+const ArenaPage = lazy(() => import("./arena/arena-page").then(m => ({ default: m.ArenaPage })));
 const NotesIndex = lazy(() => import("./notes").then(m => ({ default: m.NotesIndex })));
 const ExperimentNote = lazy(() => import("./notes").then(m => ({ default: m.ExperimentNote })));
 
@@ -88,6 +89,7 @@ function Header({ route }: { route: string }) {
         </a>
         <nav aria-label="Main navigation">
           <a href="#/" aria-current={!route || route === "#" || route === "#/" || route === "#collection" || route.startsWith("#experiment/") ? "page" : undefined}>Play</a>
+          <a href="#/arena" aria-current={route === "#/arena" ? "page" : undefined}>Arena</a>
           <a href="#/notes" aria-current={route.startsWith("#/notes") ? "page" : undefined}>Notes</a>
           <a href="#/about" aria-current={route === "#/about" ? "page" : undefined}>About</a>
           <details className="header-settings" ref={settings} onKeyDown={(event) => {
@@ -259,6 +261,7 @@ function App() {
       ? route.split("/")[2].replaceAll("-", " ")
       : route.startsWith("#/notes") ? "Notes"
       : route === "#/about" || route === "#about" ? "About"
+      : route === "#/arena" ? "Arena"
       : id ? lookup(id).title : "Play";
     document.title = `${label.charAt(0).toUpperCase()}${label.slice(1)} · Jev experiments`;
   }, [route, id]);
@@ -290,6 +293,8 @@ function App() {
       )}
       {route === "#/about" || route === "#about" ? (
         <Suspense fallback={<main className="loading-stage">Opening About…</main>}><AboutPage /></Suspense>
+      ) : route === "#/arena" ? (
+        <Suspense fallback={<main className="loading-stage">Opening the arena…</main>}><ArenaPage /></Suspense>
       ) : id || route.startsWith("#/notes") ? null : <PlayPage />}
       <footer className="site-footer">
         <a className="brand" href="#/">
