@@ -139,22 +139,43 @@ pub struct Journal {
     out: BufWriter<File>,
     next_seq: u64,
     last_mac: [u8; 32],
+    /// Set by a failed write. The file's tail is then unknown (a partial line
+    /// may be on disk), so nothing more is written until the journal is
+    /// reopened, which verifies and repairs it.
+    failed: bool,
 }
 
 impl Journal {
-    /// Creates a new session journal whose first entry is `first`.
+    /// Creates a new session journal whose first entry is `first`. The
+    /// directory (absent or empty beforehand) is filled only once the first
+    /// entry and head are durable: it is built under a staging name and
+    /// renamed into place, so a crash leaves at most a staging directory,
+    /// which the next create replaces.
     pub fn create(dir: &Path, session_id: &str, key: &Key, ts_ms: u64, first: Event) -> io::Result<Self> {
-        fs::create_dir_all(dir)?;
-        let file = OpenOptions::new().create_new(true).append(true).open(dir.join(JOURNAL))?;
+        if fs::read_dir(dir).is_ok_and(|mut d| d.next().is_some()) {
+            return Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{} is not empty", dir.display())));
+        }
+        let parent = dir.parent().unwrap_or(Path::new("."));
+        let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("session");
+        let staging = parent.join(format!(".{name}.creating"));
+        // A leftover from a crashed create. If it can't be removed, the
+        // create_new below reports the real problem.
+        let _ = fs::remove_dir_all(&staging);
+        fs::create_dir_all(&staging)?;
+        let file = OpenOptions::new().create_new(true).append(true).open(staging.join(JOURNAL))?;
         let mut j = Journal {
-            dir: dir.to_path_buf(),
+            dir: staging.clone(),
             key: key.clone(),
             out: BufWriter::new(file),
             next_seq: 1,
             last_mac: key.genesis(session_id),
+            failed: false,
         };
         j.append(ts_ms, &[first])?;
         j.commit()?;
+        fs::rename(&staging, dir)?;
+        File::open(parent)?.sync_all()?;
+        j.dir = dir.to_path_buf();
         Ok(j)
     }
 
@@ -176,6 +197,7 @@ impl Journal {
             out: BufWriter::new(file),
             next_seq: report.entries.len() as u64 + 1,
             last_mac: scan.last_mac,
+            failed: false,
         };
         let mut entries = report.entries;
         if report.torn_bytes > 0 {
@@ -187,6 +209,13 @@ impl Journal {
 
     /// Buffers entries. They are durable only after [`Journal::commit`].
     pub fn append(&mut self, ts_ms: u64, events: &[Event]) -> io::Result<Vec<Entry>> {
+        self.check()?;
+        let r = self.write_entries(ts_ms, events);
+        self.failed = r.is_err();
+        r
+    }
+
+    fn write_entries(&mut self, ts_ms: u64, events: &[Event]) -> io::Result<Vec<Entry>> {
         let mut out = Vec::with_capacity(events.len());
         for event in events {
             let seq = self.next_seq;
@@ -205,17 +234,34 @@ impl Journal {
     /// Makes every appended entry durable: syncs the journal, then atomically
     /// replaces the head.
     pub fn commit(&mut self) -> io::Result<()> {
+        self.check()?;
+        let r = self.write_head();
+        self.failed = r.is_err();
+        r
+    }
+
+    fn write_head(&mut self) -> io::Result<()> {
         self.out.flush()?;
         self.out.get_ref().sync_data()?;
         let seq = self.next_seq - 1;
         let mac = hex::encode(self.last_mac);
         let head = Head { seq, sig: self.key.head_mac(seq, &mac), mac };
         let tmp = self.dir.join("head.json.tmp");
-        let mut f = File::create(&tmp)?;
+        // create_new won't follow or reuse whatever is at the temp path, so a
+        // planted symlink can't redirect this write.
+        let _ = fs::remove_file(&tmp);
+        let mut f = OpenOptions::new().write(true).create_new(true).open(&tmp)?;
         f.write_all(&serde_json::to_vec(&head).map_err(io::Error::other)?)?;
         f.sync_data()?;
         fs::rename(&tmp, self.dir.join(HEAD))?;
         File::open(&self.dir)?.sync_all()
+    }
+
+    fn check(&self) -> io::Result<()> {
+        if self.failed {
+            return Err(io::Error::other("an earlier write to this journal failed; reopen it to continue"));
+        }
+        Ok(())
     }
 }
 
@@ -232,8 +278,12 @@ struct Scan {
 }
 
 fn scan(dir: &Path, session_id: &str, key: &Key) -> io::Result<Scan> {
-    let bytes = fs::read(dir.join(JOURNAL))?;
+    // Head first. A writer syncs the journal before it replaces the head, so
+    // a journal read after the head holds at least the entries the head
+    // names; read the other way round, a commit in between would look like
+    // truncation.
     let head = read_head(dir, key);
+    let bytes = fs::read(dir.join(JOURNAL))?;
     let complete = bytes.iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
     let mut entries = Vec::new();
     let mut prev = key.genesis(session_id);

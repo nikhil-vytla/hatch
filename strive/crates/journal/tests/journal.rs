@@ -254,3 +254,60 @@ fn opening_an_invalid_journal_says_why() {
     let err = Journal::open(dir.path(), SESSION, &key(), 5000).err().unwrap();
     assert_eq!(err.to_string(), "the head record is missing or was modified");
 }
+
+/// A planted symlink at the head's temp path must not redirect the write.
+#[test]
+fn committing_does_not_follow_a_planted_temp_symlink() {
+    let dir = tempfile::tempdir().unwrap();
+    let victim = dir.path().join("victim");
+    fs::write(&victim, b"precious").unwrap();
+    let mut j = Journal::create(&dir.path().join("s"), SESSION, &key(), 1000, started()).unwrap();
+    std::os::unix::fs::symlink(&victim, dir.path().join("s/head.json.tmp")).unwrap();
+    j.append(2000, &[msg("a")]).unwrap();
+    j.commit().unwrap();
+    assert_eq!(fs::read(&victim).unwrap(), b"precious");
+    assert_eq!(read(&dir.path().join("s"), SESSION, &key()).unwrap().committed, 2);
+}
+
+/// Creating a session is all or nothing: the directory appears only with a
+/// committed head, and a leftover from a crashed create doesn't block a retry.
+#[test]
+fn create_leaves_no_half_made_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("s");
+    let leftover = dir.path().join(".s.creating");
+    fs::create_dir_all(&leftover).unwrap();
+    fs::write(leftover.join("journal.jsonl"), b"{\"seq\":1}\n").unwrap();
+    Journal::create(&target, SESSION, &key(), 1000, started()).unwrap();
+    let report = read(&target, SESSION, &key()).unwrap();
+    assert_eq!((report.problem, report.committed), (None, 1));
+    let names: Vec<String> =
+        fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+    assert_eq!(names, vec!["s".to_string()]);
+}
+
+/// After a failed write the journal's tail is unknown (a partial line may be
+/// on disk), so it refuses further appends until reopened, and reopening
+/// yields a valid journal.
+#[test]
+fn a_failed_commit_refuses_further_appends_until_reopened() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let s = dir.path().join("s");
+    let mut j = Journal::create(&s, SESSION, &key(), 1000, started()).unwrap();
+    fs::set_permissions(&s, fs::Permissions::from_mode(0o500)).unwrap();
+    j.append(2000, &[msg("a")]).unwrap();
+    let failed = j.commit();
+    fs::set_permissions(&s, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(failed.is_err(), "the head can't be written in a read-only directory");
+
+    let err = j.append(3000, &[msg("b")]).unwrap_err();
+    assert_eq!(err.to_string(), "an earlier write to this journal failed; reopen it to continue");
+    assert!(j.commit().is_err());
+    drop(j);
+
+    let (_, entries) = Journal::open(&s, SESSION, &key(), 4000).unwrap();
+    assert_eq!(entries.iter().map(|e| e.seq).collect::<Vec<_>>(), vec![1, 2]);
+    let report = read(&s, SESSION, &key()).unwrap();
+    assert_eq!((report.problem, report.committed), (None, 2));
+}
