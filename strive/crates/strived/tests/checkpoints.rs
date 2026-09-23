@@ -1,5 +1,6 @@
 //! Checkpoints: the workspace is saved before each prompt, and /rewind puts
 //! it back. The user's own git repository is never touched.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 
 mod common;
 

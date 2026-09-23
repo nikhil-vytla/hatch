@@ -32,7 +32,7 @@ impl Report {
     }
 }
 
-#[allow(clippy::verbose_bit_mask, reason = "`mode & 0o077` reads as a permission check")]
+#[expect(clippy::verbose_bit_mask, reason = "`mode & 0o077` reads as a permission check")]
 pub async fn run(home: &Home) -> Result<bool> {
     let mut r = Report { failed: false };
     println!("strive {} ({})\n", env!("CARGO_PKG_VERSION"), build_id());

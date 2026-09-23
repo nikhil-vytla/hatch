@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 use strive_budget::{Ledger, Limits, Models, Price, Refusal, Reservation, cost, format_usd, open_calls};
 use strive_proto::{CallOutcome, Digest, Event, Usage};
 

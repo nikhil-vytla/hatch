@@ -19,6 +19,8 @@ mod paths;
 mod server;
 mod sessions;
 mod settings;
+mod sync;
+
 mod tui;
 
 use std::process::ExitCode;
@@ -94,7 +96,13 @@ enum Cmd {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime");
+    let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("strive: could not start the async runtime: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     match rt.block_on(run(cli)) {
         Ok(code) => code,
         Err(e) => {

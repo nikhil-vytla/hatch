@@ -30,7 +30,7 @@ pub struct Hosts {
 
 impl Hosts {
     pub fn register(&self, id: &SessionId) {
-        let mut slots = self.slots.lock().expect("hosts");
+        let mut slots = crate::sync::lock(&self.slots);
         let slot = slots.entry(id.clone()).or_default();
         slot.registered += 1;
         slot.starting = None;
@@ -38,11 +38,11 @@ impl Hosts {
 
     /// Connections registered as hosts: they don't keep the daemon awake.
     pub fn count(&self) -> u32 {
-        self.slots.lock().expect("hosts").values().map(|s| s.registered).sum()
+        crate::sync::lock(&self.slots).values().map(|s| s.registered).sum()
     }
 
     pub fn unregister(&self, id: &SessionId) {
-        if let Some(slot) = self.slots.lock().expect("hosts").get_mut(id) {
+        if let Some(slot) = crate::sync::lock(&self.slots).get_mut(id) {
             slot.registered = slot.registered.saturating_sub(1);
         }
     }
@@ -51,7 +51,7 @@ impl Hosts {
     pub fn ensure(&self, id: &SessionId, socket: &Path, log: &Path) {
         let Some(mut cmd) = command() else { return };
         {
-            let mut slots = self.slots.lock().expect("hosts");
+            let mut slots = crate::sync::lock(&self.slots);
             let slot = slots.entry(id.clone()).or_default();
             if slot.registered > 0 || slot.starting.is_some_and(|t| t.elapsed() < START_GRACE) {
                 return;
@@ -70,7 +70,7 @@ impl Hosts {
             Ok(_) => crate::log!("started an agent host for session {}", id.as_str()),
             Err(e) => {
                 crate::log!("could not start an agent host: {e}");
-                if let Some(slot) = self.slots.lock().expect("hosts").get_mut(id) {
+                if let Some(slot) = crate::sync::lock(&self.slots).get_mut(id) {
                     slot.starting = None;
                 }
             }

@@ -1,4 +1,5 @@
 //! The session commands a user types: `strive log`, `verify`, `sessions`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 
 mod common;
 

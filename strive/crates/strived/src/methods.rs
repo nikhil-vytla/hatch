@@ -64,10 +64,10 @@ impl Conn {
     /// Stops forwarding session entries and gives up any host registration;
     /// called when the connection closes.
     pub fn close(&self, state: &State) {
-        if let Some(sid) = self.host_of.lock().expect("host registration").take() {
+        if let Some(sid) = crate::sync::lock(&self.host_of).take() {
             state.hosts.unregister(&sid);
         }
-        for t in self.subscriptions.lock().expect("subscriptions").drain(..) {
+        for t in crate::sync::lock(&self.subscriptions).drain(..) {
             t.abort();
         }
     }
@@ -142,7 +142,7 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
         m if m.starts_with("host/") => route_host(state, conn, m, params).await,
         ApprovalRespond::NAME => {
             let ApprovalRespondParams { id, effect, decision } = parse::<ApprovalRespond>(params)?;
-            let by = conn.client.lock().expect("client name").clone();
+            let by = crate::sync::lock(&conn.client).clone();
             match state.sessions.decide(&session_id(&id)?, effect, decision, by).await {
                 Ok(()) => reply::<ApprovalRespond>(Empty {}),
                 Err(crate::sessions::DecideError::NotPending) => Err(RpcError::new(
@@ -202,7 +202,7 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             };
             state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
             {
-                let mut host = conn.host_of.lock().expect("host registration");
+                let mut host = crate::sync::lock(&conn.host_of);
                 if host.is_none() {
                     state.hosts.register(&sid);
                     *host = Some(sid.clone());
@@ -359,19 +359,22 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         SessionAttach::NAME => {
             let SessionAttachParams { id, after_seq } = parse::<SessionAttach>(params)?;
             let sid = session_id(&id)?;
-            let person = conn.host_of.lock().expect("host registration").is_none();
+            let person = crate::sync::lock(&conn.host_of).is_none();
             let (session, entries, mut stream) =
                 state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
             let weak = conn.out.clone();
             let forward = tokio::spawn(async move {
                 while let Some(push) = stream.recv().await {
-                    let msg = notification(&id, push);
+                    let Some(msg) = notification(&id, push) else {
+                        crate::log!("a session {id} notification did not serialize; ending the subscription");
+                        break;
+                    };
                     if weak.upgrade().is_none_or(|out| out.send(msg).is_err()) {
                         break;
                     }
                 }
             });
-            conn.subscriptions.lock().expect("subscriptions").push(forward);
+            crate::sync::lock(&conn.subscriptions).push(forward);
             reply::<SessionAttach>(SessionAttachResult { session, entries })
         }
         SessionPrompt::NAME => prompt(state, params).await,
@@ -422,7 +425,7 @@ fn initialize(state: &Arc<State>, conn: &Arc<Conn>, p: &InitializeParams) -> Rep
         e.data = Some(json!({ "protocolVersion": PROTOCOL_VERSION }));
         return Err(e);
     }
-    conn.client.lock().expect("client name").clone_from(&p.client.name);
+    crate::sync::lock(&conn.client).clone_from(&p.client.name);
     conn.initialized.store(true, std::sync::atomic::Ordering::SeqCst);
     reply::<Initialize>(InitializeResult {
         protocol_version: PROTOCOL_VERSION,
@@ -481,20 +484,18 @@ async fn checkpoint(state: &Arc<State>, sid: &SessionId, cwd: &str, message: &st
 }
 
 /// The notification a subscriber gets for a push.
-fn notification(session_id: &str, push: Push) -> Message {
+fn notification(session_id: &str, push: Push) -> Option<Message> {
     let session_id = session_id.to_string();
-    match push {
-        Push::Entry(entry) => Message::notification(
-            SessionEntry::NAME,
-            serde_json::to_value(SessionEntryNotification { session_id, entry }).expect("serializes"),
-        ),
-        Push::Delta { turn, text } => Message::notification(
-            SessionDelta::NAME,
-            serde_json::to_value(SessionDeltaNotification { session_id, turn, text }).expect("serializes"),
-        ),
-        Push::Interrupt => Message::notification(
-            SessionInterruptRequested::NAME,
-            serde_json::to_value(SessionInterruptNotification { session_id }).expect("serializes"),
-        ),
-    }
+    let (name, params) = match push {
+        Push::Entry(entry) => {
+            (SessionEntry::NAME, serde_json::to_value(SessionEntryNotification { session_id, entry }))
+        }
+        Push::Delta { turn, text } => {
+            (SessionDelta::NAME, serde_json::to_value(SessionDeltaNotification { session_id, turn, text }))
+        }
+        Push::Interrupt => {
+            (SessionInterruptRequested::NAME, serde_json::to_value(SessionInterruptNotification { session_id }))
+        }
+    };
+    params.ok().map(|p| Message::notification(name, p))
 }

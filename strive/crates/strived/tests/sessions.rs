@@ -1,4 +1,5 @@
 //! Sessions end to end: the real daemon, real journals on disk.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 
 mod common;
 

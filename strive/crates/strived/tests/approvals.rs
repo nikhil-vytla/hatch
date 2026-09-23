@@ -1,5 +1,6 @@
 //! Approval modes: what the agent may do on its own, and asking a person
 //! (any attached client) for the rest.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 
 mod common;
 

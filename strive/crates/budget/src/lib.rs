@@ -150,7 +150,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
 
 fn micros_per_mtok(dollars: f64) -> u64 {
     // Prices are published to at most three decimals of a dollar.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "non-negative, small")]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "non-negative, small")]
     let m = (dollars * 1_000_000.0).round() as u64;
     m
 }

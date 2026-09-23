@@ -1,5 +1,6 @@
 //! End-to-end tests against the real `strive` binary, each with its own
 //! `STRIVE_HOME`, so they never touch a developer's daemon.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 
 mod common;
 

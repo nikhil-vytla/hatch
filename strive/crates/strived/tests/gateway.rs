@@ -1,5 +1,6 @@
 //! The model gateway end to end: the real daemon in front of a fake provider
 //! (the one boundary where a stand-in is the point), with real HTTP.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 
 mod common;
 

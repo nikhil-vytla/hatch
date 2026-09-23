@@ -29,6 +29,18 @@ pedantic = { level = "warn", priority = -1 }
 module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 must_use_candidate = "allow"
+# A daemon that owns money and journals must not panic on bad input or
+# broken invariants; tests may (clippy.toml allows it there).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+dbg_macro = "deny"
+# `#[expect]` instead, so a suppression that no longer applies fails the build.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+await_holding_lock = "deny"
+
 
 [profile.release]
 strip = true

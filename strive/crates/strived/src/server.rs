@@ -185,7 +185,12 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
     let writer = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            let mut line = serde_json::to_vec(&msg).expect("messages serialize");
+            // Closing the connection, rather than dropping one message, makes
+            // the client fail its pending requests instead of waiting forever.
+            let Ok(mut line) = serde_json::to_vec(&msg) else {
+                crate::log!("a message to a client did not serialize; closing the connection");
+                break;
+            };
             line.push(b'\n');
             if write.write_all(&line).await.is_err() {
                 break;

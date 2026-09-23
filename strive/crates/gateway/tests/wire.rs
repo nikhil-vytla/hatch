@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 use serde_json::{Value, json};
 use strive_gateway::{Api, RequestInfo, UsageMeter, prepare_request};
 use strive_proto::Usage;

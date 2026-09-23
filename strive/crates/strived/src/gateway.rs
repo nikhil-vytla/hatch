@@ -61,7 +61,7 @@ impl Gateway {
 
     /// Base URLs for a session's agent, minting its token on first use.
     pub fn info(&self, id: &SessionId) -> std::io::Result<GatewayInfo> {
-        let mut tokens = self.tokens.lock().expect("token map");
+        let mut tokens = crate::sync::lock(&self.tokens);
         let existing = tokens.iter().find(|(_, s)| *s == id).map(|(t, _)| t.clone());
         let token = if let Some(t) = existing {
             t
@@ -77,7 +77,7 @@ impl Gateway {
     }
 
     fn session(&self, token: &str) -> Option<SessionId> {
-        self.tokens.lock().expect("token map").get(token).cloned()
+        crate::sync::lock(&self.tokens).get(token).cloned()
     }
 }
 
@@ -124,7 +124,7 @@ struct Admitted {
 
 /// Everything that can refuse a call happens here, before anything is sent
 /// or stored; the last step journals the call as started.
-#[allow(clippy::result_large_err, reason = "the refusal is the HTTP response, built at most once per call")]
+#[expect(clippy::result_large_err, reason = "the refusal is the HTTP response, built at most once per call")]
 async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body: &[u8]) -> Result<Admitted, Response> {
     let session = state
         .gateway

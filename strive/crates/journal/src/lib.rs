@@ -38,6 +38,7 @@ impl Key {
         Self(bytes)
     }
 
+    #[expect(clippy::expect_used, reason = "HMAC accepts keys of any length, so new_from_slice cannot fail")]
     fn mac(&self, parts: &[&[u8]]) -> [u8; 32] {
         let mut m = <HmacSha256 as KeyInit>::new_from_slice(&self.0).expect("HMAC takes any key length");
         for p in parts {

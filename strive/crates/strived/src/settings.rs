@@ -85,7 +85,7 @@ pub struct BudgetSetting {
     pub tokens: Option<u64>,
 }
 
-#[allow(clippy::unnecessary_wraps, reason = "serde's default must return the field's type")]
+#[expect(clippy::unnecessary_wraps, reason = "serde's default must return the field's type")]
 fn default_usd() -> Option<f64> {
     Some(5.0)
 }
@@ -98,7 +98,7 @@ impl Default for BudgetSetting {
 
 impl BudgetSetting {
     pub fn limits(&self) -> Limits {
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "validated non-negative on load")]
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "validated non-negative on load")]
         let usd_micros = self.usd.map(|d| (d * 1_000_000.0).round() as u64);
         Limits { usd_micros, tokens: self.tokens }
     }
@@ -115,7 +115,9 @@ impl Settings {
         let path = home.join("settings.json");
         let s: Settings = match std::fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes).with_context(|| format!("reading {}", path.display()))?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::from_str("{}").expect("defaults parse"),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                serde_json::from_str("{}").context("the default settings")?
+            }
             Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
         };
         if s.budget.usd.is_some_and(|d| !d.is_finite() || d < 0.0) {

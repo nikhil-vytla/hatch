@@ -44,13 +44,13 @@ impl Credentials {
     }
 
     pub fn get(&self, provider: &str) -> Option<String> {
-        let file = self.file.read().expect("credentials lock");
+        let file = crate::sync::read(&self.file);
         file.get(provider).map(|s| s.api_key.clone()).or_else(|| self.env.get(provider).cloned())
     }
 
     /// `file`, `env` or `none`.
     pub fn source(&self, provider: &str) -> &'static str {
-        if self.file.read().expect("credentials lock").contains_key(provider) {
+        if crate::sync::read(&self.file).contains_key(provider) {
             "file"
         } else if self.env.contains_key(provider) {
             "env"
@@ -61,7 +61,7 @@ impl Credentials {
 
     /// Stores a key, replacing the file atomically with mode 0600.
     pub fn set(&self, provider: &str, api_key: String) -> io::Result<()> {
-        let mut file = self.file.write().expect("credentials lock");
+        let mut file = crate::sync::write(&self.file);
         let mut next = file.clone();
         next.insert(provider.to_string(), Stored { api_key });
         let tmp = self.path.with_extension(format!("json.{}", std::process::id()));

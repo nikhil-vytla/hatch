@@ -1,6 +1,7 @@
 //! Effects end to end: the daemon reads, writes, edits and runs commands for
 //! the agent, inside the session's directory and the OS sandbox, and
 //! journals each one.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 
 mod common;
 

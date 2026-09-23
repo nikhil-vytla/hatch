@@ -238,7 +238,7 @@ impl Sessions {
     /// Creates a session whose budget starts at `limits` and approvals at `mode`.
     pub async fn create(&self, cwd: String, limits: Limits, mode: ApprovalMode) -> Result<SessionInfo> {
         let id = {
-            let mut g = self.ids.lock().expect("id generator lock");
+            let mut g = crate::sync::lock(&self.ids);
             SessionId(g.generate().map_err(|e| io::Error::other(e.to_string()))?.to_string())
         };
         let ts = epoch_ms();
@@ -262,7 +262,7 @@ impl Sessions {
             io::Result::Ok((j, entries))
         })
         .await
-        .expect("journal create task")?;
+        .map_err(|e| io::Error::other(format!("creating the journal failed: {e}")))??;
         let info = SessionInfo { id: id.as_str().to_string(), cwd, created_at_ms: ts };
         let (tx, thread) = spawn_writer(journal, entries, self.verifier(&id));
         live.insert(id, Live { info: info.clone(), tx, thread });
@@ -337,7 +337,7 @@ impl Sessions {
 
     /// Serializes checkpoint work for one session.
     pub fn checkpoint_lock(&self, id: &SessionId) -> Arc<Mutex<()>> {
-        self.checkpointing.lock().expect("checkpoint locks").entry(id.clone()).or_default().clone()
+        crate::sync::lock(&self.checkpointing).entry(id.clone()).or_default().clone()
     }
 
     /// Journals a prompt after the checkpoint taken for it.
@@ -423,13 +423,13 @@ impl Sessions {
     /// `None` when no client is attached to answer.
     pub async fn ask(&self, id: &SessionId, effect: u64, description: String) -> Result<Option<Decision>> {
         let (decided, answer) = oneshot::channel();
-        self.pending.lock().expect("pending approvals").insert((id.clone(), effect), decided);
+        crate::sync::lock(&self.pending).insert((id.clone(), effect), decided);
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::Ask { effect, description, reply }).map_err(|_| writer_gone())?;
         let delivered = rx.await.map_err(|_| writer_gone())??;
         if delivered == 0 {
-            self.pending.lock().expect("pending approvals").remove(&(id.clone(), effect));
+            crate::sync::lock(&self.pending).remove(&(id.clone(), effect));
             return Ok(None);
         }
         Ok(Some(answer.await.unwrap_or(Decision::Deny)))
@@ -443,12 +443,7 @@ impl Sessions {
         decision: Decision,
         by: String,
     ) -> std::result::Result<(), DecideError> {
-        let waiting = self
-            .pending
-            .lock()
-            .expect("pending approvals")
-            .remove(&(id.clone(), effect))
-            .ok_or(DecideError::NotPending)?;
+        let waiting = crate::sync::lock(&self.pending).remove(&(id.clone(), effect)).ok_or(DecideError::NotPending)?;
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::Decide { effect, decision, by, reply }).map_err(|_| writer_gone())?;
@@ -513,7 +508,7 @@ impl Sessions {
         let (journal, entries) =
             tokio::task::spawn_blocking(move || Journal::open(&dir, sid.as_str(), &key, epoch_ms()))
                 .await
-                .expect("journal open task")?;
+                .map_err(|e| io::Error::other(format!("opening the journal failed: {e}")))??;
         let (tx, thread) = spawn_writer(journal, entries, self.verifier(id));
         live.insert(id.clone(), Live { info: info.clone(), tx: tx.clone(), thread });
         Ok((info, tx))
