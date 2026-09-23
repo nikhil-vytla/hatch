@@ -2,7 +2,7 @@
 // Entry point. `strive` starts the daemon and execs this with STRIVE_SOCKET set.
 import { ProcessTerminal, TuiMainScreen } from "@earendil-works/pi-tui";
 import { StriveClient } from "@strive/protocol";
-import { App } from "./app";
+import { App, parseSessionMode } from "./app";
 
 const socket = process.env.STRIVE_SOCKET;
 if (!socket) {
@@ -23,5 +23,6 @@ const exit = (code: number) => {
   tui.stop();
   process.exit(code);
 };
-new App(tui, connected.client, connected.init, exit);
+const app = new App(tui, connected.client, connected.init, exit);
 tui.start();
+await app.open(parseSessionMode(process.env.STRIVE_SESSION));

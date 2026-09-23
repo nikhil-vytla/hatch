@@ -4,11 +4,14 @@
 //! current, then hands the terminal to the TUI.
 
 mod client;
+mod commands;
 mod doctor;
 mod launch;
 mod log;
+mod methods;
 mod paths;
 mod server;
+mod sessions;
 mod tui;
 
 use std::process::ExitCode;
@@ -21,12 +24,14 @@ use strive_proto::{DaemonShutdown, DaemonStatus, Empty};
 use crate::paths::Home;
 
 #[derive(Parser)]
-#[command(
-    name = "strive",
-    version,
-    about = "A self-improving coding agent you can trust."
-)]
+#[command(name = "strive", version, about = "A self-improving coding agent you can trust.")]
 struct Cli {
+    /// Continue the latest session in this directory.
+    #[arg(short = 'c', long = "continue", conflicts_with = "resume")]
+    continue_latest: bool,
+    /// Resume a session by id (see `strive sessions`).
+    #[arg(short = 'r', long, value_name = "ID")]
+    resume: Option<String>,
     #[command(subcommand)]
     command: Option<Cmd>,
 }
@@ -42,6 +47,27 @@ enum Cmd {
     Stop,
     /// Check that everything strive needs is in place.
     Doctor,
+    /// Show a session's journal (default: the latest session in this directory).
+    Log {
+        id: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Check that session journals are intact. Exits 1 if any is not.
+    Verify {
+        id: Option<String>,
+        /// Every session, in every directory.
+        #[arg(long, conflicts_with = "id")]
+        all: bool,
+    },
+    /// List sessions started in this directory, newest first.
+    Sessions {
+        /// Sessions from every directory.
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        json: bool,
+    },
     /// Run the daemon in the foreground (normally started for you).
     #[command(hide = true)]
     Daemon {
@@ -53,10 +79,7 @@ enum Cmd {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
+    let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime");
     match rt.block_on(run(cli)) {
         Ok(code) => code,
         Err(e) => {
@@ -71,8 +94,20 @@ async fn run(cli: Cli) -> Result<ExitCode> {
     match cli.command {
         None => {
             launch::ensure(&home, "strive").await?;
-            tui::exec(&home)?;
+            let session = match (cli.continue_latest, cli.resume) {
+                (_, Some(id)) => tui::Session::Resume(id),
+                (true, None) => tui::Session::Continue,
+                (false, None) => tui::Session::New,
+            };
+            tui::exec(&home, &session)?;
             unreachable!("exec returns only on error")
+        }
+        Some(Cmd::Log { id, json }) => commands::log(&mut launch::ensure(&home, "strive-log").await?.0, id, json).await,
+        Some(Cmd::Verify { id, all }) => {
+            commands::verify(&mut launch::ensure(&home, "strive-verify").await?.0, id, all).await
+        }
+        Some(Cmd::Sessions { all, json }) => {
+            commands::sessions(&mut launch::ensure(&home, "strive-sessions").await?.0, all, json).await
         }
         Some(Cmd::Status { json }) => {
             let (mut c, _) = launch::ensure(&home, "strive-status").await?;
@@ -80,12 +115,7 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             if json {
                 println!("{}", serde_json::to_string_pretty(&s)?);
             } else {
-                println!(
-                    "daemon  pid {}  up {}s  clients {}",
-                    s.server.pid,
-                    s.uptime_ms / 1000,
-                    s.clients
-                );
+                println!("daemon  pid {}  up {}s  clients {}", s.server.pid, s.uptime_ms / 1000, s.clients);
                 println!("build   {}", s.server.build);
                 println!("socket  {}", home.socket().display());
                 println!("log     {}", home.log().display());
@@ -103,18 +133,9 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Some(Cmd::Doctor) => Ok(if doctor::run(&home).await? {
-            ExitCode::SUCCESS
-        } else {
-            ExitCode::FAILURE
-        }),
+        Some(Cmd::Doctor) => Ok(if doctor::run(&home).await? { ExitCode::SUCCESS } else { ExitCode::FAILURE }),
         Some(Cmd::Daemon { idle_exit_secs }) => {
-            match server::run(server::Config {
-                home,
-                idle_exit: Duration::from_secs(idle_exit_secs),
-            })
-            .await?
-            {
+            match server::run(server::Config { home, idle_exit: Duration::from_secs(idle_exit_secs) }).await? {
                 server::Started::Served | server::Started::AlreadyRunning => Ok(ExitCode::SUCCESS),
             }
         }

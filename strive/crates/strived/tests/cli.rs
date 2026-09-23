@@ -1,0 +1,153 @@
+//! The session commands a user types: `strive log`, `verify`, `sessions`.
+
+mod common;
+
+use std::fs;
+use std::path::PathBuf;
+
+use common::Env;
+use serde_json::{Value, json};
+
+struct Repo {
+    env: Env,
+    dir: tempfile::TempDir,
+}
+
+impl Repo {
+    fn new() -> Self {
+        Self { env: Env::new(), dir: tempfile::tempdir().unwrap() }
+    }
+    fn path(&self) -> PathBuf {
+        self.dir.path().canonicalize().unwrap()
+    }
+    fn session(&self, prompts: &[&str]) -> String {
+        let mut c = self.env.rpc();
+        let id = c.ok("session/create", &json!({"cwd": self.path()}))["id"].as_str().unwrap().to_string();
+        for p in prompts {
+            c.ok("session/prompt", &json!({"id": id, "text": p}));
+        }
+        id
+    }
+    fn run(&self, args: &[&str]) -> (i32, String, String) {
+        let out = self.env.strive_in(&self.path(), args);
+        (out.status.code().unwrap(), String::from_utf8(out.stdout).unwrap(), String::from_utf8(out.stderr).unwrap())
+    }
+    fn tamper(&self, id: &str, from: &str, to: &str) {
+        let path = self.env.session_dir(id).join("journal.jsonl");
+        let text = fs::read_to_string(&path).unwrap();
+        fs::write(&path, text.replace(from, to)).unwrap();
+    }
+}
+
+/// `#N HH:MM:SS  what` — the time is local, so match around it.
+fn entry_line(out: &str, seq: u64) -> &str {
+    let prefix = format!("#{seq} ");
+    out.lines().find(|l| l.starts_with(&prefix)).unwrap_or_else(|| panic!("no entry #{seq} in:\n{out}"))
+}
+
+#[test]
+fn log_shows_the_latest_session_in_this_directory() {
+    let r = Repo::new();
+    r.session(&["older prompt"]);
+    let id = r.session(&["fix the flaky test"]);
+    let (code, out, _) = r.run(&["log"]);
+    assert_eq!(code, 0, "{out}");
+    assert_eq!(out.lines().next().unwrap(), format!("session {id}  {}", r.path().display()));
+    assert!(entry_line(&out, 1).ends_with(&format!("  started in {}", r.path().display())), "{out}");
+    assert!(entry_line(&out, 2).ends_with("  you: fix the flaky test"), "{out}");
+    assert!(!out.contains("older prompt"), "{out}");
+}
+
+#[test]
+fn log_takes_an_explicit_session_id() {
+    let r = Repo::new();
+    let older = r.session(&["older prompt"]);
+    r.session(&["newer prompt"]);
+    let (code, out, _) = r.run(&["log", &older]);
+    assert_eq!(code, 0);
+    assert!(entry_line(&out, 2).ends_with("  you: older prompt"), "{out}");
+}
+
+#[test]
+fn log_json_is_the_verified_journal() {
+    let r = Repo::new();
+    let id = r.session(&["hello"]);
+    let (code, out, _) = r.run(&["log", "--json"]);
+    assert_eq!(code, 0);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["session"]["id"], id);
+    assert_eq!(v["entries"][1]["event"], json!({"type": "userMessage", "text": "hello"}));
+    assert_eq!(v.get("problem"), None);
+}
+
+#[test]
+fn log_without_sessions_says_how_to_start_one() {
+    let r = Repo::new();
+    let (code, out, err) = r.run(&["log"]);
+    assert_eq!((code, out.as_str()), (1, ""));
+    assert_eq!(err.trim(), format!("strive: no sessions in {}; start one with `strive`", r.path().display()));
+}
+
+#[test]
+fn log_of_a_tampered_session_shows_what_verified_and_fails() {
+    let r = Repo::new();
+    let id = r.session(&["one", "two"]);
+    r.tamper(&id, r#""text":"two""#, r#""text":"TWO""#);
+    let (code, out, _) = r.run(&["log"]);
+    assert_eq!(code, 1);
+    assert!(entry_line(&out, 2).ends_with("  you: one"), "{out}");
+    assert!(!out.contains("#3 "), "{out}");
+    assert_eq!(out.lines().last().unwrap(), "journal FAILED verification: entry 3 was modified, removed or moved");
+}
+
+#[test]
+fn verify_passes_intact_sessions_and_names_the_broken_one() {
+    let r = Repo::new();
+    let good = r.session(&["fine"]);
+    let bad = r.session(&["about to change"]);
+    let (code, out, _) = r.run(&["verify", &good]);
+    assert_eq!((code, out.trim()), (0, format!("ok    {good}  2 entries").as_str()));
+
+    r.tamper(&bad, "about to change", "changed!");
+    let (code, out, _) = r.run(&["verify", "--all"]);
+    assert_eq!(code, 1);
+    assert_eq!(
+        out.lines().collect::<Vec<_>>(),
+        vec![format!("FAIL  {bad}  entry 2 was modified, removed or moved"), format!("ok    {good}  2 entries"),]
+    );
+}
+
+#[test]
+fn verify_without_an_id_checks_the_latest_session_here() {
+    let r = Repo::new();
+    let id = r.session(&[]);
+    let (code, out, _) = r.run(&["verify"]);
+    assert_eq!((code, out.trim()), (0, format!("ok    {id}  1 entries").as_str()));
+}
+
+#[test]
+fn sessions_lists_this_directory_newest_first() {
+    let r = Repo::new();
+    let a = r.session(&[]);
+    let b = r.session(&["x"]);
+    let other = tempfile::tempdir().unwrap();
+    let elsewhere = r.env.rpc().ok("session/create", &json!({"cwd": other.path()}))["id"].as_str().unwrap().to_string();
+
+    let (code, out, _) = r.run(&["sessions"]);
+    assert_eq!(code, 0);
+    let ids: Vec<&str> = out.lines().map(|l| l.split_whitespace().next().unwrap()).collect();
+    assert_eq!(ids, vec![b.as_str(), a.as_str()]);
+
+    let (_, out, _) = r.run(&["sessions", "--all"]);
+    let ids: Vec<&str> = out.lines().map(|l| l.split_whitespace().next().unwrap()).collect();
+    assert_eq!(ids, vec![elsewhere.as_str(), b.as_str(), a.as_str()]);
+    assert!(out.lines().next().unwrap().ends_with(&other.path().display().to_string()), "{out}");
+}
+
+#[test]
+fn continue_and_resume_are_mutually_exclusive() {
+    let r = Repo::new();
+    let (code, _, err) = r.run(&["--continue", "--resume", "01J8ZZZZZZZZZZZZZZZZZZZZZZ"]);
+    assert_eq!(code, 2);
+    assert!(err.contains("cannot be used with"), "{err}");
+}

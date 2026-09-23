@@ -25,3 +25,4 @@ Each feature file has an H1 and one paragraph on the user-visible behavior, then
 - [Start and quit](./start-and-quit.md) covers opening the TUI in a repository and leaving it.
 - [Slash commands](./slash-commands.md) covers `/status`, `/help` and unknown commands.
 - [Daemon lifecycle](./daemon-lifecycle.md) covers `strive status`, `strive stop`, `strive doctor` and automatic daemon start.
+- [Sessions](./sessions.md) covers new, continued and resumed sessions, `strive log`, `strive verify`, `strive sessions` and tamper detection.

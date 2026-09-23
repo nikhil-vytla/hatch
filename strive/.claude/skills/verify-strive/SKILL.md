@@ -14,7 +14,9 @@ Everything goes through `scripts/strive-verify.sh`. Paths below are relative to 
 1. Build: `.claude/skills/verify-strive/scripts/strive-verify.sh build`. It prints `built .../target/debug/strive`.
 2. Start a run: `.claude/skills/verify-strive/scripts/strive-verify.sh start NAME [REPO]`. It opens the TUI in `REPO` (default: the strive checkout) and returns once the header shows. It prints `started NAME in REPO (STRIVE_HOME=/tmp/strv-verify-NAME)`.
 
-Pick a fresh `NAME` per run. `start` refuses a name that is already running.
+Pick a fresh `NAME` per run. `start` refuses a name that is already running. Arguments after `REPO` go to `strive`, for example `start NAME /tmp -c`.
+
+`restart NAME REPO [ARGS...]` closes the TUI and opens it again against the same home, which is how to test continuing and resuming sessions. `journal NAME ID` prints a session's journal path for tamper checks.
 
 ## Doctor
 

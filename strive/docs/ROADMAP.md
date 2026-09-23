@@ -5,8 +5,8 @@
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | M0 Skeleton | Workspaces, daemon lifecycle, protocol + codegen, TUI handshake, `doctor`, install script, CI | Done |
-| M1 Journal | Hash-chained session log + CAS, `strive log`, `strive verify`, resume | Next |
-| M2 Gateway + budgets | Anthropic/OpenAI through the daemon, reservation budgets, status line, `/budget`, `/login` | |
+| M1 Journal | Authenticated session journal, `strive log`, `strive verify`, `strive sessions`, continue and resume | Done. The content store moves to M2, where model wire bytes first need it |
+| M2 Gateway + budgets | Content store; Anthropic/OpenAI through the daemon, reservation budgets, status line, `/budget`, `/login` | Next |
 | M3 Agent | pi-agent-core loop; read/write/edit/bash run by the daemon; approval modes; sandbox; checkpoints + `/rewind` | |
 | M4 Context | AGENTS.md, SKILL.md, MCP, compaction, settings. Exit: daily use on this repo | |
 | M5 Desktop | Electron client on the workspace document; drag-and-drop; agent layout edits as proposals | |

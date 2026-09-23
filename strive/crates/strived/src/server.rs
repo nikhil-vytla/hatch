@@ -11,19 +11,17 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use serde_json::Value;
-use strive_proto::rpc::{Message, RequestId, RpcError};
-use strive_proto::{
-    DaemonShutdown, DaemonStatus, DaemonStatusResult, Empty, Initialize, InitializeParams,
-    InitializeResult, Method, PROTOCOL_VERSION, ServerInfo,
-};
+use strive_proto::ServerInfo;
+use strive_proto::rpc::{Message, RpcError};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{Mutex, Notify, mpsc};
 
 use crate::log;
+use crate::methods::{self, Conn};
 use crate::paths::{Home, build_id};
+use crate::sessions::Sessions;
 
 /// Longest accepted message line. Larger messages close the connection.
 const MAX_LINE: usize = 16 * 1024 * 1024;
@@ -36,15 +34,16 @@ pub struct Config {
     pub idle_exit: Duration,
 }
 
-struct State {
-    info: ServerInfo,
-    home: Home,
-    started: Instant,
-    idle_exit: Duration,
-    clients: AtomicU32,
+pub struct State {
+    pub info: ServerInfo,
+    pub home: Home,
+    pub started: Instant,
+    pub idle_exit: Duration,
+    pub clients: AtomicU32,
     /// When the client count last dropped to zero (or the daemon started).
     idle_since: Mutex<Instant>,
-    shutdown: Notify,
+    pub shutdown: Notify,
+    pub sessions: Sessions,
 }
 
 /// Outcome of trying to become the daemon.
@@ -56,11 +55,7 @@ pub enum Started {
 
 pub async fn run(cfg: Config) -> Result<Started> {
     cfg.home.ensure()?;
-    let lock = File::options()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(cfg.home.lock())?;
+    let lock = File::options().create(true).truncate(false).write(true).open(cfg.home.lock())?;
     let socket = cfg.home.socket();
     // A held lock means either a live daemon (its socket answers) or one that
     // is exiting (socket already unlinked, lock not yet released). Only the
@@ -82,8 +77,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
     }
 
     let _ = fs::remove_file(&socket); // stale from a crash; we hold the lock
-    let listener =
-        UnixListener::bind(&socket).with_context(|| format!("binding {}", socket.display()))?;
+    let listener = UnixListener::bind(&socket).with_context(|| format!("binding {}", socket.display()))?;
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600))?;
 
     let state = Arc::new(State {
@@ -99,13 +93,9 @@ pub async fn run(cfg: Config) -> Result<Started> {
         clients: AtomicU32::new(0),
         idle_since: Mutex::new(Instant::now()),
         shutdown: Notify::new(),
+        sessions: Sessions::open(&cfg.home.root).context("opening the session store")?,
     });
-    log!(
-        "daemon {} listening on {} (pid {})",
-        state.info.build,
-        socket.display(),
-        state.info.pid
-    );
+    log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);
 
     let mut term = signal(SignalKind::terminate())?;
     let mut int = signal(SignalKind::interrupt())?;
@@ -170,7 +160,7 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
 
     let mut reader = BufReader::new(read);
     let mut line = String::new();
-    let mut initialized = false;
+    let mut conn = Conn::new(tx.clone());
     loop {
         line.clear();
         let n = reader.read_line(&mut line).await?;
@@ -178,24 +168,16 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
             break;
         }
         if line.len() > MAX_LINE {
-            let _ = tx.send(Message::err(
-                None,
-                RpcError::new(RpcError::INVALID_REQUEST, "message too large"),
-            ));
+            let _ = tx.send(Message::err(None, RpcError::new(RpcError::INVALID_REQUEST, "message too large")));
             break;
         }
         if line.trim().is_empty() {
             continue;
         }
         let reply = match serde_json::from_str::<Message>(&line) {
-            Err(e) => Some(Message::err(
-                None,
-                RpcError::new(RpcError::PARSE_ERROR, e.to_string()),
-            )),
+            Err(e) => Some(Message::err(None, RpcError::new(RpcError::PARSE_ERROR, e.to_string()))),
             Ok(msg) => match (msg.id, msg.method) {
-                (Some(id), Some(method)) => {
-                    Some(dispatch(state, &mut initialized, id, &method, msg.params))
-                }
+                (Some(id), Some(method)) => Some(methods::dispatch(state, &mut conn, id, &method, msg.params).await),
                 // Client notifications and responses to server requests: none defined yet.
                 _ => None,
             },
@@ -204,80 +186,14 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
             let _ = tx.send(reply);
         }
     }
+    // The writer ends when every sender is gone; `conn` and its session
+    // subscriptions hold some.
+    drop(conn);
     drop(tx);
     let _ = writer.await;
     Ok(())
 }
 
-fn dispatch(
-    state: &Arc<State>,
-    initialized: &mut bool,
-    id: RequestId,
-    method: &str,
-    params: Option<Value>,
-) -> Message {
-    let params = params.unwrap_or(Value::Object(serde_json::Map::default()));
-    if method != Initialize::NAME && !*initialized {
-        return Message::err(
-            Some(id),
-            RpcError::new(RpcError::NOT_INITIALIZED, "send initialize first"),
-        );
-    }
-    let result = match method {
-        Initialize::NAME => call::<Initialize>(params, |p: InitializeParams| {
-            if p.protocol_version != PROTOCOL_VERSION {
-                let mut e = RpcError::new(
-                    RpcError::PROTOCOL_MISMATCH,
-                    format!(
-                        "client speaks protocol {}, daemon speaks {PROTOCOL_VERSION}",
-                        p.protocol_version
-                    ),
-                );
-                e.data = Some(serde_json::json!({ "protocolVersion": PROTOCOL_VERSION }));
-                return Err(e);
-            }
-            *initialized = true;
-            Ok(InitializeResult {
-                protocol_version: PROTOCOL_VERSION,
-                server: state.info.clone(),
-                home: state.home.root.display().to_string(),
-            })
-        }),
-        DaemonStatus::NAME => call::<DaemonStatus>(params, |_: Empty| {
-            Ok(DaemonStatusResult {
-                server: state.info.clone(),
-                uptime_ms: u64::try_from(state.started.elapsed().as_millis()).unwrap_or(u64::MAX),
-                clients: state.clients.load(Ordering::SeqCst),
-                idle_exit_secs: state.idle_exit.as_secs(),
-            })
-        }),
-        DaemonShutdown::NAME => call::<DaemonShutdown>(params, |_: Empty| {
-            state.shutdown.notify_one();
-            Ok(Empty {})
-        }),
-        other => Err(RpcError::new(
-            RpcError::METHOD_NOT_FOUND,
-            format!("unknown method {other}"),
-        )),
-    };
-    match result {
-        Ok(v) => Message::ok(id, v),
-        Err(e) => Message::err(Some(id), e),
-    }
-}
-
-fn call<M: Method>(
-    params: Value,
-    f: impl FnOnce(M::Params) -> Result<M::Result, RpcError>,
-) -> Result<Value, RpcError> {
-    let p = serde_json::from_value(params)
-        .map_err(|e| RpcError::new(RpcError::INVALID_PARAMS, e.to_string()))?;
-    let r = f(p)?;
-    serde_json::to_value(r).map_err(|e| RpcError::new(RpcError::INTERNAL_ERROR, e.to_string()))
-}
-
 pub fn epoch_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }

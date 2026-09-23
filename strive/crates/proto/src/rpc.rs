@@ -43,11 +43,7 @@ impl Serialize for Version {
 impl<'de> Deserialize<'de> for Version {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let v = String::deserialize(d)?;
-        if v == "2.0" {
-            Ok(Version)
-        } else {
-            Err(serde::de::Error::custom("jsonrpc must be \"2.0\""))
-        }
+        if v == "2.0" { Ok(Version) } else { Err(serde::de::Error::custom("jsonrpc must be \"2.0\"")) }
     }
 }
 
@@ -77,11 +73,7 @@ impl RpcError {
     pub const JOURNAL_INVALID: i32 = -32011;
 
     pub fn new(code: i32, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            message: message.into(),
-            data: None,
-        }
+        Self { code, message: message.into(), data: None }
     }
 }
 
@@ -107,25 +99,11 @@ impl Message {
         }
     }
     pub fn ok(id: RequestId, result: Value) -> Self {
-        Self {
-            jsonrpc: Version,
-            id: Some(id),
-            method: None,
-            params: None,
-            result: Some(result),
-            error: None,
-        }
+        Self { jsonrpc: Version, id: Some(id), method: None, params: None, result: Some(result), error: None }
     }
     /// An error response. `id` is `None` only when the request id was unreadable.
     pub fn err(id: Option<RequestId>, error: RpcError) -> Self {
-        Self {
-            jsonrpc: Version,
-            id,
-            method: None,
-            params: None,
-            result: None,
-            error: Some(error),
-        }
+        Self { jsonrpc: Version, id, method: None, params: None, result: None, error: Some(error) }
     }
 }
 
@@ -135,19 +113,14 @@ mod tests {
 
     #[test]
     fn rejects_wrong_version() {
-        assert!(
-            serde_json::from_str::<Message>(r#"{"jsonrpc":"1.0","id":1,"method":"x"}"#).is_err()
-        );
+        assert!(serde_json::from_str::<Message>(r#"{"jsonrpc":"1.0","id":1,"method":"x"}"#).is_err());
     }
 
     #[test]
     fn round_trips_request() {
         let m = Message::request(RequestId::Number(7), "daemon/status", serde_json::json!({}));
         let s = serde_json::to_string(&m).unwrap();
-        assert_eq!(
-            s,
-            r#"{"jsonrpc":"2.0","id":7,"method":"daemon/status","params":{}}"#
-        );
+        assert_eq!(s, r#"{"jsonrpc":"2.0","id":7,"method":"daemon/status","params":{}}"#);
         assert_eq!(serde_json::from_str::<Message>(&s).unwrap(), m);
     }
 }

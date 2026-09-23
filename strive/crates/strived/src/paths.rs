@@ -16,9 +16,7 @@ impl Home {
     pub fn discover() -> Result<Self> {
         let root = match std::env::var_os("STRIVE_HOME") {
             Some(p) if !p.is_empty() => PathBuf::from(p),
-            _ => {
-                PathBuf::from(std::env::var_os("HOME").context("HOME is not set")?).join(".strive")
-            }
+            _ => PathBuf::from(std::env::var_os("HOME").context("HOME is not set")?).join(".strive"),
         };
         Ok(Self { root })
     }
@@ -57,17 +55,8 @@ pub fn build_id() -> String {
         .and_then(fs::metadata)
         .ok()
         .and_then(|m| {
-            let mtime = m
-                .modified()
-                .ok()?
-                .duration_since(std::time::UNIX_EPOCH)
-                .ok()?;
-            Some(format!(
-                "{:x}-{:x}-{:x}",
-                m.ino(),
-                m.len(),
-                mtime.as_nanos()
-            ))
+            let mtime = m.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?;
+            Some(format!("{:x}-{:x}-{:x}", m.ino(), m.len(), mtime.as_nanos()))
         })
         .unwrap_or_else(|| "unknown".into());
     format!("{version}+{stamp}")

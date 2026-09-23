@@ -15,12 +15,22 @@ case "$cmd" in
   build)
     cd "$ROOT" && cargo build --quiet && bun install --silent >/dev/null && echo "built $bin" ;;
   start)
-    need_name; repo="${3:-$ROOT}"
+    need_name; repo="${3:-$ROOT}"; shift $(( $# < 3 ? $# : 3 ))
     tmux has-session -t "$sess" 2>/dev/null && { echo "run $name already exists; stop it first" >&2; exit 1; }
     mkdir -p "$home" "$EVIDENCE/$name"
     tmux new-session -d -s "$sess" -x 110 -y 32 -c "$repo" \
-      "STRIVE_HOME=$home STRIVE_TUI='bun $ROOT/packages/tui/src/main.ts' $bin; echo \"[strive exited \$?]\"; sleep 600"
+      "STRIVE_HOME=$home STRIVE_TUI='bun $ROOT/packages/tui/src/main.ts' $bin $*; echo \"[strive exited \$?]\"; sleep 600"
     "$0" wait "$name" "strive" 5 >/dev/null && echo "started $name in $repo (STRIVE_HOME=$home)" ;;
+  restart)
+    # Quit the TUI and open it again in the same home and directory, with new strive args.
+    need_name; repo="$3"; shift 3
+    tmux kill-session -t "$sess" 2>/dev/null || true
+    tmux new-session -d -s "$sess" -x 110 -y 32 -c "$repo" \
+      "STRIVE_HOME=$home STRIVE_TUI='bun $ROOT/packages/tui/src/main.ts' $bin $*; echo \"[strive exited \$?]\"; sleep 600"
+    "$0" wait "$name" "strive" 5 >/dev/null && echo "restarted $name in $repo with: strive $*" ;;
+  journal)
+    # Path of a session's journal in this run's home, for tamper checks.
+    need_name; echo "$home/sessions/$3/journal.jsonl" ;;
   cli)
     need_name; shift 2
     out="$(STRIVE_HOME=$home "$bin" "$@" 2>&1)" && code=0 || code=$?
@@ -56,5 +66,5 @@ case "$cmd" in
     rm -rf "$home"
     echo "stopped $name; evidence kept in $EVIDENCE/$name" ;;
   *)
-    echo "usage: $0 build | start NAME [REPO] | send NAME TEXT | type NAME TEXT | key NAME KEY | wait NAME TEXT [SECS] | screen NAME | snap NAME LABEL | cli NAME ARGS... | doctor NAME | stop NAME" ;;
+    echo "usage: $0 build | start NAME [REPO [STRIVE_ARGS...]] | restart NAME REPO [STRIVE_ARGS...] | journal NAME SESSION_ID | send NAME TEXT | type NAME TEXT | key NAME KEY | wait NAME TEXT [SECS] | screen NAME | snap NAME LABEL | cli NAME ARGS... | doctor NAME | stop NAME" ;;
 esac

@@ -5,6 +5,7 @@ import { createConnection, type Socket } from "node:net";
 import type { ClientInfo } from "./generated/ClientInfo";
 import type { InitializeResult } from "./generated/InitializeResult";
 import { type MethodName, type Methods, PROTOCOL_VERSION } from "./generated/Methods";
+import type { NotificationName, Notifications } from "./generated/Notifications";
 import type { RpcError } from "./generated/RpcError";
 
 export class ServerError extends Error {
@@ -18,15 +19,13 @@ export class ServerError extends Error {
   }
 }
 
-export type Notification = { method: string; params: unknown };
-
 type Pending = { method: string; resolve: (v: any) => void; reject: (e: Error) => void };
 
 export class StriveClient {
   private nextId = 1;
   private buffer = "";
   private readonly pending = new Map<number, Pending>();
-  private readonly listeners = new Set<(n: Notification) => void>();
+  private readonly listeners = new Map<string, Set<(params: any) => void>>();
   private readonly closeListeners = new Set<(err?: Error) => void>();
   private closed = false;
 
@@ -58,9 +57,11 @@ export class StriveClient {
     });
   }
 
-  onNotification(fn: (n: Notification) => void): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+  on<N extends NotificationName>(method: N, fn: (params: Notifications[N]) => void): () => void {
+    const set = this.listeners.get(method) ?? new Set();
+    this.listeners.set(method, set);
+    set.add(fn);
+    return () => set.delete(fn);
   }
 
   onClose(fn: (err?: Error) => void): () => void {
@@ -90,7 +91,7 @@ export class StriveClient {
       return this.shutdown(new Error("daemon sent invalid JSON"));
     }
     if (typeof msg.method === "string" && msg.id === undefined) {
-      for (const fn of this.listeners) fn({ method: msg.method, params: msg.params });
+      for (const fn of this.listeners.get(msg.method) ?? []) fn(msg.params);
       return;
     }
     const p = typeof msg.id === "number" ? this.pending.get(msg.id) : undefined;

@@ -12,11 +12,7 @@ fn key() -> Key {
 }
 
 fn started() -> Event {
-    Event::SessionStarted {
-        format: 1,
-        cwd: "/r".into(),
-        strive_version: "0.3.0".into(),
-    }
+    Event::SessionStarted { format: 1, cwd: "/r".into(), strive_version: "0.3.0".into() }
 }
 
 fn msg(text: &str) -> Event {
@@ -35,19 +31,11 @@ fn three(dir: &Path) {
 }
 
 fn lines(dir: &Path) -> Vec<String> {
-    fs::read_to_string(dir.join("journal.jsonl"))
-        .unwrap()
-        .lines()
-        .map(String::from)
-        .collect()
+    fs::read_to_string(dir.join("journal.jsonl")).unwrap().lines().map(String::from).collect()
 }
 
 fn write_lines(dir: &Path, lines: &[String]) {
-    fs::write(
-        dir.join("journal.jsonl"),
-        lines.iter().map(|l| l.clone() + "\n").collect::<String>(),
-    )
-    .unwrap();
+    fs::write(dir.join("journal.jsonl"), lines.iter().map(|l| l.clone() + "\n").collect::<String>()).unwrap();
 }
 
 #[test]
@@ -58,14 +46,7 @@ fn entries_round_trip_through_disk() {
     assert_eq!(report.problem, None);
     assert_eq!(report.committed, 3);
     assert_eq!(report.torn_bytes, 0);
-    assert_eq!(
-        report.entries,
-        vec![
-            entry(1, 1000, started()),
-            entry(2, 2000, msg("a")),
-            entry(3, 2000, msg("b"))
-        ]
-    );
+    assert_eq!(report.entries, vec![entry(1, 1000, started()), entry(2, 2000, msg("a")), entry(3, 2000, msg("b"))]);
 }
 
 /// The on-disk format is a contract: journals written by one release must
@@ -90,10 +71,7 @@ fn an_edited_entry_is_reported_by_seq() {
     let mut l = lines(dir.path());
     l[1] = l[1].replace(r#""text":"a""#, r#""text":"x""#);
     write_lines(dir.path(), &l);
-    assert_eq!(
-        read(dir.path(), SESSION, &key()).unwrap().problem,
-        Some(Problem::Tampered { seq: 2 })
-    );
+    assert_eq!(read(dir.path(), SESSION, &key()).unwrap().problem, Some(Problem::Tampered { seq: 2 }));
 }
 
 #[test]
@@ -102,10 +80,7 @@ fn a_deleted_entry_is_reported_where_the_chain_breaks() {
     three(dir.path());
     let l = lines(dir.path());
     write_lines(dir.path(), &[l[0].clone(), l[2].clone()]);
-    assert_eq!(
-        read(dir.path(), SESSION, &key()).unwrap().problem,
-        Some(Problem::Tampered { seq: 2 })
-    );
+    assert_eq!(read(dir.path(), SESSION, &key()).unwrap().problem, Some(Problem::Tampered { seq: 2 }));
 }
 
 #[test]
@@ -130,13 +105,7 @@ fn removing_committed_entries_from_the_end_is_truncation() {
     three(dir.path());
     let l = lines(dir.path());
     write_lines(dir.path(), &l[..2]);
-    assert_eq!(
-        read(dir.path(), SESSION, &key()).unwrap().problem,
-        Some(Problem::Truncated {
-            committed: 3,
-            found: 2
-        })
-    );
+    assert_eq!(read(dir.path(), SESSION, &key()).unwrap().problem, Some(Problem::Truncated { committed: 3, found: 2 }));
 }
 
 #[test]
@@ -144,15 +113,8 @@ fn an_edited_head_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
     three(dir.path());
     let head = fs::read_to_string(dir.path().join("head.json")).unwrap();
-    fs::write(
-        dir.path().join("head.json"),
-        head.replacen(r#""seq":3"#, r#""seq":2"#, 1),
-    )
-    .unwrap();
-    assert_eq!(
-        read(dir.path(), SESSION, &key()).unwrap().problem,
-        Some(Problem::BadHead)
-    );
+    fs::write(dir.path().join("head.json"), head.replacen(r#""seq":3"#, r#""seq":2"#, 1)).unwrap();
+    assert_eq!(read(dir.path(), SESSION, &key()).unwrap().problem, Some(Problem::BadHead));
 }
 
 #[test]
@@ -160,10 +122,7 @@ fn a_missing_head_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
     three(dir.path());
     fs::remove_file(dir.path().join("head.json")).unwrap();
-    assert_eq!(
-        read(dir.path(), SESSION, &key()).unwrap().problem,
-        Some(Problem::BadHead)
-    );
+    assert_eq!(read(dir.path(), SESSION, &key()).unwrap().problem, Some(Problem::BadHead));
 }
 
 /// A crash mid-write leaves a partial last line. Reading reports it without
@@ -172,10 +131,7 @@ fn a_missing_head_is_rejected() {
 fn a_torn_last_line_is_reported_not_rejected() {
     let dir = tempfile::tempdir().unwrap();
     three(dir.path());
-    let mut f = fs::OpenOptions::new()
-        .append(true)
-        .open(dir.path().join("journal.jsonl"))
-        .unwrap();
+    let mut f = fs::OpenOptions::new().append(true).open(dir.path().join("journal.jsonl")).unwrap();
     f.write_all(br#"{"seq":4,"tsMs":30"#).unwrap();
     let report = read(dir.path(), SESSION, &key()).unwrap();
     assert_eq!(report.problem, None);
@@ -189,37 +145,18 @@ fn a_torn_last_line_is_reported_not_rejected() {
 fn opening_recovers_a_torn_line_once() {
     let dir = tempfile::tempdir().unwrap();
     three(dir.path());
-    let mut f = fs::OpenOptions::new()
-        .append(true)
-        .open(dir.path().join("journal.jsonl"))
-        .unwrap();
+    let mut f = fs::OpenOptions::new().append(true).open(dir.path().join("journal.jsonl")).unwrap();
     f.write_all(br#"{"seq":4,"tsMs":30"#).unwrap();
 
     let (_, entries) = Journal::open(dir.path(), SESSION, &key(), 5000).unwrap();
-    assert_eq!(
-        entries.last(),
-        Some(&entry(
-            4,
-            5000,
-            Event::Recovered {
-                discarded_bytes: 18
-            }
-        ))
-    );
+    assert_eq!(entries.last(), Some(&entry(4, 5000, Event::Recovered { discarded_bytes: 18 })));
     let report = read(dir.path(), SESSION, &key()).unwrap();
-    assert_eq!(
-        (report.problem, report.committed, report.torn_bytes),
-        (None, 4, 0),
-        "recovery is committed"
-    );
+    assert_eq!((report.problem, report.committed, report.torn_bytes), (None, 4, 0), "recovery is committed");
 
     let (_, entries) = Journal::open(dir.path(), SESSION, &key(), 6000).unwrap();
     assert_eq!(entries.len(), 4);
     let report = read(dir.path(), SESSION, &key()).unwrap();
-    assert_eq!(
-        (report.problem, report.committed, report.torn_bytes),
-        (None, 4, 0)
-    );
+    assert_eq!((report.problem, report.committed, report.torn_bytes), (None, 4, 0));
 }
 
 /// A crash after the journal was synced but before the head was updated
@@ -235,10 +172,7 @@ fn entries_written_after_the_last_head_update_are_adopted() {
     fs::write(dir.path().join("head.json"), old_head).unwrap();
 
     let report = read(dir.path(), SESSION, &key()).unwrap();
-    assert_eq!(
-        (report.problem, report.committed, report.entries.len()),
-        (None, 1, 2)
-    );
+    assert_eq!((report.problem, report.committed, report.entries.len()), (None, 1, 2));
 
     Journal::open(dir.path(), SESSION, &key(), 3000).unwrap();
     let report = read(dir.path(), SESSION, &key()).unwrap();
@@ -254,10 +188,7 @@ fn appends_after_reopening_continue_the_sequence() {
     j.commit().unwrap();
     assert_eq!(appended, vec![entry(4, 4000, msg("c"))]);
     let report = read(dir.path(), SESSION, &key()).unwrap();
-    assert_eq!(
-        (report.problem, report.committed, report.entries.len()),
-        (None, 4, 4)
-    );
+    assert_eq!((report.problem, report.committed, report.entries.len()), (None, 4, 4));
 }
 
 #[test]
@@ -269,16 +200,9 @@ fn opening_a_tampered_journal_fails_with_the_problem() {
     write_lines(dir.path(), &l);
     match Journal::open(dir.path(), SESSION, &key(), 5000) {
         Err(OpenError::Invalid(p)) => assert_eq!(p, Problem::Tampered { seq: 3 }),
-        other => panic!(
-            "expected an invalid journal, got {:?}",
-            other.map(|(_, e)| e)
-        ),
+        other => panic!("expected an invalid journal, got {:?}", other.map(|(_, e)| e)),
     }
-    assert_eq!(
-        lines(dir.path())[2],
-        l[2],
-        "a tampered journal must not be modified by open"
-    );
+    assert_eq!(lines(dir.path())[2], l[2], "a tampered journal must not be modified by open");
 }
 
 /// Truncating the journal and pointing the head at the new last entry needs
@@ -294,10 +218,7 @@ fn a_forged_head_after_truncation_is_rejected() {
         serde_json::from_str(&fs::read_to_string(dir.path().join("head.json")).unwrap()).unwrap();
     let forged = serde_json::json!({"seq": 2, "mac": mac2, "headMac": head["headMac"]});
     fs::write(dir.path().join("head.json"), forged.to_string()).unwrap();
-    assert_eq!(
-        read(dir.path(), SESSION, &key()).unwrap().problem,
-        Some(Problem::BadHead)
-    );
+    assert_eq!(read(dir.path(), SESSION, &key()).unwrap().problem, Some(Problem::BadHead));
 }
 
 /// A genuine head from another history of the same session (same key, same
@@ -312,30 +233,17 @@ fn a_head_from_a_different_history_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
     three(dir.path());
     fs::copy(other.path().join("head.json"), dir.path().join("head.json")).unwrap();
-    assert_eq!(
-        read(dir.path(), SESSION, &key()).unwrap().problem,
-        Some(Problem::BadHead)
-    );
+    assert_eq!(read(dir.path(), SESSION, &key()).unwrap().problem, Some(Problem::BadHead));
 }
 
 #[test]
 fn problems_explain_themselves() {
+    assert_eq!(Problem::Tampered { seq: 2 }.to_string(), "entry 2 was modified, removed or moved");
     assert_eq!(
-        Problem::Tampered { seq: 2 }.to_string(),
-        "entry 2 was modified, removed or moved"
-    );
-    assert_eq!(
-        Problem::Truncated {
-            committed: 3,
-            found: 2
-        }
-        .to_string(),
+        Problem::Truncated { committed: 3, found: 2 }.to_string(),
         "entries were removed from the end (2 of 3 committed entries remain)"
     );
-    assert_eq!(
-        Problem::BadHead.to_string(),
-        "the head record is missing or was modified"
-    );
+    assert_eq!(Problem::BadHead.to_string(), "the head record is missing or was modified");
 }
 
 #[test]
@@ -343,11 +251,6 @@ fn opening_an_invalid_journal_says_why() {
     let dir = tempfile::tempdir().unwrap();
     three(dir.path());
     fs::remove_file(dir.path().join("head.json")).unwrap();
-    let err = Journal::open(dir.path(), SESSION, &key(), 5000)
-        .err()
-        .unwrap();
-    assert_eq!(
-        err.to_string(),
-        "the head record is missing or was modified"
-    );
+    let err = Journal::open(dir.path(), SESSION, &key(), 5000).err().unwrap();
+    assert_eq!(err.to_string(), "the head record is missing or was modified");
 }

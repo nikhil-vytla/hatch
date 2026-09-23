@@ -37,8 +37,7 @@ impl Key {
     }
 
     fn mac(&self, parts: &[&[u8]]) -> [u8; 32] {
-        let mut m =
-            <HmacSha256 as KeyInit>::new_from_slice(&self.0).expect("HMAC takes any key length");
+        let mut m = <HmacSha256 as KeyInit>::new_from_slice(&self.0).expect("HMAC takes any key length");
         for p in parts {
             m.update(p);
         }
@@ -71,10 +70,7 @@ impl std::fmt::Display for Problem {
         match self {
             Problem::Tampered { seq } => write!(f, "entry {seq} was modified, removed or moved"),
             Problem::Truncated { committed, found } => {
-                write!(
-                    f,
-                    "entries were removed from the end ({found} of {committed} committed entries remain)"
-                )
+                write!(f, "entries were removed from the end ({found} of {committed} committed entries remain)")
             }
             Problem::BadHead => write!(f, "the head record is missing or was modified"),
         }
@@ -145,18 +141,9 @@ pub struct Journal {
 
 impl Journal {
     /// Creates a new session journal whose first entry is `first`.
-    pub fn create(
-        dir: &Path,
-        session_id: &str,
-        key: &Key,
-        ts_ms: u64,
-        first: Event,
-    ) -> io::Result<Self> {
+    pub fn create(dir: &Path, session_id: &str, key: &Key, ts_ms: u64, first: Event) -> io::Result<Self> {
         fs::create_dir_all(dir)?;
-        let file = OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .open(dir.join(JOURNAL))?;
+        let file = OpenOptions::new().create_new(true).append(true).open(dir.join(JOURNAL))?;
         let mut j = Journal {
             dir: dir.to_path_buf(),
             key: key.clone(),
@@ -173,12 +160,7 @@ impl Journal {
     /// an invalid one without modifying it. Repairs what a crash can leave: a
     /// torn last line is truncated and recorded, and a head behind the synced
     /// entries catches up. Running it again changes nothing.
-    pub fn open(
-        dir: &Path,
-        session_id: &str,
-        key: &Key,
-        ts_ms: u64,
-    ) -> Result<(Self, Vec<Entry>), OpenError> {
+    pub fn open(dir: &Path, session_id: &str, key: &Key, ts_ms: u64) -> Result<(Self, Vec<Entry>), OpenError> {
         let scan = scan(dir, session_id, key)?;
         let report = scan.report;
         if let Some(p) = report.problem {
@@ -195,12 +177,7 @@ impl Journal {
         };
         let mut entries = report.entries;
         if report.torn_bytes > 0 {
-            entries.extend(j.append(
-                ts_ms,
-                &[Event::Recovered {
-                    discarded_bytes: report.torn_bytes,
-                }],
-            )?);
+            entries.extend(j.append(ts_ms, &[Event::Recovered { discarded_bytes: report.torn_bytes }])?);
         }
         j.commit()?;
         Ok((j, entries))
@@ -218,11 +195,7 @@ impl Journal {
             self.out.write_all(b"\n")?;
             self.last_mac = mac;
             self.next_seq += 1;
-            out.push(Entry {
-                seq,
-                ts_ms,
-                event: event.clone(),
-            });
+            out.push(Entry { seq, ts_ms, event: event.clone() });
         }
         Ok(out)
     }
@@ -234,11 +207,7 @@ impl Journal {
         self.out.get_ref().sync_data()?;
         let seq = self.next_seq - 1;
         let mac = hex::encode(self.last_mac);
-        let head = Head {
-            seq,
-            sig: self.key.head_mac(seq, &mac),
-            mac,
-        };
+        let head = Head { seq, sig: self.key.head_mac(seq, &mac), mac };
         let tmp = self.dir.join("head.json.tmp");
         let mut f = File::create(&tmp)?;
         f.write_all(&serde_json::to_vec(&head).map_err(io::Error::other)?)?;
@@ -268,11 +237,7 @@ fn scan(dir: &Path, session_id: &str, key: &Key) -> io::Result<Scan> {
     let mut prev = key.genesis(session_id);
     let mut head_matches = false;
     let mut problem = None;
-    for (i, line) in bytes[..complete]
-        .split(|&b| b == b'\n')
-        .filter(|l| !l.is_empty())
-        .enumerate()
-    {
+    for (i, line) in bytes[..complete].split(|&b| b == b'\n').filter(|l| !l.is_empty()).enumerate() {
         let seq = i as u64 + 1;
         let Some((entry, mac)) = verify_line(key, &prev, line, seq) else {
             problem = Some(Problem::Tampered { seq });
@@ -287,20 +252,12 @@ fn scan(dir: &Path, session_id: &str, key: &Key) -> io::Result<Scan> {
     let found = entries.len() as u64;
     let committed = head.as_ref().map_or(0, |h| h.seq);
     problem = problem.or(match head {
-        Some(h) if h.seq > found => Some(Problem::Truncated {
-            committed: h.seq,
-            found,
-        }),
+        Some(h) if h.seq > found => Some(Problem::Truncated { committed: h.seq, found }),
         Some(_) if head_matches => None,
         _ => Some(Problem::BadHead),
     });
     Ok(Scan {
-        report: Report {
-            entries,
-            committed,
-            torn_bytes: (bytes.len() - complete) as u64,
-            problem,
-        },
+        report: Report { entries, committed, torn_bytes: (bytes.len() - complete) as u64, problem },
         valid_len: complete as u64,
         last_mac: prev,
     })

@@ -18,10 +18,12 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 
 | Path | What |
 | --- | --- |
-| `crates/proto` | Protocol: JSON-RPC envelopes, method declarations, TS export |
-| `crates/strived` | The `strive` binary: CLI, launcher, daemon |
+| `crates/proto` | Protocol: JSON-RPC envelopes, method and notification declarations, events, TS export |
+| `crates/journal` | Authenticated session journals: format, verification, crash recovery |
+| `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client |
+| `packages/testkit` | Test helpers: a scratch-home daemon and a virtual terminal |
 
 ## Daemon lifecycle
 
@@ -47,3 +49,35 @@ protocol versions must match exactly. Error codes: `-32002` not initialized,
 declared once in `crates/proto/src/lib.rs`. `cargo test` regenerates
 `packages/protocol/src/generated/`, and `scripts/check.sh` fails if the
 committed copy differs.
+
+## Sessions and the journal
+
+Each session is a directory under `~/.strive/sessions/<ULID>/`:
+
+- **`journal.jsonl`** holds one entry per line: `{"seq","tsMs","event","mac"}`.
+  The MAC is HMAC-SHA256 over the previous entry's MAC and this line's exact
+  bytes. The chain starts from a value derived from the session id, so an
+  edit, deletion, reordering or move between sessions fails at the first
+  affected entry.
+- **`head.json`** records the last committed entry and is MAC'd itself. That
+  catches entries removed from the end and heads forged from a readable line.
+- **The key** is `~/.strive/keys/journal.key`: 32 random bytes, mode 0600,
+  created on first start. From M3 the agent's sandbox denies it.
+
+**Writes.** One writer thread per open session owns the journal. Appends
+queued while it was busy are committed together: one `fsync` of the journal,
+then an atomic replace of the head. Only then does the writer broadcast the
+entries to attached clients.
+
+**Attach.** Attaching goes through the same thread and re-verifies the file
+on disk. A new subscriber's history and its live stream therefore never
+overlap or leave a gap, and a journal edited while the daemon ran is refused
+on resume.
+
+**Crash recovery.** Opening repairs only what a crash can leave behind. A
+torn last line is cut and recorded as a `recovered` entry, and a head
+behind the synced entries catches up. An invalid journal is refused and
+never modified.
+
+**Format contract.** The first line's bytes are pinned by a golden test,
+whose MAC was computed independently with openssl.

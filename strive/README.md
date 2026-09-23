@@ -5,8 +5,9 @@ one you can review, measure and undo. Proposed changes to its memory and
 skills are gated against the current version before they're kept. Budgets,
 a verifiable session log and an OS sandbox are on by default.
 
-> **Status: rebuilding.** Milestone M0 is done: the daemon, protocol, TUI shell
-> and installer work. The agent loop arrives in M3. See
+> **Status: rebuilding.** Milestones M0 and M1 are done. The daemon,
+> protocol, TUI and installer work, and sessions are journaled and
+> verifiable. The agent loop arrives in M3. See
 > [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation is
 > at git tag `strive-py-final`.
 
@@ -22,7 +23,12 @@ From this directory, with [Rust](https://rustup.rs) and [Bun](https://bun.sh):
 
 ```sh
 cd any/repository
-strive                # opens the TUI; the per-user daemon starts on its own
+strive                # opens the TUI in a new session; the per-user daemon starts on its own
+strive -c             # continue the latest session in this directory
+strive -r ID          # resume a session by id
+strive sessions       # sessions started here, newest first (--all for every directory)
+strive log [ID]       # a session's journal (default: the latest here)
+strive verify [ID]    # check a journal is intact; --all checks every session
 strive doctor         # checks sandbox, git, credentials and the daemon
 strive status         # daemon pid, uptime, clients
 strive stop           # stop the daemon (it also exits when idle)
@@ -34,6 +40,7 @@ No config file is needed. State lives in `~/.strive`, or in `STRIVE_HOME` if set
 
 ```sh
 ./scripts/check.sh                        # fmt, clippy, tests, protocol drift, tsc, bun test
+./scripts/mutants.sh                      # mutation testing: every surviving mutant is an untested defect
 STRIVE_TUI="bun packages/tui/src/main.ts" cargo run   # run the TUI from source
 ```
 

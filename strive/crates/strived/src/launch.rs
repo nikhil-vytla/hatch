@@ -42,21 +42,17 @@ pub async fn ensure(home: &Home, client_name: &str) -> Result<(Client, Initializ
                 // Stale. Ask it to go; the next pass either finds it still
                 // exiting, finds a current daemon another launcher started, or
                 // finds nothing and spawns one (which waits for the lock).
-                crate::log!(
-                    "replacing stale daemon {} (pid {})",
-                    init.server.build,
-                    init.server.pid
-                );
+                crate::log!("replacing stale daemon {} (pid {})", init.server.build, init.server.pid);
                 let _ = c.request::<DaemonShutdown>(Empty {}).await;
             }
-            Ok(None) => {
-                let running = child
-                    .as_mut()
-                    .is_some_and(|c| matches!(c.try_wait(), Ok(None)));
-                if !running {
-                    child = Some(spawn(home)?);
+            Ok(None) => match child.as_mut().map(Child::try_wait) {
+                Some(Ok(None)) => {}
+                Some(Ok(Some(status))) if !status.success() => {
+                    bail!("the daemon failed to start: {}", last_error(home));
                 }
-            }
+                // Not spawned yet, or it stood down because another daemon won the lock.
+                _ => child = Some(spawn(home)?),
+            },
             Err(e) if is_protocol_mismatch(&e) => {
                 // A daemon from an incompatible release: we can't ask it nicely.
                 bail!(
@@ -69,27 +65,26 @@ pub async fn ensure(home: &Home, client_name: &str) -> Result<(Client, Initializ
             Err(_) => {}
         }
         if Instant::now() > deadline {
-            bail!(
-                "the daemon did not start within {}s; see {}",
-                START_TIMEOUT.as_secs(),
-                home.log().display()
-            );
+            bail!("the daemon did not start within {}s; see {}", START_TIMEOUT.as_secs(), home.log().display());
         }
         tokio::time::sleep(RETRY).await;
     }
 }
 
+/// The error a failed daemon printed as it exited: the log's last line.
+fn last_error(home: &Home) -> String {
+    std::fs::read_to_string(home.log())
+        .ok()
+        .and_then(|log| log.lines().last().map(|l| l.strip_prefix("strive: ").unwrap_or(l).to_string()))
+        .unwrap_or_else(|| format!("no log at {}", home.log().display()))
+}
+
 fn is_protocol_mismatch(e: &anyhow::Error) -> bool {
-    e.downcast_ref::<ServerError>()
-        .is_some_and(|s| s.0.code == RpcError::PROTOCOL_MISMATCH)
+    e.downcast_ref::<ServerError>().is_some_and(|s| s.0.code == RpcError::PROTOCOL_MISMATCH)
 }
 
 fn spawn(home: &Home) -> Result<Child> {
-    let log = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(home.log())
-        .context("opening the daemon log")?;
+    let log = OpenOptions::new().create(true).append(true).open(home.log()).context("opening the daemon log")?;
     Command::new(std::env::current_exe()?)
         .arg("daemon")
         .stdin(Stdio::null())
@@ -106,10 +101,7 @@ pub async fn wait_until_gone(home: &Home) -> Result<()> {
     let deadline = Instant::now() + START_TIMEOUT;
     while Client::connect(&home.socket()).await.is_ok() || !lock_is_free(home) {
         if Instant::now() > deadline {
-            bail!(
-                "the old daemon did not exit within {}s",
-                START_TIMEOUT.as_secs()
-            );
+            bail!("the old daemon did not exit within {}s", START_TIMEOUT.as_secs());
         }
         tokio::time::sleep(RETRY).await;
     }
@@ -119,12 +111,7 @@ pub async fn wait_until_gone(home: &Home) -> Result<()> {
 /// True when no daemon holds the lock. Taking it for this probe is harmless: a
 /// daemon starting at the same moment waits for it (see `server::run`).
 fn lock_is_free(home: &Home) -> bool {
-    let Ok(f) = File::options()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(home.lock())
-    else {
+    let Ok(f) = File::options().create(true).truncate(false).write(true).open(home.lock()) else {
         return false;
     };
     match f.try_lock() {

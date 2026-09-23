@@ -1,106 +1,16 @@
 //! End-to-end tests against the real `strive` binary, each with its own
 //! `STRIVE_HOME`, so they never touch a developer's daemon.
 
-use std::io::{BufRead, BufReader, Write};
+mod common;
+
 use std::os::unix::net::UnixStream;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
+use common::{Env, pid, wait_for};
 use serde_json::{Value, json};
-
-struct Env {
-    home: tempfile::TempDir,
-    exe: PathBuf,
-}
-
-impl Env {
-    fn new() -> Self {
-        Self::with_exe(PathBuf::from(env!("CARGO_BIN_EXE_strive")))
-    }
-    fn with_exe(exe: PathBuf) -> Self {
-        // Short base path: Unix socket paths are limited to ~104 bytes on macOS.
-        let home = tempfile::Builder::new()
-            .prefix("strv")
-            .tempdir_in("/tmp")
-            .unwrap();
-        Self { home, exe }
-    }
-    fn cmd(&self, exe: &Path, args: &[&str]) -> Output {
-        Command::new(exe)
-            .args(args)
-            .env("STRIVE_HOME", self.home.path())
-            .env_remove("STRIVE_IDLE_SECS")
-            .env_remove("STRIVE_TUI")
-            .output()
-            .unwrap()
-    }
-    fn strive(&self, args: &[&str]) -> Output {
-        self.cmd(&self.exe, args)
-    }
-    fn status(&self) -> Value {
-        let out = self.strive(&["status", "--json"]);
-        assert!(
-            out.status.success(),
-            "status failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        serde_json::from_slice(&out.stdout).unwrap()
-    }
-    fn socket(&self) -> PathBuf {
-        self.home.path().join("run/strived.sock")
-    }
-    fn rpc(&self) -> Rpc {
-        let s = UnixStream::connect(self.socket()).unwrap();
-        s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-        Rpc {
-            r: BufReader::new(s.try_clone().unwrap()),
-            w: s,
-        }
-    }
-}
-
-impl Drop for Env {
-    fn drop(&mut self) {
-        let _ = self.strive(&["stop"]);
-    }
-}
-
-struct Rpc {
-    r: BufReader<UnixStream>,
-    w: UnixStream,
-}
-
-impl Rpc {
-    fn send_raw(&mut self, line: &str) -> Value {
-        self.w.write_all(line.as_bytes()).unwrap();
-        self.w.write_all(b"\n").unwrap();
-        let mut buf = String::new();
-        self.r.read_line(&mut buf).unwrap();
-        serde_json::from_str(&buf).unwrap()
-    }
-    fn call(&mut self, id: i64, method: &str, params: &Value) -> Value {
-        self.send_raw(
-            &json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}).to_string(),
-        )
-    }
-    fn init(&mut self) -> Value {
-        self.call(0, "initialize", &json!({"protocolVersion": strive_proto::PROTOCOL_VERSION, "client": {"name": "test", "version": "0"}}))
-    }
-}
-
-fn pid(status: &Value) -> u64 {
-    status["server"]["pid"].as_u64().unwrap()
-}
-
-fn wait_for(what: &str, timeout: Duration, mut f: impl FnMut() -> bool) {
-    let deadline = Instant::now() + timeout;
-    while !f() {
-        assert!(Instant::now() < deadline, "timed out waiting for {what}");
-        std::thread::sleep(Duration::from_millis(20));
-    }
-}
 
 #[test]
 fn starts_once_and_reuses_the_daemon() {
@@ -109,9 +19,8 @@ fn starts_once_and_reuses_the_daemon() {
     let b = env.status();
     assert_eq!(pid(&a), pid(&b));
     assert_eq!(a["server"]["version"], env!("CARGO_PKG_VERSION"));
-    let mode = std::fs::metadata(env.socket())
-        .map(|m| std::os::unix::fs::PermissionsExt::mode(&m.permissions()))
-        .unwrap();
+    let mode =
+        std::fs::metadata(env.socket()).map(|m| std::os::unix::fs::PermissionsExt::mode(&m.permissions())).unwrap();
     assert_eq!(mode & 0o777, 0o600, "socket must be private to the user");
 }
 
@@ -136,11 +45,7 @@ fn concurrent_starts_yield_one_daemon() {
             pid(&serde_json::from_slice(&out.stdout).unwrap())
         })
         .collect();
-    assert_eq!(
-        pids.len(),
-        1,
-        "racing starts produced several daemons: {pids:?}"
-    );
+    assert_eq!(pids.len(), 1, "racing starts produced several daemons: {pids:?}");
 }
 
 #[test]
@@ -151,10 +56,7 @@ fn stop_stops_it() {
     assert!(String::from_utf8_lossy(&out.stdout).starts_with("stopped daemon"));
     assert!(!env.socket().exists());
     let out = env.strive(&["stop"]);
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout).trim(),
-        "no daemon running"
-    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "no daemon running");
 }
 
 #[test]
@@ -167,9 +69,7 @@ fn exits_when_idle() {
         .output()
         .unwrap();
     assert!(out.status.success());
-    wait_for("idle exit", Duration::from_secs(5), || {
-        !env.socket().exists()
-    });
+    wait_for("idle exit", Duration::from_secs(5), || !env.socket().exists());
 }
 
 #[test]
@@ -181,11 +81,7 @@ fn replaces_a_stale_daemon_from_another_build() {
     let old_status: Value = serde_json::from_slice(&out.stdout).unwrap();
     let new_status = env.status();
     assert_ne!(old_status["server"]["build"], new_status["server"]["build"]);
-    assert_ne!(
-        pid(&old_status),
-        pid(&new_status),
-        "the stale daemon should have been replaced"
-    );
+    assert_ne!(pid(&old_status), pid(&new_status), "the stale daemon should have been replaced");
 }
 
 /// Race: a daemon that is exiting has unlinked its socket but still holds the
@@ -228,11 +124,7 @@ fn concurrent_launchers_replace_a_stale_daemon_once() {
             .into_iter()
             .map(|c| {
                 let out = c.wait_with_output().unwrap();
-                assert!(
-                    out.status.success(),
-                    "launcher failed: {}",
-                    String::from_utf8_lossy(&out.stderr)
-                );
+                assert!(out.status.success(), "launcher failed: {}", String::from_utf8_lossy(&out.stderr));
                 pid(&serde_json::from_slice(&out.stdout).unwrap())
             })
             .collect();
@@ -259,11 +151,7 @@ fn launches_succeed_near_idle_exits() {
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(3) {
         let out = status_with_idle(&env, "1");
-        assert!(
-            out.status.success(),
-            "launch failed near an idle exit: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert!(out.status.success(), "launch failed near an idle exit: {}", String::from_utf8_lossy(&out.stderr));
         std::thread::sleep(Duration::from_millis(97));
     }
 }
@@ -274,15 +162,9 @@ fn a_launch_after_idle_exit_starts_a_new_daemon() {
     let env = Env::new();
     let mut previous = pid(&serde_json::from_slice(&status_with_idle(&env, "1").stdout).unwrap());
     for _ in 0..3 {
-        wait_for("idle exit", Duration::from_secs(5), || {
-            !env.socket().exists()
-        });
+        wait_for("idle exit", Duration::from_secs(5), || !env.socket().exists());
         let out = status_with_idle(&env, "1");
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
         let next = pid(&serde_json::from_slice(&out.stdout).unwrap());
         assert_ne!(next, previous, "the idle daemon should have been replaced");
         previous = next;
@@ -291,12 +173,7 @@ fn a_launch_after_idle_exit_starts_a_new_daemon() {
 
 /// Starts threads that connect and disconnect as fast as they can, until the
 /// returned flag is set.
-fn flood(
-    socket: &Path,
-) -> (
-    std::sync::Arc<std::sync::atomic::AtomicBool>,
-    Vec<std::thread::JoinHandle<()>>,
-) {
+fn flood(socket: &Path) -> (std::sync::Arc<std::sync::atomic::AtomicBool>, Vec<std::thread::JoinHandle<()>>) {
     let done = std::sync::Arc::new(AtomicBool::new(false));
     let threads = (0..4)
         .map(|_| {
@@ -321,11 +198,7 @@ fn shutdown_is_not_starved_by_connection_floods() {
     let (done, threads) = flood(&env.socket());
     std::thread::sleep(Duration::from_millis(100));
     let out = env.strive(&["stop"]);
-    assert!(
-        out.status.success(),
-        "stop under load failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(out.status.success(), "stop under load failed: {}", String::from_utf8_lossy(&out.stderr));
     done.store(true, Ordering::Relaxed);
     for t in threads {
         t.join().unwrap();
@@ -334,16 +207,8 @@ fn shutdown_is_not_starved_by_connection_floods() {
     let daemon = pid(&env.status());
     let (done, threads) = flood(&env.socket());
     std::thread::sleep(Duration::from_millis(100));
-    assert!(
-        Command::new("kill")
-            .arg(daemon.to_string())
-            .status()
-            .unwrap()
-            .success()
-    );
-    wait_for("SIGTERM under load", Duration::from_secs(3), || {
-        !env.socket().exists()
-    });
+    assert!(Command::new("kill").arg(daemon.to_string()).status().unwrap().success());
+    wait_for("SIGTERM under load", Duration::from_secs(3), || !env.socket().exists());
     done.store(true, Ordering::Relaxed);
     for t in threads {
         t.join().unwrap();
@@ -354,38 +219,21 @@ fn shutdown_is_not_starved_by_connection_floods() {
 fn protocol_errors() {
     let env = Env::new();
     env.status();
-    let mut c = env.rpc();
-    assert_eq!(
-        c.call(1, "daemon/status", &json!({}))["error"]["code"],
-        -32002,
-        "must initialize first"
-    );
-    let bad = c.call(
-        2,
-        "initialize",
-        &json!({"protocolVersion": 999, "client": {"name": "t", "version": "0"}}),
-    );
+    let mut c = env.raw();
+    assert_eq!(c.call_id(1, "daemon/status", &json!({}))["error"]["code"], -32002, "must initialize first");
+    let bad = c.call_id(2, "initialize", &json!({"protocolVersion": 999, "client": {"name": "t", "version": "0"}}));
     assert_eq!(bad["error"]["code"], -32003);
-    assert_eq!(
-        bad["error"]["data"]["protocolVersion"],
-        strive_proto::PROTOCOL_VERSION
-    );
-    assert_eq!(
-        c.init()["result"]["protocolVersion"],
-        strive_proto::PROTOCOL_VERSION
-    );
+    assert_eq!(bad["error"]["data"]["protocolVersion"], strive_proto::PROTOCOL_VERSION);
+    assert_eq!(c.init()["result"]["protocolVersion"], strive_proto::PROTOCOL_VERSION);
     assert_eq!(c.send_raw("{not json")["error"]["code"], -32700);
-    assert_eq!(c.call(3, "no/such", &json!({}))["error"]["code"], -32601);
-    assert_eq!(
-        c.call(4, "initialize", &json!({"protocolVersion": "x"}))["error"]["code"],
-        -32602
-    );
+    assert_eq!(c.call_id(3, "no/such", &json!({}))["error"]["code"], -32601);
+    assert_eq!(c.call_id(4, "initialize", &json!({"protocolVersion": "x"}))["error"]["code"], -32602);
     // The `strive status` that started the daemon has disconnected by now,
     // but the daemon may not have observed it yet.
     let mut id = 5;
     wait_for("only this client connected", Duration::from_secs(2), || {
         id += 1;
-        let s = c.call(id, "daemon/status", &json!({}));
+        let s = c.call_id(id, "daemon/status", &json!({}));
         assert_eq!(s["id"], id);
         s["result"]["clients"] == 1
     });
@@ -411,13 +259,9 @@ fn doctor_fails_without_a_tui_and_passes_with_one() {
     assert_eq!(out.status.code(), Some(0), "{text}");
     let daemon = text.lines().find(|l| l.contains(" daemon ")).unwrap();
     assert!(
-        daemon.starts_with("ok")
-            && daemon.contains(&format!("pid {}, protocol 1", pid(&env.status()))),
+        daemon.starts_with("ok") && daemon.contains(&format!("pid {}, protocol 1", pid(&env.status()))),
         "{daemon}"
     );
     let tui = text.lines().find(|l| l.contains(" tui ")).unwrap();
-    assert!(
-        tui.starts_with("ok") && tui.ends_with("/bin/echo tui"),
-        "{tui}"
-    );
+    assert!(tui.starts_with("ok") && tui.ends_with("/bin/echo tui"), "{tui}");
 }

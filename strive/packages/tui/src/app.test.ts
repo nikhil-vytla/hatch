@@ -1,83 +1,179 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
 import { StriveClient } from "@strive/protocol";
 import { startDaemon, type TestDaemon, VirtualTerminal } from "@strive/testkit";
-import { App } from "./app";
+import { App, parseSessionMode, type SessionMode } from "./app";
+
+const CWD = "/tmp/some-repo";
+
+type Ui = { term: VirtualTerminal; exits: number[]; app: App; stop(): void };
 
 let daemon: TestDaemon;
-let term: VirtualTerminal;
-let tui: TuiMainScreen;
-let exits: number[];
-let client: StriveClient;
+let uis: Ui[];
 
-beforeEach(async () => {
-  daemon = startDaemon();
-  term = new VirtualTerminal(100, 30);
-  tui = new TuiMainScreen(term);
-  const codes: number[] = [];
-  exits = codes;
-  const connected = await StriveClient.connect(daemon.socket, { name: "tui-test", version: "0" });
-  client = connected.client;
-  new App(tui, client, connected.init, (code) => codes.push(code), "/tmp/some-repo");
+async function openUi(mode: SessionMode = "new"): Promise<Ui> {
+  const term = new VirtualTerminal(100, 30);
+  const tui = new TuiMainScreen(term);
+  const exits: number[] = [];
+  const { client, init } = await StriveClient.connect(daemon.socket, { name: "tui-test", version: "0" });
+  const app = new App(tui, client, init, (code) => exits.push(code), CWD);
   tui.start();
+  await app.open(mode);
+  const ui = { term, exits, app, stop: () => (tui.stop(), client.close()) };
+  uis.push(ui);
+  return ui;
+}
+
+beforeEach(() => {
+  daemon = startDaemon();
+  uis = [];
 });
 
 afterEach(() => {
-  tui.stop();
-  client.close();
+  for (const ui of uis) ui.stop();
   daemon.dispose();
 });
 
-const daemonClients = () => JSON.parse(daemon.strive("status", "--json").stdout).clients as number;
-
-const enter = async (text: string) => {
-  term.type(text);
+const enter = async (ui: Ui, text: string) => {
+  ui.term.type(text);
   await Bun.sleep(20);
-  term.type("\x1b");
-  term.type("\r");
+  ui.term.type("\x1b");
+  ui.term.type("\r");
 };
 
-test("the header names the working directory", async () => {
-  const screen = await term.waitFor("strive");
-  expect(screen[0]).toContain("/tmp/some-repo");
+const sessions = () =>
+  JSON.parse(daemon.strive("sessions", "--all", "--json").stdout) as { id: string; cwd: string }[];
+const daemonClients = () => JSON.parse(daemon.strive("status", "--json").stdout).clients as number;
+
+test("a new session is created in the working directory and named in the header", async () => {
+  const ui = await openUi();
+  const [s] = sessions();
+  expect(s?.cwd).toBe(CWD);
+  const screen = await ui.term.waitFor("session …");
+  expect(screen[0]).toContain(`${CWD}  session …${s?.id.slice(-6)}`);
+  expect(screen.some((l) => l.includes(`Session started in ${CWD}`))).toBe(true);
+});
+
+test("a prompt is shown from the journal and is in `strive log`", async () => {
+  const ui = await openUi();
+  await enter(ui, "fix the flaky test");
+  await ui.term.waitFor("› fix the flaky test");
+  await ui.term.waitFor("Saved to this session. No agent is connected yet");
+  const log = daemon.strive("log", sessions()[0]!.id);
+  expect(log.stdout).toMatch(/\n#2 \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
+});
+
+test("the missing-agent note appears once, not per prompt", async () => {
+  const ui = await openUi();
+  await enter(ui, "one");
+  await ui.term.waitFor("› one");
+  await enter(ui, "two");
+  const screen = await ui.term.waitFor("› two");
+  expect(screen.filter((l) => l.includes("No agent is connected yet")).length).toBe(1);
+});
+
+test("continue reopens the latest session here with its history", async () => {
+  const first = await openUi();
+  await enter(first, "remember me");
+  await first.term.waitFor("› remember me");
+  first.app.quit(0);
+
+  const second = await openUi("continue");
+  const screen = await second.term.waitFor("› remember me");
+  expect(screen[0]).toContain(`session …${sessions()[0]!.id.slice(-6)}`);
+  expect(sessions().length).toBe(1);
+});
+
+test("continue with no session here starts a new one", async () => {
+  await openUi("continue");
+  expect(sessions().map((s) => s.cwd)).toEqual([CWD]);
+});
+
+test("two clients on one session see each other's prompts", async () => {
+  const a = await openUi();
+  const id = sessions()[0]!.id;
+  const b = await openUi({ resume: id });
+  await enter(a, "hello from a");
+  await b.term.waitFor("› hello from a");
+  await enter(b, "hello from b");
+  await a.term.waitFor("› hello from b");
+});
+
+test("resuming a tampered session explains why and saves nothing", async () => {
+  const first = await openUi();
+  await enter(first, "original");
+  await first.term.waitFor("› original");
+  first.app.quit(0);
+  const id = sessions()[0]!.id;
+  daemon.strive("stop");
+  const journal = join(daemon.home, "sessions", id, "journal.jsonl");
+  writeFileSync(journal, readFileSync(journal, "utf8").replace("original", "tampered"));
+  const before = readFileSync(journal, "utf8");
+  daemon.strive("status");
+
+  const ui = await openUi({ resume: id });
+  await ui.term.waitFor("This session's journal failed verification: entry 2 was modified, removed or moved.");
+  await enter(ui, "should not be saved");
+  await Bun.sleep(100);
+  expect(readFileSync(journal, "utf8")).toBe(before);
+});
+
+test("resuming an unknown session says so", async () => {
+  const ui = await openUi({ resume: "01J8ZZZZZZZZZZZZZZZZZZZZZZ" });
+  await ui.term.waitFor("No session 01J8ZZZZZZZZZZZZZZZZZZZZZZ.");
 });
 
 test("/status reports the daemon the TUI is attached to", async () => {
-  await enter("/status");
-  const screen = await term.waitFor("daemon pid");
+  const ui = await openUi();
+  await enter(ui, "/status");
+  const screen = await ui.term.waitFor("daemon pid");
   const line = screen.find((l) => l.includes("daemon pid"));
   expect(line).toContain(`daemon pid ${daemon.pid()} ·`);
   expect(line).toContain("· 1 client");
 });
 
-test("a prompt is echoed and the missing agent is stated", async () => {
-  await enter("fix the flaky test");
-  const screen = await term.waitFor("› fix the flaky test");
-  expect(screen.some((l) => l.includes("Nothing can run this yet"))).toBe(true);
+test("/session prints the full id and the resume command", async () => {
+  const ui = await openUi();
+  await enter(ui, "/session");
+  const id = sessions()[0]!.id;
+  await ui.term.waitFor(`session ${id} · resume with strive -r ${id}`);
 });
 
 test("an unknown command is named in the error", async () => {
-  await enter("/nope");
-  await term.waitFor("Unknown command /nope. Type /help.");
+  const ui = await openUi();
+  await enter(ui, "/nope");
+  await ui.term.waitFor("Unknown command /nope. Type /help.");
 });
 
-test("Ctrl+C exits with status 0 and is not reported as a lost connection", async () => {
-  term.type("\x03");
+test("Ctrl+C exits with status 0 and disconnects without reporting a lost connection", async () => {
+  const ui = await openUi();
+  ui.term.type("\x03");
   await Bun.sleep(50);
-  expect(exits).toEqual([0]);
+  expect(ui.exits).toEqual([0]);
   expect(daemonClients()).toBe(1);
-  expect((await term.screen()).some((l) => l.includes("Lost the connection"))).toBe(false);
+  expect((await ui.term.screen()).some((l) => l.includes("Lost the connection"))).toBe(false);
 });
 
 test("/quit exits with status 0 and disconnects", async () => {
-  await enter("/quit");
+  const ui = await openUi();
+  await enter(ui, "/quit");
   await Bun.sleep(50);
-  expect(exits).toEqual([0]);
+  expect(ui.exits).toEqual([0]);
   expect(daemonClients()).toBe(1);
 });
 
 test("losing the daemon is reported and exits with status 1", async () => {
+  const ui = await openUi();
   daemon.strive("stop");
-  await term.waitFor("Lost the connection to the daemon.");
-  expect(exits).toEqual([1]);
+  await ui.term.waitFor("Lost the connection to the daemon.");
+  expect(ui.exits).toEqual([1]);
+});
+
+test("STRIVE_SESSION values map to session modes", () => {
+  expect(parseSessionMode(undefined)).toBe("new");
+  expect(parseSessionMode("new")).toBe("new");
+  expect(parseSessionMode("continue")).toBe("continue");
+  expect(parseSessionMode("01J8ZZZZZZZZZZZZZZZZZZZZZZ")).toEqual({ resume: "01J8ZZZZZZZZZZZZZZZZZZZZZZ" });
 });
