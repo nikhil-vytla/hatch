@@ -2,13 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { TetrisArena, timedReplay } from "./tetris";
 
-const path = new URL("../recordings/realtime.replay.json", import.meta.url);
-const recording = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { games: [] };
+const load = (name: string) => { const path = new URL(`../recordings/${name}`, import.meta.url); return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")).games : []; };
+// The first real-time recording predates backoff: it re-asked failures after a fixed 400 ms.
+const games = [...load("realtime.replay.json").map((g: any) => ({ ...g, retryPolicy: g.retryPolicy ?? "fixed" })), ...load("realtime-2.replay.json")];
 
 describe("real-time recordings", () => {
-  for (const game of recording.games) {
-    test(`replays ${game.design} on seed ${game.seed} exactly`, () => {
-      const arena = new TetrisArena(game.seed, [timedReplay(game.events, game.design, game.design)], "realtime", { pieceLimit: 40 });
+  for (const game of games) {
+    test(`replays ${game.design} (${game.retryPolicy} retries) on seed ${game.seed} exactly`, () => {
+      const arena = new TetrisArena(game.seed, [timedReplay(game.events, game.design, game.design, game.retryPolicy)], "realtime", { pieceLimit: 40 });
       while (!arena.over && arena.clockMs < game.worldMs) arena.step();
       arena.stop();
       const lane = arena.lanes[0];
