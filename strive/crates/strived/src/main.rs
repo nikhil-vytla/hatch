@@ -16,6 +16,7 @@ mod launch;
 mod log;
 mod methods;
 mod paths;
+mod pinned;
 mod server;
 mod sessions;
 mod settings;

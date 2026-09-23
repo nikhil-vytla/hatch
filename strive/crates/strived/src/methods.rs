@@ -388,7 +388,8 @@ async fn run_effect(
         let started = std::time::Instant::now();
         let mode = state.sessions.mode(&sid).await.map_err(session_error)?;
         let cancel = cancelled.clone();
-        let refusal = match crate::effects::gate(&scope, &request, mode) {
+        let (gate, target) = crate::effects::gate(&scope, &request, mode);
+        let refusal = match gate {
             crate::effects::Gate::Allow => None,
             crate::effects::Gate::Deny(why) => Some(why),
             crate::effects::Gate::Ask(what) => {
@@ -404,7 +405,7 @@ async fn run_effect(
         };
         let result = match refusal {
             Some(why) => crate::effects::Result::Refused(why),
-            None => tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request, &cancel))
+            None => tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request, &target, &cancel))
                 .await
                 .map_err(|e| internal(&e))?,
         };

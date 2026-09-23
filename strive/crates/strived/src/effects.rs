@@ -10,8 +10,7 @@
 
 use std::fmt::Write as _;
 use std::fs;
-use std::io::{self, Read, Write};
-use std::os::unix::fs::PermissionsExt;
+use std::io::{self, Read};
 use std::os::unix::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -58,52 +57,71 @@ pub enum Gate {
 }
 
 /// Applies the policy and the session's approval mode to a request.
-pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> Gate {
+/// The file a gated effect acts on: the path the gate checked, with every
+/// symlink resolved. `perform` reaches exactly it, or fails.
+pub struct Target(Option<PathBuf>);
+
+pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate, Target) {
     let change = |verb: &str, path: &str| match resolve(scope, path, true) {
-        Access::Denied(why) => Gate::Deny(why),
-        Access::Ask(real) => Gate::Ask(format!("{verb} outside the workspace: {}", real.display())),
-        Access::Allowed(_) if mode == ApprovalMode::Ask => Gate::Ask(format!("{verb} {path}")),
-        Access::Allowed(_) => Gate::Allow,
+        Access::Denied(why) => (Gate::Deny(why), Target(None)),
+        Access::Ask(real) => {
+            (Gate::Ask(format!("{verb} outside the workspace: {}", real.display())), Target(Some(real)))
+        }
+        Access::Allowed(real) if mode == ApprovalMode::Ask => (Gate::Ask(format!("{verb} {path}")), Target(Some(real))),
+        Access::Allowed(real) => (Gate::Allow, Target(Some(real))),
     };
     match request {
         EffectRequest::Read { path, .. } => match resolve(scope, path, false) {
-            Access::Denied(why) => Gate::Deny(why),
-            Access::Allowed(_) | Access::Ask(_) => Gate::Allow,
+            Access::Denied(why) => (Gate::Deny(why), Target(None)),
+            Access::Allowed(real) | Access::Ask(real) => (Gate::Allow, Target(Some(real))),
         },
         EffectRequest::Write { path, .. } => change("write", path),
         EffectRequest::Edit { path, .. } => change("edit", path),
         EffectRequest::Bash { command, .. } => {
-            if sandboxed_command(scope, command).is_none() {
+            let gate = if sandboxed_command(scope, command).is_none() {
                 Gate::Ask(format!("run without a sandbox: {command}"))
             } else if mode == ApprovalMode::FullAuto {
                 Gate::Allow
             } else {
                 Gate::Ask(format!("run: {command}"))
-            }
+            };
+            (gate, Target(None))
         }
     }
 }
 
-/// Performs an effect the gate allowed (or a person approved).
-/// Performs an effect. `cancelled` stops a running command early.
-pub fn perform(scope: &Scope, request: &EffectRequest, cancelled: &AtomicBool) -> Result {
+/// Performs an effect the gate allowed (or a person approved), on the
+/// target the gate checked. `cancelled` stops a running command early.
+pub fn perform(scope: &Scope, request: &EffectRequest, target: &Target, cancelled: &AtomicBool) -> Result {
+    let file = || target.0.as_deref().ok_or_else(|| Result::Refused("the effect has no checked path".into()));
     match request {
-        EffectRequest::Read { path, offset, limit } => match resolve(scope, path, false) {
-            Access::Allowed(p) | Access::Ask(p) => read(&p, path, *offset, *limit),
-            Access::Denied(why) => Result::Refused(why),
+        EffectRequest::Read { path, offset, limit } => match file() {
+            Ok(p) => read(p, path, *offset, *limit),
+            Err(r) => r,
         },
-        EffectRequest::Write { path, content } => match resolve(scope, path, true) {
-            Access::Allowed(p) | Access::Ask(p) => write(&p, path, content.as_bytes()),
-            Access::Denied(why) => Result::Refused(why),
+        EffectRequest::Write { path, content } => match file() {
+            Ok(p) => write(p, path, content.as_bytes()),
+            Err(r) => r,
         },
-        EffectRequest::Edit { path, old_text, new_text } => match resolve(scope, path, true) {
-            Access::Allowed(p) | Access::Ask(p) => edit(&p, path, old_text, new_text),
-            Access::Denied(why) => Result::Refused(why),
+        EffectRequest::Edit { path, old_text, new_text } => match file() {
+            Ok(p) => edit(p, path, old_text, new_text),
+            Err(r) => r,
         },
         EffectRequest::Bash { command, timeout_ms } => {
             bash(scope, command, timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS), cancelled)
         }
     }
+}
+
+/// A pinned-file failure as the agent reads it.
+fn explain(e: crate::pinned::Error, verb: &str, shown: &str) -> Result {
+    use crate::pinned::Error as E;
+    Result::Refused(match e {
+        E::NotFound => format!("no such file: {shown}"),
+        E::NotRegular => format!("{shown} is not a regular file"),
+        E::Changed => format!("can't {verb} {shown}: a directory in its path was replaced while this ran"),
+        E::Io(e) => format!("can't {verb} {shown}: {e}"),
+    })
 }
 
 fn absolute(scope: &Scope, path: &str) -> PathBuf {
@@ -151,66 +169,82 @@ fn real_path(p: &Path) -> Option<PathBuf> {
 }
 
 fn read(p: &Path, shown: &str, offset: Option<u64>, limit: Option<u64>) -> Result {
-    let bytes = match fs::read(p) {
-        Ok(b) => b,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Result::Refused(format!("no such file: {shown}")),
-        Err(e) if e.kind() == io::ErrorKind::IsADirectory => {
+    let opened = crate::pinned::parent(p, false).and_then(|(dir, name)| dir.open_regular(&name));
+    let (file, stat) = match opened {
+        Ok(f) => f,
+        Err(crate::pinned::Error::NotRegular) if p.is_dir() => {
             return Result::Refused(format!("{shown} is a directory; use bash to list it"));
         }
-        Err(e) => return Result::Refused(format!("can't read {shown}: {e}")),
+        Err(e) => return explain(e, "read", shown),
     };
-    if bytes[..bytes.len().min(8192)].contains(&0) {
-        return Result::Done {
-            text: format!("{shown} is a binary file ({} bytes)", bytes.len()),
+    match read_lines(file, offset, limit) {
+        Ok(Some((text, truncated))) => Result::Done { text, exit_code: None, truncated },
+        Ok(None) => Result::Done {
+            text: format!("{shown} is a binary file ({} bytes)", stat.st_size),
             exit_code: None,
             truncated: false,
-        };
+        },
+        Err(e) => Result::Refused(format!("can't read {shown}: {e}")),
     }
-    let text = String::from_utf8_lossy(&bytes);
-    let start = offset.unwrap_or(1).max(1);
-    let limit = limit.unwrap_or(READ_LINES).min(READ_LINES);
-    let mut out = String::new();
-    let mut shown_lines = 0;
-    let mut truncated = false;
-    for (i, line) in text.split_inclusive('\n').enumerate() {
-        let n = i as u64 + 1;
-        if n < start {
-            continue;
-        }
-        if shown_lines == limit || out.len() + line.len() > READ_BYTES {
-            truncated = true;
-            let _ = writeln!(out, "[... more lines; read with offset {n} to continue]");
-            break;
-        }
-        out.push_str(line);
-        shown_lines += 1;
-    }
-    Result::Done { text: out, exit_code: None, truncated }
 }
 
-/// Replaces a file atomically, keeping an existing file's permissions.
-fn replace_file(p: &Path, bytes: &[u8]) -> io::Result<()> {
-    let dir = p.parent().ok_or_else(|| io::Error::other("no parent directory"))?;
-    fs::create_dir_all(dir)?;
-    let mode = fs::metadata(p).ok().map(|m| m.permissions().mode());
-    let tmp =
-        dir.join(format!(".{}.strive-{}", p.file_name().and_then(|n| n.to_str()).unwrap_or("f"), std::process::id()));
-    let _ = fs::remove_file(&tmp);
-    let mut f = fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
-    f.write_all(bytes)?;
-    f.sync_all()?;
-    if let Some(mode) = mode {
-        fs::set_permissions(&tmp, fs::Permissions::from_mode(mode))?;
+/// The requested lines, streamed so a huge file costs no more memory than
+/// what is shown; `None` for a binary file.
+fn read_lines(file: fs::File, offset: Option<u64>, limit: Option<u64>) -> io::Result<Option<(String, bool)>> {
+    use std::io::BufRead;
+    let mut r = io::BufReader::with_capacity(8192, file);
+    if r.fill_buf()?.contains(&0) {
+        return Ok(None);
     }
-    fs::rename(&tmp, p)
+    let start = offset.unwrap_or(1).max(1);
+    let limit = limit.unwrap_or(READ_LINES).min(READ_LINES);
+    for _ in 1..start {
+        if !skip_line(&mut r)? {
+            return Ok(Some((String::new(), false)));
+        }
+    }
+    let mut out = Vec::new();
+    let mut shown_lines = 0;
+    let mut line = Vec::new();
+    loop {
+        line.clear();
+        // One byte past what fits, to tell a line that fits from one that doesn't.
+        let room = (READ_BYTES - out.len().min(READ_BYTES)) as u64 + 1;
+        if r.by_ref().take(room).read_until(b'\n', &mut line)? == 0 {
+            return Ok(Some((String::from_utf8_lossy(&out).into_owned(), false)));
+        }
+        if shown_lines == limit || out.len() + line.len() > READ_BYTES {
+            let mut text = String::from_utf8_lossy(&out).into_owned();
+            let _ = writeln!(text, "[... more lines; read with offset {} to continue]", start + shown_lines);
+            return Ok(Some((text, true)));
+        }
+        out.extend_from_slice(&line);
+        shown_lines += 1;
+    }
+}
+
+/// Reads past one line without keeping it; false at the end of the file.
+fn skip_line(r: &mut impl std::io::BufRead) -> io::Result<bool> {
+    loop {
+        let buf = r.fill_buf()?;
+        if buf.is_empty() {
+            return Ok(false);
+        }
+        if let Some(i) = buf.iter().position(|&b| b == b'\n') {
+            r.consume(i + 1);
+            return Ok(true);
+        }
+        let n = buf.len();
+        r.consume(n);
+    }
 }
 
 fn write(p: &Path, shown: &str, bytes: &[u8]) -> Result {
-    match replace_file(p, bytes) {
+    match crate::pinned::parent(p, true).and_then(|(dir, name)| dir.replace(&name, bytes)) {
         Ok(()) => {
             Result::Done { text: format!("wrote {shown} ({} bytes)", bytes.len()), exit_code: None, truncated: false }
         }
-        Err(e) => Result::Refused(format!("can't write {shown}: {e}")),
+        Err(e) => explain(e, "write", shown),
     }
 }
 
@@ -220,19 +254,28 @@ fn quoted(s: &str) -> String {
 }
 
 fn edit(p: &Path, shown: &str, old: &str, new: &str) -> Result {
-    let text = match fs::read_to_string(p) {
-        Ok(t) => t,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Result::Refused(format!("no such file: {shown}")),
-        Err(e) => return Result::Refused(format!("can't read {shown}: {e}")),
+    let (dir, name) = match crate::pinned::parent(p, false) {
+        Ok(d) => d,
+        Err(e) => return explain(e, "edit", shown),
+    };
+    let text = match dir.open_regular(&name) {
+        Ok((mut f, _)) => {
+            let mut t = String::new();
+            if let Err(e) = f.read_to_string(&mut t) {
+                return Result::Refused(format!("can't read {shown}: {e}"));
+            }
+            t
+        }
+        Err(e) => return explain(e, "edit", shown),
     };
     if old.is_empty() {
         return Result::Refused("the text to replace is empty; use write to create a file".into());
     }
     match text.matches(old).count() {
         0 => Result::Refused(format!("{} does not appear in {shown}", quoted(old))),
-        1 => match replace_file(p, text.replacen(old, new, 1).as_bytes()) {
+        1 => match dir.replace(&name, text.replacen(old, new, 1).as_bytes()) {
             Ok(()) => Result::Done { text: format!("edited {shown}"), exit_code: None, truncated: false },
-            Err(e) => Result::Refused(format!("can't write {shown}: {e}")),
+            Err(e) => explain(e, "edit", shown),
         },
         n => Result::Refused(format!(
             "{} appears {n} times in {shown}; include more surrounding text so it matches once",

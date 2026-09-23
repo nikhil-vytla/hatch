@@ -335,3 +335,45 @@ fn effect_numbers_continue_across_effects_and_restarts() {
         w.events().iter().filter(|e| e["type"] == "effectStarted").map(|e| e["effect"].as_u64().unwrap()).collect();
     assert_eq!(numbers, vec![1, 2, 3]);
 }
+
+/// Parallel tool calls may write the same file; each write must replace it
+/// whole with its own content, and leave no temporary files behind.
+#[test]
+fn parallel_writes_to_one_file_each_land_whole() {
+    let w = Ws::new();
+    let writers: Vec<_> = (0..16)
+        .map(|i| {
+            let mut c = w.env.rpc();
+            let params = json!({"id": w.id, "callId": format!("call_{i}"),
+                "request": {"kind": "write", "path": "same.txt", "content": "x".repeat(1000 + i)}});
+            std::thread::spawn(move || c.ok("effect/run", &params))
+        })
+        .collect();
+    for (i, t) in writers.into_iter().enumerate() {
+        let r = t.join().unwrap();
+        assert_eq!(r["text"], format!("wrote same.txt ({} bytes)", 1000 + i), "{r}");
+    }
+    let len = fs::read(w.path("same.txt")).unwrap().len();
+    assert!((1000..1016).contains(&len), "the file is one write's content, whole: {len} bytes");
+    let names: Vec<String> =
+        fs::read_dir(w.dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    assert_eq!(names, vec!["same.txt"]);
+}
+
+/// Reading a device or a FIFO would never end (or never start); only
+/// regular files are read.
+#[test]
+fn only_regular_files_are_read() {
+    let mut w = Ws::new();
+    assert!(std::process::Command::new("mkfifo").arg(w.path("pipe")).status().unwrap().success());
+    let started = std::time::Instant::now();
+    assert_eq!(
+        w.kind(json!({"kind": "read", "path": "pipe"})),
+        ("refused".into(), "pipe is not a regular file".into())
+    );
+    assert_eq!(
+        w.kind(json!({"kind": "read", "path": "/dev/zero"})),
+        ("refused".into(), "/dev/zero is not a regular file".into())
+    );
+    assert!(started.elapsed() < Duration::from_secs(2));
+}
