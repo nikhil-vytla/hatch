@@ -44,6 +44,20 @@ const SERVER_STATE: &str = "the request relies on conversation state kept by the
 const REMOTE_INPUT: &str = "the request includes an image or file the provider fetches or keeps, whose cost can't be bounded from the request; send it inline instead";
 const PREMIUM_TIER: &str =
     "the request asks for a service tier priced above the standard rates strive knows; leave service_tier unset";
+const PRICED_BETA: &str =
+    "the request enables a beta feature priced above the standard rates strive knows (long context); leave it off";
+/// Anthropic betas that change what a call costs: `context-1m` bills long
+/// requests at premium rates.
+const PRICED_BETAS: &[&str] = &["context-1m"];
+
+/// Refuses `anthropic-beta` features that change a call's price.
+pub fn check_betas(header: &str) -> Result<(), &'static str> {
+    if header.split(',').map(str::trim).any(|b| PRICED_BETAS.iter().any(|p| b.starts_with(p))) {
+        return Err(PRICED_BETA);
+    }
+    Ok(())
+}
+
 /// Service tiers billed at (or below) the standard rates.
 const STANDARD_TIERS: &[&str] = &["auto", "default", "flex", "standard_only"];
 const SERVER_TOOLS: &str = "the request enables tools the provider runs and bills separately, which strive can't bound; use tools the agent runs itself";
@@ -77,7 +91,9 @@ pub fn prepare_request(api: Api, body: &[u8]) -> Result<(RequestInfo, Vec<u8>), 
     if obj.get("service_tier").is_some_and(|t| !t.as_str().is_some_and(|t| STANDARD_TIERS.contains(&t))) {
         return Err(PREMIUM_TIER);
     }
-    if names_remote_input(&Value::Object(obj.clone())) {
+    // A stored prompt (Responses `prompt: {id}`) is text the provider keeps.
+    let stored_prompt = obj.get("prompt").is_some_and(Value::is_object);
+    if stored_prompt || names_remote_input(&Value::Object(obj.clone())) {
         return Err(REMOTE_INPUT);
     }
     // `cache_control` means a cache write only to Anthropic; elsewhere it's
@@ -130,6 +146,8 @@ fn names_remote_input(v: &Value) -> bool {
                 Some("input_image" | "input_file") => {
                     remote(o.get("image_url")) || remote(o.get("file_url")) || o.contains_key("file_id")
                 }
+                // OpenAI Responses: an earlier item the provider kept.
+                Some("item_reference") => true,
                 _ => false,
             };
             let own_args = o.get("type").and_then(Value::as_str) == Some("tool_use");

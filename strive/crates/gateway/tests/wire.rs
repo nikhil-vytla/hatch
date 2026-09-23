@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 use serde_json::{Value, json};
-use strive_gateway::{Api, Holdback, RequestInfo, UsageMeter, prepare_request};
+use strive_gateway::{Api, Holdback, RequestInfo, UsageMeter, check_betas, prepare_request};
 use strive_proto::Usage;
 
 fn usage(input: u64, output: u64, cache_write: u64, cache_read: u64) -> Usage {
@@ -408,4 +408,12 @@ fn a_streams_last_event_is_held_back_however_it_is_split() {
             assert_eq!(String::from_utf8(h.rest()).unwrap(), stream[at..], "{last}, chunks of {chunk}");
         }
     }
+}
+
+/// Long-context pricing (context-1m) is dearer than the rates strive knows.
+#[test]
+fn betas_that_change_the_price_are_refused_and_others_are_not() {
+    assert!(check_betas("context-1m-2025-08-07").is_err());
+    assert!(check_betas("fine-grained-tool-streaming-2025-05-14, context-1m-2025-08-07").is_err());
+    assert_eq!(check_betas("fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14"), Ok(()));
 }

@@ -118,7 +118,8 @@ async fn handle(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    match admit(&state, &token, &provider, &format!("/{rest}"), &body).await {
+    let betas = headers.get("anthropic-beta").and_then(|v| v.to_str().ok()).unwrap_or_default();
+    match admit(&state, &token, &provider, &format!("/{rest}"), betas, &body).await {
         Ok(call) => forward(state, call, &headers).await,
         Err(refusal) => refusal,
     }
@@ -139,7 +140,14 @@ struct Admitted {
 /// Everything that can refuse a call happens here, before anything is sent
 /// or stored; the last step journals the call as started.
 #[expect(clippy::result_large_err, reason = "the refusal is the HTTP response, built at most once per call")]
-async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body: &[u8]) -> Result<Admitted, Response> {
+async fn admit(
+    state: &Arc<State>,
+    token: &str,
+    provider: &str,
+    path: &str,
+    betas: &str,
+    body: &[u8],
+) -> Result<Admitted, Response> {
     let session = state
         .gateway
         .session(token)
@@ -149,6 +157,7 @@ async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body
     })?;
     let bad = |status, kind, why: &str| refuse(Some(api), status, kind, why);
     let session_failed = |e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &format!("{e:?}"));
+    strive_gateway::check_betas(betas).map_err(|why| bad(StatusCode::BAD_REQUEST, "invalid_request_error", why))?;
     let (info, sent) =
         prepare_request(api, body).map_err(|why| bad(StatusCode::BAD_REQUEST, "invalid_request_error", why))?;
     let model = state.models.get(&info.model).copied().ok_or_else(|| {

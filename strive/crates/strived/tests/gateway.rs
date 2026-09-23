@@ -725,3 +725,22 @@ fn a_streams_last_event_arrives_only_after_the_call_is_journaled() {
         assert_eq!(s.last("modelCallFinished")["outcome"]["kind"], "complete", "{provider}");
     }
 }
+
+#[test]
+fn a_call_asking_for_long_context_pricing_is_refused_before_it_is_sent() {
+    let s = setup(Reply::Json(200, ANTHROPIC_JSON.to_string()), &[("ANTHROPIC_API_KEY", "k")]);
+    let (status, body) = s.rt.block_on(async {
+        let r = reqwest::Client::new()
+            .post(format!("{}/v1/messages", s.base))
+            .header("anthropic-beta", "context-1m-2025-08-07")
+            .body(BODY)
+            .send()
+            .await
+            .unwrap();
+        (r.status().as_u16(), r.bytes().await.unwrap().to_vec())
+    });
+    assert_eq!(status, 400);
+    assert!(error_message(&body).contains("long context"), "{}", String::from_utf8_lossy(&body));
+    assert!(s.upstream.seen().is_empty(), "nothing reached the provider");
+    assert_eq!(s.count("modelCallStarted"), 0);
+}
