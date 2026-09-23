@@ -202,6 +202,9 @@ pub struct SessionListParams {
 pub struct SessionListResult {
     /// Newest first.
     pub sessions: Vec<SessionInfo>,
+    /// Sessions whose journal can't be read far enough to know their
+    /// directory. Listed only when not filtering by directory.
+    pub unreadable: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

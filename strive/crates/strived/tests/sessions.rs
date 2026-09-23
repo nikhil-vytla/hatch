@@ -265,3 +265,62 @@ fn attach_verifies_a_journal_tampered_while_the_daemon_ran() {
     assert_eq!(p["error"]["code"], -32011, "{p}");
     assert_eq!(fs::read_to_string(&path).unwrap(), tampered);
 }
+
+/// A write failure stops the session's writer; the next request reopens the
+/// journal, which repairs it, instead of every later prompt failing.
+#[test]
+fn a_session_recovers_after_a_failed_write() {
+    use std::os::unix::fs::PermissionsExt;
+    let env = Env::new();
+    let id = create(&env, "/tmp/repo");
+    let mut c = env.rpc();
+    let dir = env.session_dir(&id);
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o500)).unwrap();
+    let failed = c.call("session/prompt", &json!({"id": id, "text": "a"}));
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(failed["error"]["code"], -32603, "{failed}");
+
+    let ok = c.ok("session/prompt", &json!({"id": id, "text": "b"}));
+    let r = c.ok("session/read", &json!({"id": id}));
+    assert_eq!(r.get("problem"), None);
+    let texts: Vec<&str> =
+        r["entries"].as_array().unwrap()[1..].iter().map(|e| e["event"]["text"].as_str().unwrap()).collect();
+    assert_eq!(texts, vec!["a", "b"], "the unconfirmed prompt was synced before the failure, so it is adopted");
+    assert_eq!(ok["seq"], 3);
+}
+
+/// Attaching to a session the instant it appears in a listing must not open
+/// a second writer for a journal whose creator is still registering its own.
+#[test]
+fn racing_creates_and_attaches_keep_one_writer_per_journal() {
+    let env = Env::new();
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let racer = {
+        let (stop, mut c) = (stop.clone(), env.rpc());
+        std::thread::spawn(move || {
+            let mut seen = BTreeSet::new();
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                for s in c.ok("session/list", &json!({}))["sessions"].as_array().unwrap().clone() {
+                    let id = s["id"].as_str().unwrap().to_string();
+                    if seen.insert(id.clone()) {
+                        c.ok("session/prompt", &json!({"id": id, "text": "from the racer"}));
+                    }
+                }
+            }
+        })
+    };
+    let mut c = env.rpc();
+    let ids: Vec<String> = (0..60)
+        .map(|_| {
+            let id = c.ok("session/create", &json!({"cwd": "/tmp/race"}))["id"].as_str().unwrap().to_string();
+            c.ok("session/prompt", &json!({"id": id, "text": "from the creator"}));
+            id
+        })
+        .collect();
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    racer.join().unwrap();
+    for id in ids {
+        let r = c.ok("session/read", &json!({"id": id}));
+        assert_eq!(r.get("problem"), None, "session {id}: {r}");
+    }
+}

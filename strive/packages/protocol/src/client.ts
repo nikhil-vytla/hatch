@@ -11,11 +11,14 @@ import type { RpcError } from "./generated/RpcError";
 export class ServerError extends Error {
   readonly code: number;
   readonly data: unknown;
+  /** The daemon's message alone, for showing to a user. */
+  readonly detail: string;
   constructor(method: string, e: RpcError) {
     super(`${method}: ${e.message} (${e.code})`);
     this.name = "ServerError";
     this.code = e.code;
     this.data = e.data;
+    this.detail = e.message;
   }
 }
 

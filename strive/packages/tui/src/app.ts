@@ -82,6 +82,8 @@ export class App {
   private readonly offClose: () => void;
   private session?: SessionInfo;
   private lastSeq = 0;
+  /** Entries that arrived before the attach reply; shown after its history. */
+  private early: { sessionId: string; entry: Entry }[] = [];
   private notedMissingAgent = false;
 
   constructor(
@@ -93,7 +95,9 @@ export class App {
   ) {
     this.editor = new Editor(tui, editorTheme, { paddingX: 1 });
     this.editor.setAutocompleteProvider(new CombinedAutocompleteProvider(COMMANDS, cwd));
-    this.editor.onSubmit = (text) => void this.submit(text.trim());
+    this.editor.onSubmit = (text) => {
+      this.submit(text.trim()).catch((e) => this.say(style.danger((e as Error).message)));
+    };
     this.editor.disableSubmit = true;
     this.renderHeader();
 
@@ -114,8 +118,9 @@ export class App {
       this.say(style.danger(`Lost the connection to the daemon${err ? `: ${err.message}` : ""}.`));
       this.exit(1);
     });
-    client.on("session/entry", ({ sessionId, entry }) => {
-      if (sessionId === this.session?.id) this.show(entry);
+    client.on("session/entry", (n) => {
+      if (!this.session) this.early.push(n);
+      else if (n.sessionId === this.session.id) this.show(n.entry);
     });
   }
 
@@ -125,7 +130,9 @@ export class App {
       const id = await this.chooseSession(mode);
       const { session, entries } = await this.client.request("session/attach", { id });
       this.session = session;
-      for (const e of entries) this.show(e);
+      const early = this.early.filter((n) => n.sessionId === session.id).map((n) => n.entry);
+      this.early = [];
+      for (const e of [...entries, ...early].sort((a, b) => a.seq - b.seq)) this.show(e);
       this.editor.disableSubmit = false;
       this.renderHeader();
     } catch (e) {
@@ -180,7 +187,14 @@ export class App {
     if (!text || !this.session) return;
     this.editor.setText("");
     if (!text.startsWith("/")) {
-      await this.client.request("session/prompt", { id: this.session.id, text });
+      try {
+        await this.client.request("session/prompt", { id: this.session.id, text });
+      } catch (e) {
+        this.editor.setText(text);
+        const why = e instanceof ServerError ? e.detail : (e as Error).message;
+        this.say(style.danger(`Couldn't confirm your message was saved: ${why}`));
+        return;
+      }
       if (!this.notedMissingAgent) {
         this.notedMissingAgent = true;
         this.say(style.muted("Saved to this session. No agent is connected yet; the agent host is the next milestone."));

@@ -81,3 +81,23 @@ never modified.
 
 **Format contract.** The first line's bytes are pinned by a golden test,
 whose MAC was computed independently with openssl.
+
+**Creation and failure.**
+- Creating a session is atomic. The journal and head are built in a staging
+  directory and renamed into place, so a session is listable only once it
+  can be opened.
+- After any failed write, the writer stops and the journal refuses further
+  appends. The next request reopens it, which repairs the tail.
+- A prompt whose write failed may still be in the journal. Its line can be
+  synced before the head write fails, so an error means "not confirmed",
+  not "not saved".
+- On shutdown the daemon joins every writer before releasing its ownership
+  lock.
+- Temp files are created exclusively and never follow symlinks.
+
+**What the journal does not catch.** Someone who can write the user's files,
+and who kept an older copy of a session's `head.json`, can restore that head
+and truncate the journal to match. The result verifies. Detecting this
+rollback needs a counter the attacker can't roll back, which a local file
+can't provide. The agent's sandbox denies `~/.strive` entirely, so an agent
+can't do this. A person with the user's file access can.

@@ -67,6 +67,7 @@ enum Cmd {
 struct Live {
     info: SessionInfo,
     tx: mpsc::UnboundedSender<Cmd>,
+    thread: std::thread::JoinHandle<()>,
 }
 
 pub struct Sessions {
@@ -105,29 +106,37 @@ impl Sessions {
         };
         let entries = vec![Entry { seq: 1, ts_ms: ts, event: first.clone() }];
         let (dir, key, sid) = (self.dir(&id), self.key.clone(), id.clone());
+        // Held until the writer is registered: the session is listable as soon
+        // as its directory exists, and an attach in that window must find this
+        // writer rather than open a second one.
+        let mut live = self.live.lock().await;
         let journal = tokio::task::spawn_blocking(move || Journal::create(&dir, sid.as_str(), &key, ts, first))
             .await
             .expect("journal create task")?;
         let info = SessionInfo { id: id.as_str().to_string(), cwd, created_at_ms: ts };
-        let tx = spawn_writer(journal, entries, self.verifier(&id));
-        self.live.lock().await.insert(id, Live { info: info.clone(), tx });
+        let (tx, thread) = spawn_writer(journal, entries, self.verifier(&id));
+        live.insert(id, Live { info: info.clone(), tx, thread });
         Ok(info)
     }
 
-    /// Sessions started in `cwd` (or all of them), newest first. Reads only
-    /// each journal's first line; verification happens on attach and read.
-    pub fn list(&self, cwd: Option<&str>) -> io::Result<Vec<SessionInfo>> {
-        let mut out = Vec::new();
+    /// Sessions started in `cwd` (or all of them), newest first, and the ids
+    /// of sessions whose first entry can't be read. Reads only each
+    /// journal's first line; verification happens on attach and read.
+    pub fn list(&self, cwd: Option<&str>) -> io::Result<(Vec<SessionInfo>, Vec<String>)> {
+        let mut sessions = Vec::new();
+        let mut unreadable = Vec::new();
         for dir in fs::read_dir(&self.root)? {
             let dir = dir?;
             let Some(id) = dir.file_name().to_str().and_then(SessionId::parse) else { continue };
-            let Some(info) = peek_info(&id, &dir.path()) else { continue };
-            if cwd.is_none_or(|c| c == info.cwd) {
-                out.push(info);
+            match peek_info(&id, &dir.path()) {
+                Some(info) if cwd.is_none_or(|c| c == info.cwd) => sessions.push(info),
+                None if cwd.is_none() => unreadable.push(id.0),
+                _ => {}
             }
         }
-        out.sort_by(|a, b| b.id.cmp(&a.id));
-        Ok(out)
+        sessions.sort_by(|a, b| b.id.cmp(&a.id));
+        unreadable.sort_by(|a, b| b.cmp(a));
+        Ok((sessions, unreadable))
     }
 
     /// The session's history after `after_seq`, and a stream of later entries.
@@ -151,10 +160,20 @@ impl Sessions {
     }
 
     /// The journal as it is on disk, verified, without repairing anything.
+    /// A journal too damaged to name its session is an error, not a report.
     pub fn read(&self, id: &SessionId) -> Result<(SessionInfo, Report)> {
         let dir = self.dir(id);
-        let info = peek_info(id, &dir).ok_or(SessionError::NotFound)?;
-        Ok((info, strive_journal::read(&dir, id.as_str(), &self.key)?))
+        if !dir.is_dir() {
+            return Err(SessionError::NotFound);
+        }
+        let report = strive_journal::read(&dir, id.as_str(), &self.key)?;
+        match peek_info(id, &dir) {
+            Some(info) if !report.entries.is_empty() => Ok((info, report)),
+            _ => Err(report.problem.map_or_else(
+                || SessionError::Io(io::Error::other("the journal's first entry is unreadable")),
+                SessionError::Invalid,
+            )),
+        }
     }
 
     /// The session's writer, opening (verifying, recovering) the journal if
@@ -172,9 +191,20 @@ impl Sessions {
             tokio::task::spawn_blocking(move || Journal::open(&dir, sid.as_str(), &key, epoch_ms()))
                 .await
                 .expect("journal open task")?;
-        let tx = spawn_writer(journal, entries, self.verifier(id));
-        live.insert(id.clone(), Live { info: info.clone(), tx: tx.clone() });
+        let (tx, thread) = spawn_writer(journal, entries, self.verifier(id));
+        live.insert(id.clone(), Live { info: info.clone(), tx: tx.clone(), thread });
         Ok((info, tx))
+    }
+
+    /// Stops every writer after it finishes what is queued. The daemon calls
+    /// this before releasing its ownership lock, so a successor never opens a
+    /// journal an old writer is still writing.
+    pub async fn shutdown(&self) {
+        let live: Vec<Live> = self.live.lock().await.drain().map(|(_, l)| l).collect();
+        for l in live {
+            drop(l.tx);
+            let _ = tokio::task::spawn_blocking(move || l.thread.join()).await;
+        }
     }
 
     /// Reads and verifies the session's journal on disk.
@@ -190,9 +220,13 @@ fn writer_gone() -> SessionError {
 
 type Verifier = Box<dyn Fn() -> io::Result<Report> + Send>;
 
-fn spawn_writer(mut journal: Journal, mut entries: Vec<Entry>, verify: Verifier) -> mpsc::UnboundedSender<Cmd> {
+fn spawn_writer(
+    mut journal: Journal,
+    mut entries: Vec<Entry>,
+    verify: Verifier,
+) -> (mpsc::UnboundedSender<Cmd>, std::thread::JoinHandle<()>) {
     let (tx, mut rx) = mpsc::unbounded_channel::<Cmd>();
-    std::thread::spawn(move || {
+    let thread = std::thread::spawn(move || {
         let mut subscribers: Vec<mpsc::UnboundedSender<Entry>> = Vec::new();
         while let Some(first) = rx.blocking_recv() {
             let mut batch = vec![first];
@@ -202,20 +236,30 @@ fn spawn_writer(mut journal: Journal, mut entries: Vec<Entry>, verify: Verifier)
             let ts = epoch_ms();
             let mut appended = Vec::new();
             let mut attaches = Vec::new();
+            let mut failed = false;
             for cmd in batch {
                 match cmd {
                     Cmd::Append { events, reply } => match journal.append(ts, &events) {
                         Ok(es) => appended.push((reply, es)),
                         Err(e) => {
                             let _ = reply.send(Err(e));
+                            failed = true;
                         }
                     },
                     Cmd::Attach { after_seq, reply } => attaches.push((after_seq, reply)),
                 }
             }
-            if !appended.is_empty() {
-                if let Err(e) = journal.commit() {
-                    crate::log!("journal commit failed, stopping this session's writer: {e}");
+            if failed || !appended.is_empty() {
+                // After any failed write the file's tail is unknown. Stop, so
+                // the next request reopens (verifying and repairing) the journal.
+                let commit = if failed {
+                    Err(io::Error::other("an earlier append in this batch failed"))
+                } else {
+                    journal.commit()
+                };
+                if let Err(e) = commit {
+                    crate::log!("journal write failed, stopping this session's writer: {e}");
+                    rx.close();
                     for (reply, _) in appended {
                         let _ = reply.send(Err(io::Error::new(e.kind(), e.to_string())));
                     }
@@ -260,7 +304,7 @@ fn spawn_writer(mut journal: Journal, mut entries: Vec<Entry>, verify: Verifier)
             }
         }
     });
-    tx
+    (tx, thread)
 }
 
 /// Session info from the journal's first line, without verifying it.
@@ -277,15 +321,26 @@ fn peek_info(id: &SessionId, dir: &Path) -> Option<SessionInfo> {
     }
 }
 
+/// Loads the journal key, creating it on first start. The key is written to
+/// a temp file, synced, then hard-linked into place, which fails rather than
+/// replace an existing key; so a crash leaves either no key or a whole one.
 fn load_or_create_key(dir: &Path) -> io::Result<Key> {
     let path = dir.join("journal.key");
     if !path.exists() {
-        let mut bytes = [0u8; 32];
         fs::create_dir_all(dir)?;
+        let mut bytes = [0u8; 32];
         fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-        let mut f = OpenOptions::new().write(true).create_new(true).mode(0o600).open(&path)?;
+        let tmp = dir.join(format!(".journal.key.{}", std::process::id()));
+        let _ = fs::remove_file(&tmp);
+        let mut f = OpenOptions::new().write(true).create_new(true).mode(0o600).open(&tmp)?;
         f.write_all(&bytes)?;
         f.sync_all()?;
+        let linked = fs::hard_link(&tmp, &path);
+        fs::remove_file(&tmp)?;
+        match linked {
+            Err(e) if e.kind() != io::ErrorKind::AlreadyExists => return Err(e),
+            _ => fs::File::open(dir)?.sync_all()?,
+        }
     }
     let bytes: [u8; 32] = fs::read(&path)?
         .try_into()

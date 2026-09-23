@@ -8,15 +8,28 @@ use strive_proto::{
     CallOutcome, Entry, Event, SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef,
 };
 
-use crate::client::Client;
+use crate::client::{Client, ServerError};
 
 fn cwd() -> Result<String> {
     Ok(std::env::current_dir()?.display().to_string())
 }
 
 async fn list(c: &mut Client, all: bool) -> Result<Vec<SessionInfo>> {
+    Ok(listing(c, all).await?.0)
+}
+
+/// Readable sessions, and the ids of unreadable ones (only with `all`).
+async fn listing(c: &mut Client, all: bool) -> Result<(Vec<SessionInfo>, Vec<String>)> {
     let cwd = if all { None } else { Some(cwd()?) };
-    Ok(c.request::<SessionList>(SessionListParams { cwd }).await?.sessions)
+    let r = c.request::<SessionList>(SessionListParams { cwd }).await?;
+    Ok((r.sessions, r.unreadable))
+}
+
+/// Every session id from a listing, newest first.
+fn all_ids(sessions: &[SessionInfo], unreadable: &[String]) -> Vec<String> {
+    let mut ids: Vec<String> = sessions.iter().map(|s| s.id.clone()).chain(unreadable.iter().cloned()).collect();
+    ids.sort_by(|a, b| b.cmp(a));
+    ids
 }
 
 /// The given session, or the latest one started in this directory.
@@ -91,26 +104,40 @@ pub async fn log(c: &mut Client, id: Option<String>, json: bool) -> Result<ExitC
 }
 
 pub async fn verify(c: &mut Client, id: Option<String>, all: bool) -> Result<ExitCode> {
-    let ids = if all { list(c, true).await?.into_iter().map(|s| s.id).collect() } else { vec![resolve(c, id).await?] };
+    let ids = if all {
+        let (sessions, unreadable) = listing(c, true).await?;
+        all_ids(&sessions, &unreadable)
+    } else {
+        vec![resolve(c, id).await?]
+    };
     let mut failed = false;
     for id in ids {
-        let r: SessionReadResult = c.request::<SessionRead>(SessionRef { id: id.clone() }).await?;
-        match r.problem {
-            Some(p) => {
+        match c.request::<SessionRead>(SessionRef { id: id.clone() }).await {
+            Ok(SessionReadResult { problem: None, entries, .. }) => println!("ok    {id}  {} entries", entries.len()),
+            Ok(SessionReadResult { problem: Some(p), .. }) => {
                 failed = true;
                 println!("FAIL  {id}  {p}");
             }
-            None => println!("ok    {id}  {} entries", r.entries.len()),
+            Err(e) => match e.downcast_ref::<ServerError>().and_then(|s| s.0.data.as_ref()?.get("problem")?.as_str()) {
+                Some(p) => {
+                    failed = true;
+                    println!("FAIL  {id}  {p}");
+                }
+                None => return Err(e),
+            },
         }
     }
     Ok(if failed { ExitCode::FAILURE } else { ExitCode::SUCCESS })
 }
 
 pub async fn sessions(c: &mut Client, all: bool, json: bool) -> Result<ExitCode> {
-    let sessions = list(c, all).await?;
+    let (sessions, unreadable) = listing(c, all).await?;
     if json {
         println!("{}", serde_json::to_string_pretty(&sessions)?);
     } else {
+        for id in &unreadable {
+            println!("{id}  unreadable journal");
+        }
         for s in sessions {
             let when = i64::try_from(s.created_at_ms)
                 .ok()

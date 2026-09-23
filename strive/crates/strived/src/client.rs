@@ -21,7 +21,7 @@ pub struct ServerError(pub RpcError);
 
 impl std::fmt::Display for ServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "daemon error {}: {}", self.0.code, self.0.message)
+        f.write_str(&self.0.message)
     }
 }
 impl std::error::Error for ServerError {}

@@ -5,4 +5,9 @@ export type SessionListResult = {
 /**
  * Newest first.
  */
-sessions: Array<SessionInfo>, };
+sessions: Array<SessionInfo>, 
+/**
+ * Sessions whose journal can't be read far enough to know their
+ * directory. Listed only when not filtering by directory.
+ */
+unreadable: Array<string>, };

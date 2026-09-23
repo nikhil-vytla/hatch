@@ -86,8 +86,8 @@ async fn route(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value)
         }
         SessionList::NAME => {
             let SessionListParams { cwd } = parse::<SessionList>(params)?;
-            let sessions = state.sessions.list(cwd.as_deref()).map_err(|e| internal(&e))?;
-            reply::<SessionList>(SessionListResult { sessions })
+            let (sessions, unreadable) = state.sessions.list(cwd.as_deref()).map_err(|e| internal(&e))?;
+            reply::<SessionList>(SessionListResult { sessions, unreadable })
         }
         SessionAttach::NAME => {
             let SessionAttachParams { id, after_seq } = parse::<SessionAttach>(params)?;

@@ -135,10 +135,12 @@ pub async fn run(cfg: Config) -> Result<Started> {
             }
         }
     }
-    // Unlink first so no new client can reach this daemon, then release the
-    // lock so a successor (waiting in the loop above) can start.
+    // Unlink first so no new client can reach this daemon, then stop the
+    // session writers, then release the lock so a successor (waiting in the
+    // loop above) can start.
     let _ = fs::remove_file(&socket);
     drop(listener);
+    state.sessions.shutdown().await;
     drop(lock);
     Ok(Started::Served)
 }

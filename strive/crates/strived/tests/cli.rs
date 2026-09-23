@@ -151,3 +151,29 @@ fn continue_and_resume_are_mutually_exclusive() {
     assert_eq!(code, 2);
     assert!(err.contains("cannot be used with"), "{err}");
 }
+
+#[test]
+fn verify_all_reports_sessions_whose_journal_cannot_be_read() {
+    let r = Repo::new();
+    let emptied = r.session(&["x"]);
+    let garbled = r.session(&[]);
+    let fine = r.session(&[]);
+    fs::write(r.env.session_dir(&emptied).join("journal.jsonl"), b"").unwrap();
+    fs::write(r.env.session_dir(&garbled).join("journal.jsonl"), b"not json\n").unwrap();
+
+    let (code, out, _) = r.run(&["verify", "--all"]);
+    assert_eq!(code, 1, "{out}");
+    assert_eq!(
+        out.lines().collect::<Vec<_>>(),
+        vec![
+            format!("ok    {fine}  1 entries"),
+            format!("FAIL  {garbled}  entry 1 was modified, removed or moved"),
+            format!("FAIL  {emptied}  entries were removed from the end (0 of 2 committed entries remain)"),
+        ]
+    );
+    let (_, out, _) = r.run(&["sessions", "--all"]);
+    assert!(out.lines().any(|l| l == format!("{garbled}  unreadable journal")), "{out}");
+    let (code, _, err) = r.run(&["log", &garbled]);
+    assert_eq!(code, 1);
+    assert_eq!(err.trim(), "strive: the session journal failed verification: entry 1 was modified, removed or moved");
+}

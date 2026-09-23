@@ -31,6 +31,7 @@ test("server errors carry the JSON-RPC code", async () => {
   const err = await client.request("initialize", { protocolVersion: 999, client: info }).catch((e) => e);
   expect((err as ServerError).code).toBe(-32003);
   expect((err as ServerError).message).toBe("initialize: client speaks protocol 999, daemon speaks 1 (-32003)");
+  expect((err as ServerError).detail).toBe("client speaks protocol 999, daemon speaks 1");
   client.close();
 });
 
