@@ -43,7 +43,7 @@ async function waitFor(client: StriveClient, id: string, done: (e: Event[]) => b
   for (;;) {
     const e = await events(client, id);
     if (done(e)) return e;
-        if (Date.now() > deadline) {
+    if (Date.now() > deadline) {
       const log = (() => {
         try {
           return readFileSync(join(daemon!.home, "sessions", id, "host.log"), "utf8");
@@ -102,7 +102,7 @@ test("a later prompt continues the conversation, even after the host restarts", 
   await client.request("session/prompt", { id, text: "first question" });
   await waitFor(client, id, turnsEnded(1));
 
-    daemon!.strive("stop");
+  daemon!.strive("stop");
   daemon!.strive("status");
   const again = await connect();
   await again.request("session/prompt", { id, text: "second question" });

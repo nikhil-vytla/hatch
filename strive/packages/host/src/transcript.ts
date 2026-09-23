@@ -14,12 +14,12 @@ export function resultText(
   switch (outcome.kind) {
     case "done": {
       const exit = record.kind === "bash" && outcome.exitCode !== undefined && outcome.exitCode !== 0;
-            const sep = output === "" || output.endsWith("\n") ? "" : "\n";
+      const sep = output === "" || output.endsWith("\n") ? "" : "\n";
       return { text: exit ? `${output}${sep}[exit code ${outcome.exitCode}]` : output, isError: false };
     }
     case "refused":
       return { text: outcome.reason, isError: true };
-        case "interrupted":
+    case "interrupted":
       return { text: "the daemon stopped while this ran; whatever it changed stays changed", isError: true };
     default:
       return outcome satisfies never;

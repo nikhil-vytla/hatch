@@ -19,14 +19,14 @@ case "$cmd" in
     tmux has-session -t "$sess" 2>/dev/null && { echo "run $name already exists; stop it first" >&2; exit 1; }
     mkdir -p "$home" "$EVIDENCE/$name"
     tmux new-session -d -s "$sess" -x 110 -y 32 -c "$repo" \
-      "STRIVE_HOME=$home STRIVE_TUI='bun $ROOT/packages/tui/src/main.ts' $bin $*; echo \"[strive exited \$?]\"; sleep 600"
+      "STRIVE_HOME=$home STRIVE_TUI='bun $ROOT/packages/tui/src/main.ts' STRIVE_HOST='bun $ROOT/packages/host/src/main.ts' $bin $*; echo \"[strive exited \$?]\"; sleep 600"
     "$0" wait "$name" "strive" 5 >/dev/null && echo "started $name in $repo (STRIVE_HOME=$home)" ;;
   restart)
     # Quit the TUI and open it again in the same home and directory, with new strive args.
     need_name; repo="$3"; shift 3
     tmux kill-session -t "$sess" 2>/dev/null || true
     tmux new-session -d -s "$sess" -x 110 -y 32 -c "$repo" \
-      "STRIVE_HOME=$home STRIVE_TUI='bun $ROOT/packages/tui/src/main.ts' $bin $*; echo \"[strive exited \$?]\"; sleep 600"
+      "STRIVE_HOME=$home STRIVE_TUI='bun $ROOT/packages/tui/src/main.ts' STRIVE_HOST='bun $ROOT/packages/host/src/main.ts' $bin $*; echo \"[strive exited \$?]\"; sleep 600"
     "$0" wait "$name" "strive" 5 >/dev/null && echo "restarted $name in $repo with: strive $*" ;;
   journal)
     # Path of a session's journal in this run's home, for tamper checks.

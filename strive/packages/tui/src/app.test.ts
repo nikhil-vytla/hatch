@@ -45,8 +45,7 @@ const enter = async (ui: Ui, text: string) => {
   ui.term.type("\r");
 };
 
-const sessions = () =>
-  JSON.parse(daemon.strive("sessions", "--all", "--json").stdout) as { id: string; cwd: string }[];
+const sessions = () => JSON.parse(daemon.strive("sessions", "--all", "--json").stdout) as { id: string; cwd: string }[];
 const daemonClients = () => JSON.parse(daemon.strive("status", "--json").stdout).clients as number;
 
 test("a new session is created in the working directory and named in the header", async () => {
@@ -98,7 +97,7 @@ test("resuming a tampered session explains why and saves nothing", async () => {
   await enter(first, "original");
   await first.term.waitFor("› original");
   first.app.quit(0);
-    const id = sessions()[0]!.id;
+  const id = sessions()[0]!.id;
   const logged = JSON.parse(daemon.strive("log", id, "--json").stdout) as { entries: Entry[] };
   const seq = logged.entries.find((e) => e.event.type === "userMessage")!.seq;
   daemon.strive("stop");
@@ -108,7 +107,7 @@ test("resuming a tampered session explains why and saves nothing", async () => {
   daemon.strive("status");
 
   const ui = await openUi({ resume: id });
-      await ui.term.waitFor(`This session's journal failed verification: entry ${seq} was modified, removed or moved.`);
+  await ui.term.waitFor(`This session's journal failed verification: entry ${seq} was modified, removed or moved.`);
   await enter(ui, "should not be saved");
   await Bun.sleep(100);
   expect(readFileSync(journal, "utf8")).toBe(before);
@@ -185,7 +184,7 @@ test("/budget changes the session's limit, in the journal too", async () => {
   await enter(ui, "/budget 2.5");
   await ui.term.waitFor("$0.0000 of $2.5000");
   expect(await footer(ui)).toBe("$0.0000 of $2.5000");
-    expect(daemon.strive("log", sessions()[0]!.id).stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}budget: \$2\.5000\n/);
+  expect(daemon.strive("log", sessions()[0]!.id).stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}budget: \$2\.5000\n/);
   await enter(ui, "/budget off");
   await ui.term.waitFor("$0.0000 spent · no budget");
 });

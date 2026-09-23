@@ -24,7 +24,8 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
-| `packages/tui` | The terminal client |
+| `packages/tui` | The terminal client; its binary also runs the agent host |
+| `packages/host` | The agent host: pi-agent-core loop, tools as daemon effects |
 | `packages/testkit` | Test helpers: a scratch-home daemon and a virtual terminal |
 
 ## Daemon lifecycle
@@ -148,3 +149,46 @@ by changing its base URL.
 creation from settings, $5 by default, and changed with `session/budget`
 (`/budget` in the TUI). Editing settings later never changes an existing
 session's budget.
+
+## The agent
+
+**Hosts.** When a prompt arrives and no host is registered for the
+session, the daemon starts one: `strive-tui host --session ID`, one binary
+with one runtime. A host registers with `host/register`, which returns the
+agent config (model, gateway URL, limits), then attaches to the session.
+Hosts don't count as clients for idle exit.
+
+**The loop.** The host runs pi-agent-core with four tools: read, write,
+edit and bash.
+- Every tool call is an `effect/run` performed by the daemon, in the
+  sandbox and subject to approvals.
+- Every model call goes through the session's gateway, with a placeholder
+  key.
+- The host therefore holds no keys and touches no files.
+
+**The journal is the conversation.** The host records `turnStarted`,
+`assistantMessage` and `turnEnded`. `assistantMessage` carries the display
+text, the tool calls, and the exact message fed back on resume. Tool
+results are rebuilt from the daemon's effect records, never from the host,
+and a tool call that never ran gets an explicit result.
+- A restarted host resumes the whole conversation.
+- A turn cut off by a host crash is closed as failed.
+- Live reply text travels as `session/delta` and is not journaled.
+- Only people, never hosts, can answer approvals.
+
+## Approvals and checkpoints
+
+**Approval modes** are journaled per session:
+- `ask`: every change and command asks.
+- `autoEdit` (the default): changes in the workspace are free; commands ask.
+- `fullAuto`: everything inside the workspace and sandbox is free.
+
+In every mode, writes outside the workspace and commands without a sandbox
+ask, and strive's own state is refused. An approval request is a journal
+entry, so every attached client sees it and the first answer wins. With no
+one attached, the request is refused at once.
+
+**Checkpoints** snapshot the workspace before each prompt, into a shadow
+git repository in the session's directory. The user's own repository,
+config and hooks never take part. A rewind first saves the current files,
+so it can be undone.

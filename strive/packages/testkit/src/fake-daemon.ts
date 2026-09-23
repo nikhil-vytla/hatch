@@ -38,11 +38,20 @@ export class FakeDaemon {
         buffer = buffer.slice(nl + 1);
         this.calls.push({ method: msg.method, params: msg.params });
         const out: string[] = [];
-        const notify = (method: string, params: unknown) => out.push(JSON.stringify({ jsonrpc: "2.0", method, params }));
+        const notify = (method: string, params: unknown) =>
+          out.push(JSON.stringify({ jsonrpc: "2.0", method, params }));
         const reply: FakeReply =
           msg.method === "initialize"
-            ? { result: { protocolVersion: 1, server: { version: "fake", build: "fake", pid: 1, startedAtMs: 0 }, home: this.dir } }
-            : (this.handlers[msg.method]?.(msg.params, notify) ?? { error: { code: -32601, message: "unknown method" } });
+            ? {
+                result: {
+                  protocolVersion: 1,
+                  server: { version: "fake", build: "fake", pid: 1, startedAtMs: 0 },
+                  home: this.dir,
+                },
+              }
+            : (this.handlers[msg.method]?.(msg.params, notify) ?? {
+                error: { code: -32601, message: "unknown method" },
+              });
         out.push(JSON.stringify({ jsonrpc: "2.0", id: msg.id, ...reply }));
         conn.write(`${out.join("\n")}\n`);
       }

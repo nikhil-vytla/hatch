@@ -66,7 +66,10 @@ function tool(
     execute: async (toolCallId, params) => {
       const request = toRequest(params);
       const r = await client.request("effect/run", { id: sessionId, callId: toolCallId, request });
-      const record = request.kind === "bash" ? { kind: "bash" as const, command: request.command, timeoutMs: 0 } : { kind: "read" as const, path: "" };
+      const record =
+        request.kind === "bash"
+          ? { kind: "bash" as const, command: request.command, timeoutMs: 0 }
+          : { kind: "read" as const, path: "" };
       const { text, isError } = resultText(record, r.outcome, r.text);
       if (isError) throw new Error(text);
       return { content: [{ type: "text", text }], details: undefined };
@@ -112,7 +115,10 @@ export function tools(client: StriveClient, sessionId: string): AgentTool<any>[]
 }
 
 const textOf = (m: AssistantMessage) =>
-  m.content.filter((c) => c.type === "text").map((c) => (c as { text: string }).text).join("");
+  m.content
+    .filter((c) => c.type === "text")
+    .map((c) => (c as { text: string }).text)
+    .join("");
 
 export class Host {
   private agent!: Agent;
@@ -135,9 +141,13 @@ export class Host {
     const ended = lastStart && entries.some((e) => e.seq > lastStart.seq && e.event.type === "turnEnded");
     if (lastStart?.event.type === "turnStarted") this.turn = lastStart.event.turn;
     if (lastStart && !ended) {
-      await this.record({ type: "turnEnded", turn: this.turn, reason: { kind: "failed", error: "the agent host stopped during this turn" } });
+      await this.record({
+        type: "turnEnded",
+        turn: this.turn,
+        reason: { kind: "failed", error: "the agent host stopped during this turn" },
+      });
     }
-        // Prompts after the last turn began are still waiting: they are sent as
+    // Prompts after the last turn began are still waiting: they are sent as
     // the next turn, not replayed as history.
     const since = lastStart?.seq ?? 0;
     const waiting = entries.filter((e) => e.seq > since && e.event.type === "userMessage");
@@ -164,11 +174,13 @@ export class Host {
       }
       if (event.type === "message_end" && event.message.role === "assistant") {
         const m = event.message as AssistantMessage;
-        const toolCalls = m.content.filter((c) => c.type === "toolCall").map((c) => ({ id: (c as any).id, name: (c as any).name }));
+        const toolCalls = m.content
+          .filter((c) => c.type === "toolCall")
+          .map((c) => ({ id: (c as any).id, name: (c as any).name }));
         await this.record({ type: "assistantMessage", turn: this.turn, text: textOf(m), toolCalls, message: m });
       }
     });
-        this.lastSeq = entries.at(-1)?.seq ?? 0;
+    this.lastSeq = entries.at(-1)?.seq ?? 0;
     this.queued = waiting.map((e) => (e.event as { text: string }).text);
     void this.drain();
   }
@@ -218,7 +230,8 @@ export class Host {
       const last = this.agent.state.messages.at(-1) as AssistantMessage | undefined;
       if (this.timedOut) reason = { kind: "timedOut", seconds: this.config.turnSeconds };
       else if (last?.role === "assistant" && last.stopReason === "aborted") reason = { kind: "interrupted" };
-      else if (last?.role === "assistant" && last.stopReason === "error") reason = { kind: "failed", error: last.errorMessage ?? "the model call failed" };
+      else if (last?.role === "assistant" && last.stopReason === "error")
+        reason = { kind: "failed", error: last.errorMessage ?? "the model call failed" };
       else reason = { kind: "done" };
     } catch (e) {
       reason = { kind: "failed", error: (e as Error).message };

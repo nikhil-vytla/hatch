@@ -46,9 +46,16 @@ test("the agent's reply and its file changes show in the transcript", async () =
   await type("make hello.txt");
   const screen = await term.waitFor("Wrote hello.txt with a greeting.", 15_000);
   expect(screen.some((l) => l.includes("write hello.txt (2 bytes)"))).toBe(true);
+  expect(
+    screen.some((l) => l.includes("claude-sonnet-4-5 …")),
+    "model calls show their cost, not a start line",
+  ).toBe(false);
   expect(readFileSync(join(cwd, "hello.txt"), "utf8")).toBe("hi");
   await term.waitFor("$0.0");
   expect(screen.some((l) => l.includes("No agent is connected"))).toBe(false);
+  await Bun.sleep(300);
+  const footer = (await term.screen()).at(-1)!.trim();
+  expect(footer).toMatch(/^\$0\.\d{4} of \$5\.0000$/);
 });
 
 test("the footer shows the agent working, and Esc interrupts it", async () => {

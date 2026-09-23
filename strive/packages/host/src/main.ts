@@ -4,7 +4,10 @@ import { StriveClient } from "@strive/protocol";
 import { Host } from "./host";
 
 export async function runHost(socket: string, sessionId: string): Promise<{ host: Host; client: StriveClient }> {
-  const { client } = await StriveClient.connect(socket, { name: "strive-host", version: process.env.STRIVE_VERSION ?? "dev" });
+  const { client } = await StriveClient.connect(socket, {
+    name: "strive-host",
+    version: process.env.STRIVE_VERSION ?? "dev",
+  });
   const config = await client.request("host/register", { id: sessionId });
   const host = new Host(client, sessionId, config);
   client.on("session/entry", ({ sessionId: sid, entry }) => sid === sessionId && host.onEntry(entry));

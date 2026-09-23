@@ -31,12 +31,15 @@ export class FakeAnthropic {
       port: 0,
       hostname: "127.0.0.1",
       fetch: async (req) => {
-                const body: any = await req.json();
+        const body: any = await req.json();
         this.requests.push(body);
         const reply = this.script.shift() ?? { text: "(the script has no more replies)" };
         if (reply.delayMs) await Bun.sleep(reply.delayMs);
         if (reply.status) {
-          return Response.json({ type: "error", error: { type: "api_error", message: reply.error ?? "failed" } }, { status: reply.status });
+          return Response.json(
+            { type: "error", error: { type: "api_error", message: reply.error ?? "failed" } },
+            { status: reply.status },
+          );
         }
         const usage = { input_tokens: reply.inputTokens ?? 10, output_tokens: reply.outputTokens ?? 5 };
         const stop = reply.toolCalls?.length ? "tool_use" : "end_turn";
@@ -45,28 +48,63 @@ export class FakeAnthropic {
             ...(reply.text ? [{ type: "text", text: reply.text }] : []),
             ...(reply.toolCalls ?? []).map((c) => ({ type: "tool_use", id: c.id, name: c.name, input: c.input })),
           ];
-          return Response.json({ id: "msg_fake", type: "message", role: "assistant", model: body.model, content, stop_reason: stop, usage });
+          return Response.json({
+            id: "msg_fake",
+            type: "message",
+            role: "assistant",
+            model: body.model,
+            content,
+            stop_reason: stop,
+            usage,
+          });
         }
         let out = sse("message_start", {
           type: "message_start",
-          message: { id: "msg_fake", type: "message", role: "assistant", model: body.model, content: [], usage: { input_tokens: usage.input_tokens, output_tokens: 1 } },
+          message: {
+            id: "msg_fake",
+            type: "message",
+            role: "assistant",
+            model: body.model,
+            content: [],
+            usage: { input_tokens: usage.input_tokens, output_tokens: 1 },
+          },
         });
         let index = 0;
         if (reply.text) {
-          out += sse("content_block_start", { type: "content_block_start", index, content_block: { type: "text", text: "" } });
+          out += sse("content_block_start", {
+            type: "content_block_start",
+            index,
+            content_block: { type: "text", text: "" },
+          });
           for (const piece of reply.text.match(/.{1,8}/gs) ?? []) {
-            out += sse("content_block_delta", { type: "content_block_delta", index, delta: { type: "text_delta", text: piece } });
+            out += sse("content_block_delta", {
+              type: "content_block_delta",
+              index,
+              delta: { type: "text_delta", text: piece },
+            });
           }
           out += sse("content_block_stop", { type: "content_block_stop", index });
           index++;
         }
         for (const c of reply.toolCalls ?? []) {
-          out += sse("content_block_start", { type: "content_block_start", index, content_block: { type: "tool_use", id: c.id, name: c.name, input: {} } });
-          out += sse("content_block_delta", { type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: JSON.stringify(c.input) } });
+          out += sse("content_block_start", {
+            type: "content_block_start",
+            index,
+            content_block: { type: "tool_use", id: c.id, name: c.name, input: {} },
+          });
+          out += sse("content_block_delta", {
+            type: "content_block_delta",
+            index,
+            delta: { type: "input_json_delta", partial_json: JSON.stringify(c.input) },
+          });
           out += sse("content_block_stop", { type: "content_block_stop", index });
           index++;
         }
-        out += sse("message_delta", { type: "message_delta", delta: { stop_reason: stop }, usage: { output_tokens: usage.output_tokens } });
+        out += sse("message_delta", {
+          type: "message_delta",
+          delta: { stop_reason: stop },
+          usage: { output_tokens: usage.output_tokens },
+        });
         out += sse("message_stop", { type: "message_stop" });
         return new Response(out, { headers: { "content-type": "text/event-stream" } });
       },

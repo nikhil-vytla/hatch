@@ -21,7 +21,7 @@ export function startDaemon(extra: Record<string, string> = {}): TestDaemon {
     STRIVE_IDLE_SECS: undefined,
     ANTHROPIC_API_KEY: undefined,
     OPENAI_API_KEY: undefined,
-        STRIVE_UPSTREAM_ANTHROPIC: "http://127.0.0.1:9",
+    STRIVE_UPSTREAM_ANTHROPIC: "http://127.0.0.1:9",
     STRIVE_UPSTREAM_OPENAI: "http://127.0.0.1:9",
     // No agent host unless a test asks for one.
     STRIVE_HOST: "none",

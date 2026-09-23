@@ -25,7 +25,7 @@ export class Spend {
         const o = e.outcome;
         if (o.kind === "complete") {
           this.spentUsd += o.costUsdMicros;
-                    const u = o.usage;
+          const u = o.usage;
           this.spentTokens += u.input + u.output + u.cacheRead + u.cacheWrite + u.cacheWriteLong;
         } else if (o.kind === "broken") {
           this.spentUsd += o.costUsdMicros;
@@ -40,8 +40,8 @@ export class Spend {
       case "effectFinished":
       case "approvalModeSet":
       case "approvalRequested":
-            case "approvalDecided":
-            case "checkpointed":
+      case "approvalDecided":
+      case "checkpointed":
       case "rewound":
       case "turnStarted":
       case "assistantMessage":

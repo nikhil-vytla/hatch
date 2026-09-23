@@ -23,9 +23,21 @@ export { formatUsd };
 export const COMMANDS: SlashCommand[] = [
   { name: "status", description: "Show the daemon's status" },
   { name: "session", description: "Show this session's id and how to resume it" },
-    { name: "budget", description: "Set this session's spending limit: /budget 10, or /budget off", argumentHint: "<dollars>|off" },
-    { name: "approvals", description: "What the agent may do without asking: ask, auto-edit or full-auto", argumentHint: "<mode>" },
-  { name: "rewind", description: "List checkpoints, or put the files back to one: /rewind 2", argumentHint: "[checkpoint]" },
+  {
+    name: "budget",
+    description: "Set this session's spending limit: /budget 10, or /budget off",
+    argumentHint: "<dollars>|off",
+  },
+  {
+    name: "approvals",
+    description: "What the agent may do without asking: ask, auto-edit or full-auto",
+    argumentHint: "<mode>",
+  },
+  {
+    name: "rewind",
+    description: "List checkpoints, or put the files back to one: /rewind 2",
+    argumentHint: "[checkpoint]",
+  },
   { name: "help", description: "List commands and keys" },
   { name: "quit", description: "Exit strive (the daemon keeps running)" },
 ];
@@ -56,7 +68,7 @@ export function describe(entry: Entry): string {
     case "budgetSet":
       return style.faint(`Budget: ${budgetText(e.usdMicros, e.tokens)}`);
     case "modelCallStarted":
-      return style.faint(`${e.provider} ${e.model} …`);
+      return "";
     case "modelCallFinished":
       switch (e.outcome.kind) {
         case "complete":
@@ -66,27 +78,36 @@ export function describe(entry: Entry): string {
         case "rejected":
           return style.danger(`The provider refused the call (HTTP ${e.outcome.status}).`);
         case "broken":
-          return style.danger(`The call broke (${e.outcome.reason}); charged its full hold of ${formatUsd(e.outcome.costUsdMicros)}.`);
+          return style.danger(
+            `The call broke (${e.outcome.reason}); charged its full hold of ${formatUsd(e.outcome.costUsdMicros)}.`,
+          );
       }
     case "effectStarted": {
       const r = e.record;
-      const what = r.kind === "bash" ? `$ ${r.command}` : r.kind === "write" ? `write ${r.path} (${r.bytes} bytes)` : `${r.kind} ${r.path}`;
+      const what =
+        r.kind === "bash"
+          ? `$ ${r.command}`
+          : r.kind === "write"
+            ? `write ${r.path} (${r.bytes} bytes)`
+            : `${r.kind} ${r.path}`;
       return style.muted(what);
     }
     case "effectFinished":
       switch (e.outcome.kind) {
-                case "done":
-          return e.outcome.exitCode === undefined || e.outcome.exitCode === 0 ? "" : style.faint(`exit ${e.outcome.exitCode}`);
+        case "done":
+          return e.outcome.exitCode === undefined || e.outcome.exitCode === 0
+            ? ""
+            : style.faint(`exit ${e.outcome.exitCode}`);
         case "refused":
           return style.danger(`Refused: ${e.outcome.reason}`);
         case "interrupted":
           return style.danger("Interrupted: the daemon stopped while this ran.");
       }
-        case "approvalModeSet":
+    case "approvalModeSet":
       return style.faint(`Approvals: ${MODE_NAMES[e.mode]}`);
     case "checkpointed":
       return style.faint(`Checkpoint ${e.checkpoint}`);
-        case "rewound":
+    case "rewound":
       return style.accent(`Rewound to checkpoint ${e.to}. Undo with /rewind ${e.savedAs}.`);
     case "turnStarted":
       return "";
@@ -112,7 +133,6 @@ export function describe(entry: Entry): string {
   }
 }
 
-
 function budgetText(usd?: number, tokens?: number): string {
   if (usd === undefined && tokens === undefined) return "unlimited";
   return [usd === undefined ? null : formatUsd(usd), tokens === undefined ? null : `${tokens} tokens`]
@@ -124,10 +144,10 @@ export class App {
   readonly transcript = new Container();
   readonly editor: Editor;
   private readonly header = new Text("", 1, 0);
-    private readonly footer = new Text("", 1, 0);
+  private readonly footer = new Text("", 1, 0);
   /** The approval line shown while an effect waits for a decision. */
   private readonly prompt = new Text("", 1, 0);
-    /** Effects waiting for a decision, oldest first. */
+  /** Effects waiting for a decision, oldest first. */
   private readonly pending = new Map<number, string>();
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
@@ -138,7 +158,7 @@ export class App {
   private lastSeq = 0;
   /** Entries that arrived before the attach reply; shown after its history. */
   private early: { sessionId: string; entry: Entry }[] = [];
-    /** The turn the agent is working on, if any. */
+  /** The turn the agent is working on, if any. */
   private working?: number;
   /** The reply streaming in, until its final message arrives. */
   private readonly live = new Text("", 1, 0);
@@ -160,7 +180,7 @@ export class App {
 
     tui.addChild(this.header);
     tui.addChild(new Spacer(1));
-            tui.addChild(this.transcript);
+    tui.addChild(this.transcript);
     tui.addChild(this.live);
     tui.addChild(this.prompt);
     tui.addChild(this.editor);
@@ -168,11 +188,11 @@ export class App {
     tui.setFocus(this.editor);
 
     tui.addInputListener((data) => {
-            if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
+      if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
         this.quit(0);
         return { consume: true };
       }
-            if (matchesKey(data, "escape") && this.working !== undefined && this.pending.size === 0 && this.session) {
+      if (matchesKey(data, "escape") && this.working !== undefined && this.pending.size === 0 && this.session) {
         this.client.request("session/interrupt", { id: this.session.id }).catch(() => {});
         return { consume: true };
       }
@@ -190,7 +210,7 @@ export class App {
       this.say(style.danger(`Lost the connection to the daemon${err ? `: ${err.message}` : ""}.`));
       this.exit(1);
     });
-        client.on("session/delta", ({ sessionId, turn, text }) => {
+    client.on("session/delta", ({ sessionId, turn, text }) => {
       if (sessionId !== this.session?.id || turn !== this.working) return;
       this.live.setText(text.trim());
       this.tui.requestRender();
@@ -237,23 +257,25 @@ export class App {
     return `Could not open the session: ${(e as Error).message}`;
   }
 
-    private renderFooter() {
+  private renderFooter() {
     const working = this.working === undefined ? "" : ` · ${style.accent("working… Esc to interrupt")}`;
     this.footer.setText(`${style.muted(this.spend.summary())}${working}`);
   }
 
   private renderHeader() {
     const id = this.session ? `  ${style.muted(`session ${shortId(this.session.id)}`)}` : "";
-    this.header.setText(`${style.bold(style.accent("strive"))} ${style.muted(this.init.server.version)}  ${tilde(this.cwd)}${id}`);
+    this.header.setText(
+      `${style.bold(style.accent("strive"))} ${style.muted(this.init.server.version)}  ${tilde(this.cwd)}${id}`,
+    );
     this.tui.requestRender();
   }
 
-    private show(entry: Entry) {
+  private show(entry: Entry) {
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
     this.spend.apply(entry.event);
     const e = entry.event;
-        if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
+    if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
     if (e.type === "checkpointed") {
       this.checkpoints.set(e.checkpoint, "");
       this.awaitingPrompt = e.checkpoint;
@@ -262,18 +284,22 @@ export class App {
       this.checkpoints.set(this.awaitingPrompt, `before “${e.text}”`);
       this.awaitingPrompt = undefined;
     }
-        if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
+    if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
     if (e.type === "turnStarted") this.working = e.turn;
     if (e.type === "turnEnded") this.working = undefined;
     if (e.type === "assistantMessage" || e.type === "turnEnded") this.live.setText("");
     if (e.type === "approvalDecided") this.pending.delete(e.effect);
     const next = this.pending.values().next();
     this.prompt.setText(
-      next.done ? "" : `${style.accent(`Allow ${next.value}?`)}  ${style.muted("y yes · a yes for this session · n no")}`,
+      next.done
+        ? ""
+        : `${style.accent(`Allow ${next.value}?`)}  ${style.muted("y yes · a yes for this session · n no")}`,
     );
-        this.renderFooter();
-        const text = describe(entry);
+    this.renderFooter();
+    const text = describe(entry);
     if (text) this.say(text);
+    // Entries that add no line (a finished turn) still change the footer.
+    this.tui.requestRender();
   }
 
   quit(code: number) {
@@ -291,7 +317,7 @@ export class App {
     if (!text || !this.session) return;
     this.editor.setText("");
     if (!text.startsWith("/")) {
-            try {
+      try {
         await this.client.request("session/prompt", { id: this.session.id, text });
       } catch (e) {
         this.editor.setText(text);
@@ -320,7 +346,7 @@ export class App {
         await this.client.request("session/budget", { id: this.session.id, usdMicros, tokens: this.spend.tokenLimit });
         return;
       }
-            case "approvals": {
+      case "approvals": {
         const arg = text.slice(1).split(/\s+/)[1] ?? "";
         const mode = ({ ask: "ask", "auto-edit": "autoEdit", "full-auto": "fullAuto" } as const)[arg as "ask"];
         if (!mode) {
@@ -330,7 +356,7 @@ export class App {
         await this.client.request("session/approvals", { id: this.session.id, mode });
         return;
       }
-            case "rewind": {
+      case "rewind": {
         const arg = text.slice(1).split(/\s+/)[1];
         if (!arg) {
           if (this.checkpoints.size === 0) {
@@ -345,12 +371,20 @@ export class App {
         try {
           await this.client.request("session/rewind", { id: this.session.id, checkpoint });
         } catch (e) {
-          this.say(style.danger(e instanceof ServerError && e.code === -32602 ? `No checkpoint ${arg} in this session.` : (e as Error).message));
+          this.say(
+            style.danger(
+              e instanceof ServerError && e.code === -32602
+                ? `No checkpoint ${arg} in this session.`
+                : (e as Error).message,
+            ),
+          );
         }
         return;
       }
       case "session":
-        this.say(`${style.muted("session")} ${this.session.id} · resume with ${style.accent(`strive -r ${this.session.id}`)}`);
+        this.say(
+          `${style.muted("session")} ${this.session.id} · resume with ${style.accent(`strive -r ${this.session.id}`)}`,
+        );
         return;
       case "help":
         this.say(COMMANDS.map((c) => `${style.accent(`/${c.name}`)}  ${style.muted(c.description ?? "")}`).join("\n"));

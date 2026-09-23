@@ -41,14 +41,33 @@ test("prompts and replies come back in order, and other events are skipped", asy
 test("each tool call gets the daemon's result, in call order", async () => {
   const entries = [
     at({ type: "userMessage", text: "look" }),
-    assistant("", [{ id: "t1", name: "read" }, { id: "t2", name: "bash" }]),
+    assistant("", [
+      { id: "t1", name: "read" },
+      { id: "t2", name: "bash" },
+    ]),
     effect(1, "t2", "bash"),
     effect(2, "t1", "read"),
-    at({ type: "effectFinished", effect: 2, outcome: { kind: "done", output: "sha256:out1", truncated: false }, durationMs: 1 }),
-    at({ type: "effectFinished", effect: 1, outcome: { kind: "done", output: "sha256:out2", exitCode: 3, truncated: false }, durationMs: 1 }),
+    at({
+      type: "effectFinished",
+      effect: 2,
+      outcome: { kind: "done", output: "sha256:out1", truncated: false },
+      durationMs: 1,
+    }),
+    at({
+      type: "effectFinished",
+      effect: 1,
+      outcome: { kind: "done", output: "sha256:out2", exitCode: 3, truncated: false },
+      durationMs: 1,
+    }),
   ];
   const [, , first, second] = await rebuild(entries, blob);
-  expect(first).toMatchObject({ role: "toolResult", toolCallId: "t1", toolName: "read", isError: false, content: [{ type: "text", text: "file text" }] });
+  expect(first).toMatchObject({
+    role: "toolResult",
+    toolCallId: "t1",
+    toolName: "read",
+    isError: false,
+    content: [{ type: "text", text: "file text" }],
+  });
   expect(second).toMatchObject({
     role: "toolResult",
     toolCallId: "t2",
@@ -60,16 +79,28 @@ test("each tool call gets the daemon's result, in call order", async () => {
 
 test("refused and interrupted effects are errors the model can read", async () => {
   const entries = [
-    assistant("", [{ id: "a", name: "bash" }, { id: "b", name: "read" }]),
+    assistant("", [
+      { id: "a", name: "bash" },
+      { id: "b", name: "read" },
+    ]),
     effect(1, "a", "bash"),
-    at({ type: "effectFinished", effect: 1, outcome: { kind: "refused", reason: "declined: run: false" }, durationMs: 0 }),
+    at({
+      type: "effectFinished",
+      effect: 1,
+      outcome: { kind: "refused", reason: "declined: run: false" },
+      durationMs: 0,
+    }),
     effect(2, "b", "read"),
     at({ type: "effectFinished", effect: 2, outcome: { kind: "interrupted" }, durationMs: 0 }),
   ];
   const results = (await rebuild(entries, blob)).slice(1);
   expect(results).toMatchObject([
     { toolCallId: "a", isError: true, content: [{ type: "text", text: "declined: run: false" }] },
-    { toolCallId: "b", isError: true, content: [{ type: "text", text: "the daemon stopped while this ran; whatever it changed stays changed" }] },
+    {
+      toolCallId: "b",
+      isError: true,
+      content: [{ type: "text", text: "the daemon stopped while this ran; whatever it changed stays changed" }],
+    },
   ]);
 });
 

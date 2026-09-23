@@ -5,9 +5,10 @@ one you can review, measure and undo. Proposed changes to its memory and
 skills are gated against the current version before they're kept. Budgets,
 a verifiable session log and an OS sandbox are on by default.
 
-> **Status: rebuilding.** Milestones M0 to M2 are done. The daemon,
-> protocol, TUI and installer work. Sessions are journaled and verifiable,
-> and model calls go through a budgeted gateway. The agent loop arrives in M3. See
+> **Status: early.** Milestones M0 to M3 are done: strive runs a coding
+> agent in any repository, with a verifiable session journal, budgets,
+> approvals, a sandbox and checkpoints. Project context (AGENTS.md, skills,
+> MCP) arrives in M4. See [ROADMAP.md](docs/ROADMAP.md). See
 > [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation is
 > at git tag `strive-py-final`.
 
@@ -36,12 +37,20 @@ strive status         # daemon pid, uptime, clients
 strive stop           # stop the daemon (it also exits when idle)
 ```
 
+In the TUI, type what you want done. The agent reads and changes files in
+the directory and runs commands in a sandbox (no network, writes only in
+the workspace). By default, edits in the workspace just happen and commands
+ask first; `/approvals` changes that. Esc interrupts. `/rewind` puts the files
+back to how they were before any prompt.
+
 No config file is needed. State lives in `~/.strive`, or in `STRIVE_HOME` if set.
 Every session starts with a $5 budget. Change it with `/budget` in the TUI,
 or for new sessions in `~/.strive/settings.json`:
 
 ```json
 {
+  "model": "claude-sonnet-4-5",
+  "approvals": "autoEdit",
   "budget": { "usd": 10 },
   "models": {
     "claude-opus-5-5": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000 }

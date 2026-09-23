@@ -2,13 +2,17 @@
   "name": "strive-workspace",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "check": "tsc -p tsconfig.json",
-    "test": "bun test"
+    "test": "bun test",
+    "format": "biome format --write packages"
   },
   "devDependencies": {
     "@types/bun": "1.4.2",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "@biomejs/biome": "2.5.14"
   }
 }

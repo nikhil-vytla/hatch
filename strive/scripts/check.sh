@@ -18,6 +18,7 @@ if ! git diff --quiet -- "$gen" || [ -n "$(git ls-files --others --exclude-stand
 fi
 
 bun install --frozen-lockfile --silent
+bunx biome format packages
 bunx tsc -p tsconfig.json
 bun test
 echo "all checks passed"
