@@ -613,6 +613,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "strive-gateway"
+version = "0.3.0-dev"
+dependencies = [
+ "serde_json",
+ "strive-proto",
+]
+
+[[package]]
 name = "strive-journal"
 version = "0.3.0-dev"
 dependencies = [
