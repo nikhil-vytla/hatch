@@ -62,18 +62,8 @@ test("a prompt is shown from the journal and is in `strive log`", async () => {
   const ui = await openUi();
   await enter(ui, "fix the flaky test");
   await ui.term.waitFor("› fix the flaky test");
-  await ui.term.waitFor("Saved to this session. No agent is connected yet");
   const log = daemon.strive("log", sessions()[0]!.id);
-    expect(log.stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
-});
-
-test("the missing-agent note appears once, not per prompt", async () => {
-  const ui = await openUi();
-  await enter(ui, "one");
-  await ui.term.waitFor("› one");
-  await enter(ui, "two");
-  const screen = await ui.term.waitFor("› two");
-  expect(screen.filter((l) => l.includes("No agent is connected yet")).length).toBe(1);
+  expect(log.stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
 });
 
 test("continue reopens the latest session here with its history", async () => {

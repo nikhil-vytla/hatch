@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
     ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, SessionInfo, SessionList,
-    SessionListParams, SessionRead, SessionReadResult, SessionRef,
+    SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
 };
 
 use crate::client::{Client, ServerError};
@@ -100,6 +100,21 @@ fn describe(e: &Entry) -> String {
         Event::Rewound { to, saved_as } => {
             format!("rewound to checkpoint {to}; the files before are checkpoint {saved_as}")
         }
+        Event::TurnStarted { turn } => format!("turn {turn} started"),
+        Event::AssistantMessage { text, tool_calls, .. } => {
+            let calls: Vec<&str> = tool_calls.iter().map(|c| c.name.as_str()).collect();
+            match (text.trim().is_empty(), calls.is_empty()) {
+                (_, true) => format!("agent: {}", text.trim()),
+                (true, false) => format!("agent calls {}", calls.join(", ")),
+                (false, false) => format!("agent: {} (calls {})", text.trim(), calls.join(", ")),
+            }
+        }
+        Event::TurnEnded { turn, reason } => match reason {
+            TurnEnd::Done => format!("turn {turn} done"),
+            TurnEnd::Interrupted => format!("turn {turn} interrupted"),
+            TurnEnd::TimedOut { seconds } => format!("turn {turn} stopped at its {seconds}s limit"),
+            TurnEnd::Failed { error } => format!("turn {turn} failed: {error}"),
+        },
         Event::ApprovalRequested { effect, description } => format!("effect {effect} asks: {description}"),
         Event::ApprovalDecided { effect, decision, by } => format!(
             "effect {effect} {} by {by}",

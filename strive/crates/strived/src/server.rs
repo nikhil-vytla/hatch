@@ -54,6 +54,7 @@ pub struct State {
     pub gateway: Gateway,
     /// Model calls in flight. They count as activity, like connected clients.
     pub gateway_calls: AtomicU32,
+    pub hosts: crate::hosts::Hosts,
 }
 
 impl State {
@@ -120,6 +121,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
         models,
         gateway,
         gateway_calls: AtomicU32::new(0),
+        hosts: crate::hosts::Hosts::default(),
     });
     let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
     log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);
@@ -155,7 +157,9 @@ pub async fn run(cfg: Config) -> Result<Started> {
                 Err(e) => log!("accept failed: {e}"),
             },
             _ = tick.tick() => {
-                                let busy = state.clients.load(Ordering::SeqCst) + state.gateway_calls.load(Ordering::SeqCst) > 0;
+                                                // Hosts don't count: they exist to serve clients, and exit with the daemon.
+                let people = state.clients.load(Ordering::SeqCst).saturating_sub(state.hosts.count());
+                let busy = people + state.gateway_calls.load(Ordering::SeqCst) > 0;
                 if !busy && state.idle_since.lock().await.elapsed() >= state.idle_exit {
                     log!("idle for {}s with no clients, exiting", state.idle_exit.as_secs());
                     break;
@@ -230,7 +234,7 @@ async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> 
     }
     // The writer ends when the last strong sender, `tx`, is gone; `conn`
     // and everything it spawned hold only weak ones.
-    conn.close();
+    conn.close(state);
     drop(tx);
     let _ = writer.await;
     Ok(())

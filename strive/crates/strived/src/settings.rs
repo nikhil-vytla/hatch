@@ -24,6 +24,28 @@ pub struct Settings {
     pub approvals: strive_proto::ApprovalMode,
     #[serde(default)]
     pub gateway: GatewaySetting,
+    /// The model the agent uses.
+    #[serde(default = "default_model")]
+    pub model: String,
+    /// The longest a turn may run before it is stopped.
+    #[serde(default = "default_turn_seconds")]
+    pub turn_seconds: u64,
+    /// The agent's per-reply output cap. Each model call holds budget for a
+    /// reply this long, so a smaller cap leaves more of the budget usable.
+    #[serde(default = "default_agent_max_output")]
+    pub agent_max_output: u64,
+}
+
+fn default_agent_max_output() -> u64 {
+    16_384
+}
+
+fn default_model() -> String {
+    "claude-sonnet-4-5".into()
+}
+
+fn default_turn_seconds() -> u64 {
+    1800
 }
 
 #[derive(Debug, Deserialize)]

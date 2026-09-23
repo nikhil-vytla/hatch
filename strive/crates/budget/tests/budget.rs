@@ -264,3 +264,23 @@ fn absurd_usage_saturates_instead_of_wrapping() {
     let huge = Usage { input: u64::MAX, output: u64::MAX, ..Usage::default() };
     assert_eq!(huge.total(), u64::MAX);
 }
+
+#[test]
+fn unset_cache_rates_default_to_the_dearest_rates() {
+    let settings: std::collections::BTreeMap<String, strive_budget::PriceSetting> =
+        serde_json::from_str(r#"{"some-model": {"input": 3.0, "output": 9.0, "contextWindow": 1000}}"#).unwrap();
+    let m = Models::builtin().with_overrides(&settings);
+    let p = m.get("some-model").unwrap().price;
+    assert_eq!((p.cache_write, p.cache_write_long, p.cache_read), (3_750_000, 6_000_000, 3_000_000));
+}
+
+#[test]
+fn a_call_is_open_from_reservation_until_settlement() {
+    let mut l = Ledger::new(Limits::default());
+    assert!(!l.is_open(1));
+    l.reserve(1, Reservation { usd_micros: 5, tokens: 5 }).unwrap();
+    assert!(l.is_open(1));
+    assert!(!l.is_open(2));
+    l.settle(1, 5, 5);
+    assert!(!l.is_open(1));
+}

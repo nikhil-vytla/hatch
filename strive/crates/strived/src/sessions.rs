@@ -85,7 +85,29 @@ impl From<SessionError> for CallError {
     }
 }
 
+/// What a session's subscribers receive.
+#[derive(Debug, Clone)]
+pub enum Push {
+    Entry(Entry),
+    /// The model's reply so far; shown while it streams, not journaled.
+    Delta {
+        turn: u64,
+        text: String,
+    },
+    /// The host should stop the current turn.
+    Interrupt,
+}
+
 enum Cmd {
+    /// Journals events a host recorded (turns and assistant messages).
+    Append {
+        events: Vec<Event>,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
+    /// Sends something to subscribers without journaling it.
+    Push {
+        push: Push,
+    },
     SetBudget {
         limits: Limits,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
@@ -154,12 +176,13 @@ enum Cmd {
     },
     Attach {
         after_seq: u64,
+        person: bool,
         reply: AttachReply,
     },
 }
 
 /// History for a new subscriber, and its stream of later entries.
-type AttachReply = oneshot::Sender<Result<(Vec<Entry>, mpsc::UnboundedReceiver<Entry>)>>;
+type AttachReply = oneshot::Sender<Result<(Vec<Entry>, mpsc::UnboundedReceiver<Push>)>>;
 
 struct Live {
     info: SessionInfo,
@@ -267,14 +290,17 @@ impl Sessions {
     }
 
     /// The session's history after `after_seq`, and a stream of later entries.
+    /// `person` is false for an agent host: it sees everything, but can't
+    /// answer approvals.
     pub async fn attach(
         &self,
         id: &SessionId,
         after_seq: u64,
-    ) -> Result<(SessionInfo, Vec<Entry>, mpsc::UnboundedReceiver<Entry>)> {
+        person: bool,
+    ) -> Result<(SessionInfo, Vec<Entry>, mpsc::UnboundedReceiver<Push>)> {
         let (info, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
-        tx.send(Cmd::Attach { after_seq, reply }).map_err(|_| writer_gone())?;
+        tx.send(Cmd::Attach { after_seq, person, reply }).map_err(|_| writer_gone())?;
         let (entries, stream) = rx.await.map_err(|_| writer_gone())??;
         Ok((info, entries, stream))
     }
@@ -284,6 +310,24 @@ impl Sessions {
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::SetBudget { limits, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    pub async fn append(&self, id: &SessionId, events: Vec<Event>) -> Result<Vec<Entry>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Append { events, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// Sends a delta or an interrupt to the session's subscribers.
+    pub async fn push(&self, id: &SessionId, push: Push) -> Result<()> {
+        let (_, tx) = self.writer(id).await?;
+        tx.send(Cmd::Push { push }).map_err(|_| writer_gone())
+    }
+
+    /// The session's directory in strive's home.
+    pub fn session_dir(&self, id: &SessionId) -> PathBuf {
+        self.dir(id)
     }
 
     /// The session's shadow repository for checkpoints.
@@ -513,7 +557,7 @@ enum Staged {
     /// Entries to append, and what to do once they are committed.
     Events(Vec<Event>, Done),
     /// A new subscriber, answered after the batch commits.
-    Attach(u64, AttachReply),
+    Attach(u64, bool, AttachReply),
     /// Answered already; nothing to append.
     Handled,
 }
@@ -529,7 +573,9 @@ struct Writer {
     /// Checkpoint commits; checkpoint n is `checkpoints[n - 1]`.
     checkpoints: Vec<String>,
     mode: ApprovalMode,
-    subscribers: Vec<mpsc::UnboundedSender<Entry>>,
+    /// Attached clients, and whether each is a person (not an agent host):
+    /// only people can answer approvals.
+    subscribers: Vec<(mpsc::UnboundedSender<Push>, bool)>,
     verify: Verifier,
 }
 
@@ -610,8 +656,8 @@ impl Writer {
             for cmd in batch {
                 let (events, done) = match self.stage(cmd) {
                     Staged::Events(events, done) => (events, done),
-                    Staged::Attach(after_seq, reply) => {
-                        attaches.push((after_seq, reply));
+                    Staged::Attach(after_seq, person, reply) => {
+                        attaches.push((after_seq, person, reply));
                         continue;
                     }
                     Staged::Handled => continue,
@@ -636,6 +682,11 @@ impl Writer {
     /// Applies one command to the writer's state and returns what to append.
     fn stage(&mut self, cmd: Cmd) -> Staged {
         let (events, done): (Vec<Event>, Done) = match cmd {
+            Cmd::Append { events, reply } => (events, Box::new(move |r, _| drop(reply.send(r)))),
+            Cmd::Push { push } => {
+                self.subscribers.retain(|(s, _)| s.send(push.clone()).is_ok());
+                return Staged::Handled;
+            }
             Cmd::SetMode { mode, reply } => {
                 self.mode = mode;
                 (vec![Event::ApprovalModeSet { mode }], Box::new(move |r, _| drop(reply.send(r))))
@@ -723,7 +774,7 @@ impl Writer {
                     Box::new(move |r, _| drop(reply.send(r))),
                 )
             }
-            Cmd::Attach { after_seq, reply } => return Staged::Attach(after_seq, reply),
+            Cmd::Attach { after_seq, person, reply } => return Staged::Attach(after_seq, person, reply),
         };
         Staged::Events(events, done)
     }
@@ -770,9 +821,9 @@ impl Writer {
         }
         for (done, es) in staged {
             for e in &es {
-                self.subscribers.retain(|s| s.send(e.clone()).is_ok());
+                self.subscribers.retain(|(s, _)| s.send(Push::Entry(e.clone())).is_ok());
             }
-            let delivered = self.subscribers.len();
+            let delivered = self.subscribers.iter().filter(|(_, person)| *person).count();
             self.entries.extend(es.iter().cloned());
             done(Ok(es), delivered);
         }
@@ -783,11 +834,11 @@ impl Writer {
     /// writer held the session. A refused journal takes no more commands;
     /// closing first makes later callers reopen it (and be refused) instead
     /// of queueing behind this writer.
-    fn attach(&mut self, attaches: Vec<(u64, AttachReply)>, rx: &mut mpsc::UnboundedReceiver<Cmd>) -> bool {
+    fn attach(&mut self, attaches: Vec<(u64, bool, AttachReply)>, rx: &mut mpsc::UnboundedReceiver<Cmd>) -> bool {
         let problem = match (self.verify)() {
             Ok(r) => r.problem,
             Err(e) => {
-                for (_, reply) in attaches {
+                for (_, _, reply) in attaches {
                     let _ = reply.send(Err(SessionError::Io(io_copy(&e))));
                 }
                 return true;
@@ -795,14 +846,14 @@ impl Writer {
         };
         if let Some(p) = problem {
             rx.close();
-            for (_, reply) in attaches {
+            for (_, _, reply) in attaches {
                 let _ = reply.send(Err(SessionError::Invalid(p.clone())));
             }
             return false;
         }
-        for (after_seq, reply) in attaches {
+        for (after_seq, person, reply) in attaches {
             let (stx, srx) = mpsc::unbounded_channel();
-            self.subscribers.push(stx);
+            self.subscribers.push((stx, person));
             let history = self.entries.iter().filter(|e| e.seq > after_seq).cloned().collect();
             let _ = reply.send(Ok((history, srx)));
         }

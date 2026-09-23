@@ -10,6 +10,7 @@ mod credentials;
 mod doctor;
 mod effects;
 mod gateway;
+mod hosts;
 mod launch;
 mod log;
 mod methods;

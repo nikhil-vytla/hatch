@@ -75,8 +75,8 @@ export function describe(entry: Entry): string {
     }
     case "effectFinished":
       switch (e.outcome.kind) {
-        case "done":
-          return style.faint(e.outcome.exitCode === undefined ? "done" : `exit ${e.outcome.exitCode}`);
+                case "done":
+          return e.outcome.exitCode === undefined || e.outcome.exitCode === 0 ? "" : style.faint(`exit ${e.outcome.exitCode}`);
         case "refused":
           return style.danger(`Refused: ${e.outcome.reason}`);
         case "interrupted":
@@ -86,8 +86,23 @@ export function describe(entry: Entry): string {
       return style.faint(`Approvals: ${MODE_NAMES[e.mode]}`);
     case "checkpointed":
       return style.faint(`Checkpoint ${e.checkpoint}`);
-    case "rewound":
+        case "rewound":
       return style.accent(`Rewound to checkpoint ${e.to}. Undo with /rewind ${e.savedAs}.`);
+    case "turnStarted":
+      return "";
+    case "assistantMessage":
+      return e.text.trim();
+    case "turnEnded":
+      switch (e.reason.kind) {
+        case "done":
+          return "";
+        case "interrupted":
+          return style.muted("Interrupted.");
+        case "timedOut":
+          return style.danger(`Stopped: the turn reached its ${e.reason.seconds}s limit.`);
+        case "failed":
+          return style.danger(`The agent stopped: ${e.reason.error}`);
+      }
     case "approvalRequested":
       return style.accent(`Allow ${e.description}?`);
     case "approvalDecided":
@@ -123,7 +138,10 @@ export class App {
   private lastSeq = 0;
   /** Entries that arrived before the attach reply; shown after its history. */
   private early: { sessionId: string; entry: Entry }[] = [];
-  private notedMissingAgent = false;
+    /** The turn the agent is working on, if any. */
+  private working?: number;
+  /** The reply streaming in, until its final message arrives. */
+  private readonly live = new Text("", 1, 0);
 
   constructor(
     private readonly tui: TUI,
@@ -142,7 +160,8 @@ export class App {
 
     tui.addChild(this.header);
     tui.addChild(new Spacer(1));
-        tui.addChild(this.transcript);
+            tui.addChild(this.transcript);
+    tui.addChild(this.live);
     tui.addChild(this.prompt);
     tui.addChild(this.editor);
     tui.addChild(this.footer);
@@ -151,6 +170,10 @@ export class App {
     tui.addInputListener((data) => {
             if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
         this.quit(0);
+        return { consume: true };
+      }
+            if (matchesKey(data, "escape") && this.working !== undefined && this.pending.size === 0 && this.session) {
+        this.client.request("session/interrupt", { id: this.session.id }).catch(() => {});
         return { consume: true };
       }
       const decision = { y: "allow", a: "allowSession", n: "deny" }[data];
@@ -166,6 +189,11 @@ export class App {
     this.offClose = client.onClose((err) => {
       this.say(style.danger(`Lost the connection to the daemon${err ? `: ${err.message}` : ""}.`));
       this.exit(1);
+    });
+        client.on("session/delta", ({ sessionId, turn, text }) => {
+      if (sessionId !== this.session?.id || turn !== this.working) return;
+      this.live.setText(text.trim());
+      this.tui.requestRender();
     });
     client.on("session/entry", (n) => {
       if (!this.session) this.early.push(n);
@@ -209,6 +237,11 @@ export class App {
     return `Could not open the session: ${(e as Error).message}`;
   }
 
+    private renderFooter() {
+    const working = this.working === undefined ? "" : ` · ${style.accent("working… Esc to interrupt")}`;
+    this.footer.setText(`${style.muted(this.spend.summary())}${working}`);
+  }
+
   private renderHeader() {
     const id = this.session ? `  ${style.muted(`session ${shortId(this.session.id)}`)}` : "";
     this.header.setText(`${style.bold(style.accent("strive"))} ${style.muted(this.init.server.version)}  ${tilde(this.cwd)}${id}`);
@@ -229,14 +262,18 @@ export class App {
       this.checkpoints.set(this.awaitingPrompt, `before “${e.text}”`);
       this.awaitingPrompt = undefined;
     }
-    if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
+        if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
+    if (e.type === "turnStarted") this.working = e.turn;
+    if (e.type === "turnEnded") this.working = undefined;
+    if (e.type === "assistantMessage" || e.type === "turnEnded") this.live.setText("");
     if (e.type === "approvalDecided") this.pending.delete(e.effect);
     const next = this.pending.values().next();
     this.prompt.setText(
       next.done ? "" : `${style.accent(`Allow ${next.value}?`)}  ${style.muted("y yes · a yes for this session · n no")}`,
     );
-    this.footer.setText(style.muted(this.spend.summary()));
-    this.say(describe(entry));
+        this.renderFooter();
+        const text = describe(entry);
+    if (text) this.say(text);
   }
 
   quit(code: number) {
@@ -254,17 +291,12 @@ export class App {
     if (!text || !this.session) return;
     this.editor.setText("");
     if (!text.startsWith("/")) {
-      try {
+            try {
         await this.client.request("session/prompt", { id: this.session.id, text });
       } catch (e) {
         this.editor.setText(text);
         const why = e instanceof ServerError ? e.detail : (e as Error).message;
         this.say(style.danger(`Couldn't confirm your message was saved: ${why}`));
-        return;
-      }
-      if (!this.notedMissingAgent) {
-        this.notedMissingAgent = true;
-        this.say(style.muted("Saved to this session. No agent is connected yet; the agent host is the next milestone."));
       }
       return;
     }

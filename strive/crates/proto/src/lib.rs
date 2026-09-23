@@ -81,7 +81,11 @@ methods! {
     BlobGet = "blob/get" (BlobGetParams) -> BlobGetResult;
     SessionApprovals = "session/approvals" (SessionApprovalsParams) -> Appended;
         ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
-    SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
+        SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
+    HostRegister = "host/register" (SessionRef) -> AgentConfig;
+    HostRecord = "host/record" (HostRecordParams) -> Appended;
+    HostStream = "host/stream" (HostStreamParams) -> Empty;
+    SessionInterrupt = "session/interrupt" (SessionRef) -> Empty;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -119,8 +123,12 @@ macro_rules! notifications {
 }
 
 notifications! {
-    /// A new entry in a session this connection attached to.
+        /// A new entry in a session this connection attached to.
     SessionEntry = "session/entry" (SessionEntryNotification);
+    /// The model's reply so far, while it streams.
+    SessionDelta = "session/delta" (SessionDeltaNotification);
+    /// Sent to the session's host: stop the current turn.
+    SessionInterruptRequested = "session/interrupt" (SessionInterruptNotification);
 }
 
 /// Parameters or result with no fields. Serializes as `{}`.
@@ -413,6 +421,58 @@ pub struct SessionApprovalsParams {
     pub mode: ApprovalMode,
 }
 
+/// What the agent host needs to run a session's agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AgentConfig {
+    pub cwd: String,
+    pub model: String,
+    /// `anthropic` or `openai`.
+    pub provider: String,
+    /// The gateway base URL for that provider (holds the session's token).
+    pub base_url: String,
+    pub context_window: u64,
+    pub max_output: u64,
+    pub turn_seconds: u64,
+}
+
+/// An event the host records: only turn and assistant events are accepted.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct HostRecordParams {
+    pub id: String,
+    pub event: Event,
+}
+
+/// Live text from the model, shown while it streams; not journaled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct HostStreamParams {
+    pub id: String,
+    pub turn: u64,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionDeltaNotification {
+    pub session_id: String,
+    pub turn: u64,
+    /// The reply's text so far.
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionInterruptNotification {
+    pub session_id: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -545,6 +605,48 @@ pub enum Event {
         to: u64,
         saved_as: u64,
     },
+    /// The agent began working on the session's prompts.
+    TurnStarted {
+        turn: u64,
+    },
+    /// The model's reply within a turn.
+    AssistantMessage {
+        turn: u64,
+        /// The reply's text, for showing.
+        text: String,
+        /// The tools it called; their results are the effects with these ids.
+        tool_calls: Vec<ToolCall>,
+        /// The message exactly as the agent keeps it, fed back on resume.
+        #[ts(type = "unknown")]
+        message: serde_json::Value,
+    },
+    TurnEnded {
+        turn: u64,
+        reason: TurnEnd,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+}
+
+/// Why a turn ended.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum TurnEnd {
+    /// The model finished.
+    Done,
+    /// Someone interrupted it.
+    Interrupted,
+    /// It ran past the session's time limit for a turn.
+    TimedOut { seconds: u64 },
+    /// A model call failed (budget, provider error, ...).
+    Failed { error: String },
 }
 
 /// What the agent may do without asking. Writes outside the workspace

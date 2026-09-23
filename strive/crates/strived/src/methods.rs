@@ -18,13 +18,20 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use crate::server::State;
+use crate::sessions::Push;
 use crate::sessions::{SessionError, SessionId};
+use strive_proto::{
+    AgentConfig, Event, HostRecord, HostRecordParams, HostRegister, HostStream, HostStreamParams, SessionDelta,
+    SessionDeltaNotification, SessionInterrupt, SessionInterruptNotification, SessionInterruptRequested,
+};
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
 
 /// Per-connection state.
 pub struct Conn {
     initialized: std::sync::atomic::AtomicBool,
+    /// The session this connection hosts the agent for, if any.
+    host_of: std::sync::Mutex<Option<SessionId>>,
     /// The client's name from `initialize`, recorded with its decisions.
     client: std::sync::Mutex<String>,
     /// Weak, so neither requests in flight nor subscriptions keep a closed
@@ -38,6 +45,7 @@ impl Conn {
     pub fn new(out: &mpsc::UnboundedSender<Message>) -> Self {
         Self {
             initialized: std::sync::atomic::AtomicBool::new(false),
+            host_of: std::sync::Mutex::new(None),
             client: std::sync::Mutex::new(String::new()),
             out: out.downgrade(),
             subscriptions: std::sync::Mutex::new(Vec::new()),
@@ -53,8 +61,12 @@ impl Conn {
         self.out.upgrade().is_some_and(|out| out.send(msg).is_ok())
     }
 
-    /// Stops forwarding session entries; called when the connection closes.
-    pub fn close(&self) {
+    /// Stops forwarding session entries and gives up any host registration;
+    /// called when the connection closes.
+    pub fn close(&self, state: &State) {
+        if let Some(sid) = self.host_of.lock().expect("host registration").take() {
+            state.hosts.unregister(&sid);
+        }
         for t in self.subscriptions.lock().expect("subscriptions").drain(..) {
             t.abort();
         }
@@ -127,6 +139,7 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
             reply::<AuthStatus>(AuthStatusResult { providers })
         }
         m if m.starts_with("effect/") => route_effect(state, m, params).await,
+        m if m.starts_with("host/") => route_host(state, conn, m, params).await,
         ApprovalRespond::NAME => {
             let ApprovalRespondParams { id, effect, decision } = parse::<ApprovalRespond>(params)?;
             let by = conn.client.lock().expect("client name").clone();
@@ -149,6 +162,94 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
         }
         other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
     }
+}
+
+async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
+    match method {
+        HostRegister::NAME => {
+            let SessionRef { id } = parse::<HostRegister>(params)?;
+            let sid = session_id(&id)?;
+            let info = state.sessions.info(&sid).await.map_err(session_error)?;
+            let model_id = state.settings.model.clone();
+            let model = state.models.get(&model_id).copied().ok_or_else(|| {
+                RpcError::new(
+                    RpcError::INVALID_PARAMS,
+                    format!("no price is known for {model_id}; add it under \"models\" in ~/.strive/settings.json"),
+                )
+            })?;
+            let provider = if model_id.starts_with("claude") { "anthropic" } else { "openai" };
+            let urls = state.gateway.info(&sid).map_err(|e| internal(&e))?;
+            {
+                let mut host = conn.host_of.lock().expect("host registration");
+                if host.is_none() {
+                    state.hosts.register(&sid);
+                    *host = Some(sid.clone());
+                }
+            }
+            reply::<HostRegister>(AgentConfig {
+                cwd: info.cwd,
+                base_url: if provider == "anthropic" { urls.anthropic } else { urls.openai },
+                provider: provider.into(),
+                model: model_id,
+                context_window: model.context_window,
+                max_output: model.max_output.min(state.settings.agent_max_output),
+                turn_seconds: state.settings.turn_seconds,
+            })
+        }
+        HostRecord::NAME => {
+            let HostRecordParams { id, event } = parse::<HostRecord>(params)?;
+            if !matches!(event, Event::TurnStarted { .. } | Event::AssistantMessage { .. } | Event::TurnEnded { .. }) {
+                return Err(RpcError::new(
+                    RpcError::INVALID_PARAMS,
+                    "a host records only turns and assistant messages",
+                ));
+            }
+            let entries = state.sessions.append(&session_id(&id)?, vec![event]).await.map_err(session_error)?;
+            reply::<HostRecord>(Appended { seq: entries[0].seq })
+        }
+        HostStream::NAME => {
+            let HostStreamParams { id, turn, text } = parse::<HostStream>(params)?;
+            state.sessions.push(&session_id(&id)?, Push::Delta { turn, text }).await.map_err(session_error)?;
+            reply::<HostStream>(Empty {})
+        }
+        other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
+    }
+}
+
+async fn prompt(state: &Arc<State>, params: Value) -> Reply {
+    let SessionPromptParams { id, text } = parse::<SessionPrompt>(params)?;
+    let sid = session_id(&id)?;
+    let info = state.sessions.info(&sid).await.map_err(session_error)?;
+    let commit = checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await;
+    let entries = state.sessions.prompt(&sid, text, commit).await.map_err(session_error)?;
+    state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
+    reply::<SessionPrompt>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
+}
+
+async fn rewind(state: &Arc<State>, params: Value) -> Reply {
+    let SessionRewindParams { id, checkpoint: to } = parse::<SessionRewind>(params)?;
+    let sid = session_id(&id)?;
+    let info = state.sessions.info(&sid).await.map_err(session_error)?;
+    let target = state
+        .sessions
+        .checkpoint_commit(&sid, to)
+        .await
+        .map_err(session_error)?
+        .ok_or_else(|| RpcError::new(RpcError::INVALID_PARAMS, format!("no checkpoint {to} in this session")))?;
+    let lock = state.sessions.checkpoint_lock(&sid);
+    let _held = lock.lock().await;
+    let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), std::path::Path::new(&info.cwd))
+        .ok_or_else(|| RpcError::new(RpcError::INTERNAL_ERROR, "checkpoints need git, which isn't available"))?;
+    let saved = tokio::task::spawn_blocking(move || {
+        let saved = shadow.snapshot(&format!("before rewinding to checkpoint {to}"))?;
+        shadow.restore(&target)?;
+        std::io::Result::Ok(saved)
+    })
+    .await
+    .map_err(|e| internal(&e))?
+    .map_err(|e| internal(&e))?;
+    let saved_as = state.sessions.record_rewind(&sid, to, saved).await.map_err(session_error)?;
+    reply::<SessionRewind>(SessionRewindResult { saved_as })
 }
 
 async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply {
@@ -224,13 +325,13 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         SessionAttach::NAME => {
             let SessionAttachParams { id, after_seq } = parse::<SessionAttach>(params)?;
             let sid = session_id(&id)?;
+            let person = conn.host_of.lock().expect("host registration").is_none();
             let (session, entries, mut stream) =
-                state.sessions.attach(&sid, after_seq.unwrap_or(0)).await.map_err(session_error)?;
+                state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
             let weak = conn.out.clone();
             let forward = tokio::spawn(async move {
-                while let Some(entry) = stream.recv().await {
-                    let n = SessionEntryNotification { session_id: id.clone(), entry };
-                    let msg = Message::notification(SessionEntry::NAME, serde_json::to_value(n).expect("serializes"));
+                while let Some(push) = stream.recv().await {
+                    let msg = notification(&id, push);
                     if weak.upgrade().is_none_or(|out| out.send(msg).is_err()) {
                         break;
                     }
@@ -239,39 +340,8 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             conn.subscriptions.lock().expect("subscriptions").push(forward);
             reply::<SessionAttach>(SessionAttachResult { session, entries })
         }
-        SessionPrompt::NAME => {
-            let SessionPromptParams { id, text } = parse::<SessionPrompt>(params)?;
-            let sid = session_id(&id)?;
-            let info = state.sessions.info(&sid).await.map_err(session_error)?;
-            let commit = checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await;
-            let entries = state.sessions.prompt(&sid, text, commit).await.map_err(session_error)?;
-            reply::<SessionPrompt>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
-        }
-        SessionRewind::NAME => {
-            let SessionRewindParams { id, checkpoint: to } = parse::<SessionRewind>(params)?;
-            let sid = session_id(&id)?;
-            let info = state.sessions.info(&sid).await.map_err(session_error)?;
-            let target = state.sessions.checkpoint_commit(&sid, to).await.map_err(session_error)?.ok_or_else(|| {
-                RpcError::new(RpcError::INVALID_PARAMS, format!("no checkpoint {to} in this session"))
-            })?;
-            let lock = state.sessions.checkpoint_lock(&sid);
-            let _held = lock.lock().await;
-            let shadow =
-                crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), std::path::Path::new(&info.cwd))
-                    .ok_or_else(|| {
-                        RpcError::new(RpcError::INTERNAL_ERROR, "checkpoints need git, which isn't available")
-                    })?;
-            let saved = tokio::task::spawn_blocking(move || {
-                let saved = shadow.snapshot(&format!("before rewinding to checkpoint {to}"))?;
-                shadow.restore(&target)?;
-                std::io::Result::Ok(saved)
-            })
-            .await
-            .map_err(|e| internal(&e))?
-            .map_err(|e| internal(&e))?;
-            let saved_as = state.sessions.record_rewind(&sid, to, saved).await.map_err(session_error)?;
-            reply::<SessionRewind>(SessionRewindResult { saved_as })
-        }
+        SessionPrompt::NAME => prompt(state, params).await,
+        SessionRewind::NAME => rewind(state, params).await,
         SessionRead::NAME => {
             let SessionRef { id } = parse::<SessionRead>(params)?;
             let (session, report) = state.sessions.read(&session_id(&id)?).map_err(session_error)?;
@@ -288,6 +358,11 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             let sid = session_id(&id)?;
             state.sessions.check(&sid).await.map_err(session_error)?;
             reply::<SessionGateway>(state.gateway.info(&sid).map_err(|e| internal(&e))?)
+        }
+        SessionInterrupt::NAME => {
+            let SessionRef { id } = parse::<SessionInterrupt>(params)?;
+            state.sessions.push(&session_id(&id)?, Push::Interrupt).await.map_err(session_error)?;
+            reply::<SessionInterrupt>(Empty {})
         }
         SessionApprovals::NAME => {
             let SessionApprovalsParams { id, mode } = parse::<SessionApprovals>(params)?;
@@ -368,5 +443,24 @@ async fn checkpoint(state: &Arc<State>, sid: &SessionId, cwd: &str, message: &st
             crate::log!("checkpoint skipped: {e}");
             None
         }
+    }
+}
+
+/// The notification a subscriber gets for a push.
+fn notification(session_id: &str, push: Push) -> Message {
+    let session_id = session_id.to_string();
+    match push {
+        Push::Entry(entry) => Message::notification(
+            SessionEntry::NAME,
+            serde_json::to_value(SessionEntryNotification { session_id, entry }).expect("serializes"),
+        ),
+        Push::Delta { turn, text } => Message::notification(
+            SessionDelta::NAME,
+            serde_json::to_value(SessionDeltaNotification { session_id, turn, text }).expect("serializes"),
+        ),
+        Push::Interrupt => Message::notification(
+            SessionInterruptRequested::NAME,
+            serde_json::to_value(SessionInterruptNotification { session_id }).expect("serializes"),
+        ),
     }
 }

@@ -42,6 +42,8 @@ impl Env {
             .env_remove("OPENAI_API_KEY")
             .env("STRIVE_UPSTREAM_ANTHROPIC", "http://127.0.0.1:9")
             .env("STRIVE_UPSTREAM_OPENAI", "http://127.0.0.1:9")
+            // No agent host unless a test asks for one.
+            .env("STRIVE_HOST", "none")
             .envs(self.vars.iter().map(|(k, v)| (k.as_str(), v.as_str())));
         c
     }

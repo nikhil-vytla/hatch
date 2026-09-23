@@ -5,6 +5,8 @@ import type { Decision } from "./Decision";
 import type { Digest } from "./Digest";
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
+import type { ToolCall } from "./ToolCall";
+import type { TurnEnd } from "./TurnEnd";
 
 /**
  * Something that happened in a session. Journaled in order; never edited.
@@ -45,4 +47,16 @@ by: string, } | { "type": "checkpointed", checkpoint: number,
 /**
  * The commit in the session's shadow repository.
  */
-commit: string, } | { "type": "rewound", to: number, savedAs: number, };
+commit: string, } | { "type": "rewound", to: number, savedAs: number, } | { "type": "turnStarted", turn: number, } | { "type": "assistantMessage", turn: number, 
+/**
+ * The reply's text, for showing.
+ */
+text: string, 
+/**
+ * The tools it called; their results are the effects with these ids.
+ */
+toolCalls: Array<ToolCall>, 
+/**
+ * The message exactly as the agent keeps it, fed back on resume.
+ */
+message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, };

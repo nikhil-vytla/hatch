@@ -41,8 +41,11 @@ export class Spend {
       case "approvalModeSet":
       case "approvalRequested":
             case "approvalDecided":
-      case "checkpointed":
+            case "checkpointed":
       case "rewound":
+      case "turnStarted":
+      case "assistantMessage":
+      case "turnEnded":
         return;
     }
   }

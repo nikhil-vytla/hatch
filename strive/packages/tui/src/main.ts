@@ -1,5 +1,11 @@
 #!/usr/bin/env bun
-// Entry point. `strive` starts the daemon and execs this with STRIVE_SOCKET set.
+// Entry point. `strive` starts the daemon and execs this with STRIVE_SOCKET
+// set; the daemon runs `strive-tui host --session ID` to host an agent. One
+// binary, so one embedded runtime.
+if (process.argv[2] === "host") {
+  await import("@strive/host/main");
+  await new Promise(() => {});
+}
 import { ProcessTerminal, TuiMainScreen } from "@earendil-works/pi-tui";
 import { StriveClient } from "@strive/protocol";
 import { App, parseSessionMode } from "./app";

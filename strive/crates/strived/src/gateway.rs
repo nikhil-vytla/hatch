@@ -353,8 +353,10 @@ impl Finish {
     /// Journals how the call ended; false if that couldn't be recorded.
     async fn done(mut self, outcome: CallOutcome, response: Option<Digest>) -> bool {
         self.finished = true;
+        crate::log!("call {} ending: {outcome:?}", self.call);
         let ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let recorded = self.state.sessions.finish_call(&self.session, self.call, outcome, response, ms).await;
+        crate::log!("call {} end recorded: {}", self.call, recorded.is_ok());
         if let Err(e) = &recorded {
             crate::log!(
                 "could not journal the end of call {} (reserved {}): {e:?}",

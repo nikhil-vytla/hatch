@@ -12,7 +12,7 @@ export type TestDaemon = {
   dispose(): void;
 };
 
-export function startDaemon(): TestDaemon {
+export function startDaemon(extra: Record<string, string> = {}): TestDaemon {
   const home = mkdtempSync("/tmp/strv-ts-");
   // Real keys and upstreams must never reach a test daemon.
   const env = {
@@ -21,8 +21,11 @@ export function startDaemon(): TestDaemon {
     STRIVE_IDLE_SECS: undefined,
     ANTHROPIC_API_KEY: undefined,
     OPENAI_API_KEY: undefined,
-    STRIVE_UPSTREAM_ANTHROPIC: "http://127.0.0.1:9",
+        STRIVE_UPSTREAM_ANTHROPIC: "http://127.0.0.1:9",
     STRIVE_UPSTREAM_OPENAI: "http://127.0.0.1:9",
+    // No agent host unless a test asks for one.
+    STRIVE_HOST: "none",
+    ...extra,
   };
   const strive = (...args: string[]) => {
     const r = Bun.spawnSync([STRIVE_EXE, ...args], { env });

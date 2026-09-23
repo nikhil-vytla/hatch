@@ -638,8 +638,17 @@ fn a_call_is_finished_and_charged_once_even_across_a_writer_restart() {
     let failed = s.env.rpc().call("session/prompt", &json!({"id": s.id, "text": "breaks the writer"}));
     std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert!(failed.get("error").is_some(), "{failed}");
-    assert!(call.join().unwrap() > 0);
-    common::wait_for("the call to be closed", Duration::from_secs(5), || s.count("modelCallFinished") >= 1);
+    let got = call.join().unwrap();
+    assert!(got > 0);
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while s.count("modelCallFinished") == 0 {
+        if std::time::Instant::now() > deadline {
+            let kinds: Vec<Value> = s.entries().iter().map(|e| e["type"].clone()).collect();
+            let log = std::fs::read_to_string(s.env.home.path().join("logs/strived.log")).unwrap_or_default();
+            panic!("the call was never closed.\nentries: {kinds:?}\ndaemon log:\n{log}");
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(s.count("modelCallFinished"), 1, "{:?}", s.entries());
 }
