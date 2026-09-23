@@ -325,3 +325,23 @@ test("an MCP server that didn't start is shown", async () => {
   client.close();
   await ui.term.waitFor("MCP server broken didn't start: can't run /no/such/server");
 });
+
+// The model's text is shown, never obeyed: terminal controls in a reply
+// could clear the screen and forge the header or earlier prompts.
+test("terminal control sequences in a reply are shown as text, not run", async () => {
+  const ui = await openUi();
+  await enter(ui, "first prompt");
+  await ui.term.waitFor("› first prompt");
+  const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
+  const id = sessions()[0]!.id;
+  await client.request("host/register", { id });
+  await client.request("host/record", {
+    id,
+    event: { type: "assistantMessage", turn: 1, text: "\x1b[2J\x1b[HFORGED HEADER", toolCalls: [], message: {} },
+  });
+  client.close();
+  const screen = await ui.term.waitFor("FORGED HEADER");
+  expect(screen[0]).toContain("strive");
+  expect(screen.some((l) => l.includes("› first prompt"))).toBe(true);
+  expect(screen.some((l) => l.includes("^[[2J^[[HFORGED HEADER"))).toBe(true);
+});

@@ -350,3 +350,28 @@ test("the model can propose a layout change, which is journaled and changes noth
   expect(e.some((x) => x.type === "effectStarted")).toBe(false);
   expect(JSON.stringify(fake!.requests[1].messages.at(-1))).toContain("the desktop app");
 });
+
+test("summarizing before a turn is part of the turn: it can be interrupted, and it has the time limit", async () => {
+  for (const stop of ["interrupt", "time limit"] as const) {
+    const { client, id } = await setupWith({ compactAtTokens: 5, turnSeconds: stop === "time limit" ? 2 : 60 }, [
+      { text: "The first answer, long enough to push the conversation past the tiny limit." },
+      { text: "a summary that takes too long", delayMs: 20_000 },
+      { text: "never sent" },
+    ]);
+
+    await client.request("session/prompt", { id, text: "first question" });
+    await waitFor(client, id, turnsEnded(1));
+    await client.request("session/prompt", { id, text: "second question" });
+    await waitFor(client, id, (e) => e.filter((x) => x.type === "modelCallStarted").length === 2);
+    const started = Date.now();
+
+    if (stop === "interrupt") await client.request("session/interrupt", { id });
+    const e = await waitFor(client, id, turnsEnded(2), 8000);
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(lastTurnEnd(e)?.reason.kind).toBe(stop === "interrupt" ? "interrupted" : "timedOut");
+    await Bun.sleep(300);
+    expect(fake!.requests.length).toBe(2); // the prompt wasn't run after all
+    daemon!.dispose();
+    fake!.stop();
+  }
+});

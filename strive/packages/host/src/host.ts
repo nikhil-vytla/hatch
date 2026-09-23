@@ -324,6 +324,8 @@ const textOf = (m: AssistantMessage) => m.content.flatMap((c) => (c.type === "te
 export class Host {
   private agent!: Agent;
   private turn = 0;
+  /** Stops the running turn's own model calls (the summary); the agent has its own abort. */
+  private turnAbort?: AbortController;
   /** Prompts not yet sent, with their journal seqs. */
   private queued: { text: string; seq: number }[] = [];
   private running = false;
@@ -433,6 +435,7 @@ export class Host {
   interrupt() {
     if (!this.running) return;
     this.interrupted = true;
+    this.turnAbort?.abort();
     this.agent?.abort();
   }
 
@@ -458,7 +461,7 @@ export class Host {
   }
 
   /** Summarizes the conversation up to entry `upto` if it has grown past the limit. */
-  private async compactIfLarge(upto: number) {
+  private async compactIfLarge(upto: number, signal: AbortSignal) {
     const messages = this.agent.state.messages;
 
     if (
@@ -467,23 +470,27 @@ export class Host {
     )
       return;
 
-    const reply = await this.models.completeSimple(model(this.config), {
-      systemPrompt: SUMMARIZE,
-      messages: [{ role: "user", content: transcriptText(messages), timestamp: Date.now() }],
-    });
+    const reply = await this.models.completeSimple(
+      model(this.config),
+      {
+        systemPrompt: SUMMARIZE,
+        messages: [{ role: "user", content: transcriptText(messages), timestamp: Date.now() }],
+      },
+      { signal },
+    );
 
     const summary = textOf(reply).trim();
 
-    if (!summary || reply.stopReason === "error") return;
+    if (!summary || reply.stopReason === "error" || reply.stopReason === "aborted" || signal.aborted) return;
     await this.record({ type: "compacted", uptoSeq: upto, summary });
     const system = messages.filter((m) => m.role === "system").slice(0, 1);
     this.agent.state.messages = [...system, summaryMessage(summary, Date.now())];
   }
 
   private async runTurn(prompts: { text: string; seq: number }[]) {
-    // The summary covers the conversation so far; prompts no turn has taken
-    // (these ones) are kept past it on resume.
-    await this.compactIfLarge(this.conversationSeq);
+    // The summary covers the conversation before this turn; the prompts this
+    // turn takes are kept past it on resume.
+    const upto = this.conversationSeq;
     this.turn += 1;
     this.timedOut = false;
     this.interrupted = false;
@@ -491,10 +498,33 @@ export class Host {
     await this.record({ type: "turnStarted", turn: this.turn, throughSeq: taken });
     this.conversationSeq = Math.max(this.conversationSeq, taken ?? 0);
 
+    // Summarizing is part of the turn: Esc and the time limit stop it too.
+    const abort = new AbortController();
+    this.turnAbort = abort;
+
     const timer = setTimeout(() => {
       this.timedOut = true;
+      abort.abort();
       this.agent.abort();
     }, this.config.turnSeconds * 1000);
+
+    try {
+      await this.compactIfLarge(upto, abort.signal);
+    } catch (e) {
+      if (!abort.signal.aborted) console.error(`summarizing failed, going on without: ${describeError(e)}`);
+    }
+
+    if (abort.signal.aborted) {
+      clearTimeout(timer);
+
+      const reason: TurnEnd = this.timedOut
+        ? { kind: "timedOut", seconds: this.config.turnSeconds }
+        : { kind: "interrupted" };
+
+      await this.record({ type: "turnEnded", turn: this.turn, reason });
+
+      return;
+    }
 
     let reason: TurnEnd;
 

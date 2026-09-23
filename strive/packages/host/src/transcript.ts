@@ -36,6 +36,18 @@ export function summaryMessage(summary: string, timestamp: number): Message {
   return { role: "user", content: `[A summary of the conversation so far]\n\n${summary}`, timestamp };
 }
 
+/** An assistant message as pi-ai makes it, as far as replay relies on it. */
+function isAssistantMessage(v: unknown): v is AssistantMessage {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    "role" in v &&
+    v.role === "assistant" &&
+    "content" in v &&
+    Array.isArray(v.content)
+  );
+}
+
 export async function rebuild(all: Entry[], blob: (digest: string) => Promise<string>): Promise<Message[]> {
   // The latest summary replaces everything it covers, except prompts no turn
   // had taken by then: those follow it, before the entries after it.
@@ -116,12 +128,14 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
     } else if (e.type === "userMessage") {
       held.push({ seq, message: { role: "user", content: e.text, timestamp: tsMs } });
     } else if (e.type === "assistantMessage") {
+      const reply = e.message;
+
+      // A host wrote it, and a host can be wrong: what isn't a reply is left out.
+      if (!isAssistantMessage(reply)) continue;
+
       // Without turn markers, a reply answers the prompts before it.
       if (inTurn) close();
       else release();
-      // SAFETY: only the host writes assistantMessage entries, and it records pi-ai's
-      // AssistantMessage as is (Host.record in host.ts); the daemon stores it untouched.
-      const reply = e.message as AssistantMessage;
       messages.push(reply);
       // Providers drop an aborted or failed reply when it is sent back, so
       // results for its calls would answer calls the model never sees.

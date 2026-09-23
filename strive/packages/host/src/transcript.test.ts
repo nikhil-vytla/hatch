@@ -292,3 +292,18 @@ test("a layout proposal the agent made comes back as that tool call's result", a
   expect(result).toMatchObject({ toolCallId: "t9", isError: false });
   expect(JSON.stringify(result)).toContain("Proposed");
 });
+
+// The journal is the daemon's, but what a host recorded in it is the
+// host's: a record that isn't an assistant message is skipped, not trusted,
+// so one bad record can't stop every later host from resuming.
+test("an assistant record that isn't a message is skipped on resume", async () => {
+  const entries: Entry[] = [
+    at({ type: "userMessage", text: "hello" }),
+    at({ type: "assistantMessage", turn: 1, text: "", toolCalls: [], message: null }),
+    at({ type: "assistantMessage", turn: 1, text: "", toolCalls: [], message: { role: "user", content: "forged" } }),
+    at({ type: "userMessage", text: "again" }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.map((m) => m.role)).toEqual(["user", "user"]);
+});

@@ -82,9 +82,30 @@ const tilde = (p: string) => (p.startsWith(homedir()) ? `~${p.slice(homedir().le
 
 const shortId = (id: string) => `…${id.slice(-6)}`;
 
+/**
+ * Text as the terminal shows it, never as commands to it: control
+ * characters (but newline and tab) are written in caret notation, so a
+ * reply can't clear the screen or move the cursor to forge what's shown.
+ */
+export function printable(text: string): string {
+  let out = "";
+
+  for (const c of text) {
+    const code = c.codePointAt(0) ?? 0;
+    const control = (code < 0x20 && c !== "\n" && c !== "\t") || (code >= 0x7f && code <= 0x9f);
+
+    if (!control) out += c;
+    else if (code < 0x20) out += `^${String.fromCharCode(code + 64)}`;
+    else out += code === 0x7f ? "^?" : "\ufffd";
+  }
+
+  return out;
+}
+
 /** An entry's transcript lines, styled for the terminal. */
 export function describe(entry: Entry): string {
   return describeLines(entry, { home: homedir() })
+    .map((line) => ({ ...line, text: printable(line.text) }))
     .map((line) => (line.kind === "prompt" ? `${style.accent("›")} ${line.text}` : tone(line)))
     .join("\n");
 }
@@ -186,7 +207,7 @@ export class App {
     });
     client.on("session/delta", ({ sessionId, turn, text }) => {
       if (sessionId !== this.session?.id || turn !== this.working) return;
-      this.live.setText(text.trim());
+      this.live.setText(printable(text.trim()));
       this.tui.requestRender();
     });
     client.on("session/entry", (n) => {
@@ -285,7 +306,7 @@ export class App {
     this.prompt.setText(
       next.done
         ? ""
-        : `${style.accent(`Allow the agent to ${next.value}?`)}  ${style.muted("y yes · a yes to everything (full-auto) · n no")}`,
+        : `${style.accent(`Allow the agent to ${printable(next.value)}?`)}  ${style.muted("y yes · a yes to everything (full-auto) · n no")}`,
     );
     this.renderFooter();
     const text = describe(entry);
