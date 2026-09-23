@@ -18,30 +18,51 @@ function decisions(dir: string): string[] {
   }
 }
 
-/** The saved workspace in `dir`, or undefined when none is saved or it doesn't parse. */
-export function loadWorkspace(dir: string): History | undefined {
+function loadLayout(file: string): History | undefined {
+  let text: string;
+
   try {
-    const parsed = parseJson(HistorySchema, readFileSync(join(dir, "workspace.json"), "utf8"));
-
-    if (!parsed.ok) return undefined;
-
-    return { ...parsed.value, decided: [...new Set([...parsed.value.decided, ...decisions(dir)])] };
+    text = readFileSync(file, "utf8");
   } catch {
     return undefined; // none saved yet
   }
+
+  const parsed = parseJson(HistorySchema, text);
+
+  return parsed.ok ? parsed.value : undefined;
+}
+
+/** The saved workspace in `dir`, or undefined when none is saved or it doesn't parse. */
+export function loadWorkspace(dir: string): History | undefined {
+  const saved = loadLayout(join(dir, "workspace.json"));
+
+  return saved && { ...saved, decided: [...new Set([...saved.decided, ...decisions(dir)])] };
+}
+
+/** Makes a file for each decision, where there isn't one. */
+function mark(dir: string, keys: readonly string[]): void {
+  mkdirSync(join(dir, "decided"), { recursive: true });
+
+  for (const key of keys) writeFileSync(join(dir, "decided", marker(key)), "", { flag: "a" });
 }
 
 /**
  * Saves `h` in `dir`, keeping decisions other windows saved since this one
  * loaded. The layout goes first: a save that fails before it lands decides
  * nothing, so an accepted proposal whose edit wasn't saved is offered again.
+ * A save that failed after it left decisions only in the layout, so each
+ * save first gives the layout's decisions files before replacing it.
  */
 export function saveWorkspace(dir: string, h: History): void {
   const file = join(dir, "workspace.json");
+
+  const onDisk = loadLayout(file);
+
+  // Unguarded: if this fails, the layout must not be replaced.
+  if (onDisk) mark(dir, onDisk.decided);
+
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify({ ...h, decided: [...new Set([...decisions(dir), ...h.decided])] }));
   renameSync(tmp, file);
-  mkdirSync(join(dir, "decided"), { recursive: true });
-
-  for (const key of h.decided) writeFileSync(join(dir, "decided", marker(key)), "", { flag: "a" });
+  mark(dir, h.decided);
 }

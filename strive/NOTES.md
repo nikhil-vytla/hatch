@@ -512,3 +512,15 @@ Stop-gate review of `c29c796`:
 - **Test hygiene:** a failed e2e test left its Electron app and sockets open,
   so `node --test` never exited, and a dozen stale runners had piled up. Apps
   now close in `afterEach`, and the probe closes its listeners in `finally`.
+
+Stop-gate review of `884a994`:
+- **The problem:** if a decision's file failed to write after the layout
+  landed, the decision existed only in the layout. The next save from a stale
+  window merged only decision files, so it dropped the decision.
+- **The fix:** every save first gives each decision in the on-disk layout a
+  file, repairing an earlier partial save, before it replaces the layout. If
+  that repair fails, the save stops. A test injects the failed write and then
+  saves from a stale window.
+- **What's left:** the failure has to line up with another process's save that
+  read the layout before this one's rename. That needs a cross-process lock,
+  which isn't worth adding for a UI preference file.

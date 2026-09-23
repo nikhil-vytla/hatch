@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { history, type Workspace } from "@strive/workspace";
@@ -38,6 +38,20 @@ test("a save that fails decides nothing, so its proposals are offered again", ()
   expect(() => saveWorkspace(dir, { ...history(base), decided: ["accepted"] })).toThrow();
 
   expect(loadWorkspace(dir)?.decided).toEqual([]);
+});
+
+test("a decision whose own file failed is kept by the next window's save", () => {
+  const dir = mkdtempSync(join(tmpdir(), "strv-store-"));
+  saveWorkspace(dir, history(base));
+  // The decision's file can't be written: a directory has its name.
+  const blocker = join(dir, "decided", Buffer.from("rejected-p").toString("base64url"));
+  mkdirSync(blocker);
+  expect(() => saveWorkspace(dir, { ...history(base), decided: ["rejected-p"] })).toThrow();
+  rmdirSync(blocker);
+
+  saveWorkspace(dir, history(base)); // a window that loaded before the decision
+
+  expect(loadWorkspace(dir)?.decided).toEqual(["rejected-p"]);
 });
 
 // Each window is its own process, so saves from two of them interleave.
