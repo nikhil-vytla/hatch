@@ -1,4 +1,4 @@
-use strive_budget::{Ledger, Limits, Models, Price, Refusal, Reservation, cost, format_usd};
+use strive_budget::{Ledger, Limits, Models, Price, Refusal, Reservation, cost, format_usd, open_calls};
 use strive_proto::{CallOutcome, Digest, Event, Usage};
 
 const HAIKU: Price = Price { input: 1_000_000, output: 5_000_000, cache_write: 1_250_000, cache_read: 100_000 };
@@ -50,7 +50,7 @@ fn models_match_by_longest_prefix() {
 fn configured_prices_override_and_extend_the_builtins() {
     let json = r#"{
         "claude-haiku-4-5": {"input": 2.0, "output": 10.0, "contextWindow": 200000},
-        "claude-opus-5-5": {"input": 5.0, "output": 25.0, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000}
+        "claude-opus-5-5": {"input": 5.0, "output": 25.0, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000, "maxOutput": 128000}
     }"#;
     let m = Models::builtin().with_overrides(&serde_json::from_str(json).unwrap());
     assert_eq!(
@@ -58,7 +58,8 @@ fn configured_prices_override_and_extend_the_builtins() {
         Some((2_000_000, 10_000_000))
     );
     let opus = m.get("claude-opus-5-5").unwrap();
-    assert_eq!((opus.price.cache_read, opus.context_window), (500_000, 1_000_000));
+    assert_eq!((opus.price.cache_read, opus.context_window, opus.max_output), (500_000, 1_000_000, 128_000));
+    assert_eq!(m.get("claude-haiku-4-5").unwrap().max_output, 200_000, "max output defaults to the context window");
     assert_eq!(
         m.get("claude-haiku-4-5").unwrap().price.cache_read,
         0,
@@ -70,11 +71,26 @@ fn configured_prices_override_and_extend_the_builtins() {
 fn a_reservation_bounds_input_by_bytes_and_the_context_window() {
     let m = Models::builtin();
     let sonnet = m.get("claude-sonnet-4-5").unwrap();
-    assert_eq!(Reservation::for_request(sonnet, 1000, 100), Reservation { usd_micros: 3000 + 1500, tokens: 1100 });
     assert_eq!(
-        Reservation::for_request(sonnet, 5_000_000, 100),
+        Reservation::for_request(sonnet, 1000, Some(100)),
+        Reservation { usd_micros: 3000 + 1500, tokens: 1100 }
+    );
+    assert_eq!(
+        Reservation::for_request(sonnet, 5_000_000, Some(100)),
         Reservation { usd_micros: 200_000 * 3 + 1500, tokens: 200_100 },
         "input can't exceed the context window"
+    );
+}
+
+#[test]
+fn a_request_without_an_output_cap_is_bounded_by_the_models_maximum() {
+    let m = Models::builtin();
+    let haiku = m.get("claude-haiku-4-5").unwrap();
+    assert_eq!(Reservation::for_request(haiku, 10, None), Reservation { usd_micros: 10 + 64_000 * 5, tokens: 64_010 });
+    assert_eq!(
+        Reservation::for_request(haiku, 10, Some(1_000_000)),
+        Reservation { usd_micros: 10 + 64_000 * 5, tokens: 64_010 },
+        "a cap above the model's maximum can't be reached"
     );
 }
 
@@ -172,17 +188,19 @@ fn a_call_left_open_by_a_crash_is_charged_its_reservation() {
     let events = vec![Event::BudgetSet { usd_micros: Some(100_000), tokens: None }, started(1, 9000, 900)];
     let l = Ledger::replay(&events);
     assert_eq!((l.spent_usd(), l.spent_tokens(), l.committed_usd()), (9000, 900, 9000));
-    assert_eq!(l.unfinished_calls(), vec![1]);
 }
 
 #[test]
-fn unfinished_calls_are_listed_in_call_order() {
+fn open_calls_are_listed_in_call_order_with_their_reservations() {
     let events = vec![
-        started(5, 100, 1),
-        started(2, 100, 1),
-        started(3, 100, 1),
+        started(5, 500, 5),
+        started(2, 200, 2),
+        started(3, 300, 3),
         finished(3, CallOutcome::Rejected { status: 500 }),
     ];
-    assert_eq!(Ledger::replay(&events).unfinished_calls(), vec![2, 5]);
-    assert_eq!(Ledger::replay(&events[3..]).unfinished_calls(), Vec::<u64>::new());
+    assert_eq!(
+        open_calls(&events),
+        vec![(2, Reservation { usd_micros: 200, tokens: 2 }), (5, Reservation { usd_micros: 500, tokens: 5 })]
+    );
+    assert_eq!(open_calls(&events[3..]), vec![]);
 }

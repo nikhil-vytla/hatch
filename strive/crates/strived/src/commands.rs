@@ -150,3 +150,29 @@ pub async fn sessions(c: &mut Client, all: bool, json: bool) -> Result<ExitCode>
     }
     Ok(ExitCode::SUCCESS)
 }
+
+pub async fn auth(c: &mut Client, provider: Option<String>) -> Result<ExitCode> {
+    use std::io::IsTerminal;
+    let Some(provider) = provider else {
+        for p in c.request::<strive_proto::AuthStatus>(strive_proto::Empty {}).await?.providers {
+            let source = match p.source.as_str() {
+                "file" => "set with strive auth",
+                "env" => "from the daemon's environment",
+                _ => "not set",
+            };
+            println!("{:<10} {source}", p.provider);
+        }
+        return Ok(ExitCode::SUCCESS);
+    };
+    let key = if std::io::stdin().is_terminal() {
+        rpassword::prompt_password(format!("Paste your {provider} API key (it won't be shown): "))?
+    } else {
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line)?;
+        line
+    };
+    c.request::<strive_proto::AuthSet>(strive_proto::AuthSetParams { provider: provider.clone(), api_key: key })
+        .await?;
+    println!("saved the {provider} key; new model calls use it");
+    Ok(ExitCode::SUCCESS)
+}

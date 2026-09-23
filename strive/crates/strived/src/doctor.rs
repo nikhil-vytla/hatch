@@ -80,14 +80,30 @@ pub async fn run(home: &Home) -> Result<bool> {
         None => r.line(&Level::Warn, "git", "git not found; checkpoints and /rewind need it"),
     }
 
-    let keys: Vec<&str> = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
-        .into_iter()
-        .filter(|k| std::env::var_os(k).is_some_and(|v| !v.is_empty()))
-        .collect();
-    if keys.is_empty() {
-        r.line(&Level::Warn, "credentials", "no API key in the environment; /login arrives with the model gateway");
-    } else {
-        r.line(&Level::Ok, "credentials", &format!("{} set", keys.join(", ")));
+    match launch::ensure(home, "strive-doctor").await {
+        Ok((mut c, _)) => {
+            let set: Vec<String> = c
+                .request::<strive_proto::AuthStatus>(strive_proto::Empty {})
+                .await?
+                .providers
+                .into_iter()
+                .filter_map(|p| match p.source.as_str() {
+                    "file" => Some(format!("{} (strive auth)", p.provider)),
+                    "env" => Some(format!("{} (environment)", p.provider)),
+                    _ => None,
+                })
+                .collect();
+            if set.is_empty() {
+                r.line(
+                    &Level::Warn,
+                    "credentials",
+                    "no provider keys; run `strive auth anthropic` or `strive auth openai`",
+                );
+            } else {
+                r.line(&Level::Ok, "credentials", &set.join(", "));
+            }
+        }
+        Err(_) => r.line(&Level::Fail, "credentials", "can't check without the daemon"),
     }
 
     Ok(!r.failed)

@@ -62,7 +62,7 @@ test("a prompt is shown from the journal and is in `strive log`", async () => {
   await ui.term.waitFor("› fix the flaky test");
   await ui.term.waitFor("Saved to this session. No agent is connected yet");
   const log = daemon.strive("log", sessions()[0]!.id);
-  expect(log.stdout).toMatch(/\n#2 \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
+  expect(log.stdout).toMatch(/\n#3 \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
 });
 
 test("the missing-agent note appears once, not per prompt", async () => {
@@ -114,7 +114,7 @@ test("resuming a tampered session explains why and saves nothing", async () => {
   daemon.strive("status");
 
   const ui = await openUi({ resume: id });
-  await ui.term.waitFor("This session's journal failed verification: entry 2 was modified, removed or moved.");
+  await ui.term.waitFor("This session's journal failed verification: entry 3 was modified, removed or moved.");
   await enter(ui, "should not be saved");
   await Bun.sleep(100);
   expect(readFileSync(journal, "utf8")).toBe(before);
@@ -176,4 +176,28 @@ test("STRIVE_SESSION values map to session modes", () => {
   expect(parseSessionMode("new")).toBe("new");
   expect(parseSessionMode("continue")).toBe("continue");
   expect(parseSessionMode("01J8ZZZZZZZZZZZZZZZZZZZZZZ")).toEqual({ resume: "01J8ZZZZZZZZZZZZZZZZZZZZZZ" });
+});
+
+const footer = async (ui: Ui) => (await ui.term.screen()).at(-1)?.trim();
+
+test("the footer shows spend against the session's budget", async () => {
+  const ui = await openUi();
+  await ui.term.waitFor("$0.0000 of $5.0000");
+  expect(await footer(ui)).toBe("$0.0000 of $5.0000");
+});
+
+test("/budget changes the session's limit, in the journal too", async () => {
+  const ui = await openUi();
+  await enter(ui, "/budget 2.5");
+  await ui.term.waitFor("$0.0000 of $2.5000");
+  expect(await footer(ui)).toBe("$0.0000 of $2.5000");
+  expect(daemon.strive("log", sessions()[0]!.id).stdout).toMatch(/\n#3 \d\d:\d\d:\d\d {2}budget: \$2\.5000\n/);
+  await enter(ui, "/budget off");
+  await ui.term.waitFor("$0.0000 spent · no budget");
+});
+
+test("/budget explains its arguments", async () => {
+  const ui = await openUi();
+  await enter(ui, "/budget lots");
+  await ui.term.waitFor("Use /budget <dollars>, for example /budget 10, or /budget off.");
 });

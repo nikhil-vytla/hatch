@@ -24,6 +24,9 @@ pub struct Model {
     pub price: Price,
     /// The most input tokens one request can carry.
     pub context_window: u64,
+    /// The most output tokens one response can carry; bounds requests that
+    /// set no cap of their own.
+    pub max_output: u64,
 }
 
 /// The cost of `usage` at `price`, rounded up to a whole micro-dollar.
@@ -43,16 +46,16 @@ pub fn format_usd(micros: u64) -> String {
 
 /// Built-in prices, as published by each provider. Anything else must be
 /// priced in settings; an unpriced model is refused rather than guessed.
-const BUILTIN: &[(&str, f64, f64, f64, f64, u64)] = &[
-    // id prefix, $/MTok input, output, cache write, cache read, context window
-    ("claude-haiku-4-5", 1.0, 5.0, 1.25, 0.10, 200_000),
-    ("claude-sonnet-4-5", 3.0, 15.0, 3.75, 0.30, 200_000),
-    ("claude-opus-4-5", 5.0, 25.0, 6.25, 0.50, 200_000),
-    ("claude-opus-4-1", 15.0, 75.0, 18.75, 1.50, 200_000),
-    ("gpt-4.1-mini", 0.40, 1.60, 0.0, 0.10, 1_047_576),
-    ("gpt-4.1", 2.0, 8.0, 0.0, 0.50, 1_047_576),
-    ("gpt-5-mini", 0.25, 2.0, 0.0, 0.025, 400_000),
-    ("gpt-5", 1.25, 10.0, 0.0, 0.125, 400_000),
+const BUILTIN: &[(&str, f64, f64, f64, f64, u64, u64)] = &[
+    // id prefix, $/MTok input, output, cache write, cache read, context window, max output
+    ("claude-haiku-4-5", 1.0, 5.0, 1.25, 0.10, 200_000, 64_000),
+    ("claude-sonnet-4-5", 3.0, 15.0, 3.75, 0.30, 200_000, 64_000),
+    ("claude-opus-4-5", 5.0, 25.0, 6.25, 0.50, 200_000, 64_000),
+    ("claude-opus-4-1", 15.0, 75.0, 18.75, 1.50, 200_000, 32_000),
+    ("gpt-4.1-mini", 0.40, 1.60, 0.0, 0.10, 1_047_576, 32_768),
+    ("gpt-4.1", 2.0, 8.0, 0.0, 0.50, 1_047_576, 32_768),
+    ("gpt-5-mini", 0.25, 2.0, 0.0, 0.025, 400_000, 128_000),
+    ("gpt-5", 1.25, 10.0, 0.0, 0.125, 400_000, 128_000),
 ];
 
 fn micros_per_mtok(dollars: f64) -> u64 {
@@ -73,6 +76,9 @@ pub struct PriceSetting {
     #[serde(default)]
     pub cache_read: f64,
     pub context_window: u64,
+    /// Defaults to the context window.
+    #[serde(default)]
+    pub max_output: Option<u64>,
 }
 
 impl PriceSetting {
@@ -85,6 +91,7 @@ impl PriceSetting {
                 cache_read: micros_per_mtok(self.cache_read),
             },
             context_window: self.context_window,
+            max_output: self.max_output.unwrap_or(self.context_window),
         }
     }
 }
@@ -97,8 +104,15 @@ impl Models {
         Self(
             BUILTIN
                 .iter()
-                .map(|&(id, input, output, cache_write, cache_read, context_window)| {
-                    let setting = PriceSetting { input, output, cache_write, cache_read, context_window };
+                .map(|&(id, input, output, cache_write, cache_read, context_window, max_output)| {
+                    let setting = PriceSetting {
+                        input,
+                        output,
+                        cache_write,
+                        cache_read,
+                        context_window,
+                        max_output: Some(max_output),
+                    };
                     (id.to_string(), setting.model())
                 })
                 .collect(),
@@ -131,12 +145,14 @@ pub struct Reservation {
 impl Reservation {
     /// Input is bounded by the request's size in bytes (a byte-level
     /// tokenizer yields at most one token per byte) and by the context
-    /// window; output by `max_tokens`. Priced at the full input rate, so
-    /// cache discounts only make the real cost lower.
-    pub fn for_request(model: &Model, body_bytes: u64, max_tokens: u64) -> Self {
+    /// window; output by the request's cap, or the model's maximum when it
+    /// sets none. Priced at the full input rate, so cache discounts only make
+    /// the real cost lower.
+    pub fn for_request(model: &Model, body_bytes: u64, max_output: Option<u64>) -> Self {
         let input = body_bytes.min(model.context_window);
-        let usage = Usage { input, output: max_tokens, ..Usage::default() };
-        Self { usd_micros: cost(&model.price, &usage), tokens: input + max_tokens }
+        let output = max_output.unwrap_or(model.max_output).min(model.max_output);
+        let usage = Usage { input, output, ..Usage::default() };
+        Self { usd_micros: cost(&model.price, &usage), tokens: input + output }
     }
 }
 
@@ -236,16 +252,9 @@ impl Ledger {
         self.spent_tokens += tokens;
     }
 
-    /// Calls reserved but not settled, in call order.
-    pub fn unfinished_calls(&self) -> Vec<u64> {
-        let mut calls: Vec<u64> = self.open.keys().copied().collect();
-        calls.sort_unstable();
-        calls
-    }
-
     /// Rebuilds a ledger from a session's events. Calls that started but
     /// never finished are charged their full reservation, since no one can
-    /// know what they cost; they stay listed in [`Ledger::unfinished_calls`].
+    /// know what they cost.
     pub fn replay(events: &[Event]) -> Self {
         let mut l = Ledger::default();
         let mut abandoned = HashMap::new();
@@ -270,9 +279,26 @@ impl Ledger {
             l.spent_usd += r.usd_micros;
             l.spent_tokens += r.tokens;
         }
-        l.open = abandoned.into_keys().map(|call| (call, Reservation::default())).collect();
         l
     }
+}
+
+/// Calls that started but never finished, with what they reserved, in call
+/// order. After a crash these are closed as broken, charged the reservation.
+pub fn open_calls(events: &[Event]) -> Vec<(u64, Reservation)> {
+    let mut open = std::collections::BTreeMap::new();
+    for e in events {
+        match e {
+            Event::ModelCallStarted { call, reserved_usd_micros, reserved_tokens, .. } => {
+                open.insert(*call, Reservation { usd_micros: *reserved_usd_micros, tokens: *reserved_tokens });
+            }
+            Event::ModelCallFinished { call, .. } => {
+                open.remove(call);
+            }
+            _ => {}
+        }
+    }
+    open.into_iter().collect()
 }
 
 /// What a finished call is charged.

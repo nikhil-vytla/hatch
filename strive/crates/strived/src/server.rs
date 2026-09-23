@@ -18,10 +18,13 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{Mutex, Notify, mpsc};
 
+use crate::credentials::Credentials;
+use crate::gateway::{self, Gateway};
 use crate::log;
 use crate::methods::{self, Conn};
 use crate::paths::{Home, build_id};
 use crate::sessions::Sessions;
+use crate::settings::Settings;
 
 /// Longest accepted message line. Larger messages close the connection.
 const MAX_LINE: usize = 16 * 1024 * 1024;
@@ -44,6 +47,11 @@ pub struct State {
     idle_since: Mutex<Instant>,
     pub shutdown: Notify,
     pub sessions: Sessions,
+    pub settings: Settings,
+    pub models: strive_budget::Models,
+    pub credentials: Credentials,
+    pub cas: strive_journal::cas::Cas,
+    pub gateway: Gateway,
 }
 
 /// Outcome of trying to become the daemon.
@@ -80,6 +88,9 @@ pub async fn run(cfg: Config) -> Result<Started> {
     let listener = UnixListener::bind(&socket).with_context(|| format!("binding {}", socket.display()))?;
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600))?;
 
+    let settings = Settings::load(&cfg.home.root)?;
+    let models = strive_budget::Models::builtin().with_overrides(&settings.models);
+    let (gateway, gateway_listener) = Gateway::bind().await.context("binding the model gateway")?;
     let state = Arc::new(State {
         info: ServerInfo {
             version: env!("CARGO_PKG_VERSION").into(),
@@ -94,7 +105,13 @@ pub async fn run(cfg: Config) -> Result<Started> {
         idle_since: Mutex::new(Instant::now()),
         shutdown: Notify::new(),
         sessions: Sessions::open(&cfg.home.root).context("opening the session store")?,
+        credentials: Credentials::load(&cfg.home.root).context("reading credentials")?,
+        cas: strive_journal::cas::Cas::open(&cfg.home.root.join("cas")).context("opening the content store")?,
+        settings,
+        models,
+        gateway,
     });
+    let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
     log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);
 
     let mut term = signal(SignalKind::terminate())?;
@@ -140,6 +157,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
     // loop above) can start.
     let _ = fs::remove_file(&socket);
     drop(listener);
+    gateway_task.abort();
     state.sessions.shutdown().await;
     drop(lock);
     Ok(Started::Served)

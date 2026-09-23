@@ -71,8 +71,12 @@ methods! {
     SessionCreate = "session/create" (SessionCreateParams) -> SessionInfo;
     SessionList = "session/list" (SessionListParams) -> SessionListResult;
     SessionAttach = "session/attach" (SessionAttachParams) -> SessionAttachResult;
-    SessionPrompt = "session/prompt" (SessionPromptParams) -> SessionPromptResult;
+    SessionPrompt = "session/prompt" (SessionPromptParams) -> Appended;
     SessionRead = "session/read" (SessionRef) -> SessionReadResult;
+    SessionGateway = "session/gateway" (SessionRef) -> GatewayInfo;
+    SessionBudget = "session/budget" (SessionBudgetParams) -> Appended;
+    AuthSet = "auth/set" (AuthSetParams) -> Empty;
+    AuthStatus = "auth/status" (Empty) -> AuthStatusResult;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -242,11 +246,64 @@ pub struct SessionPromptParams {
     pub text: String,
 }
 
+/// The seq of the entry a request appended.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub struct SessionPromptResult {
+pub struct Appended {
     pub seq: u64,
+}
+
+/// Where a session's model calls go. Each URL embeds a secret token scoped to
+/// the session, so give it only to that session's agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GatewayInfo {
+    /// Base URL for the Anthropic SDK (it appends `/v1/messages`).
+    pub anthropic: String,
+    /// Base URL for the OpenAI SDK (it appends `/chat/completions` or `/responses`).
+    pub openai: String,
+}
+
+/// Replaces the session's limits. An absent limit means unlimited.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionBudgetParams {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub usd_micros: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub tokens: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AuthSetParams {
+    /// `anthropic` or `openai`.
+    pub provider: String,
+    pub api_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AuthStatusResult {
+    pub providers: Vec<ProviderAuth>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProviderAuth {
+    pub provider: String,
+    /// Where the key came from: `file` (strive auth), `env` (the daemon's
+    /// environment when it started), or `none`.
+    pub source: String,
 }
 
 /// A session's journal as it is on disk, and whether it verifies.

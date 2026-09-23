@@ -7,10 +7,11 @@ use std::sync::atomic::Ordering;
 use serde_json::{Value, json};
 use strive_proto::rpc::{Message, RequestId, RpcError};
 use strive_proto::{
-    DaemonShutdown, DaemonStatus, DaemonStatusResult, Empty, Event, Initialize, InitializeParams, InitializeResult,
-    Method, Notification, PROTOCOL_VERSION, SessionAttach, SessionAttachParams, SessionAttachResult, SessionCreate,
-    SessionCreateParams, SessionEntry, SessionEntryNotification, SessionList, SessionListParams, SessionListResult,
-    SessionPrompt, SessionPromptParams, SessionPromptResult, SessionRead, SessionReadResult, SessionRef,
+    Appended, AuthSet, AuthSetParams, AuthStatus, AuthStatusResult, DaemonShutdown, DaemonStatus, DaemonStatusResult,
+    Empty, Event, Initialize, InitializeParams, InitializeResult, Method, Notification, PROTOCOL_VERSION, ProviderAuth,
+    SessionAttach, SessionAttachParams, SessionAttachResult, SessionBudget, SessionBudgetParams, SessionCreate,
+    SessionCreateParams, SessionEntry, SessionEntryNotification, SessionGateway, SessionList, SessionListParams,
+    SessionListResult, SessionPrompt, SessionPromptParams, SessionRead, SessionReadResult, SessionRef,
 };
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -80,9 +81,44 @@ async fn route(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value)
             state.shutdown.notify_one();
             reply::<DaemonShutdown>(Empty {})
         }
+        m if m.starts_with("session/") => route_session(state, conn, m, params).await,
+        AuthSet::NAME => {
+            let AuthSetParams { provider, api_key } = parse::<AuthSet>(params)?;
+            if !crate::credentials::PROVIDERS.iter().any(|(p, _)| *p == provider) {
+                return Err(RpcError::new(
+                    RpcError::INVALID_PARAMS,
+                    format!("unknown provider {provider:?}; use anthropic or openai"),
+                ));
+            }
+            let api_key = api_key.trim().to_string();
+            if api_key.is_empty() {
+                return Err(RpcError::new(RpcError::INVALID_PARAMS, "the API key is empty"));
+            }
+            state.credentials.set(&provider, api_key).map_err(|e| internal(&e))?;
+            reply::<AuthSet>(Empty {})
+        }
+        AuthStatus::NAME => {
+            parse::<AuthStatus>(params)?;
+            let providers = crate::credentials::PROVIDERS
+                .iter()
+                .map(|(p, _)| ProviderAuth {
+                    provider: (*p).to_string(),
+                    source: state.credentials.source(p).to_string(),
+                })
+                .collect();
+            reply::<AuthStatus>(AuthStatusResult { providers })
+        }
+        other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
+    }
+}
+
+async fn route_session(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value) -> Reply {
+    match method {
         SessionCreate::NAME => {
             let SessionCreateParams { cwd } = parse::<SessionCreate>(params)?;
-            reply::<SessionCreate>(state.sessions.create(cwd).await.map_err(session_error)?)
+            reply::<SessionCreate>(
+                state.sessions.create(cwd, state.settings.budget.limits()).await.map_err(session_error)?,
+            )
         }
         SessionList::NAME => {
             let SessionListParams { cwd } = parse::<SessionList>(params)?;
@@ -113,7 +149,7 @@ async fn route(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value)
                 .append(&session_id(&id)?, vec![Event::UserMessage { text }])
                 .await
                 .map_err(session_error)?;
-            reply::<SessionPrompt>(SessionPromptResult { seq: entries[0].seq })
+            reply::<SessionPrompt>(Appended { seq: entries[0].seq })
         }
         SessionRead::NAME => {
             let SessionRef { id } = parse::<SessionRead>(params)?;
@@ -125,6 +161,18 @@ async fn route(state: &Arc<State>, conn: &mut Conn, method: &str, params: Value)
                 torn_bytes: report.torn_bytes,
                 problem: report.problem.map(|p| p.to_string()),
             })
+        }
+        SessionGateway::NAME => {
+            let SessionRef { id } = parse::<SessionGateway>(params)?;
+            let sid = session_id(&id)?;
+            state.sessions.check(&sid).await.map_err(session_error)?;
+            reply::<SessionGateway>(state.gateway.info(&sid).map_err(|e| internal(&e))?)
+        }
+        SessionBudget::NAME => {
+            let SessionBudgetParams { id, usd_micros, tokens } = parse::<SessionBudget>(params)?;
+            let limits = strive_budget::Limits { usd_micros, tokens };
+            let entries = state.sessions.set_budget(&session_id(&id)?, limits).await.map_err(session_error)?;
+            reply::<SessionBudget>(Appended { seq: entries[0].seq })
         }
         other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
     }

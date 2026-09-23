@@ -14,7 +14,16 @@ export type TestDaemon = {
 
 export function startDaemon(): TestDaemon {
   const home = mkdtempSync("/tmp/strv-ts-");
-  const env = { ...process.env, STRIVE_HOME: home, STRIVE_IDLE_SECS: undefined };
+  // Real keys and upstreams must never reach a test daemon.
+  const env = {
+    ...process.env,
+    STRIVE_HOME: home,
+    STRIVE_IDLE_SECS: undefined,
+    ANTHROPIC_API_KEY: undefined,
+    OPENAI_API_KEY: undefined,
+    STRIVE_UPSTREAM_ANTHROPIC: "http://127.0.0.1:9",
+    STRIVE_UPSTREAM_OPENAI: "http://127.0.0.1:9",
+  };
   const strive = (...args: string[]) => {
     const r = Bun.spawnSync([STRIVE_EXE, ...args], { env });
     return { exitCode: r.exitCode, stdout: r.stdout.toString(), stderr: r.stderr.toString() };

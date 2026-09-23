@@ -12,20 +12,37 @@ use serde_json::{Value, json};
 pub struct Env {
     pub home: tempfile::TempDir,
     pub exe: PathBuf,
+    /// Extra environment for every strive command, and so for the daemon.
+    pub vars: Vec<(String, String)>,
 }
 
 impl Env {
     pub fn new() -> Self {
         // Short base path: Unix socket paths are limited to ~104 bytes on macOS.
         let home = tempfile::Builder::new().prefix("strv").tempdir_in("/tmp").unwrap();
-        Self { home, exe: PathBuf::from(env!("CARGO_BIN_EXE_strive")) }
+        Self { home, exe: PathBuf::from(env!("CARGO_BIN_EXE_strive")), vars: Vec::new() }
+    }
+    pub fn with_vars(vars: &[(&str, &str)]) -> Self {
+        let mut e = Self::new();
+        e.vars = vars.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect();
+        e
     }
     pub fn cmd(&self, exe: &Path, args: &[&str]) -> Output {
         self.command(exe, args).output().unwrap()
     }
     pub fn command(&self, exe: &Path, args: &[&str]) -> Command {
         let mut c = Command::new(exe);
-        c.args(args).env("STRIVE_HOME", self.home.path()).env_remove("STRIVE_IDLE_SECS").env_remove("STRIVE_TUI");
+        // Real keys and upstreams from the developer's shell must never reach
+        // a test daemon: each test sets exactly what it needs.
+        c.args(args)
+            .env("STRIVE_HOME", self.home.path())
+            .env_remove("STRIVE_IDLE_SECS")
+            .env_remove("STRIVE_TUI")
+            .env_remove("ANTHROPIC_API_KEY")
+            .env_remove("OPENAI_API_KEY")
+            .env("STRIVE_UPSTREAM_ANTHROPIC", "http://127.0.0.1:9")
+            .env("STRIVE_UPSTREAM_OPENAI", "http://127.0.0.1:9")
+            .envs(self.vars.iter().map(|(k, v)| (k.as_str(), v.as_str())));
         c
     }
     pub fn strive(&self, args: &[&str]) -> Output {

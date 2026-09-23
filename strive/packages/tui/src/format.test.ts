@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { formatUsd } from "./app";
+import { formatUsd } from "./format";
 
 test("dollars format like the daemon's, rounding up to four places", () => {
   expect(formatUsd(0)).toBe("$0.0000");

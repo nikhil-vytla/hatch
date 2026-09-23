@@ -5,13 +5,16 @@
 
 mod client;
 mod commands;
+mod credentials;
 mod doctor;
+mod gateway;
 mod launch;
 mod log;
 mod methods;
 mod paths;
 mod server;
 mod sessions;
+mod settings;
 mod tui;
 
 use std::process::ExitCode;
@@ -60,6 +63,11 @@ enum Cmd {
         #[arg(long, conflicts_with = "id")]
         all: bool,
     },
+    /// Store a provider API key, or with no provider, show which keys are set.
+    Auth {
+        #[arg(value_parser = ["anthropic", "openai"])]
+        provider: Option<String>,
+    },
     /// List sessions started in this directory, newest first.
     Sessions {
         /// Sessions from every directory.
@@ -105,6 +113,9 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         Some(Cmd::Log { id, json }) => commands::log(&mut launch::ensure(&home, "strive-log").await?.0, id, json).await,
         Some(Cmd::Verify { id, all }) => {
             commands::verify(&mut launch::ensure(&home, "strive-verify").await?.0, id, all).await
+        }
+        Some(Cmd::Auth { provider }) => {
+            commands::auth(&mut launch::ensure(&home, "strive-auth").await?.0, provider).await
         }
         Some(Cmd::Sessions { all, json }) => {
             commands::sessions(&mut launch::ensure(&home, "strive-sessions").await?.0, all, json).await

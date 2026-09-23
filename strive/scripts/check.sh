@@ -3,6 +3,8 @@
 # drive and regenerates the protocol bindings the drift check compares.
 set -eu
 cd "$(dirname "$0")/.."
+# No test may reach a real provider, so none may hold a real key.
+unset ANTHROPIC_API_KEY OPENAI_API_KEY
 
 cargo fmt --check
 cargo clippy --all-targets --quiet -- -D warnings

@@ -14,11 +14,16 @@ import {
   matchesKey,
 } from "@earendil-works/pi-tui";
 import { type Entry, type InitializeResult, ServerError, type SessionInfo, type StriveClient } from "@strive/protocol";
+import { formatUsd } from "./format";
+import { Spend } from "./spend";
 import { editorTheme, style } from "./theme";
+
+export { formatUsd };
 
 export const COMMANDS: SlashCommand[] = [
   { name: "status", description: "Show the daemon's status" },
   { name: "session", description: "Show this session's id and how to resume it" },
+  { name: "budget", description: "Set this session's spending limit: /budget 10, or /budget off", argumentHint: "<dollars>|off" },
   { name: "help", description: "List commands and keys" },
   { name: "quit", description: "Exit strive (the daemon keeps running)" },
 ];
@@ -62,11 +67,6 @@ export function describe(entry: Entry): string {
   }
 }
 
-/** `$D.DDDD`, rounded up so a nonzero cost never shows as zero. Matches the daemon's format. */
-export function formatUsd(micros: number): string {
-  const units = Math.ceil(micros / 100);
-  return `$${Math.floor(units / 10_000)}.${String(units % 10_000).padStart(4, "0")}`;
-}
 
 function budgetText(usd?: number, tokens?: number): string {
   if (usd === undefined && tokens === undefined) return "unlimited";
@@ -79,6 +79,8 @@ export class App {
   readonly transcript = new Container();
   readonly editor: Editor;
   private readonly header = new Text("", 1, 0);
+  private readonly footer = new Text("", 1, 0);
+  private readonly spend = new Spend();
   private readonly offClose: () => void;
   private session?: SessionInfo;
   private lastSeq = 0;
@@ -105,6 +107,7 @@ export class App {
     tui.addChild(new Spacer(1));
     tui.addChild(this.transcript);
     tui.addChild(this.editor);
+    tui.addChild(this.footer);
     tui.setFocus(this.editor);
 
     tui.addInputListener((data) => {
@@ -169,6 +172,8 @@ export class App {
   private show(entry: Entry) {
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
+    this.spend.apply(entry.event);
+    this.footer.setText(style.muted(this.spend.summary()));
     this.say(describe(entry));
   }
 
@@ -208,6 +213,17 @@ export class App {
         this.say(
           `${style.muted("daemon")} pid ${s.server.pid} · up ${Math.round(s.uptimeMs / 1000)}s · ${s.clients} client${s.clients === 1 ? "" : "s"}`,
         );
+        return;
+      }
+      case "budget": {
+        const arg = text.slice(1).split(/\s+/)[1];
+        const dollars = arg === "off" ? undefined : Number(arg);
+        if (arg !== "off" && !(Number.isFinite(dollars) && (dollars as number) >= 0)) {
+          this.say(style.danger("Use /budget <dollars>, for example /budget 10, or /budget off."));
+          return;
+        }
+        const usdMicros = dollars === undefined ? undefined : Math.round(dollars * 1_000_000);
+        await this.client.request("session/budget", { id: this.session.id, usdMicros, tokens: this.spend.tokenLimit });
         return;
       }
       case "session":
