@@ -265,6 +265,40 @@ test("a long prompt folds, and each prompt has a tick on the rail, named by it",
   assert.equal(await ticks.nth(1).getAttribute("aria-label"), "a short second prompt");
 });
 
+test("the changes pane follows a rewind", async () => {
+  const { page, cwd } = await openApp();
+  writeFileSync(join(cwd, "a.txt"), "v1\n");
+  await page.getByPlaceholder("Ask strive to do anything…").fill("first");
+  await page.keyboard.press("Enter");
+  await page.locator(".checkpoints li").first().waitFor();
+  writeFileSync(join(cwd, "a.txt"), "v2\n");
+  await page.getByRole("button", { name: "changes", exact: true }).click();
+  const pane = page.getByRole("complementary", { name: "changes" });
+  await pane.getByRole("tab", { name: "Whole session" }).click();
+  await pane.getByText("1 changed file").waitFor();
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Rewind to 1");
+  await page.keyboard.press("Enter");
+  await pane.getByText("No changes").waitFor();
+  assert.equal(readFileSync(join(cwd, "a.txt"), "utf8"), "v1\n");
+});
+
+test("a change deep in a long file shows in the pane, with the unchanged lines folded", async () => {
+  const { page, cwd } = await openApp();
+  const lines = Array.from({ length: 500 }, (_, i) => `line ${i + 1}`);
+  writeFileSync(join(cwd, "long.txt"), `${lines.join("\n")}\n`);
+  await page.getByPlaceholder("Ask strive to do anything…").fill("first");
+  await page.keyboard.press("Enter");
+  await page.locator(".checkpoints li").first().waitFor();
+  lines[449] = "LINE 450";
+  writeFileSync(join(cwd, "long.txt"), `${lines.join("\n")}\n`);
+  await page.getByRole("button", { name: "changes", exact: true }).click();
+  const pane = page.getByRole("complementary", { name: "changes" });
+  await pane.locator(".row.add", { hasText: "LINE 450" }).waitFor();
+  await pane.getByRole("button", { name: "⋯ 446 unchanged lines" }).click();
+  await pane.locator(".row.keep", { hasText: "line 1" }).first().waitFor();
+});
+
 test("a reloaded window shows what happened since it opened", async () => {
   const { page, cwd } = await openApp();
   const rpc = await Rpc.open();

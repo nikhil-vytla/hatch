@@ -59,3 +59,49 @@ export function diffLines(before: string, after: string): DiffRow[] {
 
   return rows.map((r, n) => ({ ...r, n }));
 }
+
+/** Unchanged lines kept on each side of a change. */
+export const CONTEXT = 3;
+
+export type Hunked = { kind: "rows"; rows: DiffRow[] } | { kind: "gap"; rows: DiffRow[] };
+
+/**
+ * The rows as a reader wants them: changes with `context` unchanged lines
+ * around each, and every longer unchanged run folded into a gap that can
+ * be opened.
+ */
+export function hunks(rows: DiffRow[], context = CONTEXT): Hunked[] {
+  const near = rows.map(() => false);
+
+  rows.forEach((r, i) => {
+    if (r.kind === "keep") return;
+
+    for (let j = Math.max(0, i - context); j <= Math.min(rows.length - 1, i + context); j++) near[j] = true;
+  });
+
+  const runs: Hunked[] = [];
+
+  rows.forEach((r, i) => {
+    const kind = near[i] ? "rows" : "gap";
+    const last = runs.at(-1);
+
+    if (last?.kind === kind) last.rows.push(r);
+    else runs.push({ kind, rows: [r] });
+  });
+
+  // Folding a few lines hides more than it saves: short gaps stay shown.
+  const out: Hunked[] = [];
+
+  for (const run of runs) {
+    const kind = run.kind === "gap" && run.rows.length < MIN_GAP ? "rows" : run.kind;
+    const last = out.at(-1);
+
+    if (last?.kind === "rows" && kind === "rows") last.rows.push(...run.rows);
+    else out.push({ kind, rows: [...run.rows] });
+  }
+
+  return out;
+}
+
+/** The fewest unchanged lines worth folding. */
+const MIN_GAP = 4;

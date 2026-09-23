@@ -98,11 +98,6 @@ export function App({ bridge, opened, onSwitch }: Props) {
       return !open;
     });
 
-  // The files may have changed: an effect finished, or a turn ended.
-  const filesVersion =
-    model.activity.filter((a) => a.outcome !== undefined).length +
-    model.conversation.items.filter((i) => i.kind === "turn").length;
-
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -200,7 +195,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
           {changes && (
             <ChangesPane
               checkpoints={model.checkpoints.map((c) => c.n)}
-              version={filesVersion}
+              version={model.filesVersion}
               load={loadChanges}
               onClose={toggleChanges}
             />

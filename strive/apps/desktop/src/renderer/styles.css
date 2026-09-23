@@ -416,3 +416,6 @@ pre.diff { padding: 6px 0; }
 .rail .card { display: none; position: absolute; left: 26px; top: 50%; transform: translateY(-50%); width: max-content; max-width: 280px; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line-2); box-shadow: 0 10px 30px rgb(0 0 0 / 0.5); color: var(--text); font-size: 12.5px; text-align: left; white-space: normal; }
 .rail .tick:hover .card { display: block; }
 @media (max-width: 900px) { .rail { display: none; } }
+.diff .row.gap { display: block; width: 100%; padding: 3px 12px 3px 88px; border: 0; border-radius: 0; background: rgb(255 255 255 / 0.025); color: var(--faint); font: inherit; text-align: left; }
+.diff .row.gap:hover { background: var(--surface-2); color: var(--muted); }
+.detail pre.diff .row.gap { padding-left: 28px; }

@@ -15,6 +15,8 @@ export class SessionModel {
   modelName?: string;
   /** The session's directory, which paths are shown from. */
   workspace?: string;
+  /** Counts events after which the files may differ: a finished effect, a rewind, a turn's end. */
+  filesVersion = 0;
   /** Reply text still streaming in, not yet journaled. */
   live = "";
   readonly spend = new Spend();
@@ -62,12 +64,14 @@ export class SessionModel {
         this.labelNext = undefined;
         break;
       case "rewound":
+        this.filesVersion++;
         this.label(e.savedAs, `before rewinding to ${e.to}`);
         break;
       case "turnStarted":
         this.working = true;
         break;
       case "turnEnded":
+        this.filesVersion++;
         this.working = false;
         this.live = "";
         break;
@@ -84,6 +88,7 @@ export class SessionModel {
         this.modelName = e.model;
         break;
       case "effectFinished": {
+        this.filesVersion++;
         const a = this.activity.find((x) => x.effect === e.effect);
 
         if (a) a.outcome = e.outcome.kind === "done" ? "done" : e.outcome.kind === "refused" ? "refused" : "failed";
