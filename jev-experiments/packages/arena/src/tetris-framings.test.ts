@@ -56,3 +56,31 @@ describe("recorded framing games", () => {
     });
   }
 });
+
+describe("remembering judgements", () => {
+  test("asks only about new sentences and answers repeats from memory", async () => {
+    const seen: number[] = [], exchanges: any[] = [];
+    const counting: Send = async (body, signal) => { seen.push(Object.keys(body.questions).length); const st = body.state as any; return idealReader({ ...body, state: { ...st, spots: Object.fromEntries(Object.entries(body.questions).map(([k, q]) => [k, (q as any).instructions])) } }, signal); };
+    const arena = new TetrisArena(7, [framedJev("spot-clean-cached", counting, (x) => exchanges.push(x))], "turns");
+    for (let i = 0; i < 40 && !arena.over; i++) await arena.turn();
+    expect(arena.lanes[0].game.lines).toBeGreaterThan(0);
+    const fromMemory = exchanges.reduce((s, x) => s + (x.fromMemory ?? 0), 0);
+    expect(fromMemory).toBeGreaterThan(0);
+    expect(exchanges.some((x) => !x.body && x.ms === 0)).toBe(true);
+    expect(seen.reduce((a, b) => a + b, 0)).toBeLessThan(exchanges.reduce((s, x) => s + Object.keys(x.judged).length, 0));
+  });
+});
+
+describe("slow live answers", () => {
+  test("a reply for a locked piece is dropped so the lane asks about the next piece", async () => {
+    const { TetrisArena: Arena } = await import("./tetris");
+    const never: Send = (_body, signal) => new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("aborted"))));
+    const arena = new Arena(7, [framedJev("spot-clean", never)]);
+    while (arena.clockMs < 60_000 && !arena.over) arena.step();
+    const lane = arena.lanes[0];
+    expect(lane.game.pieces).toBeGreaterThan(1);
+    const asked = new Set(arena.log.map((e) => e.pieceId));
+    expect(asked.size).toBeGreaterThan(1);
+    expect(arena.log.filter((e) => e.status === "stale").length).toBeGreaterThan(0);
+  });
+});
