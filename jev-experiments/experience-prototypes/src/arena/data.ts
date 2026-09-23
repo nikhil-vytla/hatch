@@ -10,18 +10,18 @@ export const loadChunk = <T = any>(path: string): Promise<T> => {
 };
 
 /** Card view state, kept in the hash so any view can be shared. */
-export type View = { card: string; c?: string[]; lens?: string; m?: string; g?: string; seed?: string; wf?: string; qt?: string };
+export type View = { card: string; c?: string[]; lens?: string; m?: string; g?: string; seed?: string; wf?: string; qt?: string; /** identity prototype variant */ v?: string };
 export function readView(hash = location.hash): View | null {
   const m = hash.match(/^#\/arena(?:\/([^?]+))?(?:\?(.*))?$/);
   if (!m) return null;
   const p = new URLSearchParams(m[2] ?? "");
   const get = (k: string) => p.get(k) ?? undefined;
-  return { card: m[1] ?? "", c: p.get("c")?.split(",").filter(Boolean), lens: get("lens"), m: get("m"), g: get("g"), seed: get("seed"), wf: get("wf"), qt: get("qt") };
+  return { card: m[1] ?? "", c: p.get("c")?.split(",").filter(Boolean), lens: get("lens"), m: get("m"), g: get("g"), seed: get("seed"), wf: get("wf"), qt: get("qt"), v: get("v") };
 }
 export function writeView(v: View, replace = false) {
   const p = new URLSearchParams();
   if (v.c) p.set("c", v.c.join(","));
-  for (const k of ["lens", "m", "g", "seed", "wf", "qt"] as const) if (v[k]) p.set(k, v[k]!);
+  for (const k of ["lens", "m", "g", "seed", "wf", "qt", "v"] as const) if (v[k]) p.set(k, v[k]!);
   const q = p.toString().replaceAll("%2C", ","), hash = `#/arena${v.card ? `/${v.card}` : ""}${q ? `?${q}` : ""}`;
   if (hash === location.hash) return;
   if (replace) history.replaceState(null, "", hash); else history.pushState(null, "", hash);

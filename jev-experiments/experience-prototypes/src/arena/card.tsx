@@ -187,7 +187,8 @@ function Mini({ values, highlight, color }: { values: number[]; highlight: numbe
 type LensProps = { card: Card; metric: MetricDef; ids: string[]; results: Card["results"]; colorOf: (id: string) => string; focus: string | null; setFocus: (id: string | null) => void };
 
 // ---------------------------------------------------------------- the card
-export function BenchmarkCard({ card, view }: { card: Card; view: View }) {
+/** Everything a card view needs, derived from the card data and the URL. Variants share it. */
+export function useCardModel(card: Card, view: View) {
   const pool = new Set(card.contestants.map((c) => c.id).concat(LIVE_ID));
   const requested = view.c?.filter((id) => pool.has(id));
   const dropped = (view.c ?? []).filter((id) => !pool.has(id));
@@ -197,13 +198,13 @@ export function BenchmarkCard({ card, view }: { card: Card; view: View }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const colorOf = (id: string) => card.contestants.find((c) => c.id === id)?.color ?? "#0b8a55";
+  const nameOf = (id: string, short = false) => { const c = card.contestants.find((x) => x.id === id); return (short ? c?.short : c?.name) ?? (id === LIVE_ID ? "Jev live" : id); };
   const set = (patch: Partial<View>, replace = false) => writeView({ ...view, card: card.id, ...patch }, replace);
   // Slices (judgement sets): workflow and question type.
-  const facetResults = useMemo(() => {
+  const results = useMemo(() => {
     const wf = view.wf && card.slices?.workflow?.[view.wf], qt = view.qt && card.slices?.type?.[view.qt];
     return (wf || qt || card.results) as Card["results"];
   }, [card, view.wf, view.qt]);
-  const results = facetResults;
   const resultIds = ids.filter((id) => results[id]);
   const scatterAxes = card.id === "typed-decisions" ? ["ece", "agreement"] : card.id === "tetris-realtime" ? ["gameTime", "lines"] : card.id === "spot-robustness" ? ["meanChange", "sameChoice"] : ["decisionMs", "lines"];
   const [xM, yM] = scatterAxes.map((id) => card.metrics.find((m) => m.id === id)!);
@@ -219,42 +220,73 @@ export function BenchmarkCard({ card, view }: { card: Card; view: View }) {
   const groupsInView = new Set(ids.flatMap((id) => card.contestants.find((c) => c.id === id)?.runSets ?? []).map((rs) => card.protocolGroups.find((g) => g.runSets.includes(rs))?.hash).filter(Boolean));
   const slice = useMemo(() => (r: any) => (!view.wf || r.wf === view.wf) && (!view.qt || r.type === view.qt), [view.wf, view.qt]);
   const copy = async () => { await navigator.clipboard?.writeText(`${location.href.replace(/#.*/, "")}#/arena/${card.id}?c=${ids.join(",")}&lens=${lens}&m=${metric.id}${view.wf ? `&wf=${view.wf}` : ""}${view.qt ? `&qt=${view.qt}` : ""}${view.seed ? `&seed=${view.seed}` : ""}`).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  return { card, view, ids, dropped, lens, metric, results, resultIds, xM, yM, models, tiles, groupsInView, slice, set, colorOf, nameOf, focus, setFocus, copy, copied };
+}
+export type CardModel = ReturnType<typeof useCardModel>;
+export const KIND = (card: Card) => card.family === "game" ? "Game" : card.family === "robustness" ? "Robustness" : "Judgement set";
+export const REFERENCE = (card: Card) => card.reference === "world-outcome" ? "measured in the world" : card.reference === "soft-teacher" ? "agreement with a soft reference" : "self-consistency";
+export { better, spread, LENS_LABEL };
+
+export function Tiles({ model: m }: { model: CardModel }) {
+  if (!m.tiles.length) return null;
+  return <>
+    <div className="arena-tiles">{m.tiles.map(({ m: metric, ids: winners, e }) => (
+      <div key={metric.id} className="arena-tile" title={metric.help}><p>{metric.better === "higher" ? "Most" : "Least"} · {metric.label.toLowerCase()}</p>
+        <b>{winners.length > 2 ? <>Tie · {winners.length} models</> : winners.map((id, k) => <span key={id} className="arena-tile-name">{k > 0 && <span className="arena-muted"> & </span>}<span className="arena-dot" style={{ background: m.colorOf(id) }} />{m.nameOf(id, true)}</span>)}</b>
+        <span>{formatValue(metric.unit, e.value)}</span></div>))}</div>
+    {m.models.length > 0 && m.models.length < m.resultIds.length && <p className="arena-muted arena-tiles-note">Best among the models on this card. Code players are references and appear in every view.</p>}
+  </>;
+}
+export function Contestants({ model: m }: { model: CardModel }) {
+  return <>
+    <Picker card={m.card} selected={m.ids} onChange={(c) => m.set({ c })} colorOf={m.colorOf} />
+    {m.dropped.length > 0 && <p className="arena-notice">Not on this card: {m.dropped.join(", ")}.</p>}
+    {m.groupsInView.size > 1 && <p className="arena-notice">These contestants were recorded under {m.groupsInView.size} different protocols ({m.card.protocolGroups.filter((g) => m.groupsInView.has(g.hash)).map((g) => g.label).join("; ")}). Compare with care.</p>}
+  </>;
+}
+export function Toolbar({ model: m }: { model: CardModel }) {
+  const { card, view, lens, metric, set } = m;
+  return <>
+    <div className="arena-toolbar">
+      <div className="arena-tabs" role="tablist">{card.lenses.map((l) => <button key={l} role="tab" aria-selected={l === lens} onClick={() => set({ lens: l })}>{LENS_LABEL[l]}</button>)}</div>
+      {["bars", "per-item"].includes(lens) && <label>Metric <select value={metric.id} onChange={(e) => set({ m: e.target.value })}>{card.metrics.map((mm) => <option key={mm.id} value={mm.id}>{mm.label}</option>)}</select></label>}
+      {card.slices && ["bars", "scatter", "table", "reliability", "case"].includes(lens) && <>
+        <label>Workflow <select value={view.wf ?? ""} onChange={(e) => set({ wf: e.target.value || undefined, qt: undefined })}><option value="">All</option>{Object.keys(card.slices.workflow ?? {}).map((w) => <option key={w} value={w}>{w.replaceAll("_", " ")}</option>)}</select></label>
+        {lens !== "case" && <label>Question type <select value={view.qt ?? ""} onChange={(e) => set({ qt: e.target.value || undefined, wf: undefined })}><option value="">All</option>{Object.keys(card.slices.type ?? {}).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>}
+      </>}
+    </div>
+    {["bars", "per-item"].includes(lens) && <p className="arena-subtitle">{metric.help} <b>{metric.better === "higher" ? "Higher" : "Lower"} is better.</b></p>}
+  </>;
+}
+export function LensView({ model: m }: { model: CardModel }) {
+  const p = { card: m.card, metric: m.metric, ids: m.resultIds, results: m.results, colorOf: m.colorOf, focus: m.focus, setFocus: m.setFocus };
+  return (
+    <div className="arena-lens">
+      {m.lens === "bars" && <Bars {...p} />}
+      {m.lens === "scatter" && <Scatter {...p} xMetric={m.xM} yMetric={m.yM} />}
+      {m.lens === "per-item" && <PerItem {...p} />}
+      {m.lens === "table" && <Table {...p} />}
+      {m.lens === "reliability" && <Reliability {...p} slice={m.slice} />}
+      {m.lens === "case" && <CaseLens {...p} wf={m.view.wf} />}
+      {m.lens === "board" && <BoardLens card={m.card} selected={m.ids} colorOf={m.colorOf} seed={m.view.seed ?? m.card.items?.[0]?.id ?? "7"} onSeed={(seed) => m.set({ seed })} />}
+    </div>
+  );
+}
+
+export function BenchmarkCard({ card, view }: { card: Card; view: View }) {
+  const m = useCardModel(card, view);
   return (
     <article className="arena-card" aria-labelledby={`card-${card.id}`}>
       <header className="arena-card-head">
-        <p className="arena-kicker">{card.family === "game" ? "Game" : card.family === "robustness" ? "Robustness" : "Judgement set"} · {card.reference === "world-outcome" ? "measured in the world" : card.reference === "soft-teacher" ? "agreement with a soft reference" : "self-consistency"}</p>
+        <p className="arena-kicker">{KIND(card)} · {REFERENCE(card)}</p>
         <h2 id={`card-${card.id}`}>{card.title}</h2>
         <p className="arena-question-line">{card.question}</p>
-        <button className="arena-link" onClick={copy}>{copied ? "Link copied" : "Copy link"}</button>
+        <button className="arena-link" onClick={m.copy}>{m.copied ? "Link copied" : "Copy link"}</button>
       </header>
-      {tiles.length > 0 && <>
-        <div className="arena-tiles">{tiles.map(({ m, ids: winners, e }) => (
-          <div key={m.id} className="arena-tile" title={m.help}><p>{m.better === "higher" ? "Most" : "Least"} · {m.label.toLowerCase()}</p>
-            <b>{winners.length > 2 ? <>Tie · {winners.length} models</> : winners.map((id, k) => <span key={id} className="arena-tile-name">{k > 0 && <span className="arena-muted"> & </span>}<span className="arena-dot" style={{ background: colorOf(id) }} />{card.contestants.find((c) => c.id === id)?.short ?? id}</span>)}</b>
-            <span>{formatValue(m.unit, e.value)}</span></div>))}</div>
-        {models.length > 0 && models.length < resultIds.length && <p className="arena-muted arena-tiles-note">Best among the models on this card. Code players are references and appear in every view.</p>}
-      </>}
-      <Picker card={card} selected={ids} onChange={(c) => set({ c })} colorOf={colorOf} />
-      {dropped.length > 0 && <p className="arena-notice">Not on this card: {dropped.join(", ")}.</p>}
-      {groupsInView.size > 1 && <p className="arena-notice">These contestants were recorded under {groupsInView.size} different protocols ({card.protocolGroups.filter((g) => groupsInView.has(g.hash)).map((g) => g.label).join("; ")}). Compare with care.</p>}
-      <div className="arena-toolbar">
-        <div className="arena-tabs" role="tablist">{card.lenses.map((l) => <button key={l} role="tab" aria-selected={l === lens} onClick={() => set({ lens: l })}>{LENS_LABEL[l]}</button>)}</div>
-        {["bars", "per-item"].includes(lens) && <label>Metric <select value={metric.id} onChange={(e) => set({ m: e.target.value })}>{card.metrics.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></label>}
-        {card.slices && ["bars", "scatter", "table", "reliability", "case"].includes(lens) && <>
-          <label>Workflow <select value={view.wf ?? ""} onChange={(e) => set({ wf: e.target.value || undefined, qt: undefined })}><option value="">All</option>{Object.keys(card.slices.workflow ?? {}).map((w) => <option key={w} value={w}>{w.replaceAll("_", " ")}</option>)}</select></label>
-          {lens !== "case" && <label>Question type <select value={view.qt ?? ""} onChange={(e) => set({ qt: e.target.value || undefined, wf: undefined })}><option value="">All</option>{Object.keys(card.slices.type ?? {}).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>}
-        </>}
-      </div>
-      {["bars", "per-item"].includes(lens) && <p className="arena-subtitle">{metric.help} <b>{metric.better === "higher" ? "Higher" : "Lower"} is better.</b></p>}
-      <div className="arena-lens">
-        {lens === "bars" && <Bars card={card} metric={metric} ids={resultIds} results={results} colorOf={colorOf} focus={focus} setFocus={setFocus} />}
-        {lens === "scatter" && <Scatter card={card} metric={metric} ids={resultIds} results={results} colorOf={colorOf} focus={focus} setFocus={setFocus} xMetric={xM} yMetric={yM} />}
-        {lens === "per-item" && <PerItem card={card} metric={metric} ids={resultIds} results={results} colorOf={colorOf} focus={focus} setFocus={setFocus} />}
-        {lens === "table" && <Table card={card} metric={metric} ids={resultIds} results={results} colorOf={colorOf} focus={focus} setFocus={setFocus} />}
-        {lens === "reliability" && <Reliability card={card} metric={metric} ids={resultIds} results={results} colorOf={colorOf} focus={focus} setFocus={setFocus} slice={slice} />}
-        {lens === "case" && <CaseLens card={card} metric={metric} ids={resultIds} results={results} colorOf={colorOf} focus={focus} setFocus={setFocus} wf={view.wf} />}
-        {lens === "board" && <BoardLens card={card} selected={ids} colorOf={colorOf} seed={view.seed ?? card.items?.[0]?.id ?? "7"} onSeed={(seed) => set({ seed })} />}
-      </div>
+      <Tiles model={m} />
+      <Contestants model={m} />
+      <Toolbar model={m} />
+      <LensView model={m} />
       <footer className="arena-provenance">{card.provenance}</footer>
     </article>
   );
