@@ -287,3 +287,47 @@ the fix, or a run before the fix.
 - **A lesson from the harness.** The first run of the approval tests hung,
   because the tests reproduced the bugs. Test runs are now wrapped in
   `perl -e 'alarm N; exec @ARGV'`, since macOS has no `timeout`.
+
+## 2026-09-23: Codex's review of the fixes, and M4 done
+
+Codex re-reviewed `546a5e9..0e88806`. It judged 8 fixes sound and found 12
+gaps, 8 of them high. All 12 were addressed; the macOS one only in the docs.
+- **Fixed with a test that fails first:**
+  - A host could loosen its own limits through `session/approvals` or
+    `session/budget`.
+  - A registration rollback could erase `Closed`.
+  - A stale person flag on a host that attached before registering.
+  - A rewind could destroy a nested repository, or ignored files named
+    with different case.
+  - Old gitlinks were re-added.
+  - Workspace locks were per session, not per directory.
+  - An effect cancelled before it ran still ran.
+  - Shutdown left commands running.
+  - Prompts journaled before `turnStarted` were misordered.
+  - Linux Unix sockets outside /tmp and /run were reachable.
+- **While fixing ordering:** resuming after a compaction dropped that
+  turn's prompt. Compaction now covers only what precedes the turn.
+- **Documented, not fixed:** on macOS a detached job can outlive a command
+  that exits normally. There are no PID namespaces there.
+- **A flake found by looping the suite:** a job forked between the `ps`
+  scan and the kill escaped, 1 run in 5. The tree is now frozen with
+  SIGSTOP first. 8 clean runs since.
+- **Linux, tested for real.** podman's VM shares `/Users` but not `/tmp`.
+  - The earlier bubblewrap changes pass there.
+  - The socket test first passed on Linux for the wrong reason: its socket
+    was in `/tmp`, which the sandbox now replaces. Moving it to
+    `CARGO_TARGET_TMPDIR` exposed the escape.
+  - It also exposed an MCP EPIPE race.
+- **Side effect to remember.** The first `podman run` pulled
+  `rust:latest`, and a registry credential helper printed "Opening browser
+  to issuer.enforce.dev…", Canva SSO. Later runs use `--pull=never`.
+- **Process slip, twice.** Piping `check.sh` through `tail` before `&&`
+  let a failed check commit. Both commits were amended after a passing
+  check. Commits now run only as `check.sh > log && git commit`.
+- **M4 exit criterion.** Real Haiku 4.5 on this repo, $0.5 cap:
+  - it answered from AGENTS.md (`scripts/check.sh` and what it runs);
+  - it listed the `verify-strive` skill;
+  - it called the fake MCP server's echo after TUI approval.
+  - The journal holds `echo: strive`. `strive verify` passes on 18
+    entries. The cost was $0.0069.
+  - The run showed approvals displayed twice; that is fixed.
