@@ -3,4 +3,12 @@
 /**
  * Tokens a call used, as the provider reported them.
  */
-export type Usage = { input: number, output: number, cacheWrite: number, cacheRead: number, };
+export type Usage = { input: number, output: number, 
+/**
+ * Cache writes at the standard (five-minute) rate.
+ */
+cacheWrite: number, 
+/**
+ * Cache writes kept for an hour, at their higher rate.
+ */
+cacheWriteLong: number, cacheRead: number, };

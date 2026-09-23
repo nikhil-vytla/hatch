@@ -17,7 +17,7 @@ test("spend follows the ledger's rules for each outcome", () => {
   for (const e of [
     { type: "budgetSet", usdMicros: 5_000_000 },
     started(1, 900),
-    { type: "modelCallFinished", call: 1, durationMs: 1, outcome: { kind: "complete", status: 200, usage: { input: 1, output: 1, cacheWrite: 0, cacheRead: 0 }, costUsdMicros: 350 } },
+    { type: "modelCallFinished", call: 1, durationMs: 1, outcome: { kind: "complete", status: 200, usage: { input: 1, output: 1, cacheWrite: 0, cacheWriteLong: 0, cacheRead: 0 }, costUsdMicros: 350 } },
     started(2, 900),
     { type: "modelCallFinished", call: 2, durationMs: 1, outcome: { kind: "rejected", status: 429 } },
     started(3, 900),

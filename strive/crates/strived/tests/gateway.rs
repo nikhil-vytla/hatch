@@ -212,7 +212,7 @@ fn a_call_is_forwarded_with_the_real_key_metered_and_journaled() {
         finished,
         json!({"type": "modelCallFinished", "call": 1, "response": sha(ANTHROPIC_JSON.as_bytes()),
                "outcome": {"kind": "complete", "status": 200,
-                           "usage": {"input": 12, "output": 7, "cacheWrite": 100, "cacheRead": 2000},
+                           "usage": {"input": 12, "output": 7, "cacheWrite": 100, "cacheWriteLong": 0, "cacheRead": 2000},
                            "costUsdMicros": 12 + 35 + 125 + 200}})
     );
     assert_eq!(s.blob(&started["request"]), BODY.as_bytes(), "the exact request bytes are stored");
@@ -231,7 +231,7 @@ fn a_stream_passes_through_unchanged_and_is_metered() {
     let finished = s.last("modelCallFinished");
     assert_eq!(
         finished["outcome"],
-        json!({"kind": "complete", "status": 200, "usage": {"input": 25, "output": 15, "cacheWrite": 0, "cacheRead": 1000},
+        json!({"kind": "complete", "status": 200, "usage": {"input": 25, "output": 15, "cacheWrite": 0, "cacheWriteLong": 0, "cacheRead": 1000},
                "costUsdMicros": 25 + 75 + 100})
     );
     assert_eq!(s.blob(&finished["response"]), SSE.concat().as_bytes());
@@ -284,7 +284,9 @@ fn a_model_without_a_price_is_refused_and_settings_can_price_it() {
     let base = s.env.rpc().ok("session/gateway", &json!({"id": s.id}))["anthropic"].as_str().unwrap().to_string();
     let (status, _) = s.post(&format!("{base}/v1/messages"), &BODY.replace("claude-haiku-4-5", "claude-mystery-1"));
     assert_eq!(status, 200);
-    assert_eq!(s.entries().last().unwrap()["outcome"]["costUsdMicros"], 12 * 2 + 7 * 4);
+    // No cache rates were configured, so the response's cache tokens cost the
+    // conservative defaults: writes at 1.25x input, reads at full input.
+    assert_eq!(s.last("modelCallFinished")["outcome"]["costUsdMicros"], 12 * 2 + 7 * 4 + 100 * 5 / 2 + 2000 * 2);
 }
 
 #[test]
@@ -410,7 +412,7 @@ fn streaming_openai_chat_is_made_to_report_usage() {
     assert_eq!(sent["stream_options"], json!({"include_usage": true}));
     assert_eq!(
         s.last("modelCallFinished")["outcome"]["usage"],
-        json!({"input": 50, "output": 9, "cacheWrite": 0, "cacheRead": 0})
+        json!({"input": 50, "output": 9, "cacheWrite": 0, "cacheWriteLong": 0, "cacheRead": 0})
     );
 }
 

@@ -25,7 +25,8 @@ export class Spend {
         const o = e.outcome;
         if (o.kind === "complete") {
           this.spentUsd += o.costUsdMicros;
-          this.spentTokens += o.usage.input + o.usage.output + o.usage.cacheRead + o.usage.cacheWrite;
+                    const u = o.usage;
+          this.spentTokens += u.input + u.output + u.cacheRead + u.cacheWrite + u.cacheWriteLong;
         } else if (o.kind === "broken") {
           this.spentUsd += o.costUsdMicros;
           this.spentTokens += o.tokens;

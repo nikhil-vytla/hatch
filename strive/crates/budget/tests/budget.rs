@@ -1,8 +1,20 @@
 use strive_budget::{Ledger, Limits, Models, Price, Refusal, Reservation, cost, format_usd, open_calls};
 use strive_proto::{CallOutcome, Digest, Event, Usage};
 
-const HAIKU: Price = Price { input: 1_000_000, output: 5_000_000, cache_write: 1_250_000, cache_read: 100_000 };
-const SONNET: Price = Price { input: 3_000_000, output: 15_000_000, cache_write: 3_750_000, cache_read: 300_000 };
+const HAIKU: Price = Price {
+    input: 1_000_000,
+    output: 5_000_000,
+    cache_write: 1_250_000,
+    cache_write_long: 2_000_000,
+    cache_read: 100_000,
+};
+const SONNET: Price = Price {
+    input: 3_000_000,
+    output: 15_000_000,
+    cache_write: 3_750_000,
+    cache_write_long: 6_000_000,
+    cache_read: 300_000,
+};
 
 fn usage(input: u64, output: u64) -> Usage {
     Usage { input, output, ..Usage::default() }
@@ -12,7 +24,7 @@ fn usage(input: u64, output: u64) -> Usage {
 fn cost_is_tokens_times_price_per_million() {
     assert_eq!(cost(&HAIKU, &usage(1000, 500)), 3500);
     assert_eq!(
-        cost(&SONNET, &Usage { input: 10, output: 20, cache_write: 1000, cache_read: 100_000 }),
+        cost(&SONNET, &Usage { input: 10, output: 20, cache_write: 1000, cache_read: 100_000, ..Usage::default() }),
         30 + 300 + 3750 + 30_000
     );
 }
@@ -62,8 +74,8 @@ fn configured_prices_override_and_extend_the_builtins() {
     assert_eq!(m.get("claude-haiku-4-5").unwrap().max_output, 200_000, "max output defaults to the context window");
     assert_eq!(
         m.get("claude-haiku-4-5").unwrap().price.cache_read,
-        0,
-        "an override replaces the whole entry; unset cache prices are zero"
+        2_000_000,
+        "an override replaces the whole entry; an unset cache price defaults to the dearest rate, full input"
     );
 }
 
@@ -72,11 +84,11 @@ fn a_reservation_bounds_input_by_bytes_and_the_context_window() {
     let m = Models::builtin();
     let sonnet = m.get("claude-sonnet-4-5").unwrap();
     assert_eq!(
-        Reservation::for_request(sonnet, 1000, Some(100)),
+        Reservation::for_call(sonnet, 1000, Some(100), 1, strive_budget::InputRate::Plain),
         Reservation { usd_micros: 3000 + 1500, tokens: 1100 }
     );
     assert_eq!(
-        Reservation::for_request(sonnet, 5_000_000, Some(100)),
+        Reservation::for_call(sonnet, 5_000_000, Some(100), 1, strive_budget::InputRate::Plain),
         Reservation { usd_micros: 200_000 * 3 + 1500, tokens: 200_100 },
         "input can't exceed the context window"
     );
@@ -86,9 +98,12 @@ fn a_reservation_bounds_input_by_bytes_and_the_context_window() {
 fn a_request_without_an_output_cap_is_bounded_by_the_models_maximum() {
     let m = Models::builtin();
     let haiku = m.get("claude-haiku-4-5").unwrap();
-    assert_eq!(Reservation::for_request(haiku, 10, None), Reservation { usd_micros: 10 + 64_000 * 5, tokens: 64_010 });
     assert_eq!(
-        Reservation::for_request(haiku, 10, Some(1_000_000)),
+        Reservation::for_call(haiku, 10, None, 1, strive_budget::InputRate::Plain),
+        Reservation { usd_micros: 10 + 64_000 * 5, tokens: 64_010 }
+    );
+    assert_eq!(
+        Reservation::for_call(haiku, 10, Some(1_000_000), 1, strive_budget::InputRate::Plain),
         Reservation { usd_micros: 10 + 64_000 * 5, tokens: 64_010 },
         "a cap above the model's maximum can't be reached"
     );
@@ -203,4 +218,47 @@ fn open_calls_are_listed_in_call_order_with_their_reservations() {
         vec![(2, Reservation { usd_micros: 200, tokens: 2 }), (5, Reservation { usd_micros: 500, tokens: 5 })]
     );
     assert_eq!(open_calls(&events[3..]), vec![]);
+}
+
+#[test]
+fn only_exact_ids_and_dated_releases_share_a_price() {
+    let m = Models::builtin();
+    assert_eq!(m.get("gpt-5-pro"), None, "a different model with a shared prefix is not priced as gpt-5");
+    assert_eq!(m.get("gpt-4.1-nano"), None);
+    assert_eq!(m.get("claude-haiku-4-5-20251001").map(|m| m.price.input), Some(1_000_000));
+    assert_eq!(m.get("gpt-4.1-2025-04-14").map(|m| m.price.input), Some(2_000_000));
+    assert_eq!(m.get("gpt-4.1-mini-2025-04-14").map(|m| m.price.input), Some(400_000));
+    assert_eq!(m.get("claude-haiku-4-5-latest"), None);
+}
+
+#[test]
+fn a_reservation_covers_several_choices_and_the_cache_write_rate() {
+    use strive_budget::InputRate;
+    let m = Models::builtin();
+    let sonnet = m.get("claude-sonnet-4-5").unwrap();
+    let r = |bytes, out, choices, rate| Reservation::for_call(sonnet, bytes, out, choices, rate).usd_micros;
+    assert_eq!(r(1000, Some(100), 1, InputRate::Plain), 3000 + 1500);
+    assert_eq!(r(1000, Some(100), 3, InputRate::Plain), 3000 + 4500);
+    assert_eq!(r(1000, Some(100), 1, InputRate::CacheWrite), 3750 + 1500);
+    assert_eq!(r(1000, Some(100), 1, InputRate::CacheWriteLong), 6000 + 1500);
+}
+
+#[test]
+fn one_hour_cache_writes_cost_twice_the_input_rate() {
+    let u = Usage { cache_write_long: 1000, ..Usage::default() };
+    assert_eq!(cost(&Models::builtin().get("claude-haiku-4-5").unwrap().price, &u), 2000);
+}
+
+/// A usage report no real call produces must not wrap the ledger around
+/// to admit more calls.
+#[test]
+fn absurd_usage_saturates_instead_of_wrapping() {
+    let mut l = Ledger::new(Limits { usd_micros: Some(10_000), tokens: None });
+    l.reserve(1, Reservation { usd_micros: 1, tokens: 1 }).unwrap();
+    l.settle(1, u64::MAX, u64::MAX);
+    l.settle(2, 5, 5);
+    assert_eq!(l.spent_usd(), u64::MAX);
+    assert!(l.reserve(3, Reservation { usd_micros: 589, tokens: 1 }).is_err());
+    let huge = Usage { input: u64::MAX, output: u64::MAX, ..Usage::default() };
+    assert_eq!(huge.total(), u64::MAX);
 }

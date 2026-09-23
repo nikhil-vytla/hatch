@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 strive-proto.workspace = true
+strive-budget.workspace = true
 serde_json.workspace = true
 
 [lints]

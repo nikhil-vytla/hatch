@@ -642,13 +642,21 @@ pub enum CallOutcome {
 pub struct Usage {
     pub input: u64,
     pub output: u64,
+    /// Cache writes at the standard (five-minute) rate.
     pub cache_write: u64,
+    /// Cache writes kept for an hour, at their higher rate.
+    #[serde(default)]
+    pub cache_write_long: u64,
     pub cache_read: u64,
 }
 
 impl Usage {
     pub fn total(&self) -> u64 {
-        self.input + self.output + self.cache_write + self.cache_read
+        self.input
+            .saturating_add(self.output)
+            .saturating_add(self.cache_write)
+            .saturating_add(self.cache_write_long)
+            .saturating_add(self.cache_read)
     }
 }
 

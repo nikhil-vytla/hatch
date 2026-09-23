@@ -136,7 +136,7 @@ async fn admit(state: &Arc<State>, token: &str, provider: &str, path: &str, body
         let why = format!("no {provider} API key; run `strive auth {provider}`");
         bad(StatusCode::UNAUTHORIZED, "authentication_error", &why)
     })?;
-    let reservation = Reservation::for_request(&model, sent.len() as u64, info.max_output);
+    let reservation = Reservation::for_call(&model, sent.len() as u64, info.max_output, info.choices, info.input_rate);
     let request =
         state.cas.put(&sent).map_err(|e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &e.to_string()))?;
     let start = CallStart { provider: provider.to_string(), model: info.model.clone(), request, reservation };

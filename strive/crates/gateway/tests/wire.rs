@@ -3,7 +3,7 @@ use strive_gateway::{Api, RequestInfo, UsageMeter, prepare_request};
 use strive_proto::Usage;
 
 fn usage(input: u64, output: u64, cache_write: u64, cache_read: u64) -> Usage {
-    Usage { input, output, cache_write, cache_read }
+    Usage { input, output, cache_write, cache_write_long: 0, cache_read }
 }
 
 #[test]
@@ -20,7 +20,16 @@ fn apis_are_recognized_by_provider_and_path() {
 fn anthropic_requests_name_their_model_cap_and_streaming() {
     let body = json!({"model": "claude-haiku-4-5", "max_tokens": 1024, "stream": true, "messages": []});
     let (info, sent) = prepare_request(Api::AnthropicMessages, &serde_json::to_vec(&body).unwrap()).unwrap();
-    assert_eq!(info, RequestInfo { model: "claude-haiku-4-5".into(), max_output: Some(1024), stream: true });
+    assert_eq!(
+        info,
+        RequestInfo {
+            model: "claude-haiku-4-5".into(),
+            max_output: Some(1024),
+            stream: true,
+            choices: 1,
+            input_rate: strive_budget::InputRate::Plain,
+        }
+    );
     assert_eq!(serde_json::from_slice::<Value>(&sent).unwrap(), body, "Anthropic bodies are sent unchanged");
 }
 
@@ -32,7 +41,16 @@ fn openai_caps_come_from_whichever_field_the_request_uses() {
     assert_eq!(chat(json!({"model": "gpt-4.1"})), None);
     let responses =
         prepare_request(Api::OpenAiResponses, br#"{"model":"gpt-5","max_output_tokens":77,"input":"hi"}"#).unwrap().0;
-    assert_eq!(responses, RequestInfo { model: "gpt-5".into(), max_output: Some(77), stream: false });
+    assert_eq!(
+        responses,
+        RequestInfo {
+            model: "gpt-5".into(),
+            max_output: Some(77),
+            stream: false,
+            choices: 1,
+            input_rate: strive_budget::InputRate::Plain,
+        }
+    );
 }
 
 /// Chat Completions streams report usage only when asked, and the gateway
@@ -141,4 +159,126 @@ fn a_stream_cut_before_its_usage_has_none() {
     let cut = &CHAT_SSE[..CHAT_SSE.find("data: {\"id\":\"c1\",\"choices\":[]").unwrap()];
     assert_eq!(metered(Api::OpenAiChat, true, cut), None);
     assert_eq!(metered(Api::OpenAiResponses, false, r#"{"error":{"message":"bad"}}"#), None);
+}
+
+fn prepared(api: Api, body: &Value) -> Result<RequestInfo, &'static str> {
+    prepare_request(api, &serde_json::to_vec(body).unwrap()).map(|(info, _)| info)
+}
+
+#[test]
+fn several_chat_choices_multiply_the_output_bound() {
+    let info =
+        prepared(Api::OpenAiChat, &json!({"model": "gpt-4.1-mini", "n": 2, "max_completion_tokens": 1000})).unwrap();
+    assert_eq!((info.max_output, info.choices), (Some(1000), 2));
+    assert_eq!(prepared(Api::OpenAiChat, &json!({"model": "gpt-4.1-mini"})).unwrap().choices, 1);
+}
+
+#[test]
+fn server_side_conversation_state_is_refused() {
+    let why = "the request relies on conversation state kept by the provider, whose cost can't be bounded from the request; send the full history instead";
+    assert_eq!(prepared(Api::OpenAiResponses, &json!({"model": "gpt-5", "previous_response_id": "resp_1"})), Err(why));
+    assert_eq!(prepared(Api::OpenAiResponses, &json!({"model": "gpt-5", "conversation": "conv_1"})), Err(why));
+}
+
+#[test]
+fn paid_server_side_tools_are_refused_and_client_tools_are_not() {
+    let why = "the request enables tools the provider runs and bills separately, which strive can't bound; use tools the agent runs itself";
+    let refused = [
+        (Api::OpenAiResponses, json!({"model": "gpt-5", "tools": [{"type": "web_search"}]})),
+        (
+            Api::OpenAiResponses,
+            json!({"model": "gpt-5", "tools": [{"type": "function", "name": "f"}, {"type": "file_search"}]}),
+        ),
+        (Api::OpenAiChat, json!({"model": "gpt-4.1", "web_search_options": {}})),
+        (
+            Api::AnthropicMessages,
+            json!({"model": "claude-haiku-4-5", "max_tokens": 5, "tools": [{"type": "web_search_20250305", "name": "web_search"}]}),
+        ),
+        (
+            Api::AnthropicMessages,
+            json!({"model": "claude-haiku-4-5", "max_tokens": 5, "tools": [{"type": "code_execution_20250522", "name": "code_execution"}]}),
+        ),
+        (
+            Api::AnthropicMessages,
+            json!({"model": "claude-haiku-4-5", "max_tokens": 5, "mcp_servers": [{"url": "https://x"}]}),
+        ),
+    ];
+    for (api, body) in refused {
+        assert_eq!(prepared(api, &body), Err(why), "{body}");
+    }
+    let allowed = [
+        (Api::OpenAiResponses, json!({"model": "gpt-5", "tools": [{"type": "function", "name": "read"}]})),
+        (Api::OpenAiChat, json!({"model": "gpt-4.1", "tools": [{"type": "function", "function": {"name": "read"}}]})),
+        (
+            Api::AnthropicMessages,
+            json!({"model": "claude-haiku-4-5", "max_tokens": 5, "tools": [{"name": "read", "input_schema": {}}]}),
+        ),
+        (
+            Api::AnthropicMessages,
+            json!({"model": "claude-haiku-4-5", "max_tokens": 5, "tools": [{"type": "bash_20250124", "name": "bash"}]}),
+        ),
+    ];
+    for (api, body) in allowed {
+        assert!(prepared(api, &body).is_ok(), "{body}");
+    }
+}
+
+#[test]
+fn requests_that_write_the_cache_are_bounded_at_the_cache_write_rate() {
+    use strive_budget::InputRate;
+    let plain = json!({"model": "claude-haiku-4-5", "max_tokens": 5, "messages": [{"role": "user", "content": "hi"}]});
+    assert_eq!(prepared(Api::AnthropicMessages, &plain).unwrap().input_rate, InputRate::Plain);
+    let cached = json!({"model": "claude-haiku-4-5", "max_tokens": 5, "system": [{"type": "text", "text": "s", "cache_control": {"type": "ephemeral"}}]});
+    assert_eq!(prepared(Api::AnthropicMessages, &cached).unwrap().input_rate, InputRate::CacheWrite);
+    let long = json!({"model": "claude-haiku-4-5", "max_tokens": 5, "messages": [{"role": "user", "content": [{"type": "text", "text": "x", "cache_control": {"type": "ephemeral", "ttl": "1h"}}]}]});
+    assert_eq!(prepared(Api::AnthropicMessages, &long).unwrap().input_rate, InputRate::CacheWriteLong);
+}
+
+#[test]
+fn one_hour_cache_writes_are_counted_apart() {
+    let body = r#"{"usage":{"input_tokens":5,"output_tokens":2,"cache_creation_input_tokens":150,"cache_read_input_tokens":0,
+"cache_creation":{"ephemeral_5m_input_tokens":100,"ephemeral_1h_input_tokens":50}}}"#;
+    assert_eq!(
+        metered(Api::AnthropicMessages, false, body),
+        Some(Usage { input: 5, output: 2, cache_write: 100, cache_write_long: 50, cache_read: 0 })
+    );
+}
+
+#[test]
+fn a_responses_stream_that_ends_incomplete_still_reports_usage() {
+    let sse = "event: response.incomplete\n\
+data: {\"type\":\"response.incomplete\",\"response\":{\"status\":\"incomplete\",\"usage\":{\"input_tokens\":40,\"output_tokens\":16,\"input_tokens_details\":{\"cached_tokens\":0}}}}\n\n";
+    assert_eq!(metered(Api::OpenAiResponses, true, sse), Some(usage(40, 16, 0, 0)));
+}
+
+#[test]
+fn streams_framed_with_crlf_or_multi_line_data_are_metered() {
+    let crlf = ANTHROPIC_SSE.replace('\n', "\r\n");
+    assert_eq!(metered(Api::AnthropicMessages, true, &crlf), Some(usage(25, 15, 0, 1000)));
+    assert_eq!(metered_bytewise(Api::AnthropicMessages, &crlf), Some(usage(25, 15, 0, 1000)));
+    let multi = "event: response.completed\n\
+data: {\"type\":\"response.completed\",\n\
+data: \"response\":{\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}}\n\n";
+    assert_eq!(metered(Api::OpenAiResponses, true, multi), Some(usage(3, 4, 0, 0)));
+}
+
+/// Usage the gateway can't read as numbers is unknown, not zero: the call
+/// is then charged its hold.
+#[test]
+fn malformed_usage_is_unknown_not_free() {
+    assert_eq!(metered(Api::AnthropicMessages, false, r#"{"usage":{"input_tokens":null,"output_tokens":3}}"#), None);
+    assert_eq!(metered(Api::AnthropicMessages, false, r#"{"usage":{"input_tokens":3}}"#), None);
+    assert_eq!(metered(Api::OpenAiChat, false, r#"{"usage":{"prompt_tokens":10}}"#), None);
+    assert_eq!(metered(Api::OpenAiResponses, false, r#"{"usage":{"input_tokens":"10","output_tokens":1}}"#), None);
+}
+
+/// A stream the gateway can't frame (an event larger than any real one)
+/// has unknown usage rather than growing without bound.
+#[test]
+fn an_oversized_stream_event_has_unknown_usage() {
+    let mut m = UsageMeter::new(Api::AnthropicMessages, true);
+    m.feed(&ANTHROPIC_SSE.as_bytes()[..ANTHROPIC_SSE.find("event: message_delta").unwrap()]);
+    m.feed(&vec![b'x'; 17 * 1024 * 1024]);
+    m.feed(b"\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":15}}\n\n");
+    assert_eq!(m.finish(), None);
 }

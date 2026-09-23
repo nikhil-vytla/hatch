@@ -16,6 +16,8 @@ pub struct Price {
     pub input: u64,
     pub output: u64,
     pub cache_write: u64,
+    /// One-hour cache writes.
+    pub cache_write_long: u64,
     pub cache_read: u64,
 }
 
@@ -34,6 +36,7 @@ pub fn cost(price: &Price, usage: &Usage) -> u64 {
     let nano = u128::from(usage.input) * u128::from(price.input)
         + u128::from(usage.output) * u128::from(price.output)
         + u128::from(usage.cache_write) * u128::from(price.cache_write)
+        + u128::from(usage.cache_write_long) * u128::from(price.cache_write_long)
         + u128::from(usage.cache_read) * u128::from(price.cache_read);
     u64::try_from(nano.div_ceil(1_000_000)).unwrap_or(u64::MAX)
 }
@@ -46,16 +49,103 @@ pub fn format_usd(micros: u64) -> String {
 
 /// Built-in prices, as published by each provider. Anything else must be
 /// priced in settings; an unpriced model is refused rather than guessed.
-const BUILTIN: &[(&str, f64, f64, f64, f64, u64, u64)] = &[
-    // id prefix, $/MTok input, output, cache write, cache read, context window, max output
-    ("claude-haiku-4-5", 1.0, 5.0, 1.25, 0.10, 200_000, 64_000),
-    ("claude-sonnet-4-5", 3.0, 15.0, 3.75, 0.30, 200_000, 64_000),
-    ("claude-opus-4-5", 5.0, 25.0, 6.25, 0.50, 200_000, 64_000),
-    ("claude-opus-4-1", 15.0, 75.0, 18.75, 1.50, 200_000, 32_000),
-    ("gpt-4.1-mini", 0.40, 1.60, 0.0, 0.10, 1_047_576, 32_768),
-    ("gpt-4.1", 2.0, 8.0, 0.0, 0.50, 1_047_576, 32_768),
-    ("gpt-5-mini", 0.25, 2.0, 0.0, 0.025, 400_000, 128_000),
-    ("gpt-5", 1.25, 10.0, 0.0, 0.125, 400_000, 128_000),
+const BUILTIN: &[(&str, PriceSetting)] = &[
+    (
+        "claude-haiku-4-5",
+        PriceSetting {
+            input: 1.0,
+            output: 5.0,
+            cache_write: Some(1.25),
+            cache_write_long: Some(2.0),
+            cache_read: Some(0.1),
+            context_window: 200_000,
+            max_output: Some(64_000),
+        },
+    ),
+    (
+        "claude-sonnet-4-5",
+        PriceSetting {
+            input: 3.0,
+            output: 15.0,
+            cache_write: Some(3.75),
+            cache_write_long: Some(6.0),
+            cache_read: Some(0.3),
+            context_window: 200_000,
+            max_output: Some(64_000),
+        },
+    ),
+    (
+        "claude-opus-4-5",
+        PriceSetting {
+            input: 5.0,
+            output: 25.0,
+            cache_write: Some(6.25),
+            cache_write_long: Some(10.0),
+            cache_read: Some(0.5),
+            context_window: 200_000,
+            max_output: Some(64_000),
+        },
+    ),
+    (
+        "claude-opus-4-1",
+        PriceSetting {
+            input: 15.0,
+            output: 75.0,
+            cache_write: Some(18.75),
+            cache_write_long: Some(30.0),
+            cache_read: Some(1.5),
+            context_window: 200_000,
+            max_output: Some(32_000),
+        },
+    ),
+    (
+        "gpt-4.1-mini",
+        PriceSetting {
+            input: 0.4,
+            output: 1.6,
+            cache_write: Some(0.0),
+            cache_write_long: Some(0.0),
+            cache_read: Some(0.1),
+            context_window: 1_047_576,
+            max_output: Some(32_768),
+        },
+    ),
+    (
+        "gpt-4.1",
+        PriceSetting {
+            input: 2.0,
+            output: 8.0,
+            cache_write: Some(0.0),
+            cache_write_long: Some(0.0),
+            cache_read: Some(0.5),
+            context_window: 1_047_576,
+            max_output: Some(32_768),
+        },
+    ),
+    (
+        "gpt-5-mini",
+        PriceSetting {
+            input: 0.25,
+            output: 2.0,
+            cache_write: Some(0.0),
+            cache_write_long: Some(0.0),
+            cache_read: Some(0.025),
+            context_window: 400_000,
+            max_output: Some(128_000),
+        },
+    ),
+    (
+        "gpt-5",
+        PriceSetting {
+            input: 1.25,
+            output: 10.0,
+            cache_write: Some(0.0),
+            cache_write_long: Some(0.0),
+            cache_read: Some(0.125),
+            context_window: 400_000,
+            max_output: Some(128_000),
+        },
+    ),
 ];
 
 fn micros_per_mtok(dollars: f64) -> u64 {
@@ -65,16 +155,21 @@ fn micros_per_mtok(dollars: f64) -> u64 {
     m
 }
 
-/// A price as written in settings: dollars per million tokens.
+/// A price as written in settings: dollars per million tokens. Unset cache
+/// rates default to the dearest rate any provider charges (writes 1.25x
+/// input, one-hour writes 2x, reads at full input), so an omission can only
+/// overstate cost.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PriceSetting {
     pub input: f64,
     pub output: f64,
     #[serde(default)]
-    pub cache_write: f64,
+    pub cache_write: Option<f64>,
     #[serde(default)]
-    pub cache_read: f64,
+    pub cache_write_long: Option<f64>,
+    #[serde(default)]
+    pub cache_read: Option<f64>,
     pub context_window: u64,
     /// Defaults to the context window.
     #[serde(default)]
@@ -87,8 +182,9 @@ impl PriceSetting {
             price: Price {
                 input: micros_per_mtok(self.input),
                 output: micros_per_mtok(self.output),
-                cache_write: micros_per_mtok(self.cache_write),
-                cache_read: micros_per_mtok(self.cache_read),
+                cache_write: micros_per_mtok(self.cache_write.unwrap_or(self.input * 1.25)),
+                cache_write_long: micros_per_mtok(self.cache_write_long.unwrap_or(self.input * 2.0)),
+                cache_read: micros_per_mtok(self.cache_read.unwrap_or(self.input)),
             },
             context_window: self.context_window,
             max_output: self.max_output.unwrap_or(self.context_window),
@@ -101,22 +197,7 @@ pub struct Models(BTreeMap<String, Model>);
 
 impl Models {
     pub fn builtin() -> Self {
-        Self(
-            BUILTIN
-                .iter()
-                .map(|&(id, input, output, cache_write, cache_read, context_window, max_output)| {
-                    let setting = PriceSetting {
-                        input,
-                        output,
-                        cache_write,
-                        cache_read,
-                        context_window,
-                        max_output: Some(max_output),
-                    };
-                    (id.to_string(), setting.model())
-                })
-                .collect(),
-        )
+        Self(BUILTIN.iter().map(|(id, setting)| ((*id).to_string(), setting.model())).collect())
     }
 
     /// Settings entries replace built-in ones with the same id and add new ones.
@@ -128,11 +209,30 @@ impl Models {
         self
     }
 
-    /// The entry whose id is the longest prefix of `model`, so dated model
-    /// ids (`claude-haiku-4-5-20251001`) find their family's price.
+    /// The entry for `model`, or for the model it is a dated release of
+    /// (`claude-haiku-4-5-20251001`, `gpt-4.1-2025-04-14`). Any other
+    /// suffix names a different model (`gpt-5-pro` is not `gpt-5`) and gets
+    /// no price.
     pub fn get(&self, model: &str) -> Option<&Model> {
-        self.0.iter().filter(|(id, _)| model.starts_with(id.as_str())).max_by_key(|(id, _)| id.len()).map(|(_, m)| m)
+        if let Some(m) = self.0.get(model) {
+            return Some(m);
+        }
+        self.0.iter().find_map(|(id, m)| {
+            let suffix = model.strip_prefix(id.as_str())?.strip_prefix('-')?;
+            let digits = suffix.chars().filter(char::is_ascii_digit).count();
+            let dated = digits == 8 && suffix.chars().all(|c| c.is_ascii_digit() || c == '-');
+            dated.then_some(m)
+        })
     }
+}
+
+/// Which rate bounds a request's input: a request that writes the cache can
+/// be billed above the plain input rate for everything it sends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputRate {
+    Plain,
+    CacheWrite,
+    CacheWriteLong,
 }
 
 /// The most a call can cost and use.
@@ -145,14 +245,18 @@ pub struct Reservation {
 impl Reservation {
     /// Input is bounded by the request's size in bytes (a byte-level
     /// tokenizer yields at most one token per byte) and by the context
-    /// window; output by the request's cap, or the model's maximum when it
-    /// sets none. Priced at the full input rate, so cache discounts only make
-    /// the real cost lower.
-    pub fn for_request(model: &Model, body_bytes: u64, max_output: Option<u64>) -> Self {
+    /// window, priced at the dearest rate the request can incur; output by
+    /// the request's cap, or the model's maximum when it sets none, for each
+    /// choice it asks for.
+    pub fn for_call(model: &Model, body_bytes: u64, max_output: Option<u64>, choices: u64, rate: InputRate) -> Self {
         let input = body_bytes.min(model.context_window);
-        let output = max_output.unwrap_or(model.max_output).min(model.max_output);
-        let usage = Usage { input, output, ..Usage::default() };
-        Self { usd_micros: cost(&model.price, &usage), tokens: input + output }
+        let output = max_output.unwrap_or(model.max_output).min(model.max_output).saturating_mul(choices.max(1));
+        let usage = match rate {
+            InputRate::Plain => Usage { input, output, ..Usage::default() },
+            InputRate::CacheWrite => Usage { cache_write: input, output, ..Usage::default() },
+            InputRate::CacheWriteLong => Usage { cache_write_long: input, output, ..Usage::default() },
+        };
+        Self { usd_micros: cost(&model.price, &usage), tokens: input.saturating_add(output) }
     }
 }
 
@@ -221,23 +325,23 @@ impl Ledger {
 
     /// Spent plus held by calls in flight.
     pub fn committed_usd(&self) -> u64 {
-        self.spent_usd + self.open.values().map(|r| r.usd_micros).sum::<u64>()
+        self.open.values().fold(self.spent_usd, |a, r| a.saturating_add(r.usd_micros))
     }
 
     fn committed_tokens(&self) -> u64 {
-        self.spent_tokens + self.open.values().map(|r| r.tokens).sum::<u64>()
+        self.open.values().fold(self.spent_tokens, |a, r| a.saturating_add(r.tokens))
     }
 
     pub fn reserve(&mut self, call: u64, r: Reservation) -> Result<(), Refusal> {
         if let Some(limit) = self.limits.usd_micros {
             let committed = self.committed_usd();
-            if committed + r.usd_micros > limit {
+            if committed.saturating_add(r.usd_micros) > limit {
                 return Err(Refusal::Usd { limit, committed, wanted: r.usd_micros });
             }
         }
         if let Some(limit) = self.limits.tokens {
             let committed = self.committed_tokens();
-            if committed + r.tokens > limit {
+            if committed.saturating_add(r.tokens) > limit {
                 return Err(Refusal::Tokens { limit, committed, wanted: r.tokens });
             }
         }
@@ -248,8 +352,8 @@ impl Ledger {
     /// Releases the call's reservation and charges what it actually cost.
     pub fn settle(&mut self, call: u64, usd_micros: u64, tokens: u64) {
         self.open.remove(&call);
-        self.spent_usd += usd_micros;
-        self.spent_tokens += tokens;
+        self.spent_usd = self.spent_usd.saturating_add(usd_micros);
+        self.spent_tokens = self.spent_tokens.saturating_add(tokens);
     }
 
     /// Rebuilds a ledger from a session's events. Calls that started but
@@ -269,8 +373,8 @@ impl Ledger {
                 Event::ModelCallFinished { call, outcome, .. } => {
                     abandoned.remove(call);
                     let (usd, tokens) = charge(outcome);
-                    l.spent_usd += usd;
-                    l.spent_tokens += tokens;
+                    l.spent_usd = l.spent_usd.saturating_add(usd);
+                    l.spent_tokens = l.spent_tokens.saturating_add(tokens);
                 }
                 Event::SessionStarted { .. }
                 | Event::UserMessage { .. }
@@ -283,8 +387,8 @@ impl Ledger {
             }
         }
         for r in abandoned.values() {
-            l.spent_usd += r.usd_micros;
-            l.spent_tokens += r.tokens;
+            l.spent_usd = l.spent_usd.saturating_add(r.usd_micros);
+            l.spent_tokens = l.spent_tokens.saturating_add(r.tokens);
         }
         l
     }
