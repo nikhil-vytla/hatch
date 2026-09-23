@@ -8,6 +8,8 @@ mod client;
 mod commands;
 mod context;
 mod credentials;
+mod desktop;
+
 mod doctor;
 mod effects;
 mod gateway;
@@ -50,6 +52,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Open the desktop app on a new session in this directory.
+    App {
+        /// Continue the latest session in this directory.
+        #[arg(short = 'c', long = "continue", conflicts_with = "resume")]
+        continue_latest: bool,
+        /// Resume a session by id.
+        #[arg(short = 'r', long, value_name = "ID")]
+        resume: Option<String>,
+    },
     /// Show the daemon's status.
     Status {
         #[arg(long)]
@@ -127,6 +138,17 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             };
             tui::exec(&home, &session)?;
             unreachable!("exec returns only on error")
+        }
+        Some(Cmd::App { continue_latest, resume }) => {
+            launch::ensure(&home, "strive-app").await?;
+            let session = match (continue_latest, resume) {
+                (_, Some(id)) => tui::Session::Resume(id),
+                (true, None) => tui::Session::Continue,
+                (false, None) => tui::Session::New,
+            };
+            desktop::open(&home, &session)?;
+            println!("opened the desktop app");
+            Ok(ExitCode::SUCCESS)
         }
         Some(Cmd::Log { id, json }) => commands::log(&mut launch::ensure(&home, "strive-log").await?.0, id, json).await,
         Some(Cmd::Verify { id, all }) => {

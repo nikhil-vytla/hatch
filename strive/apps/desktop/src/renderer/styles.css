@@ -1,0 +1,48 @@
+:root {
+  color-scheme: dark;
+  --bg: #15171a;
+  --panel: #1d2024;
+  --line: #2a2e33;
+  --text: #e6e6e6;
+  --muted: #9aa0a6;
+  --faint: #6b7178;
+  --accent: #7cc4fa;
+  --danger: #f28b82;
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.app { display: flex; flex-direction: column; height: 100vh; }
+header { display: flex; gap: 12px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.brand { font-weight: 600; }
+.cwd, .mode { color: var(--muted); }
+.spacer { flex: 1; }
+.working { color: var(--accent); }
+.banner { padding: 6px 14px; border: 0; text-align: left; font: inherit; }
+.banner.danger, .danger { color: var(--danger); }
+.columns { display: flex; flex: 1; gap: 10px; padding: 10px; min-height: 0; }
+.column { display: flex; flex-direction: column; gap: 10px; flex-basis: 0; min-width: 0; min-height: 0; }
+.panel { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-height: 0; }
+.column > .panel:first-child:has(.transcript) { flex: 1; display: flex; flex-direction: column; }
+.handle { position: absolute; top: 4px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--line); cursor: grab; }
+h2 { margin: 2px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.faint { color: var(--faint); }
+.transcript { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.lines { flex: 1; overflow-y: auto; }
+.line { margin: 0 0 6px; white-space: pre-wrap; }
+.line.muted { color: var(--muted); }
+.line.faint { color: var(--faint); }
+.line.accent, .caret { color: var(--accent); }
+.line.danger { color: var(--danger); }
+.line.live { color: var(--muted); }
+.composer { margin-top: 8px; min-height: 64px; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; }
+button { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; margin: 0 6px 6px 0; font: inherit; cursor: pointer; }
+.approval p { margin: 0 0 8px; }
+.checkpoints, .activity { list-style: none; margin: 0; padding: 0; }
+.checkpoints li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.activity li { color: var(--muted); }
+.activity li.refused, .activity li.failed { color: var(--danger); }
+.activity li.running { color: var(--accent); }
+progress { width: 100%; }

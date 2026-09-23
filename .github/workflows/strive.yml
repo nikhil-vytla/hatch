@@ -29,7 +29,7 @@ jobs:
       # AppArmor blocks the unprivileged user namespaces bubblewrap needs.
       - if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y bubblewrap
+          sudo apt-get install -y bubblewrap xvfb
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: ./scripts/check.sh
   mutants:

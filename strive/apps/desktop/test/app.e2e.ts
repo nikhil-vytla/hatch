@@ -1,0 +1,196 @@
+// The desktop app, driven as a person would, against a real daemon. Runs
+// under Node (`node --test`): Playwright's Electron driver needs it.
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { connect, type Socket } from "node:net";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { after, before, test } from "node:test";
+import { _electron as electron, type ElectronApplication, type Page } from "playwright";
+
+const ROOT = resolve(import.meta.dirname, "../../..");
+
+const STRIVE = join(ROOT, "target/debug/strive");
+
+const APP = resolve(import.meta.dirname, "..");
+
+const electronPath: string = createRequire(import.meta.url)("electron");
+
+let home: string;
+
+function strive(...args: string[]): string {
+  return execFileSync(STRIVE, args, { env: { ...process.env, STRIVE_HOME: home, STRIVE_HOST: "none" } }).toString();
+}
+
+before(() => {
+  home = mkdtempSync(join(tmpdir(), "strv-desk-"));
+  strive("status"); // starts the daemon
+});
+
+after(() => {
+  try {
+    strive("stop");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
+type Reply = { id: number; result?: Json; error?: { message: string } };
+
+function isReply(v: unknown): v is Reply {
+  return typeof v === "object" && v !== null && "id" in v && typeof v.id === "number";
+}
+
+/** A plain JSON-RPC connection to the daemon, standing in for the agent. */
+class Rpc {
+  private buffer = "";
+  private waiting = new Map<number, (reply: Reply) => void>();
+  private next = 1;
+  private readonly socket: Socket;
+
+  // Plain fields, not parameter properties: Node strips types but doesn't transform.
+  private constructor(socket: Socket) {
+    this.socket = socket;
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => {
+      this.buffer += chunk;
+      let nl = this.buffer.indexOf("\n");
+
+      while (nl >= 0) {
+        const msg = JSON.parse(this.buffer.slice(0, nl));
+        this.buffer = this.buffer.slice(nl + 1);
+        nl = this.buffer.indexOf("\n");
+
+        if (isReply(msg)) this.waiting.get(msg.id)?.(msg);
+      }
+    });
+  }
+
+  static async open(): Promise<Rpc> {
+    const socket = connect(join(home, "run/strived.sock"));
+    await new Promise((ok) => socket.once("connect", ok));
+    const rpc = new Rpc(socket);
+    await rpc.call("initialize", { protocolVersion: 1, client: { name: "e2e", version: "0" } });
+
+    return rpc;
+  }
+
+  call(method: string, params: { [key: string]: Json }): Promise<Reply> {
+    const id = this.next++;
+    this.socket.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
+
+    return new Promise((ok) => this.waiting.set(id, ok));
+  }
+
+  close() {
+    this.socket.end();
+  }
+}
+
+type Opened = { app: ElectronApplication; page: Page; cwd: string; userData: string };
+
+async function openApp(): Promise<Opened> {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-ws-")));
+  const userData = mkdtempSync(join(tmpdir(), "strv-desk-data-"));
+
+  const app = await electron.launch({
+    executablePath: electronPath,
+    args: [APP, `--user-data-dir=${userData}`, "--cwd", cwd],
+    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
+  });
+
+  const page = await app.firstWindow();
+  await page.getByText(`Session started in ${cwd}`).waitFor();
+
+  return { app, page, cwd, userData };
+}
+
+function sessionId(cwd: string): string {
+  const sessions: { id: string; cwd: string }[] = JSON.parse(strive("sessions", "--all", "--json"));
+  const s = sessions.find((x) => x.cwd === cwd);
+  assert.ok(s, `a session in ${cwd}`);
+
+  return s.id;
+}
+
+test("a prompt typed in the window is journaled and shown", async () => {
+  const { app, page, cwd } = await openApp();
+  await page.getByPlaceholder("What should the agent do?").fill("tidy the readme");
+  await page.keyboard.press("Enter");
+  await page.getByText("› tidy the readme").waitFor();
+  const log = JSON.parse(strive("log", sessionId(cwd), "--json"));
+  assert.ok(log.entries.some((e: { event: { type: string; text?: string } }) => e.event.text === "tidy the readme"));
+  await app.close();
+});
+
+test("an approval waits in its panel and Allow lets the command run", async () => {
+  const { app, page, cwd } = await openApp();
+  const agent = await Rpc.open();
+  const id = sessionId(cwd);
+  const run = agent.call("effect/run", { id, callId: "c1", request: { kind: "bash", command: "echo allowed" } });
+  await page.getByText("Allow the agent to run: echo allowed?").waitFor();
+  await page.getByRole("button", { name: "Allow", exact: true }).click();
+  const r = await run;
+  assert.deepEqual({ text: "allowed\n" }, { text: JSON.parse(JSON.stringify(r.result)).text });
+  await page.getByText("Allowed by strive-desktop").waitFor();
+  agent.close();
+  await app.close();
+});
+
+test("Rewind in the checkpoints panel puts the files back", async () => {
+  const { app, page, cwd } = await openApp();
+  writeFileSync(join(cwd, "notes.txt"), "v1");
+  await page.getByPlaceholder("What should the agent do?").fill("first");
+  await page.keyboard.press("Enter");
+  await page.getByText("1 before “first”").waitFor();
+  writeFileSync(join(cwd, "notes.txt"), "v2");
+  await page.locator(".checkpoints li", { hasText: "before “first”" }).getByRole("button", { name: "Rewind" }).click();
+  await page.getByText("Rewound to checkpoint 1.").waitFor();
+  assert.equal(readFileSync(join(cwd, "notes.txt"), "utf8"), "v1");
+  await app.close();
+});
+
+test("a panel dragged to another column stays there, and is saved", async () => {
+  const { app, page, userData } = await openApp();
+  const spend = page.locator('[data-panel="spend"] .handle');
+  const main = page.locator('[data-column="main"]');
+  const from = await spend.boundingBox();
+  const to = await main.boundingBox();
+  assert.ok(from && to);
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x - 40, from.y + 20, { steps: 5 });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height - 10, { steps: 10 });
+  await page.mouse.up();
+  await page.locator('[data-column="main"] [data-panel="spend"]').waitFor();
+
+  const order = await page
+    .locator('[data-column="main"] [data-panel]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-panel")));
+
+  assert.deepEqual(order, ["transcript", "spend"], "dropped on the lower half of the transcript: after it");
+  const saved = JSON.parse(readFileSync(join(userData, "workspace.json"), "utf8"));
+  assert.deepEqual(saved.edits.at(-1).ops, [{ op: "move", panel: "spend", column: "main" }]);
+  await app.close();
+});
+
+test("the window has no Node, only the app's bridge", async () => {
+  const { app, page } = await openApp();
+
+  const seen = await page.evaluate(() => ({
+    require: "require" in globalThis,
+    process: "process" in globalThis,
+    bridge: Object.keys(Object.getOwnPropertyDescriptor(window, "strive")?.value ?? {}).sort(),
+  }));
+
+  assert.deepEqual(seen, {
+    require: false,
+    process: false,
+    bridge: ["loadWorkspace", "onClosed", "onEvent", "opened", "request", "saveWorkspace"],
+  });
+  await app.close();
+});

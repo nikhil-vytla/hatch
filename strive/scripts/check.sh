@@ -18,8 +18,19 @@ if ! git diff --quiet -- "$gen" || [ -n "$(git ls-files --others --exclude-stand
 fi
 
 bun install --frozen-lockfile --silent
-bunx biome format packages
-bunx oxlint --deny-warnings packages
+bunx biome format packages apps
+bunx oxlint --deny-warnings packages apps
 bunx tsc -p tsconfig.json
-bun test
+bunx tsc -p apps/desktop/tsconfig.json
+bun test packages apps/desktop/src
+# The desktop app, driven through Playwright under Node (its Electron driver
+# needs Node), against the daemon cargo test just built.
+bun run --cwd apps/desktop build
+if [ "$(uname)" = Darwin ] || [ -n "${DISPLAY:-}" ]; then
+  node --test "apps/desktop/test/*.e2e.ts"
+elif command -v xvfb-run >/dev/null; then
+  xvfb-run -a node --test "apps/desktop/test/*.e2e.ts"
+else
+  echo "skipping the desktop tests: no display (install xvfb)" >&2
+fi
 echo "all checks passed"
