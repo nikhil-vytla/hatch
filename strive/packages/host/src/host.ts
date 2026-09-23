@@ -216,10 +216,73 @@ function mcpTool(client: StriveClient, sessionId: string, t: McpTool, name: stri
   }));
 }
 
+/**
+ * Proposes a change to the desktop app's layout. It journals the proposal
+ * and changes nothing: a person accepts or rejects it in the app.
+ */
+function proposeLayout(client: StriveClient, sessionId: string): AgentTool<typeof LayoutProposal> {
+  return {
+    name: "propose_layout",
+    label: "propose_layout",
+    description: [
+      "Propose a change to the person's desktop workspace: columns (main, side) of panels (transcript, spend, approvals, checkpoints, activity).",
+      "Ops: move {panel, column, before?}, add {panel: {id, kind, title?, html?}, column, before?}, remove {panel}, resize {column, grow}.",
+      "An html panel is a small self-contained page you write (a chart, a checklist); it runs sandboxed with no network.",
+      "Nothing changes until the person accepts it in the desktop app.",
+    ].join(" "),
+    parameters: LayoutProposal,
+    execute: async (_id, params) => {
+      await client.request("host/record", {
+        id: sessionId,
+        event: { type: "layoutProposed", label: params.label, ops: params.ops },
+      });
+
+      return {
+        content: [{ type: "text", text: "Proposed. The person will accept or reject it in the desktop app." }],
+        details: undefined,
+      };
+    },
+  };
+}
+
+function layoutProposalSchema() {
+  const panel = Type.Object({
+    id: Type.String(),
+    kind: Type.Union([
+      Type.Literal("transcript"),
+      Type.Literal("spend"),
+      Type.Literal("approvals"),
+      Type.Literal("checkpoints"),
+      Type.Literal("activity"),
+      Type.Literal("html"),
+    ]),
+    title: Type.Optional(Type.String()),
+    html: Type.Optional(
+      Type.String({ description: "For kind html: a self-contained page, run sandboxed with no network" }),
+    ),
+  });
+
+  const op = Type.Object({
+    op: Type.Union([Type.Literal("move"), Type.Literal("add"), Type.Literal("remove"), Type.Literal("resize")]),
+    panel: Type.Optional(Type.Union([Type.String(), panel])),
+    column: Type.Optional(Type.String()),
+    before: Type.Optional(Type.String()),
+    grow: Type.Optional(Type.Number()),
+  });
+
+  return Type.Object({
+    label: Type.String({ description: "What the change is for, in a few words" }),
+    ops: Type.Array(op),
+  });
+}
+
+const LayoutProposal = layoutProposalSchema();
+
 export function tools(client: StriveClient, sessionId: string, mcp: McpTool[] = []): AgentTool<any>[] {
   const names = mcpToolNames(mcp);
 
   return [
+    proposeLayout(client, sessionId),
     ...mcp.map((t, i) => mcpTool(client, sessionId, t, names[i] ?? t.name)),
     tool(
       client,

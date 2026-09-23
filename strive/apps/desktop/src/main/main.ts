@@ -5,7 +5,7 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describeError, type MethodName, type Methods, type SessionInfo, StriveClient } from "@strive/protocol";
 import { HistorySchema, parseJson } from "@strive/workspace";
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, session as electronSession } from "electron";
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, session as electronSession, protocol } from "electron";
 import type { Opened } from "../shared/bridge";
 
 /** What the renderer may ask the daemon for: a person's actions on this session. */
@@ -89,6 +89,7 @@ async function main() {
   const opened: Opened = { init, session, entries, home: app.getPath("home") };
 
   await app.whenReady();
+  serveWidgets();
   // Nothing loads from the network: the renderer is local files, and agent
   // widgets are sandboxed documents with their own policy.
   electronSession.defaultSession.webRequest.onBeforeRequest({ urls: ["http://*/*", "https://*/*"] }, (_d, cb) =>
@@ -158,6 +159,23 @@ async function main() {
 
   window.on("closed", () => client.close());
   await window.loadFile(join(built(), "renderer", "index.html"));
+}
+
+/** Agent widgets: pages the agent wrote, served with a policy of their own. */
+const WIDGET_POLICY =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:";
+
+protocol.registerSchemesAsPrivileged([{ scheme: "strive-widget", privileges: { standard: true } }]);
+
+function serveWidgets() {
+  protocol.handle("strive-widget", (request) => {
+    const encoded = new URL(request.url).pathname.slice(1).replace(/-/g, "+").replace(/_/g, "/");
+    const html = Buffer.from(encoded, "base64").toString("utf8");
+
+    return new Response(html, {
+      headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": WIDGET_POLICY },
+    });
+  });
 }
 
 app.on("window-all-closed", () => app.quit());

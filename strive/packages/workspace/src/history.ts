@@ -14,7 +14,7 @@ export type Folded = {
   skipped: { edit: number; error: string }[];
 };
 
-export const history = (base: Workspace): History => ({ base, edits: [], nextId: 1 });
+export const history = (base: Workspace): History => ({ base, edits: [], nextId: 1, decided: [] });
 
 /** The workspace the history describes. */
 export function fold(h: History): Folded {
@@ -59,6 +59,11 @@ export function record(h: History, author: Author, label: string, ops: Op[]): Re
 /** Reverts one edit (or puts it back), leaving the others. */
 export function setReverted(h: History, edit: number, reverted: boolean): History {
   return { ...h, edits: h.edits.map((e) => (e.id === edit ? { ...e, reverted } : e)) };
+}
+
+/** Marks an agent proposal as accepted or rejected, so it isn't offered again. */
+export function decide(h: History, proposal: string): History {
+  return h.decided.includes(proposal) ? h : { ...h, decided: [...h.decided, proposal] };
 }
 
 /** The last edit still in effect, for undo. */

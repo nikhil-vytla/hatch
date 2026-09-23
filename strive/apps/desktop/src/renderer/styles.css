@@ -46,3 +46,7 @@ button { background: var(--bg); color: var(--text); border: 1px solid var(--line
 .activity li.refused, .activity li.failed { color: var(--danger); }
 .activity li.running { color: var(--accent); }
 progress { width: 100%; }
+.proposal { display: flex; gap: 10px; align-items: center; padding: 6px 14px; border-bottom: 1px solid var(--line); }
+.proposal button { margin: 0; }
+.proposal.applied { color: var(--muted); }
+.widget { width: 100%; min-height: 160px; border: 0; background: #fff; border-radius: 4px; }

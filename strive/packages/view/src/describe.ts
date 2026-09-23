@@ -114,6 +114,11 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       );
     case "compacted":
       return note("faint", "Summarized the conversation so far to keep it within the model's context.");
+    case "layoutProposed":
+      return note(
+        "accent",
+        `The agent proposed a layout change: ${e.label}. Review it in the desktop app (strive app).`,
+      );
     case "assistantMessage": {
       const text = e.text.trim();
 

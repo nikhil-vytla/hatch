@@ -330,3 +330,22 @@ test("the model can call an MCP server's tool, and the result comes back to it",
   expect(result).toMatchObject({ type: "tool_result", tool_use_id: "toolu_1" });
   expect(JSON.stringify(result.content)).toContain("echo: hello");
 });
+
+test("the model can propose a layout change, which is journaled and changes nothing else", async () => {
+  const ops = [{ op: "move", panel: "spend", column: "main" }];
+
+  const { client, id } = await setup([
+    { toolCalls: [{ id: "toolu_1", name: "propose_layout", input: { label: "spend next to the chat", ops } }] },
+    { text: "Proposed." },
+  ]);
+
+  await client.request("session/prompt", { id, text: "put spend by the chat" });
+  const e = await waitFor(client, id, turnsEnded(1));
+  expect(e.find((x) => x.type === "layoutProposed")).toEqual({
+    type: "layoutProposed",
+    label: "spend next to the chat",
+    ops,
+  });
+  expect(e.some((x) => x.type === "effectStarted")).toBe(false);
+  expect(JSON.stringify(fake!.requests[1].messages.at(-1))).toContain("the desktop app");
+});

@@ -7,7 +7,7 @@ let seq = 0;
 const at = (event: Event): Entry => ({ seq: ++seq, tsMs: 0, event });
 
 test("checkpoints are labelled with the prompt they came before, and rewinds with where they went", () => {
-  const m = new SessionModel();
+  const m = new SessionModel("s1");
   m.apply(at({ type: "checkpointed", checkpoint: 1, commit: "a" }));
   m.apply(at({ type: "userMessage", text: "fix it" }));
   m.apply(at({ type: "checkpointed", checkpoint: 2, commit: "b" }));
@@ -19,7 +19,7 @@ test("checkpoints are labelled with the prompt they came before, and rewinds wit
 });
 
 test("an approval waits until it is decided, and an entry seen twice counts once", () => {
-  const m = new SessionModel();
+  const m = new SessionModel("s1");
   const asked = at({ type: "approvalRequested", effect: 3, description: "run: ls" });
   m.apply(asked);
   expect(m.apply(asked)).toBe(false);
@@ -29,7 +29,7 @@ test("an approval waits until it is decided, and an entry seen twice counts once
 });
 
 test("activity shows each effect and how it ended", () => {
-  const m = new SessionModel();
+  const m = new SessionModel("s1");
   m.apply(
     at({ type: "effectStarted", effect: 1, callId: "c", record: { kind: "bash", command: "false", timeoutMs: 1 } }),
   );

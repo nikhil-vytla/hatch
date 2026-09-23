@@ -398,6 +398,7 @@ impl Ledger {
                 | Event::Checkpointed { .. }
                 | Event::Rewound { .. }
                 | Event::TurnStarted { .. }
+                | Event::LayoutProposed { .. }
                 | Event::AssistantMessage { .. }
                 | Event::TurnEnded { .. }
                 | Event::ContextLoaded { .. }

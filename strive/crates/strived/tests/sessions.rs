@@ -354,6 +354,6 @@ fn hosts_may_record_only_turns_and_replies() {
     c.ok("host/register", &json!({"id": id}));
     let r = c.call("host/record", &json!({"id": id, "event": {"type": "budgetSet", "usdMicros": 999_999_999}}));
     assert_eq!(r["error"]["code"], -32602);
-    assert_eq!(r["error"]["message"], "a host records only turns and assistant messages");
+    assert_eq!(r["error"]["message"], "a host records only turns, assistant messages, summaries and layout proposals");
     c.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
 }

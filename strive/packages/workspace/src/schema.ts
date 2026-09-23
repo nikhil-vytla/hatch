@@ -56,7 +56,13 @@ export const EditSchema = v.object({
   reverted: v.boolean(),
 });
 
-export const HistorySchema = v.object({ base: WorkspaceSchema, edits: v.array(EditSchema), nextId: v.number() });
+export const HistorySchema = v.object({
+  base: WorkspaceSchema,
+  edits: v.array(EditSchema),
+  nextId: v.number(),
+  /** Agent proposals already accepted or rejected, by key, so they aren't offered again. */
+  decided: v.optional(v.array(v.string()), []),
+});
 
 /** An agent's proposed change to the layout. */
 export const ProposalSchema = v.object({ label: v.pipe(v.string(), v.nonEmpty()), ops: v.array(OpSchema) });

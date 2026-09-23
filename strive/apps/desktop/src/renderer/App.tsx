@@ -6,11 +6,15 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { formatUsd, MODE_NAMES } from "@strive/view";
 import {
   DEFAULT_WORKSPACE,
+  decide,
   fold,
   type History,
   history as newHistory,
   type Panel,
+  ProposalSchema,
+  parseJson,
   record,
+  setReverted,
   type Workspace,
 } from "@strive/workspace";
 import { type ReactNode, useEffect, useReducer, useRef, useState } from "react";
@@ -20,7 +24,7 @@ import { SessionModel } from "./model";
 type Props = { bridge: Bridge; opened: Opened };
 
 export function App({ bridge, opened }: Props) {
-  const [model] = useState(() => new SessionModel(opened.home));
+  const [model] = useState(() => new SessionModel(opened.session.id, opened.home));
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [closed, setClosed] = useState(false);
   const [error, setError] = useState<string>();
@@ -63,6 +67,7 @@ export function App({ bridge, opened }: Props) {
         {model.working && <span className="working">working… Esc to interrupt</span>}
       </header>
       {closed && <div className="banner danger">Lost the connection to the daemon.</div>}
+      <Proposals model={model} layout={layout} onChange={edit} />
       {error && (
         <button type="button" className="banner danger" onClick={() => setError(undefined)}>
           {error}
@@ -87,6 +92,55 @@ export function App({ bridge, opened }: Props) {
         )}
       />
     </div>
+  );
+}
+
+/** The agent's layout proposals not yet decided, and an undo for the last one applied. */
+function Proposals({
+  model,
+  layout,
+  onChange,
+}: {
+  model: SessionModel;
+  layout: History;
+  onChange: (h: History) => void;
+}) {
+  const open = model.proposals.filter((p) => !layout.decided.includes(p.key));
+  const applied = layout.edits.findLast((e) => e.author === "agent" && !e.reverted);
+
+  return (
+    <>
+      {open.map((p) => {
+        const parsed = parseJson(ProposalSchema, p.json);
+        const recorded = parsed.ok ? record(layout, "agent", parsed.value.label, parsed.value.ops) : parsed;
+
+        return (
+          <div key={p.key} className="proposal" data-proposal={p.key}>
+            <span>
+              The agent proposes: <strong>{p.label}</strong>
+            </span>
+            {recorded.ok ? (
+              <button type="button" onClick={() => onChange(decide(recorded.history, p.key))}>
+                Accept
+              </button>
+            ) : (
+              <span className="danger">It doesn't apply: {recorded.error}</span>
+            )}
+            <button type="button" onClick={() => onChange(decide(layout, p.key))}>
+              {recorded.ok ? "Reject" : "Dismiss"}
+            </button>
+          </div>
+        );
+      })}
+      {applied && open.length === 0 && (
+        <div className="proposal applied">
+          <span>Layout: {applied.label}</span>
+          <button type="button" onClick={() => onChange(setReverted(layout, applied.id, true))}>
+            Undo
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -162,6 +216,16 @@ function Sortable({ id, children }: { id: string; children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+/** An agent widget's page, carried in its URL for the main process to serve. */
+function widgetUrl(html: string): string {
+  const bytes = new TextEncoder().encode(html);
+  let binary = "";
+
+  for (const b of bytes) binary += String.fromCharCode(b);
+
+  return `strive-widget://page/${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
 }
 
 type PanelProps = {
@@ -251,7 +315,9 @@ function PanelView({ panel, model, onPrompt, onInterrupt, onDecide, onRewind }: 
       return (
         <>
           <h2>{panel.title}</h2>
-          <p className="faint">Agent widgets arrive in a later version.</p>
+          {/* An opaque origin (no allow-same-origin): no parent, bridge or storage. The
+              strive-widget: response carries its own CSP, so no network either. */}
+          <iframe className="widget" title={panel.title} sandbox="allow-scripts" src={widgetUrl(panel.html)} />
         </>
       );
     default:

@@ -660,6 +660,14 @@ pub enum Event {
         #[serde(default)]
         mcp: Vec<McpStatus>,
     },
+    /// The agent proposed a change to the desktop workspace's layout. It
+    /// changes nothing until a person accepts it in the desktop app.
+    LayoutProposed {
+        label: String,
+        /// The workspace ops, as the agent gave them; the app parses them.
+        #[ts(type = "unknown")]
+        ops: serde_json::Value,
+    },
     /// The conversation up to entry `upto_seq` was summarized; from here on
     /// the agent carries the summary instead of those messages.
     Compacted {

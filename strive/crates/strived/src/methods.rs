@@ -330,10 +330,11 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                     | Event::AssistantMessage { .. }
                     | Event::TurnEnded { .. }
                     | Event::Compacted { .. }
+                    | Event::LayoutProposed { .. }
             ) {
                 return Err(RpcError::new(
                     RpcError::INVALID_PARAMS,
-                    "a host records only turns and assistant messages",
+                    "a host records only turns, assistant messages, summaries and layout proposals",
                 ));
             }
             let entries = state.sessions.append(&session_id(&id)?, vec![event]).await.map_err(session_error)?;

@@ -194,3 +194,66 @@ test("the window has no Node, only the app's bridge", async () => {
   });
   await app.close();
 });
+
+/** A widget that reports what it can reach from inside its sandbox. */
+const PROBE = `<body><p id="out">starting</p><script>
+const seen = [];
+const probe = (name, f) => { try { f(); seen.push(name + ": reached"); } catch { seen.push(name + ": blocked"); } };
+probe("parent", () => parent.document.title);
+probe("bridge", () => { if (!top.strive) throw new Error(); });
+probe("storage", () => localStorage.getItem("x"));
+document.getElementById("out").textContent = seen.join(", ");
+fetch("https://example.com").then(() => document.body.append(" network: reached"), () => document.body.append(" network: blocked"));
+</script></body>`;
+
+/** Registers as the session's host (only it may propose) and proposes. */
+async function propose(cwd: string, label: string, ops: Json[]): Promise<Rpc> {
+  const host = await Rpc.open();
+  const id = sessionId(cwd);
+  await host.call("host/register", { id });
+  const r = await host.call("host/record", { id, event: { type: "layoutProposed", label, ops } });
+  assert.equal(r.error, undefined, JSON.stringify(r));
+
+  return host;
+}
+
+test("an agent's layout proposal changes nothing until accepted, and can be undone", async () => {
+  const { app, page, cwd } = await openApp();
+
+  const host = await propose(cwd, "show a probe", [
+    { op: "add", panel: { id: "probe", kind: "html", title: "Probe", html: PROBE }, column: "side" },
+  ]);
+
+  await page.getByText("The agent proposes: show a probe").waitFor();
+  assert.equal(await page.locator('[data-panel="probe"]').count(), 0, "not applied yet");
+  await page.getByRole("button", { name: "Accept" }).click();
+  const widget = page.frameLocator("iframe.widget");
+  await widget.getByText("parent: blocked, bridge: blocked, storage: blocked").waitFor();
+  await widget.getByText("network: blocked").waitFor();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await page.locator('[data-panel="probe"]').waitFor({ state: "detached" });
+  host.close();
+  await app.close();
+});
+
+test("a rejected proposal isn't offered again, even after reopening", async () => {
+  const first = await openApp();
+  const host = await propose(first.cwd, "drop spend", [{ op: "remove", panel: "spend" }]);
+  await first.page.getByText("The agent proposes: drop spend").waitFor();
+  await first.page.getByRole("button", { name: "Reject" }).click();
+  await first.page.getByText("The agent proposes: drop spend").waitFor({ state: "detached" });
+  host.close();
+  await first.app.close();
+
+  const again = await electron.launch({
+    executablePath: electronPath,
+    args: [APP, `--user-data-dir=${first.userData}`, "--cwd", first.cwd, "--continue"],
+    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
+  });
+
+  const page = await again.firstWindow();
+  await page.getByText("The agent proposed a layout change: drop spend").waitFor();
+  assert.equal(await page.getByText("The agent proposes: drop spend").count(), 0);
+  assert.equal(await page.locator('[data-panel="spend"]').count(), 1);
+  await again.close();
+});

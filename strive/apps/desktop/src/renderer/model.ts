@@ -7,6 +7,9 @@ export type TranscriptLine = Line & { seq: number };
 
 export type Activity = { effect: number; what: string; outcome?: "done" | "failed" | "refused" };
 
+/** A layout change the agent proposed, as JSON to parse (it comes from the model). */
+export type Proposal = { key: string; label: string; json: string };
+
 export class SessionModel {
   lines: TranscriptLine[] = [];
   /** Reply text still streaming in, not yet journaled. */
@@ -16,12 +19,16 @@ export class SessionModel {
   readonly pending = new Map<number, string>();
   readonly checkpoints: { n: number; label: string }[] = [];
   readonly activity: Activity[] = [];
+  readonly proposals: Proposal[] = [];
   mode: ApprovalMode = "autoEdit";
   working = false;
   private lastSeq = 0;
   private labelNext?: number;
 
-  constructor(private readonly home?: string) {}
+  constructor(
+    private readonly sessionId: string,
+    private readonly home?: string,
+  ) {}
 
   /** Folds an entry in; false for one already seen. */
   apply(entry: Entry): boolean {
@@ -41,6 +48,13 @@ export class SessionModel {
         break;
       case "approvalModeSet":
         this.mode = e.mode;
+        break;
+      case "layoutProposed":
+        this.proposals.push({
+          key: `${this.sessionId}:${entry.seq}`,
+          label: e.label,
+          json: JSON.stringify({ label: e.label, ops: e.ops }),
+        });
         break;
       case "checkpointed":
         this.checkpoints.push({ n: e.checkpoint, label: "" });

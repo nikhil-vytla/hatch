@@ -70,4 +70,8 @@ message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | 
 /**
  * MCP servers from settings, and how each started.
  */
-mcp: Array<McpStatus>, } | { "type": "compacted", uptoSeq: number, summary: string, };
+mcp: Array<McpStatus>, } | { "type": "layoutProposed", label: string, 
+/**
+ * The workspace ops, as the agent gave them; the app parses them.
+ */
+ops: unknown, } | { "type": "compacted", uptoSeq: number, summary: string, };
