@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import gamesUrl from "../../../roadmap/tetris/games.jsonl?url";
+import framingsUrl from "../../../packages/arena/recordings/tetris-framings.replay.jsonl?url";
+import { recordedFraming, type Exchange } from "../../../packages/arena/src/tetris-framings";
 import { cells, COLS, ROWS, ghost, type Game } from "../../../live-worlds/tetris/engine";
 import { heuristic, live, randomPlayer, recorded, TetrisArena, type Contestant, type LogEntry, type RecordedEvent, type TimingMode } from "../../../packages/arena/src/tetris";
 import { questions, scoreboard, verdict, type Study, type StudyQuestion } from "../../../packages/arena/src/study";
@@ -14,25 +16,32 @@ const describeLanding = (id: string) => { const xs = id.split("-").map((c) => +c
 const median = (xs: number[]) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 
 // ---------- game lane ----------
-type Recordings = Record<number, RecordedEvent[]>;
+type Recordings = { games: Record<number, RecordedEvent[]>; framings: Record<number, Exchange[]> };
+const jsonl = (text: string) => text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
 function useRecordings() {
   const [recordings, setRecordings] = useState<Recordings | null>(null);
   useEffect(() => {
     let alive = true;
-    fetch(gamesUrl).then((r) => r.text()).then((text) => {
+    Promise.all([fetch(gamesUrl).then((r) => r.text()), fetch(framingsUrl).then((r) => r.text())]).then(([games, framings]) => {
       if (!alive) return;
-      const games = text.trim().split("\n").map((line) => JSON.parse(line));
-      setRecordings(Object.fromEntries(games.map((g: any) => [g.summary.seed, g.events.filter((e: any) => e.lane === LANDING_LANE)])));
+      const byseed: Record<number, Exchange[]> = {};
+      for (const x of jsonl(framings)) (byseed[x.seed] ??= []).push(x);
+      setRecordings({ games: Object.fromEntries(jsonl(games).map((g: any) => [g.summary.seed, g.events.filter((e: any) => e.lane === LANDING_LANE)])), framings: byseed });
     });
     return () => { alive = false; };
   }, []);
   return recordings;
 }
 
-function lineup(seed: number, recordings: Recordings, jevLive: boolean): Contestant[] {
+type Lineup = "baselines" | "designs";
+function lineup(kind: Lineup, seed: number, recordings: Recordings, jevLive: boolean): Contestant[] {
+  if (kind === "designs") {
+    const x = recordings.framings[seed] ?? [];
+    return [recordedFraming(x, "landing-choice"), recordedFraming(x, "spot-clean"), recordedFraming(x, "spot-score"), heuristic(0, "Code planner")];
+  }
   const jev = jevLive
     ? live("Jev · live", "jev-live", (request) => run(request.state, request.questions))
-    : recorded(recordings[seed] ?? [], "Jev · recorded");
+    : recorded(recordings.games[seed] ?? [], "Jev · recorded");
   return [jev, heuristic(0, "Code planner"), heuristic(900, "Code planner · 900 ms"), randomPlayer(seed)];
 }
 
@@ -69,6 +78,7 @@ function GameLane() {
   const recordings = useRecordings();
   const [seed, setSeed] = useState(7);
   const [mode, setMode] = useState<TimingMode>("realtime");
+  const [kind, setKind] = useState<Lineup>("baselines");
   const [jevLive, setJevLive] = useState(false);
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -76,8 +86,8 @@ function GameLane() {
   const arena = useRef<TetrisArena | null>(null);
   const hasKey = !!getApiKey();
 
-  const reset = () => { if (!recordings) return; arena.current = new TetrisArena(seed, lineup(seed, recordings, jevLive && hasKey), mode); setRunning(false); setFrame((f) => f + 1); };
-  useEffect(reset, [recordings, seed, mode, jevLive]);
+  const reset = () => { if (!recordings) return; arena.current = new TetrisArena(seed, lineup(kind, seed, recordings, jevLive && hasKey), mode, { pieceLimit: kind === "designs" ? 40 : undefined }); setRunning(false); setFrame((f) => f + 1); };
+  useEffect(reset, [recordings, seed, mode, jevLive, kind]);
 
   useEffect(() => {
     if (!running || !arena.current) return;
@@ -113,11 +123,12 @@ function GameLane() {
           <button onClick={() => a.turn().then(() => setFrame((f) => f + 1))} disabled={running || a.over}>Next piece</button>
         </>)}
         <button onClick={reset}>Reset</button>
+        <label>Players <select value={kind} onChange={(e) => setKind(e.target.value as Lineup)}><option value="baselines">Jev and code players</option><option value="designs">Three ways to ask Jev</option></select></label>
         <label>Timing <select value={mode} onChange={(e) => setMode(e.target.value as TimingMode)}><option value="realtime">Real time: gravity keeps going</option><option value="turns">Turns: the world waits</option></select></label>
         <label>Seed <select value={seed} onChange={(e) => setSeed(+e.target.value)}>{SEEDS.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
         <label>Speed <select value={speed} onChange={(e) => setSpeed(+e.target.value)}>{[1, 2, 4, 8].map((s) => <option key={s} value={s}>{s}×</option>)}</select></label>
         <label className="arena-check"><input type="checkbox" checked={jevLive && hasKey} disabled={!hasKey} onChange={(e) => setJevLive(e.target.checked)} /> Jev live {hasKey ? "(uses your key)" : "(connect a key in Settings)"}</label>
-        <span className="arena-clock">{a.mode === "realtime" ? `${(a.clockMs / 1000).toFixed(1)} s of game time` : `Piece ${Math.max(...a.lanes.map((l) => l.game.pieces)) + 1}`}</span>
+        <span className="arena-clock">{a.mode === "realtime" ? `${(a.clockMs / 1000).toFixed(1)} s of game time` : `Piece ${Math.min(a.pieceLimit, Math.max(...a.lanes.map((l) => l.game.pieces)) + 1)}`}{Number.isFinite(a.pieceLimit) ? ` · ${a.pieceLimit}-piece games` : ""}</span>
       </div>
       <div className="arena-lanes">
         {a.lanes.map((lane, i) => {
@@ -133,14 +144,15 @@ function GameLane() {
                 <div><dt>Median answer</dt><dd>{lat == null ? "—" : `${Math.round(lat)} ms`}</dd></div>
               </dl>
               <p className="arena-decisions">{lane.stats.applied} used · {lane.stats.stale} too late · {lane.stats.failed} failed{lane.stats.missing ? ` · ${lane.stats.missing} unanswered` : ""}</p>
-              <p className="arena-status">{lane.game.status === "over" ? "Game over" : a.mode === "turns" ? "Waits for the next turn" : pending ? "Waiting for an answer while gravity continues" : lane.plan ? "Moving to its chosen landing" : "Falling with no plan"}</p>
-              {lane.recordingEnded !== null && <p className="arena-marker">The recording stops at piece {lane.recordingEnded}. {lane.contestant.source === "recorded" ? "Connect a key to continue live." : ""}</p>}
+              <p className="arena-status">{lane.game.status === "over" ? "Game over" : lane.recordingEnded !== null ? "Stopped where the recording ends" : a.finished(lane) ? `Finished ${a.pieceLimit} pieces` : a.mode === "turns" ? "Waits for the next turn" : pending ? "Waiting for an answer while gravity continues" : lane.plan ? "Moving to its chosen landing" : "Falling with no plan"}</p>
+              {lane.recordingEnded !== null && <p className="arena-marker">The recorded answers cover this game up to piece {lane.recordingEnded}. Beyond that the board differs from anything recorded, so the lane stops rather than guess.</p>}
               <TopChoices entry={last} />
             </article>
           );
         })}
       </div>
-      <p className="arena-note">Jev's answers come from live games recorded on 20 September 2026 through AI Gateway, replayed exactly at their recorded world times, including its late and failed answers. On a different board or with different timing the recording no longer applies, and the lane says so. The code planner is the same rule in both lanes; the second answers 900 ms later, so the difference between them is the cost of latency alone.</p>
+      {kind === "designs" ? <p className="arena-note">Three ways of asking Jev the same thing, recorded on 22 September 2026 in turn-based 40-piece games. Picking one landing from a list of numbers cleared 2, 7 and 7 lines on seeds 7, 19 and 42. Describing each distinct spot in a sentence and asking Jev to judge it cleared 13, 14 and 12; rating each spot 0–3 cleared 15, 8 and 13. The code planner cleared 15, 14 and 12. Code does the counting and picks the best-judged spot; Jev judges. Three seeds is a small sample. In real time these recordings apply only until the board first differs from the recorded one.</p> :
+      <p className="arena-note">Jev's answers come from live games recorded on 20 September 2026 through AI Gateway, replayed exactly at their recorded world times, including its late and failed answers. On a different board or with different timing the recording no longer applies, and the lane says so. The code planner is the same rule in both lanes; the second answers 900 ms later, so the difference between them is the cost of latency alone.</p>}
       <DecisionLog log={a.log} lanes={a.lanes.map((l) => l.contestant.name)} />
     </section>
   );
