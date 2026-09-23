@@ -15,6 +15,11 @@ provider: string,
  */
 baseUrl: string, contextWindow: number, maxOutput: number, turnSeconds: number, 
 /**
+ * Summarize the conversation before a turn once it is estimated to be
+ * this many tokens.
+ */
+compactAtTokens: number, 
+/**
  * Instruction files (AGENTS.md, CLAUDE.md), outermost first.
  */
 instructions: Array<InstructionFile>, skills: Array<SkillInfo>, };

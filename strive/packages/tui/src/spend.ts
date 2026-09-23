@@ -47,6 +47,7 @@ export class Spend {
       case "assistantMessage":
       case "turnEnded":
       case "contextLoaded":
+      case "compacted":
         return;
     }
   }

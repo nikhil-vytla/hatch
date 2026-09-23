@@ -216,13 +216,23 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                 context_window: model.context_window,
                 max_output: model.max_output.min(state.settings.agent_max_output),
                 turn_seconds: state.settings.turn_seconds,
+                compact_at_tokens: match state.settings.compact_at_tokens {
+                    0 => model.context_window / 5 * 4,
+                    n => n,
+                },
                 instructions: ctx.instructions,
                 skills: ctx.skills,
             })
         }
         HostRecord::NAME => {
             let HostRecordParams { id, event } = parse::<HostRecord>(params)?;
-            if !matches!(event, Event::TurnStarted { .. } | Event::AssistantMessage { .. } | Event::TurnEnded { .. }) {
+            if !matches!(
+                event,
+                Event::TurnStarted { .. }
+                    | Event::AssistantMessage { .. }
+                    | Event::TurnEnded { .. }
+                    | Event::Compacted { .. }
+            ) {
                 return Err(RpcError::new(
                     RpcError::INVALID_PARAMS,
                     "a host records only turns and assistant messages",

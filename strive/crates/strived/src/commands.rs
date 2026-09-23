@@ -101,6 +101,9 @@ fn describe(e: &Entry) -> String {
             format!("rewound to checkpoint {to}; the files before are checkpoint {saved_as}")
         }
         Event::TurnStarted { turn } => format!("turn {turn} started"),
+        Event::Compacted { upto_seq, summary } => {
+            format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
+        }
         Event::ContextLoaded { instructions, skills } => {
             let files: Vec<&str> = instructions.iter().map(|f| f.path.as_str()).collect();
             format!(

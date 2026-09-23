@@ -4,9 +4,9 @@
 import { type AssistantMessage, createModels, createProvider, type Model, Type } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentTool, estimateContextTokens } from "@earendil-works/pi-agent-core";
 import type { AgentConfig, EffectRequest, Entry, StriveClient, TurnEnd } from "@strive/protocol";
-import { rebuild, resultText } from "./transcript";
+import { rebuild, resultText, summaryMessage } from "./transcript";
 
 export function systemPrompt(config: AgentConfig): string {
   const parts = [base(config.cwd)];
@@ -55,7 +55,7 @@ function model(config: AgentConfig): Model<any> {
   };
 }
 
-function streamFn(m: Model<any>) {
+function createStriveModels(m: Model<any>) {
   const models = createModels();
   models.setProvider(
     createProvider({
@@ -67,7 +67,30 @@ function streamFn(m: Model<any>) {
       api: { "anthropic-messages": anthropicMessagesApi(), "openai-completions": openAICompletionsApi() },
     }),
   );
-  return models.streamSimple.bind(models);
+  return models;
+}
+
+const SUMMARIZE = [
+  "Summarize this coding session so the work can continue without the full history.",
+  "Keep: what the user asked for, decisions made and why, files changed and how, commands run and what they showed, the current state, and anything left open.",
+  "Be specific (paths, names, numbers). Write plain prose and short lists; no preamble.",
+].join("\n");
+
+/** The conversation as plain text for summarizing: tool output is cut short. */
+function transcriptText(messages: any[]): string {
+  const cut = (s: string) => (s.length > 2000 ? `${s.slice(0, 2000)} [...]` : s);
+  return messages
+    .filter((m) => m.role !== "system")
+    .map((m) => {
+      if (m.role === "user") return `USER: ${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`;
+      if (m.role === "toolResult")
+        return `TOOL RESULT (${m.toolName}): ${cut(m.content.map((c: any) => c.text ?? "").join(""))}`;
+      const parts = m.content.map((c: any) =>
+        c.type === "text" ? c.text : c.type === "toolCall" ? `[calls ${c.name} ${JSON.stringify(c.arguments)}]` : "",
+      );
+      return `ASSISTANT: ${parts.join(" ")}`;
+    })
+    .join("\n\n");
 }
 
 /** A tool whose work the daemon does. Refusals reach the model as errors. */
@@ -148,12 +171,15 @@ export class Host {
   private running = false;
   private timedOut = false;
   private lastSeq = 0;
+  private readonly models: ReturnType<typeof createStriveModels>;
 
   constructor(
     private readonly client: StriveClient,
     private readonly sessionId: string,
     private readonly config: AgentConfig,
-  ) {}
+  ) {
+    this.models = createStriveModels(model(config));
+  }
 
   /** Resumes from the journal and handles prompts as they arrive. */
   async start(entries: Entry[]): Promise<void> {
@@ -180,7 +206,7 @@ export class Host {
         tools: tools(this.client, this.sessionId),
         messages: await rebuild(history, blob),
       },
-      streamFn: streamFn(model(this.config)),
+      streamFn: this.models.streamSimple.bind(this.models),
       toolExecution: "parallel",
     });
     let lastDelta = 0;
@@ -237,7 +263,28 @@ export class Host {
     }
   }
 
+  /** Summarizes the conversation so far if it has grown past the limit. */
+  private async compactIfLarge() {
+    const messages = this.agent.state.messages;
+    if (
+      estimateContextTokens(messages).tokens < this.config.compactAtTokens ||
+      messages.every((m) => m.role === "system")
+    )
+      return;
+    const upto = this.lastSeq;
+    const reply = await this.models.completeSimple(model(this.config), {
+      systemPrompt: SUMMARIZE,
+      messages: [{ role: "user", content: transcriptText(messages), timestamp: Date.now() }],
+    });
+    const summary = textOf(reply as AssistantMessage).trim();
+    if (!summary || (reply as AssistantMessage).stopReason === "error") return;
+    await this.record({ type: "compacted", uptoSeq: upto, summary });
+    const system = messages.filter((m) => m.role === "system").slice(0, 1);
+    this.agent.state.messages = [...system, summaryMessage(summary, Date.now())];
+  }
+
   private async runTurn(prompts: string[]) {
+    await this.compactIfLarge();
     this.turn += 1;
     this.timedOut = false;
     await this.record({ type: "turnStarted", turn: this.turn });

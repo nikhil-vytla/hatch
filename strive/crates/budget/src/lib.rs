@@ -400,7 +400,8 @@ impl Ledger {
                 | Event::TurnStarted { .. }
                 | Event::AssistantMessage { .. }
                 | Event::TurnEnded { .. }
-                | Event::ContextLoaded { .. } => {}
+                | Event::ContextLoaded { .. }
+                | Event::Compacted { .. } => {}
             }
         }
         for r in abandoned.values() {

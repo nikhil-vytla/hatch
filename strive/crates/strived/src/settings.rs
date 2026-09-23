@@ -34,6 +34,10 @@ pub struct Settings {
     /// reply this long, so a smaller cap leaves more of the budget usable.
     #[serde(default = "default_agent_max_output")]
     pub agent_max_output: u64,
+    /// Summarize the conversation before a turn at this many estimated
+    /// tokens. 0 means 80% of the model's context window.
+    #[serde(default)]
+    pub compact_at_tokens: u64,
 }
 
 fn default_agent_max_output() -> u64 {

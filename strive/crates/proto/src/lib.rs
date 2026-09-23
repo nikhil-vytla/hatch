@@ -435,6 +435,9 @@ pub struct AgentConfig {
     pub context_window: u64,
     pub max_output: u64,
     pub turn_seconds: u64,
+    /// Summarize the conversation before a turn once it is estimated to be
+    /// this many tokens.
+    pub compact_at_tokens: u64,
     /// Instruction files (AGENTS.md, CLAUDE.md), outermost first.
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,
@@ -631,6 +634,12 @@ pub enum Event {
     ContextLoaded {
         instructions: Vec<ContextFile>,
         skills: Vec<String>,
+    },
+    /// The conversation up to entry `upto_seq` was summarized; from here on
+    /// the agent carries the summary instead of those messages.
+    Compacted {
+        upto_seq: u64,
+        summary: String,
     },
 }
 

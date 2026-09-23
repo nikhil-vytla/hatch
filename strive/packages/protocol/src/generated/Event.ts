@@ -60,4 +60,4 @@ toolCalls: Array<ToolCall>,
 /**
  * The message exactly as the agent keeps it, fed back on resume.
  */
-message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | { "type": "contextLoaded", instructions: Array<ContextFile>, skills: Array<string>, };
+message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | { "type": "contextLoaded", instructions: Array<ContextFile>, skills: Array<string>, } | { "type": "compacted", uptoSeq: number, summary: string, };

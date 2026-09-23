@@ -112,6 +112,8 @@ export function describe(entry: Entry): string {
     case "turnStarted":
     case "contextLoaded":
       return "";
+    case "compacted":
+      return style.faint("Summarized the conversation so far to keep it within the model's context.");
     case "assistantMessage":
       return e.text.trim();
     case "turnEnded":

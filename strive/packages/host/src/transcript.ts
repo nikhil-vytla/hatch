@@ -28,7 +28,15 @@ export function resultText(
 
 const NOT_RUN = "this tool call did not run: the turn ended first";
 
-export async function rebuild(entries: Entry[], blob: (digest: string) => Promise<string>): Promise<Message[]> {
+/** The user message that stands in for a summarized part of the conversation. */
+export function summaryMessage(summary: string, timestamp: number): Message {
+  return { role: "user", content: `[A summary of the conversation so far]\n\n${summary}`, timestamp };
+}
+
+export async function rebuild(all: Entry[], blob: (digest: string) => Promise<string>): Promise<Message[]> {
+  // The latest summary replaces everything it covers.
+  const compacted = all.findLast((e) => e.event.type === "compacted");
+  const entries = compacted ? all.filter((e) => e.seq > compacted.seq) : all;
   const records = new Map<number, { callId: string; record: EffectRecord }>();
   const results = new Map<string, { text: string; isError: boolean; ts: number }>();
   for (const { event: e, tsMs } of entries) {
@@ -41,7 +49,8 @@ export async function rebuild(entries: Entry[], blob: (digest: string) => Promis
     }
   }
 
-  const messages: Message[] = [];
+  const messages: Message[] =
+    compacted?.event.type === "compacted" ? [summaryMessage(compacted.event.summary, compacted.tsMs)] : [];
   let open: { id: string; name: string; ts: number }[] = [];
   const close = () => {
     for (const call of open) {

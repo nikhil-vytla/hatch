@@ -179,3 +179,65 @@ test("the model is given the project's instructions and the skills it can load",
   expect(system).toContain("Always write tests first.");
   expect(system).toContain(`release: Cut a release. (${join(cwd, ".strive/skills/release/SKILL.md")})`);
 });
+
+async function setupWith(settings: object, script: ScriptedReply[]) {
+  fake = new FakeAnthropic(script).start();
+  daemon = startDaemon({ STRIVE_UPSTREAM_ANTHROPIC: fake.url, ANTHROPIC_API_KEY: "sk-test-key", STRIVE_HOST: HOST });
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(join(daemon.home, "settings.json"), JSON.stringify(settings));
+  daemon.strive("stop");
+  daemon.strive("status");
+  const cwd = realpathSync(mkdtempSync("/tmp/strv-agent-"));
+  const client = await connect();
+  const { id } = await client.request("session/create", { cwd });
+  return { client, id, cwd };
+}
+
+test("a long conversation is summarized before the next turn, and resumes from the summary", async () => {
+  const { client, id } = await setupWith({ compactAtTokens: 5 }, [
+    { text: "The first answer, long enough to push the conversation past the tiny limit." },
+    { text: "SUMMARY-1: the user asked a first question and got an answer." },
+    { text: "second answer" },
+    { text: "SUMMARY-2, which carries SUMMARY-1 forward." },
+    { text: "third answer" },
+  ]);
+  await client.request("session/prompt", { id, text: "first question" });
+  await waitFor(client, id, turnsEnded(1));
+  await client.request("session/prompt", { id, text: "second question" });
+  const e = await waitFor(client, id, turnsEnded(2));
+
+  const summarize = fake!.requests[1];
+  expect(JSON.stringify(summarize.system)).toContain("Summarize");
+  expect(JSON.stringify(summarize.messages)).toContain("first question");
+  const next = fake!.requests[2].messages.map((m: any) => JSON.stringify(m.content));
+  expect(next[0]).toContain("SUMMARY-1");
+  expect(next.at(-1)).toContain("second question");
+  expect(next.join("")).not.toContain("The first answer");
+  expect(e.find((x) => x.type === "compacted")).toMatchObject({
+    type: "compacted",
+    summary: "SUMMARY-1: the user asked a first question and got an answer.",
+  });
+
+  daemon!.strive("stop");
+  daemon!.strive("status");
+  fake!.requests.length = 0;
+  const again = await connect();
+  await again.request("session/prompt", { id, text: "third question" });
+  await waitFor(again, id, turnsEnded(3));
+  const resumed = fake!.requests
+    .at(-1)
+    .messages.map((m: any) => JSON.stringify(m.content))
+    .join("");
+  expect(resumed).toContain("SUMMARY-1");
+  expect(resumed).not.toContain("first question");
+});
+
+test("a short conversation is not summarized", async () => {
+  const { client, id } = await setupWith({}, [{ text: "one" }, { text: "two" }]);
+  await client.request("session/prompt", { id, text: "first" });
+  await waitFor(client, id, turnsEnded(1));
+  await client.request("session/prompt", { id, text: "second" });
+  const e = await waitFor(client, id, turnsEnded(2));
+  expect(e.some((x) => x.type === "compacted")).toBe(false);
+  expect(fake!.requests.length).toBe(2);
+});
