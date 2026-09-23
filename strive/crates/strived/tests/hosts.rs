@@ -67,3 +67,33 @@ fn a_host_that_disconnects_mid_registration_leaves_no_registration_behind() {
         host.call("host/register", &json!({"id": id})).get("error").is_none()
     });
 }
+
+/// Attaching and registering at the same moment must not leave a host
+/// counted as a person: approvals would wait on someone who can't answer.
+#[test]
+fn a_host_that_attaches_while_registering_is_never_counted_as_a_person() {
+    let env = Env::new();
+    for _ in 0..20 {
+        let id = session(&env);
+        let mut c = env.rpc();
+        let attach = json!({"jsonrpc": "2.0", "id": 1, "method": "session/attach", "params": {"id": id}});
+        let register = json!({"jsonrpc": "2.0", "id": 2, "method": "host/register", "params": {"id": id}});
+        c.send_line(&format!("{attach}\n{register}"));
+        let (first, second) = (c.next_response(), c.next_response());
+        let registered = [first, second].iter().any(|r| r["id"] == 2 && r.get("result").is_some());
+        if !registered {
+            continue;
+        }
+        // Only this connection is attached. If it counted as a person, the
+        // request would wait for it instead of being refused at once.
+        let mut agent = env.rpc();
+        agent.ok("session/approvals", &json!({"id": id, "mode": "ask"}));
+        let started = std::time::Instant::now();
+        let r = agent.ok(
+            "effect/run",
+            &json!({"id": id, "callId": "c", "request": {"kind": "write", "path": "x.txt", "content": "x"}}),
+        );
+        assert!(started.elapsed() < Duration::from_secs(2), "the request waited on a host");
+        assert!(r["outcome"]["reason"].as_str().unwrap().contains("no client is attached"), "{r}");
+    }
+}

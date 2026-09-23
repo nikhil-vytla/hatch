@@ -249,3 +249,30 @@ test("the prompt of the turn that was compacted comes back after the summary", a
     "assistant",
   ]);
 });
+
+test("a prompt sent during the turn before a compaction comes back after the summary, not the old reply", async () => {
+  const a = at({ type: "userMessage", text: "A" });
+
+  const entries = [
+    a,
+    at({ type: "turnStarted", turn: 1, throughSeq: a.seq }),
+    at({ type: "userMessage", text: "B" }),
+    assistant("answer to A"),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
+  ];
+
+  const b = entries[2]!;
+  const last = entries.at(-1)!;
+  entries.push(
+    at({ type: "compacted", uptoSeq: last.seq, summary: "A was answered" }),
+    at({ type: "turnStarted", turn: 2, throughSeq: b.seq }),
+    assistant("answer to B"),
+  );
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.map((m) => (m.role === "user" ? `user ${m.content}` : m.role))).toEqual([
+    "user [A summary of the conversation so far]\n\nA was answered",
+    "user B",
+    "assistant",
+  ]);
+});

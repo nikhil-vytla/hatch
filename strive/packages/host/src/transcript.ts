@@ -34,11 +34,20 @@ export function summaryMessage(summary: string, timestamp: number): Message {
 }
 
 export async function rebuild(all: Entry[], blob: (digest: string) => Promise<string>): Promise<Message[]> {
-  // The latest summary replaces everything it covers. Entries after what it
-  // covers (the prompts of the turn that compacted) follow it.
+  // The latest summary replaces everything it covers, except prompts no turn
+  // had taken by then: those follow it, before the entries after it.
   const compacted = all.findLast((e) => e.event.type === "compacted");
   const upto = compacted?.event.type === "compacted" ? compacted.event.uptoSeq : 0;
-  const entries = all.filter((e) => e.seq > upto);
+  let taken = 0;
+
+  for (const e of all) {
+    if (e.seq <= upto && e.event.type === "turnStarted") taken = Math.max(taken, e.event.throughSeq ?? e.seq);
+  }
+
+  const entries = all.filter(
+    (e) => e.seq > upto || (compacted !== undefined && e.seq > taken && e.event.type === "userMessage"),
+  );
+
   const records = new Map<number, { callId: string; record: EffectRecord }>();
   const results = new Map<string, { text: string; isError: boolean; ts: number }>();
 

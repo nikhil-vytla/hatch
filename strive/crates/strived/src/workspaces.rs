@@ -16,7 +16,9 @@ pub struct Workspaces {
 
 #[derive(Default)]
 struct Busy {
-    effects: Vec<PathBuf>,
+    /// Each running effect's paths: its workspace, and any destination
+    /// outside it.
+    effects: Vec<Vec<PathBuf>>,
     rewinding: Vec<PathBuf>,
 }
 
@@ -24,10 +26,10 @@ fn overlaps(a: &Path, b: &Path) -> bool {
     a.starts_with(b) || b.starts_with(a)
 }
 
-/// An effect in progress; dropping it lets rewinds of its directory go ahead.
+/// An effect in progress; dropping it lets rewinds of its paths go ahead.
 pub struct Effect {
     owner: Arc<Workspaces>,
-    path: PathBuf,
+    paths: Vec<PathBuf>,
 }
 
 /// A rewind in progress; dropping it lets effects in its directory go ahead.
@@ -37,16 +39,16 @@ pub struct Rewind {
 }
 
 impl Workspaces {
-    /// Waits until no overlapping directory is being rewound, then counts an
-    /// effect in `path`.
-    pub async fn effect(self: &Arc<Self>, path: &Path) -> Effect {
+    /// Waits until nothing overlapping `paths` is being rewound, then counts
+    /// an effect on them.
+    pub async fn effect(self: &Arc<Self>, paths: Vec<PathBuf>) -> Effect {
         loop {
             let changed = self.changed.notified();
             {
                 let mut busy = crate::sync::lock(&self.busy);
-                if !busy.rewinding.iter().any(|r| overlaps(r, path)) {
-                    busy.effects.push(path.to_path_buf());
-                    return Effect { owner: self.clone(), path: path.to_path_buf() };
+                if !busy.rewinding.iter().any(|r| paths.iter().any(|p| overlaps(r, p))) {
+                    busy.effects.push(paths.clone());
+                    return Effect { owner: self.clone(), paths };
                 }
             }
             changed.await;
@@ -57,7 +59,7 @@ impl Workspaces {
     /// in an overlapping directory is under way.
     pub fn rewind(self: &Arc<Self>, path: &Path) -> Option<Rewind> {
         let mut busy = crate::sync::lock(&self.busy);
-        if busy.effects.iter().chain(&busy.rewinding).any(|p| overlaps(p, path)) {
+        if busy.effects.iter().flatten().chain(&busy.rewinding).any(|p| overlaps(p, path)) {
             return None;
         }
         busy.rewinding.push(path.to_path_buf());
@@ -73,7 +75,11 @@ fn remove_one(list: &mut Vec<PathBuf>, path: &Path) {
 
 impl Drop for Effect {
     fn drop(&mut self) {
-        remove_one(&mut crate::sync::lock(&self.owner.busy).effects, &self.path);
+        let mut busy = crate::sync::lock(&self.owner.busy);
+        if let Some(i) = busy.effects.iter().position(|p| *p == self.paths) {
+            busy.effects.swap_remove(i);
+        }
+        drop(busy);
         self.owner.changed.notify_waiters();
     }
 }
@@ -92,7 +98,7 @@ mod tests {
     #[tokio::test]
     async fn nested_directories_overlap_and_siblings_dont() {
         let w = Arc::new(Workspaces::default());
-        let effect = w.effect(Path::new("/repo/app")).await;
+        let effect = w.effect(vec!["/repo/app".into()]).await;
         assert!(w.rewind(Path::new("/repo")).is_none(), "a parent overlaps");
         assert!(w.rewind(Path::new("/repo/app/src")).is_none(), "a child overlaps");
         assert!(w.rewind(Path::new("/repo/lib")).is_some(), "a sibling doesn't");
@@ -106,11 +112,21 @@ mod tests {
         let rewind = w.rewind(Path::new("/repo")).unwrap();
         let waiting = tokio::spawn({
             let w = w.clone();
-            async move { w.effect(Path::new("/repo/a")).await }
+            async move { w.effect(vec!["/repo/a".into()]).await }
         });
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         assert!(!waiting.is_finished());
         drop(rewind);
         tokio::time::timeout(std::time::Duration::from_secs(1), waiting).await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_write_outside_its_workspace_holds_the_destination_too() {
+        let w = Arc::new(Workspaces::default());
+        let effect = w.effect(vec!["/a".into(), "/b/notes".into()]).await;
+        assert!(w.rewind(Path::new("/b")).is_none(), "the destination's directory is busy");
+        assert!(w.rewind(Path::new("/c")).is_some());
+        drop(effect);
+        assert!(w.rewind(Path::new("/b")).is_some());
     }
 }

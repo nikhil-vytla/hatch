@@ -178,18 +178,29 @@ pub async fn run(cfg: Config) -> Result<Started> {
             }
         }
     }
-    // Unlink first so no new client can reach this daemon, then stop the
-    // session writers, then release the lock so a successor (waiting in the
-    // loop above) can start.
+    // Unlink first so no new client can reach this daemon.
     let _ = fs::remove_file(&socket);
     drop(listener);
     gateway_task.abort();
-    // Commands first, while their ends can still be journaled; then writers.
-    state.sessions.cancel_effects(Duration::from_secs(10)).await;
-    state.sessions.shutdown().await;
-    state.mcp.stop_all().await;
+    stand_down(&state).await;
+    // Only now can a successor (waiting in the loop above) start.
     drop(lock);
     Ok(Started::Served)
+}
+
+/// Ends the daemon's work: commands first, while their ends can still be
+/// journaled; then the session writers; then MCP servers.
+async fn stand_down(state: &State) {
+    let settled = state.sessions.cancel_effects(Duration::from_secs(10)).await;
+    state.sessions.shutdown().await;
+    state.mcp.stop_all().await;
+    if !settled {
+        // Releasing ownership now would let a successor rewind files this
+        // daemon's work may still be changing. Exiting ends that work, and
+        // the lock is released only once the process is gone.
+        log!("effects still running after 10s; exiting without them");
+        std::process::exit(1);
+    }
 }
 
 async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> {

@@ -397,8 +397,9 @@ export class Host {
   }
 
   private async runTurn(prompts: { text: string; seq: number }[]) {
-    // Everything before this turn's first prompt is in the conversation.
-    await this.compactIfLarge((prompts[0]?.seq ?? this.lastSeq + 1) - 1);
+    // The summary covers everything seen so far; prompts no turn has taken
+    // (these ones) are kept past it on resume.
+    await this.compactIfLarge(this.lastSeq);
     this.turn += 1;
     this.timedOut = false;
     this.interrupted = false;

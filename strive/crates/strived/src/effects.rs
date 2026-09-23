@@ -71,6 +71,13 @@ const fn file(path: PathBuf) -> Target {
 
 const NOTHING: Target = Target { path: None, sandboxed: false };
 
+impl Target {
+    /// The file the effect acts on, if it acts on one.
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+}
+
 pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate, Target) {
     let change = |verb: &str, path: &str| match resolve(scope, path, true) {
         Access::Denied(why) => (Gate::Deny(why), NOTHING),

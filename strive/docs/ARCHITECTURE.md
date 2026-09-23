@@ -166,8 +166,9 @@ attaches to the session. Hosts don't count as clients for idle exit.
 change, command and model call goes through it. The host itself still
 runs as the user, unsandboxed. The host-only restrictions above guard
 against the agent loop's mistakes. They don't stop a hostile host (say, a
-compromised dependency), which could act without the daemon. Confining the
-host process to the daemon's socket and gateway is planned.
+compromised dependency), which could act without the daemon. It could, for
+instance, open a second connection and approve its own effects there.
+Confining the host process to the daemon's socket and gateway is planned.
 
 **Context.** Registration loads the project's context:
 - **Instructions:** `AGENTS.md` (or `CLAUDE.md`) from the repository root
@@ -177,7 +178,12 @@ host process to the daemon's socket and gateway is planned.
 - **MCP servers:** the stdio servers in `mcpServers` in settings.
   - They are started for the session in its directory, without strive's
     variables or provider keys.
-  - Each server's process group is killed when the daemon stops.
+    - Servers are user-configured programs and run unsandboxed, as in other
+    agents.
+  - A server's process group is killed when the daemon stops, when a write
+    to it stalls, and when it doesn't answer a cancelled call within 2s.
+    A killed server restarts on its next call. A process that leaves the
+    group (`setsid`) is out of reach.
 - `contextLoaded` journals what was loaded and how each server started.
 - Before a turn, a conversation past `compactAtTokens` is summarized. The
   summary is journaled as `compacted` and replaces what it covers on
@@ -222,14 +228,19 @@ Writes replace files atomically, each through its own temporary file.
 - an MCP call is cancelled at the server too;
 - one not yet running doesn't run.
 
-Shutdown cancels every running effect, and waits for their ends to be
-journaled, before it stops the session writers and releases ownership. No
-command outlives its daemon.
+Shutdown refuses new effects and rewinds, cancels running effects, and
+waits for their ends to be journaled. Only then does it stop the session
+writers and release ownership. If work hasn't settled within 10s, the
+daemon exits instead of releasing ownership, so a successor never
+overlaps work that may still be running.
 
 **Workspaces.** Effects and rewinds are coordinated by directory across
 sessions: sessions sharing a directory, or nesting one in another, share
-its files. A rewind is refused while an effect in an overlapping directory
-runs, and effects wait for a rewind to finish.
+its files. An effect holds its session's directory, and also its
+destination when it writes outside it (with approval). A rewind is refused
+while an effect holding an overlapping path runs, and effects wait for a
+rewind to finish. MCP tools' own file changes are known only to the
+server, so they are coordinated by the session's directory alone.
 
 **The sandbox.**
 - **macOS (Seatbelt):**

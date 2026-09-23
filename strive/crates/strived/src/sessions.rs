@@ -218,8 +218,10 @@ pub struct Sessions {
     cancels: StdMutex<HashMap<(SessionId, String), Arc<std::sync::atomic::AtomicBool>>>,
     /// Directories effects are changing and rewinds are restoring.
     pub workspaces: Arc<crate::workspaces::Workspaces>,
-    /// Effects running now; shutdown waits for them.
+    /// Effects and rewinds running now; shutdown waits for them.
     in_flight: Arc<std::sync::atomic::AtomicUsize>,
+    /// Set when shutdown begins: no new effect or rewind may start.
+    closing: std::sync::atomic::AtomicBool,
     effects_done: Arc<tokio::sync::Notify>,
 }
 
@@ -274,6 +276,7 @@ impl Sessions {
             cancels: StdMutex::new(HashMap::new()),
             workspaces: Arc::default(),
             in_flight: Arc::default(),
+            closing: std::sync::atomic::AtomicBool::new(false),
             effects_done: Arc::default(),
         })
     }
@@ -419,27 +422,37 @@ impl Sessions {
         Ok(())
     }
 
-    /// Counts an effect as running until the returned guard drops.
-    pub fn begin_effect(&self) -> InFlight {
+    /// Counts an effect (or rewind) as running until the returned guard
+    /// drops; `None` once shutdown has begun. Counted before the check, so
+    /// shutdown either sees it running or it sees shutdown.
+    pub fn begin_effect(&self) -> Option<InFlight> {
         self.in_flight.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        InFlight { count: self.in_flight.clone(), done: self.effects_done.clone() }
+        let guard = InFlight { count: self.in_flight.clone(), done: self.effects_done.clone() };
+        (!self.closing.load(std::sync::atomic::Ordering::SeqCst)).then_some(guard)
     }
 
-    /// Cancels every running effect and waits (up to `wait`) for them to
-    /// finish and be journaled. Shutdown does this before stopping writers,
-    /// so no command outlives the daemon that started it.
-    pub async fn cancel_effects(&self, wait: std::time::Duration) {
-        for flag in crate::sync::lock(&self.cancels).values() {
-            flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        }
+    /// Stops new effects and rewinds, cancels running effects, and waits (up
+    /// to `wait`) for everything to finish and be journaled. Shutdown does
+    /// this before stopping writers, so no command outlives the daemon that
+    /// started it. False if something is still running.
+    pub async fn cancel_effects(&self, wait: std::time::Duration) -> bool {
+        use std::sync::atomic::Ordering::SeqCst;
+        self.closing.store(true, SeqCst);
         let deadline = tokio::time::Instant::now() + wait;
-        while self.in_flight.load(std::sync::atomic::Ordering::SeqCst) > 0 {
-            let done = self.effects_done.notified();
-            if self.in_flight.load(std::sync::atomic::Ordering::SeqCst) == 0
-                || tokio::time::timeout_at(deadline, done).await.is_err()
-            {
-                break;
+        loop {
+            // Again each round: an effect admitted just before `closing` may
+            // create its cancel flag after an earlier sweep.
+            for flag in crate::sync::lock(&self.cancels).values() {
+                flag.store(true, SeqCst);
             }
+            if self.in_flight.load(SeqCst) == 0 {
+                return true;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return false;
+            }
+            let done = self.effects_done.notified();
+            let _ = tokio::time::timeout(std::time::Duration::from_millis(100), done).await;
         }
     }
 

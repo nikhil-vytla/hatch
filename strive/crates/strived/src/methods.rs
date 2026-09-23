@@ -54,6 +54,18 @@ pub struct Conn {
     out: mpsc::WeakUnboundedSender<Message>,
     /// Tasks forwarding session entries to this connection.
     subscriptions: std::sync::Mutex<Vec<JoinHandle<()>>>,
+    /// Attaches under way as a person. Counted under `host_of`'s lock, so
+    /// one can't finish after a registration that didn't see it.
+    attaching: std::sync::atomic::AtomicUsize,
+}
+
+/// Counts an attach as under way until dropped.
+struct Attaching<'a>(&'a std::sync::atomic::AtomicUsize);
+
+impl Drop for Attaching<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 impl Conn {
@@ -64,6 +76,7 @@ impl Conn {
             client: std::sync::Mutex::new(String::new()),
             out: out.downgrade(),
             subscriptions: std::sync::Mutex::new(Vec::new()),
+            attaching: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -185,8 +198,11 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
 /// Under the connection's host lock, so it can't race `Conn::close`.
 fn claim_host(state: &State, conn: &Conn, sid: &SessionId) -> Result<bool, RpcError> {
     let mut host = crate::sync::lock(&conn.host_of);
-    // Its subscriptions would go on counting it as a person who can approve.
-    if !host.is_host() && !crate::sync::lock(&conn.subscriptions).is_empty() {
+    // Its subscriptions (made or under way) would go on counting it as a
+    // person who can approve.
+    let attached = !crate::sync::lock(&conn.subscriptions).is_empty()
+        || conn.attaching.load(std::sync::atomic::Ordering::SeqCst) > 0;
+    if !host.is_host() && attached {
         return Err(RpcError::new(RpcError::INVALID_REQUEST, "register as a host before attaching to the session"));
     }
     match &*host {
@@ -353,6 +369,9 @@ async fn rewind(state: &Arc<State>, params: Value) -> Reply {
         .await
         .map_err(session_error)?
         .ok_or_else(|| RpcError::new(RpcError::INVALID_PARAMS, format!("no checkpoint {to} in this session")))?;
+    let Some(_running) = state.sessions.begin_effect() else {
+        return Err(RpcError::new(RpcError::INTERNAL_ERROR, "the daemon is stopping"));
+    };
     // No effect in this directory (from any session) may run during the restore.
     let workspace = std::path::Path::new(&info.cwd).canonicalize().map_err(|e| internal(&e))?;
     let _files = state.sessions.workspaces.rewind(&workspace).ok_or_else(|| {
@@ -416,7 +435,9 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
             };
             let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
-            let _running = state.sessions.begin_effect();
+            let Some(_running) = state.sessions.begin_effect() else {
+                return Err(RpcError::new(RpcError::INTERNAL_ERROR, "the daemon is stopping"));
+            };
             let cancelled = state.sessions.cancel_flag(&sid, &call_id);
             let effect = state.sessions.start_effect(&sid, call_id.clone(), record).await.map_err(session_error);
             let result = run_effect(state, &sid, scope, request, effect, &cancelled).await;
@@ -497,8 +518,13 @@ async fn run_effect(
         let result = if let Some(why) = refusal {
             crate::effects::Result::Refused(why)
         } else {
-            // Held while the effect runs, so no rewind of its directory races it.
-            let files = state.sessions.workspaces.effect(&scope.workspace).await;
+            // Held while the effect runs, so no rewind of its directory races
+            // it; a destination outside the workspace is held too.
+            let mut paths = vec![scope.workspace.clone()];
+            if let Some(p) = target.path().filter(|p| !p.starts_with(&scope.workspace)) {
+                paths.push(p.to_path_buf());
+            }
+            let files = state.sessions.workspaces.effect(paths).await;
             if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
                 // Cancelled while it waited (for approval, or for a rewind).
                 drop(files);
@@ -549,7 +575,15 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         SessionAttach::NAME => {
             let SessionAttachParams { id, after_seq } = parse::<SessionAttach>(params)?;
             let sid = session_id(&id)?;
-            let person = !crate::sync::lock(&conn.host_of).is_host();
+            let (person, _attaching) = {
+                let host = crate::sync::lock(&conn.host_of);
+                if host.is_host() {
+                    (false, None)
+                } else {
+                    conn.attaching.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    (true, Some(Attaching(&conn.attaching)))
+                }
+            };
             let (session, entries, mut stream) =
                 state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
             let weak = conn.out.clone();
