@@ -26,6 +26,25 @@ const config = (baseUrl: string): AgentConfig => ({
   mcpTools: [],
 });
 
+/** An assistant message as pi-ai records it. */
+const reply = (text: string) => ({
+  role: "assistant",
+  content: [{ type: "text", text }],
+  api: "anthropic-messages",
+  provider: "anthropic",
+  model: "claude-sonnet-4-5",
+  usage: {
+    input: 1,
+    output: 1,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 2,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  },
+  stopReason: "stop",
+  timestamp: 0,
+});
+
 const history: Entry[] = [
   { seq: 1, tsMs: 0, event: { type: "sessionStarted", format: 1, cwd: "/tmp/r", striveVersion: "x" } },
   { seq: 2, tsMs: 0, event: { type: "userMessage", text: "read a.txt" } },
@@ -142,4 +161,57 @@ test("a prompt the interrupted turn hadn't taken yet runs when the host starts a
   const sent = JSON.stringify(model.requests[0]?.messages);
   expect(sent).toContain('"A"');
   expect(JSON.stringify(model.requests[0]?.messages.at(-1))).toContain('"B"');
+});
+
+// A notification can arrive after the reply to a later request, so what the
+// host has been notified of isn't what its conversation holds.
+test("a compaction covers what the conversation holds, not the latest entry the host was told of", async () => {
+  const model = new FakeAnthropic([{ text: "the summary" }, { text: "answered C" }]).start();
+  const recorded: Event[] = [];
+  let seq = 4;
+
+  const entries: Entry[] = [
+    { seq: 1, tsMs: 0, event: { type: "userMessage", text: "A" } },
+    { seq: 2, tsMs: 0, event: { type: "turnStarted", turn: 1, throughSeq: 1 } },
+    {
+      seq: 3,
+      tsMs: 0,
+      event: { type: "assistantMessage", turn: 1, text: "answer to A", toolCalls: [], message: reply("answer to A") },
+    },
+    { seq: 4, tsMs: 0, event: { type: "turnEnded", turn: 1, reason: { kind: "done" } } },
+  ];
+
+  const daemon = new FakeDaemon({
+    "host/register": () => ({ result: { ...config(model.url), compactAtTokens: 1 } }),
+    "session/attach": (_p, notify) => {
+      // C arrives with a seq past anything in the conversation.
+      notify("session/entry", {
+        sessionId: ID,
+        entry: { seq: 40, tsMs: 0, event: { type: "userMessage", text: "C" } },
+      });
+
+      return { result: { session: { id: ID, cwd: "/tmp/r", createdAtMs: 0 }, entries } };
+    },
+    "host/record": (p) => {
+      recorded.push(p.event);
+
+      return { result: { seq: ++seq } };
+    },
+    "host/stream": () => ({ result: {} }),
+  });
+
+  await daemon.listen();
+  let client: StriveClient | undefined;
+  stop = () => {
+    client?.close();
+    daemon.close();
+    model.stop();
+  };
+
+  ({ client } = await runHost(daemon.socket, ID));
+  const deadline = Date.now() + 5_000;
+
+  while (!recorded.some((e) => e.type === "turnEnded") && Date.now() < deadline) await Bun.sleep(20);
+
+  expect(recorded.find((e) => e.type === "compacted")).toMatchObject({ uptoSeq: 4, summary: "the summary" });
 });

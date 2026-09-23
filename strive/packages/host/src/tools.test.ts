@@ -17,6 +17,13 @@ test("tools whose names would collide once cleaned up stay distinct", () => {
   for (const n of names) expect(n).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
 });
 
+test("a hashed name can't land on another tool's own name", () => {
+  const [first] = mcpToolNames([tool("s", "a.b"), tool("s", "a_b")]);
+  const hashed = first?.replace("mcp__s__", "") ?? "";
+  const names = mcpToolNames([tool("s", "a.b"), tool("s", "a_b"), tool("s", hashed)]);
+  expect(new Set(names).size).toBe(3);
+});
+
 test("long names that share their first 64 characters stay distinct", () => {
   const long = "x".repeat(70);
   const names = mcpToolNames([tool("s", `${long}1`), tool("s", `${long}2`)]);

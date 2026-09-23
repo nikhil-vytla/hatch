@@ -8,7 +8,9 @@
 //! `FAKE_MCP_LOG` a file to append the tool calls and notifications it gets to. With
 //! `FAKE_MCP_STUBBORN` it outlives its stdin closing, as some servers do.
 //! With `FAKE_MCP_DEAF` it stops reading once it has listed its tools. With
-//! `FAKE_MCP_LOOP` every tools/list page names the same next cursor.
+//! `FAKE_MCP_LOOP` every tools/list page names the same next cursor. With
+//! `FAKE_MCP_HANG` it never answers initialize. Its `closer` tool closes
+//! its output, then writes `late.txt` in its directory a second later.
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test fixture")]
 
 use std::io::{BufRead, Write};
@@ -47,6 +49,15 @@ fn main() {
             }
             continue;
         };
+        if method == "initialize" && std::env::var("FAKE_MCP_HANG").is_ok() {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+        }
+        if msg["params"]["name"] == "closer" {
+            let _ = nix::unistd::close(1); // the daemon now sees its output end
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            std::fs::write("late.txt", "written after the output closed").unwrap();
+            continue;
+        }
         if msg["params"]["name"] == "patient" {
             patient.lock().unwrap().insert(id.to_string());
         }
@@ -96,7 +107,8 @@ fn tools(cursor: Option<&str>) -> Value {
         ], "nextCursor": "page2"}),
         Some(_) => json!({"tools": [
                         {"name": "slow", "description": "Takes 30 seconds.", "inputSchema": empty},
-            {"name": "patient", "description": "Takes 30 seconds unless cancelled.", "inputSchema": empty},
+                        {"name": "patient", "description": "Takes 30 seconds unless cancelled.", "inputSchema": empty},
+            {"name": "closer", "description": "Closes its output and keeps working.", "inputSchema": empty},
             {"name": "where", "description": "Where it runs.", "inputSchema": empty},
         ]}),
     }

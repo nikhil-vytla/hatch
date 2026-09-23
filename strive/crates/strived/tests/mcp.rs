@@ -90,11 +90,11 @@ fn the_agent_is_given_every_tool_and_the_journal_says_which_servers_started() {
         .map(|t| (t["server"].as_str().unwrap().into(), t["name"].as_str().unwrap().into()))
         .collect();
     let names: Vec<&str> = tools.iter().map(|(_, n)| n.as_str()).collect();
-    assert_eq!(names, ["echo", "fail", "slow", "patient", "where"], "both pages of tools/list");
+    assert_eq!(names, ["echo", "fail", "slow", "patient", "closer", "where"], "both pages of tools/list");
     assert!(tools.iter().all(|(s, _)| s == "fake"));
     assert_eq!(w.config["mcpTools"][0]["inputSchema"]["required"], json!(["text"]));
     let loaded = w.events().into_iter().find(|e| e["type"] == "contextLoaded").unwrap();
-    assert_eq!(loaded["mcp"][1], json!({"server": "fake", "tools": 5}));
+    assert_eq!(loaded["mcp"][1], json!({"server": "fake", "tools": 6}));
     assert_eq!(loaded["mcp"][0]["server"], "broken");
     assert_eq!(loaded["mcp"][0]["tools"], 0);
     assert!(loaded["mcp"][0]["error"].as_str().unwrap().contains("exited during initialize"), "{loaded}");
@@ -223,6 +223,47 @@ fn a_tool_list_that_loops_still_ends() {
     let names: Vec<&str> =
         w.config["mcpTools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(names, ["echo", "echo"], "the first page, and the one its cursor named, and no more");
+}
+
+/// A server that closes its output can still be working. The call ends only
+/// once the server is dead, so nothing it does lands after the effect.
+#[test]
+fn a_call_to_a_server_that_closes_its_output_ends_only_once_it_is_dead() {
+    // Started directly: a wrapping shell would hold the output open itself.
+    let env = Env::new();
+    let dir = tempfile::Builder::new().prefix("strv-mcp").tempdir_in("/tmp").unwrap();
+    let settings = json!({"mcpServers": {"fake": {"command": fake_server()}}});
+    std::fs::write(env.home.path().join("settings.json"), settings.to_string()).unwrap();
+    let mut host = env.rpc();
+    let cwd = dir.path().canonicalize().unwrap();
+    let id = host.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    host.ok("host/register", &json!({"id": id}));
+    env.rpc().ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let request = json!({"kind": "mcp", "server": "fake", "tool": "closer", "arguments": {}});
+    let r = host.ok("effect/run", &json!({"id": id, "callId": "c", "request": request}));
+    assert_eq!(r["outcome"]["kind"], "refused", "{r}");
+    std::thread::sleep(Duration::from_millis(1500));
+    assert!(!cwd.join("late.txt").exists(), "the server was stopped before the call ended");
+}
+
+/// Stopping the daemon stops servers still starting, too.
+#[test]
+fn stopping_the_daemon_stops_servers_still_starting() {
+    let env = Env::new();
+    let dir = tempfile::Builder::new().prefix("strv-mcp").tempdir_in("/tmp").unwrap();
+    let pid_file = env.home.path().join("hung.pid");
+    let settings = json!({"mcpServers": {"hung": {"command": "/bin/sh", "args": ["-c", "\"$0\"; true", fake_server()],
+        "env": {"FAKE_MCP_HANG": "1", "FAKE_MCP_STUBBORN": "1", "FAKE_MCP_PID": pid_file}}}});
+    std::fs::write(env.home.path().join("settings.json"), settings.to_string()).unwrap();
+    let mut host = env.rpc();
+    let cwd = dir.path().canonicalize().unwrap();
+    let id = host.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    host.send_line(&json!({"jsonrpc": "2.0", "id": 9, "method": "host/register", "params": {"id": id}}).to_string());
+    common::wait_for("the server to start", Duration::from_secs(5), || pid_file.exists());
+    let pid = std::fs::read_to_string(&pid_file).unwrap().trim().to_string();
+    assert!(alive(&pid));
+    env.stop();
+    common::wait_for("the starting server to be stopped", Duration::from_secs(5), || !alive(&pid));
 }
 
 #[test]

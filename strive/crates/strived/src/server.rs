@@ -199,6 +199,13 @@ async fn stand_down(state: &State) {
         // daemon's work may still be changing. Exiting ends that work, and
         // the lock is released only once the process is gone.
         log!("effects still running after 10s; exiting without them");
+        // Children in the daemon's own process group (a rewind's git, say)
+        // go with it; commands, hosts and MCP servers have their own groups,
+        // already stopped above. The launcher makes the daemon a group leader.
+        let me = nix::unistd::getpid();
+        if nix::unistd::getpgrp() == me {
+            let _ = nix::sys::signal::killpg(me, nix::sys::signal::Signal::SIGKILL);
+        }
         std::process::exit(1);
     }
 }

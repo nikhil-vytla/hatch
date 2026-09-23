@@ -26,5 +26,5 @@ await vite({
   base: "./",
   plugins: [react()],
   logLevel: "warn",
-  build: { outDir: `${here}/out/renderer`, emptyOutDir: true, minify: false },
+  build: { outDir: `${here}/out/renderer`, emptyOutDir: true },
 });

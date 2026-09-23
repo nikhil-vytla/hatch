@@ -18,6 +18,7 @@ import {
   describeError,
   type EffectRequest,
   type Entry,
+  type Event,
   type McpTool,
   type StriveClient,
   type TurnEnd,
@@ -177,16 +178,27 @@ export function mcpToolNames(tools: McpTool[]): string[] {
   const plain = (t: McpTool) => `mcp__${t.server}__${t.name}`.replace(/[^A-Za-z0-9_-]/g, "_");
   const counts = new Map<string, number>();
 
-  for (const t of tools) counts.set(plain(t).slice(0, 64), (counts.get(plain(t).slice(0, 64)) ?? 0) + 1);
+  for (const t of tools) counts.set(plain(t), (counts.get(plain(t)) ?? 0) + 1);
+
+  // Every name is checked against those already given, so a hashed name
+  // can't land on a tool's own name (a server may advertise `a_b_1kah0i6i`).
+  const given = new Set<string>();
 
   return tools.map((t) => {
     const name = plain(t);
 
-    if (name.length <= 64 && counts.get(name) === 1) return name;
+    let candidate =
+      name.length <= 64 && counts.get(name) === 1
+        ? name
+        : `${name.slice(0, 55)}_${Bun.hash(`${t.server}\0${t.name}`).toString(36).slice(0, 8)}`;
 
-    const hash = Bun.hash(`${t.server}\0${t.name}`).toString(36).slice(0, 8);
+    for (let n = 2; given.has(candidate) || (candidate !== name && counts.has(candidate)); n++) {
+      candidate = `${name.slice(0, 60 - String(n).length)}_${n}`;
+    }
 
-    return `${name.slice(0, 55)}_${hash}`;
+    given.add(candidate);
+
+    return candidate;
   });
 }
 
@@ -256,6 +268,12 @@ export class Host {
 
   private interrupted = false;
   private lastSeq = 0;
+  /**
+   * The last journal entry the conversation holds: its history, what this
+   * host recorded, and the prompts it took. Notifications can lag the
+   * replies to later requests, so this isn't the last entry seen.
+   */
+  private conversationSeq = 0;
   /** Entries that arrive while `start` is still loading, replayed after it. */
   private early: Entry[] | undefined = [];
   private readonly models: ReturnType<typeof createStriveModels>;
@@ -290,6 +308,7 @@ export class Host {
     const since = lastStart?.event.type === "turnStarted" ? (lastStart.event.throughSeq ?? lastStart.seq) : 0;
     const waiting = entries.filter((e) => e.seq > since && e.event.type === "userMessage");
     const history = entries.filter((e) => !waiting.includes(e));
+    this.conversationSeq = Math.max(0, ...history.map((e) => e.seq));
     this.agent = new Agent({
       initialState: {
         systemPrompt: systemPrompt(this.config),
@@ -354,8 +373,10 @@ export class Host {
     this.agent?.abort();
   }
 
-  private async record(event: Parameters<StriveClient["request"]>[1] extends never ? never : any) {
-    await this.client.request("host/record", { id: this.sessionId, event });
+  /** Journals an event; what it records is now part of the conversation. */
+  private async record(event: Event) {
+    const { seq } = await this.client.request("host/record", { id: this.sessionId, event });
+    this.conversationSeq = Math.max(this.conversationSeq, seq);
   }
 
   /** Runs turns until no prompts are waiting. */
@@ -397,13 +418,15 @@ export class Host {
   }
 
   private async runTurn(prompts: { text: string; seq: number }[]) {
-    // The summary covers everything seen so far; prompts no turn has taken
+    // The summary covers the conversation so far; prompts no turn has taken
     // (these ones) are kept past it on resume.
-    await this.compactIfLarge(this.lastSeq);
+    await this.compactIfLarge(this.conversationSeq);
     this.turn += 1;
     this.timedOut = false;
     this.interrupted = false;
-    await this.record({ type: "turnStarted", turn: this.turn, throughSeq: prompts.at(-1)?.seq });
+    const taken = prompts.at(-1)?.seq;
+    await this.record({ type: "turnStarted", turn: this.turn, throughSeq: taken });
+    this.conversationSeq = Math.max(this.conversationSeq, taken ?? 0);
 
     const timer = setTimeout(() => {
       this.timedOut = true;

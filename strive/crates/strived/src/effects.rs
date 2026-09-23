@@ -393,7 +393,8 @@ fn give_seccomp_filter(c: &mut Command) -> io::Result<()> {
     .collect();
     let filter = SeccompFilter::new(rules, SeccompAction::Allow, SeccompAction::Errno(libc::EPERM as u32), arch)
         .map_err(|e| bad(&e))?;
-    let program: BpfProgram = filter.try_into().map_err(|e| bad(&e))?;
+    let mut program: BpfProgram = filter.try_into().map_err(|e| bad(&e))?;
+    refuse_x32(&mut program);
     let mut bytes = Vec::with_capacity(program.len() * 8);
     for f in &program {
         bytes.extend(f.code.to_ne_bytes());
@@ -406,6 +407,28 @@ fn give_seccomp_filter(c: &mut Command) -> io::Result<()> {
     c.fd_mappings(vec![FdMapping { parent_fd: read, child_fd: SECCOMP_FD }]).map_err(|e| bad(&format!("{e:?}")))?;
     c.arg("--seccomp").arg(SECCOMP_FD.to_string());
     Ok(())
+}
+
+/// On x86-64, a syscall number with the x32 bit set passes the filter's
+/// architecture check but matches none of its rules (they name native
+/// numbers). Refusing every such syscall first closes that way around them;
+/// strive runs no x32 programs.
+#[cfg(target_os = "linux")]
+fn refuse_x32(program: &mut seccompiler::BpfProgram) {
+    if cfg!(target_arch = "x86_64") {
+        use seccompiler::sock_filter;
+        const LOAD_NR: u16 = 0x20; // BPF_LD | BPF_W | BPF_ABS, seccomp_data.nr at offset 0
+        const JUMP_IF_SET: u16 = 0x45; // BPF_JMP | BPF_JSET | BPF_K
+        const RETURN: u16 = 0x06; // BPF_RET | BPF_K
+        const X32_BIT: u32 = 0x4000_0000;
+        const ERRNO: u32 = 0x0005_0000; // SECCOMP_RET_ERRNO
+        let prefix = [
+            sock_filter { code: LOAD_NR, jt: 0, jf: 0, k: 0 },
+            sock_filter { code: JUMP_IF_SET, jt: 0, jf: 1, k: X32_BIT },
+            sock_filter { code: RETURN, jt: 0, jf: 0, k: ERRNO | libc::EPERM.unsigned_abs() },
+        ];
+        program.splice(0..0, prefix);
+    }
 }
 
 #[cfg(not(target_os = "linux"))]

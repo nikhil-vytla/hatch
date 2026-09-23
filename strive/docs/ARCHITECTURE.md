@@ -180,10 +180,16 @@ Confining the host process to the daemon's socket and gateway is planned.
     variables or provider keys.
     - Servers are user-configured programs and run unsandboxed, as in other
     agents.
-  - A server's process group is killed when the daemon stops, when a write
-    to it stalls, and when it doesn't answer a cancelled call within 2s.
-    A killed server restarts on its next call. A process that leaves the
-    group (`setsid`) is out of reach.
+    - A server's process group is killed when the daemon stops (even
+    mid-startup), when a write to it stalls or its queue fills, when its
+    output ends, and when it doesn't answer a cancelled call within 2s.
+    A call fails only once its server has exited, so nothing it does lands
+    after the effect ends. A killed server restarts on its next call.
+  - MCP lets a server stay silent about a cancelled call. strive still
+    stops one that does: silence can't show that a file-changing tool has
+    stopped, and the workspace must be free for a rewind. Other calls to
+    that server fail when it is stopped.
+  - A process that leaves the group (`setsid`) is out of reach.
 - `contextLoaded` journals what was loaded and how each server started.
 - Before a turn, a conversation past `compactAtTokens` is summarized. The
   summary is journaled as `compacted` and replaces what it covers on
@@ -256,7 +262,10 @@ server, so they are coordinated by the session's directory alone.
   - `/tmp` and `/run` are private, which keeps the user's D-Bus, systemd,
     X11 and Docker sockets out of reach.
   - There is no network.
-  - A seccomp filter refuses `socket(AF_UNIX)`, matching macOS.
+    - A seccomp filter refuses `socket(AF_UNIX)`, matching macOS. It also
+    refuses datagram Unix `socketpair`, `io_uring_setup`, and (on x86-64)
+    every x32 syscall. The x32 part is untested here: the local Linux VM
+    is aarch64.
   - `scripts/test-linux.sh` runs these tests in a container.
 - Where there is no sandbox, every command asks first.
 
