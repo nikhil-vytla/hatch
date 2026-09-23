@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import gamesUrl from "../../../roadmap/tetris/games.jsonl?url";
 import framingsUrl from "../../../packages/arena/recordings/tetris-framings.replay.jsonl?url";
 import realtimeUrl from "../../../packages/arena/recordings/realtime.replay.json?url";
+import realtime2Url from "../../../packages/arena/recordings/realtime-2.replay.json?url";
 import { framedJev, recordedFraming, FRAMING_NAMES, type Exchange, type FramingId } from "../../../packages/arena/src/tetris-framings";
 import { cells, COLS, ROWS, ghost, type Game } from "../../../live-worlds/tetris/engine";
 import { heuristic, randomPlayer, recorded, timedReplay, TetrisArena, type Contestant, type TimedEvent, type LogEntry, type RecordedEvent, type TimingMode } from "../../../packages/arena/src/tetris";
@@ -17,18 +18,18 @@ const describeLanding = (id: string) => { const xs = id.split("-").map((c) => +c
 const median = (xs: number[]) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 
 // ---------- game lane ----------
-type RealtimeGame = { seed: number; design: FramingId; events: TimedEvent[] };
+type RealtimeGame = { seed: number; design: FramingId; retryPolicy?: "fixed" | "backoff"; events: TimedEvent[] };
 type Recordings = { games: Record<number, RecordedEvent[]>; framings: Record<number, Exchange[]>; realtime: RealtimeGame[] };
 const jsonl = (text: string) => text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
 function useRecordings() {
   const [recordings, setRecordings] = useState<Recordings | null>(null);
   useEffect(() => {
     let alive = true;
-    Promise.all([fetch(gamesUrl).then((r) => r.text()), fetch(framingsUrl).then((r) => r.text()), fetch(realtimeUrl).then((r) => r.json())]).then(([games, framings, realtime]) => {
+    Promise.all([fetch(gamesUrl).then((r) => r.text()), fetch(framingsUrl).then((r) => r.text()), fetch(realtimeUrl).then((r) => r.json()), fetch(realtime2Url).then((r) => r.json())]).then(([games, framings, realtime, realtime2]) => {
       if (!alive) return;
       const byseed: Record<number, Exchange[]> = {};
       for (const x of jsonl(framings)) (byseed[x.seed] ??= []).push(x);
-      setRecordings({ games: Object.fromEntries(jsonl(games).map((g: any) => [g.summary.seed, g.events.filter((e: any) => e.lane === LANDING_LANE)])), framings: byseed, realtime: realtime.games });
+      setRecordings({ games: Object.fromEntries(jsonl(games).map((g: any) => [g.summary.seed, g.events.filter((e: any) => e.lane === LANDING_LANE)])), framings: byseed, realtime: [...realtime.games.map((g: RealtimeGame) => ({ ...g, retryPolicy: "fixed" as const })), ...realtime2.games] });
     });
     return () => { alive = false; };
   }, []);
@@ -39,8 +40,9 @@ type Lineup = "baselines" | "designs";
 function lineup(kind: Lineup, seed: number, recordings: Recordings, jevLive: boolean, mode: TimingMode): Contestant[] {
   if (kind === "designs") {
     if (mode === "realtime") {
-      const game = (d: FramingId) => recordings.realtime.find((g) => g.seed === seed && g.design === d)?.events ?? [];
-      return [...(["landing-choice", "spot-clean", "spot-clean-cached"] as FramingId[]).map((d) => timedReplay(game(d), `Jev · ${FRAMING_NAMES[d]}`, `jev-${d}-realtime`)), heuristic(0, "Code planner")];
+      // The most recent recording of each design (run 2 backs off after rate limits).
+      const lane = (d: FramingId) => { const g = [...recordings.realtime].reverse().find((x) => x.seed === seed && x.design === d); return timedReplay(g?.events ?? [], `Jev · ${FRAMING_NAMES[d]}`, `jev-${d}-realtime`, g?.retryPolicy ?? "backoff"); };
+      return [lane("landing-choice"), lane("spot-clean"), lane("spot-clean-confident"), heuristic(0, "Code planner")];
     }
     const x = recordings.framings[seed] ?? [];
     return [recordedFraming(x, "landing-choice"), recordedFraming(x, "spot-clean"), recordedFraming(x, "spot-score"), heuristic(0, "Code planner")];
@@ -161,7 +163,7 @@ function GameLane() {
       </div>
       {kind === "designs" ? <p className="arena-note">{mode === "turns"
         ? "Turns, recorded 22 September 2026, 40 pieces. Picking one landing from a list of numbers cleared 2, 7 and 7 lines on seeds 7, 19 and 42. Describing each distinct spot in a sentence and asking Jev to judge it cleared 13, 14 and 12; rating each spot 0–3 cleared 15, 8 and 13. The code planner cleared 15, 14 and 12. Code does the counting and picks the best-judged spot; Jev judges."
-        : "Real time, recorded 22 September 2026, 40 pieces, gravity never waits. Picking one landing cleared 5, 6 and 7 lines; judging each spot cleared 13 on every seed but took 78–87 s because most of its requests were rate-limited; remembering past judgements played fastest (40–42 s, about 1,285 judgements reused) but cleared 10, 6 and 9. Each Jev lane played its own game with one request in flight; they are shown side by side here from their recordings."}</p> :
+        : "Real time, recorded 22 September 2026, 40 pieces, gravity never waits. Picking one landing cleared 5, 6 and 7 lines. Judging each spot cleared 13, 14 and 12 but took 68–88 s of game time, mostly waiting out rate limits. Remembering only confident judgements, and asking again about unsure ones with every spot in view, cleared 12, 11 and 10 in 40–51 s, reusing about 390 judgements per game. Each Jev lane played its own game with one request in flight; they are shown side by side here from their recordings."}</p> :
       <p className="arena-note">Jev's answers come from live games recorded on 20 September 2026 through AI Gateway, replayed exactly at their recorded world times, including its late and failed answers. On a different board or with different timing the recording no longer applies, and the lane says so. The code planner is the same rule in both lanes; the second answers 900 ms later, so the difference between them is the cost of latency alone.</p>}
       <DecisionLog log={a.log} lanes={a.lanes.map((l) => l.contestant.name)} />
     </section>

@@ -11,7 +11,7 @@ import { boardFeatures, type Landing } from "../../../live-worlds/tetris/engine"
 import { optionCriteria, type Answer, type Contestant, type Question } from "./tetris";
 import { DECISION_INSTRUCTIONS } from "../../../live-worlds/tetris/session";
 
-export type FramingId = "landing-choice" | "spot-clean" | "spot-score" | "spot-clean-cached";
+export type FramingId = "landing-choice" | "spot-clean" | "spot-score" | "spot-clean-cached" | "spot-clean-confident";
 export type Wire = { state: unknown; questions: Record<string, { type: "choice" | "noul" | "score"; instructions: string; criteria?: Record<string, string> | string[] }> };
 export type WireAnswer = { value: string | number; probabilities?: Record<string, number> | null; confidence?: number | null };
 export type Send = (body: Wire, signal?: AbortSignal) => Promise<{ answers: Record<string, WireAnswer> }>;
@@ -84,7 +84,10 @@ export const FRAMING_NAMES: Record<FramingId, string> = {
   "spot-clean": "Judge each spot: clean or not",
   "spot-score": "Rate each spot 0–3",
   "spot-clean-cached": "Judge each spot, remembering past judgements",
+  "spot-clean-confident": "Judge each spot, remembering only confident judgements",
 };
+/** A judgement at least this far from 0.5 is reused; closer ones are asked again, in context. */
+export const CONFIDENT_MARGIN = 0.3;
 
 const CLEAN = "After this, the stack stays clean: flat, with no new holes and no tall tower.";
 /** Picks the best-judged group; ties keep the leftmost, as in Laya. */
@@ -108,7 +111,7 @@ export function framedJev(framing: FramingId, send: Send, record?: (exchange: Ex
   const failure = (q: Question, body: Wire, started: number) => (error: any): Answer => {
     const ms = performance.now() - started;
     record?.({ framing, pieceId: q.pieceId, board: q.state.board, body, error: String(error?.message ?? error), attempts: (error?.attempts ?? []).map((a: any) => ({ status: a.status, retryAfterMs: a.retryAfterMs })), ms });
-    return { error: String(error?.message ?? error), latencyMs: ms };
+    return { error: String(error?.message ?? error), latencyMs: ms, retryAfterMs: typeof error?.retryAfterMs === "number" ? error.retryAfterMs : undefined };
   };
   return {
     id: `jev-${framing}`, name: `Jev · ${FRAMING_NAMES[framing]}`, source: "live",
@@ -126,6 +129,21 @@ export function framedJev(framing: FramingId, send: Send, record?: (exchange: Ex
           return { choice: out.choice, probabilities: out.probabilities, confidence: null, latencyMs: ms };
         };
         return fresh.length ? send(body, signal).then(finish, failure(q, body, started)) : Promise.resolve(finish());
+      }
+      if (framing === "spot-clean-confident") {
+        // Every spot stays in view as context; only sentences without a confident judgement are asked.
+        const groups = spots(q);
+        const settled = (g: (typeof groups)[number]) => memory.has(g.sentence) && Math.abs(memory.get(g.sentence)! - 0.5) >= CONFIDENT_MARGIN;
+        const ask = groups.filter((g) => !settled(g));
+        const body: Wire = { state: { task: "A Tetris piece is about to land. Each spot below is one place it could come to rest, described after code worked out the result.", piece: q.state.active.type, spots: Object.fromEntries(groups.map((g) => [g.key, g.sentence])) }, questions: Object.fromEntries(ask.map((g) => [g.key, { type: "noul" as const, instructions: `After the piece lands at ${g.key}, the stack stays clean: flat, with no new holes and no tall tower.` }])) };
+        const finish = (response?: { answers: Record<string, WireAnswer> }): Answer => {
+          ask.forEach((g) => memory.set(g.sentence, Number(response!.answers[g.key].value)));
+          const judged = Object.fromEntries(groups.map((g) => [g.sentence, memory.get(g.sentence)!]));
+          const out = best(groups, (g) => judged[g.sentence]), ms = ask.length ? performance.now() - started : 0;
+          record?.({ framing, pieceId: q.pieceId, board: q.state.board, body: ask.length ? body : undefined, response, ms, judged, fromMemory: groups.length - ask.length, choice: out.choice });
+          return { choice: out.choice, probabilities: out.probabilities, confidence: null, latencyMs: ms };
+        };
+        return ask.length ? send(body, signal).then(finish, failure(q, body, started)) : Promise.resolve(finish());
       }
       const built = buildRequest(framing, q);
       return send(built.body, signal).then((response) => {
