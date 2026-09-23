@@ -417,7 +417,7 @@ async fn rewind(state: &Arc<State>, params: Value) -> Reply {
         return Err(RpcError::new(RpcError::INTERNAL_ERROR, "the daemon is stopping"));
     };
     // No effect in this directory (from any session) may run during the restore.
-    let workspace = std::path::Path::new(&info.cwd).canonicalize().map_err(|e| internal(&e))?;
+    let workspace = workspace_of(&info.cwd)?;
     let _files = state.sessions.workspaces.rewind(&workspace).ok_or_else(|| {
         RpcError::new(
             RpcError::INVALID_REQUEST,
@@ -427,7 +427,7 @@ async fn rewind(state: &Arc<State>, params: Value) -> Reply {
     let lock = state.sessions.checkpoint_lock(&sid);
     let _held = lock.lock().await;
     let shadow = Arc::new(
-        crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), std::path::Path::new(&info.cwd))
+        crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), &workspace)
             .ok_or_else(|| RpcError::new(RpcError::INTERNAL_ERROR, "checkpoints need git, which isn't available"))?,
     );
     let git = shadow.clone();
@@ -470,12 +470,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
             let sid = session_id(&id)?;
             let info = state.sessions.info(&sid).await.map_err(session_error)?;
             let scope = crate::effects::Scope {
-                workspace: std::path::Path::new(&info.cwd).canonicalize().map_err(|e| {
-                    RpcError::new(
-                        RpcError::INTERNAL_ERROR,
-                        format!("the session's directory {} is missing: {e}", info.cwd),
-                    )
-                })?,
+                workspace: workspace_of(&info.cwd)?,
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
             };
@@ -613,6 +608,8 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
     match method {
         SessionCreate::NAME => {
             let SessionCreateParams { cwd } = parse::<SessionCreate>(params)?;
+            // Kept as its real path, so a later swap of any part shows (see `workspace_of`).
+            let cwd = std::path::Path::new(&cwd).canonicalize().map_or(cwd, |p| p.display().to_string());
             reply::<SessionCreate>(
                 state
                     .sessions
@@ -623,6 +620,8 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         }
         SessionList::NAME => {
             let SessionListParams { cwd } = parse::<SessionList>(params)?;
+            // Sessions keep their directory's real path; so does the filter.
+            let cwd = cwd.map(|c| std::path::Path::new(&c).canonicalize().map_or(c, |p| p.display().to_string()));
             let (sessions, unreadable) = state.sessions.list(cwd.as_deref()).map_err(|e| internal(&e))?;
             reply::<SessionList>(SessionListResult { sessions, unreadable })
         }
@@ -748,8 +747,29 @@ fn internal(e: &dyn std::fmt::Display) -> RpcError {
 
 /// Saves the workspace before a prompt. Checkpoints are best effort: without
 /// git, or if saving fails, the prompt still goes ahead, unrecorded.
+/// The session's directory, if it's still where the session began. Each
+/// part of the path is followed again every time, so one swapped for a
+/// symlink (a directory under /tmp, replaced) would lead effects, the
+/// sandbox's writable area and checkpoints somewhere else entirely.
+fn workspace_of(cwd: &str) -> Result<std::path::PathBuf, RpcError> {
+    let real = std::path::Path::new(cwd).canonicalize().map_err(|e| {
+        RpcError::new(RpcError::INTERNAL_ERROR, format!("the session's directory {cwd} is missing: {e}"))
+    })?;
+    if real != std::path::Path::new(cwd) {
+        return Err(RpcError::new(
+            RpcError::INVALID_REQUEST,
+            format!(
+                "the session's directory {cwd} now leads to {}; nothing runs there. Start a new session where you mean to work",
+                real.display()
+            ),
+        ));
+    }
+    Ok(real)
+}
+
 async fn checkpoint(state: &Arc<State>, sid: &SessionId, cwd: &str, message: &str) -> Option<String> {
-    let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(sid), std::path::Path::new(cwd))?;
+    let workspace = workspace_of(cwd).map_err(|e| crate::log!("checkpoint skipped: {}", e.message)).ok()?;
+    let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(sid), &workspace)?;
     let lock = state.sessions.checkpoint_lock(sid);
     let _held = lock.lock().await;
     let message = message.to_string();

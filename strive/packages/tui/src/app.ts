@@ -285,7 +285,7 @@ export class App {
     this.prompt.setText(
       next.done
         ? ""
-        : `${style.accent(`Allow the agent to ${next.value}?`)}  ${style.muted("y yes · a yes for this session · n no")}`,
+        : `${style.accent(`Allow the agent to ${next.value}?`)}  ${style.muted("y yes · a yes to everything (full-auto) · n no")}`,
     );
     this.renderFooter();
     const text = describe(entry);

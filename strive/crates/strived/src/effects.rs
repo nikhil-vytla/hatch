@@ -328,6 +328,17 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
     let ws = scope.workspace.display();
     let home = scope.strive_home.display();
     if cfg!(target_os = "macos") {
+        // The paths go into the profile's string literals: one that would
+        // need escaping could end a literal and add rules of its own.
+        for p in [&scope.workspace, &scope.strive_home] {
+            let text = p.to_string_lossy();
+            if text.chars().any(|c| c == '"' || c == '\\' || c.is_control()) {
+                return Err(io::Error::other(format!(
+                    "{} has a quote, backslash or control character in its path, which the macOS sandbox profile can't hold safely",
+                    p.display()
+                )));
+            }
+        }
         let tmp = std::env::temp_dir().canonicalize().unwrap_or_else(|_| PathBuf::from("/private/tmp"));
         let profile = format!(
             r#"(version 1)

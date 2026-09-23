@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
 import {
@@ -13,6 +13,9 @@ import { startDaemon, type TestDaemon, VirtualTerminal } from "@strive/testkit";
 import { App, parseSessionMode, type SessionMode } from "./app";
 
 const CWD = "/tmp/some-repo";
+
+/** Where sessions say they are: the daemon keeps a directory's real path. */
+const real = () => realpathSync(CWD);
 
 type Ui = { term: VirtualTerminal; exits: number[]; app: App; stop(): void };
 
@@ -63,10 +66,10 @@ const daemonClients = () => (JSON.parse(daemon.strive("status", "--json").stdout
 test("a new session is created in the working directory and named in the header", async () => {
   const ui = await openUi();
   const [s] = sessions();
-  expect(s?.cwd).toBe(CWD);
+  expect(s?.cwd).toBe(real());
   const screen = await ui.term.waitFor("session …");
   expect(screen[0]).toContain(`${CWD}  session …${s?.id.slice(-6)}`);
-  expect(screen.some((l) => l.includes(`Session started in ${CWD}`))).toBe(true);
+  expect(screen.some((l) => l.includes(`Session started in ${real()}`))).toBe(true);
 });
 
 test("a prompt is shown from the journal and is in `strive log`", async () => {
@@ -91,7 +94,7 @@ test("continue reopens the latest session here with its history", async () => {
 
 test("continue with no session here starts a new one", async () => {
   await openUi("continue");
-  expect(sessions().map((s) => s.cwd)).toEqual([CWD]);
+  expect(sessions().map((s) => s.cwd)).toEqual([real()]);
 });
 
 test("two clients on one session see each other's prompts", async () => {
@@ -220,7 +223,7 @@ async function agentRuns(request: EffectRequest) {
 test("a command waiting for approval is shown and y allows it", async () => {
   const ui = await openUi();
   const agent = await agentRuns({ kind: "bash", command: "echo approved" });
-  await ui.term.waitFor("Allow the agent to run: echo approved?  y yes · a yes for this session · n no");
+  await ui.term.waitFor("Allow the agent to run: echo approved?  y yes · a yes to everything (full-auto) · n no");
   const asked = await ui.term.screen();
   expect(asked.filter((l) => l.includes("Allow the agent to")).length).toBe(1); // asked once, not twice
   expect(asked.some((l) => l.includes("The agent asked to run: echo approved"))).toBe(true);
@@ -229,7 +232,7 @@ test("a command waiting for approval is shown and y allows it", async () => {
   expect(r.text).toBe("approved\n");
   await ui.term.waitFor("Allowed by tui-test");
   const screen = await ui.term.screen();
-  expect(screen.some((l) => l.includes("y yes · a yes for this session"))).toBe(false);
+  expect(screen.some((l) => l.includes("y yes · a yes to everything"))).toBe(false);
   agent.close();
 });
 

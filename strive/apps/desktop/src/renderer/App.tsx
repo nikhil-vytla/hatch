@@ -559,7 +559,7 @@ const KIND_ICON: Record<Tool["record"]["kind"], IconName> = {
 
 const DECIDED: Record<Decision, string> = {
   allow: "Allowed",
-  allowSession: "Allowed for this session",
+  allowSession: "Allowed; full-auto from here",
   deny: "Declined",
 };
 
@@ -594,8 +594,12 @@ function Approval({ tool, session }: { tool: Tool; session: SessionActions }) {
         <button type="button" className="quiet danger" onClick={() => session.decide(tool.effect, "deny")}>
           Decline
         </button>
-        <button type="button" onClick={() => session.decide(tool.effect, "allowSession")}>
-          Allow for this session
+        <button
+          type="button"
+          title="Switches this session to full-auto: nothing asks again"
+          onClick={() => session.decide(tool.effect, "allowSession")}
+        >
+          Allow everything
         </button>
         <button type="button" className="primary" onClick={() => session.decide(tool.effect, "allow")}>
           Allow

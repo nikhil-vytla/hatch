@@ -518,3 +518,45 @@ fn with_the_sandbox_off_commands_run_unconfined_under_the_approval_mode() {
         "run: true needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
     );
 }
+
+/// The macOS sandbox profile names the workspace in a string literal; a
+/// path with a quote in it could end the literal and add rules. Such a
+/// workspace's commands are refused, never run with a broken sandbox.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_workspace_path_the_sandbox_profile_cant_hold_is_refused() {
+    let env = Env::new();
+    let parent = tempfile::Builder::new().prefix("strv-ws").tempdir_in("/tmp").unwrap();
+    let dir = parent.path().canonicalize().unwrap().join(r#"a") (allow file-write* (subpath "/"#);
+    fs::create_dir_all(&dir).unwrap();
+    let mut c = env.rpc();
+    let id = c.ok("session/create", &json!({"cwd": dir}))["id"].as_str().unwrap().to_string();
+    c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let marker = parent.path().join("escaped.txt");
+    let r = c.ok(
+        "effect/run",
+        &json!({"id": id, "callId": "c", "request": {"kind": "bash",
+        "command": format!("touch {}", marker.display())}}),
+    );
+    assert_eq!(r["outcome"]["kind"], "refused", "{r}");
+    assert!(r["text"].as_str().unwrap().contains("sandbox profile can't hold"), "{r}");
+    assert!(!marker.exists());
+}
+
+/// A session's directory swapped for a symlink (easy under /tmp, where
+/// anyone can replace an entry) must not carry the agent's writes, or the
+/// sandbox's writable area, to wherever the link points.
+#[test]
+fn a_session_directory_swapped_for_a_symlink_is_not_followed() {
+    let mut w = Ws::new();
+    let elsewhere = tempfile::Builder::new().prefix("strv-elsewhere").tempdir_in("/tmp").unwrap();
+    let ws = w.dir.path().canonicalize().unwrap();
+    fs::remove_dir(&ws).unwrap();
+    std::os::unix::fs::symlink(elsewhere.path(), &ws).unwrap();
+    let r = w.c.call(
+        "effect/run",
+        &json!({"id": w.id, "callId": "c", "request": {"kind": "write", "path": "x.txt", "content": "hi"}}),
+    );
+    assert!(r["error"]["message"].as_str().unwrap_or_default().contains("now leads to"), "{r}");
+    assert!(!elsewhere.path().join("x.txt").exists(), "nothing was written through the link");
+}

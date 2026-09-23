@@ -143,7 +143,11 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("muted", `The agent asked to ${e.description}`);
     case "approvalDecided": {
       const verb =
-        e.decision === "deny" ? "Declined" : e.decision === "allowSession" ? "Allowed for this session" : "Allowed";
+        e.decision === "deny"
+          ? "Declined"
+          : e.decision === "allowSession"
+            ? "Allowed, and full-auto from here"
+            : "Allowed";
 
       return note("faint", `${verb} by ${e.by}`);
     }
