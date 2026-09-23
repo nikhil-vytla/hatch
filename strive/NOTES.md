@@ -439,3 +439,40 @@ addressed.
   broke Python twice. `check.sh` now compiles the Harbor agent.
 - `podman pull` once printed a Canva SSO "Opening browser" prompt. Later
   pulls didn't.
+
+## 2026-09-23: Codex's fifth review
+
+The fifth review covered the fourth round's fixes, the desktop app and the
+headless path. It found 13 issues, 4 of them high, and judged the widget
+sandbox, observer attach, sandbox-off gating and CA fallback sound.
+
+The high findings:
+- **Cross-session bridge:** the window could act on any session by id.
+  Reproduced, then fixed.
+- **Widget WebRTC:** STUN packets reached a real UDP listener before the
+  fix.
+  - The only layer that worked here was removing WebRTC before the
+    widget's code runs.
+  - A WebRTC IP policy, a dead proxy and the CSP `webrtc` directive each
+    failed alone.
+  - The `about:blank` bypass doesn't apply: the widget's origin is
+    opaque, so a child frame is cross-origin.
+- **git outliving a forced exit:** checkpoint git now runs in tracked
+  process groups.
+- **MCP termination:** accepted as far as the kernel allows. A 10s wait
+  follows the kill, and a process that still hasn't exited is logged.
+
+The rest:
+- **Fixed with a failing-first test:**
+  - absurd MCP request ids;
+  - a host dying mid-turn leaving `strive run` waiting;
+  - `propose_layout` replaying as "did not run";
+  - decided proposals lost across windows.
+- **Fixed structurally:**
+  - early Ctrl+C is re-sent once the turn starts;
+  - desktop startup events are buffered.
+  The startup-gap test I wrote passed on the old code, so I dropped it.
+- **Harbor:** exit status propagates, with the turn's reason (tried with a
+  bad key), and accounting counts cached input.
+- **Documented:** what `"sandbox": "off"` doesn't protect inside the
+  container; the silent-cancel stop policy.
