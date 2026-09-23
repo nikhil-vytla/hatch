@@ -184,7 +184,10 @@ fn a_cancelled_command_is_stopped() {
     let w = Ws::new();
     let marker = w.path("late.txt");
     let mut c = w.env.rpc();
-    let params = json!({"id": w.id, "callId": "call_7", "request": {"kind": "bash", "command": "(sleep 1; touch late.txt) & sleep 30"}});
+    // The child waits for a go-file, not a timer: however long the test takes
+    // to cancel, only a child that survived the cancel can make the marker.
+    let params = json!({"id": w.id, "callId": "call_7", "request": {"kind": "bash",
+        "command": "(while [ ! -e go ]; do sleep 0.05; done; touch late.txt) & sleep 30"}});
     let running = std::thread::spawn(move || c.ok("effect/run", &params));
     common::wait_for("the command to start", Duration::from_secs(5), || {
         let r = w.env.rpc().ok("session/read", &json!({"id": w.id}));
@@ -196,7 +199,8 @@ fn a_cancelled_command_is_stopped() {
     let r = running.join().unwrap();
     assert!(started.elapsed() < Duration::from_secs(2), "stopped after {:?}", started.elapsed());
     assert_eq!(r["text"], "the command was interrupted and stopped");
-    std::thread::sleep(Duration::from_millis(1500));
+    fs::write(w.path("go"), "").unwrap();
+    std::thread::sleep(Duration::from_millis(600));
     assert!(!marker.exists(), "its background child was killed too");
 }
 

@@ -166,6 +166,58 @@ test("code in a reply is highlighted in the window, under its CSP", async () => 
   host.close();
 });
 
+test("a new session starts from the sidebar, and the old one is a click away", async () => {
+  const { page } = await openApp();
+  await page.getByPlaceholder("Ask strive to do anything…").fill("the first task");
+  await page.keyboard.press("Enter");
+  await page.locator(".msg.user", { hasText: "the first task" }).waitFor();
+  await page.getByRole("button", { name: "new session", exact: true }).click();
+  await page.getByText("What should we work on?").waitFor();
+  const first = page.locator(".session", { hasText: "the first task" });
+  await first.waitFor();
+  assert.equal(await page.locator(".session").count(), 2);
+  await first.click();
+  await page.locator(".msg.user", { hasText: "the first task" }).waitFor();
+  assert.equal(await page.locator(".session.current", { hasText: "the first task" }).count(), 1);
+});
+
+test("the window switches only to its own project's sessions", async () => {
+  const { page } = await openApp();
+  const rpc = await Rpc.open();
+
+  const other = await rpc.call("session/create", {
+    cwd: realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-other-"))),
+  });
+
+  const otherId = JSON.parse(JSON.stringify(other.result)).id;
+
+  const r = await page.evaluate(
+    (id) =>
+      Object.getOwnPropertyDescriptor(window, "strive")
+        ?.value.switchTo(id)
+        .then(
+          () => "switched",
+          (e: Error) => e.message,
+        ),
+    otherId,
+  );
+
+  assert.match(String(r), /isn't one of this project's/);
+  rpc.close();
+});
+
+test("a session the window has left doesn't wait on it for approvals", async () => {
+  const { page, cwd } = await openApp();
+  const left = sessionId(cwd);
+  await page.getByRole("button", { name: "new session", exact: true }).click();
+  await page.getByText("What should we work on?").waitFor();
+  const agent = await Rpc.open();
+  const run = agent.call("effect/run", { id: left, callId: "c1", request: { kind: "bash", command: "echo hi" } });
+  const r = await Promise.race([run, new Promise((ok) => setTimeout(() => ok("still waiting"), 8000))]);
+  assert.match(JSON.stringify(r), /no client is attached/);
+  agent.close();
+});
+
 test("a reloaded window shows what happened since it opened", async () => {
   const { page, cwd } = await openApp();
   const rpc = await Rpc.open();
@@ -244,7 +296,17 @@ test("the window has no Node, only the app's bridge", async () => {
   assert.deepEqual(seen, {
     require: false,
     process: false,
-    bridge: ["blob", "loadWorkspace", "onClosed", "onEvent", "opened", "request", "saveWorkspace"],
+    bridge: [
+      "blob",
+      "loadWorkspace",
+      "onClosed",
+      "onEvent",
+      "opened",
+      "request",
+      "saveWorkspace",
+      "sessions",
+      "switchTo",
+    ],
   });
   await app.close();
 });

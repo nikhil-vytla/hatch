@@ -7,15 +7,15 @@ import { pathToFileURL } from "node:url";
 import {
   type Digest,
   describeError,
-  type Event,
   type MethodName,
   type Methods,
   type SessionInfo,
-  StriveClient,
+  type StriveClient,
 } from "@strive/protocol";
 import { HistorySchema, parseJson } from "@strive/workspace";
 import { app, BrowserWindow, session as electronSession, type IpcMainInvokeEvent, ipcMain, protocol } from "electron";
-import type { Opened, StriveEvent } from "../shared/bridge";
+import type { StriveEvent } from "../shared/bridge";
+import { Connection } from "./connection";
 import { loadWorkspace, saveWorkspace } from "./store";
 
 /** What the renderer may ask the daemon for: a person's actions on this session. */
@@ -84,49 +84,12 @@ async function main() {
 
   const { args } = parsed;
 
-  const { client, init } = await StriveClient.connect(args.socket, {
-    name: "strive-desktop",
-    version: app.getVersion(),
-  });
+  const open = (pick: (c: StriveClient) => Promise<string>) =>
+    Connection.open(args.socket, app.getVersion(), app.getPath("home"), pick);
 
-  const id = await openSession(client, args);
-  // Listening before attaching, and holding events until the page asks for
-  // the session: anything journaled meanwhile still reaches it.
-  let forward: ((event: StriveEvent) => void) | undefined;
-  const early: StriveEvent[] = [];
-
-  // The blobs the window may read: ones its own session's journal names.
-  // The content store holds every session's, found by digest alone.
-  const readable = new Set<Digest>();
-  // What the page gets when it asks for the session, kept up to date.
-  let opened: Opened | undefined;
-  const deliver = (event: StriveEvent) => (forward ? forward(event) : early.push(event));
-  client.on("session/entry", (params) => {
-    if (params.sessionId === id) {
-      for (const d of digestsOf(params.entry.event)) readable.add(d);
-
-      // A page that reloads asks for the session again; it gets all of it.
-      if (opened && params.entry.seq > (opened.entries.at(-1)?.seq ?? 0)) opened.entries.push(params.entry);
-    }
-
-    deliver({ method: "session/entry", params });
-  });
-  client.on("session/delta", (params) => deliver({ method: "session/delta", params }));
-  client.on("session/interrupt", (params) => deliver({ method: "session/interrupt", params }));
-
-  const { session, entries } = await client.request("session/attach", { id });
-
-  for (const entry of entries) for (const d of digestsOf(entry.event)) readable.add(d);
-  opened = { init, session, entries, home: app.getPath("home"), platform: process.platform };
-  const snapshot = opened;
-
-  // Entries notified while the attach was on its way are held in `early`;
-  // the snapshot gets them too.
-  for (const event of early) {
-    if (event.method !== "session/entry" || event.params.sessionId !== id) continue;
-
-    if (event.params.entry.seq > (snapshot.entries.at(-1)?.seq ?? 0)) snapshot.entries.push(event.params.entry);
-  }
+  let current = await open((c) => openSession(c, args));
+  // The window's project: it lists, and switches between, sessions started here only.
+  const cwd = current.snapshot.session.cwd;
 
   await app.whenReady();
   serveWidgets();
@@ -151,8 +114,8 @@ async function main() {
     height: 820,
     minWidth: 720,
     minHeight: 480,
-    title: `strive · ${session.cwd}`,
-    backgroundColor: "#141218",
+    title: `strive · ${cwd}`,
+    backgroundColor: "#0b0b0c",
     ...(process.platform === "darwin" && { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 17 } }),
     webPreferences: {
       preload: join(built(), "preload.cjs"),
@@ -174,32 +137,67 @@ async function main() {
   window.webContents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
   window.webContents.on("will-navigate", (e) => e.preventDefault());
 
+  const send = (event: StriveEvent) => {
+    if (!window.isDestroyed()) window.webContents.send("strive:event", event);
+  };
+
+  const watch = (c: Connection) =>
+    c.onLost(() => {
+      if (!window.isDestroyed() && c === current) window.webContents.send("strive:closed");
+    });
+
+  watch(current);
+
   ipcMain.handle("strive:opened", (e) => {
     if (!fromOurPage(e)) return undefined;
 
     // The page listens before it asks, so what was held can go now.
-    forward = (event) => {
-      if (!window.isDestroyed()) window.webContents.send("strive:event", event);
-    };
+    current.attachPage(send);
 
-    for (const event of early.splice(0)) forward(event);
-
-    return snapshot;
+    return current.snapshot;
   });
+
+  ipcMain.handle("strive:sessions", async (e) => {
+    if (!fromOurPage(e)) return [];
+
+    return (await current.client.request("session/list", { cwd })).sessions;
+  });
+
+  // To another session of this project, or a new one (no id).
+  ipcMain.handle("strive:switch", async (e, target: string | undefined) => {
+    if (!fromOurPage(e)) throw new Error("not available to this frame");
+
+    // Anything but one of this project's session ids (whatever the page sent) is refused here.
+    if (target !== undefined) {
+      const { sessions } = await current.client.request("session/list", { cwd });
+
+      if (!sessions.some((s) => s.id === target)) throw new Error("that session isn't one of this project's");
+    }
+
+    const next = await open(async (c) => target ?? (await c.request("session/create", { cwd })).id);
+    const left = current;
+    current = next;
+    watch(next);
+    left.close();
+    next.attachPage(send);
+
+    return next.snapshot;
+  });
+
   // The daemon parses and checks every request's params itself.
   ipcMain.handle("strive:request", async (e, method: MethodName, params: Methods[MethodName]["params"]) => {
     if (!fromOurPage(e) || !ALLOWED.has(method)) throw new Error(`${method} isn't available to the window`);
 
-    // The window acts on its own session only, whatever id it sends.
-    const bound = method === "daemon/status" ? params : { ...params, id: session.id };
+    // The window acts on the session it shows only, whatever id it sends.
+    const bound = method === "daemon/status" ? params : { ...params, id: current.id };
 
-    return client.request<MethodName>(method, bound);
+    return current.client.request<MethodName>(method, bound);
   });
 
   ipcMain.handle("strive:blob", async (e, digest: Digest) => {
-    if (!fromOurPage(e) || !readable.has(digest)) throw new Error("that output isn't this session's");
+    if (!fromOurPage(e) || !current.readable.has(digest)) throw new Error("that output isn't this session's");
 
-    return (await client.request("blob/get", { digest })).text;
+    return (await current.client.request("blob/get", { digest })).text;
   });
 
   ipcMain.handle("workspace:load", (e) => (fromOurPage(e) ? loadWorkspace(app.getPath("userData")) : undefined));
@@ -214,39 +212,13 @@ async function main() {
     saveWorkspace(app.getPath("userData"), parsed.value);
   });
 
-  client.onClose(() => {
-    if (!window.isDestroyed()) window.webContents.send("strive:closed");
-  });
-
-  window.on("closed", () => client.close());
+  window.on("closed", () => current.close());
   await window.loadFile(join(built(), "renderer", "index.html"));
 }
 
 /** A TCP listener's address: a string only for a pipe, null before it listens. */
 function isInet(a: AddressInfo | string | null): a is AddressInfo {
   return a !== null && typeof a === "object";
-}
-
-/** The content-store blobs an event names that the window shows: tool inputs and outputs. */
-function digestsOf(event: Event): Digest[] {
-  switch (event.type) {
-    case "effectStarted": {
-      const r = event.record;
-
-      return r.kind === "write"
-        ? [r.content]
-        : r.kind === "edit"
-          ? [r.oldText, r.newText]
-          : r.kind === "mcp"
-            ? [r.arguments]
-            : [];
-    }
-
-    case "effectFinished":
-      return event.outcome.kind === "done" ? [event.outcome.output] : [];
-    default:
-      return [];
-  }
 }
 
 /**

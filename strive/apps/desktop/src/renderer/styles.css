@@ -34,7 +34,25 @@ body { margin: 0; overflow: hidden; }
 ::selection { background: rgb(139 124 246 / 0.35); }
 button, select, textarea { font: inherit; color: inherit; }
 
-.app { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
+.app { display: flex; height: 100vh; background: var(--bg); }
+.main-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+
+/* The sessions sidebar: the window's chrome, not a workspace panel. */
+.sidebar { display: flex; flex-direction: column; width: 256px; flex: none; background: #111113; border-right: 1px solid var(--line); }
+.sidebar-top { -webkit-app-region: drag; display: flex; align-items: center; gap: 4px; height: 46px; padding: 0 10px; flex: none; }
+.mac .sidebar-top { padding-left: 84px; }
+.icon-button { -webkit-app-region: no-drag; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--faint); }
+.icon-button:hover { background: var(--surface-2); color: var(--text); }
+.project { display: flex; align-items: center; gap: 8px; padding: 6px 16px 10px; font-weight: 600; color: var(--text); }
+.project .icon { color: var(--faint); }
+.project span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sessions { display: flex; flex-direction: column; gap: 1px; padding: 0 8px 12px; overflow-y: auto; }
+.session { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; color: var(--muted); }
+.session:hover { background: var(--surface-2); color: var(--text); }
+.session.current { background: var(--surface-3); color: var(--text); }
+.session .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session .when { flex: none; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.session .dot.idle { background: var(--line-2); }
 
 .icon { flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .icon-grip { stroke-width: 2.4; }
@@ -55,7 +73,7 @@ button, select, textarea { font: inherit; color: inherit; }
   flex: none;
   user-select: none;
 }
-.mac .titlebar { padding-left: 88px; }
+.mac:not(.with-sidebar) .titlebar { padding-left: 84px; }
 .titlebar .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
 .titlebar .where { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); white-space: nowrap; }
 .status { display: inline-flex; align-items: center; gap: 7px; color: var(--faint); font-size: 12.5px; }

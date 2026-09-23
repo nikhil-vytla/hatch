@@ -195,6 +195,14 @@ pub struct SessionInfo {
     pub id: String,
     pub cwd: String,
     pub created_at_ms: u64,
+    /// The session's first prompt, shortened: what a list calls it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub title: Option<String>,
+    /// When its journal last changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_active_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

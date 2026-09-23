@@ -26,6 +26,10 @@ export type StriveEvent = {
 export type Bridge = {
   opened(): Promise<Opened>;
   request<M extends MethodName>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]>;
+  /** This project's sessions, newest first. */
+  sessions(): Promise<SessionInfo[]>;
+  /** Shows another of this project's sessions, or a new one; what it shows. */
+  switchTo(id?: string): Promise<Opened>;
   /** A tool's input or output from the content store, as text: only ones this session's journal names. */
   blob(digest: Digest): Promise<string>;
   /** Listens for the window's lifetime (a function returned across the bridge isn't callable). */

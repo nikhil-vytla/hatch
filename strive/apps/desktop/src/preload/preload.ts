@@ -8,6 +8,8 @@ const bridge: Bridge = {
   opened: () => ipcRenderer.invoke("strive:opened"),
   request: (method, params) => ipcRenderer.invoke("strive:request", method, params),
   blob: (digest) => ipcRenderer.invoke("strive:blob", digest),
+  sessions: () => ipcRenderer.invoke("strive:sessions"),
+  switchTo: (id) => ipcRenderer.invoke("strive:switch", id),
   onEvent: (listener) => {
     ipcRenderer.on("strive:event", (_, event: StriveEvent) => listener(event));
   },

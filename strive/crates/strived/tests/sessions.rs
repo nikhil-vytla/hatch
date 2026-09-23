@@ -37,7 +37,10 @@ fn a_prompt_is_journaled_and_read_back() {
     assert_eq!(p, json!({"seq": 4}));
 
     let r = c.ok("session/read", &json!({"id": id}));
-    assert_eq!(r["session"], s);
+    for field in ["id", "cwd", "createdAtMs"] {
+        assert_eq!(r["session"][field], s[field], "{field}");
+    }
+    assert_eq!(r["session"]["title"], "hello", "named by its first prompt");
     assert_eq!(r["committed"], 4);
     assert_eq!(r["tornBytes"], 0);
     assert_eq!(r.get("problem"), None);
@@ -356,4 +359,27 @@ fn hosts_may_record_only_turns_and_replies() {
     assert_eq!(r["error"]["code"], -32602);
     assert_eq!(r["error"]["message"], "a host records only turns, assistant messages, summaries and layout proposals");
     c.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
+}
+
+/// A list names each session by its first prompt, on one line and short.
+#[test]
+fn a_session_is_listed_by_its_first_prompt() {
+    let env = Env::new();
+    let dir = tempfile::Builder::new().prefix("strv-ws").tempdir_in("/tmp").unwrap();
+    let cwd = dir.path().canonicalize().unwrap();
+    let mut c = env.rpc();
+    let id = c.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    let untitled = c.ok("session/list", &json!({"cwd": cwd}));
+    assert_eq!(untitled["sessions"][0].get("title"), None, "{untitled}");
+    let long = format!("Fix the flaky\ntest in {}", "the parser module ".repeat(10));
+    c.ok("session/prompt", &json!({"id": id, "text": long}));
+    c.ok("session/prompt", &json!({"id": id, "text": "and then this"}));
+    let listed = c.ok("session/list", &json!({"cwd": cwd}));
+    let title = listed["sessions"][0]["title"].as_str().unwrap();
+    assert!(title.starts_with("Fix the flaky test in the parser module"), "{title}");
+    assert!(title.ends_with('…') && title.chars().count() <= 81, "{title}");
+    assert!(
+        listed["sessions"][0]["lastActiveMs"].as_u64().unwrap()
+            >= listed["sessions"][0]["createdAtMs"].as_u64().unwrap()
+    );
 }

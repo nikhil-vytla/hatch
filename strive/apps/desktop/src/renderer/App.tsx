@@ -3,7 +3,7 @@
 // dragging, which records an edit in the workspace history.
 import { closestCorners, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import type { ApprovalMode, Decision, Digest } from "@strive/protocol";
+import type { ApprovalMode, Decision, Digest, SessionInfo } from "@strive/protocol";
 import { formatUsd as exactUsd, MODE_NAMES } from "@strive/view";
 import {
   DEFAULT_WORKSPACE,
@@ -27,9 +27,12 @@ import { Icon, type IconName } from "./icons";
 import { Markdown } from "./MarkdownView";
 import { SessionModel } from "./model";
 
-type Props = { bridge: Bridge; opened: Opened };
+type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promise<void> };
 
-export function App({ bridge, opened }: Props) {
+/** Whether the sessions sidebar shows, kept across launches. */
+const SIDEBAR_KEY = "strive.sidebar";
+
+export function App({ bridge, opened, onSwitch }: Props) {
   const [model] = useState(() => new SessionModel(opened.session.id, opened.home));
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [closed, setClosed] = useState(false);
@@ -70,6 +73,34 @@ export function App({ bridge, opened }: Props) {
 
   const workspace = fold(layout).workspace;
   const inline = workspace.columns.some((c) => c.panels.includes("transcript"));
+  const [sidebar, setSidebar] = useState(() => localStorage.getItem(SIDEBAR_KEY) !== "hidden");
+
+  const toggleSidebar = () =>
+    setSidebar((open) => {
+      localStorage.setItem(SIDEBAR_KEY, open ? "hidden" : "shown");
+
+      return !open;
+    });
+
+  const switchTo = (to?: string) => act(onSwitch(to));
+
+  useEffect(() => {
+    const keys = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+
+      if (e.key === "n") {
+        e.preventDefault();
+        void onSwitch().catch((err: Error) => setError(err.message));
+      } else if (e.key === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+
+    window.addEventListener("keydown", keys);
+
+    return () => window.removeEventListener("keydown", keys);
+  });
 
   const session: SessionActions = {
     prompt: (text) => act(bridge.request("session/prompt", { id, text })),
@@ -81,29 +112,128 @@ export function App({ bridge, opened }: Props) {
   };
 
   return (
-    <div className={`app ${opened.platform === "darwin" ? "mac" : ""}`}>
-      <Titlebar model={model} opened={opened} />
-      {closed && (
-        <div className="banner danger">
-          Lost the connection to the daemon. Restart it with strive, then reopen this window.
-        </div>
+    <div className={`app ${opened.platform === "darwin" ? "mac" : ""} ${sidebar ? "with-sidebar" : ""}`}>
+      {sidebar && (
+        <Sidebar bridge={bridge} opened={opened} model={model} onSwitch={switchTo} onToggle={toggleSidebar} />
       )}
-      {error && (
-        <button type="button" className="banner danger" onClick={() => setError(undefined)}>
-          {error}
-        </button>
-      )}
-      {loaded && <Proposals model={model} layout={layout} onChange={edit} />}
-      <Columns
-        workspace={workspace}
-        onMove={(panel, column, before) => {
-          const r = record(layout, "person", `move ${panel}`, [{ op: "move", panel, column, before }]);
+      <div className="main-area">
+        <Titlebar model={model} opened={opened} sidebar={sidebar} onToggle={toggleSidebar} />
+        {closed && (
+          <div className="banner danger">
+            Lost the connection to the daemon. Restart it with strive, then reopen this window.
+          </div>
+        )}
+        {error && (
+          <button type="button" className="banner danger" onClick={() => setError(undefined)}>
+            {error}
+          </button>
+        )}
+        {loaded && <Proposals model={model} layout={layout} onChange={edit} />}
+        <Columns
+          workspace={workspace}
+          onMove={(panel, column, before) => {
+            const r = record(layout, "person", `move ${panel}`, [{ op: "move", panel, column, before }]);
 
-          if (r.ok) edit(r.history);
-        }}
-        render={(panel) => <PanelView panel={panel} model={model} opened={opened} session={session} inline={inline} />}
-      />
+            if (r.ok) edit(r.history);
+          }}
+          render={(panel) => (
+            <PanelView panel={panel} model={model} opened={opened} session={session} inline={inline} />
+          )}
+        />
+      </div>
     </div>
+  );
+}
+
+/** A time ago as a list shows it: now, 5m, 3h, 2d. */
+function ago(ms: number, now: number): string {
+  const m = Math.floor((now - ms) / 60_000);
+
+  if (m < 1) return "now";
+
+  if (m < 60) return `${m}m`;
+
+  const h = Math.floor(m / 60);
+
+  return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
+}
+
+type SidebarProps = {
+  bridge: Bridge;
+  opened: Opened;
+  model: SessionModel;
+  onSwitch: (id?: string) => void;
+  onToggle: () => void;
+};
+
+/** This project's sessions: the one shown, and the others to switch to. */
+function Sidebar({ bridge, opened, model, onSwitch, onToggle }: SidebarProps) {
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const prompts = model.conversation.items.filter((i) => i.kind === "user").length;
+  const [now, setNow] = useState(Date.now());
+
+  // Again when this session gets its first prompt (its title), and now and then for the others.
+  useEffect(() => {
+    const load = () => {
+      setNow(Date.now());
+      bridge.sessions().then(setSessions, () => undefined);
+    };
+
+    load();
+    const every = setInterval(load, 15_000);
+
+    return () => clearInterval(every);
+  }, [bridge, prompts]);
+
+  const waiting = model.conversation.waiting().length > 0;
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-top">
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onToggle}
+          title="Hide sessions (⌘B)"
+          aria-label="hide sessions"
+        >
+          <Icon name="sidebar" />
+        </button>
+        <span className="spacer" />
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => onSwitch()}
+          title="New session (⌘N)"
+          aria-label="new session"
+        >
+          <Icon name="plus" />
+        </button>
+      </div>
+      <div className="project" title={opened.session.cwd}>
+        <Icon name="folder" /> <span>{basename(opened.session.cwd)}</span>
+      </div>
+      <nav className="sessions" aria-label="sessions">
+        {sessions.map((s) => {
+          const current = s.id === opened.session.id;
+          const state = current ? (waiting ? "waiting" : model.working ? "working" : "") : "";
+
+          return (
+            <button
+              type="button"
+              key={s.id}
+              className={`session ${current ? "current" : ""}`}
+              aria-current={current ? "page" : undefined}
+              onClick={() => current || onSwitch(s.id)}
+            >
+              <span className={`dot ${state || "idle"}`} />
+              <span className="name">{s.title ?? "New session"}</span>
+              <span className="when">{ago(s.lastActiveMs ?? s.createdAtMs, now)}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
   );
 }
 
@@ -130,18 +260,33 @@ function basename(path: string): string {
   return path.split("/").filter(Boolean).at(-1) ?? path;
 }
 
-function Titlebar({ model, opened }: { model: SessionModel; opened: Opened }) {
+type TitlebarProps = { model: SessionModel; opened: Opened; sidebar: boolean; onToggle: () => void };
+
+function Titlebar({ model, opened, sidebar, onToggle }: TitlebarProps) {
   const first = model.conversation.items.find((i) => i.kind === "user");
   const title = first?.kind === "user" ? first.text : "New session";
 
   return (
     <header className="titlebar">
+      {!sidebar && (
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onToggle}
+          title="Show sessions (⌘B)"
+          aria-label="show sessions"
+        >
+          <Icon name="sidebar" />
+        </button>
+      )}
       <span className="title" title={title}>
         {title}
       </span>
-      <span className="where" title={opened.session.cwd}>
-        <Icon name="folder" /> {basename(opened.session.cwd)}
-      </span>
+      {!sidebar && (
+        <span className="where" title={opened.session.cwd}>
+          <Icon name="folder" /> {basename(opened.session.cwd)}
+        </span>
+      )}
       <span className="spacer" />
       {model.working ? (
         <span className="status working">

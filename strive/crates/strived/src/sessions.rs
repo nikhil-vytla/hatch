@@ -327,7 +327,8 @@ impl Sessions {
         })
         .await
         .map_err(|e| io::Error::other(format!("creating the journal failed: {e}")))??;
-        let info = SessionInfo { id: id.as_str().to_string(), cwd, created_at_ms: ts };
+        let info =
+            SessionInfo { id: id.as_str().to_string(), cwd, created_at_ms: ts, title: None, last_active_ms: Some(ts) };
         let (tx, thread) = spawn_writer(journal, entries, self.verifier(&id));
         live.insert(id, Live { info: info.clone(), tx, thread });
         Ok(info)
@@ -1174,18 +1175,44 @@ impl Writer {
     }
 }
 
-/// Session info from the journal's first line, without verifying it.
+/// How far into a journal a list looks for its first prompt.
+const PEEK_LINES: usize = 40;
+
+/// The longest title a list shows.
+const TITLE_CHARS: usize = 80;
+
+/// Session info from the journal's first lines, without verifying them: the
+/// start, and the first prompt as its title.
 fn peek_info(id: &SessionId, dir: &Path) -> Option<SessionInfo> {
-    let f = fs::File::open(dir.join("journal.jsonl")).ok()?;
-    let mut line = String::new();
-    io::BufReader::new(f).read_line(&mut line).ok()?;
-    let entry: Entry = serde_json::from_str(line.trim_end()).ok()?;
-    match entry.event {
-        Event::SessionStarted { cwd, .. } => {
-            Some(SessionInfo { id: id.as_str().to_string(), cwd, created_at_ms: entry.ts_ms })
-        }
-        _ => None,
+    let path = dir.join("journal.jsonl");
+    let f = fs::File::open(&path).ok()?;
+    let last_active_ms = f
+        .metadata()
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|d| u64::try_from(d.as_millis()).ok());
+    let mut lines = io::BufReader::new(f).lines();
+    let first: Entry = serde_json::from_str(lines.next()?.ok()?.trim_end()).ok()?;
+    let Event::SessionStarted { cwd, .. } = first.event else { return None };
+    let title = lines.take(PEEK_LINES).map_while(std::result::Result::ok).find_map(
+        |line| match serde_json::from_str::<Entry>(line.trim_end()).ok()?.event {
+            Event::UserMessage { text } => Some(shorten(&text)),
+            _ => None,
+        },
+    );
+    Some(SessionInfo { id: id.as_str().to_string(), cwd, created_at_ms: first.ts_ms, title, last_active_ms })
+}
+
+/// One line of at most `TITLE_CHARS`, cut at a word where it can be.
+fn shorten(text: &str) -> String {
+    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if line.chars().count() <= TITLE_CHARS {
+        return line;
     }
+    let cut: String = line.chars().take(TITLE_CHARS).collect();
+    let at = cut.rfind(' ').filter(|&i| i > TITLE_CHARS / 2).unwrap_or(cut.len());
+    format!("{}…", &cut[..at])
 }
 
 /// Loads the journal key, creating it on first start. The key is written to
